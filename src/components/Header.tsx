@@ -4,9 +4,10 @@ import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 
 const Navigation = () => {
   return (
-    <header className="flex w-full items-center justify-between">
-      <h1 className="site-header">SWTTR</h1>
-      <div className="flex items-center gap-4">
+    <header className="grid w-full grid-cols-3 items-center">
+      <div />
+      <h1 className="site-header text-center">SWTTR</h1>
+      <div className="flex items-center justify-end gap-4">
         <SignedIn>
           <UserButton />
         </SignedIn>
