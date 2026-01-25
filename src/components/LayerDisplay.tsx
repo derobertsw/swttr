@@ -67,7 +67,9 @@ const LayerDisplay = ({ recommendation }: LayerDisplayProps) => {
                 )}
                 {layers.outer.length > 0 && (
                   <li>
-                    <span style={{ fontWeight: 500 }}>{layerLabels.outer}:</span>{" "}
+                    <span style={{ fontWeight: 500 }}>
+                      {layerLabels.outer}:
+                    </span>{" "}
                     {layers.outer.join(", ")}
                   </li>
                 )}

@@ -6,6 +6,8 @@ import React, { useState } from "react";
 import ActivitySelection from "@/components/ActivitySelection";
 import WeatherSelection from "@/components/WeatherSelection";
 import LayerDisplay from "@/components/LayerDisplay";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import layerRecommendations from "@/data/layerRecommendations.json";
 
 interface LayerSet {
@@ -47,7 +49,10 @@ const Home = () => {
   const [showResults, setShowResults] = useState(false);
 
   const handleSubmit = () => {
-    if (!activity) return;
+    if (!activity) {
+      toast.error("Please select an activity");
+      return;
+    }
 
     const tempRange = getTempRange(temperature);
     const activityData =
@@ -76,12 +81,14 @@ const Home = () => {
               onTemperatureChange={setTemperature}
               onWindspeedChange={setWindspeed}
             />
-            <button onClick={handleSubmit}>Submit</button>
+            <Button onClick={handleSubmit}>Gear Up</Button>
           </>
         ) : (
           <>
             <LayerDisplay recommendation={recommendation} />
-            <button onClick={() => setShowResults(false)}>Back</button>
+            <Button variant="outline" onClick={() => setShowResults(false)}>
+              Back
+            </Button>
           </>
         )}
       </main>
