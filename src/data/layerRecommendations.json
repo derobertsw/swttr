@@ -542,22 +542,42 @@
       }
     },
     "0-5": {
-      "torso": { "base": ["TODO mid ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["mid tights"], "outer": [] },
+      "torso": {
+        "base": ["100g baslayer"],
+        "mid": ["fleece"],
+        "outer": ["vest"]
+      },
+      "legs": {
+        "base": ["200g tights"],
+        "outer": ["lightweight windblockers"]
+      },
       "hands": {
         "base": ["lightweight liner"],
         "outer": ["mediumweight shell"]
       },
-      "headNeck": { "base": ["beanie low weight"], "outer": [] }
+      "headNeck": {
+        "base": ["medium weight gator"],
+        "outer": ["mediumweight beanie"]
+      }
     },
     "5-10": {
-      "torso": { "base": ["TODO mid ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["mid tights"], "outer": [] },
+      "torso": {
+        "base": ["100g baslayer"],
+        "mid": ["fleece"],
+        "outer": ["vest"]
+      },
+      "legs": {
+        "base": ["200g tights"],
+        "outer": ["lightweight windblockers"]
+      },
       "hands": {
         "base": ["lightweight liner"],
         "outer": ["mediumweight shell"]
       },
-      "headNeck": { "base": ["beanie low weight"], "outer": [] }
+      "headNeck": {
+        "base": ["medium weight gator"],
+        "outer": ["mediumweight beanie"]
+      }
     },
     "10-15": {
       "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
