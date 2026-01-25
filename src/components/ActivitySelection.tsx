@@ -8,18 +8,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Footprints,
-  Bike,
-  Mountain,
-  CableCar,
-  Snowflake,
-} from "lucide-react";
+import { Footprints, Bike, Mountain, CableCar, Snowflake } from "lucide-react";
 
 const activities = [
-  { name: "Running", value: "running", icon: Footprints },
-  { name: "Biking", value: "biking", icon: Bike },
-  { name: "Backcountry Skiing", value: "backcountry-skiing", icon: Mountain },
+  //{ name: "Running", value: "running", icon: Footprints },
+  //{ name: "Biking", value: "biking", icon: Bike },
+  //{ name: "Backcountry Skiing", value: "backcountry-skiing", icon: Mountain },
   { name: "Alpine Skiing", value: "alpine-skiing", icon: CableCar },
   { name: "XC Skiing", value: "xc-skiing", icon: Snowflake },
 ];
