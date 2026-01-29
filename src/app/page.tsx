@@ -1,8 +1,7 @@
 "use client";
 
-import Header from "@/components/Header";
-
-import React, { useState } from "react";
+import { useState } from "react";
+import PageLayout from "@/components/PageLayout";
 import ActivitySelection from "@/components/ActivitySelection";
 import WeatherSelection from "@/components/WeatherSelection";
 import LayerDisplay from "@/components/LayerDisplay";
@@ -69,40 +68,27 @@ const Home = () => {
   };
 
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <Header />
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        {!showResults ? (
-          <>
-            <ActivitySelection value={activity} onChange={setActivity} />
-            <WeatherSelection
-              temperature={temperature}
-              windspeed={windspeed}
-              onTemperatureChange={setTemperature}
-              onWindspeedChange={setWindspeed}
-            />
-            <Button onClick={handleSubmit}>Gear Up</Button>
-          </>
-        ) : (
-          <>
-            <LayerDisplay recommendation={recommendation} />
-            <Button variant="outline" onClick={() => setShowResults(false)}>
-              Back
-            </Button>
-          </>
-        )}
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="hover:underline hover:underline-offset-4"
-          href="https://docs.google.com/forms/d/e/1FAIpQLSfpX2tVx485Q0ybdNH_t48_-Z_WY0ldx3VhhkUeGKIXQ2N9fg/viewform?usp=publish-editor"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Provide Feedback
-        </a>
-      </footer>
-    </div>
+    <PageLayout>
+      {!showResults ? (
+        <>
+          <ActivitySelection value={activity} onChange={setActivity} />
+          <WeatherSelection
+            temperature={temperature}
+            windspeed={windspeed}
+            onTemperatureChange={setTemperature}
+            onWindspeedChange={setWindspeed}
+          />
+          <Button onClick={handleSubmit}>Gear Up</Button>
+        </>
+      ) : (
+        <>
+          <LayerDisplay recommendation={recommendation} />
+          <Button variant="outline" onClick={() => setShowResults(false)}>
+            Back
+          </Button>
+        </>
+      )}
+    </PageLayout>
   );
 };
 
