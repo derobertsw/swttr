@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ const WeatherSelection = ({
   onWindspeedChange,
 }: WeatherSelectionProps) => {
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleCurrentWeather = async () => {
     if (!navigator.geolocation) {
@@ -62,8 +64,8 @@ const WeatherSelection = ({
     );
   };
 
-  const handleComingSoon = () => {
-    toast("Coming Soon");
+  const handlePlanAhead = () => {
+    router.push("/plan-ahead");
   };
 
   return (
@@ -96,7 +98,7 @@ const WeatherSelection = ({
         >
           {loading ? "Loading..." : "Current Weather"}
         </Button>
-        <Button variant="outline" onClick={handleComingSoon}>
+        <Button variant="outline" onClick={handlePlanAhead}>
           Plan Ahead
         </Button>
       </div>
