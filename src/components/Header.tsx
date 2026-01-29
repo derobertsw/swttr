@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Shirt, CalendarDays } from "lucide-react";
+import { Shirt } from "lucide-react";
 
 const Navigation = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -41,13 +41,6 @@ const Navigation = () => {
                 >
                   Wardrobe
                 </Link>
-                <Link
-                  href="/plan-ahead"
-                  className="block px-4 py-2 hover:bg-gray-100"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Plan Ahead
-                </Link>
               </nav>
             </div>
           )}
@@ -59,7 +52,6 @@ const Navigation = () => {
           <UserButton>
             <UserButton.MenuItems>
               <UserButton.Link label="Wardrobe" labelIcon={<Shirt size={16} />} href="/wardrobe" />
-              <UserButton.Link label="Plan Ahead" labelIcon={<CalendarDays size={16} />} href="/plan-ahead" />
             </UserButton.MenuItems>
           </UserButton>
         </SignedIn>

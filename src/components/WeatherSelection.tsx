@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -11,6 +10,7 @@ interface WeatherSelectionProps {
   windspeed: number;
   onTemperatureChange: (value: number) => void;
   onWindspeedChange: (value: number) => void;
+  onPlanAhead: () => void;
 }
 
 const WeatherSelection = ({
@@ -18,9 +18,9 @@ const WeatherSelection = ({
   windspeed,
   onTemperatureChange,
   onWindspeedChange,
+  onPlanAhead,
 }: WeatherSelectionProps) => {
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleCurrentWeather = async () => {
     if (!navigator.geolocation) {
@@ -65,7 +65,7 @@ const WeatherSelection = ({
   };
 
   const handlePlanAhead = () => {
-    router.push("/plan-ahead");
+    onPlanAhead();
   };
 
   return (

@@ -1,11 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { format } from "date-fns";
 import PageLayout from "@/components/PageLayout";
 import ActivitySelection from "@/components/ActivitySelection";
 import WeatherSelection from "@/components/WeatherSelection";
 import LayerDisplay from "@/components/LayerDisplay";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon, MapPin } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import layerRecommendations from "@/data/layerRecommendations.json";
 
@@ -38,6 +48,17 @@ const getTempRange = (temp: number): string => {
   return "40+";
 };
 
+type InputMode = "manual" | "planAhead";
+
+interface LocationSuggestion {
+  id: number;
+  name: string;
+  region?: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+}
+
 const Home = () => {
   const [activity, setActivity] = useState("");
   const [temperature, setTemperature] = useState(50);
@@ -46,24 +67,121 @@ const Home = () => {
     null,
   );
   const [showResults, setShowResults] = useState(false);
+  const [inputMode, setInputMode] = useState<InputMode>("manual");
+  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [time, setTime] = useState("12:00");
+  const [location, setLocation] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null);
+  const suggestionRef = useRef<HTMLDivElement>(null);
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (locationQuery.length < 2) {
+        setSuggestions([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/geocode?q=${encodeURIComponent(locationQuery)}`);
+        const data = await response.json();
+        setSuggestions(data.results || []);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error("Failed to fetch suggestions:", error);
+      }
+    };
+
+    const debounce = setTimeout(fetchSuggestions, 300);
+    return () => clearTimeout(debounce);
+  }, [locationQuery]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (suggestionRef.current && !suggestionRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const [loading, setLoading] = useState(false);
+
+  const handleSelectLocation = (suggestion: LocationSuggestion) => {
+    setSelectedLocation(suggestion);
+    setLocation(suggestion.region
+      ? `${suggestion.name}, ${suggestion.region}, ${suggestion.country}`
+      : `${suggestion.name}, ${suggestion.country}`
+    );
+    setLocationQuery("");
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
+
+  const getRecommendation = (temp: number) => {
+    const tempRange = getTempRange(temp);
+    const activityData =
+      layerRecommendations[activity as keyof typeof layerRecommendations];
+
+    if (activityData) {
+      return activityData[tempRange as keyof typeof activityData] as Recommendation;
+    }
+    return null;
+  };
+
+  const handleSubmit = async () => {
     if (!activity) {
       toast.error("Please select an activity");
       return;
     }
 
-    const tempRange = getTempRange(temperature);
-    const activityData =
-      layerRecommendations[activity as keyof typeof layerRecommendations];
+    if (inputMode === "planAhead") {
+      if (!selectedLocation) {
+        toast.error("Please select a location");
+        return;
+      }
+      if (!date) {
+        toast.error("Please select a date");
+        return;
+      }
 
-    if (activityData) {
-      const layers = activityData[
-        tempRange as keyof typeof activityData
-      ] as Recommendation;
+      setLoading(true);
+      try {
+        // Format datetime for API
+        const dateStr = format(date, "yyyy-MM-dd");
+        const dateTime = `${dateStr}T${time}`;
+
+        const response = await fetch(
+          `/api/weather?lat=${selectedLocation.latitude}&lon=${selectedLocation.longitude}&datetime=${dateTime}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch forecast");
+        }
+
+        const data = await response.json();
+        const layers = getRecommendation(data.temperature);
+
+        setTemperature(data.temperature);
+        setWindspeed(data.windSpeed);
+        setRecommendation(layers);
+        setShowResults(true);
+        toast.success(`Forecast: ${data.temperature}°F, ${data.windSpeed} mph wind`);
+      } catch (error) {
+        toast.error("Failed to fetch weather forecast");
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Manual mode - use slider values
+      const layers = getRecommendation(temperature);
       setRecommendation(layers);
       setShowResults(true);
-      console.log({ activity, temperature, tempRange, layers });
     }
   };
 
@@ -72,13 +190,104 @@ const Home = () => {
       {!showResults ? (
         <>
           <ActivitySelection value={activity} onChange={setActivity} />
-          <WeatherSelection
-            temperature={temperature}
-            windspeed={windspeed}
-            onTemperatureChange={setTemperature}
-            onWindspeedChange={setWindspeed}
-          />
-          <Button onClick={handleSubmit}>Gear Up</Button>
+          {inputMode === "manual" ? (
+            <WeatherSelection
+              temperature={temperature}
+              windspeed={windspeed}
+              onTemperatureChange={setTemperature}
+              onWindspeedChange={setWindspeed}
+              onPlanAhead={() => setInputMode("planAhead")}
+            />
+          ) : (
+            <div className="flex flex-col gap-6 w-[300px]">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="location" className="text-sm font-medium">
+                  Location
+                </label>
+                <div className="relative" ref={suggestionRef}>
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                  <Input
+                    id="location"
+                    placeholder="Search for a city..."
+                    value={selectedLocation ? location : locationQuery}
+                    onChange={(e) => {
+                      if (selectedLocation) {
+                        setSelectedLocation(null);
+                        setLocation("");
+                      }
+                      setLocationQuery(e.target.value);
+                    }}
+                    onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                    className="pl-10"
+                    autoComplete="off"
+                  />
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-md shadow-lg z-50 max-h-60 overflow-auto">
+                      {suggestions.map((suggestion) => (
+                        <button
+                          key={suggestion.id}
+                          type="button"
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm"
+                          onClick={() => handleSelectLocation(suggestion)}
+                        >
+                          <span className="font-medium">{suggestion.name}</span>
+                          <span className="text-gray-500">
+                            {suggestion.region ? `, ${suggestion.region}` : ""}, {suggestion.country}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Date & Time</label>
+                <div className="flex gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "flex-1 justify-start text-left font-normal",
+                          !date && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date ? format(date, "MMM d, yyyy") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={setDate}
+                        autoFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Input
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="w-[110px]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setInputMode("manual")}
+                >
+                  Manual Input
+                </Button>
+              </div>
+            </div>
+          )}
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? "Loading..." : "Gear Up"}
+          </Button>
         </>
       ) : (
         <>
