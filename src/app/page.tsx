@@ -18,6 +18,7 @@ import { CalendarIcon, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import layerRecommendations from "@/data/layerRecommendations.json";
+import { UserItemMapping } from "@/types/wardrobe";
 
 interface LayerSet {
   base: string[];
@@ -76,6 +77,51 @@ const Home = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null);
   const suggestionRef = useRef<HTMLDivElement>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [itemMappings, setItemMappings] = useState<Map<string, string>>(new Map());
+
+  const loadItemMappingsFromLocalStorage = (): Map<string, string> => {
+    try {
+      const stored = localStorage.getItem("swttr-item-mappings");
+      if (stored) {
+        const data = JSON.parse(stored) as Array<{
+          bodyPart: string;
+          layerType: string;
+          standardOption: string;
+          customName: string;
+        }>;
+        const map = new Map<string, string>();
+        for (const m of data) {
+          const key = `${m.bodyPart}:${m.layerType}:${m.standardOption}`;
+          map.set(key, m.customName);
+        }
+        return map;
+      }
+    } catch (err) {
+      console.error("Failed to load from localStorage:", err);
+    }
+    return new Map();
+  };
+
+  // Load user ID and item mappings on mount
+  useEffect(() => {
+    const storedUserId = localStorage.getItem("swttr-user-id");
+    if (storedUserId) {
+      setUserId(storedUserId);
+    }
+    // Load item mappings immediately from localStorage
+    setItemMappings(loadItemMappingsFromLocalStorage());
+  }, []);
+
+  // Refetch item mappings when window regains focus (user might have updated on wardrobe page)
+  useEffect(() => {
+    const handleFocus = () => {
+      setItemMappings(loadItemMappingsFromLocalStorage());
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, []);
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -151,7 +197,6 @@ const Home = () => {
 
       setLoading(true);
       try {
-        // Format datetime for API
         const dateStr = format(date, "yyyy-MM-dd");
         const dateTime = `${dateStr}T${time}`;
 
@@ -178,7 +223,6 @@ const Home = () => {
         setLoading(false);
       }
     } else {
-      // Manual mode - use slider values
       const layers = getRecommendation(temperature);
       setRecommendation(layers);
       setShowResults(true);
@@ -291,7 +335,7 @@ const Home = () => {
         </>
       ) : (
         <>
-          <LayerDisplay recommendation={recommendation} />
+          <LayerDisplay recommendation={recommendation} temperature={temperature} windspeed={windspeed} itemMappings={itemMappings} />
           <Button variant="outline" onClick={() => setShowResults(false)}>
             Back
           </Button>

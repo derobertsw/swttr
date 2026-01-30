@@ -1,38 +1,142 @@
 # Swttr
 
-Find the right clothes for winter sports based on conditions
+Find the right clothes for winter sports based on conditions.
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Features
+
+- **Activity-based recommendations** - Get layer suggestions for Alpine skiing and XC skiing
+- **Manual or forecast mode** - Enter conditions manually or look up weather by location and date
+- **Customizable gear names** - Replace generic layer names with your actual gear
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- npm, yarn, pnpm, or bun
+
+### Installation
+
+```bash
+npm install
+```
+
+### Environment Variables
+
+Create a `.env.local` file with the following optional variables:
+
+```bash
+# Supabase (optional - enables persistent gear mappings)
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Without Supabase configured, the app uses static layer recommendations from `src/data/layerRecommendations.json`.
+
+### Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+```
 
-## Learn More
+### Lint
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run lint
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Testing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This project uses [Vitest](https://vitest.dev/) with [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/) for testing.
 
-## Deploy on Vercel
+### Run Tests
 
-This application is hosted at [swttr.vercel.app](swttr.vercel.app)
+```bash
+# Run all tests (watch mode by default in dev)
+npm test
+
+# Run tests with UI
+npm run test:ui
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+### Test Structure
+
+Tests are co-located with their source files:
+
+```
+src/
+  components/
+    LayerDisplay.tsx
+    LayerDisplay.test.tsx
+  app/api/
+    weather/
+      route.ts
+      route.test.ts
+  lib/
+    utils.ts
+    utils.test.ts
+```
+
+## Project Structure
+
+```
+src/
+  app/                          # Next.js App Router pages
+    api/
+      geocode/                  # Location search API
+      wardrobe/
+        items/                  # GET/PUT/DELETE user gear mappings
+      weather/                  # Weather forecast API
+    wardrobe/                   # My Gear settings page
+    page.tsx                    # Home page
+  components/
+    wardrobe/                   # Wardrobe components
+      ItemMappingEditor.tsx     # Custom gear names editor
+      useItemMappings.ts        # Gear mappings hook
+    ActivitySelection.tsx       # Activity picker
+    LayerDisplay.tsx            # Recommendation display
+    WeatherSelection.tsx        # Temperature/wind sliders
+  data/
+    layerRecommendations.json   # Default layer recommendations
+    layerOptions.ts             # Available layer options
+  lib/
+    supabase.ts                 # Supabase client
+  types/
+    wardrobe.ts                 # TypeScript types
+```
+
+## Database Schema (Supabase)
+
+If using Supabase for persistent settings, create this table:
+
+```sql
+-- User gear name mappings
+CREATE TABLE user_item_mappings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  body_part TEXT NOT NULL,
+  layer_type TEXT NOT NULL,
+  standard_option TEXT NOT NULL,
+  custom_name TEXT NOT NULL,
+  UNIQUE(user_id, body_part, layer_type, standard_option)
+);
+```
+
+## Deployment
+
+This application is hosted at [swttr.vercel.app](https://swttr.vercel.app)
+
+Deploy your own instance with Vercel:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/swttr)

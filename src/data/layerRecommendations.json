@@ -1,625 +1,344 @@
 {
-  "running": {
-    "-20--15": {
-      "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["shell"]
-      },
-      "legs": { "base": ["heavy tights"], "outer": ["shell pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy shell"] },
-      "headNeck": {
-        "base": ["beanie high weight", "neck gator medium weight"],
-        "outer": []
-      }
-    },
-    "-15--10": {
-      "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["shell"]
-      },
-      "legs": { "base": ["heavy tights"], "outer": ["shell pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy shell"] },
-      "headNeck": {
-        "base": ["beanie high weight", "neck gator medium weight"],
-        "outer": []
-      }
-    },
-    "-10--5": {
-      "torso": { "base": ["TODO heavy ls"], "mid": ["mid ls"], "outer": [] },
-      "legs": { "base": ["heavy tights"], "outer": [] },
-      "hands": {
-        "base": ["mediumweight liner"],
-        "outer": ["mediumweight shell"]
-      },
-      "headNeck": {
-        "base": ["beanie medium weight", "neck gator low weight"],
-        "outer": []
-      }
-    },
-    "-5-0": {
-      "torso": { "base": ["TODO heavy ls"], "mid": ["mid ls"], "outer": [] },
-      "legs": { "base": ["heavy tights"], "outer": [] },
-      "hands": {
-        "base": ["mediumweight liner"],
-        "outer": ["mediumweight shell"]
-      },
-      "headNeck": {
-        "base": ["beanie medium weight", "neck gator low weight"],
-        "outer": []
-      }
-    },
-    "0-5": {
-      "torso": { "base": ["TODO mid ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["mid tights"], "outer": [] },
-      "hands": { "base": ["lightweight liner"], "outer": [] },
-      "headNeck": { "base": ["beanie low weight"], "outer": [] }
-    },
-    "5-10": {
-      "torso": { "base": ["TODO mid ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["mid tights"], "outer": [] },
-      "hands": { "base": ["lightweight liner"], "outer": [] },
-      "headNeck": { "base": ["beanie low weight"], "outer": [] }
-    },
-    "10-15": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["light tights"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
-    },
-    "15-20": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["light tights"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
-    },
-    "20-25": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
-    },
-    "25-30": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
-    },
-    "30-35": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
-    },
-    "35-40": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
-    },
-    "40+": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
-    }
-  },
-  "biking": {
-    "-20--15": {
-      "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["heavy shell"]
-      },
-      "legs": { "base": ["heavy tights"], "outer": ["shell pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy mittens"] },
-      "headNeck": {
-        "base": ["beanie high weight", "neck gator medium weight"],
-        "outer": ["helmet"]
-      }
-    },
-    "-15--10": {
-      "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["heavy shell"]
-      },
-      "legs": { "base": ["heavy tights"], "outer": ["shell pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy mittens"] },
-      "headNeck": {
-        "base": ["beanie high weight", "neck gator medium weight"],
-        "outer": ["helmet"]
-      }
-    },
-    "-10--5": {
-      "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["shell"]
-      },
-      "legs": { "base": ["heavy tights"], "outer": [] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy shell"] },
-      "headNeck": {
-        "base": ["beanie medium weight", "neck gator low weight"],
-        "outer": ["helmet"]
-      }
-    },
-    "-5-0": {
-      "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["shell"]
-      },
-      "legs": { "base": ["heavy tights"], "outer": [] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy shell"] },
-      "headNeck": {
-        "base": ["beanie medium weight", "neck gator low weight"],
-        "outer": ["helmet"]
-      }
-    },
-    "0-5": {
-      "torso": { "base": ["TODO mid ls"], "mid": [], "outer": ["light shell"] },
-      "legs": { "base": ["mid tights"], "outer": [] },
-      "hands": {
-        "base": ["lightweight liner"],
-        "outer": ["mediumweight shell"]
-      },
-      "headNeck": { "base": ["beanie low weight"], "outer": ["helmet"] }
-    },
-    "5-10": {
-      "torso": { "base": ["TODO mid ls"], "mid": [], "outer": ["light shell"] },
-      "legs": { "base": ["mid tights"], "outer": [] },
-      "hands": {
-        "base": ["lightweight liner"],
-        "outer": ["mediumweight shell"]
-      },
-      "headNeck": { "base": ["beanie low weight"], "outer": ["helmet"] }
-    },
-    "10-15": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["light tights"], "outer": [] },
-      "hands": { "base": ["lightweight liner"], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "15-20": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["light tights"], "outer": [] },
-      "hands": { "base": ["lightweight liner"], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "20-25": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "25-30": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "30-35": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "35-40": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "40+": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    }
-  },
-  "backcountry-skiing": {
-    "-20--15": {
-      "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["heavy shell"]
-      },
-      "legs": { "base": ["heavy tights"], "outer": ["shell pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy mittens"] },
-      "headNeck": {
-        "base": ["beanie high weight", "neck gator medium weight"],
-        "outer": ["helmet"]
-      }
-    },
-    "-15--10": {
-      "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["heavy shell"]
-      },
-      "legs": { "base": ["heavy tights"], "outer": ["shell pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy mittens"] },
-      "headNeck": {
-        "base": ["beanie high weight", "neck gator medium weight"],
-        "outer": ["helmet"]
-      }
-    },
-    "-10--5": {
-      "torso": { "base": ["TODO heavy ls"], "mid": [], "outer": ["shell"] },
-      "legs": { "base": ["mid tights"], "outer": ["shell pants"] },
-      "hands": {
-        "base": ["mediumweight liner"],
-        "outer": ["mediumweight shell"]
-      },
-      "headNeck": {
-        "base": ["beanie medium weight", "neck gator low weight"],
-        "outer": ["helmet"]
-      }
-    },
-    "-5-0": {
-      "torso": { "base": ["TODO heavy ls"], "mid": [], "outer": ["shell"] },
-      "legs": { "base": ["mid tights"], "outer": ["shell pants"] },
-      "hands": {
-        "base": ["mediumweight liner"],
-        "outer": ["mediumweight shell"]
-      },
-      "headNeck": {
-        "base": ["beanie medium weight", "neck gator low weight"],
-        "outer": ["helmet"]
-      }
-    },
-    "0-5": {
-      "torso": { "base": ["TODO mid ls"], "mid": [], "outer": ["light shell"] },
-      "legs": { "base": ["light tights"], "outer": ["shell pants"] },
-      "hands": {
-        "base": ["lightweight liner"],
-        "outer": ["mediumweight shell"]
-      },
-      "headNeck": { "base": ["beanie low weight"], "outer": ["helmet"] }
-    },
-    "5-10": {
-      "torso": { "base": ["TODO mid ls"], "mid": [], "outer": ["light shell"] },
-      "legs": { "base": ["light tights"], "outer": ["shell pants"] },
-      "hands": {
-        "base": ["lightweight liner"],
-        "outer": ["mediumweight shell"]
-      },
-      "headNeck": { "base": ["beanie low weight"], "outer": ["helmet"] }
-    },
-    "10-15": {
-      "torso": {
-        "base": ["TODO light ls"],
-        "mid": [],
-        "outer": ["light shell"]
-      },
-      "legs": { "base": ["light tights"], "outer": ["shell pants"] },
-      "hands": { "base": ["lightweight liner"], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "15-20": {
-      "torso": {
-        "base": ["TODO light ls"],
-        "mid": [],
-        "outer": ["light shell"]
-      },
-      "legs": { "base": ["light tights"], "outer": ["shell pants"] },
-      "hands": { "base": ["lightweight liner"], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "20-25": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["light tights"], "outer": ["shell pants"] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "25-30": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["light tights"], "outer": ["shell pants"] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "30-35": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": ["shell pants"] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "35-40": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": ["shell pants"] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    },
-    "40+": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
-      "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
-    }
-  },
   "alpine-skiing": {
     "-20--15": {
       "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["heavy ls", "mid ls"],
-        "outer": ["heavy shell"]
+        "base": ["Heavy"],
+        "mid": ["Sweater", "Vest"],
+        "outer": ["Insulated Shell"]
       },
-      "legs": { "base": ["heavy tights"], "outer": ["insulated pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy mittens"] },
+      "legs": { "base": ["Heavy"], "outer": ["Insulated Shell"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy mittens"] },
       "headNeck": {
-        "base": ["beanie high weight", "neck gator medium weight"],
-        "outer": ["helmet"]
+        "base": ["Balaclava heavy weight", "Neck gator heavy weight"],
+        "outer": ["Helmet"]
       }
     },
     "-15--10": {
       "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["heavy ls", "mid ls"],
-        "outer": ["heavy shell"]
+        "base": ["Heavy"],
+        "mid": ["Sweater", "Vest"],
+        "outer": ["Insulated Shell"]
       },
-      "legs": { "base": ["heavy tights"], "outer": ["insulated pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy mittens"] },
+      "legs": { "base": ["Heavy"], "outer": ["Insulated Shell"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy mittens"] },
       "headNeck": {
-        "base": ["beanie high weight", "neck gator medium weight"],
-        "outer": ["helmet"]
+        "base": ["Balaclava heavy weight", "Neck gator medium weight"],
+        "outer": ["Helmet"]
       }
     },
     "-10--5": {
       "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["heavy shell"]
+        "base": ["Heavy"],
+        "mid": ["Sweater"],
+        "outer": ["Insulated Shell"]
       },
-      "legs": { "base": ["mid tights"], "outer": ["insulated pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy shell"] },
+      "legs": { "base": ["Heavy"], "outer": ["Insulated Shell"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy shell"] },
       "headNeck": {
-        "base": ["beanie medium weight", "neck gator low weight"],
-        "outer": ["helmet"]
+        "base": ["Balaclava medium weight", "Neck gator low weight"],
+        "outer": ["Helmet"]
       }
     },
     "-5-0": {
       "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["heavy shell"]
+        "base": ["Heavy"],
+        "mid": ["Pullover"],
+        "outer": ["Snow Shell"]
       },
-      "legs": { "base": ["mid tights"], "outer": ["insulated pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy shell"] },
+      "legs": { "base": ["Medium"], "outer": ["Insulated Shell"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy shell"] },
       "headNeck": {
-        "base": ["beanie medium weight", "neck gator low weight"],
-        "outer": ["helmet"]
+        "base": ["Beanie medium weight", "Neck gator low weight"],
+        "outer": ["Helmet"]
       }
     },
     "0-5": {
       "torso": {
-        "base": ["TODO mid ls"],
-        "mid": ["mid ls"],
-        "outer": ["shell"]
+        "base": ["Medium"],
+        "mid": ["Pullover"],
+        "outer": ["Snow Shell"]
       },
-      "legs": { "base": ["light tights"], "outer": ["insulated pants"] },
-      "hands": {
-        "base": ["lightweight liner"],
-        "outer": ["mediumweight shell"]
-      },
-      "headNeck": { "base": ["beanie low weight"], "outer": ["helmet"] }
+      "legs": { "base": ["Medium"], "outer": ["Insulated Shell"] },
+      "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
+      "headNeck": {
+        "base": ["Beanie low weight"],
+        "outer": ["Helmet"]
+      }
     },
     "5-10": {
       "torso": {
-        "base": ["TODO mid ls"],
-        "mid": ["mid ls"],
-        "outer": ["shell"]
+        "base": ["Medium"],
+        "mid": ["Pullover"],
+        "outer": ["Snow Shell"]
       },
-      "legs": { "base": ["light tights"], "outer": ["insulated pants"] },
-      "hands": {
-        "base": ["lightweight liner"],
-        "outer": ["mediumweight shell"]
-      },
-      "headNeck": { "base": ["beanie low weight"], "outer": ["helmet"] }
+      "legs": { "base": ["Medium"], "outer": ["Insulated Shell"] },
+      "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
+      "headNeck": {
+        "base": ["Beanie low weight"],
+        "outer": ["Helmet"]
+      }
     },
     "10-15": {
-      "torso": { "base": ["TODO mid ls"], "mid": [], "outer": ["shell"] },
-      "legs": { "base": ["light tights"], "outer": ["shell pants"] },
-      "hands": {
-        "base": ["lightweight liner"],
-        "outer": ["mediumweight shell"]
+      "torso": {
+        "base": ["Medium"],
+        "mid": ["Vest"],
+        "outer": ["Snow Shell"]
       },
-      "headNeck": { "base": [], "outer": ["helmet"] }
+      "legs": { "base": ["Light"], "outer": ["Snow Shell"] },
+      "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
+      "headNeck": {
+        "base": [],
+        "outer": ["Helmet"]
+      }
     },
     "15-20": {
-      "torso": { "base": ["TODO mid ls"], "mid": [], "outer": ["shell"] },
-      "legs": { "base": ["light tights"], "outer": ["shell pants"] },
-      "hands": {
-        "base": ["lightweight liner"],
-        "outer": ["mediumweight shell"]
+      "torso": {
+        "base": ["Medium"],
+        "mid": [],
+        "outer": ["Snow Shell"]
       },
-      "headNeck": { "base": [], "outer": ["helmet"] }
+      "legs": { "base": ["Light"], "outer": ["Snow Shell"] },
+      "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
+      "headNeck": {
+        "base": [],
+        "outer": ["Helmet"]
+      }
     },
     "20-25": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": ["shell"] },
-      "legs": { "base": [], "outer": ["shell pants"] },
-      "hands": { "base": ["lightweight liner"], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": ["Snow Shell"]
+      },
+      "legs": { "base": ["Light"], "outer": ["Snow Shell"] },
+      "hands": { "base": ["Lightweight liner"], "outer": [] },
+      "headNeck": {
+        "base": [],
+        "outer": ["Helmet"]
+      }
     },
     "25-30": {
       "torso": {
-        "base": ["Heat360 Layer"],
-        "mid": ["Thermalweight Fleece"],
-        "outer": ["Shell Jacket"]
+        "base": ["Light"],
+        "mid": [],
+        "outer": ["Soft Shell"]
       },
-      "legs": {
-        "base": ["Thermal Weight Baselayer"],
-        "outer": ["Shell Pants"]
-      },
-      "hands": { "base": [], "outer": ["Heavyweight Gloves"] },
-      "headNeck": { "base": ["Lightweight gator"], "outer": ["Helmet"] }
+      "legs": { "base": [], "outer": ["Snow Shell"] },
+      "hands": { "base": [], "outer": [] },
+      "headNeck": {
+        "base": [],
+        "outer": ["Helmet"]
+      }
     },
     "30-35": {
       "torso": {
-        "base": ["TODO light ls"],
+        "base": ["Light"],
         "mid": [],
-        "outer": ["light shell"]
+        "outer": ["Soft Shell"]
       },
-      "legs": { "base": [], "outer": ["shell pants"] },
+      "legs": { "base": [], "outer": ["Snow Shell"] },
       "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
+      "headNeck": {
+        "base": [],
+        "outer": ["Helmet"]
+      }
     },
     "35-40": {
       "torso": {
-        "base": ["TODO light ls"],
+        "base": ["Light"],
         "mid": [],
-        "outer": ["light shell"]
+        "outer": ["Soft Shell"]
       },
-      "legs": { "base": [], "outer": ["shell pants"] },
+      "legs": { "base": [], "outer": ["Snow Shell"] },
       "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
+      "headNeck": {
+        "base": [],
+        "outer": ["Helmet"]
+      }
     },
     "40+": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": [], "outer": ["shell pants"] },
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": []
+      },
+      "legs": { "base": [], "outer": ["Snow Shell"] },
       "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": ["helmet"] }
+      "headNeck": {
+        "base": [],
+        "outer": ["Helmet"]
+      }
     }
   },
   "xc-skiing": {
     "-20--15": {
       "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["shell"]
+        "base": ["Heavy"],
+        "mid": ["Sweater"],
+        "outer": ["Soft Shell"]
       },
-      "legs": { "base": ["heavy tights"], "outer": ["shell pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy shell"] },
+      "legs": { "base": ["Heavy"], "outer": ["Soft Shell"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy shell"] },
       "headNeck": {
-        "base": ["beanie high weight", "neck gator medium weight"],
+        "base": ["Balaclava heavy weight", "Neck gator medium weight"],
         "outer": []
       }
     },
     "-15--10": {
       "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": ["mid ls"],
-        "outer": ["shell"]
+        "base": ["Heavy"],
+        "mid": ["Sweater"],
+        "outer": ["Soft Shell"]
       },
-      "legs": { "base": ["heavy tights"], "outer": ["shell pants"] },
-      "hands": { "base": ["mediumweight liner"], "outer": ["heavy shell"] },
+      "legs": { "base": ["Heavy"], "outer": ["Soft Shell"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy shell"] },
       "headNeck": {
-        "base": ["beanie high weight", "neck gator medium weight"],
+        "base": ["Balaclava medium weight", "Neck gator medium weight"],
         "outer": []
       }
     },
     "-10--5": {
       "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": [],
-        "outer": ["light shell"]
+        "base": ["Heavy"],
+        "mid": ["Vest"],
+        "outer": ["Soft Shell"]
       },
-      "legs": { "base": ["mid tights"], "outer": [] },
-      "hands": {
-        "base": ["mediumweight liner"],
-        "outer": ["mediumweight shell"]
-      },
+      "legs": { "base": ["Medium"], "outer": ["Soft Shell"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Mediumweight shell"] },
       "headNeck": {
-        "base": ["beanie medium weight", "neck gator low weight"],
+        "base": ["Beanie medium weight", "Neck gator low weight"],
         "outer": []
       }
     },
     "-5-0": {
       "torso": {
-        "base": ["TODO heavy ls"],
-        "mid": [],
-        "outer": ["light shell"]
+        "base": ["Medium"],
+        "mid": ["Vest"],
+        "outer": ["Soft Shell"]
       },
-      "legs": { "base": ["mid tights"], "outer": [] },
-      "hands": {
-        "base": ["mediumweight liner"],
-        "outer": ["mediumweight shell"]
-      },
+      "legs": { "base": ["Medium"], "outer": ["Joggers"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Mediumweight shell"] },
       "headNeck": {
-        "base": ["beanie medium weight", "neck gator low weight"],
+        "base": ["Beanie medium weight", "Neck gator low weight"],
         "outer": []
       }
     },
     "0-5": {
       "torso": {
-        "base": ["100g baslayer"],
-        "mid": ["fleece"],
-        "outer": ["vest"]
+        "base": ["Medium"],
+        "mid": ["Vest"],
+        "outer": []
       },
-      "legs": {
-        "base": ["200g tights"],
-        "outer": ["lightweight windblockers"]
-      },
-      "hands": {
-        "base": ["lightweight liner"],
-        "outer": ["mediumweight shell"]
-      },
+      "legs": { "base": ["Medium"], "outer": ["Joggers"] },
+      "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
       "headNeck": {
-        "base": ["medium weight gator"],
-        "outer": ["mediumweight beanie"]
+        "base": ["Beanie low weight", "Neck gator low weight"],
+        "outer": []
       }
     },
     "5-10": {
       "torso": {
-        "base": ["100g baslayer"],
-        "mid": ["fleece"],
-        "outer": ["vest"]
+        "base": ["Medium"],
+        "mid": ["Vest"],
+        "outer": []
       },
-      "legs": {
-        "base": ["200g tights"],
-        "outer": ["lightweight windblockers"]
-      },
-      "hands": {
-        "base": ["lightweight liner"],
-        "outer": ["mediumweight shell"]
-      },
+      "legs": { "base": ["Medium"], "outer": ["Joggers"] },
+      "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
       "headNeck": {
-        "base": ["medium weight gator"],
-        "outer": ["mediumweight beanie"]
+        "base": ["Beanie low weight"],
+        "outer": []
       }
     },
     "10-15": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["light tights"], "outer": [] },
-      "hands": { "base": ["lightweight liner"], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": []
+      },
+      "legs": { "base": ["Light"], "outer": ["Joggers"] },
+      "hands": { "base": ["Lightweight liner"], "outer": [] },
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
     },
     "15-20": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["light tights"], "outer": [] },
-      "hands": { "base": ["lightweight liner"], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": []
+      },
+      "legs": { "base": ["Light"], "outer": ["Joggers"] },
+      "hands": { "base": ["Lightweight liner"], "outer": [] },
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
     },
     "20-25": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["light tights"], "outer": [] },
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": []
+      },
+      "legs": { "base": ["Light"], "outer": [] },
       "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
     },
     "25-30": {
-      "torso": { "base": ["TODO light ls"], "mid": [], "outer": [] },
-      "legs": { "base": ["light tights"], "outer": [] },
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": []
+      },
+      "legs": { "base": [], "outer": ["Shorts"] },
       "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
     },
     "30-35": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": []
+      },
+      "legs": { "base": [], "outer": ["Shorts"] },
       "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
     },
     "35-40": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": []
+      },
+      "legs": { "base": [], "outer": ["Shorts"] },
       "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
     },
     "40+": {
-      "torso": { "base": ["TODO light ss"], "mid": [], "outer": [] },
-      "legs": { "base": ["shorts"], "outer": [] },
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": []
+      },
+      "legs": { "base": [], "outer": ["Shorts"] },
       "hands": { "base": [], "outer": [] },
-      "headNeck": { "base": [], "outer": [] }
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
     }
   }
 }
