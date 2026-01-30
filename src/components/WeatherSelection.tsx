@@ -1,28 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-interface WeatherSelectionProps {
-  temperature: number;
-  windspeed: number;
-  onTemperatureChange: (value: number) => void;
-  onWindspeedChange: (value: number) => void;
-  onPlanAhead: () => void;
+interface WeatherSliderProps {
+  id: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  unit: string;
+  onChange: (value: number) => void;
 }
 
-const WeatherSelection = ({
-  temperature,
-  windspeed,
-  onTemperatureChange,
-  onWindspeedChange,
-  onPlanAhead,
-}: WeatherSelectionProps) => {
+function WeatherSlider({ id, label, value, min, max, unit, onChange }: WeatherSliderProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id}>
+        {label}: {value}{unit}
+      </label>
+      <Slider
+        id={id}
+        min={min}
+        max={max}
+        value={[value]}
+        onValueChange={(values) => onChange(values[0])}
+      />
+    </div>
+  );
+}
+
+function useCurrentWeather(
+  onTemperatureChange: (value: number) => void,
+  onWindspeedChange: (value: number) => void
+) {
   const [loading, setLoading] = useState(false);
 
-  const handleCurrentWeather = async () => {
+  const fetchCurrentWeather = useCallback(() => {
     if (!navigator.geolocation) {
       toast.error("Geolocation is not supported by your browser");
       return;
@@ -62,48 +78,63 @@ const WeatherSelection = ({
         }
       }
     );
-  };
+  }, [onTemperatureChange, onWindspeedChange]);
 
-  const handlePlanAhead = () => {
-    onPlanAhead();
-  };
+  return { loading, fetchCurrentWeather };
+}
+
+interface WeatherSelectionProps {
+  temperature: number;
+  windspeed: number;
+  onTemperatureChange: (value: number) => void;
+  onWindspeedChange: (value: number) => void;
+  onPlanAhead: () => void;
+}
+
+export default function WeatherSelection({
+  temperature,
+  windspeed,
+  onTemperatureChange,
+  onWindspeedChange,
+  onPlanAhead,
+}: WeatherSelectionProps) {
+  const { loading, fetchCurrentWeather } = useCurrentWeather(
+    onTemperatureChange,
+    onWindspeedChange
+  );
 
   return (
     <div className="flex flex-col gap-6 w-[300px]">
-      <div className="flex flex-col gap-2">
-        <label htmlFor="temperature">Temperature: {temperature}°F</label>
-        <Slider
-          id="temperature"
-          min={-20}
-          max={100}
-          value={[temperature]}
-          onValueChange={(value) => onTemperatureChange(value[0])}
-        />
-      </div>
-      <div className="flex flex-col gap-2">
-        <label htmlFor="windspeed">Wind Speed: {windspeed} mph</label>
-        <Slider
-          id="windspeed"
-          min={0}
-          max={50}
-          value={[windspeed]}
-          onValueChange={(value) => onWindspeedChange(value[0])}
-        />
-      </div>
+      <WeatherSlider
+        id="temperature"
+        label="Temperature"
+        value={temperature}
+        min={-20}
+        max={100}
+        unit="°F"
+        onChange={onTemperatureChange}
+      />
+      <WeatherSlider
+        id="windspeed"
+        label="Wind Speed"
+        value={windspeed}
+        min={0}
+        max={50}
+        unit=" mph"
+        onChange={onWindspeedChange}
+      />
       <div className="flex gap-2">
         <Button
           variant="outline"
-          onClick={handleCurrentWeather}
+          onClick={fetchCurrentWeather}
           disabled={loading}
         >
           {loading ? "Loading..." : "Current Weather"}
         </Button>
-        <Button variant="outline" onClick={handlePlanAhead}>
+        <Button variant="outline" onClick={onPlanAhead}>
           Plan Ahead
         </Button>
       </div>
     </div>
   );
-};
-
-export default WeatherSelection;
+}

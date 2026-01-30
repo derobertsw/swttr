@@ -97,6 +97,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
 
       // If database not configured, fall back to localStorage
       if (res.status === 503) {
+        console.log("Database unavailable (503), falling back to localStorage for fetch");
         setUseLocalStorage(true);
         const localMappings = loadFromLocalStorage();
         setMappings(localMappings);
@@ -126,6 +127,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
     } catch (err) {
       console.error("Failed to fetch item mappings:", err);
       // Fall back to localStorage on any error
+      console.log("Database fetch failed, falling back to localStorage");
       setUseLocalStorage(true);
       const localMappings = loadFromLocalStorage();
       setMappings(localMappings);
@@ -180,6 +182,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
 
         // If database not configured, fall back to localStorage
         if (res.status === 503) {
+          console.log("Database unavailable (503), falling back to localStorage for update");
           setUseLocalStorage(true);
           setMappings((prev) => {
             const next = new Map(prev);
@@ -200,6 +203,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
       } catch (err) {
         console.error("Failed to update mapping:", err);
         // Fall back to localStorage on error
+        console.log("Database update failed, falling back to localStorage");
         setUseLocalStorage(true);
         setMappings((prev) => {
           const next = new Map(prev);
@@ -247,6 +251,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
 
         // If database not configured, fall back to localStorage
         if (res.status === 503) {
+          console.log("Database unavailable (503), falling back to localStorage for delete");
           setUseLocalStorage(true);
           setMappings((prev) => {
             const next = new Map(prev);
@@ -267,6 +272,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
       } catch (err) {
         console.error("Failed to delete mapping:", err);
         // Fall back to localStorage on error
+        console.log("Database delete failed, falling back to localStorage");
         setUseLocalStorage(true);
         setMappings((prev) => {
           const next = new Map(prev);

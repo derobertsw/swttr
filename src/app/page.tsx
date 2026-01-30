@@ -61,7 +61,7 @@ interface LocationSuggestion {
 }
 
 const Home = () => {
-  const [activity, setActivity] = useState("");
+  const [activity, setActivity] = useState("alpine-skiing");
   const [temperature, setTemperature] = useState(50);
   const [windspeed, setWindspeed] = useState(10);
   const [recommendation, setRecommendation] = useState<Recommendation | null>(
