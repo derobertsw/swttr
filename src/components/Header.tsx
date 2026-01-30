@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Shirt, HelpCircle } from "lucide-react";
+import { Shirt, HelpCircle, Share2, Settings } from "lucide-react";
+import { toast } from "sonner";
 
 interface NavigationProps {
   onLogoClick?: () => void;
@@ -11,6 +12,28 @@ interface NavigationProps {
 
 const Navigation = ({ onLogoClick }: NavigationProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleShare = async () => {
+    setMenuOpen(false);
+    const shareData = {
+      title: "SWTTR",
+      text: "Check out SWTTR - get clothing recommendations for outdoor activities!",
+      url: window.location.origin,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          console.error("Share failed:", err);
+        }
+      }
+    } else {
+      await navigator.clipboard.writeText(shareData.url);
+      toast.success("Link copied to clipboard!");
+    }
+  };
 
   return (
     <header className="relative flex w-full items-center justify-center">
@@ -46,12 +69,25 @@ const Navigation = ({ onLogoClick }: NavigationProps) => {
                   Wardrobe
                 </Link>
                 <Link
+                  href="/settings"
+                  className="block px-4 py-2 hover:bg-gray-100"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Preferences
+                </Link>
+                <Link
                   href="/faq"
                   className="block px-4 py-2 hover:bg-gray-100"
                   onClick={() => setMenuOpen(false)}
                 >
                   FAQ
                 </Link>
+                <button
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                  onClick={handleShare}
+                >
+                  Share
+                </button>
               </nav>
             </div>
           )}
@@ -63,7 +99,9 @@ const Navigation = ({ onLogoClick }: NavigationProps) => {
           <UserButton>
             <UserButton.MenuItems>
               <UserButton.Link label="Wardrobe" labelIcon={<Shirt size={16} />} href="/wardrobe" />
+              <UserButton.Link label="Preferences" labelIcon={<Settings size={16} />} href="/settings" />
               <UserButton.Link label="FAQ" labelIcon={<HelpCircle size={16} />} href="/faq" />
+              <UserButton.Action label="Share" labelIcon={<Share2 size={16} />} onClick={handleShare} />
             </UserButton.MenuItems>
           </UserButton>
         </SignedIn>

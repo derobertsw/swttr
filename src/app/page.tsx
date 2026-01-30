@@ -11,10 +11,11 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import layerRecommendations from "@/data/layerRecommendations.json";
 import { Recommendation } from "@/types/recommendations";
-import { getTempRange } from "@/lib/getTempRange";
+import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { useItemMappings } from "@/hooks/useItemMappings";
 import { fetchCurrentWeather } from "@/hooks/useCurrentWeather";
+import { useTemperatureSensitivity } from "@/hooks/useTemperatureSensitivity";
 
 type InputMode = "manual" | "planAhead";
 
@@ -32,9 +33,10 @@ const Home = () => {
 
   const locationSearch = useLocationSearch();
   const { itemMappings } = useItemMappings();
+  const { sensitivity } = useTemperatureSensitivity();
 
   const getRecommendation = (temp: number) => {
-    const tempRange = getTempRange(temp);
+    const tempRange = getAdjustedTempRange(temp, sensitivity);
     const activityData =
       layerRecommendations[activity as keyof typeof layerRecommendations];
 

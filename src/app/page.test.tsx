@@ -40,10 +40,25 @@ describe("Home Page", () => {
     originalGeolocation = navigator.geolocation;
     localStorageMock.getItem.mockReturnValue("test-user-id");
 
-    // Default mock for item mappings API
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ mappings: [] }),
+    // Default mock for item mappings and preferences APIs
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/api/wardrobe/items")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ mappings: [] }),
+        });
+      }
+      if (url.includes("/api/preferences")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ temperatureSensitivity: "neutral" }),
+        });
+      }
+      // Default response for other endpoints
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
     });
   });
 
@@ -89,15 +104,27 @@ describe("Home Page", () => {
         writable: true,
       });
 
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ mappings: [] }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ temperature: 32, windSpeed: 15 }),
-        });
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes("/api/wardrobe/items")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ mappings: [] }),
+          });
+        }
+        if (url.includes("/api/preferences")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ temperatureSensitivity: "neutral" }),
+          });
+        }
+        if (url.includes("/api/weather")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ temperature: 32, windSpeed: 15 }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
 
       const user = userEvent.setup();
       render(<Home />);
@@ -122,15 +149,27 @@ describe("Home Page", () => {
         writable: true,
       });
 
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ mappings: [] }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ temperature: 32, windSpeed: 15 }),
-        });
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes("/api/wardrobe/items")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ mappings: [] }),
+          });
+        }
+        if (url.includes("/api/preferences")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ temperatureSensitivity: "neutral" }),
+          });
+        }
+        if (url.includes("/api/weather")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ temperature: 32, windSpeed: 15 }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
 
       const user = userEvent.setup();
       render(<Home />);
@@ -213,14 +252,24 @@ describe("Home Page", () => {
         writable: true,
       });
 
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ mappings: [] }),
-        })
-        .mockResolvedValueOnce({
-          ok: false,
-        });
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes("/api/wardrobe/items")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ mappings: [] }),
+          });
+        }
+        if (url.includes("/api/preferences")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ temperatureSensitivity: "neutral" }),
+          });
+        }
+        if (url.includes("/api/weather")) {
+          return Promise.resolve({ ok: false });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
 
       const user = userEvent.setup();
       render(<Home />);
@@ -306,15 +355,27 @@ describe("Home Page", () => {
         writable: true,
       });
 
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ mappings: [] }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ temperature: 32, windSpeed: 15 }),
-        });
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes("/api/wardrobe/items")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ mappings: [] }),
+          });
+        }
+        if (url.includes("/api/preferences")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ temperatureSensitivity: "neutral" }),
+          });
+        }
+        if (url.includes("/api/weather")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ temperature: 32, windSpeed: 15 }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
 
       const user = userEvent.setup();
       render(<Home />);

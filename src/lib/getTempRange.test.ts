@@ -1,21 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-// Export the function for testing (this is the same logic from page.tsx)
-const getTempRange = (temp: number): string => {
-  if (temp < -15) return "-20--15";
-  if (temp < -10) return "-15--10";
-  if (temp < -5) return "-10--5";
-  if (temp < 0) return "-5-0";
-  if (temp < 5) return "0-5";
-  if (temp < 10) return "5-10";
-  if (temp < 15) return "10-15";
-  if (temp < 20) return "15-20";
-  if (temp < 25) return "20-25";
-  if (temp < 30) return "25-30";
-  if (temp < 35) return "30-35";
-  if (temp < 40) return "35-40";
-  return "40+";
-};
+import { getTempRange, getAdjustedTempRange, TEMP_BRACKETS } from "./getTempRange";
 
 describe("getTempRange", () => {
   describe("extreme cold temperatures", () => {
@@ -117,5 +101,59 @@ describe("getTempRange", () => {
       expect(getTempRange(-0.1)).toBe("-5-0");
       expect(getTempRange(0.0)).toBe("0-5");
     });
+  });
+});
+
+describe("getAdjustedTempRange", () => {
+  describe("neutral sensitivity", () => {
+    it("should return the same bracket as getTempRange", () => {
+      expect(getAdjustedTempRange(25, "neutral")).toBe("25-30");
+      expect(getAdjustedTempRange(10, "neutral")).toBe("10-15");
+      expect(getAdjustedTempRange(-5, "neutral")).toBe("-5-0");
+    });
+  });
+
+  describe("hot sensitivity (shift warmer = lighter gear)", () => {
+    it("should shift to a warmer bracket", () => {
+      expect(getAdjustedTempRange(25, "hot")).toBe("30-35");
+      expect(getAdjustedTempRange(10, "hot")).toBe("15-20");
+      expect(getAdjustedTempRange(0, "hot")).toBe("5-10");
+    });
+
+    it("should not exceed the maximum bracket", () => {
+      expect(getAdjustedTempRange(45, "hot")).toBe("40+");
+      expect(getAdjustedTempRange(40, "hot")).toBe("40+");
+    });
+  });
+
+  describe("cold sensitivity (shift colder = warmer gear)", () => {
+    it("should shift to a colder bracket", () => {
+      expect(getAdjustedTempRange(25, "cold")).toBe("20-25");
+      expect(getAdjustedTempRange(10, "cold")).toBe("5-10");
+      expect(getAdjustedTempRange(0, "cold")).toBe("-5-0");
+    });
+
+    it("should not go below the minimum bracket", () => {
+      expect(getAdjustedTempRange(-20, "cold")).toBe("-20--15");
+      expect(getAdjustedTempRange(-50, "cold")).toBe("-20--15");
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should handle boundary temperatures with adjustments", () => {
+      expect(getAdjustedTempRange(5, "hot")).toBe("10-15");
+      expect(getAdjustedTempRange(5, "cold")).toBe("0-5");
+    });
+  });
+});
+
+describe("TEMP_BRACKETS", () => {
+  it("should have 13 brackets", () => {
+    expect(TEMP_BRACKETS.length).toBe(13);
+  });
+
+  it("should be in ascending order", () => {
+    expect(TEMP_BRACKETS[0]).toBe("-20--15");
+    expect(TEMP_BRACKETS[TEMP_BRACKETS.length - 1]).toBe("40+");
   });
 });
