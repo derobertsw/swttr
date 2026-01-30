@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Shirt } from "lucide-react";
+import { Shirt, HelpCircle } from "lucide-react";
 
 interface NavigationProps {
   onLogoClick?: () => void;
@@ -45,6 +45,13 @@ const Navigation = ({ onLogoClick }: NavigationProps) => {
                 >
                   Wardrobe
                 </Link>
+                <Link
+                  href="/faq"
+                  className="block px-4 py-2 hover:bg-gray-100"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  FAQ
+                </Link>
               </nav>
             </div>
           )}
@@ -56,6 +63,7 @@ const Navigation = ({ onLogoClick }: NavigationProps) => {
           <UserButton>
             <UserButton.MenuItems>
               <UserButton.Link label="Wardrobe" labelIcon={<Shirt size={16} />} href="/wardrobe" />
+              <UserButton.Link label="FAQ" labelIcon={<HelpCircle size={16} />} href="/faq" />
             </UserButton.MenuItems>
           </UserButton>
         </SignedIn>
