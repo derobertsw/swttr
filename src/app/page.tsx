@@ -406,12 +406,12 @@ const Home = () => {
               </div>
             </div>
           ) : null}
-          <div className="flex gap-2">
-            <Button onClick={handleSubmit} disabled={loading}>
+          <div className="flex gap-3">
+            <Button size="lg" onClick={handleSubmit} disabled={loading}>
               {loading ? "Loading..." : "Gear Up"}
             </Button>
             {inputMode === "manual" && !showSliders && (
-              <Button variant="outline" onClick={() => setInputMode("planAhead")}>
+              <Button size="lg" variant="outline" onClick={() => setInputMode("planAhead")}>
                 Plan Ahead
               </Button>
             )}
@@ -420,7 +420,7 @@ const Home = () => {
       ) : (
         <>
           <LayerDisplay recommendation={recommendation} temperature={temperature} windspeed={windspeed} itemMappings={itemMappings} />
-          <Button variant="outline" onClick={() => setShowResults(false)}>
+          <Button size="lg" variant="outline" onClick={() => setShowResults(false)}>
             Back
           </Button>
         </>
