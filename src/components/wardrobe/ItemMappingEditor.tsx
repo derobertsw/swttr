@@ -3,10 +3,23 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { BodyPart, BODY_PARTS, LayerType, makeItemMappingKey } from "@/types/wardrobe";
 import { layerOptions } from "@/data/layerOptions";
-import { Pencil, X, Check } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BODY_PART_LABELS: Record<BodyPart, string> = {
@@ -30,83 +43,44 @@ interface EditingState {
 }
 
 interface ItemRowProps {
-  bodyPart: BodyPart;
-  layerType: LayerType;
   standardOption: string;
   customName: string | undefined;
-  isEditing: boolean;
-  editValue: string;
-  saving: boolean;
-  onEdit: () => void;
-  onSave: () => void;
-  onCancel: () => void;
+  onClick: () => void;
   onClear: () => void;
-  onEditValueChange: (value: string) => void;
 }
 
-function ItemRow({
-  standardOption,
-  customName,
-  isEditing,
-  editValue,
-  saving,
-  onEdit,
-  onSave,
-  onCancel,
-  onClear,
-  onEditValueChange,
-}: ItemRowProps) {
+function ItemRow({ standardOption, customName, onClick, onClear }: ItemRowProps) {
   return (
     <div
       className={cn(
-        "flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-2.5 rounded-lg border transition-colors",
+        "flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer hover:bg-accent/50",
         customName ? "bg-primary/5 border-primary/20" : "bg-muted/50 border-border"
       )}
+      onClick={onClick}
     >
-      <div className="flex items-center gap-2 sm:min-w-[140px] sm:shrink-0">
+      <div className="flex items-center gap-2 min-w-[120px] shrink-0">
         <span className="text-sm text-muted-foreground">{standardOption}</span>
-        <span className="text-muted-foreground/50 hidden sm:inline">→</span>
+        <span className="text-muted-foreground/50">→</span>
       </div>
-
-      {isEditing ? (
-        <div className="flex items-center gap-2 flex-1">
-          <Input
-            value={editValue}
-            onChange={(e) => onEditValueChange(e.target.value)}
-            placeholder="Enter your item name"
-            className="h-8 text-sm"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onSave();
-              if (e.key === "Escape") onCancel();
-            }}
-          />
-          <Button size="icon-xs" onClick={onSave} disabled={saving || !editValue.trim()}>
-            <Check className="h-3 w-3" />
-          </Button>
-          <Button size="icon-xs" variant="outline" onClick={onCancel}>
-            <X className="h-3 w-3" />
-          </Button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span
-            className={cn(
-              "text-sm flex-1 truncate",
-              customName ? "text-primary font-medium" : "text-muted-foreground/60 italic"
-            )}
-          >
-            {customName || "Not set"}
-          </span>
-          <Button size="icon-xs" variant="ghost" onClick={onEdit}>
-            <Pencil className="h-3 w-3" />
-          </Button>
-          {customName && (
-            <Button size="icon-xs" variant="ghost" onClick={onClear}>
-              <X className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
+      <span
+        className={cn(
+          "text-sm flex-1 truncate",
+          customName ? "text-primary font-medium" : "text-muted-foreground/60 italic"
+        )}
+      >
+        {customName || "Not set"}
+      </span>
+      {customName && (
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClear();
+          }}
+        >
+          <X className="h-3 w-3" />
+        </Button>
       )}
     </div>
   );
@@ -136,8 +110,21 @@ export function ItemMappingEditor({
 }: ItemMappingEditorProps) {
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [openSections, setOpenSections] = useState<Set<BodyPart>>(new Set(["torso"]));
 
-  const handleEdit = (bodyPart: BodyPart, layerType: LayerType, standardOption: string) => {
+  const toggleSection = (bodyPart: BodyPart) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(bodyPart)) {
+        next.delete(bodyPart);
+      } else {
+        next.add(bodyPart);
+      }
+      return next;
+    });
+  };
+
+  const handleItemClick = (bodyPart: BodyPart, layerType: LayerType, standardOption: string) => {
     const key = makeItemMappingKey(bodyPart, layerType, standardOption);
     setEditing({
       bodyPart,
@@ -159,7 +146,7 @@ export function ItemMappingEditor({
     }
   };
 
-  const handleCancel = () => setEditing(null);
+  const handleClose = () => setEditing(null);
 
   if (!userId) {
     return (
@@ -172,61 +159,105 @@ export function ItemMappingEditor({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {BODY_PARTS.map((bodyPart) => {
-        const options = layerOptions[bodyPart];
-        const layerTypes = Object.keys(options) as LayerType[];
+    <>
+      <div className="flex flex-col gap-3">
+        {BODY_PARTS.map((bodyPart) => {
+          const options = layerOptions[bodyPart];
+          const layerTypes = Object.keys(options) as LayerType[];
+          const isOpen = openSections.has(bodyPart);
 
-        return (
-          <Card key={bodyPart}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{BODY_PART_LABELS[bodyPart]}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {layerTypes.map((layerType) => {
-                const items = (options as Record<string, readonly string[]>)[layerType];
-                if (!items?.length) return null;
+          // Count configured items for this body part
+          const configuredCount = layerTypes.reduce((count, layerType) => {
+            const items = (options as Record<string, readonly string[]>)[layerType] || [];
+            return count + items.filter((item) => mappings.has(makeItemMappingKey(bodyPart, layerType, item))).length;
+          }, 0);
 
-                return (
-                  <div key={layerType} className="flex flex-col gap-2">
-                    <h5 className="text-sm font-medium text-muted-foreground">
-                      {LAYER_TYPE_LABELS[layerType]}
-                    </h5>
-                    <div className="grid gap-2">
-                      {items.map((standardOption) => {
-                        const key = makeItemMappingKey(bodyPart, layerType, standardOption);
-                        const customName = mappings.get(key);
-                        const isEditing =
-                          editing?.bodyPart === bodyPart &&
-                          editing?.layerType === layerType &&
-                          editing?.standardOption === standardOption;
-
-                        return (
-                          <ItemRow
-                            key={standardOption}
-                            bodyPart={bodyPart}
-                            layerType={layerType}
-                            standardOption={standardOption}
-                            customName={customName}
-                            isEditing={isEditing}
-                            editValue={editing?.value || ""}
-                            saving={saving}
-                            onEdit={() => handleEdit(bodyPart, layerType, standardOption)}
-                            onSave={handleSave}
-                            onCancel={handleCancel}
-                            onClear={() => onDelete(bodyPart, layerType, standardOption)}
-                            onEditValueChange={(value) => setEditing(editing ? { ...editing, value } : null)}
-                          />
-                        );
-                      })}
+          return (
+            <Collapsible key={bodyPart} open={isOpen} onOpenChange={() => toggleSection(bodyPart)}>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <button className="flex w-full items-center justify-between p-4 text-left hover:bg-accent/50 transition-colors rounded-t-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{BODY_PART_LABELS[bodyPart]}</span>
+                      {configuredCount > 0 && (
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                          {configuredCount} set
+                        </span>
+                      )}
                     </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 text-muted-foreground transition-transform",
+                        isOpen && "rotate-180"
+                      )}
+                    />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0 pb-4 flex flex-col gap-4">
+                    {layerTypes.map((layerType) => {
+                      const items = (options as Record<string, readonly string[]>)[layerType];
+                      if (!items?.length) return null;
+
+                      return (
+                        <div key={layerType} className="flex flex-col gap-2">
+                          <h5 className="text-sm font-medium text-muted-foreground">
+                            {LAYER_TYPE_LABELS[layerType]}
+                          </h5>
+                          <div className="grid gap-2">
+                            {items.map((standardOption) => {
+                              const key = makeItemMappingKey(bodyPart, layerType, standardOption);
+                              const customName = mappings.get(key);
+
+                              return (
+                                <ItemRow
+                                  key={standardOption}
+                                  standardOption={standardOption}
+                                  customName={customName}
+                                  onClick={() => handleItemClick(bodyPart, layerType, standardOption)}
+                                  onClear={() => onDelete(bodyPart, layerType, standardOption)}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          );
+        })}
+      </div>
+
+      <Dialog open={!!editing} onOpenChange={(open) => !open && handleClose()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set Custom Name</DialogTitle>
+            <DialogDescription>
+              Replace "{editing?.standardOption}" with your own gear name.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={editing?.value || ""}
+            onChange={(e) => setEditing(editing ? { ...editing, value: e.target.value } : null)}
+            placeholder="Enter your item name"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && editing?.value.trim()) handleSave();
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving || !editing?.value.trim()}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
