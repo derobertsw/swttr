@@ -4,26 +4,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BodyPart, BODY_PARTS, LayerType } from "@/types/wardrobe";
+import { BodyPart, BODY_PARTS, LayerType, makeItemMappingKey } from "@/types/wardrobe";
 import { layerOptions } from "@/data/layerOptions";
 import { Pencil, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface ItemMappingEditorProps {
-  userId: string | null;
-  mappings: Map<string, string>;
-  onUpdate: (
-    bodyPart: BodyPart,
-    layerType: LayerType,
-    standardOption: string,
-    customName: string
-  ) => Promise<void>;
-  onDelete: (
-    bodyPart: BodyPart,
-    layerType: LayerType,
-    standardOption: string
-  ) => Promise<void>;
-}
 
 const BODY_PART_LABELS: Record<BodyPart, string> = {
   torso: "Torso",
@@ -45,6 +29,105 @@ interface EditingState {
   value: string;
 }
 
+interface ItemRowProps {
+  bodyPart: BodyPart;
+  layerType: LayerType;
+  standardOption: string;
+  customName: string | undefined;
+  isEditing: boolean;
+  editValue: string;
+  saving: boolean;
+  onEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onClear: () => void;
+  onEditValueChange: (value: string) => void;
+}
+
+function ItemRow({
+  standardOption,
+  customName,
+  isEditing,
+  editValue,
+  saving,
+  onEdit,
+  onSave,
+  onCancel,
+  onClear,
+  onEditValueChange,
+}: ItemRowProps) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-2.5 rounded-lg border transition-colors",
+        customName ? "bg-primary/5 border-primary/20" : "bg-muted/50 border-border"
+      )}
+    >
+      <div className="flex items-center gap-2 sm:min-w-[140px] sm:shrink-0">
+        <span className="text-sm text-muted-foreground">{standardOption}</span>
+        <span className="text-muted-foreground/50 hidden sm:inline">→</span>
+      </div>
+
+      {isEditing ? (
+        <div className="flex items-center gap-2 flex-1">
+          <Input
+            value={editValue}
+            onChange={(e) => onEditValueChange(e.target.value)}
+            placeholder="Enter your item name"
+            className="h-8 text-sm"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onSave();
+              if (e.key === "Escape") onCancel();
+            }}
+          />
+          <Button size="icon-xs" onClick={onSave} disabled={saving || !editValue.trim()}>
+            <Check className="h-3 w-3" />
+          </Button>
+          <Button size="icon-xs" variant="outline" onClick={onCancel}>
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span
+            className={cn(
+              "text-sm flex-1 truncate",
+              customName ? "text-primary font-medium" : "text-muted-foreground/60 italic"
+            )}
+          >
+            {customName || "Not set"}
+          </span>
+          <Button size="icon-xs" variant="ghost" onClick={onEdit}>
+            <Pencil className="h-3 w-3" />
+          </Button>
+          {customName && (
+            <Button size="icon-xs" variant="ghost" onClick={onClear}>
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ItemMappingEditorProps {
+  userId: string | null;
+  mappings: Map<string, string>;
+  onUpdate: (
+    bodyPart: BodyPart,
+    layerType: LayerType,
+    standardOption: string,
+    customName: string
+  ) => Promise<void>;
+  onDelete: (
+    bodyPart: BodyPart,
+    layerType: LayerType,
+    standardOption: string
+  ) => Promise<void>;
+}
+
 export function ItemMappingEditor({
   userId,
   mappings,
@@ -54,24 +137,13 @@ export function ItemMappingEditor({
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const getMappingKey = (
-    bodyPart: BodyPart,
-    layerType: LayerType,
-    option: string
-  ) => `${bodyPart}:${layerType}:${option}`;
-
-  const handleEdit = (
-    bodyPart: BodyPart,
-    layerType: LayerType,
-    standardOption: string
-  ) => {
-    const key = getMappingKey(bodyPart, layerType, standardOption);
-    const currentValue = mappings.get(key) || "";
+  const handleEdit = (bodyPart: BodyPart, layerType: LayerType, standardOption: string) => {
+    const key = makeItemMappingKey(bodyPart, layerType, standardOption);
     setEditing({
       bodyPart,
       layerType,
       standardOption,
-      value: currentValue,
+      value: mappings.get(key) || "",
     });
   };
 
@@ -80,37 +152,20 @@ export function ItemMappingEditor({
 
     setSaving(true);
     try {
-      await onUpdate(
-        editing.bodyPart,
-        editing.layerType,
-        editing.standardOption,
-        editing.value.trim()
-      );
+      await onUpdate(editing.bodyPart, editing.layerType, editing.standardOption, editing.value.trim());
       setEditing(null);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleClear = async (
-    bodyPart: BodyPart,
-    layerType: LayerType,
-    standardOption: string
-  ) => {
-    await onDelete(bodyPart, layerType, standardOption);
-  };
-
-  const handleCancel = () => {
-    setEditing(null);
-  };
+  const handleCancel = () => setEditing(null);
 
   if (!userId) {
     return (
       <Card className="border-amber-200 bg-amber-50">
         <CardContent className="pt-6">
-          <p className="text-amber-700 text-sm">
-            Log in to customize your gear items.
-          </p>
+          <p className="text-amber-700 text-sm">Log in to customize your gear items.</p>
         </CardContent>
       </Card>
     );
@@ -129,24 +184,17 @@ export function ItemMappingEditor({
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               {layerTypes.map((layerType) => {
-                const items = (options as Record<string, readonly string[]>)[
-                  layerType
-                ];
-                if (!items || items.length === 0) return null;
+                const items = (options as Record<string, readonly string[]>)[layerType];
+                if (!items?.length) return null;
 
                 return (
                   <div key={layerType} className="flex flex-col gap-2">
                     <h5 className="text-sm font-medium text-muted-foreground">
                       {LAYER_TYPE_LABELS[layerType]}
                     </h5>
-
                     <div className="grid gap-2">
                       {items.map((standardOption) => {
-                        const key = getMappingKey(
-                          bodyPart,
-                          layerType,
-                          standardOption
-                        );
+                        const key = makeItemMappingKey(bodyPart, layerType, standardOption);
                         const customName = mappings.get(key);
                         const isEditing =
                           editing?.bodyPart === bodyPart &&
@@ -154,94 +202,21 @@ export function ItemMappingEditor({
                           editing?.standardOption === standardOption;
 
                         return (
-                          <div
+                          <ItemRow
                             key={standardOption}
-                            className={cn(
-                              "flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-2.5 rounded-lg border transition-colors",
-                              customName
-                                ? "bg-primary/5 border-primary/20"
-                                : "bg-muted/50 border-border"
-                            )}
-                          >
-                            <div className="flex items-center gap-2 sm:min-w-[140px] sm:shrink-0">
-                              <span className="text-sm text-muted-foreground">
-                                {standardOption}
-                              </span>
-                              <span className="text-muted-foreground/50 hidden sm:inline">→</span>
-                            </div>
-
-                            {isEditing ? (
-                              <div className="flex items-center gap-2 flex-1">
-                                <Input
-                                  value={editing.value}
-                                  onChange={(e) =>
-                                    setEditing({
-                                      ...editing,
-                                      value: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Enter your item name"
-                                  className="h-8 text-sm"
-                                  autoFocus
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") handleSave();
-                                    if (e.key === "Escape") handleCancel();
-                                  }}
-                                />
-                                <Button
-                                  size="icon-xs"
-                                  onClick={handleSave}
-                                  disabled={saving || !editing.value.trim()}
-                                >
-                                  <Check className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="icon-xs"
-                                  variant="outline"
-                                  onClick={handleCancel}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <span
-                                  className={cn(
-                                    "text-sm flex-1 truncate",
-                                    customName
-                                      ? "text-primary font-medium"
-                                      : "text-muted-foreground/60 italic"
-                                  )}
-                                >
-                                  {customName || "Not set"}
-                                </span>
-                                <Button
-                                  size="icon-xs"
-                                  variant="ghost"
-                                  onClick={() =>
-                                    handleEdit(bodyPart, layerType, standardOption)
-                                  }
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                {customName && (
-                                  <Button
-                                    size="icon-xs"
-                                    variant="ghost"
-                                    onClick={() =>
-                                      handleClear(
-                                        bodyPart,
-                                        layerType,
-                                        standardOption
-                                      )
-                                    }
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                            bodyPart={bodyPart}
+                            layerType={layerType}
+                            standardOption={standardOption}
+                            customName={customName}
+                            isEditing={isEditing}
+                            editValue={editing?.value || ""}
+                            saving={saving}
+                            onEdit={() => handleEdit(bodyPart, layerType, standardOption)}
+                            onSave={handleSave}
+                            onCancel={handleCancel}
+                            onClear={() => onDelete(bodyPart, layerType, standardOption)}
+                            onEditValueChange={(value) => setEditing(editing ? { ...editing, value } : null)}
+                          />
                         );
                       })}
                     </div>

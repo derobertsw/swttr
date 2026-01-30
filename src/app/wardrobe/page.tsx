@@ -4,15 +4,9 @@ import { useState, useEffect } from "react";
 import PageLayout from "@/components/PageLayout";
 import { ItemMappingEditor, useItemMappings } from "@/components/wardrobe";
 
-const Wardrobe = () => {
+export default function Wardrobe() {
   const [userId, setUserId] = useState<string | null>(null);
-
-  const {
-    mappings,
-    loading,
-    updateMapping,
-    deleteMapping,
-  } = useItemMappings(userId);
+  const { mappings, loading, updateMapping, deleteMapping } = useItemMappings(userId);
 
   useEffect(() => {
     let storedUserId = localStorage.getItem("swttr-user-id");
@@ -25,18 +19,17 @@ const Wardrobe = () => {
 
   return (
     <PageLayout>
-      <div className="flex flex-col gap-4 sm:gap-6 w-full max-w-2xl">
-        <div>
+      <div className="flex flex-col gap-6 w-full max-w-2xl">
+        <header>
           <h2 className="text-2xl font-semibold">My Gear</h2>
           <p className="text-muted-foreground">
-            Replace standard layer names with your actual gear. These names will
-            appear in your recommendations.
+            Replace standard layer names with your actual gear. These names will appear in your recommendations.
           </p>
-        </div>
+        </header>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="text-muted-foreground">Loading...</div>
+            <span className="text-muted-foreground">Loading...</span>
           </div>
         ) : (
           <ItemMappingEditor
@@ -49,6 +42,4 @@ const Wardrobe = () => {
       </div>
     </PageLayout>
   );
-};
-
-export default Wardrobe;
+}
