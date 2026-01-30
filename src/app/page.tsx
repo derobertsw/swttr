@@ -80,47 +80,81 @@ const Home = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [itemMappings, setItemMappings] = useState<Map<string, string>>(new Map());
 
-  const loadItemMappingsFromLocalStorage = (): Map<string, string> => {
+  const fetchItemMappings = async (uid: string) => {
     try {
-      const stored = localStorage.getItem("swttr-item-mappings");
-      if (stored) {
-        const data = JSON.parse(stored) as Array<{
-          bodyPart: string;
-          layerType: string;
-          standardOption: string;
-          customName: string;
-        }>;
-        const map = new Map<string, string>();
-        for (const m of data) {
-          const key = `${m.bodyPart}:${m.layerType}:${m.standardOption}`;
-          map.set(key, m.customName);
-        }
-        return map;
+      const res = await fetch("/api/wardrobe/items", {
+        headers: { "x-user-id": uid },
+      });
+
+      if (!res.ok) {
+        console.log("Failed to fetch item mappings from API, using empty map");
+        return new Map<string, string>();
       }
+
+      const { mappings: data } = (await res.json()) as {
+        mappings: UserItemMapping[];
+      };
+
+      const map = new Map<string, string>();
+      for (const m of data) {
+        const key = `${m.body_part}:${m.layer_type}:${m.standard_option}`;
+        map.set(key, m.custom_name);
+      }
+      return map;
     } catch (err) {
-      console.error("Failed to load from localStorage:", err);
+      console.error("Failed to fetch item mappings:", err);
+      return new Map<string, string>();
     }
-    return new Map();
   };
 
   // Load user ID and item mappings on mount
   useEffect(() => {
-    const storedUserId = localStorage.getItem("swttr-user-id");
-    if (storedUserId) {
-      setUserId(storedUserId);
+    let storedUserId = localStorage.getItem("swttr-user-id");
+    if (!storedUserId) {
+      storedUserId = `user-${crypto.randomUUID()}`;
+      localStorage.setItem("swttr-user-id", storedUserId);
     }
-    // Load item mappings immediately from localStorage
-    setItemMappings(loadItemMappingsFromLocalStorage());
+    setUserId(storedUserId);
+    fetchItemMappings(storedUserId).then(setItemMappings);
   }, []);
 
   // Refetch item mappings when window regains focus (user might have updated on wardrobe page)
   useEffect(() => {
     const handleFocus = () => {
-      setItemMappings(loadItemMappingsFromLocalStorage());
+      if (userId) {
+        fetchItemMappings(userId).then(setItemMappings);
+      }
     };
 
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
+  }, [userId]);
+
+  // Fetch current weather on mount
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const response = await fetch(
+            `/api/weather?lat=${latitude}&lon=${longitude}`
+          );
+
+          if (!response.ok) return;
+
+          const data = await response.json();
+          setTemperature(data.temperature);
+          setWindspeed(data.windSpeed);
+        } catch (error) {
+          console.error("Failed to fetch current weather:", error);
+        }
+      },
+      () => {
+        // Silently fail if location access denied
+      }
+    );
   }, []);
 
   useEffect(() => {
