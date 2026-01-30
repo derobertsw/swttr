@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { format } from "date-fns";
 import PageLayout from "@/components/PageLayout";
 import ActivitySelection from "@/components/ActivitySelection";
@@ -68,6 +68,7 @@ const Home = () => {
     null,
   );
   const [showResults, setShowResults] = useState(false);
+  const [showSliders, setShowSliders] = useState(false);
   const [inputMode, setInputMode] = useState<InputMode>("manual");
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState("12:00");
@@ -130,32 +131,6 @@ const Home = () => {
     return () => window.removeEventListener("focus", handleFocus);
   }, [userId]);
 
-  // Fetch current weather on mount
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const response = await fetch(
-            `/api/weather?lat=${latitude}&lon=${longitude}`
-          );
-
-          if (!response.ok) return;
-
-          const data = await response.json();
-          setTemperature(data.temperature);
-          setWindspeed(data.windSpeed);
-        } catch (error) {
-          console.error("Failed to fetch current weather:", error);
-        }
-      },
-      () => {
-        // Silently fail if location access denied
-      }
-    );
-  }, []);
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -213,6 +188,56 @@ const Home = () => {
     return null;
   };
 
+  const resetToInitialState = useCallback(() => {
+    setActivity("alpine-skiing");
+    setTemperature(50);
+    setWindspeed(10);
+    setRecommendation(null);
+    setShowResults(false);
+    setShowSliders(false);
+    setInputMode("manual");
+    setDate(undefined);
+    setTime("12:00");
+    setLocation("");
+    setLocationQuery("");
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setSelectedLocation(null);
+  }, []);
+
+  const fetchCurrentWeather = (): Promise<{ temperature: number; windSpeed: number } | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            const response = await fetch(
+              `/api/weather?lat=${latitude}&lon=${longitude}`
+            );
+
+            if (!response.ok) {
+              resolve(null);
+              return;
+            }
+
+            const data = await response.json();
+            resolve({ temperature: data.temperature, windSpeed: data.windSpeed });
+          } catch {
+            resolve(null);
+          }
+        },
+        () => {
+          resolve(null);
+        }
+      );
+    });
+  };
+
   const handleSubmit = async () => {
     if (!activity) {
       toast.error("Please select an activity");
@@ -256,19 +281,37 @@ const Home = () => {
       } finally {
         setLoading(false);
       }
-    } else {
+    } else if (showSliders) {
+      // User is using manual sliders
       const layers = getRecommendation(temperature);
       setRecommendation(layers);
       setShowResults(true);
+    } else {
+      // Try to fetch current weather automatically
+      setLoading(true);
+      const weather = await fetchCurrentWeather();
+
+      if (weather) {
+        setTemperature(weather.temperature);
+        setWindspeed(weather.windSpeed);
+        const layers = getRecommendation(weather.temperature);
+        setRecommendation(layers);
+        setShowResults(true);
+        toast.success(`Current: ${weather.temperature}°F, ${weather.windSpeed} mph wind`);
+      } else {
+        toast.error("Could not get current weather. Please set manually.");
+        setShowSliders(true);
+      }
+      setLoading(false);
     }
   };
 
   return (
-    <PageLayout>
+    <PageLayout onLogoClick={resetToInitialState}>
       {!showResults ? (
         <>
           <ActivitySelection value={activity} onChange={setActivity} />
-          {inputMode === "manual" ? (
+          {inputMode === "manual" && showSliders ? (
             <WeatherSelection
               temperature={temperature}
               windspeed={windspeed}
@@ -276,7 +319,7 @@ const Home = () => {
               onWindspeedChange={setWindspeed}
               onPlanAhead={() => setInputMode("planAhead")}
             />
-          ) : (
+          ) : inputMode === "planAhead" ? (
             <div className="flex flex-col gap-6 w-[300px]">
               <div className="flex flex-col gap-2">
                 <label htmlFor="location" className="text-sm font-medium">
@@ -362,10 +405,17 @@ const Home = () => {
                 </Button>
               </div>
             </div>
-          )}
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? "Loading..." : "Gear Up"}
-          </Button>
+          ) : null}
+          <div className="flex gap-2">
+            <Button onClick={handleSubmit} disabled={loading}>
+              {loading ? "Loading..." : "Gear Up"}
+            </Button>
+            {inputMode === "manual" && !showSliders && (
+              <Button variant="outline" onClick={() => setInputMode("planAhead")}>
+                Plan Ahead
+              </Button>
+            )}
+          </div>
         </>
       ) : (
         <>

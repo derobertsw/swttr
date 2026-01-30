@@ -5,7 +5,11 @@ import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Shirt } from "lucide-react";
 
-const Navigation = () => {
+interface NavigationProps {
+  onLogoClick?: () => void;
+}
+
+const Navigation = ({ onLogoClick }: NavigationProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -46,7 +50,7 @@ const Navigation = () => {
           )}
         </div>
       </SignedOut>
-      <Link href="/"><h1 className="site-header">SWTTR</h1></Link>
+      <Link href="/" onClick={onLogoClick}><h1 className="site-header">SWTTR</h1></Link>
       <div className="absolute right-0 flex items-center gap-4">
         <SignedIn>
           <UserButton>

@@ -3,12 +3,13 @@ import Header from "@/components/Header";
 
 interface PageLayoutProps {
   children: ReactNode;
+  onLogoClick?: () => void;
 }
 
-const PageLayout = ({ children }: PageLayoutProps) => {
+const PageLayout = ({ children, onLogoClick }: PageLayoutProps) => {
   return (
     <div className="font-sans flex flex-col min-h-screen p-4 pb-20 gap-8 sm:p-8 md:p-20 md:gap-16">
-      <Header />
+      <Header onLogoClick={onLogoClick} />
       <main className="flex flex-col gap-6 sm:gap-8 flex-1 items-center sm:items-start w-full">
         {children}
       </main>
