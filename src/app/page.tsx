@@ -17,11 +17,9 @@ import { useItemMappings } from "@/hooks/useItemMappings";
 import { fetchCurrentWeather } from "@/hooks/useCurrentWeather";
 import { useTemperatureSensitivity } from "@/hooks/useTemperatureSensitivity";
 import { useBackpack } from "@/hooks/useBackpack";
-import { getAdjustedTempRange as getTempRangeForBackpack } from "@/lib/getTempRange";
+import { BACKPACK_ACTIVITY_IDS } from "@/data/backpackConstants";
 
 type InputMode = "manual" | "planAhead";
-
-const BACKPACK_ACTIVITIES = ["backcountry-skiing", "xc-skiing"];
 
 const Home = () => {
   const [activity, setActivity] = useState("alpine-skiing");
@@ -39,7 +37,7 @@ const Home = () => {
   const { itemMappings } = useItemMappings();
   const { sensitivity } = useTemperatureSensitivity();
 
-  const tempRangeForBackpack = getTempRangeForBackpack(temperature, sensitivity);
+  const tempRangeForBackpack = getAdjustedTempRange(temperature, sensitivity);
   const backpack = useBackpack(activity, tempRangeForBackpack);
 
   const getRecommendation = (temp: number) => {
@@ -182,9 +180,9 @@ const Home = () => {
             temperature={temperature}
             windspeed={windspeed}
             itemMappings={itemMappings}
-            backpackItems={BACKPACK_ACTIVITIES.includes(activity) ? backpack.items : undefined}
-            onRemoveBackpackItem={BACKPACK_ACTIVITIES.includes(activity) ? backpack.removeItem : undefined}
-            onHideBackpackDefault={BACKPACK_ACTIVITIES.includes(activity) ? backpack.hideDefault : undefined}
+            backpackItems={BACKPACK_ACTIVITY_IDS.includes(activity) ? backpack.items : undefined}
+            onRemoveBackpackItem={BACKPACK_ACTIVITY_IDS.includes(activity) ? backpack.removeItem : undefined}
+            onHideBackpackDefault={BACKPACK_ACTIVITY_IDS.includes(activity) ? backpack.hideDefault : undefined}
           />
           <Button size="lg" variant="outline" onClick={() => setShowResults(false)}>
             Back
