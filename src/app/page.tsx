@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { format } from "date-fns";
 import PageLayout from "@/components/PageLayout";
 import ActivitySelection from "@/components/ActivitySelection";
@@ -15,14 +15,17 @@ import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { useItemMappings } from "@/hooks/useItemMappings";
 import { fetchCurrentWeather } from "@/hooks/useCurrentWeather";
-import { useTemperatureSensitivity } from "@/hooks/useTemperatureSensitivity";
+import { usePreferences } from "@/hooks/usePreferences";
 import { useBackpack } from "@/hooks/useBackpack";
 import { BACKPACK_ACTIVITY_IDS } from "@/data/backpackConstants";
+import { DEFAULT_ACTIVITY } from "@/data/activities";
 
 type InputMode = "manual" | "planAhead";
 
 const Home = () => {
-  const [activity, setActivity] = useState("alpine-skiing");
+  const { sensitivity, defaultActivity } = usePreferences();
+  const [activity, setActivity] = useState(DEFAULT_ACTIVITY);
+  const [hasSetInitialActivity, setHasSetInitialActivity] = useState(false);
   const [temperature, setTemperature] = useState(50);
   const [windspeed, setWindspeed] = useState(10);
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
@@ -35,7 +38,14 @@ const Home = () => {
 
   const locationSearch = useLocationSearch();
   const { itemMappings } = useItemMappings();
-  const { sensitivity } = useTemperatureSensitivity();
+
+  // Set initial activity from preferences when it loads
+  useEffect(() => {
+    if (!hasSetInitialActivity && defaultActivity) {
+      setActivity(defaultActivity);
+      setHasSetInitialActivity(true);
+    }
+  }, [defaultActivity, hasSetInitialActivity]);
 
   const tempRangeForBackpack = getAdjustedTempRange(temperature, sensitivity);
   const backpack = useBackpack(activity, tempRangeForBackpack);
@@ -52,7 +62,7 @@ const Home = () => {
   };
 
   const resetToInitialState = useCallback(() => {
-    setActivity("alpine-skiing");
+    setActivity(defaultActivity);
     setTemperature(50);
     setWindspeed(10);
     setRecommendation(null);
@@ -62,7 +72,7 @@ const Home = () => {
     setDate(undefined);
     setTime("12:00");
     locationSearch.reset();
-  }, [locationSearch]);
+  }, [locationSearch, defaultActivity]);
 
   const handleSubmit = async () => {
     if (!activity) {

@@ -13,12 +13,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { PreferencesDrawer } from "@/components/PreferencesDrawer";
+import { usePreferences } from "@/hooks/usePreferences";
 
 const NAV_ITEMS = [
   { href: "/", label: "Plan", icon: Home },
   { href: "/wardrobe", label: "Wardrobe", icon: Shirt },
   { href: "/backpack", label: "Backpack", icon: Backpack },
-  { href: "/settings", label: "Preferences", icon: Settings },
 ];
 
 const FOOTER_ITEMS = [
@@ -27,6 +28,12 @@ const FOOTER_ITEMS = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const {
+    sensitivity,
+    defaultActivity,
+    updateSensitivity,
+    updateDefaultActivity,
+  } = usePreferences();
 
   return (
     <Sidebar collapsible="icon">
@@ -53,9 +60,25 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              {/* Preferences as drawer trigger */}
+              <SidebarMenuItem>
+                <PreferencesDrawer
+                  sensitivity={sensitivity}
+                  defaultActivity={defaultActivity}
+                  onSensitivityChange={updateSensitivity}
+                  onDefaultActivityChange={updateDefaultActivity}
+                >
+                  <SidebarMenuButton tooltip="Preferences">
+                    <Settings />
+                    <span>Preferences</span>
+                  </SidebarMenuButton>
+                </PreferencesDrawer>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <SidebarMenu>

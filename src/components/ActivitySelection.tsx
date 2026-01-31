@@ -7,15 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Bike, CableCar, Footprints, Mountain, Snowflake } from "lucide-react";
-
-const activities = [
-  { name: "Running", value: "running", icon: Footprints },
-  { name: "Biking", value: "biking", icon: Bike },
-  { name: "Backcountry Skiing", value: "backcountry-skiing", icon: Mountain },
-  { name: "Alpine Skiing", value: "alpine-skiing", icon: CableCar },
-  { name: "XC Skiing", value: "xc-skiing", icon: Snowflake },
-];
+import { ACTIVITIES } from "@/data/activities";
 
 interface ActivitySelectionProps {
   value: string;
@@ -29,7 +21,7 @@ const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
         <SelectValue placeholder="Select an activity" />
       </SelectTrigger>
       <SelectContent>
-        {activities.map((activity) => (
+        {ACTIVITIES.map((activity) => (
           <SelectItem key={activity.value} value={activity.value}>
             <activity.icon className="size-4" />
             {activity.name}

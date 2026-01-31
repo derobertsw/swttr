@@ -11,7 +11,10 @@ export async function GET(request: NextRequest) {
   const userId = getUserId(request);
 
   if (!supabase) {
-    return NextResponse.json({ temperatureSensitivity: "neutral" });
+    return NextResponse.json({
+      temperatureSensitivity: "neutral",
+      defaultActivity: "alpine-skiing",
+    });
   }
 
   if (!userId) {
@@ -21,7 +24,7 @@ export async function GET(request: NextRequest) {
   try {
     const { data, error } = await supabase
       .from("user_preferences")
-      .select("temperature_sensitivity")
+      .select("temperature_sensitivity, default_activity")
       .eq("user_id", userId)
       .single();
 
@@ -35,6 +38,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       temperatureSensitivity: (data?.temperature_sensitivity || "neutral") as TemperatureSensitivity,
+      defaultActivity: data?.default_activity || "alpine-skiing",
     });
   } catch (err) {
     console.error("Database error:", err);
@@ -59,28 +63,31 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { temperatureSensitivity } = body as {
-      temperatureSensitivity: TemperatureSensitivity;
+    const { temperatureSensitivity, defaultActivity } = body as {
+      temperatureSensitivity?: TemperatureSensitivity;
+      defaultActivity?: string;
     };
 
-    if (!temperatureSensitivity || !["hot", "neutral", "cold"].includes(temperatureSensitivity)) {
-      return NextResponse.json(
-        { error: "Invalid temperature sensitivity value" },
-        { status: 400 }
-      );
+    // Build update object with only provided fields
+    const updateData: Record<string, string> = { user_id: userId };
+
+    if (temperatureSensitivity) {
+      if (!["hot", "neutral", "cold"].includes(temperatureSensitivity)) {
+        return NextResponse.json(
+          { error: "Invalid temperature sensitivity value" },
+          { status: 400 }
+        );
+      }
+      updateData.temperature_sensitivity = temperatureSensitivity;
+    }
+
+    if (defaultActivity) {
+      updateData.default_activity = defaultActivity;
     }
 
     const { data, error } = await supabase
       .from("user_preferences")
-      .upsert(
-        {
-          user_id: userId,
-          temperature_sensitivity: temperatureSensitivity,
-        },
-        {
-          onConflict: "user_id",
-        }
-      )
+      .upsert(updateData, { onConflict: "user_id" })
       .select()
       .single();
 
@@ -94,6 +101,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       temperatureSensitivity: data.temperature_sensitivity as TemperatureSensitivity,
+      defaultActivity: data.default_activity,
     });
   } catch (err) {
     console.error("Error saving preferences:", err);
