@@ -6,19 +6,18 @@ function getUserId(request: NextRequest): string | null {
   return request.headers.get("x-user-id");
 }
 
+const DEFAULT_PREFERENCES = {
+  temperatureSensitivity: "neutral" as TemperatureSensitivity,
+  defaultActivity: "alpine-skiing",
+};
+
 export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   const userId = getUserId(request);
 
-  if (!supabase) {
-    return NextResponse.json({
-      temperatureSensitivity: "neutral",
-      defaultActivity: "alpine-skiing",
-    });
-  }
-
-  if (!userId) {
-    return NextResponse.json({ error: "User ID required" }, { status: 401 });
+  // Return defaults if no database or no user ID
+  if (!supabase || !userId) {
+    return NextResponse.json(DEFAULT_PREFERENCES);
   }
 
   try {
@@ -28,12 +27,11 @@ export async function GET(request: NextRequest) {
       .eq("user_id", userId)
       .single();
 
+    // PGRST116 = no rows found, which is fine - use defaults
     if (error && error.code !== "PGRST116") {
       console.error("Failed to fetch preferences:", error);
-      return NextResponse.json(
-        { error: "Failed to fetch preferences" },
-        { status: 500 }
-      );
+      // Return defaults instead of failing
+      return NextResponse.json(DEFAULT_PREFERENCES);
     }
 
     return NextResponse.json({
@@ -42,7 +40,8 @@ export async function GET(request: NextRequest) {
     });
   } catch (err) {
     console.error("Database error:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    // Return defaults instead of failing
+    return NextResponse.json(DEFAULT_PREFERENCES);
   }
 }
 
@@ -50,24 +49,26 @@ export async function PUT(request: NextRequest) {
   const supabase = getSupabase();
   const userId = getUserId(request);
 
-  if (!supabase) {
-    return NextResponse.json(
-      { error: "Database not configured" },
-      { status: 503 }
-    );
+  // Parse body first to return what was sent
+  let body: { temperatureSensitivity?: TemperatureSensitivity; defaultActivity?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!userId) {
-    return NextResponse.json({ error: "User ID required" }, { status: 401 });
+  const { temperatureSensitivity, defaultActivity } = body;
+
+  // If no database or user, just acknowledge the request
+  // Client saves to localStorage anyway
+  if (!supabase || !userId) {
+    return NextResponse.json({
+      temperatureSensitivity: temperatureSensitivity || "neutral",
+      defaultActivity: defaultActivity || "alpine-skiing",
+    });
   }
 
   try {
-    const body = await request.json();
-    const { temperatureSensitivity, defaultActivity } = body as {
-      temperatureSensitivity?: TemperatureSensitivity;
-      defaultActivity?: string;
-    };
-
     // Build update object with only provided fields
     const updateData: Record<string, string> = { user_id: userId };
 
@@ -93,10 +94,11 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       console.error("Failed to upsert preferences:", error);
-      return NextResponse.json(
-        { error: "Failed to save preferences" },
-        { status: 500 }
-      );
+      // Return what was sent - client already saved to localStorage
+      return NextResponse.json({
+        temperatureSensitivity: temperatureSensitivity || "neutral",
+        defaultActivity: defaultActivity || "alpine-skiing",
+      });
     }
 
     return NextResponse.json({
@@ -105,9 +107,10 @@ export async function PUT(request: NextRequest) {
     });
   } catch (err) {
     console.error("Error saving preferences:", err);
-    return NextResponse.json(
-      { error: "Failed to save preferences" },
-      { status: 500 }
-    );
+    // Return what was sent - client already saved to localStorage
+    return NextResponse.json({
+      temperatureSensitivity: temperatureSensitivity || "neutral",
+      defaultActivity: defaultActivity || "alpine-skiing",
+    });
   }
 }
