@@ -9,7 +9,7 @@
       "legs": { "base": ["Heavy"], "outer": ["Insulated Shell"] },
       "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy mittens"] },
       "headNeck": {
-        "base": ["Balaclava heavy weight", "Neck gator heavy weight"],
+        "base": ["Balaclava heavy weight"],
         "outer": ["Helmet", "Goggles"]
       }
     },
@@ -22,7 +22,7 @@
       "legs": { "base": ["Heavy"], "outer": ["Insulated Shell"] },
       "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy mittens"] },
       "headNeck": {
-        "base": ["Balaclava heavy weight", "Neck gator medium weight"],
+        "base": ["Balaclava heavy weight"],
         "outer": ["Helmet", "Goggles"]
       }
     },
@@ -35,7 +35,7 @@
       "legs": { "base": ["Heavy"], "outer": ["Insulated Shell"] },
       "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy shell"] },
       "headNeck": {
-        "base": ["Balaclava medium weight", "Neck gator low weight"],
+        "base": ["Balaclava heavy weight"],
         "outer": ["Helmet", "Goggles"]
       }
     },
@@ -48,7 +48,7 @@
       "legs": { "base": ["Medium"], "outer": ["Insulated Shell"] },
       "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy shell"] },
       "headNeck": {
-        "base": ["Beanie medium weight", "Neck gator low weight"],
+        "base": ["Balaclava heavy weight"],
         "outer": ["Helmet", "Goggles"]
       }
     },
@@ -61,7 +61,7 @@
       "legs": { "base": ["Medium"], "outer": ["Insulated Shell"] },
       "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
       "headNeck": {
-        "base": ["Beanie low weight"],
+        "base": ["Balaclava heavy weight"],
         "outer": ["Helmet", "Goggles"]
       }
     },
@@ -74,7 +74,7 @@
       "legs": { "base": ["Medium"], "outer": ["Insulated Shell"] },
       "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
       "headNeck": {
-        "base": ["Beanie low weight"],
+        "base": ["Balaclava heavy weight"],
         "outer": ["Helmet", "Goggles"]
       }
     },
@@ -87,7 +87,7 @@
       "legs": { "base": ["Light"], "outer": ["Snow Shell"] },
       "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
       "headNeck": {
-        "base": [],
+        "base": ["Neck gator medium weight"],
         "outer": ["Helmet", "Goggles"]
       }
     },
@@ -100,7 +100,7 @@
       "legs": { "base": ["Light"], "outer": ["Snow Shell"] },
       "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
       "headNeck": {
-        "base": [],
+        "base": ["Neck gator medium weight"],
         "outer": ["Helmet", "Goggles"]
       }
     },
@@ -113,7 +113,7 @@
       "legs": { "base": ["Light"], "outer": ["Snow Shell"] },
       "hands": { "base": ["Lightweight liner"], "outer": [] },
       "headNeck": {
-        "base": [],
+        "base": ["Neck gator light weight"],
         "outer": ["Helmet", "Goggles"]
       }
     },
@@ -126,7 +126,7 @@
       "legs": { "base": [], "outer": ["Snow Shell"] },
       "hands": { "base": [], "outer": [] },
       "headNeck": {
-        "base": [],
+        "base": ["Neck gator light weight"],
         "outer": ["Helmet", "Goggles"]
       }
     },
@@ -139,7 +139,7 @@
       "legs": { "base": [], "outer": ["Snow Shell"] },
       "hands": { "base": [], "outer": [] },
       "headNeck": {
-        "base": [],
+        "base": ["Neck gator light weight"],
         "outer": ["Helmet", "Goggles"]
       }
     },
