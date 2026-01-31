@@ -1,16 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import { BackpackEditor } from "@/components/BackpackEditor";
 import { useBackpack } from "@/hooks/useBackpack";
-import { BACKPACK_ACTIVITIES, TEMP_RANGES } from "@/data/backpackConstants";
+import { BACKPACK_ACTIVITIES } from "@/data/backpackConstants";
+
+// Convert slider values to temp range string
+function toTempRange(min: number, max: number): string {
+  if (max >= 40) {
+    return "40+";
+  }
+  return `${min}-${max}`;
+}
+
+// Format temperature for display
+function formatTemp(temp: number): string {
+  if (temp >= 40) {
+    return "40+°F";
+  }
+  return `${temp}°F`;
+}
 
 export default function Backpack() {
   const [activity, setActivity] = useState("backcountry-skiing");
-  const [tempRange, setTempRange] = useState("0-5");
+  const [tempSlider, setTempSlider] = useState<number[]>([0, 5]);
+
+  const tempRange = useMemo(
+    () => toTempRange(tempSlider[0], tempSlider[1]),
+    [tempSlider]
+  );
 
   const backpack = useBackpack(activity, tempRange);
 
@@ -28,13 +50,13 @@ export default function Backpack() {
           <CardHeader>
             <CardTitle>Items to Bring</CardTitle>
             <CardDescription>
-              Select an activity and temperature to manage your backpack items.
+              Select an activity and temperature range to manage your backpack items.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex gap-4 flex-wrap">
+          <CardContent className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4">
               <Select value={activity} onValueChange={setActivity}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Activity" />
                 </SelectTrigger>
                 <SelectContent>
@@ -46,18 +68,26 @@ export default function Backpack() {
                 </SelectContent>
               </Select>
 
-              <Select value={tempRange} onValueChange={setTempRange}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Temperature" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TEMP_RANGES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col gap-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium">Temperature Range</label>
+                  <span className="text-sm text-muted-foreground">
+                    {formatTemp(tempSlider[0])} to {formatTemp(tempSlider[1])}
+                  </span>
+                </div>
+                <Slider
+                  value={tempSlider}
+                  onValueChange={setTempSlider}
+                  min={-20}
+                  max={45}
+                  step={5}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>-20°F</span>
+                  <span>40+°F</span>
+                </div>
+              </div>
             </div>
 
             <BackpackEditor
