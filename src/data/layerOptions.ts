@@ -30,7 +30,7 @@ export const layerOptions = {
       "Beanie medium weight",
       "Beanie heavy weight",
     ],
-    outer: ["Helmet"],
+    outer: ["Helmet", "Goggles"],
   },
 } as const;
 
