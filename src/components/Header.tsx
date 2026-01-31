@@ -1,16 +1,28 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Share2, HelpCircle } from "lucide-react";
+import { Share2, HelpCircle, Menu, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 
 interface HeaderProps {
   onLogoClick?: () => void;
 }
 
 const Header = ({ onLogoClick }: HeaderProps) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const handleShare = async () => {
     const shareData = {
       title: "SWTTR",
@@ -45,19 +57,80 @@ const Header = ({ onLogoClick }: HeaderProps) => {
       </div>
 
       <div className="flex items-center gap-4">
-        <SignedIn>
-          <UserButton>
-            <UserButton.MenuItems>
-              <UserButton.Link label="FAQ" labelIcon={<HelpCircle size={16} />} href="/faq" />
-              <UserButton.Action label="Share" labelIcon={<Share2 size={16} />} onClick={handleShare} />
-            </UserButton.MenuItems>
-          </UserButton>
-        </SignedIn>
-        <SignedOut>
-          <Link href="/sign-in" className="text-sm hover:underline">
-            Sign In
-          </Link>
-        </SignedOut>
+        {/* Desktop: show UserButton or Sign In */}
+        <div className="hidden md:flex items-center gap-4">
+          <SignedIn>
+            <UserButton>
+              <UserButton.MenuItems>
+                <UserButton.Link label="FAQ" labelIcon={<HelpCircle size={16} />} href="/faq" />
+                <UserButton.Action label="Share" labelIcon={<Share2 size={16} />} onClick={handleShare} />
+              </UserButton.MenuItems>
+            </UserButton>
+          </SignedIn>
+          <SignedOut>
+            <Link href="/sign-in" className="text-sm hover:underline">
+              Sign In
+            </Link>
+          </SignedOut>
+        </div>
+
+        {/* Mobile: hamburger menu */}
+        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+          <SheetTrigger asChild className="md:hidden">
+            <Button variant="ghost" size="icon">
+              <Menu className="size-5" />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-64">
+            <SheetHeader>
+              <SheetTitle>Menu</SheetTitle>
+            </SheetHeader>
+            <nav className="flex flex-col gap-4 p-4">
+              <SignedIn>
+                <div className="flex items-center gap-3 pb-4 border-b">
+                  <UserButton />
+                  <span className="text-sm text-muted-foreground">Account</span>
+                </div>
+              </SignedIn>
+              <SignedOut>
+                <SheetClose asChild>
+                  <Link
+                    href="/sign-in"
+                    className="flex items-center gap-3 text-sm font-medium hover:text-primary"
+                  >
+                    Sign In
+                  </Link>
+                </SheetClose>
+              </SignedOut>
+              <SheetClose asChild>
+                <Link
+                  href="/faq"
+                  className="flex items-center gap-3 text-sm font-medium hover:text-primary"
+                >
+                  <HelpCircle className="size-4" />
+                  FAQ
+                </Link>
+              </SheetClose>
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSfpX2tVx485Q0ybdNH_t48_-Z_WY0ldx3VhhkUeGKIXQ2N9fg/viewform?usp=publish-editor"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 text-sm font-medium hover:text-primary"
+              >
+                <MessageSquare className="size-4" />
+                Feedback
+              </a>
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-3 text-sm font-medium hover:text-primary text-left"
+              >
+                <Share2 className="size-4" />
+                Share
+              </button>
+            </nav>
+          </SheetContent>
+        </Sheet>
       </div>
     </header>
   );

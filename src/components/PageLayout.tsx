@@ -23,16 +23,6 @@ const PageLayout = ({ children, onLogoClick }: PageLayoutProps) => {
           <main className="flex flex-col gap-6 sm:gap-8 flex-1 items-center sm:items-start w-full">
             {children}
           </main>
-          <footer className="flex gap-6 flex-wrap items-center justify-center mt-auto">
-            <a
-              className="hover:underline hover:underline-offset-4"
-              href="https://docs.google.com/forms/d/e/1FAIpQLSfpX2tVx485Q0ybdNH_t48_-Z_WY0ldx3VhhkUeGKIXQ2N9fg/viewform?usp=publish-editor"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Provide Feedback
-            </a>
-          </footer>
         </div>
       </SidebarInset>
 

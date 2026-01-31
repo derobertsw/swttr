@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Shirt, Backpack, Settings, HelpCircle } from "lucide-react";
+import { Home, Shirt, Backpack, Settings, HelpCircle, MessageSquare } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -24,6 +24,12 @@ const NAV_ITEMS = [
 
 const FOOTER_ITEMS = [
   { href: "/faq", label: "FAQ", icon: HelpCircle },
+  {
+    href: "https://docs.google.com/forms/d/e/1FAIpQLSfpX2tVx485Q0ybdNH_t48_-Z_WY0ldx3VhhkUeGKIXQ2N9fg/viewform?usp=publish-editor",
+    label: "Feedback",
+    icon: MessageSquare,
+    external: true,
+  },
 ];
 
 export function AppSidebar() {
@@ -89,10 +95,17 @@ export function AppSidebar() {
                     isActive={pathname === item.href}
                     tooltip={item.label}
                   >
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </Link>
+                    {item.external ? (
+                      <a href={item.href} target="_blank" rel="noopener noreferrer">
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </a>
+                    ) : (
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </Link>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
