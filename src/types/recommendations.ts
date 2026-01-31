@@ -19,3 +19,8 @@ export interface LocationSuggestion {
   latitude: number;
   longitude: number;
 }
+
+export interface BackpackItem {
+  name: string;
+  isCustom: boolean;
+}

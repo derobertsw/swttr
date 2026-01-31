@@ -1,5 +1,7 @@
 import React from "react";
-import { Thermometer, Wind } from "lucide-react";
+import { Backpack, Thermometer, Wind, X } from "lucide-react";
+import { BackpackItem } from "@/types/recommendations";
+import { Button } from "@/components/ui/button";
 
 interface LayerSet {
   base: string[];
@@ -22,6 +24,9 @@ interface LayerDisplayProps {
   temperature: number;
   windspeed: number;
   itemMappings?: Map<string, string>;
+  backpackItems?: BackpackItem[];
+  onRemoveBackpackItem?: (name: string) => void;
+  onHideBackpackDefault?: (name: string) => void;
 }
 
 const bodyPartLabels: Record<string, string> = {
@@ -37,7 +42,15 @@ const layerLabels: Record<string, string> = {
   outer: "Outer",
 };
 
-const LayerDisplay = ({ recommendation, temperature, windspeed, itemMappings }: LayerDisplayProps) => {
+const LayerDisplay = ({
+  recommendation,
+  temperature,
+  windspeed,
+  itemMappings,
+  backpackItems,
+  onRemoveBackpackItem,
+  onHideBackpackDefault,
+}: LayerDisplayProps) => {
   if (!recommendation) return null;
 
   const bodyParts = ["torso", "legs", "hands", "headNeck"] as const;
@@ -111,6 +124,39 @@ const LayerDisplay = ({ recommendation, temperature, windspeed, itemMappings }: 
           </div>
         );
       })}
+
+      {backpackItems && backpackItems.length > 0 && (
+        <div className="pt-4 border-t">
+          <h3 className="flex items-center gap-2 font-bold mb-2">
+            <Backpack className="size-4" />
+            Backpack
+          </h3>
+          <ul className="flex flex-col gap-1">
+            {backpackItems.map((item) => (
+              <li
+                key={item.name}
+                className="flex items-center justify-between gap-2"
+              >
+                <span className="text-sm">{item.name}</span>
+                {(onRemoveBackpackItem || onHideBackpackDefault) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-5"
+                    onClick={() =>
+                      item.isCustom
+                        ? onRemoveBackpackItem?.(item.name)
+                        : onHideBackpackDefault?.(item.name)
+                    }
+                  >
+                    <X className="size-3" />
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,0 +1,32 @@
+{
+  "backcountry-skiing": {
+    "-20--15": ["Hand warmers", "Extra goggles", "Face mask"],
+    "-15--10": ["Hand warmers", "Extra goggles", "Face mask"],
+    "-10--5": ["Hand warmers", "Extra goggles"],
+    "-5-0": ["Hand warmers", "Lip balm"],
+    "0-5": ["Sunscreen", "Lip balm", "Snacks"],
+    "5-10": ["Sunscreen", "Lip balm", "Snacks"],
+    "10-15": ["Sunscreen", "Lip balm", "Snacks"],
+    "15-20": ["Sunscreen", "Lip balm", "Water bottle"],
+    "20-25": ["Sunscreen", "Lip balm", "Water bottle"],
+    "25-30": ["Water bottle", "Sunscreen", "Sunglasses"],
+    "30-35": ["Water bottle", "Sunscreen", "Sunglasses"],
+    "35-40": ["Water bottle", "Sunscreen", "Sunglasses"],
+    "40+": ["Water bottle", "Sunscreen", "Sunglasses"]
+  },
+  "xc-skiing": {
+    "-20--15": ["Hand warmers", "Extra gloves", "Thermos"],
+    "-15--10": ["Hand warmers", "Extra gloves", "Thermos"],
+    "-10--5": ["Hand warmers", "Thermos", "Snacks"],
+    "-5-0": ["Thermos", "Snacks", "Wax kit"],
+    "0-5": ["Water bottle", "Snacks", "Wax kit"],
+    "5-10": ["Water bottle", "Snacks", "Wax kit"],
+    "10-15": ["Water bottle", "Snacks"],
+    "15-20": ["Water bottle", "Snacks"],
+    "20-25": ["Water bottle", "Snacks", "Sunscreen"],
+    "25-30": ["Water bottle", "Sunscreen", "Sunglasses"],
+    "30-35": ["Water bottle", "Sunscreen", "Sunglasses"],
+    "35-40": ["Water bottle", "Sunscreen", "Sunglasses"],
+    "40+": ["Water bottle", "Sunscreen", "Sunglasses"]
+  }
+}
