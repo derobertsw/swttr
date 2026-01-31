@@ -1,20 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Shirt, HelpCircle, Share2, Settings } from "lucide-react";
+import { Share2, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
-interface NavigationProps {
+interface HeaderProps {
   onLogoClick?: () => void;
 }
 
-const Navigation = ({ onLogoClick }: NavigationProps) => {
-  const [menuOpen, setMenuOpen] = useState(false);
-
+const Header = ({ onLogoClick }: HeaderProps) => {
   const handleShare = async () => {
-    setMenuOpen(false);
     const shareData = {
       title: "SWTTR",
       text: "Check out SWTTR - get clothing recommendations for outdoor activities!",
@@ -36,70 +33,21 @@ const Navigation = ({ onLogoClick }: NavigationProps) => {
   };
 
   return (
-    <header className="relative flex w-full items-center justify-center">
-      <SignedOut>
-        <div className="absolute left-0">
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 hover:bg-gray-100 rounded-md"
-            aria-label="Menu"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </button>
-          {menuOpen && (
-            <div className="absolute top-full left-0 mt-2 bg-white border rounded-md shadow-lg z-50 min-w-40">
-              <nav className="py-2">
-                <Link
-                  href="/wardrobe"
-                  className="block px-4 py-2 hover:bg-gray-100"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Wardrobe
-                </Link>
-                <Link
-                  href="/settings"
-                  className="block px-4 py-2 hover:bg-gray-100"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Preferences
-                </Link>
-                <Link
-                  href="/faq"
-                  className="block px-4 py-2 hover:bg-gray-100"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  FAQ
-                </Link>
-                <button
-                  className="block w-full text-left px-4 py-2 hover:bg-gray-100"
-                  onClick={handleShare}
-                >
-                  Share
-                </button>
-              </nav>
-            </div>
-          )}
-        </div>
-      </SignedOut>
-      <Link href="/" onClick={onLogoClick}><h1 className="site-header">SWTTR</h1></Link>
-      <div className="absolute right-0 flex items-center gap-4">
+    <header className="flex w-full items-center justify-between gap-4">
+      <div className="flex items-center gap-2">
+        {/* Desktop sidebar toggle */}
+        <SidebarTrigger className="hidden md:flex" />
+
+        {/* Mobile: show logo */}
+        <Link href="/" onClick={onLogoClick} className="md:hidden">
+          <h1 className="site-header">SWTTR</h1>
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-4">
         <SignedIn>
           <UserButton>
             <UserButton.MenuItems>
-              <UserButton.Link label="Wardrobe" labelIcon={<Shirt size={16} />} href="/wardrobe" />
-              <UserButton.Link label="Preferences" labelIcon={<Settings size={16} />} href="/settings" />
               <UserButton.Link label="FAQ" labelIcon={<HelpCircle size={16} />} href="/faq" />
               <UserButton.Action label="Share" labelIcon={<Share2 size={16} />} onClick={handleShare} />
             </UserButton.MenuItems>
@@ -115,4 +63,4 @@ const Navigation = ({ onLogoClick }: NavigationProps) => {
   );
 };
 
-export default Navigation;
+export default Header;
