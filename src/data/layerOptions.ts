@@ -4,7 +4,7 @@ export const layerOptions = {
   torso: {
     base: ["Light", "Medium", "Heavy"],
     mid: ["Pullover", "Sweater", "Vest"],
-    outer: ["Soft Shell", "Snow Shell", "Insulated Shell"],
+    outer: ["Windbreaker", "Soft Shell", "Snow Shell", "Insulated Shell"],
   },
   legs: {
     base: ["Light", "Medium", "Heavy"],

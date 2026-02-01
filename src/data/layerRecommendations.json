@@ -227,7 +227,7 @@
       "torso": {
         "base": ["Medium"],
         "mid": ["Vest"],
-        "outer": []
+        "outer": ["Windbreaker"]
       },
       "legs": { "base": ["Medium"], "outer": ["Joggers"] },
       "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
@@ -240,7 +240,7 @@
       "torso": {
         "base": ["Medium"],
         "mid": ["Vest"],
-        "outer": []
+        "outer": ["Windbreaker"]
       },
       "legs": { "base": ["Medium"], "outer": ["Joggers"] },
       "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
@@ -253,7 +253,7 @@
       "torso": {
         "base": ["Light"],
         "mid": [],
-        "outer": []
+        "outer": ["Windbreaker"]
       },
       "legs": { "base": ["Light"], "outer": ["Joggers"] },
       "hands": { "base": ["Lightweight liner"], "outer": [] },
@@ -266,7 +266,7 @@
       "torso": {
         "base": ["Light"],
         "mid": [],
-        "outer": []
+        "outer": ["Windbreaker"]
       },
       "legs": { "base": ["Light"], "outer": ["Joggers"] },
       "hands": { "base": ["Lightweight liner"], "outer": [] },
@@ -279,7 +279,7 @@
       "torso": {
         "base": ["Light"],
         "mid": [],
-        "outer": []
+        "outer": ["Windbreaker"]
       },
       "legs": { "base": ["Light"], "outer": [] },
       "hands": { "base": [], "outer": [] },
@@ -292,7 +292,7 @@
       "torso": {
         "base": ["Light"],
         "mid": [],
-        "outer": []
+        "outer": ["Windbreaker"]
       },
       "legs": { "base": [], "outer": ["Shorts"] },
       "hands": { "base": [], "outer": [] },
