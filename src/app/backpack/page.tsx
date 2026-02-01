@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import PageLayout from "@/components/PageLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { BackpackEditor } from "@/components/BackpackEditor";
@@ -27,7 +26,7 @@ function formatTemp(temp: number): string {
 
 export default function Backpack() {
   const [activity, setActivity] = useState("backcountry-skiing");
-  const [tempSlider, setTempSlider] = useState<number[]>([0, 5]);
+  const [tempSlider, setTempSlider] = useState<number[]>([-20, 45]);
 
   const tempRange = useMemo(
     () => toTempRange(tempSlider[0], tempSlider[1]),
@@ -46,58 +45,48 @@ export default function Backpack() {
           </p>
         </header>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Items to Bring</CardTitle>
-            <CardDescription>
-              Select an activity and temperature range to manage your backpack items.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-6">
-            <div className="flex flex-col gap-4">
-              <Select value={activity} onValueChange={setActivity}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Activity" />
-                </SelectTrigger>
-                <SelectContent>
-                  {BACKPACK_ACTIVITIES.map((a) => (
-                    <SelectItem key={a.value} value={a.value}>
-                      {a.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <div className="flex flex-col gap-4">
+          <Select value={activity} onValueChange={setActivity}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Activity" />
+            </SelectTrigger>
+            <SelectContent>
+              {BACKPACK_ACTIVITIES.map((a) => (
+                <SelectItem key={a.value} value={a.value}>
+                  {a.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-              <div className="flex flex-col gap-3">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium">Temperature Range</label>
-                  <span className="text-sm text-muted-foreground">
-                    {formatTemp(tempSlider[0])} to {formatTemp(tempSlider[1])}
-                  </span>
-                </div>
-                <Slider
-                  value={tempSlider}
-                  onValueChange={setTempSlider}
-                  min={-20}
-                  max={45}
-                  step={5}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>-20°F</span>
-                  <span>40+°F</span>
-                </div>
-              </div>
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-medium">Temperature Range</label>
+              <span className="text-sm text-muted-foreground">
+                {formatTemp(tempSlider[0])} to {formatTemp(tempSlider[1])}
+              </span>
             </div>
-
-            <BackpackEditor
-              items={backpack.items}
-              onAddItem={backpack.addItem}
-              onRemoveItem={backpack.removeItem}
-              onHideDefault={backpack.hideDefault}
+            <Slider
+              value={tempSlider}
+              onValueChange={setTempSlider}
+              min={-20}
+              max={45}
+              step={5}
+              className="w-full"
             />
-          </CardContent>
-        </Card>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>-20°F</span>
+              <span>40+°F</span>
+            </div>
+          </div>
+        </div>
+
+        <BackpackEditor
+          items={backpack.items}
+          onAddItem={backpack.addItem}
+          onRemoveItem={backpack.removeItem}
+          onHideDefault={backpack.hideDefault}
+        />
       </div>
     </PageLayout>
   );
