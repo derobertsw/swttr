@@ -5,10 +5,15 @@ export interface WeatherData {
   windSpeed: number;
 }
 
-export function fetchCurrentWeather(): Promise<WeatherData | null> {
+export interface WeatherResult {
+  data: WeatherData | null;
+  locationDenied: boolean;
+}
+
+export function fetchCurrentWeather(): Promise<WeatherResult> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
-      resolve(null);
+      resolve({ data: null, locationDenied: false });
       return;
     }
 
@@ -21,19 +26,43 @@ export function fetchCurrentWeather(): Promise<WeatherData | null> {
           );
 
           if (!response.ok) {
-            resolve(null);
+            resolve({ data: null, locationDenied: false });
             return;
           }
 
           const data = await response.json();
-          resolve({ temperature: data.temperature, windSpeed: data.windSpeed });
+          resolve({
+            data: { temperature: data.temperature, windSpeed: data.windSpeed },
+            locationDenied: false,
+          });
         } catch {
-          resolve(null);
+          resolve({ data: null, locationDenied: false });
         }
       },
-      () => {
-        resolve(null);
+      (error) => {
+        const isDenied = error.code === error.PERMISSION_DENIED;
+        resolve({ data: null, locationDenied: isDenied });
       }
     );
   });
+}
+
+export async function fetchWeatherByCoords(
+  latitude: number,
+  longitude: number
+): Promise<WeatherData | null> {
+  try {
+    const response = await fetch(
+      `/api/weather?lat=${latitude}&lon=${longitude}`
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return { temperature: data.temperature, windSpeed: data.windSpeed };
+  } catch {
+    return null;
+  }
 }

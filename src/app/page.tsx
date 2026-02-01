@@ -8,6 +8,7 @@ import ActivitySelection from "@/components/ActivitySelection";
 import WeatherSelection from "@/components/WeatherSelection";
 import LayerDisplay from "@/components/LayerDisplay";
 import { PlanAheadForm } from "@/components/PlanAheadForm";
+import { LocationInput } from "@/components/LocationInput";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import layerRecommendations from "@/data/layerRecommendations.json";
@@ -15,11 +16,11 @@ import { Recommendation } from "@/types/recommendations";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { useItemMappings } from "@/hooks/useItemMappings";
-import { fetchCurrentWeather } from "@/hooks/useCurrentWeather";
+import { fetchCurrentWeather, fetchWeatherByCoords } from "@/hooks/useCurrentWeather";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useBackpack } from "@/hooks/useBackpack";
 import { BACKPACK_ACTIVITY_IDS } from "@/data/backpackConstants";
-import { DEFAULT_ACTIVITY } from "@/data/activities";
+import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type InputMode = "manual" | "planAhead";
@@ -40,6 +41,7 @@ const HomeContent = () => {
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState("12:00");
   const [loading, setLoading] = useState(false);
+  const [locationDenied, setLocationDenied] = useState(false);
 
   const locationSearch = useLocationSearch();
   const { itemMappings } = useItemMappings();
@@ -84,6 +86,7 @@ const HomeContent = () => {
     setInputMode("manual");
     setDate(undefined);
     setTime("12:00");
+    setLocationDenied(false);
     locationSearch.reset();
   }, [locationSearch, defaultActivity]);
 
@@ -135,9 +138,19 @@ const HomeContent = () => {
       const layers = getRecommendation(temperature);
       setRecommendation(layers);
       setShowResults(true);
-    } else {
+    } else if (locationDenied) {
+      // Location was previously denied, use manually entered location
+      if (!locationSearch.selectedLocation) {
+        toast.error("Please enter a location");
+        return;
+      }
+
       setLoading(true);
-      const weather = await fetchCurrentWeather();
+      const { selectedLocation } = locationSearch;
+      const weather = await fetchWeatherByCoords(
+        selectedLocation.latitude,
+        selectedLocation.longitude
+      );
 
       if (weather) {
         setTemperature(weather.temperature);
@@ -146,6 +159,24 @@ const HomeContent = () => {
         setRecommendation(layers);
         setShowResults(true);
         toast.success(`Current: ${weather.temperature}°F, ${weather.windSpeed} mph wind`);
+      } else {
+        toast.error("Could not get weather for this location.");
+      }
+      setLoading(false);
+    } else {
+      setLoading(true);
+      const result = await fetchCurrentWeather();
+
+      if (result.data) {
+        setTemperature(result.data.temperature);
+        setWindspeed(result.data.windSpeed);
+        const layers = getRecommendation(result.data.temperature);
+        setRecommendation(layers);
+        setShowResults(true);
+        toast.success(`Current: ${result.data.temperature}°F, ${result.data.windSpeed} mph wind`);
+      } else if (result.locationDenied) {
+        toast.error("Location access denied. Please enter your location manually.");
+        setLocationDenied(true);
       } else {
         toast.error("Could not get current weather. Please set manually.");
         setShowSliders(true);
@@ -166,6 +197,19 @@ const HomeContent = () => {
               onTemperatureChange={setTemperature}
               onWindspeedChange={setWindspeed}
               onPlanAhead={() => setInputMode("planAhead")}
+            />
+          ) : inputMode === "manual" && locationDenied ? (
+            <LocationInput
+              activityName={ACTIVITIES.find(a => a.value === activity)?.name.toLowerCase() || ""}
+              location={locationSearch.location}
+              locationQuery={locationSearch.locationQuery}
+              suggestions={locationSearch.suggestions}
+              showSuggestions={locationSearch.showSuggestions}
+              selectedLocation={locationSearch.selectedLocation}
+              suggestionRef={locationSearch.suggestionRef}
+              onLocationInputChange={locationSearch.handleLocationInputChange}
+              onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
+              onSelectLocation={locationSearch.handleSelectLocation}
             />
           ) : inputMode === "planAhead" ? (
             <PlanAheadForm
