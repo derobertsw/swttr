@@ -11,6 +11,13 @@ vi.mock("sonner", () => ({
   },
 }));
 
+// Mock next/navigation
+const mockSearchParams = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => mockSearchParams,
+  usePathname: () => "/",
+}));
+
 // Mock Clerk components
 vi.mock("@clerk/nextjs", () => ({
   SignedIn: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -39,6 +46,8 @@ describe("Home Page", () => {
     vi.clearAllMocks();
     originalGeolocation = navigator.geolocation;
     localStorageMock.getItem.mockReturnValue("test-user-id");
+    // Reset search params
+    mockSearchParams.delete("mode");
 
     // Default mock for item mappings and preferences APIs
     mockFetch.mockImplementation((url: string) => {
@@ -81,11 +90,6 @@ describe("Home Page", () => {
     it("should render Gear Up button", () => {
       render(<Home />);
       expect(screen.getByRole("button", { name: /gear up/i })).toBeInTheDocument();
-    });
-
-    it("should render Plan Ahead button", () => {
-      render(<Home />);
-      expect(screen.getByRole("button", { name: /plan ahead/i })).toBeInTheDocument();
     });
 
     it("should NOT render weather sliders initially", () => {
@@ -311,38 +315,26 @@ describe("Home Page", () => {
     });
   });
 
-  describe("Plan Ahead button", () => {
-    it("should switch to plan ahead mode when clicked", async () => {
-      const user = userEvent.setup();
+  describe("Plan ahead mode via URL param", () => {
+    it("should show plan ahead form when mode=planAhead in URL", () => {
+      mockSearchParams.set("mode", "planAhead");
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: /plan ahead/i }));
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
-      });
+      expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
     });
 
-    it("should show date picker in plan ahead mode", async () => {
-      const user = userEvent.setup();
+    it("should show date picker in plan ahead mode", () => {
+      mockSearchParams.set("mode", "planAhead");
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: /plan ahead/i }));
-
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /pick a date/i })).toBeInTheDocument();
-      });
+      expect(screen.getByRole("button", { name: /pick a date/i })).toBeInTheDocument();
     });
 
-    it("should show Manual Input button in plan ahead mode", async () => {
-      const user = userEvent.setup();
+    it("should show Manual Input button in plan ahead mode", () => {
+      mockSearchParams.set("mode", "planAhead");
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: /plan ahead/i }));
-
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /manual input/i })).toBeInTheDocument();
-      });
+      expect(screen.getByRole("button", { name: /manual input/i })).toBeInTheDocument();
     });
   });
 

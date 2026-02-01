@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Shirt, Backpack, Settings } from "lucide-react";
+import { CalendarDays, Shirt, Backpack, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Plan", icon: Home },
+  { href: "/?mode=planAhead", label: "Plan", icon: CalendarDays },
   { href: "/wardrobe", label: "Wardrobe", icon: Shirt },
   { href: "/backpack", label: "Backpack", icon: Backpack },
 ];
@@ -26,7 +26,7 @@ export function MobileTabBar() {
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t">
       <div className="flex justify-around items-center h-16">
         {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = item.href.startsWith("/?") ? pathname === "/" : pathname === item.href;
           return (
             <Link
               key={item.href}

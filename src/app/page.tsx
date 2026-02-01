@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import PageLayout from "@/components/PageLayout";
 import ActivitySelection from "@/components/ActivitySelection";
@@ -23,6 +24,7 @@ import { DEFAULT_ACTIVITY } from "@/data/activities";
 type InputMode = "manual" | "planAhead";
 
 const Home = () => {
+  const searchParams = useSearchParams();
   const { sensitivity, defaultActivity } = usePreferences();
   const [activity, setActivity] = useState(DEFAULT_ACTIVITY);
   const [hasSetInitialActivity, setHasSetInitialActivity] = useState(false);
@@ -31,7 +33,9 @@ const Home = () => {
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [showSliders, setShowSliders] = useState(false);
-  const [inputMode, setInputMode] = useState<InputMode>("manual");
+  const [inputMode, setInputMode] = useState<InputMode>(() =>
+    searchParams.get("mode") === "planAhead" ? "planAhead" : "manual"
+  );
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState("12:00");
   const [loading, setLoading] = useState(false);
@@ -46,6 +50,14 @@ const Home = () => {
       setHasSetInitialActivity(true);
     }
   }, [defaultActivity, hasSetInitialActivity]);
+
+  // Update input mode when URL param changes
+  useEffect(() => {
+    const mode = searchParams.get("mode");
+    if (mode === "planAhead") {
+      setInputMode("planAhead");
+    }
+  }, [searchParams]);
 
   const tempRangeForBackpack = getAdjustedTempRange(temperature, sensitivity);
   const backpack = useBackpack(activity, tempRangeForBackpack);
@@ -172,16 +184,9 @@ const Home = () => {
               onSwitchToManual={() => setInputMode("manual")}
             />
           ) : null}
-          <div className="flex gap-3">
-            <Button size="xl" onClick={handleSubmit} disabled={loading}>
-              {loading ? "Loading..." : "Gear Up"}
-            </Button>
-            {inputMode === "manual" && !showSliders && (
-              <Button size="lg" variant="outline" onClick={() => setInputMode("planAhead")}>
-                Plan Ahead
-              </Button>
-            )}
-          </div>
+          <Button size="xl" onClick={handleSubmit} disabled={loading}>
+            {loading ? "Loading..." : "Gear Up"}
+          </Button>
         </>
       ) : (
         <>
