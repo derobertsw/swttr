@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import PageLayout from "@/components/PageLayout";
@@ -23,7 +23,7 @@ import { DEFAULT_ACTIVITY } from "@/data/activities";
 
 type InputMode = "manual" | "planAhead";
 
-const Home = () => {
+const HomeContent = () => {
   const searchParams = useSearchParams();
   const { sensitivity, defaultActivity } = usePreferences();
   const [activity, setActivity] = useState(DEFAULT_ACTIVITY);
@@ -205,6 +205,14 @@ const Home = () => {
         </>
       )}
     </PageLayout>
+  );
+};
+
+const Home = () => {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
   );
 };
 
