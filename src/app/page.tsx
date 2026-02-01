@@ -229,7 +229,11 @@ const HomeContent = () => {
               onSwitchToManual={() => setInputMode("manual")}
             />
           ) : null}
-          <Button size="xl" onClick={handleSubmit} disabled={loading}>
+          <Button
+            size="xl"
+            onClick={handleSubmit}
+            disabled={loading || (process.env.NODE_ENV === "production" && ["running", "biking", "backcountry-skiing"].includes(activity))}
+          >
             {loading ? "Loading..." : "Gear Up"}
           </Button>
         </>
