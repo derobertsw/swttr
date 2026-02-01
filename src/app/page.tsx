@@ -173,7 +173,7 @@ const Home = () => {
             />
           ) : null}
           <div className="flex gap-3">
-            <Button size="lg" onClick={handleSubmit} disabled={loading}>
+            <Button size="xl" onClick={handleSubmit} disabled={loading}>
               {loading ? "Loading..." : "Gear Up"}
             </Button>
             {inputMode === "manual" && !showSliders && (

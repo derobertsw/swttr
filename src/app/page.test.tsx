@@ -70,9 +70,12 @@ describe("Home Page", () => {
   });
 
   describe("initial rendering", () => {
-    it("should render activity selector", () => {
+    it("should render activity selector carousel", () => {
       render(<Home />);
-      expect(screen.getByRole("combobox")).toBeInTheDocument();
+      expect(screen.getByRole("region")).toHaveAttribute(
+        "aria-roledescription",
+        "carousel"
+      );
     });
 
     it("should render Gear Up button", () => {
