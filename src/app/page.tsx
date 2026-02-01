@@ -20,6 +20,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useBackpack } from "@/hooks/useBackpack";
 import { BACKPACK_ACTIVITY_IDS } from "@/data/backpackConstants";
 import { DEFAULT_ACTIVITY } from "@/data/activities";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type InputMode = "manual" | "planAhead";
 
@@ -208,9 +209,22 @@ const HomeContent = () => {
   );
 };
 
+const HomeLoading = () => (
+  <PageLayout>
+    <div className="mx-auto w-full max-w-md">
+      <div className="flex justify-center gap-4 py-6">
+        <Skeleton className="h-24 w-24 rounded-xl" />
+        <Skeleton className="h-28 w-28 rounded-xl" />
+        <Skeleton className="h-24 w-24 rounded-xl" />
+      </div>
+    </div>
+    <Skeleton className="h-12 w-32 rounded-lg" />
+  </PageLayout>
+);
+
 const Home = () => {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<HomeLoading />}>
       <HomeContent />
     </Suspense>
   );
