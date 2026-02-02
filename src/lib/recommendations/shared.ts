@@ -1,7 +1,64 @@
 /**
  * Shared utilities for recommendation API routes
  */
+import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
+import { garmentToThermalProps } from '@/lib/biophysics/ensemble';
+import { fahrenheitToCelsius, mphToMs } from '@/lib/biophysics/ireq';
+import type { GarmentWithProtection } from '@/lib/biophysics/scorer';
+
+// ============================================
+// REQUEST VALIDATION
+// ============================================
+
+export interface WeatherInput {
+  temperature: number;
+  wind_speed: number;
+  humidity?: number;
+  precipitation?: boolean;
+  precipitation_type?: 'rain' | 'snow' | 'mixed';
+}
+
+export interface ValidatedRequest {
+  supabase: NonNullable<ReturnType<typeof getSupabase>>;
+  userId: string | null;
+  weather: WeatherInput;
+  tempC: number;
+  windMs: number;
+  body: Record<string, unknown>;
+}
+
+/**
+ * Validate common request fields for recommendation endpoints
+ * Returns ValidatedRequest on success, NextResponse on error
+ */
+export async function validateRecommendationRequest(
+  request: NextRequest
+): Promise<ValidatedRequest | NextResponse> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+  }
+
+  const userId = request.headers.get('x-user-id');
+  const body = await request.json();
+
+  if (!body.weather?.temperature || body.weather?.wind_speed === undefined) {
+    return NextResponse.json(
+      { error: 'weather.temperature and weather.wind_speed are required' },
+      { status: 400 }
+    );
+  }
+
+  return {
+    supabase,
+    userId,
+    weather: body.weather,
+    tempC: fahrenheitToCelsius(body.weather.temperature),
+    windMs: mphToMs(body.weather.wind_speed),
+    body,
+  };
+}
 
 // ============================================
 // TYPES
@@ -221,6 +278,27 @@ export function formatGarmentResponse(garment: GarmentRow): {
     covers_torso: garment.covers_torso,
     covers_legs: garment.covers_legs,
   };
+}
+
+// ============================================
+// THERMAL CONVERSION HELPERS
+// ============================================
+
+/**
+ * Convert an ensemble of garments to thermal garments with protection data
+ * for use with scoring functions
+ */
+export function ensembleToThermalGarments(ensemble: GarmentRow[]): GarmentWithProtection[] {
+  return ensemble.map((g) => {
+    const baseProps = garmentToThermalProps(g, g.garment_thermal_properties ?? {});
+    return {
+      ...baseProps,
+      category: g.category,
+      windproofRating: g.garment_protection?.windproof_rating as GarmentWithProtection['windproofRating'],
+      waterproofRating: g.garment_protection?.waterproof_rating as GarmentWithProtection['waterproofRating'],
+      waterproofMm: g.garment_protection?.waterproof_mm,
+    };
+  });
 }
 
 // ============================================

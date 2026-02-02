@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
-import { garmentToThermalProps, predictEnsembleThermal } from '@/lib/biophysics/ensemble';
-import { calculateIreq, fahrenheitToCelsius, mphToMs } from '@/lib/biophysics/ireq';
-import { scoreEnsemble, type GarmentWithProtection } from '@/lib/biophysics/scorer';
+import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
+import { calculateIreq } from '@/lib/biophysics/ireq';
+import { scoreEnsemble } from '@/lib/biophysics/scorer';
 import { METABOLIC_RATES, getAlpineCloTargets } from '@/lib/biophysics/constants';
 import {
+  validateRecommendationRequest,
   getUserWardrobeGarmentIds,
   fetchGarmentsWithDetails,
   categorizeGarments,
@@ -18,6 +18,7 @@ import {
   selectHeadwear,
   formatHandwearResponse,
   formatHeadwearResponse,
+  ensembleToThermalGarments,
   type GarmentRow,
   type CategorizedGarments,
 } from '@/lib/recommendations/shared';
@@ -43,40 +44,23 @@ import {
  *   x-user-id: string (optional) - If provided, uses only user's wardrobe items
  */
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) {
-    return NextResponse.json(
-      { error: 'Database not configured' },
-      { status: 503 }
-    );
-  }
+  const validated = await validateRecommendationRequest(request);
+  if (validated instanceof NextResponse) return validated;
 
-  const userId = request.headers.get('x-user-id');
-  const body = await request.json();
-
-  if (!body.weather?.temperature || body.weather?.wind_speed === undefined) {
-    return NextResponse.json(
-      { error: 'weather.temperature and weather.wind_speed are required' },
-      { status: 400 }
-    );
-  }
-
-  // Convert to metric
-  const tempC = fahrenheitToCelsius(body.weather.temperature);
-  const windMs = mphToMs(body.weather.wind_speed);
+  const { supabase, userId, weather, tempC, windMs } = validated;
 
   // Calculate IREQ for both skiing and chairlift
   const ireqSkiing = calculateIreq({
     airTemp: tempC,
     windSpeed: windMs + 5, // Add speed-induced wind
-    relativeHumidity: body.weather.humidity ?? 50,
+    relativeHumidity: weather.humidity ?? 50,
     metabolicRate: METABOLIC_RATES.alpine_skiing,
   });
 
   const ireqChairlift = calculateIreq({
     airTemp: tempC,
     windSpeed: windMs,
-    relativeHumidity: body.weather.humidity ?? 50,
+    relativeHumidity: weather.humidity ?? 50,
     metabolicRate: METABOLIC_RATES.chairlift,
   });
 
@@ -106,7 +90,7 @@ export async function POST(request: NextRequest) {
         chairlift: { min: ireqChairlift.ireqMin, neutral: ireqChairlift.ireqNeutral },
         target_range: [targetCloMin, targetCloMax],
       },
-      guidance: getAlpineGuidance(tempC, body.weather.precipitation),
+      guidance: getAlpineGuidance(tempC, weather.precipitation),
     });
   }
 
@@ -116,7 +100,7 @@ export async function POST(request: NextRequest) {
     categorized,
     targetCloMin,
     targetCloMax,
-    body.weather.precipitation ?? false
+    weather.precipitation ?? false
   );
 
   // Fetch user's extremity gear (handwear and headwear)
@@ -130,16 +114,7 @@ export async function POST(request: NextRequest) {
   const recommendedHeadwear = selectHeadwear(userHeadwear, tempC, false);
 
   // Score the ensemble
-  const thermalGarments: GarmentWithProtection[] = ensemble.map((g) => {
-    const baseProps = garmentToThermalProps(g, g.garment_thermal_properties ?? {});
-    return {
-      ...baseProps,
-      category: g.category,
-      windproofRating: g.garment_protection?.windproof_rating as GarmentWithProtection['windproofRating'],
-      waterproofRating: g.garment_protection?.waterproof_rating as GarmentWithProtection['waterproofRating'],
-      waterproofMm: g.garment_protection?.waterproof_mm,
-    };
-  });
+  const thermalGarments = ensembleToThermalGarments(ensemble);
 
   const ensembleProps = predictEnsembleThermal(thermalGarments);
 
@@ -148,9 +123,9 @@ export async function POST(request: NextRequest) {
     {
       temperature: tempC,
       windSpeed: windMs,
-      humidity: body.weather.humidity ?? 50,
-      precipitation: body.weather.precipitation ?? false,
-      precipitationType: body.weather.precipitation_type,
+      humidity: weather.humidity ?? 50,
+      precipitation: weather.precipitation ?? false,
+      precipitationType: weather.precipitation_type,
     },
     {
       name: 'Alpine Skiing',
@@ -193,9 +168,9 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     conditions: {
-      temperature: `${body.weather.temperature}°F`,
-      wind_speed: `${body.weather.wind_speed} mph`,
-      precipitation: body.weather.precipitation ?? false,
+      temperature: `${weather.temperature}°F`,
+      wind_speed: `${weather.wind_speed} mph`,
+      precipitation: weather.precipitation ?? false,
     },
     ireq: {
       skiing: { min: ireqSkiing.ireqMin, neutral: ireqSkiing.ireqNeutral },
@@ -225,7 +200,7 @@ export async function POST(request: NextRequest) {
       component_scores: score.componentScores,
     },
     warnings: score.warnings,
-    guidance: getAlpineGuidance(tempC, body.weather.precipitation),
+    guidance: getAlpineGuidance(tempC, weather.precipitation),
   });
 }
 

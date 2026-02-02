@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
-import { garmentToThermalProps, predictEnsembleThermal } from '@/lib/biophysics/ensemble';
-import { calculateIreq, fahrenheitToCelsius, mphToMs } from '@/lib/biophysics/ireq';
-import { scoreEnsemble, type GarmentWithProtection } from '@/lib/biophysics/scorer';
+import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
+import { calculateIreq } from '@/lib/biophysics/ireq';
+import { scoreEnsemble } from '@/lib/biophysics/scorer';
 import { METABOLIC_RATES } from '@/lib/biophysics/constants';
+import {
+  type GarmentRow,
+  type CategorizedGarments,
+  validateRecommendationRequest,
+  fetchGarmentsWithDetails,
+  categorizeGarments,
+  sortByBreathability,
+  ensembleToThermalGarments,
+} from '@/lib/recommendations/shared';
 
 /**
  * POST /api/v1/recommendations/ski-touring
@@ -24,62 +32,39 @@ import { METABOLIC_RATES } from '@/lib/biophysics/constants';
  * }
  */
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) {
-    return NextResponse.json(
-      { error: 'Database not configured' },
-      { status: 503 }
-    );
-  }
+  const validated = await validateRecommendationRequest(request);
+  if (validated instanceof NextResponse) return validated;
 
-  const body = await request.json();
+  const { supabase, weather, tempC, windMs, body } = validated;
 
-  if (!body.weather?.temperature || body.weather?.wind_speed === undefined) {
-    return NextResponse.json(
-      { error: 'weather.temperature and weather.wind_speed are required' },
-      { status: 400 }
-    );
-  }
-
-  const prioritizeLightPack = body.prioritize_light_pack ?? false;
-
-  // Convert to metric
-  const tempC = fahrenheitToCelsius(body.weather.temperature);
-  const windMs = mphToMs(body.weather.wind_speed);
+  const prioritizeLightPack = (body.prioritize_light_pack as boolean) ?? false;
 
   // Calculate IREQ for each phase
   const ireqUphill = calculateIreq({
     airTemp: tempC,
     windSpeed: windMs * 0.3, // Sheltered while climbing
-    relativeHumidity: body.weather.humidity ?? 50,
+    relativeHumidity: weather.humidity ?? 50,
     metabolicRate: METABOLIC_RATES.ski_touring_uphill,
   });
 
   const ireqDownhill = calculateIreq({
     airTemp: tempC,
     windSpeed: windMs + 5, // Speed adds wind
-    relativeHumidity: body.weather.humidity ?? 50,
+    relativeHumidity: weather.humidity ?? 50,
     metabolicRate: METABOLIC_RATES.ski_touring_downhill,
   });
 
   const ireqTransition = calculateIreq({
     airTemp: tempC,
     windSpeed: windMs * 1.5, // Often exposed at transitions
-    relativeHumidity: body.weather.humidity ?? 50,
+    relativeHumidity: weather.humidity ?? 50,
     metabolicRate: 90, // Standing/resting
   });
 
   // Fetch all garments with their related data
-  const { data: fetchedGarments, error } = await supabase
-    .from('garments')
-    .select(`
-      *,
-      garment_thermal_properties (*),
-      garment_protection (*),
-      garment_activity_ratings (*)
-    `);
+  const { data: fetchedGarments, error } = await fetchGarmentsWithDetails(supabase, {});
 
-  // Filter for ski touring suitability in code
+  // Apply OR filter for ski touring (uphill OR downhill suitability)
   const allGarments = (fetchedGarments ?? []).filter((g) => {
     const ratings = g.garment_activity_ratings;
     if (!ratings) return false;
@@ -115,9 +100,7 @@ export async function POST(request: NextRequest) {
   );
 
   // Calculate uphill clo
-  const uphillThermal = uphillEnsemble.map((g) =>
-    garmentToThermalProps(g, g.garment_thermal_properties ?? {})
-  );
+  const uphillThermal = ensembleToThermalGarments(uphillEnsemble);
   const uphillProps = predictEnsembleThermal(uphillThermal);
   const uphillClo = uphillProps.rcl.wholeBody;
 
@@ -132,8 +115,8 @@ export async function POST(request: NextRequest) {
   );
 
   // Select shell if needed
-  const shellLayer = (body.weather.precipitation || windMs > 8)
-    ? selectShell(categorized.shells, body.weather.precipitation ?? false)
+  const shellLayer = (weather.precipitation || windMs > 8)
+    ? selectShell(categorized.shells, weather.precipitation ?? false)
     : null;
 
   // Build downhill ensemble
@@ -144,24 +127,16 @@ export async function POST(request: NextRequest) {
   }
 
   // Calculate properties for both ensembles
-  const downhillThermal: GarmentWithProtection[] = downhillEnsemble.map((g) => {
-    const baseProps = garmentToThermalProps(g, g.garment_thermal_properties ?? {});
-    return {
-      ...baseProps,
-      category: g.category,
-      windproofRating: g.garment_protection?.windproof_rating as GarmentWithProtection['windproofRating'],
-      waterproofRating: g.garment_protection?.waterproof_rating as GarmentWithProtection['waterproofRating'],
-    };
-  });
+  const downhillThermal = ensembleToThermalGarments(downhillEnsemble);
   const downhillProps = predictEnsembleThermal(downhillThermal);
 
   // Score both configurations
   const uphillScore = scoreEnsemble(
-    uphillThermal.map((t) => ({ ...t, category: 'base_layer' as const })),
+    uphillThermal,
     {
       temperature: tempC,
       windSpeed: windMs * 0.3,
-      humidity: body.weather.humidity ?? 50,
+      humidity: weather.humidity ?? 50,
       precipitation: false,
     },
     {
@@ -178,8 +153,8 @@ export async function POST(request: NextRequest) {
     {
       temperature: tempC,
       windSpeed: windMs + 5,
-      humidity: body.weather.humidity ?? 50,
-      precipitation: body.weather.precipitation ?? false,
+      humidity: weather.humidity ?? 50,
+      precipitation: weather.precipitation ?? false,
     },
     {
       name: 'Ski Touring Downhill',
@@ -214,9 +189,9 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     conditions: {
-      temperature: `${body.weather.temperature}°F`,
-      wind_speed: `${body.weather.wind_speed} mph`,
-      precipitation: body.weather.precipitation ?? false,
+      temperature: `${weather.temperature}°F`,
+      wind_speed: `${weather.wind_speed} mph`,
+      precipitation: weather.precipitation ?? false,
     },
     ireq_analysis: {
       uphill: {
@@ -266,58 +241,6 @@ export async function POST(request: NextRequest) {
   });
 }
 
-interface GarmentRow {
-  id: string;
-  brand: string;
-  model_name: string;
-  category: string;
-  covers_torso: boolean;
-  covers_arms: boolean;
-  covers_legs: boolean;
-  weight_grams?: number;
-  garment_thermal_properties?: {
-    rcl_torso?: number;
-    rcl_arms?: number;
-    rcl_legs?: number;
-    rcl_whole_body?: number;
-    recl_torso?: number;
-    recl_arms?: number;
-    recl_legs?: number;
-    recl_whole_body?: number;
-    evap_potential?: number;
-  };
-  garment_protection?: {
-    windproof_rating?: string;
-    waterproof_rating?: string;
-  };
-  garment_activity_ratings?: {
-    ski_touring_uphill_score?: number;
-    ski_touring_downhill_score?: number;
-  };
-}
-
-interface CategorizedGarments {
-  baseLayers: GarmentRow[];
-  midLayers: GarmentRow[];
-  insulation: GarmentRow[];
-  shells: GarmentRow[];
-}
-
-function categorizeGarments(garments: GarmentRow[]): CategorizedGarments {
-  return {
-    baseLayers: garments.filter((g) => g.category === 'base_layer'),
-    midLayers: garments.filter((g) =>
-      ['mid_layer_light', 'mid_layer_heavy'].includes(g.category)
-    ),
-    insulation: garments.filter((g) =>
-      ['insulation_synthetic', 'insulation_down'].includes(g.category)
-    ),
-    shells: garments.filter((g) =>
-      ['soft_shell', 'hard_shell'].includes(g.category)
-    ),
-  };
-}
-
 function buildUphillEnsemble(
   categorized: CategorizedGarments,
   minClo: number,
@@ -331,11 +254,7 @@ function buildUphillEnsemble(
   const legsBaseLayers = categorized.baseLayers.filter((g) => g.covers_legs);
 
   // Select torso base layer (prioritize breathability)
-  const sortedTorsoBases = [...torsoBaseLayers].sort((a, b) => {
-    const epA = a.garment_thermal_properties?.evap_potential ?? 0;
-    const epB = b.garment_thermal_properties?.evap_potential ?? 0;
-    return epB - epA;
-  });
+  const sortedTorsoBases = sortByBreathability(torsoBaseLayers);
 
   if (sortedTorsoBases.length > 0) {
     const suitableBase = sortedTorsoBases.find(
@@ -345,11 +264,7 @@ function buildUphillEnsemble(
   }
 
   // Select legs base layer (prioritize breathability)
-  const sortedLegsBases = [...legsBaseLayers].sort((a, b) => {
-    const epA = a.garment_thermal_properties?.evap_potential ?? 0;
-    const epB = b.garment_thermal_properties?.evap_potential ?? 0;
-    return epB - epA;
-  });
+  const sortedLegsBases = sortByBreathability(legsBaseLayers);
 
   if (sortedLegsBases.length > 0) {
     const suitableBase = sortedLegsBases.find(
@@ -369,11 +284,7 @@ function buildUphillEnsemble(
   );
 
   if (currentClo < minClo && categorized.midLayers.length > 0) {
-    const sortedMids = [...categorized.midLayers].sort((a, b) => {
-      const epA = a.garment_thermal_properties?.evap_potential ?? 0;
-      const epB = b.garment_thermal_properties?.evap_potential ?? 0;
-      return epB - epA;
-    });
+    const sortedMids = sortByBreathability(categorized.midLayers);
 
     for (const mid of sortedMids) {
       const midClo = mid.garment_thermal_properties?.rcl_whole_body ?? 0;
@@ -394,11 +305,7 @@ function buildUphillEnsemble(
   );
 
   if (breathableSoftShells.length > 0) {
-    const sorted = breathableSoftShells.sort((a, b) => {
-      const epA = a.garment_thermal_properties?.evap_potential ?? 0;
-      const epB = b.garment_thermal_properties?.evap_potential ?? 0;
-      return epB - epA;
-    });
+    const sorted = sortByBreathability(breathableSoftShells);
     const shell = sorted[0];
     const shellClo = shell.garment_thermal_properties?.rcl_whole_body ?? 0;
     if (currentClo + shellClo <= maxClo) {
@@ -453,11 +360,7 @@ function selectShell(shells: GarmentRow[], precipitation: boolean): GarmentRow |
   }
 
   // Wind only - prefer most breathable
-  const sorted = [...shells].sort((a, b) => {
-    const epA = a.garment_thermal_properties?.evap_potential ?? 0;
-    const epB = b.garment_thermal_properties?.evap_potential ?? 0;
-    return epB - epA;
-  });
+  const sorted = sortByBreathability(shells);
 
   return sorted[0];
 }

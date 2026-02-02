@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
-import { garmentToThermalProps, predictEnsembleThermal } from '@/lib/biophysics/ensemble';
-import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq, fahrenheitToCelsius, mphToMs } from '@/lib/biophysics/ireq';
-import { scoreEnsemble, type GarmentWithProtection } from '@/lib/biophysics/scorer';
+import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
+import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
+import { scoreEnsemble } from '@/lib/biophysics/scorer';
 import { METABOLIC_RATES } from '@/lib/biophysics/constants';
 import {
+  validateRecommendationRequest,
   getUserWardrobeGarmentIds,
   fetchGarmentsWithDetails,
   categorizeGarments,
@@ -18,6 +18,7 @@ import {
   selectHeadwear,
   formatHandwearResponse,
   formatHeadwearResponse,
+  ensembleToThermalGarments,
   type GarmentRow,
   type CategorizedGarments,
 } from '@/lib/recommendations/shared';
@@ -43,23 +44,10 @@ import {
  *   x-user-id: string (optional) - If provided, uses only user's wardrobe items
  */
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
-  if (!supabase) {
-    return NextResponse.json(
-      { error: 'Database not configured' },
-      { status: 503 }
-    );
-  }
+  const validated = await validateRecommendationRequest(request);
+  if (validated instanceof NextResponse) return validated;
 
-  const userId = request.headers.get('x-user-id');
-  const body = await request.json();
-
-  if (!body.weather?.temperature || body.weather?.wind_speed === undefined) {
-    return NextResponse.json(
-      { error: 'weather.temperature and weather.wind_speed are required' },
-      { status: 400 }
-    );
-  }
+  const { supabase, userId, weather, tempC, windMs, body } = validated;
 
   const intensity = (body.intensity ?? 'moderate') as 'easy' | 'moderate' | 'racing';
   const intensityToRate: Record<'easy' | 'moderate' | 'racing', keyof typeof METABOLIC_RATES> = {
@@ -69,15 +57,11 @@ export async function POST(request: NextRequest) {
   };
   const metabolicRateKey = intensityToRate[intensity];
 
-  // Convert to metric
-  const tempC = fahrenheitToCelsius(body.weather.temperature);
-  const windMs = mphToMs(body.weather.wind_speed);
-
   // Calculate IREQ
   const ireq = calculateIreq({
     airTemp: tempC,
     windSpeed: windMs,
-    relativeHumidity: body.weather.humidity ?? 50,
+    relativeHumidity: weather.humidity ?? 50,
     metabolicRate: METABOLIC_RATES[metabolicRateKey],
   });
 
@@ -128,15 +112,7 @@ export async function POST(request: NextRequest) {
   const recommendedHeadwear = selectHeadwear(userHeadwear, tempC, true);
 
   // Score the ensemble
-  const thermalGarments: GarmentWithProtection[] = ensemble.map((g) => {
-    const baseProps = garmentToThermalProps(g, g.garment_thermal_properties ?? {});
-    return {
-      ...baseProps,
-      category: g.category,
-      windproofRating: g.garment_protection?.windproof_rating as GarmentWithProtection['windproofRating'],
-      waterproofRating: g.garment_protection?.waterproof_rating as GarmentWithProtection['waterproofRating'],
-    };
-  });
+  const thermalGarments = ensembleToThermalGarments(ensemble);
 
   const ensembleProps = predictEnsembleThermal(thermalGarments);
 
@@ -145,8 +121,8 @@ export async function POST(request: NextRequest) {
     {
       temperature: tempC,
       windSpeed: windMs,
-      humidity: body.weather.humidity ?? 50,
-      precipitation: body.weather.precipitation ?? false,
+      humidity: weather.humidity ?? 50,
+      precipitation: weather.precipitation ?? false,
     },
     {
       name: 'XC Skiing',
@@ -163,8 +139,8 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     conditions: {
-      temperature: `${body.weather.temperature}°F`,
-      wind_speed: `${body.weather.wind_speed} mph`,
+      temperature: `${weather.temperature}°F`,
+      wind_speed: `${weather.wind_speed} mph`,
       intensity,
     },
     ireq: {
