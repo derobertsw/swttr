@@ -12,17 +12,27 @@ const faqs = [
   {
     question: "How does SWTTR determine what to wear?",
     answer:
-      "SWTTR uses temperature ranges and activity type to recommend layering strategies. The recommendations are based on best practices for outdoor activities, accounting for factors like exertion level and wind exposure.",
+      "SWTTR uses a biophysics-based algorithm grounded in ISO 11079 (IREQ - Required Insulation) standards and USARIEM thermal comfort research. It calculates the exact insulation needed based on temperature, wind speed, humidity, and your activity's metabolic rate. The algorithm considers different insulation needs for body regions (torso, arms, legs) and extremities (hands, head), then selects garments from your wardrobe to meet those targets.",
+  },
+  {
+    question: "What is the thermal comfort score?",
+    answer:
+      "The score (0-100) indicates how well your recommended outfit matches the calculated insulation requirements. Green (80+) means excellent thermal balance, amber (60-79) is acceptable with minor trade-offs, and red (below 60) suggests potential discomfort. The score factors in thermal insulation, moisture management, wind/water protection, weight, and mobility.",
+  },
+  {
+    question: "What are clo values?",
+    answer:
+      "Clo is a unit of thermal resistance used to measure clothing insulation. 1 clo equals the insulation needed to keep a resting person comfortable at 21°C (70°F). A t-shirt is about 0.1 clo, while a heavy winter jacket might be 1.5+ clo. SWTTR shows current vs target clo values for each body region so you can see if you're adequately insulated.",
   },
   {
     question: "What activities are supported?",
     answer:
-      "Currently SWTTR supports Alpine Skiing, Backcountry Skiing, XC Skiing, Running, and Biking. Each activity has tailored recommendations based on typical exertion levels and conditions.",
+      "SWTTR's biophysics algorithm currently supports Alpine Skiing, Backcountry Skiing, and XC Skiing with activity-specific metabolic rates and regional insulation targets. Running and Biking use simpler temperature-based recommendations.",
   },
   {
-    question: "How do I customize my gear names?",
+    question: "How do I add my gear?",
     answer:
-      "Visit the Wardrobe page to replace standard layer names with your actual gear. For example, you can change 'Midweight base layer' to 'Patagonia Capilene'. These custom names will appear in your recommendations.",
+      "Visit the Wardrobe page to add calibrated gear from our database. Search for items by brand or name, and click to add them to your wardrobe. When you get recommendations, SWTTR will select from your wardrobe items based on their actual thermal properties (clo values, breathability, wind/water protection).",
   },
   {
     question: "What does 'Plan Ahead' do?",
@@ -37,7 +47,7 @@ const faqs = [
   {
     question: "Do I need an account to use SWTTR?",
     answer:
-      "No account is required to get clothing recommendations. However, signing in allows you to save your custom gear names across devices and sessions.",
+      "No account is required to get clothing recommendations. Your wardrobe is stored locally in your browser. Signing in allows you to sync your wardrobe across devices.",
   },
   {
     question: "What temperature unit does SWTTR use?",
@@ -45,9 +55,14 @@ const faqs = [
       "SWTTR currently displays temperatures in Fahrenheit. Support for Celsius is planned for a future update.",
   },
   {
-    question: "Why are some layers optional?",
+    question: "Why might recommendations differ from what I'd normally wear?",
     answer:
-      "Comfort varies by individual. Some people run hot while others run cold. The recommendations provide a starting point, but you should adjust based on your personal preferences and experience.",
+      "The algorithm is based on standardized thermal comfort research, but comfort varies by individual. Some people run hot while others run cold. Use the recommendations as a scientific starting point, then adjust based on your experience. The clo targets help you understand the reasoning behind each suggestion.",
+  },
+  {
+    question: "Why don't hands and head show current clo values?",
+    answer:
+      "The algorithm calculates target insulation for extremities (hands and head) based on activity and conditions, but we're still building out the handwear and headwear catalog with calibrated thermal data. For now, you'll see the target clo to aim for, and can add items to your wardrobe once they become available. Torso layers show both current and target values since those garments are fully calibrated.",
   },
 ];
 

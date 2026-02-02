@@ -19,6 +19,8 @@ import { useItemMappings } from "@/hooks/useItemMappings";
 import { fetchCurrentWeather, fetchWeatherByCoords } from "@/hooks/useCurrentWeather";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useBackpack } from "@/hooks/useBackpack";
+import { useBiophysicsRecommendation } from "@/hooks/useBiophysicsRecommendation";
+import { BiophysicsRecommendation } from "@/types/biophysics";
 import { BACKPACK_ACTIVITY_IDS } from "@/data/backpackConstants";
 import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,6 +47,8 @@ const HomeContent = () => {
 
   const locationSearch = useLocationSearch();
   const { itemMappings } = useItemMappings();
+  const biophysics = useBiophysicsRecommendation();
+  const [biophysicsData, setBiophysicsData] = useState<BiophysicsRecommendation | null>(null);
 
   // Set initial activity from preferences when it loads
   useEffect(() => {
@@ -88,7 +92,9 @@ const HomeContent = () => {
     setTime("12:00");
     setLocationDenied(false);
     locationSearch.reset();
-  }, [locationSearch, defaultActivity]);
+    biophysics.reset();
+    setBiophysicsData(null);
+  }, [locationSearch, defaultActivity, biophysics]);
 
   const handleSubmit = async () => {
     if (!activity) {
@@ -128,6 +134,10 @@ const HomeContent = () => {
         setRecommendation(layers);
         setShowResults(true);
         toast.success(`Forecast: ${data.temperature}°F, ${data.windSpeed} mph wind`);
+
+        // Fetch biophysics data for supported activities (non-blocking)
+        biophysics.fetch(activity, { temperature: data.temperature, windSpeed: data.windSpeed })
+          .then(setBiophysicsData);
       } catch (error) {
         toast.error("Failed to fetch weather forecast");
         console.error(error);
@@ -138,6 +148,10 @@ const HomeContent = () => {
       const layers = getRecommendation(temperature);
       setRecommendation(layers);
       setShowResults(true);
+
+      // Fetch biophysics data for supported activities (non-blocking)
+      biophysics.fetch(activity, { temperature, windSpeed: windspeed })
+        .then(setBiophysicsData);
     } else if (locationDenied) {
       // Location was previously denied, use manually entered location
       if (!locationSearch.selectedLocation) {
@@ -159,6 +173,10 @@ const HomeContent = () => {
         setRecommendation(layers);
         setShowResults(true);
         toast.success(`Current: ${weather.temperature}°F, ${weather.windSpeed} mph wind`);
+
+        // Fetch biophysics data for supported activities (non-blocking)
+        biophysics.fetch(activity, { temperature: weather.temperature, windSpeed: weather.windSpeed })
+          .then(setBiophysicsData);
       } else {
         toast.error("Could not get weather for this location.");
       }
@@ -174,6 +192,10 @@ const HomeContent = () => {
         setRecommendation(layers);
         setShowResults(true);
         toast.success(`Current: ${result.data.temperature}°F, ${result.data.windSpeed} mph wind`);
+
+        // Fetch biophysics data for supported activities (non-blocking)
+        biophysics.fetch(activity, { temperature: result.data.temperature, windSpeed: result.data.windSpeed })
+          .then(setBiophysicsData);
       } else if (result.locationDenied) {
         toast.error("Location access denied. Please enter your location manually.");
         setLocationDenied(true);
@@ -247,6 +269,7 @@ const HomeContent = () => {
             backpackItems={BACKPACK_ACTIVITY_IDS.includes(activity) ? backpack.items : undefined}
             onRemoveBackpackItem={BACKPACK_ACTIVITY_IDS.includes(activity) ? backpack.removeItem : undefined}
             onHideBackpackDefault={BACKPACK_ACTIVITY_IDS.includes(activity) ? backpack.hideDefault : undefined}
+            biophysicsData={biophysicsData}
           />
           <Button size="lg" variant="outline" onClick={() => setShowResults(false)}>
             Back

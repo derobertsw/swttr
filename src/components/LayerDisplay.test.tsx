@@ -111,7 +111,7 @@ describe("LayerDisplay", () => {
   });
 
   describe("empty layers", () => {
-    it("should show None when all layers are empty", () => {
+    it("should show wardrobe link when all layers are empty", () => {
       const emptyRecommendation = {
         torso: { base: [], outer: [] },
         legs: { base: [], outer: [] },
@@ -120,8 +120,12 @@ describe("LayerDisplay", () => {
       };
 
       render(<LayerDisplay recommendation={emptyRecommendation} temperature={25} windspeed={10} />);
-      const noneTexts = screen.getAllByText("None");
-      expect(noneTexts).toHaveLength(4);
+
+      // Should show "Add X items in wardrobe" links for each body part
+      expect(screen.getByText("Add torso items in wardrobe")).toBeInTheDocument();
+      expect(screen.getByText("Add legs items in wardrobe")).toBeInTheDocument();
+      expect(screen.getByText("Add hands items in wardrobe")).toBeInTheDocument();
+      expect(screen.getByText("Add head/neck items in wardrobe")).toBeInTheDocument();
     });
 
     it("should not show mid layer label when mid is not present", () => {

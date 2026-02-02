@@ -1,0 +1,235 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabase } from "@/lib/supabase";
+
+type ItemType = "garment" | "handwear" | "headwear";
+
+function getUserId(request: NextRequest): string | null {
+  return request.headers.get("x-user-id");
+}
+
+/**
+ * GET /api/wardrobe/gear
+ * Get user's wardrobe items with full details
+ */
+export async function GET(request: NextRequest) {
+  const supabase = getSupabase();
+  const userId = getUserId(request);
+
+  if (!supabase) {
+    return NextResponse.json({ items: [] });
+  }
+
+  if (!userId) {
+    return NextResponse.json({ error: "User ID required" }, { status: 401 });
+  }
+
+  try {
+    // Get user's wardrobe entries
+    const { data: wardrobeItems, error } = await supabase
+      .from("user_wardrobe")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Failed to fetch wardrobe:", error);
+      return NextResponse.json(
+        { error: "Failed to fetch wardrobe" },
+        { status: 500 }
+      );
+    }
+
+    // Fetch full details for each item
+    const itemsWithDetails = await Promise.all(
+      (wardrobeItems || []).map(async (entry) => {
+        let itemDetails = null;
+
+        if (entry.item_type === "garment") {
+          const { data } = await supabase
+            .from("garments")
+            .select("*, garment_thermal_properties(*)")
+            .eq("id", entry.item_id)
+            .single();
+          itemDetails = data;
+        } else if (entry.item_type === "handwear") {
+          const { data } = await supabase
+            .from("handwear")
+            .select("*")
+            .eq("id", entry.item_id)
+            .single();
+          itemDetails = data;
+        } else if (entry.item_type === "headwear") {
+          const { data } = await supabase
+            .from("headwear")
+            .select("*")
+            .eq("id", entry.item_id)
+            .single();
+          itemDetails = data;
+        }
+
+        return {
+          id: entry.id,
+          item_type: entry.item_type,
+          item_id: entry.item_id,
+          nickname: entry.nickname,
+          created_at: entry.created_at,
+          details: itemDetails,
+        };
+      })
+    );
+
+    return NextResponse.json({ items: itemsWithDetails });
+  } catch (err) {
+    console.error("Database error:", err);
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
+}
+
+/**
+ * POST /api/wardrobe/gear
+ * Add an item to user's wardrobe
+ */
+export async function POST(request: NextRequest) {
+  const supabase = getSupabase();
+  const userId = getUserId(request);
+
+  if (!supabase) {
+    return NextResponse.json(
+      { error: "Database not configured" },
+      { status: 503 }
+    );
+  }
+
+  if (!userId) {
+    return NextResponse.json({ error: "User ID required" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { item_type, item_id, nickname } = body as {
+      item_type: ItemType;
+      item_id: string;
+      nickname?: string;
+    };
+
+    if (!item_type || !item_id) {
+      return NextResponse.json(
+        { error: "item_type and item_id are required" },
+        { status: 400 }
+      );
+    }
+
+    // Verify the item exists
+    let itemExists = false;
+    if (item_type === "garment") {
+      const { data } = await supabase
+        .from("garments")
+        .select("id")
+        .eq("id", item_id)
+        .single();
+      itemExists = !!data;
+    } else if (item_type === "handwear") {
+      const { data } = await supabase
+        .from("handwear")
+        .select("id")
+        .eq("id", item_id)
+        .single();
+      itemExists = !!data;
+    } else if (item_type === "headwear") {
+      const { data } = await supabase
+        .from("headwear")
+        .select("id")
+        .eq("id", item_id)
+        .single();
+      itemExists = !!data;
+    }
+
+    if (!itemExists) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
+    const { data, error } = await supabase
+      .from("user_wardrobe")
+      .insert({
+        user_id: userId,
+        item_type,
+        item_id,
+        nickname: nickname || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: "Item already in wardrobe" },
+          { status: 409 }
+        );
+      }
+      console.error("Failed to add item:", error);
+      return NextResponse.json(
+        { error: "Failed to add item" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ item: data }, { status: 201 });
+  } catch (err) {
+    console.error("Error adding item:", err);
+    return NextResponse.json({ error: "Failed to add item" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/wardrobe/gear
+ * Remove an item from user's wardrobe
+ */
+export async function DELETE(request: NextRequest) {
+  const supabase = getSupabase();
+  const userId = getUserId(request);
+
+  if (!supabase) {
+    return NextResponse.json(
+      { error: "Database not configured" },
+      { status: 503 }
+    );
+  }
+
+  if (!userId) {
+    return NextResponse.json({ error: "User ID required" }, { status: 401 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "id query parameter required" },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase
+      .from("user_wardrobe")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("Failed to delete item:", error);
+      return NextResponse.json(
+        { error: "Failed to delete item" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Error deleting item:", err);
+    return NextResponse.json(
+      { error: "Failed to delete item" },
+      { status: 500 }
+    );
+  }
+}
