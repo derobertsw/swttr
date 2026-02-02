@@ -39,7 +39,7 @@ export async function GET() {
         brand: g.brand,
         model_name: g.model_name,
         category: g.category,
-        rcl_clo: g.garment_thermal_properties?.rcl_whole_body,
+        rcl_clo: g.garment_thermal_properties?.[0]?.rcl_whole_body,
       })),
       ...(handwearResult.data || []).map((h) => ({
         id: h.id,
