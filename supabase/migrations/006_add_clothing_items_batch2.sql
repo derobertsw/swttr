@@ -13,6 +13,10 @@ VALUES ('Arc''teryx', 'Fission SV Gloves', 'insulated_glove', 280, 2.70, 6, true
 INSERT INTO handwear (brand, model_name, handwear_type, weight_grams_pair, rcl_clo, dexterity_score, waterproof, windproof, touchscreen_compatible, min_temp_active, min_temp_static)
 VALUES ('HEAD', 'Ultrafit Multi-Sport Running Gloves', 'liner_glove', 60, 0.60, 9, false, false, true, -7, 5);
 
+-- Norrøna falketind dri short Gloves
+INSERT INTO handwear (brand, model_name, handwear_type, weight_grams_pair, rcl_clo, dexterity_score, waterproof, windproof, touchscreen_compatible, min_temp_active, min_temp_static)
+VALUES ('Norrøna', 'falketind dri short Gloves', 'light_glove', 109, 1.00, 7, true, true, false, -5, 5);
+
 
 -- ============================================
 -- HEADWEAR

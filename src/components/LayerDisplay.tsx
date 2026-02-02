@@ -161,7 +161,6 @@ const LayerDisplay = ({
         const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
 
         // Get wardrobe layers filtered by body part (torso or legs)
-        // Hands and headNeck don't have wardrobe garments yet
         const wardrobeLayers = (part === "torso" || part === "legs") && biophysicsGarments
           ? garmentsTolayerSet(biophysicsGarments, part)
           : { base: [], mid: [], outer: [] };
@@ -169,10 +168,19 @@ const LayerDisplay = ({
         // Use wardrobe items when biophysics is active, otherwise use static recommendation
         const layers = biophysicsActive ? wardrobeLayers : recommendation[part];
 
+        // Check for extremity gear from biophysics
+        const recommendedHandwear = biophysicsData?.recommendation?.handwear;
+        const recommendedHeadwear = biophysicsData?.recommendation?.headwear;
+
+        // For hands/headNeck, check if we have biophysics extremity recommendations
+        const hasExtremityGear = (part === "hands" && recommendedHandwear) ||
+          (part === "headNeck" && recommendedHeadwear);
+
         const hasLayers =
           layers.base.length > 0 ||
           (layers.mid && layers.mid.length > 0) ||
-          layers.outer.length > 0;
+          layers.outer.length > 0 ||
+          hasExtremityGear;
 
         // Get regional clo data if available (for torso/legs)
         const region = bodyPartToRegion[part];
@@ -191,8 +199,12 @@ const LayerDisplay = ({
           currentClo = regionalClo?.[region];
           targetClo = regionalIreq?.neutral?.[region];
         } else if (extremity) {
-          // For extremities, we don't have current clo from ensemble (would need handwear/headwear data)
-          // Just show the target for now
+          // Get current clo from recommended extremity gear
+          if (extremity === "hands" && recommendedHandwear) {
+            currentClo = recommendedHandwear.rcl;
+          } else if (extremity === "head" && recommendedHeadwear) {
+            currentClo = recommendedHeadwear.rcl;
+          }
           targetClo = extremityIreq?.neutral?.[extremity];
         }
 
@@ -230,6 +242,18 @@ const LayerDisplay = ({
               </Link>
             ) : (
               <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {/* Show extremity gear for hands/headNeck */}
+                {part === "hands" && recommendedHandwear && (
+                  <li>
+                    {recommendedHandwear.name} ({recommendedHandwear.rcl.toFixed(2)} clo)
+                  </li>
+                )}
+                {part === "headNeck" && recommendedHeadwear && (
+                  <li>
+                    {recommendedHeadwear.name} ({recommendedHeadwear.rcl.toFixed(2)} clo)
+                  </li>
+                )}
+                {/* Show garment layers for torso/legs */}
                 {layers.base.length > 0 && (
                   <li>
                     <span style={{ fontWeight: 500 }}>{layerLabels.base}:</span>{" "}

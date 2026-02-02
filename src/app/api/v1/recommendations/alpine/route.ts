@@ -12,6 +12,12 @@ import {
   sortByWaterproofness,
   sortByBreathability,
   formatGarmentResponse,
+  fetchUserHandwear,
+  fetchUserHeadwear,
+  selectHandwear,
+  selectHeadwear,
+  formatHandwearResponse,
+  formatHeadwearResponse,
   type GarmentRow,
   type CategorizedGarments,
 } from '@/lib/recommendations/shared';
@@ -113,6 +119,16 @@ export async function POST(request: NextRequest) {
     body.weather.precipitation ?? false
   );
 
+  // Fetch user's extremity gear (handwear and headwear)
+  const [userHandwear, userHeadwear] = await Promise.all([
+    fetchUserHandwear(supabase, userId),
+    fetchUserHeadwear(supabase, userId),
+  ]);
+
+  // Select best extremity gear for conditions (alpine has static periods on chairlift)
+  const recommendedHandwear = selectHandwear(userHandwear, tempC, false);
+  const recommendedHeadwear = selectHeadwear(userHeadwear, tempC, false);
+
   // Score the ensemble
   const thermalGarments: GarmentWithProtection[] = ensemble.map((g) => {
     const baseProps = garmentToThermalProps(g, g.garment_thermal_properties ?? {});
@@ -168,6 +184,8 @@ export async function POST(request: NextRequest) {
         ...formatGarmentResponse(g),
         rcl: g.garment_thermal_properties?.rcl_whole_body,
       })),
+      handwear: recommendedHandwear ? formatHandwearResponse(recommendedHandwear) : null,
+      headwear: recommendedHeadwear ? formatHeadwearResponse(recommendedHeadwear) : null,
       ensemble_properties: {
         total_clo: ensembleProps.rcl.wholeBody,
         regional_clo: {

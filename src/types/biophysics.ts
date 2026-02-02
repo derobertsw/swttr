@@ -71,6 +71,23 @@ export interface RecommendedGarment {
   covers_legs?: boolean;
 }
 
+export interface RecommendedHandwear {
+  id: string;
+  name: string;
+  type: string;
+  rcl: number;
+  dexterity?: number;
+}
+
+export interface RecommendedHeadwear {
+  id: string;
+  name: string;
+  type: string;
+  rcl: number;
+  covers_ears?: boolean;
+  covers_neck?: boolean;
+}
+
 export interface BiophysicsRecommendation {
   conditions: {
     temperature: string;
@@ -80,6 +97,8 @@ export interface BiophysicsRecommendation {
   ireq: IreqRange;
   recommendation: {
     garments: RecommendedGarment[];
+    handwear?: RecommendedHandwear | null;
+    headwear?: RecommendedHeadwear | null;
     ensemble_properties: EnsembleProperties;
     score: number;
     component_scores: ComponentScores;

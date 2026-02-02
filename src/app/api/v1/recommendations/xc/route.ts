@@ -12,6 +12,12 @@ import {
   getEnsembleClo,
   findBreathableGarment,
   formatGarmentResponse,
+  fetchUserHandwear,
+  fetchUserHeadwear,
+  selectHandwear,
+  selectHeadwear,
+  formatHandwearResponse,
+  formatHeadwearResponse,
   type GarmentRow,
   type CategorizedGarments,
 } from '@/lib/recommendations/shared';
@@ -111,6 +117,16 @@ export async function POST(request: NextRequest) {
   // Build optimal ensemble prioritizing breathability
   const ensemble = buildXCEnsemble(categorized, ireq, maxClo, minEvapPotential);
 
+  // Fetch user's extremity gear (handwear and headwear)
+  const [userHandwear, userHeadwear] = await Promise.all([
+    fetchUserHandwear(supabase, userId),
+    fetchUserHeadwear(supabase, userId),
+  ]);
+
+  // Select best extremity gear for conditions
+  const recommendedHandwear = selectHandwear(userHandwear, tempC, true);
+  const recommendedHeadwear = selectHeadwear(userHeadwear, tempC, true);
+
   // Score the ensemble
   const thermalGarments: GarmentWithProtection[] = ensemble.map((g) => {
     const baseProps = garmentToThermalProps(g, g.garment_thermal_properties ?? {});
@@ -160,6 +176,8 @@ export async function POST(request: NextRequest) {
     },
     recommendation: {
       garments: ensemble.map(formatGarmentResponse),
+      handwear: recommendedHandwear ? formatHandwearResponse(recommendedHandwear) : null,
+      headwear: recommendedHeadwear ? formatHeadwearResponse(recommendedHeadwear) : null,
       ensemble_properties: {
         total_clo: ensembleProps.rcl.wholeBody,
         regional_clo: {

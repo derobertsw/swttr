@@ -222,3 +222,172 @@ export function formatGarmentResponse(garment: GarmentRow): {
     covers_legs: garment.covers_legs,
   };
 }
+
+// ============================================
+// EXTREMITY GEAR TYPES
+// ============================================
+
+export interface HandwearRow {
+  id: string;
+  brand: string;
+  model_name: string;
+  handwear_type: string;
+  rcl_clo: number;
+  dexterity_score?: number;
+  waterproof?: boolean;
+  windproof?: boolean;
+  min_temp_active?: number;
+  min_temp_static?: number;
+}
+
+export interface HeadwearRow {
+  id: string;
+  brand: string;
+  model_name: string;
+  headwear_type: string;
+  rcl_clo: number;
+  covers_ears?: boolean;
+  covers_neck?: boolean;
+  covers_face?: boolean;
+  min_temp_active?: number;
+  min_temp_static?: number;
+}
+
+// ============================================
+// EXTREMITY GEAR FETCHING
+// ============================================
+
+/**
+ * Get user's wardrobe item IDs by type
+ */
+export async function getUserWardrobeItemIds(
+  supabase: ReturnType<typeof getSupabase>,
+  userId: string | null,
+  itemType: 'garment' | 'handwear' | 'headwear'
+): Promise<string[] | null> {
+  if (!supabase || !userId) return null;
+
+  const { data } = await supabase
+    .from('user_wardrobe')
+    .select('item_id')
+    .eq('user_id', userId)
+    .eq('item_type', itemType);
+
+  if (!data || data.length === 0) return null;
+  return data.map((d) => d.item_id);
+}
+
+/**
+ * Fetch user's handwear from wardrobe
+ */
+export async function fetchUserHandwear(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  userId: string | null
+): Promise<HandwearRow[]> {
+  const ids = await getUserWardrobeItemIds(supabase, userId, 'handwear');
+  if (!ids || ids.length === 0) return [];
+
+  const { data } = await supabase
+    .from('handwear')
+    .select('*')
+    .in('id', ids);
+
+  return (data as HandwearRow[]) || [];
+}
+
+/**
+ * Fetch user's headwear from wardrobe
+ */
+export async function fetchUserHeadwear(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  userId: string | null
+): Promise<HeadwearRow[]> {
+  const ids = await getUserWardrobeItemIds(supabase, userId, 'headwear');
+  if (!ids || ids.length === 0) return [];
+
+  const { data } = await supabase
+    .from('headwear')
+    .select('*')
+    .in('id', ids);
+
+  return (data as HeadwearRow[]) || [];
+}
+
+/**
+ * Select best handwear based on temperature
+ */
+export function selectHandwear(
+  handwear: HandwearRow[],
+  tempC: number,
+  isActive: boolean
+): HandwearRow | null {
+  if (handwear.length === 0) return null;
+
+  // Filter by temperature suitability
+  const suitable = handwear.filter((h) => {
+    const minTemp = isActive ? h.min_temp_active : h.min_temp_static;
+    return minTemp === undefined || minTemp === null || tempC >= minTemp;
+  });
+
+  // Sort by clo (warmest first for cold, lightest first for warm)
+  const sorted = [...(suitable.length > 0 ? suitable : handwear)].sort((a, b) => {
+    if (tempC < -10) return b.rcl_clo - a.rcl_clo; // Cold: prefer warmer
+    if (tempC > 0) return a.rcl_clo - b.rcl_clo;   // Warm: prefer lighter
+    return b.rcl_clo - a.rcl_clo; // Default: prefer warmer
+  });
+
+  return sorted[0] || null;
+}
+
+/**
+ * Select best headwear based on temperature
+ */
+export function selectHeadwear(
+  headwear: HeadwearRow[],
+  tempC: number,
+  isActive: boolean
+): HeadwearRow | null {
+  if (headwear.length === 0) return null;
+
+  // Filter by temperature suitability
+  const suitable = headwear.filter((h) => {
+    const minTemp = isActive ? h.min_temp_active : h.min_temp_static;
+    return minTemp === undefined || minTemp === null || tempC >= minTemp;
+  });
+
+  // Sort by clo (warmest first for cold, lightest first for warm)
+  const sorted = [...(suitable.length > 0 ? suitable : headwear)].sort((a, b) => {
+    if (tempC < -10) return b.rcl_clo - a.rcl_clo; // Cold: prefer warmer
+    if (tempC > 0) return a.rcl_clo - b.rcl_clo;   // Warm: prefer lighter
+    return b.rcl_clo - a.rcl_clo; // Default: prefer warmer
+  });
+
+  return sorted[0] || null;
+}
+
+/**
+ * Format handwear for API response
+ */
+export function formatHandwearResponse(handwear: HandwearRow) {
+  return {
+    id: handwear.id,
+    name: `${handwear.brand} ${handwear.model_name}`,
+    type: handwear.handwear_type,
+    rcl: handwear.rcl_clo,
+    dexterity: handwear.dexterity_score,
+  };
+}
+
+/**
+ * Format headwear for API response
+ */
+export function formatHeadwearResponse(headwear: HeadwearRow) {
+  return {
+    id: headwear.id,
+    name: `${headwear.brand} ${headwear.model_name}`,
+    type: headwear.headwear_type,
+    rcl: headwear.rcl_clo,
+    covers_ears: headwear.covers_ears,
+    covers_neck: headwear.covers_neck,
+  };
+}

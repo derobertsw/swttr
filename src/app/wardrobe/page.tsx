@@ -129,17 +129,28 @@ export default function Wardrobe() {
     fetchData();
   }, [userId]);
 
+  // Normalize special characters for search (e.g., ø -> o)
+  const normalizeSearch = (text: string) => {
+    return text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
+      .replace(/ø/g, "o")
+      .replace(/æ/g, "ae")
+      .replace(/å/g, "a");
+  };
+
   // Filter available items by search and exclude already added
   const filteredItems = useMemo(() => {
     const wardrobeIds = new Set(wardrobeItems.map((w) => w.item_id));
-    const searchLower = search.toLowerCase();
+    const searchNormalized = normalizeSearch(search);
 
     return availableItems.filter((item) => {
       if (wardrobeIds.has(item.id)) return false;
       if (!search) return true;
 
-      const searchText = `${item.brand} ${item.model_name} ${item.category}`.toLowerCase();
-      return searchText.includes(searchLower);
+      const searchText = normalizeSearch(`${item.brand} ${item.model_name} ${item.category}`);
+      return searchText.includes(searchNormalized);
     });
   }, [availableItems, wardrobeItems, search]);
 
