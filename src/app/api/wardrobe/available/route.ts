@@ -17,7 +17,7 @@ export async function GET() {
     const [garmentsResult, handwearResult, headwearResult] = await Promise.all([
       supabase
         .from("garments")
-        .select("id, brand, model_name, category, garment_thermal_properties(rcl_whole_body)")
+        .select("id, brand, model_name, category, garment_type, garment_thermal_properties(rcl_whole_body)")
         .order("brand")
         .order("model_name"),
       supabase
@@ -39,6 +39,7 @@ export async function GET() {
         brand: g.brand,
         model_name: g.model_name,
         category: g.category,
+        garment_type: g.garment_type,
         rcl_clo: g.garment_thermal_properties?.[0]?.rcl_whole_body,
       })),
       ...(handwearResult.data || []).map((h) => ({

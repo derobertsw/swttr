@@ -326,18 +326,40 @@ function buildUphillEnsemble(
 ): GarmentRow[] {
   const ensemble: GarmentRow[] = [];
 
-  // 1. Base layer - most breathable that provides enough warmth
-  const sortedBases = [...categorized.baseLayers].sort((a, b) => {
+  // 1. Base layers for torso and legs separately - most breathable that provides enough warmth
+  const torsoBaseLayers = categorized.baseLayers.filter((g) => g.covers_torso);
+  const legsBaseLayers = categorized.baseLayers.filter((g) => g.covers_legs);
+
+  // Select torso base layer (prioritize breathability)
+  const sortedTorsoBases = [...torsoBaseLayers].sort((a, b) => {
     const epA = a.garment_thermal_properties?.evap_potential ?? 0;
     const epB = b.garment_thermal_properties?.evap_potential ?? 0;
     return epB - epA;
   });
 
-  if (sortedBases.length > 0) {
-    const suitableBase = sortedBases.find(
+  if (sortedTorsoBases.length > 0) {
+    const suitableBase = sortedTorsoBases.find(
       (b) => (b.garment_thermal_properties?.evap_potential ?? 0) >= minEvapPotential
     );
-    ensemble.push(suitableBase ?? sortedBases[0]);
+    ensemble.push(suitableBase ?? sortedTorsoBases[0]);
+  }
+
+  // Select legs base layer (prioritize breathability)
+  const sortedLegsBases = [...legsBaseLayers].sort((a, b) => {
+    const epA = a.garment_thermal_properties?.evap_potential ?? 0;
+    const epB = b.garment_thermal_properties?.evap_potential ?? 0;
+    return epB - epA;
+  });
+
+  if (sortedLegsBases.length > 0) {
+    const suitableBase = sortedLegsBases.find(
+      (b) => (b.garment_thermal_properties?.evap_potential ?? 0) >= minEvapPotential
+    );
+    // Don't add if it's the same item (e.g., one-piece that covers both)
+    const baseToAdd = suitableBase ?? sortedLegsBases[0];
+    if (!ensemble.some((g) => g.id === baseToAdd.id)) {
+      ensemble.push(baseToAdd);
+    }
   }
 
   // 2. Add breathable mid if needed

@@ -4,7 +4,29 @@ import { useState, useEffect, useMemo } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, X, Shirt, Hand, HardHat } from "lucide-react";
+import { Search, Plus, X, Shirt, Hand, HardHat, LucideProps } from "lucide-react";
+
+// Custom pants icon (ski pants style) since lucide-react doesn't have one
+function PantsIcon(props: LucideProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M6 3h12v4l1 13h-5l-2-11-2 11H5l1-13V3z" />
+    </svg>
+  );
+}
+
+const LEGS_GARMENT_TYPES = ["pants", "shorts", "bib"];
 
 interface AvailableItem {
   id: string;
@@ -12,6 +34,7 @@ interface AvailableItem {
   brand: string;
   model_name: string;
   category: string;
+  garment_type?: string;
   rcl_clo?: number;
   dexterity_score?: number;
 }
@@ -25,6 +48,7 @@ interface WardrobeItem {
     brand: string;
     model_name: string;
     category?: string;
+    garment_type?: string;
     handwear_type?: string;
     headwear_type?: string;
     rcl_clo?: number;
@@ -37,6 +61,14 @@ const typeIcons = {
   handwear: Hand,
   headwear: HardHat,
 };
+
+// Get the appropriate icon for an item based on type and garment_type
+function getItemIcon(itemType: string, garmentType?: string) {
+  if (itemType === "garment" && garmentType && LEGS_GARMENT_TYPES.includes(garmentType)) {
+    return PantsIcon;
+  }
+  return typeIcons[itemType as keyof typeof typeIcons] || Shirt;
+}
 
 const typeLabels = {
   garment: "Clothing",
@@ -224,27 +256,31 @@ export default function Wardrobe() {
                             <Icon className="size-3" />
                             {typeLabels[type as keyof typeof typeLabels]}
                           </div>
-                          {items.map((item) => (
-                            <button
-                              key={item.id}
-                              onClick={() => addItem(item)}
-                              disabled={adding === item.id}
-                              className="w-full px-3 py-2 text-left hover:bg-muted flex items-center justify-between gap-2 disabled:opacity-50"
-                            >
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">
-                                  {item.brand} {item.model_name}
+                          {items.map((item) => {
+                            const ItemIcon = getItemIcon(item.type, item.garment_type);
+                            return (
+                              <button
+                                key={item.id}
+                                onClick={() => addItem(item)}
+                                disabled={adding === item.id}
+                                className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 disabled:opacity-50"
+                              >
+                                <ItemIcon className="size-4 text-muted-foreground flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium truncate">
+                                    {item.brand} {item.model_name}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                    <span>{formatCategory(item.category)}</span>
+                                    {item.rcl_clo && (
+                                      <span className="font-mono">{item.rcl_clo.toFixed(2)} clo</span>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                  <span>{formatCategory(item.category)}</span>
-                                  {item.rcl_clo && (
-                                    <span className="font-mono">{item.rcl_clo.toFixed(2)} clo</span>
-                                  )}
-                                </div>
-                              </div>
-                              <Plus className="size-4 text-muted-foreground flex-shrink-0" />
-                            </button>
-                          ))}
+                                <Plus className="size-4 text-muted-foreground flex-shrink-0" />
+                              </button>
+                            );
+                          })}
                         </div>
                       );
                     })
@@ -267,7 +303,7 @@ export default function Wardrobe() {
               ) : (
                 <div className="flex flex-col gap-1">
                   {wardrobeItems.map((item) => {
-                    const Icon = typeIcons[item.item_type];
+                    const Icon = getItemIcon(item.item_type, item.details.garment_type);
                     const category =
                       item.details.category ||
                       item.details.handwear_type ||

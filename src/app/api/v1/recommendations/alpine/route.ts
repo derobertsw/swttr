@@ -195,17 +195,33 @@ function buildAlpineEnsemble(
   const ensemble: GarmentRow[] = [];
   let currentClo = 0;
 
-  // 1. Base layer (prioritize warmth for alpine)
-  const sortedBases = sortByInsulation(categorized.baseLayers);
+  // 1. Base layers for torso and legs separately (prioritize warmth for alpine)
+  const torsoBaseLayers = categorized.baseLayers.filter((g) => g.covers_torso);
+  const legsBaseLayers = categorized.baseLayers.filter((g) => g.covers_legs);
 
-  if (sortedBases.length > 0) {
-    // Pick base layer based on target clo
-    const suitableBase = sortedBases.find(
+  // Select torso base layer
+  const sortedTorsoBases = sortByInsulation(torsoBaseLayers);
+  if (sortedTorsoBases.length > 0) {
+    const suitableBase = sortedTorsoBases.find(
       (b) => (b.garment_thermal_properties?.rcl_whole_body ?? 0) <= minClo * 0.3
     );
-    const baseLayer = suitableBase ?? sortedBases[sortedBases.length - 1];
+    const baseLayer = suitableBase ?? sortedTorsoBases[sortedTorsoBases.length - 1];
     ensemble.push(baseLayer);
     currentClo += baseLayer.garment_thermal_properties?.rcl_whole_body ?? 0;
+  }
+
+  // Select legs base layer
+  const sortedLegsBases = sortByInsulation(legsBaseLayers);
+  if (sortedLegsBases.length > 0) {
+    const suitableBase = sortedLegsBases.find(
+      (b) => (b.garment_thermal_properties?.rcl_whole_body ?? 0) <= minClo * 0.3
+    );
+    const baseLayer = suitableBase ?? sortedLegsBases[sortedLegsBases.length - 1];
+    // Don't add if it's the same item (e.g., one-piece that covers both)
+    if (!ensemble.some((g) => g.id === baseLayer.id)) {
+      ensemble.push(baseLayer);
+      currentClo += baseLayer.garment_thermal_properties?.rcl_whole_body ?? 0;
+    }
   }
 
   // 2. Mid layer or insulation

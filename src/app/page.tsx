@@ -24,6 +24,7 @@ import { BiophysicsRecommendation } from "@/types/biophysics";
 import { BACKPACK_ACTIVITY_IDS } from "@/data/backpackConstants";
 import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from "lucide-react";
 
 type InputMode = "manual" | "planAhead";
 
@@ -132,12 +133,12 @@ const HomeContent = () => {
         setTemperature(data.temperature);
         setWindspeed(data.windSpeed);
         setRecommendation(layers);
-        setShowResults(true);
         toast.success(`Forecast: ${data.temperature}°F, ${data.windSpeed} mph wind`);
 
-        // Fetch biophysics data for supported activities (non-blocking)
-        biophysics.fetch(activity, { temperature: data.temperature, windSpeed: data.windSpeed })
-          .then(setBiophysicsData);
+        // Fetch biophysics data before showing results
+        const bioData = await biophysics.fetch(activity, { temperature: data.temperature, windSpeed: data.windSpeed });
+        setBiophysicsData(bioData);
+        setShowResults(true);
       } catch (error) {
         toast.error("Failed to fetch weather forecast");
         console.error(error);
@@ -145,13 +146,15 @@ const HomeContent = () => {
         setLoading(false);
       }
     } else if (showSliders) {
+      setLoading(true);
       const layers = getRecommendation(temperature);
       setRecommendation(layers);
-      setShowResults(true);
 
-      // Fetch biophysics data for supported activities (non-blocking)
-      biophysics.fetch(activity, { temperature, windSpeed: windspeed })
-        .then(setBiophysicsData);
+      // Fetch biophysics data before showing results
+      const bioData = await biophysics.fetch(activity, { temperature, windSpeed: windspeed });
+      setBiophysicsData(bioData);
+      setShowResults(true);
+      setLoading(false);
     } else if (locationDenied) {
       // Location was previously denied, use manually entered location
       if (!locationSearch.selectedLocation) {
@@ -171,12 +174,12 @@ const HomeContent = () => {
         setWindspeed(weather.windSpeed);
         const layers = getRecommendation(weather.temperature);
         setRecommendation(layers);
-        setShowResults(true);
         toast.success(`Current: ${weather.temperature}°F, ${weather.windSpeed} mph wind`);
 
-        // Fetch biophysics data for supported activities (non-blocking)
-        biophysics.fetch(activity, { temperature: weather.temperature, windSpeed: weather.windSpeed })
-          .then(setBiophysicsData);
+        // Fetch biophysics data before showing results
+        const bioData = await biophysics.fetch(activity, { temperature: weather.temperature, windSpeed: weather.windSpeed });
+        setBiophysicsData(bioData);
+        setShowResults(true);
       } else {
         toast.error("Could not get weather for this location.");
       }
@@ -190,12 +193,12 @@ const HomeContent = () => {
         setWindspeed(result.data.windSpeed);
         const layers = getRecommendation(result.data.temperature);
         setRecommendation(layers);
-        setShowResults(true);
         toast.success(`Current: ${result.data.temperature}°F, ${result.data.windSpeed} mph wind`);
 
-        // Fetch biophysics data for supported activities (non-blocking)
-        biophysics.fetch(activity, { temperature: result.data.temperature, windSpeed: result.data.windSpeed })
-          .then(setBiophysicsData);
+        // Fetch biophysics data before showing results
+        const bioData = await biophysics.fetch(activity, { temperature: result.data.temperature, windSpeed: result.data.windSpeed });
+        setBiophysicsData(bioData);
+        setShowResults(true);
       } else if (result.locationDenied) {
         toast.error("Location access denied. Please enter your location manually.");
         setLocationDenied(true);
@@ -256,7 +259,7 @@ const HomeContent = () => {
             onClick={handleSubmit}
             disabled={loading || (process.env.NODE_ENV === "production" && ["running", "biking", "backcountry-skiing"].includes(activity))}
           >
-            {loading ? "Loading..." : "Gear Up"}
+            {loading ? <><Loader2 className="animate-spin" /> Loading...</> : "Gear Up"}
           </Button>
         </>
       ) : (

@@ -186,13 +186,25 @@ function buildXCEnsemble(
 ): GarmentRow[] {
   const ensemble: GarmentRow[] = [];
 
-  // 1. Select base layer (prioritize breathability)
-  const sortedBases = sortByBreathability(categorized.baseLayers);
+  // 1. Select base layers for torso and legs separately
+  const torsoBaseLayers = categorized.baseLayers.filter((g) => g.covers_torso);
+  const legsBaseLayers = categorized.baseLayers.filter((g) => g.covers_legs);
 
-  if (sortedBases.length > 0) {
-    // Find warmest base that meets breathability threshold
-    const suitableBase = findBreathableGarment(sortedBases, minEvapPotential);
-    ensemble.push(suitableBase ?? sortedBases[0]);
+  // Select torso base layer (prioritize breathability)
+  const sortedTorsoBases = sortByBreathability(torsoBaseLayers);
+  if (sortedTorsoBases.length > 0) {
+    const suitableBase = findBreathableGarment(sortedTorsoBases, minEvapPotential);
+    ensemble.push(suitableBase ?? sortedTorsoBases[0]);
+  }
+
+  // Select legs base layer (prioritize breathability)
+  const sortedLegsBases = sortByBreathability(legsBaseLayers);
+  if (sortedLegsBases.length > 0) {
+    const suitableBase = findBreathableGarment(sortedLegsBases, minEvapPotential);
+    // Don't add if it's the same item (e.g., one-piece that covers both)
+    if (!ensemble.some((g) => g.id === suitableBase?.id)) {
+      ensemble.push(suitableBase ?? sortedLegsBases[0]);
+    }
   }
 
   // 2. Check if we need more layers
