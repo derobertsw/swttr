@@ -8,7 +8,7 @@ import {
   mphToMs,
   msToMph,
 } from './ireq';
-import { METABOLIC_RATES } from './constants';
+import { METABOLIC_RATES, getAlpineCloTargets, ALPINE_CLO_TARGETS } from './constants';
 
 describe('Unit Conversions', () => {
   describe('fahrenheitToCelsius', () => {
@@ -294,6 +294,84 @@ describe('calculateExtremityIreq', () => {
 
       // XC hands multiplier (1.10) < Alpine hands multiplier (1.45)
       expect(xcResult.min.hands).toBeLessThan(alpineResult.min.hands);
+    });
+  });
+});
+
+describe('getAlpineCloTargets', () => {
+  describe('temperature range selection', () => {
+    it('should return mild targets for temperatures >= -5°C', () => {
+      expect(getAlpineCloTargets(0)).toBe(ALPINE_CLO_TARGETS.mild);
+      expect(getAlpineCloTargets(-5)).toBe(ALPINE_CLO_TARGETS.mild);
+      expect(getAlpineCloTargets(5)).toBe(ALPINE_CLO_TARGETS.mild);
+    });
+
+    it('should return cold targets for temperatures -15°C to -5°C', () => {
+      expect(getAlpineCloTargets(-6)).toBe(ALPINE_CLO_TARGETS.cold);
+      expect(getAlpineCloTargets(-10)).toBe(ALPINE_CLO_TARGETS.cold);
+      expect(getAlpineCloTargets(-15)).toBe(ALPINE_CLO_TARGETS.cold);
+    });
+
+    it('should return veryCold targets for temperatures < -15°C', () => {
+      expect(getAlpineCloTargets(-16)).toBe(ALPINE_CLO_TARGETS.veryCold);
+      expect(getAlpineCloTargets(-20)).toBe(ALPINE_CLO_TARGETS.veryCold);
+      expect(getAlpineCloTargets(-40)).toBe(ALPINE_CLO_TARGETS.veryCold);
+    });
+  });
+
+  describe('target value structure', () => {
+    it('should return correct mild range values', () => {
+      const targets = getAlpineCloTargets(0);
+
+      expect(targets.torso.min).toBe(2.0);
+      expect(targets.torso.neutral).toBe(3.0);
+      expect(targets.legs.min).toBe(1.5);
+      expect(targets.legs.neutral).toBe(2.0);
+      expect(targets.head.min).toBe(0.5);
+      expect(targets.head.neutral).toBe(1.0);
+      expect(targets.hands.min).toBe(1.0);
+      expect(targets.hands.neutral).toBe(1.5);
+    });
+
+    it('should return correct cold range values', () => {
+      const targets = getAlpineCloTargets(-10);
+
+      expect(targets.torso.min).toBe(3.5);
+      expect(targets.torso.neutral).toBe(4.5);
+      expect(targets.legs.min).toBe(2.0);
+      expect(targets.legs.neutral).toBe(3.0);
+      expect(targets.head.min).toBe(1.0);
+      expect(targets.head.neutral).toBe(1.5);
+      expect(targets.hands.min).toBe(1.5);
+      expect(targets.hands.neutral).toBe(2.5);
+    });
+
+    it('should return correct veryCold range values', () => {
+      const targets = getAlpineCloTargets(-25);
+
+      expect(targets.torso.min).toBe(5.0);
+      expect(targets.torso.neutral).toBe(6.0);
+      expect(targets.legs.min).toBe(3.0);
+      expect(targets.legs.neutral).toBe(4.0);
+      expect(targets.head.min).toBe(1.5);
+      expect(targets.head.neutral).toBe(2.0);
+      expect(targets.hands.min).toBe(2.5);
+      expect(targets.hands.neutral).toBe(3.5);
+    });
+  });
+
+  describe('neutral > min invariant', () => {
+    it('should always have neutral clo greater than min clo', () => {
+      const temps = [5, 0, -5, -10, -15, -20, -30];
+
+      for (const temp of temps) {
+        const targets = getAlpineCloTargets(temp);
+
+        expect(targets.torso.neutral).toBeGreaterThan(targets.torso.min);
+        expect(targets.legs.neutral).toBeGreaterThan(targets.legs.min);
+        expect(targets.head.neutral).toBeGreaterThan(targets.head.min);
+        expect(targets.hands.neutral).toBeGreaterThan(targets.hands.min);
+      }
     });
   });
 });
