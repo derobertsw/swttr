@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
 import { garmentToThermalProps, predictEnsembleThermal } from '@/lib/biophysics/ensemble';
-import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq, fahrenheitToCelsius, mphToMs } from '@/lib/biophysics/ireq';
+import { calculateIreq, fahrenheitToCelsius, mphToMs } from '@/lib/biophysics/ireq';
 import { scoreEnsemble, type GarmentWithProtection } from '@/lib/biophysics/scorer';
-import { METABOLIC_RATES } from '@/lib/biophysics/constants';
+import { METABOLIC_RATES, getAlpineCloTargets } from '@/lib/biophysics/constants';
 import {
   getUserWardrobeGarmentIds,
   fetchGarmentsWithDetails,
@@ -162,9 +162,34 @@ export async function POST(request: NextRequest) {
     'alpine_skiing'
   );
 
-  // Calculate regional IREQ targets (use chairlift since that's the cold period)
-  const regionalIreq = calculateRegionalIreq(ireqChairlift, 'alpine_skiing');
-  const extremityIreq = calculateExtremityIreq(ireqChairlift, 'alpine_skiing', tempC, windMs);
+  // Get direct clo targets for alpine skiing based on temperature
+  const alpineTargets = getAlpineCloTargets(tempC);
+
+  // Format regional targets using the new direct values
+  const regionalIreq = {
+    min: {
+      torso: alpineTargets.torso.min,
+      arms: alpineTargets.torso.min * 0.85, // Arms need slightly less than torso
+      legs: alpineTargets.legs.min,
+    },
+    neutral: {
+      torso: alpineTargets.torso.neutral,
+      arms: alpineTargets.torso.neutral * 0.85,
+      legs: alpineTargets.legs.neutral,
+    },
+  };
+
+  // Format extremity targets using the new direct values
+  const extremityIreq = {
+    min: {
+      hands: alpineTargets.hands.min,
+      head: alpineTargets.head.min,
+    },
+    neutral: {
+      hands: alpineTargets.hands.neutral,
+      head: alpineTargets.head.neutral,
+    },
+  };
 
   return NextResponse.json({
     conditions: {

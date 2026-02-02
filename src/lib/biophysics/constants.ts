@@ -151,3 +151,42 @@ export type ActivityType = keyof typeof ACTIVITY_WEIGHTS;
 export type MetabolicRateKey = keyof typeof METABOLIC_RATES;
 export type RegionalIreqActivity = keyof typeof REGIONAL_IREQ_MULTIPLIERS;
 export type ExtremityIreqActivity = keyof typeof EXTREMITY_IREQ_MULTIPLIERS;
+
+// Alpine skiing direct clo targets by temperature range
+// Based on empirical data for downhill/resort skiing with chairlift exposure
+export const ALPINE_CLO_TARGETS = {
+  // Mild: -5°C to 0°C (23°F to 32°F)
+  mild: {
+    torso: { min: 2.0, neutral: 3.0 },
+    legs: { min: 1.5, neutral: 2.0 },
+    head: { min: 0.5, neutral: 1.0 },
+    hands: { min: 1.0, neutral: 1.5 },
+  },
+  // Cold: -15°C to -5°C (5°F to 23°F)
+  cold: {
+    torso: { min: 3.5, neutral: 4.5 },
+    legs: { min: 2.0, neutral: 3.0 },
+    head: { min: 1.0, neutral: 1.5 },
+    hands: { min: 1.5, neutral: 2.5 },
+  },
+  // Very Cold: below -15°C (below 5°F)
+  veryCold: {
+    torso: { min: 5.0, neutral: 6.0 },
+    legs: { min: 3.0, neutral: 4.0 },
+    head: { min: 1.5, neutral: 2.0 },
+    hands: { min: 2.5, neutral: 3.5 },
+  },
+} as const;
+
+/**
+ * Get alpine skiing clo targets based on temperature
+ */
+export function getAlpineCloTargets(tempC: number) {
+  if (tempC >= -5) {
+    return ALPINE_CLO_TARGETS.mild;
+  } else if (tempC >= -15) {
+    return ALPINE_CLO_TARGETS.cold;
+  } else {
+    return ALPINE_CLO_TARGETS.veryCold;
+  }
+}
