@@ -222,6 +222,27 @@ export default function Wardrobe() {
     return item.details.garment_thermal_properties?.rcl_whole_body;
   };
 
+  const getBodyPart = (item: WardrobeItem): string => {
+    if (item.item_type === "handwear") return "hands";
+    if (item.item_type === "headwear") return "head & neck";
+    if (item.details.garment_type && LEGS_GARMENT_TYPES.includes(item.details.garment_type)) return "legs";
+    return "torso";
+  };
+
+  const bodyPartOrder = ["torso", "legs", "hands", "head & neck"];
+
+  const groupedWardrobeItems = useMemo(() => {
+    const groups: Record<string, WardrobeItem[]> = {};
+    for (const part of bodyPartOrder) {
+      groups[part] = [];
+    }
+    wardrobeItems.forEach((item) => {
+      const part = getBodyPart(item);
+      groups[part].push(item);
+    });
+    return groups;
+  }, [wardrobeItems]);
+
   return (
     <PageLayout>
       <div className="flex flex-col gap-6 w-full max-w-2xl">
@@ -312,41 +333,52 @@ export default function Wardrobe() {
                   <p className="text-sm">Search above to add your calibrated items.</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-1">
-                  {wardrobeItems.map((item) => {
-                    const Icon = getItemIcon(item.item_type, item.details.garment_type);
-                    const category =
-                      item.details.category ||
-                      item.details.handwear_type ||
-                      item.details.headwear_type ||
-                      "";
-                    const clo = getClo(item);
-
+                <div className="flex flex-col gap-3">
+                  {bodyPartOrder.map((part) => {
+                    const items = groupedWardrobeItems[part];
+                    if (items.length === 0) return null;
                     return (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-3 p-3 border rounded-lg bg-card"
-                      >
-                        <Icon className="size-5 text-muted-foreground flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">
-                            {item.details.brand} {item.details.model_name}
-                          </div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-2">
-                            <span>{formatCategory(category)}</span>
-                            {clo !== undefined && (
-                              <span className="font-mono">{clo.toFixed(2)} clo</span>
-                            )}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 flex-shrink-0"
-                          onClick={() => removeItem(item.id)}
-                        >
-                          <X className="size-4" />
-                        </Button>
+                      <div key={part} className="flex flex-col gap-1">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
+                          {part}
+                        </h4>
+                        {items.map((item) => {
+                          const Icon = getItemIcon(item.item_type, item.details.garment_type);
+                          const category =
+                            item.details.category ||
+                            item.details.handwear_type ||
+                            item.details.headwear_type ||
+                            "";
+                          const clo = getClo(item);
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="flex items-center gap-3 p-3 border rounded-lg bg-card"
+                            >
+                              <Icon className="size-5 text-muted-foreground flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">
+                                  {item.details.brand} {item.details.model_name}
+                                </div>
+                                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                  <span>{formatCategory(category)}</span>
+                                  {clo !== undefined && (
+                                    <span className="font-mono">{clo.toFixed(2)} clo</span>
+                                  )}
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8 flex-shrink-0"
+                                onClick={() => removeItem(item.id)}
+                              >
+                                <X className="size-4" />
+                              </Button>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   })}
