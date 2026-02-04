@@ -98,7 +98,7 @@ export function scoreEnsemble(
     const deficit = ireq.ireqMin - rcl;
     scores.coldProtection = Math.max(0, 50 - deficit * 20);
     warnings.push(
-      `Insufficient insulation: ${rcl.toFixed(1)} clo vs ${ireq.ireqMin.toFixed(1)} clo required`
+      `Insufficient overall insulation: ${rcl.toFixed(1)} clo vs ${ireq.ireqMin.toFixed(1)} clo required`
     );
   }
 
