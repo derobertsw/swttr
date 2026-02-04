@@ -22,33 +22,42 @@ export function MobileTabBar() {
     updateDefaultActivity,
   } = usePreferences();
 
+  // On landing screen (home), no tab should have visual emphasis
+  const isLandingScreen = pathname === "/";
+
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50" style={{ backgroundColor: '#4f9da6', boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.15)' }}>
+    <nav
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 backdrop-blur-lg"
+      style={{ backgroundColor: 'rgba(79, 157, 166, 0.45)' }}
+    >
       <div className="flex justify-around items-center h-16">
         {NAV_ITEMS.map((item) => {
-          const isActive = item.href.startsWith("/?") ? pathname === "/" : pathname === item.href;
+          // Determine if this item would normally be active
+          const wouldBeActive = item.href.startsWith("/?") ? pathname === "/" : pathname === item.href;
+          // On landing screen, suppress active styling so no tab competes for attention
+          const isActive = isLandingScreen ? false : wouldBeActive;
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
                 "flex flex-col items-center gap-1 text-xs font-medium transition-all",
-                isActive ? "text-primary" : "text-foreground/60"
+                isActive ? "text-white" : "text-white/65"
               )}
             >
               <div
                 className={cn(
                   "flex items-center justify-center size-10 rounded-full transition-all",
-                  isActive && "bg-primary/15 shadow-sm"
+                  isActive && "bg-white/15"
                 )}
               >
                 <item.icon
-                  className="size-5"
+                  className={cn("size-5", !isActive && "opacity-65")}
                   fill={isActive ? "currentColor" : "none"}
                   strokeWidth={isActive ? 1.5 : 2}
                 />
               </div>
-              {item.label}
+              <span className={cn(!isActive && "opacity-65")}>{item.label}</span>
             </Link>
           );
         })}
@@ -61,12 +70,12 @@ export function MobileTabBar() {
           onDefaultActivityChange={updateDefaultActivity}
         >
           <button
-            className="flex flex-col items-center gap-1 text-xs font-medium transition-all text-foreground/60"
+            className="flex flex-col items-center gap-1 text-xs font-medium transition-all text-white/65"
           >
             <div className="flex items-center justify-center size-10 rounded-full">
-              <Settings className="size-5" />
+              <Settings className="size-5 opacity-65" />
             </div>
-            Preferences
+            <span className="opacity-65">Preferences</span>
           </button>
         </PreferencesDrawer>
       </div>

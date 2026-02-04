@@ -8,8 +8,6 @@ import {
   type CarouselApi,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
 } from "@/components/ui/carousel";
 import { ACTIVITIES } from "@/data/activities";
 
@@ -57,40 +55,76 @@ const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
         setApi={setApi}
       >
         <CarouselContent className="py-6">
-          {ACTIVITIES.map((activity, index) => (
-            <CarouselItem className="basis-1/3" key={activity.value}>
-              <Card
-                className={cn(
-                  "cursor-pointer transition-all duration-300 border-2",
-                  index === current
-                    ? "scale-100 border-primary shadow-lg"
-                    : "scale-75 opacity-60 border-transparent"
-                )}
-                onClick={() => api?.scrollTo(index)}
-              >
-                <CardContent className="flex flex-col items-center justify-center p-6 gap-3">
-                  <activity.icon
+          {ACTIVITIES.map((activity, index) => {
+            const isSelected = index === current;
+            return (
+              <CarouselItem className="basis-1/3" key={activity.value}>
+                <Card
+                  className={cn(
+                    "cursor-pointer transition-all duration-200 border-2",
+                    isSelected
+                      ? "scale-110 border-gray-300/60 shadow-[0_5px_14px_rgba(0,0,0,0.17)] bg-white"
+                      : "scale-[0.92] opacity-80 border-transparent shadow-none"
+                  )}
+                  onClick={() => api?.scrollTo(index)}
+                >
+                  <CardContent
                     className={cn(
-                      "transition-all duration-300",
-                      index === current ? "size-10" : "size-7"
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "text-center font-medium transition-all duration-300",
-                      index === current ? "text-base" : "text-xs"
+                      "flex flex-col items-center justify-center gap-2",
+                      isSelected ? "py-7 px-6" : "p-6"
                     )}
                   >
-                    {activity.name}
-                  </span>
-                </CardContent>
-              </Card>
-            </CarouselItem>
-          ))}
+                    <activity.icon
+                      className={cn(
+                        "transition-all duration-200",
+                        isSelected
+                          ? "size-11 text-primary"
+                          : "size-8 text-muted-foreground/60"
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "text-center font-medium transition-all duration-200",
+                        isSelected ? "text-base" : "text-xs text-muted-foreground"
+                      )}
+                    >
+                      {activity.name}
+                    </span>
+                    {activity.descriptor && (
+                      <span
+                        className={cn(
+                          "text-center text-xs leading-relaxed mt-1 transition-all duration-200",
+                          isSelected
+                            ? "text-muted-foreground/65"
+                            : "text-muted-foreground/45"
+                        )}
+                      >
+                        {activity.descriptor}
+                      </span>
+                    )}
+                  </CardContent>
+                </Card>
+              </CarouselItem>
+            );
+          })}
         </CarouselContent>
-        <CarouselPrevious />
-        <CarouselNext />
       </Carousel>
+      {/* Pagination dots */}
+      <div className="flex justify-center gap-2 mt-2">
+        {ACTIVITIES.map((activity, index) => (
+          <button
+            key={activity.value}
+            onClick={() => api?.scrollTo(index)}
+            className={cn(
+              "w-2 h-2 rounded-full transition-all duration-300",
+              index === current
+                ? "bg-white"
+                : "bg-white/35"
+            )}
+            aria-label={`Select ${activity.name}`}
+          />
+        ))}
+      </div>
     </div>
   );
 };

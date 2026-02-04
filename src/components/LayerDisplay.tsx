@@ -120,31 +120,55 @@ function ThermalGauge({ totalClo, targetRange }: ThermalGaugeProps) {
   // Convert position (-1 to 1) to percentage (0 to 100)
   const markerPercent = ((position + 1) / 2) * 100;
 
+  // Comfort zone spans from roughly -0.2 to +0.2 on the scale (40% to 60% on bar)
+  const comfortStart = 40;
+  const comfortEnd = 60;
+
   return (
     <div className="w-full">
-      {/* Labels */}
+      {/* Labels - Cold / Comfortable / Hot */}
       <div className="flex justify-between text-xs text-slate-500 mb-1.5">
         <span>Cold</span>
+        <span className="text-slate-400">Comfortable</span>
         <span>Hot</span>
       </div>
 
-      {/* Gauge track with extra bottom padding for "You" label */}
-      <div className="relative h-2 rounded-full bg-gradient-to-r from-[#4FA3FF] via-[#36D6A0] to-[#F2C94C] mb-5">
+      {/* Gauge track - desaturated gradient for instrument-like feel */}
+      <div
+        className="relative h-2.5 rounded-full mb-6"
+        style={{
+          background: "linear-gradient(to right, #6BAADB 0%, #7DC4A8 35%, #A8C9A0 50%, #C9C490 65%, #D4B87A 100%)",
+        }}
+      >
+        {/* Comfort zone indicator band */}
+        <div
+          className="absolute inset-y-0 rounded-full"
+          style={{
+            left: `${comfortStart}%`,
+            width: `${comfortEnd - comfortStart}%`,
+            background: "rgba(255, 255, 255, 0.12)",
+            boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.15)",
+          }}
+        />
+
         {/* Marker with "You" label */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center transition-all duration-300"
-          style={{ left: `${markerPercent}%` }}
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center"
+          style={{
+            left: `${markerPercent}%`,
+            animation: "gauge-thumb-enter 0.4s ease-out",
+          }}
         >
-          {/* Thumb - 20% larger (w-5 h-5 vs w-4 h-4), white outline, subtle shadow */}
+          {/* Thumb - hero element with enhanced shadow and size */}
           <div
-            className="w-5 h-5 rounded-full bg-white border-2 border-slate-700"
+            className="w-6 h-6 rounded-full bg-white border-[2.5px] border-slate-700"
             style={{
-              outline: "1px solid white",
-              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.15)",
+              outline: "2px solid white",
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15)",
             }}
           />
           {/* You label */}
-          <span className="text-[10px] text-slate-500 mt-1 whitespace-nowrap">You</span>
+          <span className="text-[10px] text-slate-500 mt-1.5 whitespace-nowrap font-medium">You</span>
         </div>
       </div>
     </div>

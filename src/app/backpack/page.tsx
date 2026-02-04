@@ -39,30 +39,30 @@ export default function Backpack() {
     <PageLayout>
       <div className="flex flex-col gap-6 w-full max-w-2xl">
         <header>
-          <h2 className="text-2xl font-semibold">Backpack</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl font-semibold text-white/90 tracking-wide">Backpack</h2>
+          <p className="text-[13px] text-white/55 mt-1">
             Customize items to bring for each activity and temperature range.
           </p>
         </header>
 
         <div className="flex flex-col gap-4">
           <Select value={activity} onValueChange={setActivity}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[220px] h-12 bg-white/15 backdrop-blur-sm border-white/40 text-white/70">
               <SelectValue placeholder="Activity" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
               {BACKPACK_ACTIVITIES.map((a) => (
-                <SelectItem key={a.value} value={a.value}>
+                <SelectItem key={a.value} value={a.value} className="py-2.5">
                   {a.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 mt-2">
             <div className="flex justify-between items-center">
-              <label className="text-sm font-medium">Temperature Range</label>
-              <span className="text-sm text-muted-foreground">
+              <label className="text-sm font-medium text-white/80">Temperature Range</label>
+              <span className="text-sm text-white/60">
                 {formatTemp(tempSlider[0])} to {formatTemp(tempSlider[1])}
               </span>
             </div>
@@ -74,7 +74,7 @@ export default function Backpack() {
               step={5}
               className="w-full"
             />
-            <div className="flex justify-between text-xs text-muted-foreground">
+            <div className="flex justify-between text-xs text-white/50">
               <span>-20°F</span>
               <span>40+°F</span>
             </div>

@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Search, Plus, X, Shirt, Hand, HardHat, LucideProps } from "lucide-react";
+import { Search, Plus, Check, Trash2, Shirt, Hand, HardHat, Layers, Flame, Shield, Wind, CloudRain, LucideProps } from "lucide-react";
 
 // Custom pants icon (ski pants style) since lucide-react doesn't have one
 function PantsIcon(props: LucideProps) {
@@ -62,11 +61,30 @@ const typeIcons = {
   headwear: HardHat,
 };
 
-// Get the appropriate icon for an item based on type and garment_type
-function getItemIcon(itemType: string, garmentType?: string) {
+// Category-specific icons for garments
+const categoryIcons: Record<string, React.ComponentType<LucideProps>> = {
+  base_layer: Layers,
+  mid_layer_light: Shirt,
+  mid_layer_heavy: Shirt,
+  insulation_synthetic: Flame,
+  insulation_down: Flame,
+  soft_shell: Shield,
+  hard_shell: CloudRain,
+  outer_insulated: Flame,
+  windbreaker: Wind,
+};
+
+// Get the appropriate icon for an item based on type, garment_type, and category
+function getItemIcon(itemType: string, garmentType?: string, category?: string) {
+  // Check for legs garment types first (pants, shorts, bib)
   if (itemType === "garment" && garmentType && LEGS_GARMENT_TYPES.includes(garmentType)) {
     return PantsIcon;
   }
+  // Use category-specific icon for garments
+  if (itemType === "garment" && category && categoryIcons[category]) {
+    return categoryIcons[category];
+  }
+  // Fall back to type icons
   return typeIcons[itemType as keyof typeof typeIcons] || Shirt;
 }
 
@@ -82,6 +100,110 @@ function formatCategory(category: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Swipeable item component for delete gesture
+interface SwipeableItemProps {
+  children: React.ReactNode;
+  onDelete: () => void;
+}
+
+function SwipeableItem({ children, onDelete }: SwipeableItemProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [translateX, setTranslateX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const startXRef = useRef(0);
+  const currentXRef = useRef(0);
+
+  const DELETE_THRESHOLD = -80; // Pixels to swipe to trigger delete
+  const DELETE_ACTION_WIDTH = 72; // Width of delete action area
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    startXRef.current = e.touches[0].clientX;
+    currentXRef.current = translateX;
+    setIsDragging(true);
+  }, [translateX]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging) return;
+
+    const diff = e.touches[0].clientX - startXRef.current;
+    const newTranslate = Math.min(0, Math.max(-DELETE_ACTION_WIDTH - 20, currentXRef.current + diff));
+    setTranslateX(newTranslate);
+  }, [isDragging]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false);
+
+    if (translateX < DELETE_THRESHOLD) {
+      // Snap to show delete button
+      setTranslateX(-DELETE_ACTION_WIDTH);
+    } else {
+      // Snap back
+      setTranslateX(0);
+    }
+  }, [translateX]);
+
+  const handleDelete = useCallback(() => {
+    // Animate out then delete
+    if (containerRef.current) {
+      containerRef.current.style.transition = 'all 0.3s ease-out';
+      containerRef.current.style.opacity = '0';
+      containerRef.current.style.maxHeight = '0';
+      containerRef.current.style.marginBottom = '0';
+      containerRef.current.style.padding = '0';
+    }
+    setTimeout(onDelete, 300);
+  }, [onDelete]);
+
+  // Close swipe on click elsewhere
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node) && translateX !== 0) {
+        setTranslateX(0);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [translateX]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative overflow-hidden rounded-lg"
+    >
+      {/* Delete action behind */}
+      <div
+        className="absolute inset-y-0 right-0 flex items-center justify-center bg-red-500/90 rounded-r-lg transition-opacity"
+        style={{
+          width: DELETE_ACTION_WIDTH,
+          opacity: translateX < -10 ? 1 : 0,
+        }}
+      >
+        <button
+          onClick={handleDelete}
+          className="flex flex-col items-center justify-center w-full h-full text-white"
+        >
+          <Trash2 className="size-5" />
+          <span className="text-xs mt-1">Remove</span>
+        </button>
+      </div>
+
+      {/* Main content */}
+      <div
+        className="relative bg-card border rounded-lg touch-pan-y"
+        style={{
+          transform: `translateX(${translateX}px)`,
+          transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function Wardrobe() {
   const [userId, setUserId] = useState<string | null>(null);
   const [availableItems, setAvailableItems] = useState<AvailableItem[]>([]);
@@ -89,6 +211,7 @@ export default function Wardrobe() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState<string | null>(null);
+  const [justAdded, setJustAdded] = useState<string | null>(null);
 
   // Get or create user ID
   useEffect(() => {
@@ -185,17 +308,24 @@ export default function Wardrobe() {
       });
 
       if (res.ok) {
-        // Refresh wardrobe
-        const wardrobeRes = await fetch("/api/wardrobe/gear", {
-          headers: { "x-user-id": userId },
-        });
-        const wardrobeData = await wardrobeRes.json();
-        setWardrobeItems(wardrobeData.items || []);
-        setSearch("");
+        // Show checkmark briefly
+        setJustAdded(item.id);
+        setAdding(null);
+        setTimeout(() => {
+          setJustAdded(null);
+          // Refresh wardrobe
+          fetch("/api/wardrobe/gear", {
+            headers: { "x-user-id": userId },
+          }).then(r => r.json()).then(data => {
+            setWardrobeItems(data.items || []);
+          });
+          setSearch("");
+        }, 600);
+      } else {
+        setAdding(null);
       }
     } catch (err) {
       console.error("Failed to add item:", err);
-    } finally {
       setAdding(null);
     }
   };
@@ -245,11 +375,11 @@ export default function Wardrobe() {
 
   return (
     <PageLayout>
-      <div className="flex flex-col gap-8 w-full max-w-2xl">
+      <div className="flex flex-col gap-6 w-full max-w-2xl">
         <header>
-          <h2 className="text-2xl font-semibold">My Gear</h2>
-          <p className="text-muted-foreground">
-            Add your calibrated gear to get personalized thermal recommendations.
+          <h2 className="text-2xl font-semibold text-white/90 tracking-wide">My Gear</h2>
+          <p className="text-[13px] text-white/55 mt-1">
+            Your gear powers your thermal recommendations.
           </p>
         </header>
 
@@ -267,13 +397,13 @@ export default function Wardrobe() {
                   placeholder="Search gear to add..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-12 bg-white/15 backdrop-blur-sm border-white/40 text-white/70 placeholder:text-white/70"
                 />
               </div>
 
               {/* Dropdown results */}
               {search && (
-                <div className="absolute z-10 w-full mt-1 bg-background border rounded-lg shadow-lg max-h-80 overflow-y-auto">
+                <div className="absolute z-10 w-full mt-1.5 bg-background border rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.3)] max-h-80 overflow-y-auto">
                   {filteredItems.length === 0 ? (
                     <div className="p-4 text-sm text-muted-foreground text-center">
                       No matching items found
@@ -284,32 +414,45 @@ export default function Wardrobe() {
                       const Icon = typeIcons[type as keyof typeof typeIcons];
                       return (
                         <div key={type}>
-                          <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted flex items-center gap-2">
-                            <Icon className="size-3" />
+                          <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider flex items-center gap-1.5">
+                            <Icon className="size-3 opacity-60" />
                             {typeLabels[type as keyof typeof typeLabels]}
                           </div>
                           {items.map((item) => {
-                            const ItemIcon = getItemIcon(item.type, item.garment_type);
+                            const ItemIcon = getItemIcon(item.type, item.garment_type, item.category);
+                            const isAdding = adding === item.id;
+                            const wasJustAdded = justAdded === item.id;
                             return (
                               <button
                                 key={item.id}
                                 onClick={() => addItem(item)}
-                                disabled={adding === item.id}
-                                className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 disabled:opacity-50"
+                                disabled={isAdding || wasJustAdded}
+                                className="w-full px-3 py-2.5 text-left hover:bg-muted/50 flex items-center gap-3 disabled:opacity-70 transition-colors"
                               >
-                                <ItemIcon className="size-4 text-muted-foreground flex-shrink-0" />
+                                <ItemIcon className="size-5 text-muted-foreground/60 flex-shrink-0" />
                                 <div className="flex-1 min-w-0">
                                   <div className="font-medium truncate">
                                     {item.brand} {item.model_name}
                                   </div>
-                                  <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                    <span>{formatCategory(item.category)}</span>
+                                  <div className="text-xs text-muted-foreground/65 mt-0.5">
+                                    {formatCategory(item.category)}
                                     {item.rcl_clo && (
-                                      <span className="font-mono">{item.rcl_clo.toFixed(2)} clo</span>
+                                      <span className="font-mono ml-1.5 opacity-80">· {item.rcl_clo.toFixed(2)} clo</span>
                                     )}
                                   </div>
                                 </div>
-                                <Plus className="size-4 text-muted-foreground flex-shrink-0" />
+                                <div className="size-8 flex items-center justify-center flex-shrink-0">
+                                  {wasJustAdded ? (
+                                    <Check
+                                      className="size-5 text-emerald-500"
+                                      style={{
+                                        animation: 'checkmark-pop 0.3s ease-out forwards'
+                                      }}
+                                    />
+                                  ) : (
+                                    <Plus className="size-4 text-muted-foreground/70 hover:text-muted-foreground transition-colors" />
+                                  )}
+                                </div>
                               </button>
                             );
                           })}
@@ -322,68 +465,82 @@ export default function Wardrobe() {
             </div>
 
             {/* User's wardrobe list */}
-            <div className="flex flex-col gap-3">
-              <h3 className="font-semibold text-sm text-muted-foreground">
+            <div className="flex flex-col gap-4 mt-2">
+              <h3 className="font-medium text-sm text-white/80 mb-1">
                 My Wardrobe ({wardrobeItems.length} items)
               </h3>
 
-              {wardrobeItems.length === 0 ? (
-                <div className="py-10 text-center text-muted-foreground border border-dashed rounded-lg">
-                  <p>No gear added yet.</p>
-                  <p className="text-sm">Search above to add your calibrated items.</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-5">
-                  {bodyPartOrder.map((part) => {
+              <div className="flex flex-col gap-6">
+                  {bodyPartOrder.map((part, index) => {
                     const items = groupedWardrobeItems[part];
-                    if (items.length === 0) return null;
+                    // Get the appropriate icon for empty state based on body part
+                    const getEmptyStateIcon = () => {
+                      switch (part) {
+                        case "torso": return Shirt;
+                        case "legs": return PantsIcon;
+                        case "hands": return Hand;
+                        case "head & neck": return HardHat;
+                        default: return Shirt;
+                      }
+                    };
+                    const EmptyIcon = getEmptyStateIcon();
+                    const isFirst = index === 0;
+
                     return (
-                      <div key={part} className="flex flex-col gap-2">
-                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
+                      <div key={part} className="flex flex-col gap-3">
+                        <h4 className={`text-xs font-semibold text-white/80 uppercase tracking-wider px-1 pb-1.5 border-b border-white/15 ${isFirst ? '' : 'mt-4'}`}>
                           {part}
                         </h4>
-                        {items.map((item) => {
-                          const Icon = getItemIcon(item.item_type, item.details.garment_type);
-                          const category =
-                            item.details.category ||
-                            item.details.handwear_type ||
-                            item.details.headwear_type ||
-                            "";
-                          const clo = getClo(item);
-
-                          return (
-                            <div
-                              key={item.id}
-                              className="flex items-center gap-3 p-3 border rounded-lg bg-card"
-                            >
-                              <Icon className="size-5 text-muted-foreground flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">
-                                  {item.details.brand} {item.details.model_name}
-                                </div>
-                                <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                  <span>{formatCategory(category)}</span>
-                                  {clo !== undefined && (
-                                    <span className="font-mono">{clo.toFixed(2)} clo</span>
-                                  )}
-                                </div>
+                        {items.length === 0 ? (
+                          <div className="flex items-center gap-3 px-3 py-4 border border-dashed border-white/20 rounded-lg">
+                            <EmptyIcon className="size-5 text-white/30 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm text-white/50">
+                                No {part} items yet
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="size-8 flex-shrink-0"
-                                onClick={() => removeItem(item.id)}
-                              >
-                                <X className="size-4" />
-                              </Button>
+                              <div className="text-xs text-white/40">
+                                Add gear to improve recommendations
+                              </div>
                             </div>
-                          );
-                        })}
+                            <Plus className="size-4 text-white/30 flex-shrink-0" />
+                          </div>
+                        ) : (
+                          items.map((item) => {
+                            const Icon = getItemIcon(item.item_type, item.details.garment_type, item.details.category);
+                            const category =
+                              item.details.category ||
+                              item.details.handwear_type ||
+                              item.details.headwear_type ||
+                              "";
+                            const clo = getClo(item);
+
+                            return (
+                              <SwipeableItem
+                                key={item.id}
+                                onDelete={() => removeItem(item.id)}
+                              >
+                                <div className="flex items-center gap-3 px-3 py-4">
+                                  <Icon className="size-5 text-white/60 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium truncate">
+                                      {item.details.brand} {item.details.model_name}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                                      <span>{formatCategory(category)}</span>
+                                      {clo !== undefined && (
+                                        <span className="font-mono text-[10px] opacity-55">{clo.toFixed(2)} clo</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </SwipeableItem>
+                            );
+                          })
+                        )}
                       </div>
                     );
                   })}
                 </div>
-              )}
             </div>
           </>
         )}

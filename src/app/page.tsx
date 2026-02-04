@@ -211,6 +211,9 @@ const HomeContent = () => {
     <PageLayout onLogoClick={resetToInitialState}>
       {!showResults ? (
         <>
+          <p className="text-base font-medium text-white/80 text-center mb-6">
+            Choose your activity
+          </p>
           <ActivitySelection value={activity} onChange={setActivity} />
           {inputMode === "manual" && showSliders ? (
             <WeatherSelection
@@ -248,16 +251,22 @@ const HomeContent = () => {
               onLocationInputChange={locationSearch.handleLocationInputChange}
               onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
               onSelectLocation={locationSearch.handleSelectLocation}
-              onSwitchToManual={() => setInputMode("manual")}
             />
           ) : null}
-          <Button
-            size="xl"
-            onClick={handleSubmit}
-            disabled={loading || (process.env.NODE_ENV === "production" && ["running", "biking"].includes(activity))}
-          >
-            {loading ? <><Loader2 className="animate-spin" /> Loading...</> : "Gear Up"}
-          </Button>
+          <p className="text-sm text-white/55 text-center mb-4">
+            Built on thermal science
+          </p>
+          <div className="flex flex-col items-center">
+            <Button
+              size="xl"
+              className="py-5 shadow-[0_5px_14px_rgba(0,0,0,0.3)]"
+              onClick={handleSubmit}
+              disabled={loading || (process.env.NODE_ENV === "production" && ["running", "biking"].includes(activity))}
+            >
+              {loading ? <><Loader2 className="animate-spin" /> Loading...</> : "Gear Up"}
+            </Button>
+            <span className="text-xs text-white/60 mt-1.5">Personalized for conditions</span>
+          </div>
         </>
       ) : (
         <>

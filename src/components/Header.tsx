@@ -11,6 +11,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
   SheetTrigger,
   SheetClose,
 } from "@/components/ui/sheet";
@@ -78,13 +79,14 @@ const Header = ({ onLogoClick }: HeaderProps) => {
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild className="md:hidden">
             <Button variant="ghost" size="icon">
-              <Menu className="size-5" />
+              <Menu className="size-5 text-white/95" />
               <span className="sr-only">Open menu</span>
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-64">
             <SheetHeader>
               <SheetTitle>Menu</SheetTitle>
+              <SheetDescription className="sr-only">Navigation and account options</SheetDescription>
             </SheetHeader>
             <nav className="flex flex-col gap-4 p-4">
               <SignedIn>
