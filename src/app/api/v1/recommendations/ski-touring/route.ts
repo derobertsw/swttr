@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
-import { calculateIreq } from '@/lib/biophysics/ireq';
+import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
 import { scoreEnsemble } from '@/lib/biophysics/scorer';
 import { METABOLIC_RATES } from '@/lib/biophysics/constants';
 import {
   type GarmentRow,
   type CategorizedGarments,
   validateRecommendationRequest,
+  getUserWardrobeGarmentIds,
   fetchGarmentsWithDetails,
   categorizeGarments,
   sortByBreathability,
   ensembleToThermalGarments,
+  fetchUserHandwear,
+  fetchUserHeadwear,
+  selectHandwear,
+  selectHeadwearByCategory,
+  formatGarmentResponse,
+  formatHandwearResponse,
+  formatHeadwearResponse,
 } from '@/lib/recommendations/shared';
 
 /**
@@ -30,12 +38,15 @@ import {
  *   },
  *   prioritize_light_pack?: boolean (default: false)
  * }
+ *
+ * Headers:
+ *   x-user-id: string (optional) - If provided, uses only user's wardrobe items
  */
 export async function POST(request: NextRequest) {
   const validated = await validateRecommendationRequest(request);
   if (validated instanceof NextResponse) return validated;
 
-  const { supabase, weather, tempC, windMs, body } = validated;
+  const { supabase, userId, weather, tempC, windMs, body } = validated;
 
   const prioritizeLightPack = (body.prioritize_light_pack as boolean) ?? false;
 
@@ -61,16 +72,36 @@ export async function POST(request: NextRequest) {
     metabolicRate: 90, // Standing/resting
   });
 
-  // Fetch all garments with their related data
-  const { data: fetchedGarments, error } = await fetchGarmentsWithDetails(supabase, {});
+  // Calculate regional IREQ targets for downhill (most demanding phase)
+  const regionalIreqDownhill = calculateRegionalIreq(ireqDownhill, 'ski_touring_downhill');
 
-  // Apply OR filter for ski touring (uphill OR downhill suitability)
-  const allGarments = (fetchedGarments ?? []).filter((g) => {
-    const ratings = g.garment_activity_ratings;
-    if (!ratings) return false;
-    return (ratings.ski_touring_uphill_score ?? 0) >= 6 ||
-           (ratings.ski_touring_downhill_score ?? 0) >= 6;
+  // Calculate extremity IREQ targets for downhill (exposed to speed-induced wind)
+  const extremityIreqDownhill = calculateExtremityIreq(
+    ireqDownhill,
+    'ski_touring_downhill',
+    tempC,
+    windMs + 5
+  );
+
+  // Check if user has wardrobe items
+  const wardrobeIds = await getUserWardrobeGarmentIds(supabase, userId);
+  const useWardrobe = wardrobeIds && wardrobeIds.length > 0;
+
+  // Fetch garments - prefer user's wardrobe if available
+  const { data: fetchedGarments, error } = await fetchGarmentsWithDetails(supabase, {
+    wardrobeIds: useWardrobe ? wardrobeIds : null,
   });
+
+  // Apply OR filter for ski touring (uphill OR downhill suitability) only when not using wardrobe
+  // When using wardrobe, trust that user's items are appropriate for their activities
+  const allGarments = useWardrobe
+    ? (fetchedGarments ?? [])
+    : (fetchedGarments ?? []).filter((g) => {
+        const ratings = g.garment_activity_ratings;
+        if (!ratings) return false;
+        return (ratings.ski_touring_uphill_score ?? 0) >= 6 ||
+               (ratings.ski_touring_downhill_score ?? 0) >= 6;
+      });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -90,6 +121,17 @@ export async function POST(request: NextRequest) {
 
   // Categorize garments
   const categorized = categorizeGarments(allGarments);
+
+  // Fetch user's extremity gear (handwear and headwear)
+  const [userHandwear, userHeadwear] = await Promise.all([
+    fetchUserHandwear(supabase, userId),
+    fetchUserHeadwear(supabase, userId),
+  ]);
+
+  // Select best extremity gear for conditions
+  // Use downhill temperature context since that's when extremities are most exposed
+  const recommendedHandwear = selectHandwear(userHandwear, tempC, false);
+  const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, false);
 
   // Build uphill ensemble (prioritize breathability)
   const uphillEnsemble = buildUphillEnsemble(
@@ -126,9 +168,8 @@ export async function POST(request: NextRequest) {
     downhillEnsemble.push(shellLayer);
   }
 
-  // Calculate properties for both ensembles
+  // Calculate thermal properties for downhill ensemble (for scoring)
   const downhillThermal = ensembleToThermalGarments(downhillEnsemble);
-  const downhillProps = predictEnsembleThermal(downhillThermal);
 
   // Score both configurations
   const uphillScore = scoreEnsemble(
@@ -187,46 +228,46 @@ export async function POST(request: NextRequest) {
     0
   );
 
+  // Use uphill ensemble as primary (what you wear while skinning)
+  // Use downhill IREQ for the target range (what you need at transitions/descent)
+  const targetCloMin = Math.round(ireqDownhill.ireqMin * 100) / 100;
+  const targetCloMax = Math.round(ireqDownhill.ireqNeutral * 100) / 100;
+
   return NextResponse.json({
     conditions: {
       temperature: `${weather.temperature}°F`,
       wind_speed: `${weather.wind_speed} mph`,
       precipitation: weather.precipitation ?? false,
     },
-    ireq_analysis: {
-      uphill: {
-        min_clo: ireqUphill.ireqMin,
-        neutral_clo: ireqUphill.ireqNeutral,
-      },
-      downhill: {
-        min_clo: ireqDownhill.ireqMin,
-        neutral_clo: ireqDownhill.ireqNeutral,
-      },
-      transition: {
-        min_clo: ireqTransition.ireqMin,
-        neutral_clo: ireqTransition.ireqNeutral,
-      },
+    ireq: {
+      uphill: { min: ireqUphill.ireqMin, neutral: ireqUphill.ireqNeutral },
+      downhill: { min: ireqDownhill.ireqMin, neutral: ireqDownhill.ireqNeutral },
+      target_range: [targetCloMin, targetCloMax] as [number, number],
+      regional: regionalIreqDownhill, // Use downhill for display (more demanding)
+      extremity: extremityIreqDownhill,
     },
-    uphill_ensemble: {
-      garments: uphillEnsemble.map((g) => ({
-        id: g.id,
-        name: `${g.brand} ${g.model_name}`,
-        category: g.category,
-      })),
-      total_clo: Math.round(uphillProps.rcl.wholeBody * 100) / 100,
-      evap_potential: Math.round(uphillProps.evapPotential * 1000) / 1000,
+    recommendation: {
+      garments: uphillEnsemble.map((g) => formatGarmentResponse(g)),
+      handwear: recommendedHandwear ? formatHandwearResponse(recommendedHandwear) : null,
+      headwear: {
+        helmet: recommendedHeadwear.helmet ? formatHeadwearResponse(recommendedHeadwear.helmet) : null,
+        head_warmth: recommendedHeadwear.headWarmth ? formatHeadwearResponse(recommendedHeadwear.headWarmth) : null,
+        neck_warmth: recommendedHeadwear.neckWarmth ? formatHeadwearResponse(recommendedHeadwear.neckWarmth) : null,
+      },
+      ensemble_properties: {
+        total_clo: Math.round(uphillProps.rcl.wholeBody * 100) / 100,
+        regional_clo: {
+          torso: Math.round(uphillProps.rcl.torso * 100) / 100,
+          arms: Math.round(uphillProps.rcl.arm * 100) / 100,
+          legs: Math.round(uphillProps.rcl.leg * 100) / 100,
+        },
+        evap_potential: Math.round(uphillProps.evapPotential * 1000) / 1000,
+        permeability_index: Math.round(uphillProps.im * 100) / 100,
+      },
       score: uphillScore.totalScore,
+      component_scores: uphillScore.componentScores,
     },
-    downhill_ensemble: {
-      garments: downhillEnsemble.map((g) => ({
-        id: g.id,
-        name: `${g.brand} ${g.model_name}`,
-        category: g.category,
-      })),
-      total_clo: Math.round(downhillProps.rcl.wholeBody * 100) / 100,
-      evap_potential: Math.round(downhillProps.evapPotential * 1000) / 1000,
-      score: downhillScore.totalScore,
-    },
+    // Ski touring specific: pack items for transitions/descent
     pack_items: {
       garments: packItems.map((g) => ({
         id: g.id,
@@ -371,7 +412,7 @@ function generateTransitionProtocol(
   uphillClo: number,
   ireqTransition: { ireqMin: number; ireqNeutral: number },
   insulationLayer: GarmentRow | null,
-  shellLayer: GarmentRow | null
+  _shellLayer: GarmentRow | null
 ): {
   priority: 'urgent' | 'quick' | 'normal';
   time_limit_minutes: number | null;

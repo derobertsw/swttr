@@ -109,7 +109,8 @@ const LayerDisplay = ({
   onHideBackpackDefault,
   biophysicsData,
 }: LayerDisplayProps) => {
-  if (!recommendation) return null;
+  // Allow rendering if we have biophysics data OR static recommendation
+  if (!recommendation && !biophysicsData) return null;
 
   const bodyParts = ["torso", "legs", "hands", "headNeck"] as const;
 
@@ -202,7 +203,9 @@ const LayerDisplay = ({
           : { base: [], mid: [], outer: [] };
 
         // Use wardrobe items when biophysics is active, otherwise use static recommendation
-        const layers = biophysicsActive ? wardrobeLayers : recommendation[part];
+        const layers = biophysicsActive
+          ? wardrobeLayers
+          : (recommendation?.[part] ?? { base: [], mid: [], outer: [] });
 
         // Check for extremity gear from biophysics
         const recommendedHandwear = biophysicsData?.recommendation?.handwear;

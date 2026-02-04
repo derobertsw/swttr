@@ -257,7 +257,7 @@ const HomeContent = () => {
           <Button
             size="xl"
             onClick={handleSubmit}
-            disabled={loading || (process.env.NODE_ENV === "production" && ["running", "biking", "backcountry-skiing"].includes(activity))}
+            disabled={loading || (process.env.NODE_ENV === "production" && ["running", "biking"].includes(activity))}
           >
             {loading ? <><Loader2 className="animate-spin" /> Loading...</> : "Gear Up"}
           </Button>
