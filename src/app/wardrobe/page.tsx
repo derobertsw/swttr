@@ -245,7 +245,7 @@ export default function Wardrobe() {
 
   return (
     <PageLayout>
-      <div className="flex flex-col gap-6 w-full max-w-2xl">
+      <div className="flex flex-col gap-8 w-full max-w-2xl">
         <header>
           <h2 className="text-2xl font-semibold">My Gear</h2>
           <p className="text-muted-foreground">
@@ -322,23 +322,23 @@ export default function Wardrobe() {
             </div>
 
             {/* User's wardrobe list */}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
               <h3 className="font-semibold text-sm text-muted-foreground">
                 My Wardrobe ({wardrobeItems.length} items)
               </h3>
 
               {wardrobeItems.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground border border-dashed rounded-lg">
+                <div className="py-10 text-center text-muted-foreground border border-dashed rounded-lg">
                   <p>No gear added yet.</p>
                   <p className="text-sm">Search above to add your calibrated items.</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-5">
                   {bodyPartOrder.map((part) => {
                     const items = groupedWardrobeItems[part];
                     if (items.length === 0) return null;
                     return (
-                      <div key={part} className="flex flex-col gap-1">
+                      <div key={part} className="flex flex-col gap-2">
                         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
                           {part}
                         </h4>

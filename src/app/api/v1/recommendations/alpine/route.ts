@@ -259,9 +259,18 @@ function buildAlpineEnsemble(
   }
 
   // 3. Shell (required for alpine - weather protection)
-  const sortedShells = precipitation
-    ? sortByWaterproofness(categorized.shells)
-    : sortByBreathability(categorized.shells);
+  // Alpine skiing prioritizes hard shells for maximum protection
+  const hardShells = categorized.shells.filter(s => s.category === 'hard_shell');
+  const otherShells = categorized.shells.filter(s => s.category !== 'hard_shell');
+
+  // Sort hard shells by waterproofness, others by breathability
+  const sortedHardShells = sortByWaterproofness(hardShells);
+  const sortedOtherShells = precipitation
+    ? sortByWaterproofness(otherShells)
+    : sortByBreathability(otherShells);
+
+  // Prioritize hard shells, fall back to other shells
+  const sortedShells = [...sortedHardShells, ...sortedOtherShells];
 
   if (sortedShells.length > 0) {
     ensemble.push(sortedShells[0]);

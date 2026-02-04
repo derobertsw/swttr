@@ -466,8 +466,8 @@ function buildUphillEnsemble(
     }
   }
 
-  // ---- Step 3: Soft Shell Selection (for wind protection) ----
-  // Add breathable soft shell if within clo budget
+  // ---- Step 3: Shell Selection (for wind protection) ----
+  // Prefer breathable soft shells, but fall back to any available shell if none exist
 
   const breathableSoftShells = categorizedGarments.shells.filter((shell) => {
     const isSoftShell = shell.category === 'soft_shell';
@@ -475,13 +475,18 @@ function buildUphillEnsemble(
     return isSoftShell && hasGoodBreathability;
   });
 
-  if (breathableSoftShells.length > 0) {
-    const softShellsSortedByBreathability = sortByBreathability(breathableSoftShells);
-    const bestSoftShell = softShellsSortedByBreathability[0];
-    const softShellClo = bestSoftShell.garment_thermal_properties?.rcl_whole_body ?? 0;
+  // Determine which shells to consider: prefer breathable soft shells, fall back to all shells
+  const shellCandidates = breathableSoftShells.length > 0
+    ? breathableSoftShells
+    : categorizedGarments.shells;
 
-    if (currentEnsembleClo + softShellClo <= targetMaxClo) {
-      ensemble.push(bestSoftShell);
+  if (shellCandidates.length > 0) {
+    const shellsSortedByBreathability = sortByBreathability(shellCandidates);
+    const bestShell = shellsSortedByBreathability[0];
+    const shellClo = bestShell.garment_thermal_properties?.rcl_whole_body ?? 0;
+
+    if (currentEnsembleClo + shellClo <= targetMaxClo) {
+      ensemble.push(bestShell);
     }
   }
 

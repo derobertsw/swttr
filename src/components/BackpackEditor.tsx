@@ -44,8 +44,8 @@ export function BackpackEditor({
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex gap-2">
+    <div className="flex flex-col gap-5">
+      <div className="flex gap-3">
         <Input
           placeholder="Add item..."
           value={newItem}
@@ -60,11 +60,11 @@ export function BackpackEditor({
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground">No items in backpack</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-2.5">
           {items.map((item) => (
             <li
               key={item.name}
-              className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+              className="flex items-center justify-between gap-2 rounded-md border px-3 py-2.5"
             >
               <span className="text-sm">
                 {item.name}

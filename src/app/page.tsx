@@ -133,7 +133,6 @@ const HomeContent = () => {
         setTemperature(data.temperature);
         setWindspeed(data.windSpeed);
         setRecommendation(layers);
-        toast.success(`Forecast: ${data.temperature}°F, ${data.windSpeed} mph wind`);
 
         // Fetch biophysics data before showing results
         const bioData = await biophysics.fetch(activity, { temperature: data.temperature, windSpeed: data.windSpeed });
@@ -174,7 +173,6 @@ const HomeContent = () => {
         setWindspeed(weather.windSpeed);
         const layers = getRecommendation(weather.temperature);
         setRecommendation(layers);
-        toast.success(`Current: ${weather.temperature}°F, ${weather.windSpeed} mph wind`);
 
         // Fetch biophysics data before showing results
         const bioData = await biophysics.fetch(activity, { temperature: weather.temperature, windSpeed: weather.windSpeed });
@@ -193,7 +191,6 @@ const HomeContent = () => {
         setWindspeed(result.data.windSpeed);
         const layers = getRecommendation(result.data.temperature);
         setRecommendation(layers);
-        toast.success(`Current: ${result.data.temperature}°F, ${result.data.windSpeed} mph wind`);
 
         // Fetch biophysics data before showing results
         const bioData = await biophysics.fetch(activity, { temperature: result.data.temperature, windSpeed: result.data.windSpeed });
@@ -274,9 +271,6 @@ const HomeContent = () => {
             onHideBackpackDefault={BACKPACK_ACTIVITY_IDS.includes(activity) ? backpack.hideDefault : undefined}
             biophysicsData={biophysicsData}
           />
-          <Button size="lg" variant="outline" onClick={() => setShowResults(false)}>
-            Back
-          </Button>
         </>
       )}
     </PageLayout>

@@ -222,13 +222,16 @@ function buildXCEnsemble(
     }
   }
 
-  // 3. Add windbreaker/soft shell if windy (only if breathable)
+  // 3. Add windbreaker/soft shell if windy (prefer breathable, fall back to any shell)
   if (categorized.shells.length > 0) {
-    const breathableSoftShells = categorized.shells.filter(
+    const breathableShells = categorized.shells.filter(
       (s) => (s.garment_thermal_properties?.evap_potential ?? 0) >= 0.20
     );
-    if (breathableSoftShells.length > 0) {
-      const shell = breathableSoftShells[0];
+    // Prefer breathable shells, but fall back to any available shell if none exist
+    const shellCandidates = breathableShells.length > 0 ? breathableShells : categorized.shells;
+    const sortedShells = sortByBreathability(shellCandidates);
+    if (sortedShells.length > 0) {
+      const shell = sortedShells[0];
       const shellClo = shell.garment_thermal_properties?.rcl_whole_body ?? 0;
       if (currentClo + shellClo <= maxClo) {
         ensemble.push(shell);

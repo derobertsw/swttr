@@ -464,8 +464,8 @@ describe("LayerDisplay", () => {
         />
       );
 
-      // Score of 85 should be displayed via ScoreDisplay component
-      expect(screen.getByText("85")).toBeInTheDocument();
+      // Score of 85 should display "Excellent" status via ScoreDisplay component
+      expect(screen.getByText("Excellent")).toBeInTheDocument();
     });
 
     it("should display guidance tips when available", () => {
@@ -498,6 +498,70 @@ describe("LayerDisplay", () => {
       );
 
       expect(screen.getByText("Insufficient overall insulation for conditions")).toBeInTheDocument();
+    });
+
+    it("should display human-friendly insulation warning with clo values", () => {
+      const biophysicsWithCloWarning = {
+        ...mockBiophysicsData,
+        warnings: ["Insufficient overall insulation: 0.2 clo vs 1.6 clo required"],
+      };
+
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={biophysicsWithCloWarning}
+        />
+      );
+
+      // Should show human-friendly primary message (>70% deficit)
+      expect(screen.getByText("You're significantly under-insulated for these conditions")).toBeInTheDocument();
+      // Should show actionable suggestion
+      expect(screen.getByText("Add a midlayer and consider warmer base layers")).toBeInTheDocument();
+      // Should show technical details in smaller text
+      expect(screen.getByText(/Current: 0.2 clo/)).toBeInTheDocument();
+      expect(screen.getByText(/Target: 1.6 clo/)).toBeInTheDocument();
+    });
+
+    it("should display moderate insulation warning for smaller deficit", () => {
+      const biophysicsWithModerateWarning = {
+        ...mockBiophysicsData,
+        warnings: ["Insufficient overall insulation: 0.8 clo vs 1.5 clo required"],
+      };
+
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={biophysicsWithModerateWarning}
+        />
+      );
+
+      // Should show moderate message (40-70% deficit)
+      expect(screen.getByText("You'll likely feel cold without more layers")).toBeInTheDocument();
+      expect(screen.getByText("Add a midlayer to improve warmth")).toBeInTheDocument();
+    });
+
+    it("should display mild insulation warning for small deficit", () => {
+      const biophysicsWithMildWarning = {
+        ...mockBiophysicsData,
+        warnings: ["Insufficient overall insulation: 1.3 clo vs 1.5 clo required"],
+      };
+
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={biophysicsWithMildWarning}
+        />
+      );
+
+      // Should show mild message (<40% deficit)
+      expect(screen.getByText("Consider adding a bit more insulation")).toBeInTheDocument();
+      expect(screen.getByText("A light midlayer or warmer base would help")).toBeInTheDocument();
     });
   });
 });
