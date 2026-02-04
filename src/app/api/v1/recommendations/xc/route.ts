@@ -15,7 +15,7 @@ import {
   fetchUserHandwear,
   fetchUserHeadwear,
   selectHandwear,
-  selectHeadwear,
+  selectHeadwearByCategory,
   formatHandwearResponse,
   formatHeadwearResponse,
   ensembleToThermalGarments,
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
 
   // Select best extremity gear for conditions
   const recommendedHandwear = selectHandwear(userHandwear, tempC, true);
-  const recommendedHeadwear = selectHeadwear(userHeadwear, tempC, true);
+  const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, true);
 
   // Score the ensemble
   const thermalGarments = ensembleToThermalGarments(ensemble);
@@ -153,7 +153,11 @@ export async function POST(request: NextRequest) {
     recommendation: {
       garments: ensemble.map(formatGarmentResponse),
       handwear: recommendedHandwear ? formatHandwearResponse(recommendedHandwear) : null,
-      headwear: recommendedHeadwear ? formatHeadwearResponse(recommendedHeadwear) : null,
+      headwear: {
+        helmet: recommendedHeadwear.helmet ? formatHeadwearResponse(recommendedHeadwear.helmet) : null,
+        head_warmth: recommendedHeadwear.headWarmth ? formatHeadwearResponse(recommendedHeadwear.headWarmth) : null,
+        neck_warmth: recommendedHeadwear.neckWarmth ? formatHeadwearResponse(recommendedHeadwear.neckWarmth) : null,
+      },
       ensemble_properties: {
         total_clo: ensembleProps.rcl.wholeBody,
         regional_clo: {

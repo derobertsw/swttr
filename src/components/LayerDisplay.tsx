@@ -1,8 +1,9 @@
-import { Backpack, Thermometer, Wind, X, AlertTriangle, Lightbulb, Plus } from "lucide-react";
+import { Backpack, Thermometer, Wind, X, AlertTriangle, Lightbulb, Plus, Info } from "lucide-react";
 import Link from "next/link";
 import { BackpackItem } from "@/types/recommendations";
 import { BiophysicsRecommendation, RecommendedGarment } from "@/types/biophysics";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ScoreDisplay from "@/components/ScoreDisplay";
 import BiophysicsDetails from "@/components/BiophysicsDetails";
 
@@ -147,12 +148,47 @@ const LayerDisplay = ({
       {/* Biophysics warnings */}
       {biophysicsData?.warnings && biophysicsData.warnings.length > 0 && (
         <div className="flex flex-col gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          {biophysicsData.warnings.map((warning, i) => (
-            <div key={i} className="flex items-start gap-2 text-sm text-amber-800">
-              <AlertTriangle className="size-4 mt-0.5 flex-shrink-0" />
-              <span>{warning}</span>
-            </div>
-          ))}
+          {biophysicsData.warnings.map((warning, i) => {
+            const isInsulationWarning = warning.includes("overall insulation");
+            const regionalClo = biophysicsData?.recommendation?.ensemble_properties?.regional_clo;
+            const totalClo = biophysicsData?.recommendation?.ensemble_properties?.total_clo;
+
+            return (
+              <div key={i} className="flex items-start gap-2 text-sm text-amber-800">
+                <AlertTriangle className="size-4 mt-0.5 flex-shrink-0" />
+                <span className="flex-1">{warning}</span>
+                {isInsulationWarning && regionalClo && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="text-amber-600 hover:text-amber-800">
+                        <Info className="size-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm">How overall clo is calculated</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Overall insulation is a weighted average of body regions:
+                        </p>
+                        <div className="text-xs font-mono bg-muted p-2 rounded space-y-1">
+                          <div>Torso: {regionalClo.torso.toFixed(2)} clo × 50%</div>
+                          <div>Arms: {regionalClo.arms.toFixed(2)} clo × 25%</div>
+                          <div>Legs: {regionalClo.legs.toFixed(2)} clo × 25%</div>
+                          <div className="border-t pt-1 mt-1 font-semibold">
+                            = {totalClo?.toFixed(2)} clo overall
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          The per-body-part targets shown below are empirical recommendations for comfort,
+                          while this overall target is calculated from biophysics.
+                        </p>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       {bodyParts.map((part) => {
@@ -173,8 +209,11 @@ const LayerDisplay = ({
         const recommendedHeadwear = biophysicsData?.recommendation?.headwear;
 
         // For hands/headNeck, check if we have biophysics extremity recommendations
+        const hasHeadwear = recommendedHeadwear && (
+          recommendedHeadwear.helmet || recommendedHeadwear.head_warmth || recommendedHeadwear.neck_warmth
+        );
         const hasExtremityGear = (part === "hands" && recommendedHandwear) ||
-          (part === "headNeck" && recommendedHeadwear);
+          (part === "headNeck" && hasHeadwear);
 
         const hasLayers =
           layers.base.length > 0 ||
@@ -203,7 +242,11 @@ const LayerDisplay = ({
           if (extremity === "hands" && recommendedHandwear) {
             currentClo = recommendedHandwear.rcl;
           } else if (extremity === "head" && recommendedHeadwear) {
-            currentClo = recommendedHeadwear.rcl;
+            // Sum clo from all headwear items
+            currentClo =
+              (recommendedHeadwear.helmet?.rcl ?? 0) +
+              (recommendedHeadwear.head_warmth?.rcl ?? 0) +
+              (recommendedHeadwear.neck_warmth?.rcl ?? 0);
           }
           targetClo = extremityIreq?.neutral?.[extremity];
         }
@@ -249,9 +292,26 @@ const LayerDisplay = ({
                   </li>
                 )}
                 {part === "headNeck" && recommendedHeadwear && (
-                  <li>
-                    {recommendedHeadwear.name} ({recommendedHeadwear.rcl.toFixed(2)} clo)
-                  </li>
+                  <>
+                    {recommendedHeadwear.helmet && (
+                      <li>
+                        <span style={{ fontWeight: 500 }}>Helmet:</span>{" "}
+                        {recommendedHeadwear.helmet.name} ({recommendedHeadwear.helmet.rcl.toFixed(2)} clo)
+                      </li>
+                    )}
+                    {recommendedHeadwear.head_warmth && (
+                      <li>
+                        <span style={{ fontWeight: 500 }}>Head:</span>{" "}
+                        {recommendedHeadwear.head_warmth.name} ({recommendedHeadwear.head_warmth.rcl.toFixed(2)} clo)
+                      </li>
+                    )}
+                    {recommendedHeadwear.neck_warmth && (
+                      <li>
+                        <span style={{ fontWeight: 500 }}>Neck:</span>{" "}
+                        {recommendedHeadwear.neck_warmth.name} ({recommendedHeadwear.neck_warmth.rcl.toFixed(2)} clo)
+                      </li>
+                    )}
+                  </>
                 )}
                 {/* Show garment layers for torso/legs */}
                 {layers.base.length > 0 && (

@@ -79,13 +79,19 @@ export interface RecommendedHandwear {
   dexterity?: number;
 }
 
-export interface RecommendedHeadwear {
+export interface RecommendedHeadwearItem {
   id: string;
   name: string;
   type: string;
   rcl: number;
   covers_ears?: boolean;
   covers_neck?: boolean;
+}
+
+export interface RecommendedHeadwear {
+  helmet: RecommendedHeadwearItem | null;
+  head_warmth: RecommendedHeadwearItem | null;
+  neck_warmth: RecommendedHeadwearItem | null;
 }
 
 export interface BiophysicsRecommendation {
