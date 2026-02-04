@@ -4,9 +4,11 @@ Find the right clothes for winter sports based on conditions.
 
 ## Features
 
+- **Biophysics-based recommendations** - Layer suggestions using the IREQ (ISO 11079) thermal comfort standard
 - **Activity-based recommendations** - Get layer suggestions for Alpine skiing and XC skiing
 - **Manual or forecast mode** - Enter conditions manually or look up weather by location and date
-- **Customizable gear names** - Replace generic layer names with your actual gear
+- **Wardrobe management** - Build your wardrobe from a database of calibrated gear with known thermal properties
+- **Organized by body part** - Wardrobe items grouped by torso, legs, hands, and head & neck
 
 ## Getting Started
 
@@ -94,44 +96,61 @@ src/
 src/
   app/                          # Next.js App Router pages
     api/
+      backpack/                 # User backpack API
       geocode/                  # Location search API
-      wardrobe/
-        items/                  # GET/PUT/DELETE user gear mappings
+      preferences/              # User preferences API
+      v1/                       # Versioned API routes
+      wardrobe/                 # Wardrobe API endpoints
       weather/                  # Weather forecast API
-    wardrobe/                   # My Gear settings page
+    backpack/                   # Backpack management page
+    faq/                        # FAQ page
+    wardrobe/                   # My Gear page
     page.tsx                    # Home page
   components/
     wardrobe/                   # Wardrobe components
-      ItemMappingEditor.tsx     # Custom gear names editor
-      useItemMappings.ts        # Gear mappings hook
+    ui/                         # Shared UI components (shadcn/ui)
     ActivitySelection.tsx       # Activity picker
+    BackpackEditor.tsx          # Pack list editor
+    BiophysicsDetails.tsx       # Thermal comfort details
     LayerDisplay.tsx            # Recommendation display
+    PreferencesDrawer.tsx       # User preferences
     WeatherSelection.tsx        # Temperature/wind sliders
   data/
+    activities.ts               # Activity definitions
     layerRecommendations.json   # Default layer recommendations
     layerOptions.ts             # Available layer options
+  hooks/
+    useBackpack.ts              # Backpack state management
+    useBiophysicsRecommendation.ts  # IREQ-based recommendations
+    useCurrentWeather.ts        # Weather data hook
+    useItemMappings.ts          # Gear mappings hook
+    useLocationSearch.ts        # Location search hook
+    usePreferences.ts           # User preferences hook
   lib/
+    biophysics/                 # IREQ thermal comfort calculations
+      constants.ts              # Physical constants
+      ensemble.ts               # Clothing ensemble calculations
+      ireq.ts                   # Required insulation calculations
+      scorer.ts                 # Ensemble scoring
+    recommendations/            # Shared recommendation logic
     supabase.ts                 # Supabase client
   types/
-    wardrobe.ts                 # TypeScript types
+    biophysics.ts               # Thermal property types
+    garments.ts                 # Garment database types
+    wardrobe.ts                 # Wardrobe types
 ```
 
 ## Database Schema (Supabase)
 
-If using Supabase for persistent settings, create this table:
+The app uses a biophysics-based garment database with calibrated thermal properties. See `supabase/migrations/` for the full schema. Key tables:
 
-```sql
--- User gear name mappings
-CREATE TABLE user_item_mappings (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  body_part TEXT NOT NULL,
-  layer_type TEXT NOT NULL,
-  standard_option TEXT NOT NULL,
-  custom_name TEXT NOT NULL,
-  UNIQUE(user_id, body_part, layer_type, standard_option)
-);
-```
+- **garments** - Clothing items with brand, model, category, and body coverage
+- **garment_thermal_properties** - Rcl (thermal resistance) and Recl (evaporative resistance) values in clo units
+- **garment_protection** - Wind and water resistance ratings
+- **garment_ventilation** - Pit zips, vents, and ventilation effectiveness
+- **garment_activity_ratings** - Activity-specific suitability scores
+- **handwear** / **headwear** - Extremity items with thermal properties
+- **user_wardrobe** - Links users to their owned gear
 
 ## Deployment
 
