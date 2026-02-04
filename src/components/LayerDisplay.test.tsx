@@ -218,4 +218,286 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("Be Bold, Start Cold")).toBeInTheDocument();
     });
   });
+
+  describe("biophysics-only rendering", () => {
+    const mockBiophysicsData = {
+      conditions: {
+        temperature: "15",
+        wind_speed: "10",
+        precipitation: false,
+      },
+      ireq: {
+        target_range: [1.5, 2.0] as [number, number],
+        regional: {
+          min: { torso: 1.0, arms: 0.8, legs: 0.9 },
+          neutral: { torso: 1.5, arms: 1.2, legs: 1.3 },
+        },
+        extremity: {
+          min: { hands: 0.5, head: 0.4 },
+          neutral: { hands: 0.8, head: 0.6 },
+        },
+      },
+      recommendation: {
+        garments: [
+          {
+            id: "garment-1",
+            name: "Merino Base Layer",
+            category: "base_layer",
+            rcl: 0.35,
+            covers_torso: true,
+            covers_legs: false,
+          },
+          {
+            id: "garment-2",
+            name: "Down Puffy",
+            category: "insulation_down",
+            rcl: 1.2,
+            covers_torso: true,
+            covers_legs: false,
+          },
+          {
+            id: "garment-3",
+            name: "Gore-Tex Shell",
+            category: "hard_shell",
+            rcl: 0.15,
+            covers_torso: true,
+            covers_legs: false,
+          },
+          {
+            id: "garment-4",
+            name: "Thermal Tights",
+            category: "base_layer",
+            rcl: 0.25,
+            covers_torso: false,
+            covers_legs: true,
+          },
+        ],
+        handwear: {
+          id: "glove-1",
+          name: "Hestra Insulated Gloves",
+          type: "insulated",
+          rcl: 0.65,
+        },
+        headwear: {
+          helmet: {
+            id: "helmet-1",
+            name: "Smith Vantage",
+            type: "ski_helmet",
+            rcl: 0.15,
+          },
+          head_warmth: {
+            id: "beanie-1",
+            name: "Merino Beanie",
+            type: "beanie",
+            rcl: 0.25,
+          },
+          neck_warmth: {
+            id: "gaiter-1",
+            name: "Buff Neck Gaiter",
+            type: "neck_gaiter",
+            rcl: 0.12,
+          },
+        },
+        ensemble_properties: {
+          total_clo: 1.7,
+          regional_clo: { torso: 1.7, arms: 1.2, legs: 0.25 },
+          evap_potential: 0.4,
+          permeability_index: 0.3,
+        },
+        score: 85,
+        component_scores: {
+          thermal: 90,
+          moisture: 80,
+          protection: 85,
+          weight: 75,
+          mobility: 70,
+        },
+      },
+      warnings: [],
+      guidance: ["Layer up for the chairlift"],
+    };
+
+    it("should render correctly when recommendation is null but biophysicsData exists", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      // Should render body part sections
+      expect(screen.getByText("Torso")).toBeInTheDocument();
+      expect(screen.getByText("Legs")).toBeInTheDocument();
+      expect(screen.getByText("Hands")).toBeInTheDocument();
+      expect(screen.getByText("Head/Neck")).toBeInTheDocument();
+
+      // Should render weather info
+      expect(screen.getByText("15°F")).toBeInTheDocument();
+      expect(screen.getByText("10 mph")).toBeInTheDocument();
+    });
+
+    it("should return null when both recommendation AND biophysicsData are null", () => {
+      const { container } = render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={25}
+          windspeed={10}
+          biophysicsData={null}
+        />
+      );
+      expect(container.firstChild).toBeNull();
+    });
+
+    it("should return null when both recommendation AND biophysicsData are undefined", () => {
+      const { container } = render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={25}
+          windspeed={10}
+          biophysicsData={undefined}
+        />
+      );
+      expect(container.firstChild).toBeNull();
+    });
+
+    it("should display biophysics garments with their thermal properties (clo values)", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      // Torso garments with clo values
+      expect(screen.getByText(/Merino Base Layer \(0\.35 clo\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Down Puffy \(1\.20 clo\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Gore-Tex Shell \(0\.15 clo\)/)).toBeInTheDocument();
+
+      // Legs garments with clo values
+      expect(screen.getByText(/Thermal Tights \(0\.25 clo\)/)).toBeInTheDocument();
+    });
+
+    it("should display handwear with clo value", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      expect(screen.getByText(/Hestra Insulated Gloves \(0\.65 clo\)/)).toBeInTheDocument();
+    });
+
+    it("should display headwear categories with clo values", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      // Helmet category
+      expect(screen.getByText("Helmet:")).toBeInTheDocument();
+      expect(screen.getByText(/Smith Vantage \(0\.15 clo\)/)).toBeInTheDocument();
+
+      // Head warmth category
+      expect(screen.getByText("Head:")).toBeInTheDocument();
+      expect(screen.getByText(/Merino Beanie \(0\.25 clo\)/)).toBeInTheDocument();
+
+      // Neck warmth category
+      expect(screen.getByText("Neck:")).toBeInTheDocument();
+      expect(screen.getByText(/Buff Neck Gaiter \(0\.12 clo\)/)).toBeInTheDocument();
+    });
+
+    it("should display regional clo targets", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      // Torso clo display: current / target
+      expect(screen.getByText("1.70 / 1.50 clo")).toBeInTheDocument();
+
+      // Legs clo display: current / target
+      expect(screen.getByText("0.25 / 1.30 clo")).toBeInTheDocument();
+    });
+
+    it("should display layer labels for biophysics garments", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      // Should have layer labels for torso
+      const baseLabels = screen.getAllByText("Base:");
+      const midLabels = screen.getAllByText("Mid:");
+      const outerLabels = screen.getAllByText("Outer:");
+
+      expect(baseLabels.length).toBeGreaterThan(0);
+      expect(midLabels.length).toBeGreaterThan(0);
+      expect(outerLabels.length).toBeGreaterThan(0);
+    });
+
+    it("should display biophysics score", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      // Score of 85 should be displayed via ScoreDisplay component
+      expect(screen.getByText("85")).toBeInTheDocument();
+    });
+
+    it("should display guidance tips when available", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      expect(screen.getByText("Tips")).toBeInTheDocument();
+      expect(screen.getByText("Layer up for the chairlift")).toBeInTheDocument();
+    });
+
+    it("should display warnings when present", () => {
+      const biophysicsWithWarnings = {
+        ...mockBiophysicsData,
+        warnings: ["Insufficient overall insulation for conditions"],
+      };
+
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={biophysicsWithWarnings}
+        />
+      );
+
+      expect(screen.getByText("Insufficient overall insulation for conditions")).toBeInTheDocument();
+    });
+  });
 });

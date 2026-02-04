@@ -373,7 +373,10 @@ describe('formatGarmentResponse', () => {
       name: 'Patagonia Capilene',
       category: 'base_layer',
       rcl: 0.45,
+      recl: undefined,
       evap_potential: 0.38,
+      covers_torso: true,
+      covers_legs: false,
     });
   });
 

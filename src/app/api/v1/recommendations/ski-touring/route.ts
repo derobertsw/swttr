@@ -21,93 +21,164 @@ import {
   formatHeadwearResponse,
 } from '@/lib/recommendations/shared';
 
+// ============================================
+// CONSTANTS
+// ============================================
+
+/** Maximum clo value for uphill climbing to prevent overheating */
+const UPHILL_MAX_CLO = 1.8;
+
+/** Minimum evaporative potential required for uphill garments */
+const UPHILL_MIN_EVAP_POTENTIAL = 0.20;
+
+/** Sheltered wind factor when climbing (trees, terrain block wind) */
+const UPHILL_WIND_FACTOR = 0.3;
+
+/** Additional wind speed from skiing descent (m/s) */
+const DOWNHILL_SPEED_WIND = 5;
+
+/** Wind exposure factor at transitions (often on exposed ridges) */
+const TRANSITION_WIND_FACTOR = 1.5;
+
+/** Metabolic rate for standing/resting at transitions (W/m²) */
+const TRANSITION_METABOLIC_RATE = 90;
+
+/** Wind speed threshold for recommending shell (m/s) */
+const SHELL_WIND_THRESHOLD = 8;
+
+// ============================================
+// TYPES
+// ============================================
+
+/** Transition protocol urgency levels based on thermal risk */
+type TransitionPriority = 'urgent' | 'quick' | 'normal';
+
+/** Complete transition protocol for skin-to-ski mode changes (API response format) */
+interface TransitionProtocolResponse {
+  priority: TransitionPriority;
+  time_limit_minutes: number | null;
+  steps: string[];
+  warnings: string[];
+}
+
+/** IREQ calculation result with min and neutral values */
+interface IreqResult {
+  ireqMin: number;
+  ireqNeutral: number;
+}
+
+// ============================================
+// MAIN ROUTE HANDLER
+// ============================================
+
 /**
  * POST /api/v1/recommendations/ski-touring
- * Get ski touring clothing recommendations
  *
- * Handles the unique challenge of ski touring: needing minimal insulation
- * while climbing but more protection at transitions and descending.
+ * Generates clothing recommendations for ski touring, addressing the unique
+ * challenge of needing minimal insulation while climbing (high metabolic output)
+ * but more protection during transitions and descending (lower metabolic output,
+ * higher wind exposure).
  *
- * Body:
+ * Returns two sets of recommendations:
+ * 1. Primary ensemble for uphill climbing (worn while skinning)
+ * 2. Pack items for transitions/descent (packable insulation and shell)
+ *
+ * @param request - Next.js request with weather data and optional preferences
+ * @returns JSON response with recommendations, IREQ values, and transition protocol
+ *
+ * Request Body:
  * {
  *   weather: {
- *     temperature: number,  // °F
- *     wind_speed: number,   // mph
- *     humidity?: number,
- *     precipitation?: boolean
+ *     temperature: number,       // Temperature in °F
+ *     wind_speed: number,        // Wind speed in mph
+ *     humidity?: number,         // Relative humidity (0-100)
+ *     precipitation?: boolean    // Whether precipitation is expected
  *   },
- *   prioritize_light_pack?: boolean (default: false)
+ *   prioritize_light_pack?: boolean  // Prefer lighter pack items (default: false)
  * }
  *
  * Headers:
  *   x-user-id: string (optional) - If provided, uses only user's wardrobe items
  */
 export async function POST(request: NextRequest) {
+  // ----------------------------------------
+  // Request Validation
+  // ----------------------------------------
   const validated = await validateRecommendationRequest(request);
   if (validated instanceof NextResponse) return validated;
 
   const { supabase, userId, weather, tempC, windMs, body } = validated;
+  const shouldPrioritizeLightPack = (body.prioritize_light_pack as boolean) ?? false;
+  const defaultHumidity = weather.humidity ?? 50;
 
-  const prioritizeLightPack = (body.prioritize_light_pack as boolean) ?? false;
+  // ----------------------------------------
+  // IREQ Calculations for Each Activity Phase
+  // ----------------------------------------
 
-  // Calculate IREQ for each phase
+  // Uphill: High metabolic output, sheltered from wind by terrain/trees
   const ireqUphill = calculateIreq({
     airTemp: tempC,
-    windSpeed: windMs * 0.3, // Sheltered while climbing
-    relativeHumidity: weather.humidity ?? 50,
+    windSpeed: windMs * UPHILL_WIND_FACTOR,
+    relativeHumidity: defaultHumidity,
     metabolicRate: METABOLIC_RATES.ski_touring_uphill,
   });
 
+  // Downhill: Lower metabolic output, exposed to speed-induced wind
   const ireqDownhill = calculateIreq({
     airTemp: tempC,
-    windSpeed: windMs + 5, // Speed adds wind
-    relativeHumidity: weather.humidity ?? 50,
+    windSpeed: windMs + DOWNHILL_SPEED_WIND,
+    relativeHumidity: defaultHumidity,
     metabolicRate: METABOLIC_RATES.ski_touring_downhill,
   });
 
+  // Transition: Minimal metabolic output (standing), often on exposed ridges
   const ireqTransition = calculateIreq({
     airTemp: tempC,
-    windSpeed: windMs * 1.5, // Often exposed at transitions
-    relativeHumidity: weather.humidity ?? 50,
-    metabolicRate: 90, // Standing/resting
+    windSpeed: windMs * TRANSITION_WIND_FACTOR,
+    relativeHumidity: defaultHumidity,
+    metabolicRate: TRANSITION_METABOLIC_RATE,
   });
 
-  // Calculate regional IREQ targets for downhill (most demanding phase)
+  // Regional and extremity targets based on downhill phase (most demanding)
   const regionalIreqDownhill = calculateRegionalIreq(ireqDownhill, 'ski_touring_downhill');
-
-  // Calculate extremity IREQ targets for downhill (exposed to speed-induced wind)
   const extremityIreqDownhill = calculateExtremityIreq(
     ireqDownhill,
     'ski_touring_downhill',
     tempC,
-    windMs + 5
+    windMs + DOWNHILL_SPEED_WIND
   );
 
-  // Check if user has wardrobe items
-  const wardrobeIds = await getUserWardrobeGarmentIds(supabase, userId);
-  const useWardrobe = wardrobeIds && wardrobeIds.length > 0;
+  // ----------------------------------------
+  // Wardrobe and Garment Fetching
+  // ----------------------------------------
 
-  // Fetch garments - prefer user's wardrobe if available
-  const { data: fetchedGarments, error } = await fetchGarmentsWithDetails(supabase, {
-    wardrobeIds: useWardrobe ? wardrobeIds : null,
-  });
+  const wardrobeGarmentIds = await getUserWardrobeGarmentIds(supabase, userId);
+  const hasUserWardrobe = wardrobeGarmentIds && wardrobeGarmentIds.length > 0;
 
-  // Apply OR filter for ski touring (uphill OR downhill suitability) only when not using wardrobe
-  // When using wardrobe, trust that user's items are appropriate for their activities
-  const allGarments = useWardrobe
-    ? (fetchedGarments ?? [])
-    : (fetchedGarments ?? []).filter((g) => {
-        const ratings = g.garment_activity_ratings;
-        if (!ratings) return false;
-        return (ratings.ski_touring_uphill_score ?? 0) >= 6 ||
-               (ratings.ski_touring_downhill_score ?? 0) >= 6;
-      });
+  const { data: fetchedGarments, error: garmentFetchError } = await fetchGarmentsWithDetails(
+    supabase,
+    { wardrobeIds: hasUserWardrobe ? wardrobeGarmentIds : null }
+  );
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Check for database errors first (consistent with alpine/xc routes)
+  if (garmentFetchError) {
+    return NextResponse.json({ error: garmentFetchError.message }, { status: 500 });
   }
 
-  if (!allGarments || allGarments.length === 0) {
+  // Filter garments for ski touring suitability (only when not using user's wardrobe)
+  // When using wardrobe, trust that user's items are appropriate for their activities
+  const suitableGarments = hasUserWardrobe
+    ? (fetchedGarments ?? [])
+    : (fetchedGarments ?? []).filter((garment) => {
+        const activityRatings = garment.garment_activity_ratings;
+        if (!activityRatings) return false;
+        const uphillScore = activityRatings.ski_touring_uphill_score ?? 0;
+        const downhillScore = activityRatings.ski_touring_downhill_score ?? 0;
+        return uphillScore >= 6 || downhillScore >= 6;
+      });
+
+  // Return early with IREQ guidance if no garments available
+  if (suitableGarments.length === 0) {
     return NextResponse.json({
       message: 'No suitable garments found in database',
       ireq: {
@@ -115,69 +186,82 @@ export async function POST(request: NextRequest) {
         downhill: { min: ireqDownhill.ireqMin, neutral: ireqDownhill.ireqNeutral },
         transition: { min: ireqTransition.ireqMin, neutral: ireqTransition.ireqNeutral },
       },
-      guidance: getTouringGuidance(tempC, ireqUphill, ireqDownhill),
+      guidance: generateTouringGuidance(tempC, ireqUphill, ireqDownhill),
     });
   }
 
-  // Categorize garments
-  const categorized = categorizeGarments(allGarments);
+  // ----------------------------------------
+  // Extremity Gear Selection
+  // ----------------------------------------
 
-  // Fetch user's extremity gear (handwear and headwear)
+  // Fetch handwear and headwear in parallel for efficiency
   const [userHandwear, userHeadwear] = await Promise.all([
     fetchUserHandwear(supabase, userId),
     fetchUserHeadwear(supabase, userId),
   ]);
 
-  // Select best extremity gear for conditions
-  // Use downhill temperature context since that's when extremities are most exposed
-  const recommendedHandwear = selectHandwear(userHandwear, tempC, false);
-  const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, false);
+  // Select extremity gear for static/downhill conditions (when extremities are most exposed)
+  const selectedHandwear = selectHandwear(userHandwear, tempC, false);
+  const selectedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, false);
 
-  // Build uphill ensemble (prioritize breathability)
+  // ----------------------------------------
+  // Uphill Ensemble Building
+  // ----------------------------------------
+
+  const categorizedGarments = categorizeGarments(suitableGarments);
+
   const uphillEnsemble = buildUphillEnsemble(
-    categorized,
+    categorizedGarments,
     ireqUphill.ireqMin,
-    1.8, // Max clo for uphill
-    0.20 // Min evap potential
+    UPHILL_MAX_CLO,
+    UPHILL_MIN_EVAP_POTENTIAL
   );
 
-  // Calculate uphill clo
-  const uphillThermal = ensembleToThermalGarments(uphillEnsemble);
-  const uphillProps = predictEnsembleThermal(uphillThermal);
-  const uphillClo = uphillProps.rcl.wholeBody;
+  const uphillThermalGarments = ensembleToThermalGarments(uphillEnsemble);
+  const uphillThermalProperties = predictEnsembleThermal(uphillThermalGarments);
+  const uphillTotalClo = uphillThermalProperties.rcl.wholeBody;
 
-  // Determine additional layers needed for descent
-  const additionalCloNeeded = Math.max(0, ireqDownhill.ireqNeutral - uphillClo);
+  // ----------------------------------------
+  // Pack Items Selection (for transitions/descent)
+  // ----------------------------------------
 
-  // Select packable insulation
-  const insulationLayer = selectPackableInsulation(
-    categorized.insulation,
+  const additionalCloNeeded = Math.max(0, ireqDownhill.ireqNeutral - uphillTotalClo);
+
+  const packInsulationLayer = selectPackableInsulation(
+    categorizedGarments.insulation,
     additionalCloNeeded,
-    prioritizeLightPack
+    shouldPrioritizeLightPack
   );
 
-  // Select shell if needed
-  const shellLayer = (weather.precipitation || windMs > 8)
-    ? selectShell(categorized.shells, weather.precipitation ?? false)
+  const needsShellLayer = weather.precipitation || windMs > SHELL_WIND_THRESHOLD;
+  const packShellLayer = needsShellLayer
+    ? selectShellForConditions(categorizedGarments.shells, weather.precipitation ?? false)
     : null;
 
-  // Build downhill ensemble
+  // ----------------------------------------
+  // Downhill Ensemble Building (for scoring)
+  // ----------------------------------------
+
   const downhillEnsemble = [...uphillEnsemble];
-  if (insulationLayer) downhillEnsemble.push(insulationLayer);
-  if (shellLayer && !uphillEnsemble.includes(shellLayer)) {
-    downhillEnsemble.push(shellLayer);
+  if (packInsulationLayer) {
+    downhillEnsemble.push(packInsulationLayer);
+  }
+  if (packShellLayer && !uphillEnsemble.includes(packShellLayer)) {
+    downhillEnsemble.push(packShellLayer);
   }
 
-  // Calculate thermal properties for downhill ensemble (for scoring)
-  const downhillThermal = ensembleToThermalGarments(downhillEnsemble);
+  const downhillThermalGarments = ensembleToThermalGarments(downhillEnsemble);
 
-  // Score both configurations
+  // ----------------------------------------
+  // Ensemble Scoring
+  // ----------------------------------------
+
   const uphillScore = scoreEnsemble(
-    uphillThermal,
+    uphillThermalGarments,
     {
       temperature: tempC,
-      windSpeed: windMs * 0.3,
-      humidity: weather.humidity ?? 50,
+      windSpeed: windMs * UPHILL_WIND_FACTOR,
+      humidity: defaultHumidity,
       precipitation: false,
     },
     {
@@ -190,11 +274,11 @@ export async function POST(request: NextRequest) {
   );
 
   const downhillScore = scoreEnsemble(
-    downhillThermal,
+    downhillThermalGarments,
     {
       temperature: tempC,
-      windSpeed: windMs + 5,
-      humidity: weather.humidity ?? 50,
+      windSpeed: windMs + DOWNHILL_SPEED_WIND,
+      humidity: defaultHumidity,
       precipitation: weather.precipitation ?? false,
     },
     {
@@ -206,32 +290,43 @@ export async function POST(request: NextRequest) {
     'ski_touring_downhill'
   );
 
-  // Generate transition protocol
+  // ----------------------------------------
+  // Transition Protocol Generation
+  // ----------------------------------------
+
   const transitionProtocol = generateTransitionProtocol(
     tempC,
     windMs,
-    uphillClo,
+    uphillTotalClo,
     ireqTransition,
-    insulationLayer,
-    shellLayer
+    packInsulationLayer
   );
 
-  // Pack items
+  // ----------------------------------------
+  // Pack Items Compilation
+  // ----------------------------------------
+
   const packItems: GarmentRow[] = [];
-  if (insulationLayer) packItems.push(insulationLayer);
-  if (shellLayer && !uphillEnsemble.some((g) => g.id === shellLayer.id)) {
-    packItems.push(shellLayer);
+  if (packInsulationLayer) {
+    packItems.push(packInsulationLayer);
+  }
+  if (packShellLayer && !uphillEnsemble.some((garment) => garment.id === packShellLayer.id)) {
+    packItems.push(packShellLayer);
   }
 
-  const packWeight = packItems.reduce(
-    (sum, g) => sum + (g.weight_grams ?? 0),
+  const totalPackWeightGrams = packItems.reduce(
+    (sum, garment) => sum + (garment.weight_grams ?? 0),
     0
   );
 
-  // Use uphill ensemble as primary (what you wear while skinning)
-  // Use downhill IREQ for the target range (what you need at transitions/descent)
-  const targetCloMin = Math.round(ireqDownhill.ireqMin * 100) / 100;
-  const targetCloMax = Math.round(ireqDownhill.ireqNeutral * 100) / 100;
+  // ----------------------------------------
+  // Response Formatting
+  // ----------------------------------------
+
+  const targetCloRange: [number, number] = [
+    Math.round(ireqDownhill.ireqMin * 100) / 100,
+    Math.round(ireqDownhill.ireqNeutral * 100) / 100,
+  ];
 
   return NextResponse.json({
     conditions: {
@@ -242,261 +337,397 @@ export async function POST(request: NextRequest) {
     ireq: {
       uphill: { min: ireqUphill.ireqMin, neutral: ireqUphill.ireqNeutral },
       downhill: { min: ireqDownhill.ireqMin, neutral: ireqDownhill.ireqNeutral },
-      target_range: [targetCloMin, targetCloMax] as [number, number],
-      regional: regionalIreqDownhill, // Use downhill for display (more demanding)
+      target_range: targetCloRange,
+      regional: regionalIreqDownhill,
       extremity: extremityIreqDownhill,
     },
     recommendation: {
-      garments: uphillEnsemble.map((g) => formatGarmentResponse(g)),
-      handwear: recommendedHandwear ? formatHandwearResponse(recommendedHandwear) : null,
+      garments: uphillEnsemble.map(formatGarmentResponse),
+      handwear: selectedHandwear ? formatHandwearResponse(selectedHandwear) : null,
       headwear: {
-        helmet: recommendedHeadwear.helmet ? formatHeadwearResponse(recommendedHeadwear.helmet) : null,
-        head_warmth: recommendedHeadwear.headWarmth ? formatHeadwearResponse(recommendedHeadwear.headWarmth) : null,
-        neck_warmth: recommendedHeadwear.neckWarmth ? formatHeadwearResponse(recommendedHeadwear.neckWarmth) : null,
+        helmet: selectedHeadwear.helmet ? formatHeadwearResponse(selectedHeadwear.helmet) : null,
+        head_warmth: selectedHeadwear.headWarmth ? formatHeadwearResponse(selectedHeadwear.headWarmth) : null,
+        neck_warmth: selectedHeadwear.neckWarmth ? formatHeadwearResponse(selectedHeadwear.neckWarmth) : null,
       },
       ensemble_properties: {
-        total_clo: Math.round(uphillProps.rcl.wholeBody * 100) / 100,
+        total_clo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
         regional_clo: {
-          torso: Math.round(uphillProps.rcl.torso * 100) / 100,
-          arms: Math.round(uphillProps.rcl.arm * 100) / 100,
-          legs: Math.round(uphillProps.rcl.leg * 100) / 100,
+          torso: Math.round(uphillThermalProperties.rcl.torso * 100) / 100,
+          arms: Math.round(uphillThermalProperties.rcl.arm * 100) / 100,
+          legs: Math.round(uphillThermalProperties.rcl.leg * 100) / 100,
         },
-        evap_potential: Math.round(uphillProps.evapPotential * 1000) / 1000,
-        permeability_index: Math.round(uphillProps.im * 100) / 100,
+        evap_potential: Math.round(uphillThermalProperties.evapPotential * 1000) / 1000,
+        permeability_index: Math.round(uphillThermalProperties.im * 100) / 100,
       },
       score: uphillScore.totalScore,
       component_scores: uphillScore.componentScores,
     },
-    // Ski touring specific: pack items for transitions/descent
     pack_items: {
-      garments: packItems.map((g) => ({
-        id: g.id,
-        name: `${g.brand} ${g.model_name}`,
-        weight_g: g.weight_grams,
+      garments: packItems.map((garment) => ({
+        id: garment.id,
+        name: `${garment.brand} ${garment.model_name}`,
+        weight_g: garment.weight_grams,
       })),
-      total_weight_g: packWeight,
+      total_weight_g: totalPackWeightGrams,
     },
     transition_protocol: transitionProtocol,
     warnings: [...uphillScore.warnings, ...downhillScore.warnings],
-    guidance: getTouringGuidance(tempC, ireqUphill, ireqDownhill),
+    guidance: generateTouringGuidance(tempC, ireqUphill, ireqDownhill),
   });
 }
 
+// ============================================
+// ENSEMBLE BUILDING HELPERS
+// ============================================
+
+/**
+ * Builds an optimal clothing ensemble for uphill ski touring.
+ *
+ * Prioritizes breathability (evaporative potential) over insulation since
+ * the high metabolic output during climbing generates significant body heat.
+ * The ensemble is constrained by a maximum clo value to prevent overheating.
+ *
+ * Selection order:
+ * 1. Base layers (torso and legs) - most breathable that meets minimum evap potential
+ * 2. Mid layer - only if needed to reach minimum clo, must maintain breathability
+ * 3. Soft shell - for wind protection, only if breathable and within clo budget
+ *
+ * @param categorizedGarments - Garments organized by layer type
+ * @param targetMinClo - Minimum required thermal insulation (clo)
+ * @param targetMaxClo - Maximum allowed thermal insulation to prevent overheating
+ * @param minEvapPotential - Minimum evaporative potential for breathability
+ * @returns Array of garments forming the uphill ensemble
+ */
 function buildUphillEnsemble(
-  categorized: CategorizedGarments,
-  minClo: number,
-  maxClo: number,
+  categorizedGarments: CategorizedGarments,
+  targetMinClo: number,
+  targetMaxClo: number,
   minEvapPotential: number
 ): GarmentRow[] {
   const ensemble: GarmentRow[] = [];
 
-  // 1. Base layers for torso and legs separately - most breathable that provides enough warmth
-  const torsoBaseLayers = categorized.baseLayers.filter((g) => g.covers_torso);
-  const legsBaseLayers = categorized.baseLayers.filter((g) => g.covers_legs);
+  // ---- Step 1: Base Layer Selection ----
+  // Select separate base layers for torso and legs, prioritizing breathability
 
-  // Select torso base layer (prioritize breathability)
-  const sortedTorsoBases = sortByBreathability(torsoBaseLayers);
+  const torsoBaseLayers = categorizedGarments.baseLayers.filter((garment) => garment.covers_torso);
+  const legsBaseLayers = categorizedGarments.baseLayers.filter((garment) => garment.covers_legs);
 
-  if (sortedTorsoBases.length > 0) {
-    const suitableBase = sortedTorsoBases.find(
-      (b) => (b.garment_thermal_properties?.evap_potential ?? 0) >= minEvapPotential
+  // Torso base layer: find most breathable that meets minimum evap potential
+  const torsoBasesSortedByBreathability = sortByBreathability(torsoBaseLayers);
+  if (torsoBasesSortedByBreathability.length > 0) {
+    const breathableTorsoBase = torsoBasesSortedByBreathability.find(
+      (base) => (base.garment_thermal_properties?.evap_potential ?? 0) >= minEvapPotential
     );
-    ensemble.push(suitableBase ?? sortedTorsoBases[0]);
+    ensemble.push(breathableTorsoBase ?? torsoBasesSortedByBreathability[0]);
   }
 
-  // Select legs base layer (prioritize breathability)
-  const sortedLegsBases = sortByBreathability(legsBaseLayers);
-
-  if (sortedLegsBases.length > 0) {
-    const suitableBase = sortedLegsBases.find(
-      (b) => (b.garment_thermal_properties?.evap_potential ?? 0) >= minEvapPotential
+  // Legs base layer: find most breathable that meets minimum evap potential
+  const legsBasesSortedByBreathability = sortByBreathability(legsBaseLayers);
+  if (legsBasesSortedByBreathability.length > 0) {
+    const breathableLegsBase = legsBasesSortedByBreathability.find(
+      (base) => (base.garment_thermal_properties?.evap_potential ?? 0) >= minEvapPotential
     );
-    // Don't add if it's the same item (e.g., one-piece that covers both)
-    const baseToAdd = suitableBase ?? sortedLegsBases[0];
-    if (!ensemble.some((g) => g.id === baseToAdd.id)) {
-      ensemble.push(baseToAdd);
+    const selectedLegsBase = breathableLegsBase ?? legsBasesSortedByBreathability[0];
+
+    // Avoid duplicates (handles one-piece garments covering both torso and legs)
+    const isAlreadyInEnsemble = ensemble.some((garment) => garment.id === selectedLegsBase.id);
+    if (!isAlreadyInEnsemble) {
+      ensemble.push(selectedLegsBase);
     }
   }
 
-  // 2. Add breathable mid if needed
-  let currentClo = ensemble.reduce(
-    (sum, g) => sum + (g.garment_thermal_properties?.rcl_whole_body ?? 0),
+  // ---- Step 2: Mid Layer Selection (if needed) ----
+  // Add a breathable mid layer only if current insulation is below target
+
+  let currentEnsembleClo = ensemble.reduce(
+    (sum, garment) => sum + (garment.garment_thermal_properties?.rcl_whole_body ?? 0),
     0
   );
 
-  if (currentClo < minClo && categorized.midLayers.length > 0) {
-    const sortedMids = sortByBreathability(categorized.midLayers);
+  const needsMoreInsulation = currentEnsembleClo < targetMinClo;
+  const hasMidLayersAvailable = categorizedGarments.midLayers.length > 0;
 
-    for (const mid of sortedMids) {
-      const midClo = mid.garment_thermal_properties?.rcl_whole_body ?? 0;
-      const midEp = mid.garment_thermal_properties?.evap_potential ?? 0;
-      if (currentClo + midClo <= maxClo && midEp >= minEvapPotential * 0.8) {
-        ensemble.push(mid);
-        currentClo += midClo;
+  if (needsMoreInsulation && hasMidLayersAvailable) {
+    const midLayersSortedByBreathability = sortByBreathability(categorizedGarments.midLayers);
+    const relaxedEvapThreshold = minEvapPotential * 0.8; // Allow slightly less breathable mid layers
+
+    for (const midLayer of midLayersSortedByBreathability) {
+      const midLayerClo = midLayer.garment_thermal_properties?.rcl_whole_body ?? 0;
+      const midLayerEvapPotential = midLayer.garment_thermal_properties?.evap_potential ?? 0;
+
+      const withinCloBudget = currentEnsembleClo + midLayerClo <= targetMaxClo;
+      const meetsBreathabilityRequirement = midLayerEvapPotential >= relaxedEvapThreshold;
+
+      if (withinCloBudget && meetsBreathabilityRequirement) {
+        ensemble.push(midLayer);
+        currentEnsembleClo += midLayerClo;
         break;
       }
     }
   }
 
-  // 3. Breathable soft shell for wind protection
-  const breathableSoftShells = categorized.shells.filter(
-    (s) =>
-      s.category === 'soft_shell' &&
-      (s.garment_thermal_properties?.evap_potential ?? 0) >= 0.20
-  );
+  // ---- Step 3: Soft Shell Selection (for wind protection) ----
+  // Add breathable soft shell if within clo budget
+
+  const breathableSoftShells = categorizedGarments.shells.filter((shell) => {
+    const isSoftShell = shell.category === 'soft_shell';
+    const hasGoodBreathability = (shell.garment_thermal_properties?.evap_potential ?? 0) >= UPHILL_MIN_EVAP_POTENTIAL;
+    return isSoftShell && hasGoodBreathability;
+  });
 
   if (breathableSoftShells.length > 0) {
-    const sorted = sortByBreathability(breathableSoftShells);
-    const shell = sorted[0];
-    const shellClo = shell.garment_thermal_properties?.rcl_whole_body ?? 0;
-    if (currentClo + shellClo <= maxClo) {
-      ensemble.push(shell);
+    const softShellsSortedByBreathability = sortByBreathability(breathableSoftShells);
+    const bestSoftShell = softShellsSortedByBreathability[0];
+    const softShellClo = bestSoftShell.garment_thermal_properties?.rcl_whole_body ?? 0;
+
+    if (currentEnsembleClo + softShellClo <= targetMaxClo) {
+      ensemble.push(bestSoftShell);
     }
   }
 
   return ensemble;
 }
 
+// ============================================
+// PACK ITEM SELECTION HELPERS
+// ============================================
+
+/**
+ * Selects the optimal packable insulation layer for transitions and descent.
+ *
+ * Uses a weighted scoring system balancing warmth and weight:
+ * - Warmth score: How well the garment matches the target clo requirement
+ *   (penalized for both under and over-insulation)
+ * - Weight score: Lighter garments score higher (important for uphill carry)
+ *
+ * The weighting between warmth and weight can be adjusted based on user preference:
+ * - Normal mode: 70% warmth, 30% weight
+ * - Light pack mode: 40% warmth, 60% weight
+ *
+ * @param availableInsulation - Array of insulation garments to choose from
+ * @param targetClo - Additional clo value needed to meet descent requirements
+ * @param shouldPrioritizeLightWeight - Whether to favor lighter items over warmth
+ * @returns The best-scoring insulation garment, or null if none suitable
+ */
 function selectPackableInsulation(
-  insulation: GarmentRow[],
+  availableInsulation: GarmentRow[],
   targetClo: number,
-  prioritizeLight: boolean
+  shouldPrioritizeLightWeight: boolean
 ): GarmentRow | null {
-  if (insulation.length === 0 || targetClo <= 0) return null;
+  // Early return if no insulation needed or available
+  if (availableInsulation.length === 0 || targetClo <= 0) {
+    return null;
+  }
 
-  const scored = insulation.map((ins) => {
-    const clo = ins.garment_thermal_properties?.rcl_whole_body ?? 0;
-    const weight = ins.weight_grams ?? 500;
+  // Score each insulation piece
+  const scoredInsulation = availableInsulation.map((insulationGarment) => {
+    const garmentClo = insulationGarment.garment_thermal_properties?.rcl_whole_body ?? 0;
+    const garmentWeightGrams = insulationGarment.weight_grams ?? 500; // Default weight assumption
 
-    // Warmth score
+    // Calculate warmth score (0-1 range)
+    // Perfect match = 1.0, over-insulated penalized up to 0.5, under-insulated proportionally
     let warmthScore: number;
-    if (clo >= targetClo) {
-      warmthScore = 1.0 - Math.min(0.5, (clo - targetClo) / 2);
+    if (garmentClo >= targetClo) {
+      const overInsulationPenalty = Math.min(0.5, (garmentClo - targetClo) / 2);
+      warmthScore = 1.0 - overInsulationPenalty;
     } else {
-      warmthScore = targetClo > 0 ? clo / targetClo : 0;
+      warmthScore = targetClo > 0 ? garmentClo / targetClo : 0;
     }
 
-    // Weight score (lighter = better)
-    const weightScore = Math.max(0, 1.0 - (weight - 200) / 600);
+    // Calculate weight score (0-1 range)
+    // 200g or less = 1.0, 800g or more = 0.0, linear interpolation between
+    const weightScore = Math.max(0, 1.0 - (garmentWeightGrams - 200) / 600);
 
-    const total = prioritizeLight
+    // Apply weighting based on user preference
+    const totalScore = shouldPrioritizeLightWeight
       ? warmthScore * 0.4 + weightScore * 0.6
       : warmthScore * 0.7 + weightScore * 0.3;
 
-    return { garment: ins, score: total };
+    return { garment: insulationGarment, score: totalScore };
   });
 
-  scored.sort((a, b) => b.score - a.score);
-  return scored[0]?.garment ?? null;
+  // Sort by score descending and return the best option
+  scoredInsulation.sort((a, b) => b.score - a.score);
+  return scoredInsulation[0]?.garment ?? null;
 }
 
-function selectShell(shells: GarmentRow[], precipitation: boolean): GarmentRow | null {
-  if (shells.length === 0) return null;
+/**
+ * Selects the most appropriate shell layer for descent/transition conditions.
+ *
+ * Selection logic:
+ * - If precipitation expected: prefer hard shells for waterproof protection
+ * - If wind only: prefer most breathable shell to manage moisture
+ *
+ * @param availableShells - Array of shell garments to choose from
+ * @param hasPrecipitation - Whether precipitation is expected
+ * @returns The best shell for conditions, or null if none available
+ */
+function selectShellForConditions(
+  availableShells: GarmentRow[],
+  hasPrecipitation: boolean
+): GarmentRow | null {
+  if (availableShells.length === 0) {
+    return null;
+  }
 
-  if (precipitation) {
-    const hardShells = shells.filter((s) => s.category === 'hard_shell');
+  // Precipitation: prioritize waterproof hard shells
+  if (hasPrecipitation) {
+    const hardShells = availableShells.filter((shell) => shell.category === 'hard_shell');
     if (hardShells.length > 0) {
       return hardShells[0];
     }
   }
 
-  // Wind only - prefer most breathable
-  const sorted = sortByBreathability(shells);
-
-  return sorted[0];
+  // Wind protection only: prefer most breathable to manage accumulated moisture
+  const shellsSortedByBreathability = sortByBreathability(availableShells);
+  return shellsSortedByBreathability[0];
 }
 
+// ============================================
+// TRANSITION PROTOCOL GENERATION
+// ============================================
+
+/** Clo deficit threshold for urgent transition (high heat loss risk) */
+const URGENT_CLO_DEFICIT_THRESHOLD = 1.5;
+
+/** Clo deficit threshold for quick transition (moderate heat loss risk) */
+const QUICK_CLO_DEFICIT_THRESHOLD = 0.5;
+
+/** Wind speed threshold for recommending shelter during transitions (m/s) */
+const HIGH_WIND_THRESHOLD = 10;
+
+/** Temperature threshold for frostbite warning (°C) */
+const FROSTBITE_RISK_TEMP = -15;
+
+/**
+ * Generates a transition protocol for skin-to-ski mode changes.
+ *
+ * Determines the urgency of adding layers based on the thermal deficit
+ * between current uphill clothing and what's needed while stationary.
+ * Provides step-by-step instructions and warnings for safe transitions.
+ *
+ * Priority levels:
+ * - Urgent (>1.5 clo deficit): 5 minute limit, immediate insulation required
+ * - Quick (>0.5 clo deficit): 10 minute limit, add insulation first
+ * - Normal: No time limit, handle at comfortable pace
+ *
+ * @param temperatureCelsius - Current air temperature in Celsius
+ * @param windSpeedMs - Current wind speed in m/s
+ * @param currentUphillClo - Clo value of current uphill ensemble
+ * @param ireqTransition - IREQ requirements for transition (stationary)
+ * @param packInsulationLayer - Available insulation layer to add (if any)
+ * @returns Transition protocol with priority, time limit, steps, and warnings
+ */
 function generateTransitionProtocol(
-  tempC: number,
-  windMs: number,
-  uphillClo: number,
-  ireqTransition: { ireqMin: number; ireqNeutral: number },
-  insulationLayer: GarmentRow | null,
-  _shellLayer: GarmentRow | null
-): {
-  priority: 'urgent' | 'quick' | 'normal';
-  time_limit_minutes: number | null;
-  steps: string[];
-  warnings: string[];
-} {
-  const cloDeficit = ireqTransition.ireqMin - uphillClo;
+  temperatureCelsius: number,
+  windSpeedMs: number,
+  currentUphillClo: number,
+  ireqTransition: IreqResult,
+  packInsulationLayer: GarmentRow | null
+): TransitionProtocolResponse {
+  const thermalDeficitClo = ireqTransition.ireqMin - currentUphillClo;
 
-  const protocol: {
-    priority: 'urgent' | 'quick' | 'normal';
-    time_limit_minutes: number | null;
-    steps: string[];
-    warnings: string[];
-  } = {
-    priority: 'normal',
-    time_limit_minutes: null,
-    steps: [],
-    warnings: [],
-  };
+  // Initialize protocol building variables
+  let priority: TransitionPriority = 'normal';
+  let timeLimitMinutes: number | null = null;
+  let steps: string[] = [];
+  const warnings: string[] = [];
 
-  if (cloDeficit > 1.5) {
-    protocol.priority = 'urgent';
-    protocol.time_limit_minutes = 5;
-    protocol.steps = [
+  // Determine urgency based on thermal deficit
+  if (thermalDeficitClo > URGENT_CLO_DEFICIT_THRESHOLD) {
+    priority = 'urgent';
+    timeLimitMinutes = 5;
+    steps = [
       'IMMEDIATELY add insulation layer before doing anything else',
       'Then handle skins and ski mode transition',
       'Add shell if windy/snowing',
     ];
-    protocol.warnings.push(
-      `High heat loss risk: ${uphillClo.toFixed(1)} clo vs ${ireqTransition.ireqMin.toFixed(1)} clo needed`
+    warnings.push(
+      `High heat loss risk: ${currentUphillClo.toFixed(1)} clo vs ${ireqTransition.ireqMin.toFixed(1)} clo needed`
     );
-  } else if (cloDeficit > 0.5) {
-    protocol.priority = 'quick';
-    protocol.time_limit_minutes = 10;
-    protocol.steps = [
+  } else if (thermalDeficitClo > QUICK_CLO_DEFICIT_THRESHOLD) {
+    priority = 'quick';
+    timeLimitMinutes = 10;
+    steps = [
       'Add insulation layer first',
       'Handle skins and boots',
       'Add shell if needed',
     ];
   } else {
-    protocol.steps = [
+    steps = [
       'Handle skins and ski mode at normal pace',
       'Add layers if feeling cold',
     ];
   }
 
-  if (windMs > 10) {
-    protocol.steps.unshift('Find wind shelter if possible');
-    protocol.warnings.push('High wind - minimize exposed time');
+  // Add wind shelter recommendation for high wind conditions
+  if (windSpeedMs > HIGH_WIND_THRESHOLD) {
+    steps.unshift('Find wind shelter if possible');
+    warnings.push('High wind - minimize exposed time');
   }
 
-  if (tempC < -15) {
-    protocol.warnings.push('Risk of freezing exposed skin - keep gloves on');
+  // Add frostbite warning for extreme cold
+  if (temperatureCelsius < FROSTBITE_RISK_TEMP) {
+    warnings.push('Risk of freezing exposed skin - keep gloves on');
   }
 
-  if (insulationLayer) {
-    protocol.steps.push(`Insulation to add: ${insulationLayer.brand} ${insulationLayer.model_name}`);
+  // Include specific insulation layer to add
+  if (packInsulationLayer) {
+    steps.push(`Insulation to add: ${packInsulationLayer.brand} ${packInsulationLayer.model_name}`);
   }
 
-  return protocol;
+  return {
+    priority,
+    time_limit_minutes: timeLimitMinutes,
+    steps,
+    warnings,
+  };
 }
 
-function getTouringGuidance(
-  tempC: number,
-  ireqUphill: { ireqMin: number; ireqNeutral: number },
-  ireqDownhill: { ireqMin: number; ireqNeutral: number }
+// ============================================
+// GUIDANCE GENERATION
+// ============================================
+
+/**
+ * Generates human-readable guidance for ski touring clothing decisions.
+ *
+ * Provides context-aware advice based on:
+ * - Clo targets for uphill and downhill phases
+ * - Required pack insulation to bridge the thermal gap
+ * - Temperature-specific recommendations
+ * - Breathability requirements for uphill efficiency
+ *
+ * @param temperatureCelsius - Current air temperature in Celsius
+ * @param ireqUphill - IREQ requirements for uphill climbing phase
+ * @param ireqDownhill - IREQ requirements for downhill descent phase
+ * @returns Array of guidance strings for the user
+ */
+function generateTouringGuidance(
+  temperatureCelsius: number,
+  ireqUphill: IreqResult,
+  ireqDownhill: IreqResult
 ): string[] {
   const guidance: string[] = [];
 
+  // Clo targets for each phase
   guidance.push(`Uphill target: ${ireqUphill.ireqMin.toFixed(1)}-${ireqUphill.ireqNeutral.toFixed(1)} clo`);
   guidance.push(`Downhill target: ${ireqDownhill.ireqMin.toFixed(1)}-${ireqDownhill.ireqNeutral.toFixed(1)} clo`);
 
-  const cloDiff = ireqDownhill.ireqNeutral - ireqUphill.ireqNeutral;
-  guidance.push(`Pack insulation adding ~${cloDiff.toFixed(1)} clo for transitions/descent`);
+  // Pack insulation requirement
+  const requiredPackInsulationClo = ireqDownhill.ireqNeutral - ireqUphill.ireqNeutral;
+  guidance.push(`Pack insulation adding ~${requiredPackInsulationClo.toFixed(1)} clo for transitions/descent`);
 
-  if (tempC > 0) {
+  // Temperature-specific recommendations
+  if (temperatureCelsius > 0) {
     guidance.push('Warm conditions - may need minimal extra layers for descent');
-  } else if (tempC > -10) {
+  } else if (temperatureCelsius > -10) {
     guidance.push('Standard touring conditions - bring packable insulation');
   } else {
     guidance.push('Cold conditions - ensure robust insulation in pack');
   }
 
-  guidance.push('Prioritize breathability for uphill (evap potential >= 0.20)');
+  // Breathability reminder
+  guidance.push(`Prioritize breathability for uphill (evap potential >= ${UPHILL_MIN_EVAP_POTENTIAL})`);
 
   return guidance;
 }
