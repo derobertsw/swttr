@@ -265,6 +265,7 @@ export function formatGarmentResponse(garment: GarmentRow): {
   name: string;
   category: string;
   rcl?: number;
+  recl?: number;
   evap_potential?: number;
   covers_torso: boolean;
   covers_legs: boolean;
@@ -274,6 +275,7 @@ export function formatGarmentResponse(garment: GarmentRow): {
     name: `${garment.brand} ${garment.model_name}`,
     category: garment.category,
     rcl: garment.garment_thermal_properties?.rcl_whole_body,
+    recl: garment.garment_thermal_properties?.recl_whole_body,
     evap_potential: garment.garment_thermal_properties?.evap_potential,
     covers_torso: garment.covers_torso,
     covers_legs: garment.covers_legs,

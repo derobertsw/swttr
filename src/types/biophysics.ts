@@ -66,6 +66,7 @@ export interface RecommendedGarment {
   name: string;
   category: string;
   rcl?: number;
+  recl?: number;
   evap_potential?: number;
   covers_torso?: boolean;
   covers_legs?: boolean;

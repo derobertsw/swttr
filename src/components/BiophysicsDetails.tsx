@@ -43,25 +43,24 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
               <div>
                 <h4 className="font-medium mb-2 flex items-center gap-2">
                   <Shirt className="size-4" />
-                  Analyzed Garments
+                  Garment Thermal Properties
                 </h4>
                 <p className="text-muted-foreground text-xs mb-2">
-                  Garments from database used for thermal analysis
+                  Rcl = thermal resistance (clo), Recl = evaporative resistance (m²Pa/W)
                 </p>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-2">
                   {recommendation.garments.map((garment) => (
-                    <div key={garment.id} className="flex items-center justify-between text-xs">
-                      <div className="flex flex-col">
+                    <div key={garment.id} className="text-xs">
+                      <div className="flex items-center justify-between">
                         <span className="font-medium">{garment.name}</span>
                         <span className="text-muted-foreground text-[10px] capitalize">
                           {garment.category.replace(/_/g, ' ')}
                         </span>
                       </div>
-                      {garment.rcl !== undefined && (
-                        <span className="font-mono text-muted-foreground">
-                          {garment.rcl.toFixed(2)} clo
-                        </span>
-                      )}
+                      <div className="flex gap-4 mt-0.5 font-mono text-muted-foreground">
+                        <span>Rcl: {garment.rcl?.toFixed(2) ?? "—"} clo</span>
+                        <span>Recl: {garment.recl?.toFixed(1) ?? "—"} m²Pa/W</span>
+                      </div>
                     </div>
                   ))}
                 </div>
