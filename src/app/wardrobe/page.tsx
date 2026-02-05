@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Check, Shirt, Hand, HardHat, Layers, Flame, Shield, Wind, CloudRain, LucideProps, RotateCcw, X } from "lucide-react";
+import { Search, Plus, Check, Shirt, Hand, HardHat, Layers, Flame, Shield, Wind, CloudRain, ChevronDown, ChevronRight, LucideProps, RotateCcw, X } from "lucide-react";
 import { useUserId } from "@/hooks/useUserId";
 import { SwipeableItem } from "@/components/SwipeableItem";
 import { FROSTED_INPUT_FULL, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
@@ -138,6 +138,12 @@ export default function Wardrobe() {
   const [justAdded, setJustAdded] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<WardrobeItem | null>(null);
   const [recentlyRemoved, setRecentlyRemoved] = useState<WardrobeItem[]>([]);
+  const [disabledCollapsed, setDisabledCollapsed] = useState<Record<string, boolean>>({
+    torso: true,
+    legs: true,
+    hands: true,
+    "head & neck": true,
+  });
 
   // Fetch available items and user's wardrobe
   useEffect(() => {
@@ -351,12 +357,27 @@ export default function Wardrobe() {
 
   const bodyPartOrder = ["torso", "legs", "hands", "head & neck"];
 
+  const disabledItemsByPart = useMemo(() => {
+    const groups: Record<string, WardrobeItem[]> = {};
+    for (const part of bodyPartOrder) {
+      groups[part] = [];
+    }
+    wardrobeItems.forEach((item) => {
+      if (!item.disabled) return;
+      const part = getBodyPart(item);
+      groups[part].push(item);
+    });
+    return groups;
+  }, [wardrobeItems]);
+
   const groupedWardrobeItems = useMemo(() => {
     const groups: Record<string, WardrobeItem[]> = {};
     for (const part of bodyPartOrder) {
       groups[part] = [];
     }
     wardrobeItems.forEach((item) => {
+      // Skip disabled items - they go in the collapsible section
+      if (item.disabled) return;
       const part = getBodyPart(item);
       groups[part].push(item);
     });
@@ -463,6 +484,7 @@ export default function Wardrobe() {
               <div className="flex flex-col gap-6">
                   {bodyPartOrder.map((part, index) => {
                     const items = groupedWardrobeItems[part];
+                    const disabledItems = disabledItemsByPart[part];
                     // Get the appropriate icon for empty state based on body part
                     const getEmptyStateIcon = () => {
                       switch (part) {
@@ -475,13 +497,14 @@ export default function Wardrobe() {
                     };
                     const EmptyIcon = getEmptyStateIcon();
                     const isFirst = index === 0;
+                    const isCollapsed = disabledCollapsed[part] ?? true;
 
                     return (
                       <div key={part} className="flex flex-col gap-3">
                         <h4 className={`text-xs font-semibold text-white/80 uppercase tracking-wider px-1 pb-1.5 border-b border-white/15 ${isFirst ? '' : 'mt-4'}`}>
                           {part}
                         </h4>
-                        {items.length === 0 ? (
+                        {items.length === 0 && disabledItems.length === 0 ? (
                           <div className="flex items-center gap-3 px-3 py-4 border border-dashed border-white/20 rounded-lg">
                             <EmptyIcon className="size-5 text-white/30 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
@@ -495,46 +518,101 @@ export default function Wardrobe() {
                             <Plus className="size-4 text-white/30 flex-shrink-0" />
                           </div>
                         ) : (
-                          items.map((item) => {
-                            const Icon = getItemIcon(item.item_type, item.details.garment_type, item.details.category);
-                            const category =
-                              item.details.category ||
-                              item.details.handwear_type ||
-                              item.details.headwear_type ||
-                              "";
-                            const clo = getClo(item);
-                            const isDisabled = item.disabled ?? false;
+                          <>
+                            {items.map((item) => {
+                              const Icon = getItemIcon(item.item_type, item.details.garment_type, item.details.category);
+                              const category =
+                                item.details.category ||
+                                item.details.handwear_type ||
+                                item.details.headwear_type ||
+                                "";
+                              const clo = getClo(item);
 
-                            return (
-                              <SwipeableItem
-                                key={item.id}
-                                onDelete={() => removeItem(item.id)}
-                                onClick={() => setSelectedItem(item)}
-                                onToggleDisabled={() => toggleDisabled(item.id, isDisabled)}
-                                isDisabled={isDisabled}
-                              >
-                                <div className={`flex items-center gap-3 px-3 py-4 ${isDisabled ? "opacity-50" : ""}`}>
-                                  <Icon className="size-5 text-white/60 flex-shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-medium truncate flex items-center gap-2">
-                                      {item.details.brand} {item.details.model_name}
-                                      {isDisabled && (
-                                        <span className="text-[10px] font-normal text-amber-400/80 bg-amber-400/10 px-1.5 py-0.5 rounded">
-                                          Disabled
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                                      <span>{formatCategory(category)}</span>
-                                      {clo !== undefined && (
-                                        <span className="font-mono text-[10px] opacity-55">{clo.toFixed(2)} clo</span>
-                                      )}
+                              return (
+                                <SwipeableItem
+                                  key={item.id}
+                                  onDelete={() => removeItem(item.id)}
+                                  onClick={() => setSelectedItem(item)}
+                                  onToggleDisabled={() => toggleDisabled(item.id, false)}
+                                  isDisabled={false}
+                                >
+                                  <div className="flex items-center gap-3 px-3 py-4">
+                                    <Icon className="size-5 text-white/60 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium truncate">
+                                        {item.details.brand} {item.details.model_name}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                                        <span>{formatCategory(category)}</span>
+                                        {clo !== undefined && (
+                                          <span className="font-mono text-[10px] opacity-55">{clo.toFixed(2)} clo</span>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </SwipeableItem>
-                            );
-                          })
+                                </SwipeableItem>
+                              );
+                            })}
+
+                            {/* Collapsible disabled items for this body part */}
+                            {disabledItems.length > 0 && (
+                              <div className="flex flex-col gap-2 mt-2">
+                                <button
+                                  onClick={() => setDisabledCollapsed(prev => ({ ...prev, [part]: !prev[part] }))}
+                                  className="flex items-center gap-1.5 px-2 py-1.5 text-white/50 hover:text-white/70 transition-colors"
+                                >
+                                  {isCollapsed ? (
+                                    <ChevronRight className="size-3" />
+                                  ) : (
+                                    <ChevronDown className="size-3" />
+                                  )}
+                                  <span className="text-[10px] font-medium uppercase tracking-wider">
+                                    Not on this trip ({disabledItems.length})
+                                  </span>
+                                </button>
+                                {!isCollapsed && (
+                                  <div className="flex flex-col gap-2 pl-2 border-l border-dashed border-white/15">
+                                    {disabledItems.map((item) => {
+                                      const Icon = getItemIcon(item.item_type, item.details.garment_type, item.details.category);
+                                      const category =
+                                        item.details.category ||
+                                        item.details.handwear_type ||
+                                        item.details.headwear_type ||
+                                        "";
+                                      const clo = getClo(item);
+
+                                      return (
+                                        <SwipeableItem
+                                          key={item.id}
+                                          onDelete={() => removeItem(item.id)}
+                                          onToggleDisabled={() => toggleDisabled(item.id, true)}
+                                          isDisabled={true}
+                                        >
+                                          <div className="flex items-center gap-3 px-3 py-3 opacity-50 grayscale">
+                                            <Icon className="size-5 text-white/60 flex-shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                              <div className="font-medium truncate text-sm">
+                                                {item.details.brand} {item.details.model_name}
+                                              </div>
+                                              <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                                                <span>{formatCategory(category)}</span>
+                                                {clo !== undefined && (
+                                                  <span className="font-mono text-[10px] opacity-55">{clo.toFixed(2)} clo</span>
+                                                )}
+                                              </div>
+                                              <div className="text-[10px] text-white/40 mt-0.5">
+                                                Excluded from recommendations
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </SwipeableItem>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     );

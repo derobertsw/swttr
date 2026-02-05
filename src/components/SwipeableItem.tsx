@@ -35,7 +35,9 @@ export function SwipeableItem({
   const currentXRef = useRef(0);
 
   const hasToggle = !!onToggleDisabled;
-  const totalActionWidth = hasToggle ? ACTION_WIDTH * 2 : ACTION_WIDTH;
+  // When disabled, only show Enable button (single width)
+  // When not disabled, show both Disable and Remove buttons (double width)
+  const totalActionWidth = hasToggle && isDisabled ? ACTION_WIDTH : hasToggle ? ACTION_WIDTH * 2 : ACTION_WIDTH;
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
@@ -115,7 +117,7 @@ export function SwipeableItem({
           <button
             onClick={handleToggleDisabled}
             className={`flex flex-col items-center justify-center text-white ${
-              isDisabled ? "bg-emerald-600/90" : "bg-amber-500/90"
+              isDisabled ? "bg-emerald-600/90 rounded-r-lg" : "bg-amber-500/90"
             }`}
             style={{ width: ACTION_WIDTH }}
           >
@@ -130,15 +132,17 @@ export function SwipeableItem({
           </button>
         )}
 
-        {/* Delete action */}
-        <button
-          onClick={handleDelete}
-          className="flex flex-col items-center justify-center bg-red-500/90 text-white rounded-r-lg"
-          style={{ width: ACTION_WIDTH }}
-        >
-          <Trash2 className="size-5" />
-          <span className="text-[10px] mt-1">Remove</span>
-        </button>
+        {/* Delete action - only show when not disabled */}
+        {!isDisabled && (
+          <button
+            onClick={handleDelete}
+            className="flex flex-col items-center justify-center bg-red-500/90 text-white rounded-r-lg"
+            style={{ width: ACTION_WIDTH }}
+          >
+            <Trash2 className="size-5" />
+            <span className="text-[10px] mt-1">Remove</span>
+          </button>
+        )}
       </div>
 
       {/* Main content */}
