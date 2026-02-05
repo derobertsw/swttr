@@ -3,10 +3,12 @@
 import { useState, useEffect, useMemo } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Check, Shirt, Hand, HardHat, Layers, Flame, Shield, Wind, CloudRain, LucideProps } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Plus, Check, Shirt, Hand, HardHat, Layers, Flame, Shield, Wind, CloudRain, LucideProps, RotateCcw, X } from "lucide-react";
 import { useUserId } from "@/hooks/useUserId";
 import { SwipeableItem } from "@/components/SwipeableItem";
 import { FROSTED_INPUT_FULL, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
+import { ItemDetailCard } from "@/components/wardrobe";
 
 // Custom pants icon (ski pants style) since lucide-react doesn't have one
 function PantsIcon(props: LucideProps) {
@@ -54,7 +56,29 @@ interface WardrobeItem {
     handwear_type?: string;
     headwear_type?: string;
     rcl_clo?: number;
-    garment_thermal_properties?: { rcl_whole_body?: number };
+    dexterity_score?: number;
+    covers_torso?: boolean;
+    covers_arms?: boolean;
+    covers_legs?: boolean;
+    covers_head?: boolean;
+    hood_type?: string;
+    covers_ears?: boolean;
+    covers_neck?: boolean;
+    covers_face?: boolean;
+    garment_thermal_properties?: {
+      rcl_whole_body?: number;
+      rcl_torso?: number;
+      rcl_arms?: number;
+      rcl_legs?: number;
+      recl_whole_body?: number;
+      recl_torso?: number;
+      recl_arms?: number;
+      recl_legs?: number;
+      im_whole_body?: number;
+      evap_potential?: number;
+      estimation_method?: string;
+      confidence_score?: number;
+    };
   };
 }
 
@@ -111,6 +135,8 @@ export default function Wardrobe() {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState<string | null>(null);
   const [justAdded, setJustAdded] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<WardrobeItem | null>(null);
+  const [recentlyRemoved, setRecentlyRemoved] = useState<WardrobeItem[]>([]);
 
   // Fetch available items and user's wardrobe
   useEffect(() => {
@@ -222,6 +248,9 @@ export default function Wardrobe() {
   const removeItem = async (wardrobeId: string) => {
     if (!userId) return;
 
+    // Find the item before removing
+    const itemToRemove = wardrobeItems.find((w) => w.id === wardrobeId);
+
     try {
       const res = await fetch(`/api/wardrobe/gear?id=${wardrobeId}`, {
         method: "DELETE",
@@ -230,10 +259,52 @@ export default function Wardrobe() {
 
       if (res.ok) {
         setWardrobeItems((prev) => prev.filter((w) => w.id !== wardrobeId));
+        // Add to recently removed list
+        if (itemToRemove) {
+          setRecentlyRemoved((prev) => [itemToRemove, ...prev]);
+        }
       }
     } catch (err) {
       console.error("Failed to remove item:", err);
     }
+  };
+
+  const restoreItem = async (item: WardrobeItem) => {
+    if (!userId || adding) return;
+
+    setAdding(item.item_id);
+    try {
+      const res = await fetch("/api/wardrobe/gear", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId,
+        },
+        body: JSON.stringify({
+          item_type: item.item_type,
+          item_id: item.item_id,
+        }),
+      });
+
+      if (res.ok) {
+        // Refresh wardrobe
+        const wardrobeRes = await fetch("/api/wardrobe/gear", {
+          headers: { "x-user-id": userId },
+        });
+        const wardrobeData = await wardrobeRes.json();
+        setWardrobeItems(wardrobeData.items || []);
+        // Remove from recently removed list
+        setRecentlyRemoved((prev) => prev.filter((r) => r.item_id !== item.item_id));
+      }
+    } catch (err) {
+      console.error("Failed to restore item:", err);
+    } finally {
+      setAdding(null);
+    }
+  };
+
+  const clearRecentlyRemoved = () => {
+    setRecentlyRemoved([]);
   };
 
   const getClo = (item: WardrobeItem): number | undefined => {
@@ -407,6 +478,7 @@ export default function Wardrobe() {
                               <SwipeableItem
                                 key={item.id}
                                 onDelete={() => removeItem(item.id)}
+                                onClick={() => setSelectedItem(item)}
                               >
                                 <div className="flex items-center gap-3 px-3 py-4">
                                   <Icon className="size-5 text-white/60 flex-shrink-0" />
@@ -431,9 +503,79 @@ export default function Wardrobe() {
                   })}
                 </div>
             </div>
+
+            {/* Recently removed items */}
+            {recentlyRemoved.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-sm text-white/80">
+                    Recently Removed ({recentlyRemoved.length})
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-white/50 h-7 hover:text-white/70"
+                    onClick={clearRecentlyRemoved}
+                  >
+                    <X className="size-3 mr-1" />
+                    Dismiss
+                  </Button>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  {recentlyRemoved.map((item) => {
+                    const Icon = getItemIcon(item.item_type, item.details.garment_type, item.details.category);
+                    const category =
+                      item.details.category ||
+                      item.details.handwear_type ||
+                      item.details.headwear_type ||
+                      "";
+                    const clo = getClo(item);
+
+                    return (
+                      <div
+                        key={item.item_id}
+                        className="flex items-center gap-3 p-3 border border-dashed border-white/20 rounded-lg opacity-60"
+                      >
+                        <Icon className="size-5 text-white/40 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate text-white/70">
+                            {item.details.brand} {item.details.model_name}
+                          </div>
+                          <div className="text-xs text-white/40 flex items-center gap-2">
+                            <span>{formatCategory(category)}</span>
+                            {clo !== undefined && (
+                              <span className="font-mono text-[10px]">{clo.toFixed(2)} clo</span>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex-shrink-0 text-xs text-white/60 hover:text-white"
+                          onClick={() => restoreItem(item)}
+                          disabled={adding === item.item_id}
+                        >
+                          <RotateCcw className="size-3 mr-1" />
+                          Restore
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
+
+      <ItemDetailCard
+        item={selectedItem}
+        open={selectedItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedItem(null);
+        }}
+      />
     </PageLayout>
   );
 }
