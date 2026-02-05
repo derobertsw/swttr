@@ -340,5 +340,176 @@
         "outer": []
       }
     }
+  },
+  "hiking-snowshoeing": {
+    "-20--15": {
+      "torso": {
+        "base": ["Heavy"],
+        "mid": ["Sweater"],
+        "outer": ["Soft Shell"]
+      },
+      "legs": { "base": ["Heavy"], "outer": ["Soft Shell"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy shell"] },
+      "headNeck": {
+        "base": ["Balaclava heavy weight", "Neck gator medium weight"],
+        "outer": []
+      }
+    },
+    "-15--10": {
+      "torso": {
+        "base": ["Heavy"],
+        "mid": ["Sweater"],
+        "outer": ["Soft Shell"]
+      },
+      "legs": { "base": ["Heavy"], "outer": ["Soft Shell"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Heavy shell"] },
+      "headNeck": {
+        "base": ["Balaclava medium weight", "Neck gator medium weight"],
+        "outer": []
+      }
+    },
+    "-10--5": {
+      "torso": {
+        "base": ["Heavy"],
+        "mid": ["Vest"],
+        "outer": ["Soft Shell"]
+      },
+      "legs": { "base": ["Medium"], "outer": ["Soft Shell"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Mediumweight shell"] },
+      "headNeck": {
+        "base": ["Beanie medium weight", "Neck gator low weight"],
+        "outer": []
+      }
+    },
+    "-5-0": {
+      "torso": {
+        "base": ["Medium"],
+        "mid": ["Vest"],
+        "outer": ["Soft Shell"]
+      },
+      "legs": { "base": ["Medium"], "outer": ["Joggers"] },
+      "hands": { "base": ["Mediumweight liner"], "outer": ["Mediumweight shell"] },
+      "headNeck": {
+        "base": ["Beanie medium weight", "Neck gator low weight"],
+        "outer": []
+      }
+    },
+    "0-5": {
+      "torso": {
+        "base": ["Medium"],
+        "mid": ["Vest"],
+        "outer": ["Windbreaker"]
+      },
+      "legs": { "base": ["Medium"], "outer": ["Joggers"] },
+      "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
+      "headNeck": {
+        "base": ["Beanie low weight", "Neck gator low weight"],
+        "outer": []
+      }
+    },
+    "5-10": {
+      "torso": {
+        "base": ["Medium"],
+        "mid": ["Vest"],
+        "outer": ["Windbreaker"]
+      },
+      "legs": { "base": ["Medium"], "outer": ["Joggers"] },
+      "hands": { "base": ["Lightweight liner"], "outer": ["Mediumweight shell"] },
+      "headNeck": {
+        "base": ["Beanie low weight"],
+        "outer": []
+      }
+    },
+    "10-15": {
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": ["Windbreaker"]
+      },
+      "legs": { "base": ["Light"], "outer": ["Joggers"] },
+      "hands": { "base": ["Lightweight liner"], "outer": [] },
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
+    },
+    "15-20": {
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": ["Windbreaker"]
+      },
+      "legs": { "base": ["Light"], "outer": ["Joggers"] },
+      "hands": { "base": ["Lightweight liner"], "outer": [] },
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
+    },
+    "20-25": {
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": ["Windbreaker"]
+      },
+      "legs": { "base": ["Light"], "outer": [] },
+      "hands": { "base": [], "outer": [] },
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
+    },
+    "25-30": {
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": ["Windbreaker"]
+      },
+      "legs": { "base": [], "outer": ["Shorts"] },
+      "hands": { "base": [], "outer": [] },
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
+    },
+    "30-35": {
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": []
+      },
+      "legs": { "base": [], "outer": ["Shorts"] },
+      "hands": { "base": [], "outer": [] },
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
+    },
+    "35-40": {
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": []
+      },
+      "legs": { "base": [], "outer": ["Shorts"] },
+      "hands": { "base": [], "outer": [] },
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
+    },
+    "40+": {
+      "torso": {
+        "base": ["Light"],
+        "mid": [],
+        "outer": []
+      },
+      "legs": { "base": [], "outer": ["Shorts"] },
+      "hands": { "base": [], "outer": [] },
+      "headNeck": {
+        "base": [],
+        "outer": []
+      }
+    }
   }
 }

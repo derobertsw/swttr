@@ -10,6 +10,7 @@ export interface Activity {
 export const ACTIVITIES: Activity[] = [
   { name: "Running", value: "running", icon: Footprints },
   { name: "Biking", value: "biking", icon: Bike },
+  { name: "Hiking / Snowshoeing", value: "hiking-snowshoeing", icon: Mountain },
   { name: "Backcountry Skiing", value: "backcountry-skiing", icon: Mountain, descriptor: "Uphill · Touring" },
   { name: "Alpine Skiing", value: "alpine-skiing", icon: CableCar, descriptor: "Chairlifts · Resort" },
   { name: "XC Skiing", value: "xc-skiing", icon: Snowflake, descriptor: "High output · Aerobic" },
