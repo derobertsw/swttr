@@ -1,5 +1,6 @@
 "use client";
 
+import { Info } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Dialog,
@@ -15,6 +16,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { GarmentThermalProperties, EstimationMethod } from "@/types/garments";
 
 // Extended WardrobeItem interface with full details
@@ -99,6 +101,46 @@ function CategoryBadge({ category }: { category: string }) {
   );
 }
 
+function WholeBodyCloExplainer({
+  wholeBody,
+  torso,
+  arms,
+  legs,
+}: {
+  wholeBody?: number | null;
+  torso?: number | null;
+  arms?: number | null;
+  legs?: number | null;
+}) {
+  if (!wholeBody) return null;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="inline-flex items-center text-muted-foreground hover:text-foreground ml-1">
+          <Info className="size-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72">
+        <div className="space-y-2">
+          <h4 className="font-medium text-sm">How whole body clo is calculated</h4>
+          <p className="text-xs text-muted-foreground">
+            Whole body insulation is a weighted average of body regions:
+          </p>
+          <div className="text-xs font-mono bg-muted p-2 rounded space-y-1">
+            <div>Torso: {formatValue(torso)} clo × 50%</div>
+            <div>Arms: {formatValue(arms)} clo × 25%</div>
+            <div>Legs: {formatValue(legs)} clo × 25%</div>
+            <div className="border-t pt-1 mt-1 font-semibold">
+              = {formatValue(wholeBody)} clo overall
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Standardized thermal data table with all body segments
 function ThermalTable({
   title,
@@ -109,6 +151,7 @@ function ThermalTable({
   hands,
   legs,
   wholeBody,
+  showWholeBodyExplainer,
 }: {
   title: string;
   unit?: string;
@@ -118,6 +161,7 @@ function ThermalTable({
   hands?: number | null;
   legs?: number | null;
   wholeBody?: number | null;
+  showWholeBodyExplainer?: boolean;
 }) {
   return (
     <>
@@ -132,7 +176,17 @@ function ThermalTable({
           </thead>
           <tbody className="divide-y">
             <tr>
-              <td className="px-3 py-1.5 text-muted-foreground">Whole Body</td>
+              <td className="px-3 py-1.5 text-muted-foreground">
+                Whole Body
+                {showWholeBodyExplainer && (
+                  <WholeBodyCloExplainer
+                    wholeBody={wholeBody}
+                    torso={torso}
+                    arms={arms}
+                    legs={legs}
+                  />
+                )}
+              </td>
               <td className="px-3 py-1.5 text-right font-mono">{formatValue(wholeBody)}</td>
             </tr>
             <tr>
@@ -206,6 +260,7 @@ function GarmentDetails({ details }: { details: WardrobeItemDetails }) {
         torso={thermalProps?.rcl_torso}
         arms={thermalProps?.rcl_arms}
         legs={thermalProps?.rcl_legs}
+        showWholeBodyExplainer
       />
 
       <ThermalTable
