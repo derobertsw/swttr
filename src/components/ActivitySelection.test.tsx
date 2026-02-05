@@ -3,6 +3,12 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ActivitySelection from "./ActivitySelection";
 
+// Mock next/navigation for components that use PageLayout -> AppNavigation
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+}));
+
 describe("ActivitySelection", () => {
   describe("rendering", () => {
     it("should render the carousel", () => {
@@ -29,32 +35,23 @@ describe("ActivitySelection", () => {
       expect(screen.getByText("XC Skiing")).toBeInTheDocument();
     });
 
-    it("should render navigation buttons", () => {
+    it("should render pagination dots", () => {
       render(<ActivitySelection value="running" onChange={vi.fn()} />);
-      expect(screen.getByRole("button", { name: /previous slide/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /next slide/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /select running/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /select biking/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /select alpine skiing/i })).toBeInTheDocument();
     });
   });
 
   describe("interaction", () => {
-    it("should call onChange when next button is clicked", async () => {
+    it("should call onChange when a pagination dot is clicked", async () => {
       const mockOnChange = vi.fn();
       const user = userEvent.setup();
       render(<ActivitySelection value="running" onChange={mockOnChange} />);
 
-      await user.click(screen.getByRole("button", { name: /next slide/i }));
+      await user.click(screen.getByRole("button", { name: /select biking/i }));
 
       expect(mockOnChange).toHaveBeenCalledWith("biking");
-    });
-
-    it("should call onChange when previous button is clicked (loops to end)", async () => {
-      const mockOnChange = vi.fn();
-      const user = userEvent.setup();
-      render(<ActivitySelection value="running" onChange={mockOnChange} />);
-
-      await user.click(screen.getByRole("button", { name: /previous slide/i }));
-
-      expect(mockOnChange).toHaveBeenCalledWith("xc-skiing");
     });
 
     it("should call onChange when clicking on an activity card", async () => {

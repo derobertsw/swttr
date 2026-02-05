@@ -15,7 +15,7 @@ describe("BackpackEditor", () => {
   describe("rendering", () => {
     it("should render input field", () => {
       render(<BackpackEditor {...defaultProps} />);
-      expect(screen.getByPlaceholderText(/add item/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/add custom item/i)).toBeInTheDocument();
     });
 
     it("should render add button", () => {
@@ -39,18 +39,18 @@ describe("BackpackEditor", () => {
       expect(screen.getByText("Water bottle")).toBeInTheDocument();
     });
 
-    it("should show (default) label for non-custom items", () => {
+    it("should show default label for non-custom items", () => {
       const items: BackpackItem[] = [{ name: "Sunscreen", isCustom: false }];
       render(<BackpackEditor {...defaultProps} items={items} />);
 
-      expect(screen.getByText("(default)")).toBeInTheDocument();
+      expect(screen.getByText("default")).toBeInTheDocument();
     });
 
-    it("should not show (default) label for custom items", () => {
+    it("should not show default label for custom items", () => {
       const items: BackpackItem[] = [{ name: "Water bottle", isCustom: true }];
       render(<BackpackEditor {...defaultProps} items={items} />);
 
-      expect(screen.queryByText("(default)")).not.toBeInTheDocument();
+      expect(screen.queryByText("default")).not.toBeInTheDocument();
     });
   });
 
@@ -60,7 +60,7 @@ describe("BackpackEditor", () => {
       const user = userEvent.setup();
       render(<BackpackEditor {...defaultProps} onAddItem={onAddItem} />);
 
-      await user.type(screen.getByPlaceholderText(/add item/i), "New item");
+      await user.type(screen.getByPlaceholderText(/add custom item/i), "New item");
       await user.click(screen.getByRole("button"));
 
       expect(onAddItem).toHaveBeenCalledWith("New item");
@@ -71,7 +71,7 @@ describe("BackpackEditor", () => {
       const user = userEvent.setup();
       render(<BackpackEditor {...defaultProps} onAddItem={onAddItem} />);
 
-      const input = screen.getByPlaceholderText(/add item/i);
+      const input = screen.getByPlaceholderText(/add custom item/i);
       await user.type(input, "New item{enter}");
 
       expect(onAddItem).toHaveBeenCalledWith("New item");
@@ -81,7 +81,7 @@ describe("BackpackEditor", () => {
       const user = userEvent.setup();
       render(<BackpackEditor {...defaultProps} onAddItem={vi.fn()} />);
 
-      const input = screen.getByPlaceholderText(/add item/i);
+      const input = screen.getByPlaceholderText(/add custom item/i);
       await user.type(input, "New item{enter}");
 
       expect(input).toHaveValue("");
@@ -102,7 +102,7 @@ describe("BackpackEditor", () => {
       const user = userEvent.setup();
       render(<BackpackEditor {...defaultProps} onAddItem={onAddItem} />);
 
-      await user.type(screen.getByPlaceholderText(/add item/i), "   ");
+      await user.type(screen.getByPlaceholderText(/add custom item/i), "   ");
       await user.click(screen.getByRole("button"));
 
       expect(onAddItem).not.toHaveBeenCalled();
@@ -113,7 +113,7 @@ describe("BackpackEditor", () => {
       const user = userEvent.setup();
       render(<BackpackEditor {...defaultProps} onAddItem={onAddItem} />);
 
-      await user.type(screen.getByPlaceholderText(/add item/i), "  New item  ");
+      await user.type(screen.getByPlaceholderText(/add custom item/i), "  New item  ");
       await user.click(screen.getByRole("button"));
 
       expect(onAddItem).toHaveBeenCalledWith("New item");
@@ -128,7 +128,7 @@ describe("BackpackEditor", () => {
       render(<BackpackEditor {...defaultProps} items={items} onRemoveItem={onRemoveItem} />);
 
       const removeButtons = screen.getAllByRole("button");
-      const removeButton = removeButtons.find((btn) => btn.className.includes("size-6"));
+      const removeButton = removeButtons.find((btn) => btn.className.includes("size-8"));
       await user.click(removeButton!);
 
       expect(onRemoveItem).toHaveBeenCalledWith("Custom item");
@@ -141,7 +141,7 @@ describe("BackpackEditor", () => {
       render(<BackpackEditor {...defaultProps} items={items} onHideDefault={onHideDefault} />);
 
       const removeButtons = screen.getAllByRole("button");
-      const removeButton = removeButtons.find((btn) => btn.className.includes("size-6"));
+      const removeButton = removeButtons.find((btn) => btn.className.includes("size-8"));
       await user.click(removeButton!);
 
       expect(onHideDefault).toHaveBeenCalledWith("Default item");

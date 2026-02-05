@@ -1,58 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { calculateIreq } from '@/lib/biophysics/ireq';
-import { scoreEnsemble } from '@/lib/biophysics/scorer';
 import { METABOLIC_RATES, getAlpineCloTargets } from '@/lib/biophysics/constants';
 import {
   validateRecommendationRequest,
-  getUserWardrobeGarmentIds,
-  fetchGarmentsWithDetails,
-  categorizeGarments,
   sortByInsulation,
   sortByWaterproofness,
   sortByBreathability,
   formatGarmentResponse,
-  fetchUserHandwear,
-  fetchUserHeadwear,
   selectHandwear,
   selectHeadwearByCategory,
-  formatHandwearResponse,
-  formatHeadwearResponse,
-  ensembleToThermalGarments,
   type GarmentRow,
   type CategorizedGarments,
 } from '@/lib/recommendations/shared';
+import { prepareRouteData, isPreparedData } from '@/lib/recommendations/route-handler';
+import { buildResponseComponents } from '@/lib/recommendations/response-builder';
 
 /**
  * POST /api/v1/recommendations/alpine
  * Get alpine/resort skiing clothing recommendations
  *
  * Alpine skiing accounts for chairlift time (static periods) with dual metabolic rates
- *
- * Body:
- * {
- *   weather: {
- *     temperature: number,  // °F
- *     wind_speed: number,   // mph
- *     humidity?: number,
- *     precipitation?: boolean,
- *     precipitation_type?: 'rain' | 'snow' | 'mixed'
- *   }
- * }
- *
- * Headers:
- *   x-user-id: string (optional) - If provided, uses only user's wardrobe items
  */
 export async function POST(request: NextRequest) {
   const validated = await validateRecommendationRequest(request);
   if (validated instanceof NextResponse) return validated;
 
-  const { supabase, userId, weather, tempC, windMs } = validated;
+  const { weather, tempC, windMs } = validated;
 
   // Calculate IREQ for both skiing and chairlift
   const ireqSkiing = calculateIreq({
     airTemp: tempC,
-    windSpeed: windMs + 5, // Add speed-induced wind
+    windSpeed: windMs + 5,
     relativeHumidity: weather.humidity ?? 50,
     metabolicRate: METABOLIC_RATES.alpine_skiing,
   });
@@ -64,25 +42,13 @@ export async function POST(request: NextRequest) {
     metabolicRate: METABOLIC_RATES.chairlift,
   });
 
-  // Use weighted average (40% chairlift, 60% skiing)
   const targetCloMin = ireqSkiing.ireqMin * 0.6 + ireqChairlift.ireqMin * 0.4;
-  const targetCloMax = ireqChairlift.ireqNeutral; // Don't want to be cold on lift
+  const targetCloMax = ireqChairlift.ireqNeutral;
 
-  // Check if user has wardrobe items
-  const wardrobeIds = await getUserWardrobeGarmentIds(supabase, userId);
-  const useWardrobe = wardrobeIds && wardrobeIds.length > 0;
-
-  // Fetch suitable garments
-  const { data: allGarments, error } = await fetchGarmentsWithDetails(supabase, {
-    wardrobeIds: useWardrobe ? wardrobeIds : null,
-    activityFilter: useWardrobe ? undefined : { field: 'alpine_skiing_score', minScore: 5 },
+  const prepared = await prepareRouteData(validated, {
+    activityFilter: { field: 'alpine_skiing_score', minScore: 5 },
   });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  if (!allGarments || allGarments.length === 0) {
+  if (!isPreparedData(prepared)) {
     return NextResponse.json({
       message: 'No suitable garments found in database',
       ireq: {
@@ -94,8 +60,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Categorize and build ensemble
-  const categorized = categorizeGarments(allGarments);
+  const { categorized, userHandwear, userHeadwear } = prepared;
   const ensemble = buildAlpineEnsemble(
     categorized,
     targetCloMin,
@@ -103,48 +68,44 @@ export async function POST(request: NextRequest) {
     weather.precipitation ?? false
   );
 
-  // Fetch user's extremity gear (handwear and headwear)
-  const [userHandwear, userHeadwear] = await Promise.all([
-    fetchUserHandwear(supabase, userId),
-    fetchUserHeadwear(supabase, userId),
-  ]);
-
-  // Select best extremity gear for conditions (alpine has static periods on chairlift)
   const recommendedHandwear = selectHandwear(userHandwear, tempC, false);
   const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, false);
 
-  // Score the ensemble
-  const thermalGarments = ensembleToThermalGarments(ensemble);
-
-  const ensembleProps = predictEnsembleThermal(thermalGarments);
-
-  const score = scoreEnsemble(
-    thermalGarments,
+  const response = buildResponseComponents(
     {
-      temperature: tempC,
-      windSpeed: windMs,
-      humidity: weather.humidity ?? 50,
-      precipitation: weather.precipitation ?? false,
-      precipitationType: weather.precipitation_type,
+      ensemble,
+      weather: {
+        temperature: tempC,
+        windSpeed: windMs,
+        humidity: weather.humidity ?? 50,
+        precipitation: weather.precipitation ?? false,
+        precipitationType: weather.precipitation_type,
+      },
+      activity: {
+        name: 'Alpine Skiing',
+        metabolicRate: METABOLIC_RATES.alpine_skiing,
+        hasStaticPeriods: true,
+        staticMetabolicRate: METABOLIC_RATES.chairlift,
+        windExposure: 'exposed',
+      },
+      activityKey: 'alpine_skiing',
     },
-    {
-      name: 'Alpine Skiing',
-      metabolicRate: METABOLIC_RATES.alpine_skiing,
-      hasStaticPeriods: true,
-      staticMetabolicRate: METABOLIC_RATES.chairlift,
-      windExposure: 'exposed',
-    },
-    'alpine_skiing'
+    recommendedHandwear,
+    recommendedHeadwear
   );
 
-  // Get direct clo targets for alpine skiing based on temperature
+  // Alpine uses custom garment formatting (includes rcl override)
+  const alpineGarments = ensemble.map((g) => ({
+    ...formatGarmentResponse(g),
+    rcl: g.garment_thermal_properties?.rcl_whole_body,
+  }));
+
   const alpineTargets = getAlpineCloTargets(tempC);
 
-  // Format regional targets using the new direct values
   const regionalIreq = {
     min: {
       torso: alpineTargets.torso.min,
-      arms: alpineTargets.torso.min * 0.85, // Arms need slightly less than torso
+      arms: alpineTargets.torso.min * 0.85,
       legs: alpineTargets.legs.min,
     },
     neutral: {
@@ -154,7 +115,6 @@ export async function POST(request: NextRequest) {
     },
   };
 
-  // Format extremity targets using the new direct values
   const extremityIreq = {
     min: {
       hands: alpineTargets.hands.min,
@@ -180,30 +140,10 @@ export async function POST(request: NextRequest) {
       extremity: extremityIreq,
     },
     recommendation: {
-      garments: ensemble.map((g) => ({
-        ...formatGarmentResponse(g),
-        rcl: g.garment_thermal_properties?.rcl_whole_body,
-      })),
-      handwear: recommendedHandwear ? formatHandwearResponse(recommendedHandwear) : null,
-      headwear: {
-        helmet: recommendedHeadwear.helmet ? formatHeadwearResponse(recommendedHeadwear.helmet) : null,
-        head_warmth: recommendedHeadwear.headWarmth ? formatHeadwearResponse(recommendedHeadwear.headWarmth) : null,
-        neck_warmth: recommendedHeadwear.neckWarmth ? formatHeadwearResponse(recommendedHeadwear.neckWarmth) : null,
-      },
-      ensemble_properties: {
-        total_clo: ensembleProps.rcl.wholeBody,
-        regional_clo: {
-          torso: Math.round(ensembleProps.rcl.torso * 100) / 100,
-          arms: Math.round(ensembleProps.rcl.arm * 100) / 100,
-          legs: Math.round(ensembleProps.rcl.leg * 100) / 100,
-        },
-        evap_potential: ensembleProps.evapPotential,
-        permeability_index: ensembleProps.im,
-      },
-      score: score.totalScore,
-      component_scores: score.componentScores,
+      ...response.recommendation,
+      garments: alpineGarments,
     },
-    warnings: score.warnings,
+    warnings: response.warnings,
     guidance: getAlpineGuidance(tempC, weather.precipitation),
   });
 }
@@ -217,11 +157,9 @@ function buildAlpineEnsemble(
   const ensemble: GarmentRow[] = [];
   let currentClo = 0;
 
-  // 1. Base layers for torso and legs separately (prioritize warmth for alpine)
   const torsoBaseLayers = categorized.baseLayers.filter((g) => g.covers_torso);
   const legsBaseLayers = categorized.baseLayers.filter((g) => g.covers_legs);
 
-  // Select torso base layer
   const sortedTorsoBases = sortByInsulation(torsoBaseLayers);
   if (sortedTorsoBases.length > 0) {
     const suitableBase = sortedTorsoBases.find(
@@ -232,21 +170,18 @@ function buildAlpineEnsemble(
     currentClo += baseLayer.garment_thermal_properties?.rcl_whole_body ?? 0;
   }
 
-  // Select legs base layer
   const sortedLegsBases = sortByInsulation(legsBaseLayers);
   if (sortedLegsBases.length > 0) {
     const suitableBase = sortedLegsBases.find(
       (b) => (b.garment_thermal_properties?.rcl_whole_body ?? 0) <= minClo * 0.3
     );
     const baseLayer = suitableBase ?? sortedLegsBases[sortedLegsBases.length - 1];
-    // Don't add if it's the same item (e.g., one-piece that covers both)
     if (!ensemble.some((g) => g.id === baseLayer.id)) {
       ensemble.push(baseLayer);
       currentClo += baseLayer.garment_thermal_properties?.rcl_whole_body ?? 0;
     }
   }
 
-  // 2. Mid layer or insulation
   const allMids = sortByInsulation([...categorized.midLayers, ...categorized.insulation], false);
 
   const addMidIfFits = (mid: GarmentRow | undefined) => {
@@ -259,28 +194,22 @@ function buildAlpineEnsemble(
     }
   };
 
-  // Prefer torso + legs mid/insulation pieces when available
   addMidIfFits(allMids.find((m) => m.covers_torso));
   addMidIfFits(allMids.find((m) => m.covers_legs));
 
-  // If still below target, keep adding additional mids/insulation
   for (const mid of allMids) {
     if (currentClo >= minClo) break;
     addMidIfFits(mid);
   }
 
-  // 3. Shell (required for alpine - weather protection)
-  // Alpine skiing prioritizes hard shells for maximum protection
   const hardShells = categorized.shells.filter(s => s.category === 'hard_shell');
   const otherShells = categorized.shells.filter(s => s.category !== 'hard_shell');
 
-  // Sort hard shells by waterproofness, others by breathability
   const sortedHardShells = sortByWaterproofness(hardShells);
   const sortedOtherShells = precipitation
     ? sortByWaterproofness(otherShells)
     : sortByBreathability(otherShells);
 
-  // Prioritize hard shells, fall back to other shells
   const sortedShells = [...sortedHardShells, ...sortedOtherShells];
 
   if (sortedShells.length > 0) {

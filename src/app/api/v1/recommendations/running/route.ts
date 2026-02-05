@@ -1,27 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
-import { scoreEnsemble } from '@/lib/biophysics/scorer';
 import { METABOLIC_RATES } from '@/lib/biophysics/constants';
 import {
   validateRecommendationRequest,
-  getUserWardrobeGarmentIds,
-  fetchGarmentsWithDetails,
-  categorizeGarments,
   sortByBreathability,
   getEnsembleClo,
   findBreathableGarment,
-  formatGarmentResponse,
-  fetchUserHandwear,
-  fetchUserHeadwear,
   selectHandwear,
   selectHeadwearByCategory,
-  formatHandwearResponse,
-  formatHeadwearResponse,
-  ensembleToThermalGarments,
   type GarmentRow,
   type CategorizedGarments,
 } from '@/lib/recommendations/shared';
+import { prepareRouteData, isPreparedData } from '@/lib/recommendations/route-handler';
+import { buildResponseComponents } from '@/lib/recommendations/response-builder';
 
 /**
  * POST /api/v1/recommendations/running
@@ -31,7 +22,7 @@ export async function POST(request: NextRequest) {
   const validated = await validateRecommendationRequest(request);
   if (validated instanceof NextResponse) return validated;
 
-  const { supabase, userId, weather, tempC, windMs } = validated;
+  const { weather, tempC, windMs } = validated;
 
   // Calculate IREQ for running (moderate intensity)
   const ireq = calculateIreq({
@@ -41,24 +32,13 @@ export async function POST(request: NextRequest) {
     metabolicRate: METABOLIC_RATES.running_moderate,
   });
 
-  // Running: prioritize breathability and avoid overheating
   const maxClo = Math.min(ireq.ireqNeutral + 0.2, 1.4);
   const minEvapPotential = 0.3;
 
-  // Check if user has wardrobe items
-  const wardrobeIds = await getUserWardrobeGarmentIds(supabase, userId);
-  const useWardrobe = wardrobeIds && wardrobeIds.length > 0;
-
-  // Fetch garments (no activity filter for running yet)
-  const { data: allGarments, error } = await fetchGarmentsWithDetails(supabase, {
-    wardrobeIds: useWardrobe ? wardrobeIds : null,
-  });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  if (!allGarments || allGarments.length === 0) {
+  // Prepare common data
+  const prepared = await prepareRouteData(validated, {});
+  if (!isPreparedData(prepared)) {
+    // Empty garments case
     return NextResponse.json({
       message: 'No suitable garments found in database',
       ireq: { min: ireq.ireqMin, neutral: ireq.ireqNeutral },
@@ -70,35 +50,31 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const categorized = categorizeGarments(allGarments);
+  const { categorized, userHandwear, userHeadwear } = prepared;
   const ensemble = buildRunningEnsemble(categorized, ireq, maxClo, minEvapPotential);
-
-  const [userHandwear, userHeadwear] = await Promise.all([
-    fetchUserHandwear(supabase, userId),
-    fetchUserHeadwear(supabase, userId),
-  ]);
 
   const recommendedHandwear = selectHandwear(userHandwear, tempC, true);
   const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, true);
 
-  const thermalGarments = ensembleToThermalGarments(ensemble);
-  const ensembleProps = predictEnsembleThermal(thermalGarments);
-
-  const score = scoreEnsemble(
-    thermalGarments,
+  const response = buildResponseComponents(
     {
-      temperature: tempC,
-      windSpeed: windMs,
-      humidity: weather.humidity ?? 50,
-      precipitation: weather.precipitation ?? false,
+      ensemble,
+      weather: {
+        temperature: tempC,
+        windSpeed: windMs,
+        humidity: weather.humidity ?? 50,
+        precipitation: weather.precipitation ?? false,
+      },
+      activity: {
+        name: 'Running',
+        metabolicRate: METABOLIC_RATES.running_moderate,
+        hasStaticPeriods: false,
+        windExposure: 'normal',
+      },
+      activityKey: 'running',
     },
-    {
-      name: 'Running',
-      metabolicRate: METABOLIC_RATES.running_moderate,
-      hasStaticPeriods: false,
-      windExposure: 'normal',
-    },
-    'running'
+    recommendedHandwear,
+    recommendedHeadwear
   );
 
   const regionalIreq = calculateRegionalIreq(ireq, 'running');
@@ -116,28 +92,8 @@ export async function POST(request: NextRequest) {
       regional: regionalIreq,
       extremity: extremityIreq,
     },
-    recommendation: {
-      garments: ensemble.map(formatGarmentResponse),
-      handwear: recommendedHandwear ? formatHandwearResponse(recommendedHandwear) : null,
-      headwear: {
-        helmet: recommendedHeadwear.helmet ? formatHeadwearResponse(recommendedHeadwear.helmet) : null,
-        head_warmth: recommendedHeadwear.headWarmth ? formatHeadwearResponse(recommendedHeadwear.headWarmth) : null,
-        neck_warmth: recommendedHeadwear.neckWarmth ? formatHeadwearResponse(recommendedHeadwear.neckWarmth) : null,
-      },
-      ensemble_properties: {
-        total_clo: ensembleProps.rcl.wholeBody,
-        regional_clo: {
-          torso: Math.round(ensembleProps.rcl.torso * 100) / 100,
-          arms: Math.round(ensembleProps.rcl.arm * 100) / 100,
-          legs: Math.round(ensembleProps.rcl.leg * 100) / 100,
-        },
-        evap_potential: ensembleProps.evapPotential,
-        permeability_index: ensembleProps.im,
-      },
-      score: score.totalScore,
-      component_scores: score.componentScores,
-    },
-    warnings: score.warnings,
+    recommendation: response.recommendation,
+    warnings: response.warnings,
     guidance: getRunningGuidance(tempC, ireq),
   });
 }

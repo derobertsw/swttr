@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
 import { ACTIVITIES } from "@/data/activities";
+import { STORAGE_KEYS } from "@/lib/storage";
 
 const LEFT_ITEMS = [
   { href: "/?mode=planAhead", label: "Plan", icon: CalendarDays },
@@ -52,7 +53,7 @@ export function MobileTabBar() {
 
   useEffect(() => {
     if (activityValue) return;
-    const stored = typeof window !== "undefined" ? localStorage.getItem("swttr-last-activity") : null;
+    const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.LAST_ACTIVITY) : null;
     if (stored) {
       setActivityValue(stored);
       const storedName = ACTIVITIES.find((item) => item.value === stored)?.name ?? "";

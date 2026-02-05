@@ -1,0 +1,100 @@
+import { Shirt, Hand, HardHat, Layers, Flame, Shield, Wind, CloudRain, LucideProps } from "lucide-react";
+import type { WardrobeItem } from "@/types/wardrobe";
+
+// Custom pants icon (ski pants style) since lucide-react doesn't have one
+export function PantsIcon(props: LucideProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M6 3h12v4l1 13h-5l-2-11-2 11H5l1-13V3z" />
+    </svg>
+  );
+}
+
+export const LEGS_GARMENT_TYPES = ["pants", "shorts", "bib"];
+
+export const typeIcons = {
+  garment: Shirt,
+  handwear: Hand,
+  headwear: HardHat,
+};
+
+const categoryIcons: Record<string, React.ComponentType<LucideProps>> = {
+  base_layer: Layers,
+  mid_layer_light: Shirt,
+  mid_layer_heavy: Shirt,
+  insulation_synthetic: Flame,
+  insulation_down: Flame,
+  soft_shell: Shield,
+  hard_shell: CloudRain,
+  outer_insulated: Flame,
+  windbreaker: Wind,
+};
+
+export const typeLabels = {
+  garment: "Clothing",
+  handwear: "Handwear",
+  headwear: "Headwear",
+};
+
+export const BODY_PART_ORDER = ["torso", "legs", "hands", "head & neck"];
+
+export function getItemIcon(itemType: string, garmentType?: string, category?: string) {
+  if (itemType === "garment" && garmentType && LEGS_GARMENT_TYPES.includes(garmentType)) {
+    return PantsIcon;
+  }
+  if (itemType === "garment" && category && categoryIcons[category]) {
+    return categoryIcons[category];
+  }
+  return typeIcons[itemType as keyof typeof typeIcons] || Shirt;
+}
+
+export function formatCategory(category: string): string {
+  return category
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function getClo(item: WardrobeItem): number | undefined {
+  if (item.details.rcl_clo !== undefined) return item.details.rcl_clo;
+  const tp = item.details.garment_thermal_properties;
+  const props = Array.isArray(tp) ? tp[0] : tp;
+  return props?.rcl_whole_body;
+}
+
+export function getBodyPart(item: WardrobeItem): string {
+  if (item.item_type === "handwear") return "hands";
+  if (item.item_type === "headwear") return "head & neck";
+  if (item.details.garment_type && LEGS_GARMENT_TYPES.includes(item.details.garment_type)) return "legs";
+  return "torso";
+}
+
+export function getEmptyStateIcon(part: string) {
+  switch (part) {
+    case "torso": return Shirt;
+    case "legs": return PantsIcon;
+    case "hands": return Hand;
+    case "head & neck": return HardHat;
+    default: return Shirt;
+  }
+}
+
+export function normalizeSearch(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ø/g, "o")
+    .replace(/æ/g, "ae")
+    .replace(/å/g, "a");
+}

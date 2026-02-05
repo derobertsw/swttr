@@ -16,6 +16,7 @@ const mockSearchParams = new URLSearchParams();
 vi.mock("next/navigation", () => ({
   useSearchParams: () => mockSearchParams,
   usePathname: () => "/",
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
 // Mock Clerk components
@@ -139,52 +140,7 @@ describe("Home Page", () => {
       await user.click(screen.getByRole("button", { name: /gear up/i }));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
-      });
-    });
-
-    it("should show success toast with weather data", async () => {
-      const { toast } = await import("sonner");
-
-      const mockGeolocation = {
-        getCurrentPosition: vi.fn((success) => {
-          success({ coords: { latitude: 40.7128, longitude: -74.006 } });
-        }),
-      };
-      Object.defineProperty(navigator, "geolocation", {
-        value: mockGeolocation,
-        writable: true,
-      });
-
-      mockFetch.mockImplementation((url: string) => {
-        if (url.includes("/api/wardrobe/items")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ mappings: [] }),
-          });
-        }
-        if (url.includes("/api/preferences")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ temperatureSensitivity: "neutral" }),
-          });
-        }
-        if (url.includes("/api/weather")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ temperature: 32, windSpeed: 15 }),
-          });
-        }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-      });
-
-      const user = userEvent.setup();
-      render(<Home />);
-
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
-
-      await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith("Current: 32°F, 15 mph wind");
+        expect(screen.getByText(/wind 15 mph/i)).toBeInTheDocument();
       });
     });
   });
@@ -227,7 +183,7 @@ describe("Home Page", () => {
       });
     });
 
-    it("should show sliders when geolocation permission denied", async () => {
+    it("should show location input when geolocation permission denied", async () => {
       const mockGeolocation = {
         getCurrentPosition: vi.fn((_success, error) => {
           error({ code: 1, PERMISSION_DENIED: 1 });
@@ -244,7 +200,7 @@ describe("Home Page", () => {
       await user.click(screen.getByRole("button", { name: /gear up/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/temperature:/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
       });
     });
 
@@ -306,11 +262,11 @@ describe("Home Page", () => {
         expect(screen.getByText(/temperature:/i)).toBeInTheDocument();
       });
 
-      // Second click uses slider values
+      // Second click uses slider values — shows results with weather display
       await user.click(screen.getByRole("button", { name: /gear up/i }));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
+        expect(screen.getByText(/°F/)).toBeInTheDocument();
       });
     });
   });
@@ -330,62 +286,11 @@ describe("Home Page", () => {
       expect(screen.getByRole("button", { name: /pick a date/i })).toBeInTheDocument();
     });
 
-    it("should show Manual Input button in plan ahead mode", () => {
+    it("should show time input in plan ahead mode", () => {
       mockSearchParams.set("mode", "planAhead");
       render(<Home />);
 
-      expect(screen.getByRole("button", { name: /manual input/i })).toBeInTheDocument();
-    });
-  });
-
-  describe("Back button", () => {
-    it("should return to input view when Back clicked", async () => {
-      const mockGeolocation = {
-        getCurrentPosition: vi.fn((success) => {
-          success({ coords: { latitude: 40.7128, longitude: -74.006 } });
-        }),
-      };
-      Object.defineProperty(navigator, "geolocation", {
-        value: mockGeolocation,
-        writable: true,
-      });
-
-      mockFetch.mockImplementation((url: string) => {
-        if (url.includes("/api/wardrobe/items")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ mappings: [] }),
-          });
-        }
-        if (url.includes("/api/preferences")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ temperatureSensitivity: "neutral" }),
-          });
-        }
-        if (url.includes("/api/weather")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ temperature: 32, windSpeed: 15 }),
-          });
-        }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-      });
-
-      const user = userEvent.setup();
-      render(<Home />);
-
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
-
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole("button", { name: /back/i }));
-
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /gear up/i })).toBeInTheDocument();
-      });
+      expect(screen.getByDisplayValue("12:00")).toBeInTheDocument();
     });
   });
 });

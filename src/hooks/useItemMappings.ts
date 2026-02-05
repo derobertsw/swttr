@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { UserItemMapping } from "@/types/wardrobe";
 import { useUserId } from "@/hooks/useUserId";
+import { logWarn } from "@/lib/logger";
 
 async function fetchItemMappings(userId: string): Promise<Map<string, string>> {
   try {
@@ -11,7 +12,7 @@ async function fetchItemMappings(userId: string): Promise<Map<string, string>> {
     });
 
     if (!res.ok) {
-      console.log("Failed to fetch item mappings from API, using empty map");
+      logWarn("useItemMappings", "API returned non-ok status");
       return new Map<string, string>();
     }
 
@@ -26,7 +27,7 @@ async function fetchItemMappings(userId: string): Promise<Map<string, string>> {
     }
     return map;
   } catch (err) {
-    console.error("Failed to fetch item mappings:", err);
+    logWarn("useItemMappings", err);
     return new Map<string, string>();
   }
 }

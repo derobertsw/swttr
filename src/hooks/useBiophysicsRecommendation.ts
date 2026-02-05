@@ -6,8 +6,10 @@ import {
   BIOPHYSICS_ENDPOINTS,
   isBiophysicsSupported,
 } from "@/types/biophysics";
+import { STORAGE_KEYS } from "@/lib/storage";
+import { logWarn } from "@/lib/logger";
 
-interface UseBiophysicsResult {
+export interface UseBiophysicsResult {
   data: BiophysicsRecommendation | null;
   loading: boolean;
   error: Error | null;
@@ -16,14 +18,6 @@ interface UseBiophysicsResult {
     weather: { temperature: number; windSpeed: number; humidity?: number }
   ) => Promise<BiophysicsRecommendation | null>;
   reset: () => void;
-}
-
-/**
- * Get user ID from localStorage
- */
-function getUserId(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("swttr-user-id");
 }
 
 /**
@@ -54,7 +48,9 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
       setError(null);
 
       // Get user ID to use wardrobe items
-      const userId = getUserId();
+      const userId = typeof window !== "undefined"
+        ? localStorage.getItem(STORAGE_KEYS.USER_ID)
+        : null;
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
@@ -94,7 +90,7 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
         const errorObj = err instanceof Error ? err : new Error("Unknown error");
         setError(errorObj);
         setData(null);
-        console.warn("Biophysics API error (falling back to static):", errorObj.message);
+        logWarn("useBiophysicsRecommendation", errorObj);
         return null;
       } finally {
         setLoading(false);
@@ -116,57 +112,4 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
     fetch: fetchBiophysics,
     reset,
   };
-}
-
-/**
- * Standalone function to fetch biophysics recommendations
- * Use when you don't need the hook pattern
- */
-export async function fetchBiophysicsRecommendation(
-  activity: string,
-  temperature: number,
-  windSpeed: number,
-  humidity?: number
-): Promise<BiophysicsRecommendation | null> {
-  if (!isBiophysicsSupported(activity)) {
-    return null;
-  }
-
-  const endpoint = BIOPHYSICS_ENDPOINTS[activity];
-
-  // Get user ID to use wardrobe items
-  const userId = getUserId();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (userId) {
-    headers["x-user-id"] = userId;
-  }
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        weather: {
-          temperature,
-          wind_speed: windSpeed,
-          humidity: humidity ?? 50,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const result = await response.json();
-    // Validate that the response has the expected structure
-    if (result?.recommendation?.score !== undefined) {
-      return result;
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }

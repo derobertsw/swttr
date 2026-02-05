@@ -1,3 +1,5 @@
+import type { GarmentThermalProperties } from "@/types/garments";
+
 // Body parts and their layer types
 export const BODY_PARTS = ["torso", "legs", "hands", "headNeck"] as const;
 export type BodyPart = (typeof BODY_PARTS)[number];
@@ -23,4 +25,42 @@ export function makeItemMappingKey(
   standardOption: string
 ): ItemMappingKey {
   return `${bodyPart}:${layerType}:${standardOption}`;
+}
+
+export interface AvailableItem {
+  id: string;
+  type: "garment" | "handwear" | "headwear";
+  brand: string;
+  model_name: string;
+  category: string;
+  garment_type?: string;
+  rcl_clo?: number;
+  dexterity_score?: number;
+}
+
+export interface WardrobeItem {
+  id: string;
+  item_type: "garment" | "handwear" | "headwear";
+  item_id: string;
+  nickname?: string;
+  disabled?: boolean;
+  details: {
+    brand: string;
+    model_name: string;
+    category?: string;
+    garment_type?: string;
+    handwear_type?: string;
+    headwear_type?: string;
+    rcl_clo?: number;
+    dexterity_score?: number;
+    covers_torso?: boolean;
+    covers_arms?: boolean;
+    covers_legs?: boolean;
+    covers_head?: boolean;
+    hood_type?: string;
+    covers_ears?: boolean;
+    covers_neck?: boolean;
+    covers_face?: boolean;
+    garment_thermal_properties?: GarmentThermalProperties | GarmentThermalProperties[];
+  };
 }

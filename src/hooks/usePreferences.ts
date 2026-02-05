@@ -6,6 +6,12 @@ import { DEFAULT_ACTIVITY } from "@/data/activities";
 import { useUserId } from "@/hooks/useUserId";
 import { STORAGE_KEYS } from "@/lib/storage";
 
+const VALID_SENSITIVITIES: readonly TemperatureSensitivity[] = ["hot", "neutral", "cold"];
+
+function isTemperatureSensitivity(value: string): value is TemperatureSensitivity {
+  return (VALID_SENSITIVITIES as readonly string[]).includes(value);
+}
+
 export function usePreferences() {
   const userId = useUserId();
   const [sensitivity, setSensitivity] = useState<TemperatureSensitivity>("neutral");
@@ -14,8 +20,8 @@ export function usePreferences() {
 
   useEffect(() => {
     // Load from localStorage first for immediate display
-    const storedSensitivity = localStorage.getItem(STORAGE_KEYS.SENSITIVITY) as TemperatureSensitivity | null;
-    if (storedSensitivity && ["hot", "neutral", "cold"].includes(storedSensitivity)) {
+    const storedSensitivity = localStorage.getItem(STORAGE_KEYS.SENSITIVITY);
+    if (storedSensitivity && isTemperatureSensitivity(storedSensitivity)) {
       setSensitivity(storedSensitivity);
     }
 

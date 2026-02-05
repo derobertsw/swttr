@@ -3,6 +3,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Backpack from "./page";
 
+// Mock next/navigation
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/backpack",
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+}));
+
 // Mock Clerk components
 vi.mock("@clerk/nextjs", () => ({
   SignedIn: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -73,7 +79,7 @@ describe("Backpack Page", () => {
 
     it("should show default temperature range", () => {
       render(<Backpack />);
-      expect(screen.getByText(/0°F to 5°F/i)).toBeInTheDocument();
+      expect(screen.getByText(/-20°F to 40\+°F/i)).toBeInTheDocument();
     });
 
     it("should render min and max temperature labels", () => {
@@ -84,7 +90,7 @@ describe("Backpack Page", () => {
 
     it("should render backpack editor", () => {
       render(<Backpack />);
-      expect(screen.getByPlaceholderText(/add item/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/add custom item/i)).toBeInTheDocument();
     });
   });
 
@@ -102,14 +108,14 @@ describe("Backpack Page", () => {
   });
 
   describe("card content", () => {
-    it("should render Items to Bring card title", () => {
+    it("should render page heading", () => {
       render(<Backpack />);
-      expect(screen.getByText("Items to Bring")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /backpack/i })).toBeInTheDocument();
     });
 
-    it("should render card description", () => {
+    it("should render page description", () => {
       render(<Backpack />);
-      expect(screen.getByText(/select an activity and temperature range/i)).toBeInTheDocument();
+      expect(screen.getByText(/customize items to bring/i)).toBeInTheDocument();
     });
   });
 });

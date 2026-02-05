@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { LocationSuggestion } from "@/types/recommendations";
+import { logWarn } from "@/lib/logger";
 
 export function useLocationSearch() {
   const [location, setLocation] = useState("");
@@ -24,7 +25,7 @@ export function useLocationSearch() {
         setSuggestions(data.results || []);
         setShowSuggestions(true);
       } catch (error) {
-        console.error("Failed to fetch suggestions:", error);
+        logWarn("useLocationSearch", error);
       }
     };
 

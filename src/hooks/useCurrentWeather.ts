@@ -1,14 +1,8 @@
 "use client";
 
-export interface WeatherData {
-  temperature: number;
-  windSpeed: number;
-}
+import type { WeatherData, WeatherResult } from "@/types/weather";
 
-export interface WeatherResult {
-  data: WeatherData | null;
-  locationDenied: boolean;
-}
+export type { WeatherData, WeatherResult };
 
 export function fetchCurrentWeather(): Promise<WeatherResult> {
   return new Promise((resolve) => {

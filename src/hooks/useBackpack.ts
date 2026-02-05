@@ -2,16 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { BackpackItem } from "@/types/recommendations";
+import type { StoredBackpackData } from "@/types/backpack";
 import backpackDefaults from "@/data/backpackDefaults.json";
 import { useUserId } from "@/hooks/useUserId";
 import { STORAGE_KEYS } from "@/lib/storage";
-
-interface StoredBackpackData {
-  [key: string]: {
-    customItems: string[];
-    hiddenDefaults: string[];
-  };
-}
 
 function getStorageKey(activity: string, tempRange: string): string {
   return `${activity}:${tempRange}`;

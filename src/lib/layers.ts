@@ -185,7 +185,7 @@ interface LegacyLayerSet {
 /**
  * Legacy recommendation format using string arrays
  */
-interface LegacyRecommendation {
+export interface LegacyRecommendation {
   torso: LegacyLayerSet;
   legs: LegacyLayerSet;
   hands: LegacyLayerSet;

@@ -6,10 +6,8 @@ export const STORAGE_KEYS = {
   USER_ID: "swttr-user-id",
   SENSITIVITY: "swttr-temperature-sensitivity",
   DEFAULT_ACTIVITY: "swttr-default-activity",
+  LAST_ACTIVITY: "swttr-last-activity",
   BACKPACK: "swttr-backpack",
-  ITEM_MAPPINGS: "swttr-item-mappings",
-  WARDROBE: "swttr-wardrobe",
-  WARDROBE_HIDDEN: "swttr-wardrobe-hidden",
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
