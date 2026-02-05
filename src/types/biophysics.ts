@@ -118,6 +118,8 @@ export interface BiophysicsRecommendation {
  * Activity ID to API endpoint mapping
  */
 export const BIOPHYSICS_ENDPOINTS: Record<string, string> = {
+  'running': '/api/v1/recommendations/running',
+  'biking': '/api/v1/recommendations/biking',
   'alpine-skiing': '/api/v1/recommendations/alpine',
   'xc-skiing': '/api/v1/recommendations/xc',
   'backcountry-skiing': '/api/v1/recommendations/ski-touring',

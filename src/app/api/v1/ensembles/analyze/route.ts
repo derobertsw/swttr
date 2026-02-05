@@ -22,7 +22,7 @@ import { METABOLIC_RATES, type ActivityType } from '@/lib/biophysics/constants';
  *     precipitation?: boolean,
  *     precipitation_type?: 'rain' | 'snow' | 'mixed'
  *   },
- *   activity: 'xc_skiing' | 'ski_touring_uphill' | 'ski_touring_downhill' | 'alpine_skiing'
+ *   activity: 'xc_skiing' | 'ski_touring_uphill' | 'ski_touring_downhill' | 'alpine_skiing' | 'running' | 'biking'
  * }
  */
 export async function POST(request: NextRequest) {
@@ -101,6 +101,8 @@ export async function POST(request: NextRequest) {
     ski_touring_uphill: 'ski_touring_uphill',
     ski_touring_downhill: 'ski_touring_downhill',
     alpine_skiing: 'alpine_skiing',
+    running: 'running_moderate',
+    biking: 'biking_moderate',
   }[activityType] as keyof typeof METABOLIC_RATES;
 
   // Score the ensemble
@@ -111,7 +113,7 @@ export async function POST(request: NextRequest) {
       name: activityType,
       metabolicRate: METABOLIC_RATES[metabolicRateKey],
       hasStaticPeriods: activityType === 'alpine_skiing',
-      windExposure: activityType === 'ski_touring_uphill' ? 'sheltered' : 'exposed',
+      windExposure: activityType === 'ski_touring_uphill' ? 'sheltered' : activityType === 'biking' ? 'exposed' : 'normal',
     },
     activityType
   );
@@ -159,7 +161,12 @@ function generateInterpretation(
     );
   }
 
-  if (score.componentScores.overheatPrevention < 50 && activity.includes('touring') || activity === 'xc_skiing') {
+  if (
+    (score.componentScores.overheatPrevention < 50 && activity.includes('touring')) ||
+    activity === 'xc_skiing' ||
+    activity === 'running' ||
+    activity === 'biking'
+  ) {
     details.push(
       'Risk of overheating during exertion. Consider lighter or more breathable layers.'
     );

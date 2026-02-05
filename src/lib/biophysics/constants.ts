@@ -9,6 +9,8 @@ export const METABOLIC_RATES = {
   resting: 58.2,              // 1 MET
   light_activity: 116.4,      // 2 MET
   moderate_activity: 174.6,   // 3 MET
+  running_moderate: 348.6,    // 6 MET
+  biking_moderate: 290.0,     // 5 MET
   xc_skiing_easy: 232.8,      // 4 MET
   xc_skiing_moderate: 290.0,  // 5 MET
   xc_skiing_racing: 406.2,    // 7 MET
@@ -49,6 +51,16 @@ export const ENSEMBLE_REGRESSION = {
 // Regional IREQ multipliers by activity
 // Adjusts whole-body IREQ to body-region-specific targets
 export const REGIONAL_IREQ_MULTIPLIERS = {
+  running: {
+    torso: 0.75,   // High core heat from sustained effort
+    arms: 0.95,    // Moderate arm movement
+    legs: 1.05,    // High leg output with airflow exposure
+  },
+  biking: {
+    torso: 0.80,   // Warm core, sustained effort
+    arms: 0.90,    // Arms are static but exposed
+    legs: 1.10,    // High leg output with wind exposure
+  },
   xc_skiing: {
     torso: 0.85,   // Core runs hot, needs less
     arms: 1.0,     // Poles = arm movement = moderate
@@ -81,6 +93,14 @@ export const DEFAULT_REGIONAL_MULTIPLIERS = {
 // Extremity base multipliers by activity
 // Hands and head need proportionally more insulation than core
 export const EXTREMITY_IREQ_MULTIPLIERS = {
+  running: {
+    hands: 1.05,   // High exertion keeps hands warmer
+    head: 0.90,    // Heat loss during exertion
+  },
+  biking: {
+    hands: 1.20,   // Wind exposure, lower hand movement
+    head: 1.00,    // Wind exposure
+  },
   xc_skiing: {
     hands: 1.10,   // Pole work keeps hands warmer
     head: 0.90,    // More heat loss during exertion
@@ -117,6 +137,20 @@ export type HoodType = keyof typeof HOOD_CLO_VALUES;
 
 // Activity scoring weights
 export const ACTIVITY_WEIGHTS = {
+  running: {
+    coldProtection: 0.10,
+    overheatPrevention: 0.45,
+    breathability: 0.30,
+    weatherProtection: 0.10,
+    weight: 0.05,
+  },
+  biking: {
+    coldProtection: 0.20,
+    overheatPrevention: 0.30,
+    breathability: 0.25,
+    weatherProtection: 0.15,
+    weight: 0.10,
+  },
   xc_skiing: {
     coldProtection: 0.15,
     overheatPrevention: 0.40,

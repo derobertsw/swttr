@@ -27,7 +27,7 @@ const faqs = [
   {
     question: "What activities are supported?",
     answer:
-      "SWTTR's biophysics algorithm currently supports Alpine Skiing, Backcountry Skiing, and XC Skiing with activity-specific metabolic rates and regional insulation targets. Running and Biking use simpler temperature-based recommendations.",
+      "SWTTR's biophysics algorithm currently supports Alpine Skiing, Backcountry Skiing, XC Skiing, Running, and Biking with activity-specific metabolic rates and regional insulation targets. Other activities use temperature-based recommendations.",
   },
   {
     question: "How do I add my gear?",

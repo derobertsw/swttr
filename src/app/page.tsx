@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, Suspense } from "react";
+import { useState, useCallback, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import PageLayout from "@/components/PageLayout";
@@ -49,6 +49,7 @@ const HomeContent = () => {
   const { itemMappings } = useItemMappings();
   const biophysics = useBiophysicsRecommendation();
   const [biophysicsData, setBiophysicsData] = useState<BiophysicsRecommendation | null>(null);
+  const didAutoGearUp = useRef(false);
 
   // Set initial activity from preferences when it loads
   useEffect(() => {
@@ -220,13 +221,55 @@ const HomeContent = () => {
 
   useEffect(() => {
     const shouldGearUp = searchParams.get("gearUp");
-    if (!shouldGearUp) return;
-    void handleSubmit();
-  }, [searchParams, handleSubmit]);
+    if (!shouldGearUp || didAutoGearUp.current) return;
+    didAutoGearUp.current = true;
+
+    const stored = typeof window !== "undefined"
+      ? sessionStorage.getItem("swttr-gearup-coords")
+      : null;
+    const geoDenied = searchParams.get("geoDenied");
+
+    if (stored) {
+      sessionStorage.removeItem("swttr-gearup-coords");
+      try {
+        const coords = JSON.parse(stored) as { latitude: number; longitude: number };
+        setLoading(true);
+        void (async () => {
+          const weather = await fetchWeatherByCoords(coords.latitude, coords.longitude);
+          if (weather) {
+            setTemperature(weather.temperature);
+            setWindspeed(weather.windSpeed);
+            const layers = getRecommendation(weather.temperature);
+            setRecommendation(layers);
+            const bioData = await biophysics.fetch(activity, {
+              temperature: weather.temperature,
+              windSpeed: weather.windSpeed,
+            });
+            setBiophysicsData(bioData);
+            setShowResults(true);
+          } else {
+            setShowSliders(true);
+          }
+          setLoading(false);
+        })();
+        return;
+      } catch {
+        // fall through to manual
+      }
+    }
+
+    if (geoDenied) {
+      setLocationDenied(true);
+    }
+    setShowSliders(true);
+  }, [searchParams, activity, biophysics, getRecommendation]);
 
   useEffect(() => {
     const activityName =
       ACTIVITIES.find((item) => item.value === activity)?.name ?? "";
+    if (typeof window !== "undefined") {
+      localStorage.setItem("swttr-last-activity", activity);
+    }
     window.dispatchEvent(
       new CustomEvent("activityChange", { detail: { name: activityName, value: activity } })
     );

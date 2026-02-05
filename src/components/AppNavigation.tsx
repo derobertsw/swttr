@@ -45,6 +45,28 @@ export function MobileTabBar() {
   }, []);
 
   useEffect(() => {
+    if (pathname !== "/" && isGearUpLoading) {
+      setIsGearUpLoading(false);
+    }
+  }, [pathname, isGearUpLoading]);
+
+  useEffect(() => {
+    if (activityValue) return;
+    const stored = typeof window !== "undefined" ? localStorage.getItem("swttr-last-activity") : null;
+    if (stored) {
+      setActivityValue(stored);
+      const storedName = ACTIVITIES.find((item) => item.value === stored)?.name ?? "";
+      setActivityName(storedName);
+      return;
+    }
+    if (defaultActivity) {
+      setActivityValue(defaultActivity);
+      const defaultName = ACTIVITIES.find((item) => item.value === defaultActivity)?.name ?? "";
+      setActivityName(defaultName);
+    }
+  }, [activityValue, defaultActivity]);
+
+  useEffect(() => {
     const onActivityChange = (event: Event) => {
       const detail = (event as CustomEvent<{ name?: string; value?: string }>).detail;
       const nextName = detail?.name ?? "";
@@ -59,13 +81,15 @@ export function MobileTabBar() {
   }, []);
 
   const activityShort = useMemo(() => {
-    if (!activityName) return "";
-    if (activityName.includes("Hiking")) return "Hiking";
-    if (activityName.includes("Backcountry")) return "Backcountry";
-    if (activityName.includes("Alpine")) return "Alpine";
-    if (activityName.includes("XC")) return "XC";
-    return activityName.split(" ")[0];
-  }, [activityName]);
+    const resolvedName =
+      activityName || ACTIVITIES.find((item) => item.value === activityValue)?.name || "";
+    if (!resolvedName) return "";
+    if (resolvedName.includes("Hiking")) return "Hiking";
+    if (resolvedName.includes("Backcountry")) return "Backcountry";
+    if (resolvedName.includes("Alpine")) return "Alpine";
+    if (resolvedName.includes("XC")) return "XC";
+    return resolvedName.split(" ")[0];
+  }, [activityName, activityValue]);
 
   const ActivityGlyph = useMemo(() => {
     const match = ACTIVITIES.find((item) => item.value === activityValue);
@@ -144,7 +168,27 @@ export function MobileTabBar() {
               window.dispatchEvent(new CustomEvent("gearUp"));
               return;
             }
-            router.push("/?gearUp=1");
+            if (!navigator.geolocation) {
+              router.push("/?gearUp=1&geoDenied=1");
+              return;
+            }
+            setIsGearUpLoading(true);
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                sessionStorage.setItem(
+                  "swttr-gearup-coords",
+                  JSON.stringify({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                  })
+                );
+                router.push("/?gearUp=1");
+              },
+              () => {
+                sessionStorage.removeItem("swttr-gearup-coords");
+                router.push("/?gearUp=1&geoDenied=1");
+              }
+            );
           }}
           disabled={isGearUpLoading}
         >
