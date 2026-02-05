@@ -127,7 +127,8 @@ export async function getUserWardrobeGarmentIds(
     .from('user_wardrobe')
     .select('item_id')
     .eq('user_id', userId)
-    .eq('item_type', 'garment');
+    .eq('item_type', 'garment')
+    .eq('disabled', false);
 
   if (!data || data.length === 0) return null;
   return data.map((d) => d.item_id);
@@ -351,7 +352,8 @@ export async function getUserWardrobeItemIds(
     .from('user_wardrobe')
     .select('item_id')
     .eq('user_id', userId)
-    .eq('item_type', itemType);
+    .eq('item_type', itemType)
+    .eq('disabled', false);
 
   if (!data || data.length === 0) return null;
   return data.map((d) => d.item_id);

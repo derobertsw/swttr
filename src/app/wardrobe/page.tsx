@@ -48,6 +48,7 @@ interface WardrobeItem {
   item_type: "garment" | "handwear" | "headwear";
   item_id: string;
   nickname?: string;
+  disabled?: boolean;
   details: {
     brand: string;
     model_name: string;
@@ -307,6 +308,35 @@ export default function Wardrobe() {
     setRecentlyRemoved([]);
   };
 
+  const toggleDisabled = async (wardrobeId: string, currentDisabled: boolean) => {
+    if (!userId) return;
+
+    try {
+      const res = await fetch("/api/wardrobe/gear", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId,
+        },
+        body: JSON.stringify({
+          id: wardrobeId,
+          disabled: !currentDisabled,
+        }),
+      });
+
+      if (res.ok) {
+        setWardrobeItems((prev) =>
+          prev.map((w) =>
+            w.id === wardrobeId ? { ...w, disabled: !currentDisabled } : w
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Failed to toggle item:", err);
+    }
+  };
+
+
   const getClo = (item: WardrobeItem): number | undefined => {
     if (item.details.rcl_clo !== undefined) return item.details.rcl_clo;
     return item.details.garment_thermal_properties?.rcl_whole_body;
@@ -473,18 +503,26 @@ export default function Wardrobe() {
                               item.details.headwear_type ||
                               "";
                             const clo = getClo(item);
+                            const isDisabled = item.disabled ?? false;
 
                             return (
                               <SwipeableItem
                                 key={item.id}
                                 onDelete={() => removeItem(item.id)}
                                 onClick={() => setSelectedItem(item)}
+                                onToggleDisabled={() => toggleDisabled(item.id, isDisabled)}
+                                isDisabled={isDisabled}
                               >
-                                <div className="flex items-center gap-3 px-3 py-4">
+                                <div className={`flex items-center gap-3 px-3 py-4 ${isDisabled ? "opacity-50" : ""}`}>
                                   <Icon className="size-5 text-white/60 flex-shrink-0" />
                                   <div className="flex-1 min-w-0">
-                                    <div className="font-medium truncate">
+                                    <div className="font-medium truncate flex items-center gap-2">
                                       {item.details.brand} {item.details.model_name}
+                                      {isDisabled && (
+                                        <span className="text-[10px] font-normal text-amber-400/80 bg-amber-400/10 px-1.5 py-0.5 rounded">
+                                          Disabled
+                                        </span>
+                                      )}
                                     </div>
                                     <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
                                       <span>{formatCategory(category)}</span>

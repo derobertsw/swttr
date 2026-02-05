@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
           item_type: entry.item_type,
           item_id: entry.item_id,
           nickname: entry.nickname,
+          disabled: entry.disabled ?? false,
           created_at: entry.created_at,
           details: itemDetails,
         };
@@ -177,6 +178,68 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("Error adding item:", err);
     return NextResponse.json({ error: "Failed to add item" }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/wardrobe/gear
+ * Toggle disabled status for an item
+ */
+export async function PATCH(request: NextRequest) {
+  const supabase = getSupabase();
+  const userId = getUserId(request);
+
+  if (!supabase) {
+    return NextResponse.json(
+      { error: "Database not configured" },
+      { status: 503 }
+    );
+  }
+
+  if (!userId) {
+    return NextResponse.json({ error: "User ID required" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { id, disabled } = body as { id: string; disabled: boolean };
+
+    if (!id || typeof disabled !== "boolean") {
+      return NextResponse.json(
+        { error: "id and disabled are required" },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("user_wardrobe")
+      .update({ disabled })
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select();
+
+    if (error) {
+      console.error("Failed to update item:", error);
+      return NextResponse.json(
+        { error: "Failed to update item" },
+        { status: 500 }
+      );
+    }
+
+    if (!data || data.length === 0) {
+      return NextResponse.json(
+        { error: "Item not found or not owned by user" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ item: data[0] });
+  } catch (err) {
+    console.error("Error updating item:", err);
+    return NextResponse.json(
+      { error: "Failed to update item" },
+      { status: 500 }
+    );
   }
 }
 
