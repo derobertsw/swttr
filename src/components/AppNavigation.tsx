@@ -27,7 +27,7 @@ export function MobileTabBar() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 backdrop-blur-lg"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 backdrop-blur-lg pb-[env(safe-area-inset-bottom)]"
       style={{ backgroundColor: 'rgba(79, 157, 166, 0.45)' }}
     >
       <div className="flex justify-around items-center h-16">
