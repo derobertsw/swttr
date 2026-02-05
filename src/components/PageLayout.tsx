@@ -19,7 +19,7 @@ const PageLayout = ({ children, onLogoClick }: PageLayoutProps) => {
         <AppSidebar />
 
         <SidebarInset>
-          <div className="font-sans flex flex-col min-h-screen p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] gap-4 sm:p-8 md:p-12 md:pb-12 md:gap-6">
+          <div className="font-sans flex flex-col min-h-screen p-4 pb-[calc(6rem_+_env(safe-area-inset-bottom))] gap-4 sm:p-8 md:p-12 md:pb-12 md:gap-6">
             <Header onLogoClick={onLogoClick} />
             <main className="flex flex-col gap-6 sm:gap-8 flex-1 items-center justify-center w-full">
               {children}
