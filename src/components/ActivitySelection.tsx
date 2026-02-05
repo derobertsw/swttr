@@ -19,6 +19,9 @@ interface ActivitySelectionProps {
 const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
   const [api, setApi] = React.useState<CarouselApi>();
   const [current, setCurrent] = React.useState(0);
+  const [hideDots, setHideDots] = React.useState(false);
+  const isPointerDownRef = React.useRef(false);
+  const didScrollRef = React.useRef(false);
 
   // Find initial index based on value prop (only used for initial render)
   const [initialIndex] = React.useState(() =>
@@ -35,17 +38,51 @@ const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
 
     setCurrent(api.selectedScrollSnap());
 
+    const onPointerDown = () => {
+      isPointerDownRef.current = true;
+      didScrollRef.current = false;
+    };
+
+    const onPointerUp = () => {
+      if (didScrollRef.current) {
+        setHideDots(true);
+      }
+      isPointerDownRef.current = false;
+      didScrollRef.current = false;
+    };
+
+    const onScroll = () => {
+      if (isPointerDownRef.current) {
+        didScrollRef.current = true;
+      }
+    };
+
     const onSelect = () => {
       const index = api.selectedScrollSnap();
       setCurrent(index);
       onChange(ACTIVITIES[index].value);
     };
 
+    api.on("pointerDown", onPointerDown);
+    api.on("pointerUp", onPointerUp);
+    api.on("scroll", onScroll);
     api.on("select", onSelect);
     return () => {
+      api.off("pointerDown", onPointerDown);
+      api.off("pointerUp", onPointerUp);
+      api.off("scroll", onScroll);
       api.off("select", onSelect);
     };
   }, [api, initialIndex, onChange]);
+
+  React.useEffect(() => {
+    if (!api) return;
+    const onFocus = () => {
+      api.scrollTo(current);
+    };
+    window.addEventListener("focusActivityCarousel", onFocus);
+    return () => window.removeEventListener("focusActivityCarousel", onFocus);
+  }, [api, current]);
 
   return (
     <div className="mx-auto w-full max-w-md">
@@ -66,12 +103,15 @@ const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
                       ? "scale-110 border-gray-300/60 shadow-[0_5px_14px_rgba(0,0,0,0.17)] bg-white"
                       : "scale-[0.92] opacity-80 border-transparent shadow-none"
                   )}
-                  onClick={() => api?.scrollTo(index)}
+                  onClick={() => {
+                    if (isSelected) return;
+                    api?.scrollTo(index);
+                  }}
                 >
                   <CardContent
                     className={cn(
-                      "flex h-40 flex-col items-center justify-center gap-3",
-                      isSelected ? "px-6" : "px-6"
+                      "flex flex-col items-center justify-center gap-3",
+                      isSelected ? "h-44 px-6" : "h-36 px-6"
                     )}
                   >
                     <activity.icon
@@ -98,13 +138,13 @@ const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
         </CarouselContent>
       </Carousel>
       {/* Pagination dots */}
-      <div className="flex justify-center gap-2 mt-2">
+      <div className={cn("flex justify-center gap-2 mt-1 opacity-60 transition-opacity", hideDots && "opacity-0")}>
         {ACTIVITIES.map((activity, index) => (
           <button
             key={activity.value}
             onClick={() => api?.scrollTo(index)}
             className={cn(
-              "w-2 h-2 rounded-full transition-all duration-300",
+              "w-1.5 h-1.5 rounded-full transition-all duration-300",
               index === current
                 ? "bg-white"
                 : "bg-white/35"

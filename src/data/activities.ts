@@ -1,4 +1,5 @@
-import { Bike, CableCar, Footprints, Mountain, Snowflake, LucideIcon } from "lucide-react";
+import { Bike, CableCar, Footprints, Mountain, LucideIcon } from "lucide-react";
+import XCSkiIcon from "@/components/icons/XCSkiIcon";
 
 export interface Activity {
   name: string;
@@ -13,7 +14,7 @@ export const ACTIVITIES: Activity[] = [
   { name: "Hiking / Snowshoeing", value: "hiking-snowshoeing", icon: Mountain },
   { name: "Backcountry Skiing", value: "backcountry-skiing", icon: Mountain, descriptor: "Uphill · Touring" },
   { name: "Alpine Skiing", value: "alpine-skiing", icon: CableCar, descriptor: "Chairlifts · Resort" },
-  { name: "XC Skiing", value: "xc-skiing", icon: Snowflake, descriptor: "High output · Aerobic" },
+  { name: "XC Skiing", value: "xc-skiing", icon: XCSkiIcon, descriptor: "High output · Aerobic" },
 ];
 
 export const DEFAULT_ACTIVITY = "alpine-skiing";

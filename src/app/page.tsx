@@ -9,7 +9,6 @@ import WeatherSelection from "@/components/WeatherSelection";
 import LayerDisplay from "@/components/LayerDisplay";
 import { PlanAheadForm } from "@/components/PlanAheadForm";
 import { LocationInput } from "@/components/LocationInput";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import layerRecommendations from "@/data/layerRecommendations.json";
 import { Recommendation } from "@/types/recommendations";
@@ -25,7 +24,6 @@ import { BiophysicsRecommendation } from "@/types/biophysics";
 import { BACKPACK_ACTIVITY_IDS } from "@/data/backpackConstants";
 import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2 } from "lucide-react";
 
 type InputMode = "manual" | "planAhead";
 
@@ -212,11 +210,37 @@ const HomeContent = () => {
     }
   };
 
+  useEffect(() => {
+    const onGearUp = () => {
+      void handleSubmit();
+    };
+    window.addEventListener("gearUp", onGearUp);
+    return () => window.removeEventListener("gearUp", onGearUp);
+  }, [handleSubmit]);
+
+  useEffect(() => {
+    const shouldGearUp = searchParams.get("gearUp");
+    if (!shouldGearUp) return;
+    void handleSubmit();
+  }, [searchParams, handleSubmit]);
+
+  useEffect(() => {
+    const activityName =
+      ACTIVITIES.find((item) => item.value === activity)?.name ?? "";
+    window.dispatchEvent(
+      new CustomEvent("activityChange", { detail: { name: activityName, value: activity } })
+    );
+  }, [activity]);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("gearUpLoading", { detail: loading }));
+  }, [loading]);
+
   return (
     <PageLayout onLogoClick={resetToInitialState}>
       {!showResults ? (
         <>
-          <p className="text-base font-medium text-white/80 text-center mb-6">
+          <p className="text-base font-medium text-white/80 text-center mb-3">
             Choose your activity
           </p>
           <ActivitySelection value={activity} onChange={setActivity} />
@@ -261,16 +285,7 @@ const HomeContent = () => {
           <p className="text-sm text-white/55 text-center mb-4">
             Built on thermal science
           </p>
-          <div className="flex flex-col items-center">
-            <Button
-              size="xl"
-              className="py-5 shadow-[0_5px_14px_rgba(0,0,0,0.3)]"
-              onClick={handleSubmit}
-              disabled={loading || (process.env.NODE_ENV === "production" && ["running", "biking"].includes(activity))}
-            >
-              {loading ? <><Loader2 className="animate-spin" /> Loading...</> : "Gear Up"}
-            </Button>
-          </div>
+          <div className="flex flex-col items-center" />
         </>
       ) : (
         <>
