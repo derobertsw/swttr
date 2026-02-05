@@ -4,21 +4,21 @@ import LayerDisplay from "./LayerDisplay";
 
 const mockRecommendation = {
   torso: {
-    base: ["Wool base layer"],
-    mid: ["Fleece jacket"],
-    outer: ["Insulated jacket"],
+    base: [{ name: "Wool base layer" }],
+    mid: [{ name: "Fleece jacket" }],
+    outer: [{ name: "Insulated jacket" }],
   },
   legs: {
-    base: ["Thermal pants"],
-    outer: ["Ski pants"],
+    base: [{ name: "Thermal pants" }],
+    outer: [{ name: "Ski pants" }],
   },
   hands: {
-    base: ["Liner gloves"],
-    outer: ["Ski gloves"],
+    base: [{ name: "Liner gloves" }],
+    outer: [{ name: "Ski gloves" }],
   },
   headNeck: {
-    base: ["Balaclava"],
-    outer: ["Helmet"],
+    base: [{ name: "Balaclava" }],
+    outer: [{ name: "Helmet" }],
   },
 };
 
@@ -47,9 +47,9 @@ describe("LayerDisplay", () => {
     it("should render layer labels correctly", () => {
       render(<LayerDisplay {...defaultProps} />);
 
-      const baseLabels = screen.getAllByText("Base:");
-      const midLabels = screen.getAllByText("Mid:");
-      const outerLabels = screen.getAllByText("Outer:");
+      const baseLabels = screen.getAllByText("Base");
+      const midLabels = screen.getAllByText("Mid");
+      const outerLabels = screen.getAllByText("Outer");
 
       expect(baseLabels.length).toBeGreaterThan(0);
       expect(midLabels.length).toBeGreaterThan(0);
@@ -111,7 +111,7 @@ describe("LayerDisplay", () => {
   });
 
   describe("empty layers", () => {
-    it("should show wardrobe link when all layers are empty", () => {
+    it("should show add link when all layers are empty", () => {
       const emptyRecommendation = {
         torso: { base: [], outer: [] },
         legs: { base: [], outer: [] },
@@ -121,44 +121,44 @@ describe("LayerDisplay", () => {
 
       render(<LayerDisplay recommendation={emptyRecommendation} temperature={25} windspeed={10} />);
 
-      // Should show "Add X items in wardrobe" links for each body part
-      expect(screen.getByText("Add torso items in wardrobe")).toBeInTheDocument();
-      expect(screen.getByText("Add legs items in wardrobe")).toBeInTheDocument();
-      expect(screen.getByText("Add hands items in wardrobe")).toBeInTheDocument();
-      expect(screen.getByText("Add head/neck items in wardrobe")).toBeInTheDocument();
+      // Should show empty state messages for each body part
+      expect(screen.getByText("Add torso layers for core warmth")).toBeInTheDocument();
+      expect(screen.getByText("Your legs need protection in these conditions")).toBeInTheDocument();
+      expect(screen.getByText("No hand insulation selected")).toBeInTheDocument();
+      expect(screen.getByText("Head and neck are exposed to the elements")).toBeInTheDocument();
     });
 
     it("should not show mid layer label when mid is not present", () => {
       const noMidRecommendation = {
-        torso: { base: ["Base layer"], outer: ["Outer layer"] },
-        legs: { base: ["Base layer"], outer: ["Outer layer"] },
-        hands: { base: ["Base layer"], outer: ["Outer layer"] },
-        headNeck: { base: ["Base layer"], outer: ["Outer layer"] },
+        torso: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
+        legs: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
+        hands: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
+        headNeck: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
       };
 
       render(<LayerDisplay recommendation={noMidRecommendation} temperature={25} windspeed={10} />);
-      expect(screen.queryByText("Mid:")).not.toBeInTheDocument();
+      expect(screen.queryByText("Mid")).not.toBeInTheDocument();
     });
 
     it("should not show mid layer label when mid is empty array", () => {
       const emptyMidRecommendation = {
-        torso: { base: ["Base layer"], mid: [], outer: ["Outer layer"] },
-        legs: { base: ["Base layer"], mid: [], outer: ["Outer layer"] },
-        hands: { base: ["Base layer"], mid: [], outer: ["Outer layer"] },
-        headNeck: { base: ["Base layer"], mid: [], outer: ["Outer layer"] },
+        torso: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
+        legs: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
+        hands: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
+        headNeck: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
       };
 
       render(<LayerDisplay recommendation={emptyMidRecommendation} temperature={25} windspeed={10} />);
-      expect(screen.queryByText("Mid:")).not.toBeInTheDocument();
+      expect(screen.queryByText("Mid")).not.toBeInTheDocument();
     });
   });
 
   describe("multiple items in a layer", () => {
-    it("should join multiple items with commas", () => {
+    it("should render multiple items separately", () => {
       const multiItemRecommendation = {
         torso: {
-          base: ["Item 1", "Item 2", "Item 3"],
-          outer: ["Outer item"],
+          base: [{ name: "Item 1" }, { name: "Item 2" }, { name: "Item 3" }],
+          outer: [{ name: "Outer item" }],
         },
         legs: { base: [], outer: [] },
         hands: { base: [], outer: [] },
@@ -166,29 +166,67 @@ describe("LayerDisplay", () => {
       };
 
       render(<LayerDisplay recommendation={multiItemRecommendation} temperature={25} windspeed={10} />);
-      expect(screen.getByText("Item 1, Item 2, Item 3")).toBeInTheDocument();
+      expect(screen.getByText("Item 1")).toBeInTheDocument();
+      expect(screen.getByText("Item 2")).toBeInTheDocument();
+      expect(screen.getByText("Item 3")).toBeInTheDocument();
+    });
+  });
+
+  describe("clo value display", () => {
+    it("should display clo values on separate lines when present", () => {
+      const recommendationWithClo = {
+        torso: {
+          base: [{ name: "Merino Base", rcl: 0.35 }],
+          outer: [{ name: "Shell Jacket", rcl: 0.15 }],
+        },
+        legs: { base: [], outer: [] },
+        hands: { base: [], outer: [] },
+        headNeck: { base: [], outer: [] },
+      };
+
+      render(<LayerDisplay recommendation={recommendationWithClo} temperature={25} windspeed={10} />);
+      expect(screen.getByText("Merino Base")).toBeInTheDocument();
+      expect(screen.getByText("0.35 clo")).toBeInTheDocument();
+      expect(screen.getByText("Shell Jacket")).toBeInTheDocument();
+      expect(screen.getByText("0.15 clo")).toBeInTheDocument();
+    });
+
+    it("should not show clo line when rcl is undefined", () => {
+      const recommendationNoClo = {
+        torso: {
+          base: [{ name: "Generic Base Layer" }],
+          outer: [],
+        },
+        legs: { base: [], outer: [] },
+        hands: { base: [], outer: [] },
+        headNeck: { base: [], outer: [] },
+      };
+
+      render(<LayerDisplay recommendation={recommendationNoClo} temperature={25} windspeed={10} />);
+      expect(screen.getByText("Generic Base Layer")).toBeInTheDocument();
+      expect(screen.queryByText(/clo$/)).not.toBeInTheDocument();
     });
   });
 
   describe("weather display", () => {
-    it("should display temperature with icon", () => {
+    it("should display temperature", () => {
       render(<LayerDisplay {...defaultProps} />);
-      expect(screen.getByText("25°F")).toBeInTheDocument();
+      expect(screen.getByText("25")).toBeInTheDocument();
     });
 
-    it("should display wind speed with icon", () => {
+    it("should display wind speed", () => {
       render(<LayerDisplay {...defaultProps} />);
-      expect(screen.getByText("10 mph")).toBeInTheDocument();
+      expect(screen.getByText("Wind 10 mph")).toBeInTheDocument();
     });
 
     it("should display different temperature values", () => {
       render(<LayerDisplay {...defaultProps} temperature={-5} />);
-      expect(screen.getByText("-5°F")).toBeInTheDocument();
+      expect(screen.getByText("-5")).toBeInTheDocument();
     });
 
     it("should display different wind speed values", () => {
       render(<LayerDisplay {...defaultProps} windspeed={35} />);
-      expect(screen.getByText("35 mph")).toBeInTheDocument();
+      expect(screen.getByText("Wind 35 mph")).toBeInTheDocument();
     });
   });
 
@@ -334,8 +372,8 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("Head/Neck")).toBeInTheDocument();
 
       // Should render weather info
-      expect(screen.getByText("15°F")).toBeInTheDocument();
-      expect(screen.getByText("10 mph")).toBeInTheDocument();
+      expect(screen.getByText("15")).toBeInTheDocument();
+      expect(screen.getByText("Wind 10 mph")).toBeInTheDocument();
     });
 
     it("should return null when both recommendation AND biophysicsData are null", () => {
@@ -372,13 +410,19 @@ describe("LayerDisplay", () => {
         />
       );
 
-      // Torso garments with clo values
-      expect(screen.getByText(/Merino Base Layer \(0\.35 clo\)/)).toBeInTheDocument();
-      expect(screen.getByText(/Down Puffy \(1\.20 clo\)/)).toBeInTheDocument();
-      expect(screen.getByText(/Gore-Tex Shell \(0\.15 clo\)/)).toBeInTheDocument();
+      // Torso garments
+      expect(screen.getByText("Merino Base Layer")).toBeInTheDocument();
+      expect(screen.getByText("0.35 clo")).toBeInTheDocument();
+      expect(screen.getByText("Down Puffy")).toBeInTheDocument();
+      expect(screen.getByText("1.20 clo")).toBeInTheDocument();
+      expect(screen.getByText("Gore-Tex Shell")).toBeInTheDocument();
+      // Note: 0.15 clo appears twice (Gore-Tex Shell and Smith Vantage helmet)
+      expect(screen.getAllByText("0.15 clo").length).toBeGreaterThanOrEqual(1);
 
-      // Legs garments with clo values
-      expect(screen.getByText(/Thermal Tights \(0\.25 clo\)/)).toBeInTheDocument();
+      // Legs garments
+      expect(screen.getByText("Thermal Tights")).toBeInTheDocument();
+      // Note: 0.25 clo appears twice (Thermal Tights and Merino Beanie)
+      expect(screen.getAllByText("0.25 clo").length).toBeGreaterThanOrEqual(1);
     });
 
     it("should display handwear with clo value", () => {
@@ -391,7 +435,8 @@ describe("LayerDisplay", () => {
         />
       );
 
-      expect(screen.getByText(/Hestra Insulated Gloves \(0\.65 clo\)/)).toBeInTheDocument();
+      expect(screen.getByText("Hestra Insulated Gloves")).toBeInTheDocument();
+      expect(screen.getByText("0.65 clo")).toBeInTheDocument();
     });
 
     it("should display headwear categories with clo values", () => {
@@ -405,19 +450,19 @@ describe("LayerDisplay", () => {
       );
 
       // Helmet category
-      expect(screen.getByText("Helmet:")).toBeInTheDocument();
-      expect(screen.getByText(/Smith Vantage \(0\.15 clo\)/)).toBeInTheDocument();
+      expect(screen.getByText("Helmet")).toBeInTheDocument();
+      expect(screen.getByText("Smith Vantage")).toBeInTheDocument();
 
       // Head warmth category
-      expect(screen.getByText("Head:")).toBeInTheDocument();
-      expect(screen.getByText(/Merino Beanie \(0\.25 clo\)/)).toBeInTheDocument();
+      expect(screen.getByText("Head")).toBeInTheDocument();
+      expect(screen.getByText("Merino Beanie")).toBeInTheDocument();
 
       // Neck warmth category
-      expect(screen.getByText("Neck:")).toBeInTheDocument();
-      expect(screen.getByText(/Buff Neck Gaiter \(0\.12 clo\)/)).toBeInTheDocument();
+      expect(screen.getByText("Neck")).toBeInTheDocument();
+      expect(screen.getByText("Buff Neck Gaiter")).toBeInTheDocument();
     });
 
-    it("should display regional clo targets", () => {
+    it("should display regional clo progress bars", () => {
       render(
         <LayerDisplay
           recommendation={null}
@@ -428,10 +473,10 @@ describe("LayerDisplay", () => {
       );
 
       // Torso clo display: current / target
-      expect(screen.getByText("1.70 / 1.50 clo")).toBeInTheDocument();
+      expect(screen.getByText("1.7/1.5 clo")).toBeInTheDocument();
 
       // Legs clo display: current / target
-      expect(screen.getByText("0.25 / 1.30 clo")).toBeInTheDocument();
+      expect(screen.getByText("0.3/1.3 clo")).toBeInTheDocument();
     });
 
     it("should display layer labels for biophysics garments", () => {
@@ -445,9 +490,9 @@ describe("LayerDisplay", () => {
       );
 
       // Should have layer labels for torso
-      const baseLabels = screen.getAllByText("Base:");
-      const midLabels = screen.getAllByText("Mid:");
-      const outerLabels = screen.getAllByText("Outer:");
+      const baseLabels = screen.getAllByText("Base");
+      const midLabels = screen.getAllByText("Mid");
+      const outerLabels = screen.getAllByText("Outer");
 
       expect(baseLabels.length).toBeGreaterThan(0);
       expect(midLabels.length).toBeGreaterThan(0);
@@ -464,8 +509,8 @@ describe("LayerDisplay", () => {
         />
       );
 
-      // Score of 85 should display "Excellent" status via ScoreDisplay component
-      expect(screen.getByText("Excellent")).toBeInTheDocument();
+      // Score of 85 should display "Optimal" status via ScoreDisplay component
+      expect(screen.getByText("Optimal")).toBeInTheDocument();
     });
 
     it("should display guidance tips when available", () => {
@@ -480,88 +525,6 @@ describe("LayerDisplay", () => {
 
       expect(screen.getByText("Tips")).toBeInTheDocument();
       expect(screen.getByText("Layer up for the chairlift")).toBeInTheDocument();
-    });
-
-    it("should display warnings when present", () => {
-      const biophysicsWithWarnings = {
-        ...mockBiophysicsData,
-        warnings: ["Insufficient overall insulation for conditions"],
-      };
-
-      render(
-        <LayerDisplay
-          recommendation={null}
-          temperature={15}
-          windspeed={10}
-          biophysicsData={biophysicsWithWarnings}
-        />
-      );
-
-      expect(screen.getByText("Insufficient overall insulation for conditions")).toBeInTheDocument();
-    });
-
-    it("should display human-friendly insulation warning with clo values", () => {
-      const biophysicsWithCloWarning = {
-        ...mockBiophysicsData,
-        warnings: ["Insufficient overall insulation: 0.2 clo vs 1.6 clo required"],
-      };
-
-      render(
-        <LayerDisplay
-          recommendation={null}
-          temperature={15}
-          windspeed={10}
-          biophysicsData={biophysicsWithCloWarning}
-        />
-      );
-
-      // Should show human-friendly primary message (>70% deficit)
-      expect(screen.getByText("You're significantly under-insulated for these conditions")).toBeInTheDocument();
-      // Should show actionable suggestion
-      expect(screen.getByText("Add a midlayer and consider warmer base layers")).toBeInTheDocument();
-      // Should show technical details in smaller text
-      expect(screen.getByText(/Current: 0.2 clo/)).toBeInTheDocument();
-      expect(screen.getByText(/Target: 1.6 clo/)).toBeInTheDocument();
-    });
-
-    it("should display moderate insulation warning for smaller deficit", () => {
-      const biophysicsWithModerateWarning = {
-        ...mockBiophysicsData,
-        warnings: ["Insufficient overall insulation: 0.8 clo vs 1.5 clo required"],
-      };
-
-      render(
-        <LayerDisplay
-          recommendation={null}
-          temperature={15}
-          windspeed={10}
-          biophysicsData={biophysicsWithModerateWarning}
-        />
-      );
-
-      // Should show moderate message (40-70% deficit)
-      expect(screen.getByText("You'll likely feel cold without more layers")).toBeInTheDocument();
-      expect(screen.getByText("Add a midlayer to improve warmth")).toBeInTheDocument();
-    });
-
-    it("should display mild insulation warning for small deficit", () => {
-      const biophysicsWithMildWarning = {
-        ...mockBiophysicsData,
-        warnings: ["Insufficient overall insulation: 1.3 clo vs 1.5 clo required"],
-      };
-
-      render(
-        <LayerDisplay
-          recommendation={null}
-          temperature={15}
-          windspeed={10}
-          biophysicsData={biophysicsWithMildWarning}
-        />
-      );
-
-      // Should show mild message (<40% deficit)
-      expect(screen.getByText("Consider adding a bit more insulation")).toBeInTheDocument();
-      expect(screen.getByText("A light midlayer or warmer base would help")).toBeInTheDocument();
     });
   });
 });

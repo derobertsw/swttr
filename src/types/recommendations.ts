@@ -1,7 +1,12 @@
+export interface LayerItem {
+  name: string;
+  rcl?: number;
+}
+
 export interface LayerSet {
-  base: string[];
-  mid?: string[];
-  outer: string[];
+  base: LayerItem[];
+  mid?: LayerItem[];
+  outer: LayerItem[];
 }
 
 export interface Recommendation {

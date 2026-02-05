@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { BackpackItem } from "@/types/recommendations";
 import backpackDefaults from "@/data/backpackDefaults.json";
-
-const STORAGE_KEY = "swttr-backpack";
+import { useUserId } from "@/hooks/useUserId";
+import { STORAGE_KEYS } from "@/lib/storage";
 
 interface StoredBackpackData {
   [key: string]: {
@@ -22,7 +22,7 @@ function loadFromLocalStorage(
   tempRange: string
 ): { customItems: string[]; hiddenDefaults: string[] } {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(STORAGE_KEYS.BACKPACK);
     if (stored) {
       const data: StoredBackpackData = JSON.parse(stored);
       const key = getStorageKey(activity, tempRange);
@@ -41,11 +41,11 @@ function saveToLocalStorage(
   hiddenDefaults: string[]
 ): void {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(STORAGE_KEYS.BACKPACK);
     const data: StoredBackpackData = stored ? JSON.parse(stored) : {};
     const key = getStorageKey(activity, tempRange);
     data[key] = { customItems, hiddenDefaults };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEYS.BACKPACK, JSON.stringify(data));
   } catch {
     // ignore storage errors
   }
@@ -61,7 +61,7 @@ function getDefaultItems(activity: string, tempRange: string): string[] {
 }
 
 export function useBackpack(activity: string, tempRange: string) {
-  const [userId, setUserId] = useState<string | null>(null);
+  const userId = useUserId();
   const [customItems, setCustomItems] = useState<string[]>([]);
   const [hiddenDefaults, setHiddenDefaults] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,16 +75,6 @@ export function useBackpack(activity: string, tempRange: string) {
       .map((name) => ({ name, isCustom: false })),
     ...customItems.map((name) => ({ name, isCustom: true })),
   ];
-
-  // Initialize user ID and fetch data
-  useEffect(() => {
-    let storedUserId = localStorage.getItem("swttr-user-id");
-    if (!storedUserId) {
-      storedUserId = `user-${crypto.randomUUID()}`;
-      localStorage.setItem("swttr-user-id", storedUserId);
-    }
-    setUserId(storedUserId);
-  }, []);
 
   // Fetch backpack data when activity/tempRange change
   useEffect(() => {

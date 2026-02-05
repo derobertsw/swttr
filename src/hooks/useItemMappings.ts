@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { UserItemMapping } from "@/types/wardrobe";
+import { useUserId } from "@/hooks/useUserId";
 
 async function fetchItemMappings(userId: string): Promise<Map<string, string>> {
   try {
@@ -31,18 +32,14 @@ async function fetchItemMappings(userId: string): Promise<Map<string, string>> {
 }
 
 export function useItemMappings() {
-  const [userId, setUserId] = useState<string | null>(null);
+  const userId = useUserId();
   const [itemMappings, setItemMappings] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
-    let storedUserId = localStorage.getItem("swttr-user-id");
-    if (!storedUserId) {
-      storedUserId = `user-${crypto.randomUUID()}`;
-      localStorage.setItem("swttr-user-id", storedUserId);
+    if (userId) {
+      fetchItemMappings(userId).then(setItemMappings);
     }
-    setUserId(storedUserId);
-    fetchItemMappings(storedUserId).then(setItemMappings);
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     const handleFocus = () => {

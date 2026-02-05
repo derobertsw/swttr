@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import layerRecommendations from "@/data/layerRecommendations.json";
 import { Recommendation } from "@/types/recommendations";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
+import { convertLegacyRecommendation } from "@/lib/layers";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { useItemMappings } from "@/hooks/useItemMappings";
 import { fetchCurrentWeather, fetchWeatherByCoords } from "@/hooks/useCurrentWeather";
@@ -70,13 +71,17 @@ const HomeContent = () => {
   const tempRangeForBackpack = getAdjustedTempRange(temperature, sensitivity);
   const backpack = useBackpack(activity, tempRangeForBackpack);
 
-  const getRecommendation = (temp: number) => {
+  const getRecommendation = (temp: number): Recommendation | null => {
     const tempRange = getAdjustedTempRange(temp, sensitivity);
     const activityData =
       layerRecommendations[activity as keyof typeof layerRecommendations];
 
     if (activityData) {
-      return activityData[tempRange as keyof typeof activityData] as Recommendation;
+      const legacyRec = activityData[tempRange as keyof typeof activityData];
+      if (legacyRec) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return convertLegacyRecommendation(legacyRec as any);
+      }
     }
     return null;
   };

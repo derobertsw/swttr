@@ -1,5 +1,8 @@
 import { RecommendedGarment } from "@/types/biophysics";
-import { LayerSet } from "@/types/recommendations";
+import { LayerSet, LayerItem } from "@/types/recommendations";
+
+// Re-export for convenience
+export type { LayerSet, LayerItem };
 
 /**
  * Layer type classification for garments
@@ -102,7 +105,7 @@ export function formatGarmentWithClo(name: string, rcl?: number): string {
  * @example
  * const garments = [{ name: "R1", category: "mid_layer_light", covers_torso: true, rcl: 0.85 }];
  * const layers = garmentsToLayerSet(garments, "torso");
- * // layers.mid = ["R1 (0.85 clo)"]
+ * // layers.mid = [{ name: "R1", rcl: 0.85 }]
  */
 export function garmentsToLayerSet(
   garments: RecommendedGarment[],
@@ -117,8 +120,7 @@ export function garmentsToLayerSet(
 
     const layerType = CATEGORY_TO_LAYER_TYPE[garment.category];
     if (layerType) {
-      const formattedName = formatGarmentWithClo(garment.name, garment.rcl);
-      layers[layerType]?.push(formattedName);
+      layers[layerType]?.push({ name: garment.name, rcl: garment.rcl });
     }
   }
 
@@ -143,20 +145,82 @@ export function hasAnyLayers(layers: LayerSet): boolean {
  * Applies item name mappings to transform standard garment names to custom user names.
  * Used when users have renamed items in their wardrobe.
  *
- * @param items - Array of garment names to transform
+ * @param items - Array of layer items to transform
  * @param bodyPart - The body part category
  * @param layerType - The layer type (base, mid, outer)
  * @param mappings - Map of "bodyPart:layerType:itemName" -> "customName"
  * @returns Array of items with custom names applied where mappings exist
  */
 export function applyItemMappings(
-  items: string[],
+  items: LayerItem[],
   bodyPart: BodyPart,
   layerType: LayerType,
   mappings: Map<string, string>
-): string[] {
+): LayerItem[] {
   return items.map((item) => {
-    const key = `${bodyPart}:${layerType}:${item}`;
-    return mappings.get(key) ?? item;
+    const key = `${bodyPart}:${layerType}:${item.name}`;
+    const customName = mappings.get(key);
+    return customName ? { ...item, name: customName } : item;
   });
+}
+
+/**
+ * Converts string arrays to LayerItem arrays for backward compatibility
+ * with JSON data that uses simple string arrays
+ */
+function stringsToLayerItems(items: string[] | undefined): LayerItem[] {
+  if (!items) return [];
+  return items.map((name) => ({ name }));
+}
+
+/**
+ * Legacy layer set format using string arrays (from JSON files)
+ */
+interface LegacyLayerSet {
+  base: string[];
+  mid?: string[];
+  outer: string[];
+}
+
+/**
+ * Legacy recommendation format using string arrays
+ */
+interface LegacyRecommendation {
+  torso: LegacyLayerSet;
+  legs: LegacyLayerSet;
+  hands: LegacyLayerSet;
+  headNeck: LegacyLayerSet;
+}
+
+/**
+ * Converts a legacy recommendation (with string arrays) to the new format (with LayerItem arrays)
+ */
+export function convertLegacyRecommendation(legacy: LegacyRecommendation): {
+  torso: LayerSet;
+  legs: LayerSet;
+  hands: LayerSet;
+  headNeck: LayerSet;
+} {
+  return {
+    torso: {
+      base: stringsToLayerItems(legacy.torso.base),
+      mid: stringsToLayerItems(legacy.torso.mid),
+      outer: stringsToLayerItems(legacy.torso.outer),
+    },
+    legs: {
+      base: stringsToLayerItems(legacy.legs.base),
+      mid: stringsToLayerItems(legacy.legs.mid),
+      outer: stringsToLayerItems(legacy.legs.outer),
+    },
+    hands: {
+      base: stringsToLayerItems(legacy.hands.base),
+      mid: stringsToLayerItems(legacy.hands.mid),
+      outer: stringsToLayerItems(legacy.hands.outer),
+    },
+    headNeck: {
+      base: stringsToLayerItems(legacy.headNeck.base),
+      mid: stringsToLayerItems(legacy.headNeck.mid),
+      outer: stringsToLayerItems(legacy.headNeck.outer),
+    },
+  };
 }
