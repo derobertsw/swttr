@@ -249,13 +249,24 @@ function buildAlpineEnsemble(
   // 2. Mid layer or insulation
   const allMids = sortByInsulation([...categorized.midLayers, ...categorized.insulation], false);
 
-  for (const mid of allMids) {
+  const addMidIfFits = (mid: GarmentRow | undefined) => {
+    if (!mid) return;
+    if (ensemble.some((g) => g.id === mid.id)) return;
     const midClo = mid.garment_thermal_properties?.rcl_whole_body ?? 0;
     if (currentClo + midClo <= maxClo && currentClo < minClo) {
       ensemble.push(mid);
       currentClo += midClo;
     }
+  };
+
+  // Prefer torso + legs mid/insulation pieces when available
+  addMidIfFits(allMids.find((m) => m.covers_torso));
+  addMidIfFits(allMids.find((m) => m.covers_legs));
+
+  // If still below target, keep adding additional mids/insulation
+  for (const mid of allMids) {
     if (currentClo >= minClo) break;
+    addMidIfFits(mid);
   }
 
   // 3. Shell (required for alpine - weather protection)
@@ -273,8 +284,19 @@ function buildAlpineEnsemble(
   const sortedShells = [...sortedHardShells, ...sortedOtherShells];
 
   if (sortedShells.length > 0) {
-    ensemble.push(sortedShells[0]);
-    currentClo += sortedShells[0].garment_thermal_properties?.rcl_whole_body ?? 0;
+    const torsoShell = sortedShells.find((s) => s.covers_torso) ?? sortedShells[0];
+    if (torsoShell) {
+      ensemble.push(torsoShell);
+      currentClo += torsoShell.garment_thermal_properties?.rcl_whole_body ?? 0;
+    }
+
+    const legsShell = sortedShells.find(
+      (s) => s.covers_legs && s.id !== torsoShell?.id
+    );
+    if (legsShell) {
+      ensemble.push(legsShell);
+      currentClo += legsShell.garment_thermal_properties?.rcl_whole_body ?? 0;
+    }
   }
 
   return ensemble;

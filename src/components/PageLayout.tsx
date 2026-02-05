@@ -27,8 +27,6 @@ const PageLayout = ({ children, onLogoClick }: PageLayoutProps) => {
           </div>
         </SidebarInset>
       </SidebarProvider>
-
-      {/* Mobile tab bar - outside SidebarProvider to avoid aria-hidden conflicts */}
       <MobileTabBar />
     </>
   );

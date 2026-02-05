@@ -270,7 +270,6 @@ const HomeContent = () => {
             >
               {loading ? <><Loader2 className="animate-spin" /> Loading...</> : "Gear Up"}
             </Button>
-            <span className="text-xs text-white/60 mt-1.5">Personalized for conditions</span>
           </div>
         </>
       ) : (

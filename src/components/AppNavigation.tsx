@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDays, Shirt, Backpack, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SidebarFooter } from "@/components/ui/sidebar";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
 
@@ -26,7 +27,7 @@ export function MobileTabBar() {
   const isLandingScreen = pathname === "/";
 
   return (
-    <nav
+    <SidebarFooter
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 backdrop-blur-lg pb-[env(safe-area-inset-bottom)]"
       style={{ backgroundColor: 'rgba(79, 157, 166, 0.45)' }}
     >
@@ -79,6 +80,6 @@ export function MobileTabBar() {
           </button>
         </PreferencesDrawer>
       </div>
-    </nav>
+    </SidebarFooter>
   );
 }

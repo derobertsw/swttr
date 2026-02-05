@@ -70,38 +70,26 @@ const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
                 >
                   <CardContent
                     className={cn(
-                      "flex flex-col items-center justify-center gap-2",
-                      isSelected ? "py-7 px-6" : "p-6"
+                      "flex h-40 flex-col items-center justify-center gap-3",
+                      isSelected ? "px-6" : "px-6"
                     )}
                   >
                     <activity.icon
                       className={cn(
                         "transition-all duration-200",
                         isSelected
-                          ? "size-11 text-primary"
-                          : "size-8 text-muted-foreground/60"
+                          ? "size-12 text-primary"
+                          : "size-9 text-muted-foreground/60"
                       )}
                     />
                     <span
                       className={cn(
                         "text-center font-medium transition-all duration-200",
-                        isSelected ? "text-base" : "text-xs text-muted-foreground"
+                        isSelected ? "text-base" : "text-sm text-muted-foreground"
                       )}
                     >
                       {activity.name}
                     </span>
-                    {activity.descriptor && (
-                      <span
-                        className={cn(
-                          "text-center text-xs leading-relaxed mt-1 transition-all duration-200",
-                          isSelected
-                            ? "text-muted-foreground/65"
-                            : "text-muted-foreground/45"
-                        )}
-                      >
-                        {activity.descriptor}
-                      </span>
-                    )}
                   </CardContent>
                 </Card>
               </CarouselItem>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Shirt, Footprints, Hand, HardHat } from "lucide-react";
+import { Plus, Shirt, Footprints, Hand, HardHat, Flame } from "lucide-react";
 import { RecommendedHandwear, RecommendedHeadwear } from "@/types/biophysics";
 import { BodyPart, LayerSet, BODY_PART_LABELS, hasAnyLayers } from "@/lib/layers";
 import { CloProgressBar } from "./CloProgressBar";
@@ -60,6 +60,11 @@ export function BodyPartSection({
     (bodyPart === "hands" && handwear) || (bodyPart === "headNeck" && hasHeadwear);
 
   const hasContent = hasAnyLayers(layers) || hasExtremityGear;
+  const isOverTarget =
+    targetClo !== undefined &&
+    currentClo !== undefined &&
+    targetClo > 0 &&
+    currentClo / targetClo >= 1.2;
 
   return (
     <div className="rounded-lg bg-white/40 backdrop-blur-[2px] p-5">
@@ -68,7 +73,14 @@ export function BodyPartSection({
           {getBodyPartIcon(bodyPart)}
           {BODY_PART_LABELS[bodyPart]}
         </h3>
-        {targetClo !== undefined && <CloProgressBar currentClo={currentClo} targetClo={targetClo} />}
+        <div className="flex items-center gap-2">
+          {isOverTarget && (
+            <span className="inline-flex items-center text-amber-600" title="Overheating risk">
+              <Flame className="size-4" />
+            </span>
+          )}
+          {targetClo !== undefined && <CloProgressBar currentClo={currentClo} targetClo={targetClo} />}
+        </div>
       </div>
 
       {!hasContent ? (
