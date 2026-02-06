@@ -6,12 +6,13 @@ import { Trash2 } from "lucide-react";
 interface SwipeableItemProps {
   children: React.ReactNode;
   onDelete: () => void;
+  onClick?: () => void;
 }
 
 const DELETE_THRESHOLD = -80;
 const DELETE_ACTION_WIDTH = 72;
 
-export function SwipeableItem({ children, onDelete }: SwipeableItemProps) {
+export function SwipeableItem({ children, onDelete, onClick }: SwipeableItemProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [translateX, setTranslateX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -87,7 +88,7 @@ export function SwipeableItem({ children, onDelete }: SwipeableItemProps) {
 
       {/* Main content */}
       <div
-        className="relative bg-card border rounded-lg touch-pan-y"
+        className="relative bg-card border rounded-lg touch-pan-y cursor-pointer"
         style={{
           transform: `translateX(${translateX}px)`,
           transition: isDragging ? 'none' : 'transform 0.2s ease-out',
@@ -95,6 +96,11 @@ export function SwipeableItem({ children, onDelete }: SwipeableItemProps) {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onClick={() => {
+          if (translateX === 0 && onClick) {
+            onClick();
+          }
+        }}
       >
         {children}
       </div>
