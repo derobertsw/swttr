@@ -52,8 +52,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       message: 'No suitable garments found in database',
       ireq: {
-        skiing: { min: ireqSkiing.ireqMin, neutral: ireqSkiing.ireqNeutral },
-        chairlift: { min: ireqChairlift.ireqMin, neutral: ireqChairlift.ireqNeutral },
+        skiing: { min: ireqSkiing.ireqMin, neutral: ireqSkiing.ireqNeutral, dle_hours: ireqSkiing.dleHours },
+        chairlift: { min: ireqChairlift.ireqMin, neutral: ireqChairlift.ireqNeutral, dle_hours: ireqChairlift.dleHours },
+        dle_hours: ireqChairlift.dleHours,
         target_range: [targetCloMin, targetCloMax],
       },
       guidance: getAlpineGuidance(tempC, weather.precipitation),
@@ -133,8 +134,9 @@ export async function POST(request: NextRequest) {
       precipitation: weather.precipitation ?? false,
     },
     ireq: {
-      skiing: { min: ireqSkiing.ireqMin, neutral: ireqSkiing.ireqNeutral },
-      chairlift: { min: ireqChairlift.ireqMin, neutral: ireqChairlift.ireqNeutral },
+      skiing: { min: ireqSkiing.ireqMin, neutral: ireqSkiing.ireqNeutral, dle_hours: ireqSkiing.dleHours },
+      chairlift: { min: ireqChairlift.ireqMin, neutral: ireqChairlift.ireqNeutral, dle_hours: ireqChairlift.dleHours },
+      dle_hours: ireqChairlift.dleHours,
       target_range: [Math.round(targetCloMin * 100) / 100, Math.round(targetCloMax * 100) / 100],
       regional: regionalIreq,
       extremity: extremityIreq,

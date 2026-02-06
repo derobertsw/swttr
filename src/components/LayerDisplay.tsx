@@ -114,7 +114,9 @@ const LayerDisplay = ({
       <WeatherHeader
         temperature={temperature}
         windspeed={windspeed}
-        score={biophysicsData?.recommendation?.score}
+        score={biophysicsData?.recommendation?.thermal_comfort_score ?? biophysicsData?.recommendation?.score}
+        totalClo={totalClo}
+        targetRange={biophysicsData?.ireq?.target_range}
       />
 
       <ThermalGauge

@@ -8,35 +8,22 @@ interface ThermalGaugeProps {
 }
 
 /**
- * Calculates the thermal position on a -1 to +1 scale
- * -1 = severely under-insulated (cold)
- *  0 = perfectly insulated (comfortable)
- * +1 = over-insulated (hot)
+ * Build a dynamic clo domain around the algorithm's target range.
+ * This keeps the marker and comfort band aligned with IREQ-derived targets.
  */
-function calculateThermalPosition(
-  totalClo: number,
-  targetMin: number,
-  targetNeutral: number
-): number {
-  const targetMax = targetNeutral * 1.3;
+function getGaugeBounds(targetMin: number, targetMax: number): { lower: number; upper: number } {
+  const coldSpan = Math.max(0.6, targetMin * 0.9);
+  const hotSpan = Math.max(0.6, targetMax * 0.6);
+  return {
+    lower: Math.max(0, targetMin - coldSpan),
+    upper: targetMax + hotSpan,
+  };
+}
 
-  if (totalClo < targetMin) {
-    const underRange = targetMin;
-    const position = -1 + (totalClo / underRange) * 0.8;
-    return Math.max(-1, position);
-  } else if (totalClo <= targetNeutral) {
-    const range = targetNeutral - targetMin;
-    const position = ((totalClo - targetMin) / range) * 0.2 - 0.2;
-    return position;
-  } else if (totalClo <= targetMax) {
-    const range = targetMax - targetNeutral;
-    const position = ((totalClo - targetNeutral) / range) * 0.5;
-    return position;
-  } else {
-    const excess = totalClo - targetMax;
-    const position = 0.5 + Math.min(excess / targetNeutral, 0.5);
-    return Math.min(1, position);
-  }
+function toPercent(value: number, lower: number, upper: number): number {
+  if (upper <= lower) return 50;
+  const raw = ((value - lower) / (upper - lower)) * 100;
+  return Math.max(0, Math.min(100, raw));
 }
 
 /**
@@ -52,13 +39,12 @@ export function ThermalGauge({ totalClo, targetRange }: ThermalGaugeProps) {
 
   if (totalClo === undefined || !targetRange) return null;
 
-  const [targetMin, targetNeutral] = targetRange;
-  const position = calculateThermalPosition(totalClo, targetMin, targetNeutral);
+  const [targetMin, targetMax] = targetRange;
+  const { lower, upper } = getGaugeBounds(targetMin, targetMax);
 
-  const markerPercent = ((position + 1) / 2) * 100;
-
-  const comfortStart = 40;
-  const comfortEnd = 60;
+  const markerPercent = toPercent(totalClo, lower, upper);
+  const comfortStart = toPercent(targetMin, lower, upper);
+  const comfortEnd = toPercent(targetMax, lower, upper);
 
   return (
     <div className="w-full">

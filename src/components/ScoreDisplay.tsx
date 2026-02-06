@@ -15,7 +15,8 @@ interface ScoreDisplayProps {
   score: number;
   size?: "sm" | "md" | "lg";
   className?: string;
-  isOverInsulated?: boolean;
+  totalClo?: number;
+  targetRange?: [number, number];
 }
 
 type ThermalStatus = "optimal" | "comfortable" | "cold_stress" | "overheating";
@@ -58,12 +59,17 @@ const STATUS_CONFIG: Record<ThermalStatus, StatusConfig> = {
  * Displays thermal comfort as an integrated status pill with explanatory popover.
  * Uses meteorological language and Nordic-inspired colors for visual cohesion.
  */
-const ScoreDisplay = ({ score, size = "md", className, isOverInsulated = false }: ScoreDisplayProps) => {
+const ScoreDisplay = ({ score, size = "md", className, totalClo, targetRange }: ScoreDisplayProps) => {
   const roundedScore = Math.round(score);
 
   const getStatus = (): ThermalStatus => {
-    // Check for overheating first (over-insulated condition)
-    if (isOverInsulated && roundedScore < 80) return "overheating";
+    if (totalClo !== undefined && targetRange) {
+      const [targetMin, targetMax] = targetRange;
+      if (totalClo < targetMin) return "cold_stress";
+      // Allow a small buffer above target max before flagging overheating.
+      if (totalClo > targetMax + 0.3) return "overheating";
+    }
+
     if (roundedScore >= 80) return "optimal";
     if (roundedScore >= 60) return "comfortable";
     return "cold_stress";
@@ -101,9 +107,9 @@ const ScoreDisplay = ({ score, size = "md", className, isOverInsulated = false }
       </PopoverTrigger>
       <PopoverContent className="w-64">
         <PopoverHeader>
-          <PopoverTitle>Thermal Comfort</PopoverTitle>
+          <PopoverTitle>Thermal Comfort Status</PopoverTitle>
           <PopoverDescription>
-            Score: {roundedScore}/100
+            Thermal comfort score: {roundedScore}/100
           </PopoverDescription>
         </PopoverHeader>
         <div className="mt-3 space-y-3 text-xs">
@@ -111,25 +117,31 @@ const ScoreDisplay = ({ score, size = "md", className, isOverInsulated = false }
             {config.description}
           </p>
           <p className="text-slate-500">
-            Based on biophysics research (ISO 11079, USARIEM), this estimates how
-            well your layers match the conditions.
+            Status logic: we first check your insulation against the IREQ target range.
+            If clo is below target minimum, status is cold stress. If clo is above
+            target maximum + 0.3 clo, status is overheating risk. Otherwise score bands apply.
           </p>
+          {totalClo !== undefined && targetRange && (
+            <p className="text-slate-500">
+              Current insulation: {totalClo.toFixed(2)} clo, target range: {targetRange[0].toFixed(2)}-{targetRange[1].toFixed(2)} clo.
+            </p>
+          )}
           <div className="space-y-1.5 pt-2 border-t border-slate-100">
             <div className="flex items-center gap-2 text-slate-600">
               <span className="size-2 rounded-full bg-teal-500" />
-              <span>80+ Optimal</span>
+              <span>Optimal: in range + score 80+</span>
             </div>
             <div className="flex items-center gap-2 text-slate-600">
               <span className="size-2 rounded-full bg-green-500" />
-              <span>60-79 Comfortable</span>
+              <span>Comfortable: in range + score 60-79</span>
             </div>
             <div className="flex items-center gap-2 text-slate-600">
               <span className="size-2 rounded-full bg-blue-500" />
-              <span>&lt;60 Cold Stress Likely</span>
+              <span>Cold stress: clo below target minimum</span>
             </div>
             <div className="flex items-center gap-2 text-slate-600">
               <span className="size-2 rounded-full bg-amber-500" />
-              <span>Overheating Risk</span>
+              <span>Overheating: clo above target max + 0.3</span>
             </div>
           </div>
         </div>

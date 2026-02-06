@@ -5,6 +5,7 @@
 export interface IreqData {
   min: number;
   neutral: number;
+  dle_hours?: number;
 }
 
 export interface RegionalIreqData {
@@ -35,6 +36,7 @@ export interface IreqRange {
   rest?: IreqData;
   uphill?: IreqData;
   downhill?: IreqData;
+  dle_hours?: number;
   target_range: [number, number];
   regional?: RegionalIreqRange;
   extremity?: ExtremityIreqRange;
@@ -108,6 +110,7 @@ export interface BiophysicsRecommendation {
     headwear?: RecommendedHeadwear | null;
     ensemble_properties: EnsembleProperties;
     score: number;
+    thermal_comfort_score?: number;
     component_scores: ComponentScores;
   };
   warnings: string[];

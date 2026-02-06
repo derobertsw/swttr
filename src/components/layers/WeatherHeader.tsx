@@ -5,6 +5,8 @@ interface WeatherHeaderProps {
   windspeed: number;
   feelsLike?: number;
   score?: number;
+  totalClo?: number;
+  targetRange?: [number, number];
 }
 
 /**
@@ -27,7 +29,14 @@ function calculateFeelsLike(temperature: number, windspeed: number): number {
  * Displays current weather conditions and optional thermal comfort score
  * Layout prioritizes temperature as the hero element with secondary details below
  */
-export function WeatherHeader({ temperature, windspeed, feelsLike, score }: WeatherHeaderProps) {
+export function WeatherHeader({
+  temperature,
+  windspeed,
+  feelsLike,
+  score,
+  totalClo,
+  targetRange,
+}: WeatherHeaderProps) {
   const calculatedFeelsLike = feelsLike ?? calculateFeelsLike(temperature, windspeed);
   const showFeelsLike = calculatedFeelsLike !== temperature;
 
@@ -89,7 +98,12 @@ export function WeatherHeader({ temperature, windspeed, feelsLike, score }: Weat
         </div>
 
         {score !== undefined && (
-          <ScoreDisplay score={score} size="lg" />
+          <ScoreDisplay
+            score={score}
+            size="lg"
+            totalClo={totalClo}
+            targetRange={targetRange}
+          />
         )}
       </div>
     </div>

@@ -36,6 +36,7 @@ export interface ResponseComponents {
       permeability_index: number;
     };
     score: number;
+    thermal_comfort_score: number;
     component_scores: Record<string, number>;
   };
   warnings: string[];
@@ -81,6 +82,9 @@ export function buildResponseComponents(
         permeability_index: ensembleProps.im,
       },
       score: score.totalScore,
+      thermal_comfort_score: Math.round(
+        ((score.componentScores.coldProtection + score.componentScores.overheatPrevention) / 2) * 10
+      ) / 10,
       component_scores: score.componentScores,
     },
     warnings: score.warnings,

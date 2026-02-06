@@ -123,9 +123,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       message: 'No suitable garments found in database',
       ireq: {
-        uphill: { min: ireqUphill.ireqMin, neutral: ireqUphill.ireqNeutral },
-        downhill: { min: ireqDownhill.ireqMin, neutral: ireqDownhill.ireqNeutral },
-        transition: { min: ireqTransition.ireqMin, neutral: ireqTransition.ireqNeutral },
+        uphill: { min: ireqUphill.ireqMin, neutral: ireqUphill.ireqNeutral, dle_hours: ireqUphill.dleHours },
+        downhill: { min: ireqDownhill.ireqMin, neutral: ireqDownhill.ireqNeutral, dle_hours: ireqDownhill.dleHours },
+        transition: { min: ireqTransition.ireqMin, neutral: ireqTransition.ireqNeutral, dle_hours: ireqTransition.dleHours },
+        dle_hours: ireqDownhill.dleHours,
       },
       guidance: generateTouringGuidance(tempC, ireqUphill, ireqDownhill),
     });
@@ -207,8 +208,9 @@ export async function POST(request: NextRequest) {
       precipitation: weather.precipitation ?? false,
     },
     ireq: {
-      uphill: { min: ireqUphill.ireqMin, neutral: ireqUphill.ireqNeutral },
-      downhill: { min: ireqDownhill.ireqMin, neutral: ireqDownhill.ireqNeutral },
+      uphill: { min: ireqUphill.ireqMin, neutral: ireqUphill.ireqNeutral, dle_hours: ireqUphill.dleHours },
+      downhill: { min: ireqDownhill.ireqMin, neutral: ireqDownhill.ireqNeutral, dle_hours: ireqDownhill.dleHours },
+      dle_hours: ireqDownhill.dleHours,
       target_range: targetCloRange,
       regional: regionalIreqDownhill,
       extremity: extremityIreqDownhill,
@@ -232,6 +234,9 @@ export async function POST(request: NextRequest) {
         permeability_index: Math.round(uphillThermalProperties.im * 100) / 100,
       },
       score: uphillScore.totalScore,
+      thermal_comfort_score: Math.round(
+        ((uphillScore.componentScores.coldProtection + uphillScore.componentScores.overheatPrevention) / 2) * 10
+      ) / 10,
       component_scores: uphillScore.componentScores,
     },
     pack_items: {

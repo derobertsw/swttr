@@ -13,11 +13,12 @@ interface BiophysicsDetailsProps {
 }
 
 const scoreLabels: Record<string, { label: string; icon: React.ReactNode }> = {
-  thermal: { label: "Thermal", icon: <ThermometerSnowflake className="size-3" /> },
-  moisture: { label: "Moisture", icon: <Droplets className="size-3" /> },
-  protection: { label: "Protection", icon: <Shield className="size-3" /> },
+  coldProtection: { label: "Cold Protection", icon: <ThermometerSnowflake className="size-3" /> },
+  overheatPrevention: { label: "Overheat Prevention", icon: <ThermometerSnowflake className="size-3" /> },
+  breathability: { label: "Breathability", icon: <Droplets className="size-3" /> },
+  weatherProtection: { label: "Weather Protection", icon: <Shield className="size-3" /> },
   weight: { label: "Weight", icon: <Gauge className="size-3" /> },
-  mobility: { label: "Mobility", icon: <Activity className="size-3" /> },
+  mobility: { label: "Mobility", icon: <Activity className="size-3" /> }, // backward compatibility for older payloads
 };
 
 /**
@@ -27,6 +28,12 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
   const { ireq, recommendation } = data;
   const { ensemble_properties, component_scores } = recommendation;
   const [showDetailedScores, setShowDetailedScores] = useState(false);
+
+  const dleHours = ireq.dle_hours
+    ?? ireq.chairlift?.dle_hours
+    ?? ireq.downhill?.dle_hours
+    ?? ireq.uphill?.dle_hours
+    ?? ireq.skiing?.dle_hours;
 
   // Calculate delta: midpoint of target range vs actual
   const targetMidpoint = (ireq.target_range[0] + ireq.target_range[1]) / 2;
@@ -98,6 +105,14 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
                     {delta >= 0 ? '+' : ''}{delta.toFixed(2)} clo
                   </span>
                 </div>
+                {typeof dleHours === "number" && Number.isFinite(dleHours) && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-12">DLE:</span>
+                    <span className="font-mono text-xs">
+                      {dleHours.toFixed(2)} h
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

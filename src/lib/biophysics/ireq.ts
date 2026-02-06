@@ -32,6 +32,113 @@ function calculateVaporPressure(tempC: number, rh: number): number {
   return pSat * (rh / 100);
 }
 
+function calculateConvectiveCoefficient(
+  airSpeedMs: number,
+  clothingSurfaceTempC: number,
+  airTempC: number
+): number {
+  const v = Math.max(0.05, airSpeedMs);
+  const forced = 8.3 * Math.pow(v, 0.6);
+  const natural = 2.38 * Math.pow(Math.max(0.1, Math.abs(clothingSurfaceTempC - airTempC)), 0.25);
+  return Math.max(3.0, forced, natural);
+}
+
+function calculateRadiativeCoefficient(
+  clothingSurfaceTempC: number,
+  meanRadiantTempC: number
+): number {
+  const sigma = 5.670374419e-8; // Stefan-Boltzmann constant
+  const emissivity = 0.95;
+  const tClK = clothingSurfaceTempC + 273.15;
+  const tRadK = meanRadiantTempC + 273.15;
+  const avgK = Math.max(150, (tClK + tRadK) / 2);
+  const hR = emissivity * 4 * sigma * Math.pow(avgK, 3);
+  return Math.max(3.0, Math.min(7.0, hR));
+}
+
+function calculateOperativeTemperature(
+  airTempC: number,
+  meanRadiantTempC: number,
+  hC: number,
+  hR: number
+): number {
+  return ((hC * airTempC) + (hR * meanRadiantTempC)) / (hC + hR);
+}
+
+function calculateClothingAreaFactor(iClM2kw: number): number {
+  // ISO-style clothing area factor formulation
+  if (iClM2kw <= 0.078) {
+    return 1 + (1.29 * iClM2kw);
+  }
+  return 1.05 + (0.645 * iClM2kw);
+}
+
+function calculateRequiredInsulation(
+  tSk: number,
+  airTempC: number,
+  meanRadiantTempC: number,
+  windSpeedMs: number,
+  availableHeatFlux: number
+): number {
+  if (availableHeatFlux <= 0) {
+    return Infinity;
+  }
+
+  let iClM2kw = 0.08;
+  let clothingSurfaceTempC = tSk - 2;
+
+  for (let i = 0; i < 12; i += 1) {
+    const hC = calculateConvectiveCoefficient(windSpeedMs, clothingSurfaceTempC, airTempC);
+    const hR = calculateRadiativeCoefficient(clothingSurfaceTempC, meanRadiantTempC);
+    const hTotal = hC + hR;
+
+    const iA = 1 / hTotal;
+    const tO = calculateOperativeTemperature(airTempC, meanRadiantTempC, hC, hR);
+    const iTotalRequired = (tSk - tO) / availableHeatFlux;
+    const fCl = calculateClothingAreaFactor(iClM2kw);
+
+    const nextIcl = Math.max(0, iTotalRequired - (iA / fCl));
+    const smoothedIcl = (iClM2kw * 0.4) + (nextIcl * 0.6);
+
+    clothingSurfaceTempC = tSk - (availableHeatFlux * smoothedIcl);
+    if (Math.abs(smoothedIcl - iClM2kw) < 1e-4) {
+      iClM2kw = smoothedIcl;
+      break;
+    }
+
+    iClM2kw = smoothedIcl;
+  }
+
+  return iClM2kw;
+}
+
+function estimateDleHours(
+  ireqMin: number,
+  ireqNeutral: number,
+  airTempC: number,
+  windSpeedMs: number,
+  metabolicRate: number
+): number {
+  // DLE proxy based on environmental strain and physiological buffer.
+  // Intended as a bounded planning estimate (0.5h to 8h).
+  if (ireqMin <= 0) {
+    return 8;
+  }
+
+  const comfortBand = Math.max(0, ireqNeutral - ireqMin);
+  const coldStress = Math.max(0, -airTempC) / 20;
+  const windStress = Math.max(0, windSpeedMs - 1) / 6;
+  const metabolicBuffer = Math.max(0, (metabolicRate - 58.2) / 250);
+
+  const rawHours = 8
+    - (comfortBand * 2.2)
+    - (coldStress * 1.3)
+    - (windStress * 0.9)
+    + (metabolicBuffer * 0.8);
+
+  return Math.max(0.5, Math.min(8, rawHours));
+}
+
 /**
  * Calculate required clothing insulation using ISO 11079 method.
  */
@@ -53,7 +160,8 @@ export function calculateIreq(input: IreqInput): IreqResult {
   const cRes = 0.0014 * M * (34 - airTemp);
 
   // Evaporative respiratory heat loss
-  const pA = calculateVaporPressure(airTemp, relativeHumidity);
+  const boundedRh = Math.max(0, Math.min(100, relativeHumidity));
+  const pA = calculateVaporPressure(airTemp, boundedRh);
   const eRes = 0.0173 * M * (5.87 - pA / 1000);
 
   // Available heat for skin heat loss
@@ -69,33 +177,13 @@ export function calculateIreq(input: IreqInput): IreqResult {
     ['ireqNeutral', SKIN_TEMP_NEUTRAL],
     ['ireqMin', SKIN_TEMP_MINIMUM],
   ] as const) {
-    // Operative temperature (simplified for outdoors)
-    const tO = (airTemp + meanRadiantTemp) / 2;
-
-    // Convective heat transfer coefficient
-    // ISO 11079 equation for walking/standing outdoors
-    const hC = windSpeed > 0.5 ? 8.7 * Math.sqrt(windSpeed) : 3.5;
-
-    // Radiative heat transfer coefficient (linearized)
-    const hR = 4.0; // Simplified, approximately 4 W/m²K
-
-    // Combined heat transfer coefficient
-    const h = hC + hR;
-
-    // Required total insulation (m²K/W)
-    // Based on heat balance: H = (t_sk - t_o) / I_total
-    let iTotalRequired: number;
-    if (H > 0) {
-      iTotalRequired = (tSk - tO) / H;
-    } else {
-      iTotalRequired = Infinity;
-    }
-
-    // Boundary air layer resistance
-    const iA = 1 / h;
-
-    // Required clothing insulation
-    const iCl = iTotalRequired - iA;
+    const iCl = calculateRequiredInsulation(
+      tSk,
+      airTemp,
+      meanRadiantTemp,
+      windSpeed,
+      H
+    );
 
     // Convert to clo
     const rClClo = iCl / CLO_TO_M2KW;
@@ -106,7 +194,9 @@ export function calculateIreq(input: IreqInput): IreqResult {
   return {
     ireqMin: Math.round(results.ireqMin * 100) / 100,
     ireqNeutral: Math.round(results.ireqNeutral * 100) / 100,
-    dleHours: Infinity, // DLE depends on actual clothing; use ensemble analysis for specific values
+    dleHours: Math.round(
+      estimateDleHours(results.ireqMin, results.ireqNeutral, airTemp, windSpeed, metabolicRate) * 100
+    ) / 100,
   };
 }
 

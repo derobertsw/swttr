@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
     ireq: {
       min: ireq.ireqMin,
       neutral: ireq.ireqNeutral,
+      dle_hours: ireq.dleHours,
       target_range: [ireq.ireqMin, maxClo],
       regional: regionalIreq,
       extremity: extremityIreq,

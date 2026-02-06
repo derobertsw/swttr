@@ -190,7 +190,7 @@ describe('calculateIreq', () => {
         metabolicRate: METABOLIC_RATES.xc_skiing_racing, // Very high activity
       });
 
-      expect(result.ireqMin).toBe(0);
+      expect(result.ireqMin).toBeLessThanOrEqual(0.02);
     });
   });
 
@@ -206,6 +206,80 @@ describe('calculateIreq', () => {
       // Typical skiing ensemble is 0.5-2.0 clo
       expect(result.ireqMin).toBeLessThan(3);
       expect(result.ireqNeutral).toBeLessThan(4);
+    });
+  });
+
+  describe('benchmark scenarios (golden values)', () => {
+    it('should match benchmark: mild active output', () => {
+      const result = calculateIreq({
+        airTemp: 0,
+        windSpeed: 3,
+        relativeHumidity: 50,
+        metabolicRate: METABOLIC_RATES.xc_skiing_moderate,
+      });
+
+      expect(result.ireqMin).toBeCloseTo(0.5, 2);
+      expect(result.ireqNeutral).toBeCloseTo(0.59, 2);
+      expect(result.dleHours).toBeCloseTo(8, 2);
+    });
+
+    it('should match benchmark: cold moderate output', () => {
+      const result = calculateIreq({
+        airTemp: -10,
+        windSpeed: 5,
+        relativeHumidity: 50,
+        metabolicRate: METABOLIC_RATES.xc_skiing_moderate,
+      });
+
+      expect(result.ireqMin).toBeCloseTo(0.84, 2);
+      expect(result.ireqNeutral).toBeCloseTo(0.94, 2);
+      expect(result.dleHours).toBeCloseTo(7.27, 2);
+    });
+
+    it('should match benchmark: very cold low metabolic output', () => {
+      const result = calculateIreq({
+        airTemp: -25,
+        windSpeed: 8,
+        relativeHumidity: 60,
+        metabolicRate: METABOLIC_RATES.alpine_skiing,
+      });
+
+      expect(result.ireqMin).toBeCloseTo(2.84, 2);
+      expect(result.ireqNeutral).toBeCloseTo(3.04, 2);
+      expect(result.dleHours).toBeCloseTo(5.16, 2);
+    });
+  });
+
+  describe('DLE behavior', () => {
+    it('should return finite DLE hours', () => {
+      const result = calculateIreq({
+        airTemp: -10,
+        windSpeed: 5,
+        relativeHumidity: 50,
+        metabolicRate: METABOLIC_RATES.alpine_skiing,
+      });
+
+      expect(Number.isFinite(result.dleHours)).toBe(true);
+      expect(result.dleHours).toBeGreaterThanOrEqual(0.5);
+      expect(result.dleHours).toBeLessThanOrEqual(8);
+    });
+
+    it('should reduce DLE in harsher cold and wind', () => {
+      const mild = calculateIreq({
+        airTemp: -5,
+        windSpeed: 2,
+        relativeHumidity: 50,
+        metabolicRate: METABOLIC_RATES.alpine_skiing,
+      });
+
+      const severe = calculateIreq({
+        airTemp: -25,
+        windSpeed: 10,
+        relativeHumidity: 50,
+        metabolicRate: METABOLIC_RATES.alpine_skiing,
+      });
+
+      expect(severe.dleHours).toBeLessThan(mild.dleHours);
     });
   });
 });
