@@ -147,11 +147,6 @@ export function buildXCEnsemble(
     torso: regionalIreq.neutral.torso,
     legs: regionalIreq.neutral.legs,
   };
-  const regionMin: Record<Region, number> = {
-    torso: regionalIreq.min.torso,
-    legs: regionalIreq.min.legs,
-  };
-
   const coversRegion = (garment: GarmentRow, region: Region): boolean =>
     region === "torso" ? garment.covers_torso : garment.covers_legs;
 

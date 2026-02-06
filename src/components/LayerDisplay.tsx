@@ -24,6 +24,7 @@ import {
   BackpackSection,
   GuidanceSection,
 } from "@/components/layers";
+import { cn } from "@/lib/utils";
 
 interface LayerDisplayProps {
   activity?: string;
@@ -40,6 +41,47 @@ interface LayerDisplayProps {
 interface CloValues {
   currentClo: number | undefined;
   targetClo: number | undefined;
+}
+
+interface SummaryContent {
+  title: string;
+  subtitle: string;
+  detail: string;
+}
+
+function getSummaryContent(totalClo: number | undefined, targetRange: [number, number] | undefined): SummaryContent {
+  if (totalClo === undefined || !targetRange) {
+    return {
+      title: "Layer plan ready",
+      subtitle: "Use body-part sections below to fine-tune your setup.",
+      detail: "Recommendation based on current conditions",
+    };
+  }
+
+  const [targetMin, targetMax] = targetRange;
+  if (totalClo < targetMin) {
+    const deficit = targetMin - totalClo;
+    return {
+      title: "You are running cold",
+      subtitle: `Add roughly ${deficit.toFixed(1)} clo to reach minimum target.`,
+      detail: `Current ${totalClo.toFixed(1)} clo · Target ${targetMin.toFixed(1)}-${targetMax.toFixed(1)} clo`,
+    };
+  }
+
+  if (totalClo > targetMax) {
+    const excess = totalClo - targetMax;
+    return {
+      title: "You are running warm",
+      subtitle: `Reduce roughly ${excess.toFixed(1)} clo or increase venting.`,
+      detail: `Current ${totalClo.toFixed(1)} clo · Target ${targetMin.toFixed(1)}-${targetMax.toFixed(1)} clo`,
+    };
+  }
+
+  return {
+    title: "You are in the comfort zone",
+    subtitle: "Your insulation is within the current target range.",
+    detail: `Current ${totalClo.toFixed(1)} clo · Target ${targetMin.toFixed(1)}-${targetMax.toFixed(1)} clo`,
+  };
 }
 
 /**
@@ -114,6 +156,7 @@ const LayerDisplay = ({
   const totalClo = biophysicsData?.recommendation?.ensemble_properties?.total_clo;
   const regionalIreq = biophysicsData?.ireq?.regional;
   const extremityIreq = biophysicsData?.ireq?.extremity;
+  const summary = getSummaryContent(totalClo, biophysicsData?.ireq?.target_range);
 
   return (
     <div className="flex flex-col gap-8">
@@ -124,6 +167,23 @@ const LayerDisplay = ({
         totalClo={totalClo}
         targetRange={biophysicsData?.ireq?.target_range}
       />
+
+      <div
+        className={cn(
+          "rounded-xl border px-5 py-4 backdrop-blur-md",
+          totalClo !== undefined &&
+            biophysicsData?.ireq?.target_range &&
+            totalClo >= biophysicsData.ireq.target_range[0] &&
+            totalClo <= biophysicsData.ireq.target_range[1]
+            ? "border-emerald-200/80 bg-emerald-50/80 text-emerald-950"
+            : "border-white/35 bg-white/85 text-slate-900"
+        )}
+      >
+        <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">Outfit Summary</p>
+        <h2 className="mt-1 text-xl font-semibold leading-tight">{summary.title}</h2>
+        <p className="mt-1.5 text-sm opacity-90">{summary.subtitle}</p>
+        <p className="mt-2 text-xs opacity-70">{summary.detail}</p>
+      </div>
 
       <ThermalGauge
         totalClo={totalClo}
@@ -136,6 +196,11 @@ const LayerDisplay = ({
         regionalClo={regionalClo}
       />
 
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">
+          Detailed Layer Breakdown
+        </h3>
+      </div>
       <div className="flex flex-col gap-6">
         {BODY_PARTS.map((part) => {
           const wardrobeLayers =
@@ -181,9 +246,23 @@ const LayerDisplay = ({
         />
       )}
 
-      {biophysicsData?.guidance && <GuidanceSection tips={biophysicsData.guidance} />}
+      {biophysicsData?.guidance && (
+        <div className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">Actionable Guidance</h3>
+          <GuidanceSection tips={biophysicsData.guidance} />
+        </div>
+      )}
 
-      {biophysicsData?.recommendation && <BiophysicsDetails data={biophysicsData} />}
+      {biophysicsData?.recommendation && (
+        <details className="rounded-lg border border-white/25 bg-white/10 p-4">
+          <summary className="cursor-pointer text-sm font-semibold tracking-wide text-white/85">
+            Advanced Biophysics Details
+          </summary>
+          <div className="mt-4">
+            <BiophysicsDetails data={biophysicsData} />
+          </div>
+        </details>
+      )}
     </div>
   );
 };

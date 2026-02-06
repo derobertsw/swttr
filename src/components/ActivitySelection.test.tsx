@@ -61,7 +61,7 @@ describe("ActivitySelection", () => {
 
       const slides = screen.getAllByRole("group");
       const bikingSlide = slides[1];
-      const card = within(bikingSlide).getByText("Biking").closest("[data-slot='card']");
+      const card = within(bikingSlide).getByText("Biking").closest("button");
 
       await user.click(card!);
 
@@ -75,7 +75,7 @@ describe("ActivitySelection", () => {
 
       const slides = screen.getAllByRole("group");
       const alpineSlide = slides[4];
-      const card = within(alpineSlide).getByText("Alpine Skiing").closest("[data-slot='card']");
+      const card = within(alpineSlide).getByText("Alpine Skiing").closest("button");
 
       expect(card).toHaveClass("scale-110");
     });
@@ -85,7 +85,7 @@ describe("ActivitySelection", () => {
 
       const slides = screen.getAllByRole("group");
       const runningSlide = slides[0];
-      const card = within(runningSlide).getByText("Running").closest("[data-slot='card']");
+      const card = within(runningSlide).getByText("Running").closest("button");
 
       expect(card).toHaveClass("scale-110");
     });

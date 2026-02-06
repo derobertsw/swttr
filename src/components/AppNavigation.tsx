@@ -32,7 +32,6 @@ export function MobileTabBar() {
     updateDefaultActivity,
   } = usePreferences();
 
-  // On landing screen (home), no tab should have visual emphasis
   const isLandingScreen = pathname === "/";
 
   useEffect(() => {
@@ -81,31 +80,31 @@ export function MobileTabBar() {
 
   const renderTab = (item: { href: string; label: string; icon: typeof CalendarDays }) => {
     const wouldBeActive = item.href.startsWith("/?") ? pathname === "/" : pathname === item.href;
-    const isActive = isLandingScreen ? false : wouldBeActive;
+    const isActive = wouldBeActive;
 
     return (
       <Link
         key={item.href}
         href={item.href}
         className={cn(
-          "flex flex-col items-center gap-1.5 text-[11px] font-medium leading-none transition-all",
-          isActive ? "text-white" : "text-white/55",
-          isLandingScreen && "translate-y-0.5"
+          "flex flex-col items-center gap-1 text-xs font-semibold leading-none tracking-wide transition-all",
+          isActive ? "text-white" : "text-white/70",
+          !isActive && isLandingScreen && "translate-y-0.5"
         )}
       >
         <div
           className={cn(
             "flex items-center justify-center size-9 rounded-full transition-all",
-            isActive && "bg-white/15"
+            isActive ? "bg-white/22 shadow-[0_4px_12px_rgba(0,0,0,0.2)]" : "bg-transparent"
           )}
         >
           <item.icon
-            className={cn("size-5", !isActive && "opacity-65")}
+            className={cn("size-5", !isActive && "opacity-80")}
             fill={isActive ? "currentColor" : "none"}
             strokeWidth={isActive ? 1.5 : 2}
           />
         </div>
-        <span className={cn(!isActive && "opacity-65")}>{item.label}</span>
+        <span className={cn(!isActive && "opacity-80")}>{item.label}</span>
       </Link>
     );
   };
@@ -116,7 +115,7 @@ export function MobileTabBar() {
         "md:hidden fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]",
         isLandingScreen ? "text-white/60" : "text-white/80"
       )}
-      style={{ backgroundColor: "rgba(79, 157, 166, 0.45)" }}
+      style={{ backgroundColor: "rgba(45, 107, 116, 0.62)" }}
     >
       <div className="relative h-16 backdrop-blur-lg">
         <div className="grid h-16 grid-cols-5 items-center px-3 pb-1">
@@ -129,11 +128,11 @@ export function MobileTabBar() {
             onSensitivityChange={updateSensitivity}
             onDefaultActivityChange={updateDefaultActivity}
           >
-            <button className="flex flex-col items-center gap-1.5 text-[11px] font-medium leading-none transition-all text-white/55 translate-y-0.5">
+            <button className="flex flex-col items-center gap-1 text-xs font-semibold leading-none tracking-wide transition-all text-white/70 translate-y-0.5">
               <div className="flex items-center justify-center size-9 rounded-full">
-                <Settings className="size-5 opacity-65" />
+                <Settings className="size-5 opacity-80" />
               </div>
-              <span className="opacity-65">Settings</span>
+              <span className="opacity-85">Settings</span>
             </button>
           </PreferencesDrawer>
         </div>

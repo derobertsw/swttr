@@ -1,6 +1,7 @@
 import { AlertTriangle, Info } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RegionalClo } from "@/types/biophysics";
+import { cn } from "@/lib/utils";
 
 interface ThermalStatusCardProps {
   totalClo: number | undefined;
@@ -163,20 +164,30 @@ export function ThermalStatusCard({ totalClo, targetRange, regionalClo }: Therma
   const highOverheat = severity === "high";
 
   return (
-    <div className={`rounded-lg border-l-4 border px-4 py-3 ${highOverheat
-      ? "border-l-orange-500 border-orange-200 bg-orange-50"
-      : "border-l-amber-400 border-amber-200 bg-amber-50"}`}>
+    <div
+      className={cn(
+        "rounded-lg border-l-4 border px-4 py-3",
+        highOverheat
+          ? "border-l-orange-500 border-orange-200 bg-orange-50"
+          : "border-l-amber-400 border-amber-200 bg-amber-50"
+      )}
+    >
       <div className="flex items-start gap-2">
-        <AlertTriangle className={`size-4 mt-0.5 flex-shrink-0 ${highOverheat ? "text-orange-500" : "text-amber-500"}`} />
+        <AlertTriangle
+          className={cn(
+            "size-4 mt-0.5 flex-shrink-0",
+            highOverheat ? "text-orange-500" : "text-amber-500"
+          )}
+        />
         <div className="flex-1">
-          <p className={`text-sm font-semibold ${highOverheat ? "text-orange-800" : "text-amber-800"}`}>
+          <p className={cn("text-sm font-semibold", highOverheat ? "text-orange-800" : "text-amber-800")}>
             Overheating Risk — {highOverheat ? "High" : "Moderate"}
           </p>
-          <p className={`text-sm mt-0.5 ${highOverheat ? "text-orange-700" : "text-amber-700"}`}>
+          <p className={cn("text-sm mt-0.5", highOverheat ? "text-orange-700" : "text-amber-700")}>
             You are above target insulation by {delta.toFixed(1)} clo
           </p>
-          <p className={`text-sm mt-2 ${highOverheat ? "text-orange-700" : "text-amber-700"}`}>{recommendation}</p>
-          <p className={`text-xs mt-2 ${highOverheat ? "text-orange-600/70" : "text-amber-600/70"}`}>
+          <p className={cn("text-sm mt-2", highOverheat ? "text-orange-700" : "text-amber-700")}>{recommendation}</p>
+          <p className={cn("text-xs mt-2", highOverheat ? "text-orange-600/70" : "text-amber-600/70")}>
             Current: {totalClo.toFixed(1)} clo · Target: {targetMin.toFixed(1)}-{targetMax.toFixed(1)} clo
           </p>
         </div>

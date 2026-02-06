@@ -44,54 +44,27 @@ export function WeatherHeader({
     <div className="pb-6 border-b border-white/20">
       <div className="flex items-start justify-between">
         <div className="flex flex-col">
-          <div
-            className="relative"
-            style={{
-              background: "radial-gradient(circle at 30% 50%, rgba(0,0,0,0.12) 0%, transparent 70%)",
-              margin: "-12px",
-              padding: "12px",
-            }}
-          >
-            <span
-              className="text-7xl font-medium tracking-tight"
-              style={{
-                color: "#F8FAFC",
-                textShadow: "0px 1px 6px rgba(0,0,0,0.25)",
-              }}
-            >
+          <div className="relative -m-3 p-3 bg-[radial-gradient(circle_at_30%_50%,rgba(0,0,0,0.12)_0%,transparent_70%)]">
+            <span className="text-7xl font-medium tracking-tight text-slate-50 [text-shadow:0px_1px_6px_rgba(0,0,0,0.25)]">
               {temperature}
             </span>
-            <span
-              className="text-lg font-medium align-top ml-0.5"
-              style={{
-                color: "rgba(248,250,252,0.7)",
-                textShadow: "0px 1px 4px rgba(0,0,0,0.2)",
-                position: "relative",
-                top: "-8px",
-              }}
-            >
+            <span className="ml-0.5 relative -top-2 align-top text-lg font-medium text-slate-200/85 [text-shadow:0px_1px_4px_rgba(0,0,0,0.2)]">
               °F
             </span>
           </div>
 
-          <div
-            className="mt-2 flex items-center gap-1.5 text-[15px]"
-            style={{ color: "rgba(255,255,255,0.65)" }}
-          >
+          <div className="mt-2 flex items-center gap-1.5 text-[15px] text-white/75">
             {showFeelsLike && (
               <>
                 <span>Feels like {calculatedFeelsLike}°</span>
-                <span style={{ opacity: 0.5 }}>·</span>
+                <span className="opacity-50">·</span>
               </>
             )}
             <span>Wind {windspeed} mph</span>
           </div>
 
           {temperature < 32 && (
-            <p
-              className="mt-3 text-sm font-medium"
-              style={{ color: "rgba(255,255,255,0.8)" }}
-            >
+            <p className="mt-3 text-sm font-medium text-white/85">
               Be Bold, Start Cold
             </p>
           )}

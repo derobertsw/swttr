@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Carousel,
   type CarouselApi,
@@ -85,7 +84,7 @@ const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
   }, [api, current]);
 
   return (
-    <div className="mx-auto w-full max-w-md">
+    <div className="mx-auto w-full max-w-md" role="radiogroup" aria-label="Activity">
       <Carousel
         className="w-full"
         opts={{ loop: true, startIndex: initialIndex >= 0 ? initialIndex : 0 }}
@@ -96,19 +95,36 @@ const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
             const isSelected = index === current;
             return (
               <CarouselItem className="basis-1/3" key={activity.value}>
-                <Card
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  aria-label={activity.name}
+                  tabIndex={isSelected ? 0 : -1}
                   className={cn(
-                    "cursor-pointer transition-all duration-200 border-2",
+                    "w-full rounded-xl border-2 bg-card text-card-foreground cursor-pointer transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/85 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800",
                     isSelected
                       ? "scale-110 border-gray-300/60 shadow-[0_5px_14px_rgba(0,0,0,0.17)] bg-white"
                       : "scale-[0.92] opacity-80 border-transparent shadow-none"
                   )}
                   onClick={() => {
                     if (isSelected) return;
+                    setCurrent(index);
+                    onChange(ACTIVITIES[index].value);
                     api?.scrollTo(index);
                   }}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowRight") {
+                      event.preventDefault();
+                      api?.scrollNext();
+                    }
+                    if (event.key === "ArrowLeft") {
+                      event.preventDefault();
+                      api?.scrollPrev();
+                    }
+                  }}
                 >
-                  <CardContent
+                  <div
                     className={cn(
                       "flex flex-col items-center justify-center gap-3",
                       isSelected ? "h-44 px-6" : "h-36 px-6"
@@ -130,15 +146,15 @@ const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
                     >
                       {activity.name}
                     </span>
-                  </CardContent>
-                </Card>
+                  </div>
+                </button>
               </CarouselItem>
             );
           })}
         </CarouselContent>
       </Carousel>
       {/* Pagination dots */}
-      <div className={cn("flex justify-center gap-2 mt-1 opacity-60 transition-opacity", hideDots && "opacity-0")}>
+      <div className={cn("flex justify-center gap-2 mt-1 opacity-75 transition-opacity", hideDots && "opacity-0")}>
         {ACTIVITIES.map((activity, index) => (
           <button
             key={activity.value}
