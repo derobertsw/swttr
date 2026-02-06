@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateIreq } from '@/lib/biophysics/ireq';
 import { METABOLIC_RATES, getAlpineCloTargets } from '@/lib/biophysics/constants';
-import { calculateActivityTargetRange } from '@/lib/biophysics/targets';
+import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
 import {
   validateRecommendationRequest,
   sortByInsulation,
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
 
   const alpineTargets = getAlpineCloTargets(tempC);
 
-  const regionalIreq = {
+  const baseRegionalIreq = {
     min: {
       torso: alpineTargets.torso.min,
       arms: alpineTargets.torso.min * 0.85,
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     },
   };
 
-  const extremityIreq = {
+  const baseExtremityIreq = {
     min: {
       hands: alpineTargets.hands.min,
       head: alpineTargets.head.min,
@@ -136,6 +136,18 @@ export async function POST(request: NextRequest) {
       head: alpineTargets.head.neutral,
     },
   };
+  const regionalIreq = scaleIreqShapeToTargetRange(baseRegionalIreq, {
+    ireqMin: baseTargetMin,
+    ireqNeutral: ireqChairlift.ireqNeutral,
+    targetMin: targetCloMin,
+    targetMax: targetCloMax,
+  });
+  const extremityIreq = scaleIreqShapeToTargetRange(baseExtremityIreq, {
+    ireqMin: baseTargetMin,
+    ireqNeutral: ireqChairlift.ireqNeutral,
+    targetMin: targetCloMin,
+    targetMax: targetCloMax,
+  });
 
   return NextResponse.json({
     conditions: {

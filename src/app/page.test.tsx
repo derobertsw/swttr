@@ -49,6 +49,8 @@ describe("Home Page", () => {
     localStorageMock.getItem.mockReturnValue("test-user-id");
     // Reset search params
     mockSearchParams.delete("mode");
+    mockSearchParams.delete("gearUp");
+    mockSearchParams.delete("geoDenied");
 
     // Default mock for item mappings and preferences APIs
     mockFetch.mockImplementation((url: string) => {
@@ -202,6 +204,18 @@ describe("Home Page", () => {
       await waitFor(() => {
         expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
       });
+    });
+
+    it("should prioritize location input over sliders when geoDenied query is set", async () => {
+      mockSearchParams.set("gearUp", "1");
+      mockSearchParams.set("geoDenied", "1");
+
+      render(<Home />);
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/temperature:/i)).not.toBeInTheDocument();
     });
 
     it("should show sliders when API returns error", async () => {

@@ -14,6 +14,11 @@ export interface ActivityTargetRangeResult {
   max: number;
 }
 
+type IreqShape = {
+  min: Record<string, number>;
+  neutral: Record<string, number>;
+};
+
 interface ActivityRangeProfile {
   baseMaxBuffer: number;
   maxCap: number;
@@ -68,4 +73,37 @@ export function calculateActivityTargetRange(input: ActivityTargetRangeInput): A
     min: round2(targetMin),
     max: round2(targetMax),
   };
+}
+
+/**
+ * Scale regional/extremity IREQ values so body-part targets stay aligned with the
+ * adjusted whole-body target range shown in the UI.
+ */
+export function scaleIreqShapeToTargetRange<T extends IreqShape>(
+  value: T,
+  input: {
+    ireqMin: number;
+    ireqNeutral: number;
+    targetMin: number;
+    targetMax: number;
+  }
+): T {
+  const minScale = input.ireqMin > 0
+    ? clamp(input.targetMin / input.ireqMin, 0.8, 2.2)
+    : 1;
+  const neutralScale = input.ireqNeutral > 0
+    ? clamp(input.targetMax / input.ireqNeutral, 0.8, 2.2)
+    : 1;
+
+  const scaledMin = Object.fromEntries(
+    Object.entries(value.min).map(([key, num]) => [key, round2(num * minScale)])
+  ) as T['min'];
+  const scaledNeutral = Object.fromEntries(
+    Object.entries(value.neutral).map(([key, num]) => [key, round2(num * neutralScale)])
+  ) as T['neutral'];
+
+  return {
+    min: scaledMin,
+    neutral: scaledNeutral,
+  } as T;
 }

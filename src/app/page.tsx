@@ -51,15 +51,7 @@ const HomeContent = () => {
             Choose your activity
           </p>
           <ActivitySelection value={activity} onChange={setActivity} />
-          {inputMode === "manual" && showSliders ? (
-            <WeatherSelection
-              temperature={temperature}
-              windspeed={windspeed}
-              onTemperatureChange={setTemperature}
-              onWindspeedChange={setWindspeed}
-              onPlanAhead={() => setInputMode("planAhead")}
-            />
-          ) : inputMode === "manual" && locationDenied ? (
+          {inputMode === "manual" && locationDenied ? (
             <LocationInput
               activityName={ACTIVITIES.find(a => a.value === activity)?.name.toLowerCase() || ""}
               location={locationSearch.location}
@@ -71,6 +63,14 @@ const HomeContent = () => {
               onLocationInputChange={locationSearch.handleLocationInputChange}
               onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
               onSelectLocation={locationSearch.handleSelectLocation}
+            />
+          ) : inputMode === "manual" && showSliders ? (
+            <WeatherSelection
+              temperature={temperature}
+              windspeed={windspeed}
+              onTemperatureChange={setTemperature}
+              onWindspeedChange={setWindspeed}
+              onPlanAhead={() => setInputMode("planAhead")}
             />
           ) : inputMode === "planAhead" ? (
             <PlanAheadForm

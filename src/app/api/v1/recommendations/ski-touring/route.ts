@@ -3,7 +3,7 @@ import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
 import { scoreEnsemble } from '@/lib/biophysics/scorer';
 import { METABOLIC_RATES } from '@/lib/biophysics/constants';
-import { calculateActivityTargetRange } from '@/lib/biophysics/targets';
+import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
 import {
   type GarmentRow,
   type CategorizedGarments,
@@ -93,8 +93,8 @@ export async function POST(request: NextRequest) {
     metabolicRate: TRANSITION_METABOLIC_RATE,
   });
 
-  const regionalIreqDownhill = calculateRegionalIreq(ireqDownhill, 'ski_touring_downhill');
-  const extremityIreqDownhill = calculateExtremityIreq(
+  const baseRegionalIreqDownhill = calculateRegionalIreq(ireqDownhill, 'ski_touring_downhill');
+  const baseExtremityIreqDownhill = calculateExtremityIreq(
     ireqDownhill, 'ski_touring_downhill', tempC, windMs + DOWNHILL_SPEED_WIND
   );
 
@@ -206,6 +206,18 @@ export async function POST(request: NextRequest) {
     windSpeedMs: windMs + DOWNHILL_SPEED_WIND,
   });
   const targetCloRange: [number, number] = [downhillRange.min, downhillRange.max];
+  const regionalIreqDownhill = scaleIreqShapeToTargetRange(baseRegionalIreqDownhill, {
+    ireqMin: ireqDownhill.ireqMin,
+    ireqNeutral: ireqDownhill.ireqNeutral,
+    targetMin: targetCloRange[0],
+    targetMax: targetCloRange[1],
+  });
+  const extremityIreqDownhill = scaleIreqShapeToTargetRange(baseExtremityIreqDownhill, {
+    ireqMin: ireqDownhill.ireqMin,
+    ireqNeutral: ireqDownhill.ireqNeutral,
+    targetMin: targetCloRange[0],
+    targetMax: targetCloRange[1],
+  });
 
   return NextResponse.json({
     conditions: {

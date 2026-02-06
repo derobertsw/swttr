@@ -185,8 +185,10 @@ export function useGearUp() {
       } else if (result.locationDenied) {
         toast.error("Location access denied. Please enter your location manually.");
         setLocationDenied(true);
+        setShowSliders(false);
       } else {
         toast.error("Could not get current weather. Please set manually.");
+        setLocationDenied(false);
         setShowSliders(true);
       }
       setLoading(false);
@@ -256,7 +258,10 @@ export function useGearUp() {
 
     if (geoDenied) {
       setLocationDenied(true);
+      setShowSliders(false);
+      return;
     }
+    setLocationDenied(false);
     setShowSliders(true);
   }, [searchParams, activity, biophysics, getRecommendation]);
 

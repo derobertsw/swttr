@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateActivityTargetRange } from './targets';
+import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from './targets';
 
 describe('calculateActivityTargetRange', () => {
   it('returns ordered min/max with two-decimal precision', () => {
@@ -83,5 +83,26 @@ describe('calculateActivityTargetRange', () => {
 
     expect(shortDle.min).toBeGreaterThan(longDle.min);
     expect(shortDle.max).toBeGreaterThan(longDle.max);
+  });
+});
+
+describe('scaleIreqShapeToTargetRange', () => {
+  it('scales min and neutral values to match adjusted whole-body targets', () => {
+    const shape = {
+      min: { torso: 1.0, legs: 1.2 },
+      neutral: { torso: 1.5, legs: 1.8 },
+    };
+
+    const scaled = scaleIreqShapeToTargetRange(shape, {
+      ireqMin: 1.0,
+      ireqNeutral: 1.5,
+      targetMin: 1.2,
+      targetMax: 1.95,
+    });
+
+    expect(scaled.min.torso).toBeCloseTo(1.2, 2);
+    expect(scaled.min.legs).toBeCloseTo(1.44, 2);
+    expect(scaled.neutral.torso).toBeCloseTo(1.95, 2);
+    expect(scaled.neutral.legs).toBeCloseTo(2.34, 2);
   });
 });

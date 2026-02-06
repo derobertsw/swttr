@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
 import { METABOLIC_RATES } from '@/lib/biophysics/constants';
-import { calculateActivityTargetRange } from '@/lib/biophysics/targets';
+import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
 import {
   validateRecommendationRequest,
   sortByBreathability,
@@ -96,8 +96,21 @@ export async function POST(request: NextRequest) {
     recommendedHeadwear
   );
 
-  const regionalIreq = calculateRegionalIreq(ireq, 'xc_skiing');
-  const extremityIreq = calculateExtremityIreq(ireq, 'xc_skiing', tempC, windMs);
+  const regionalIreq = scaleIreqShapeToTargetRange(calculateRegionalIreq(ireq, 'xc_skiing'), {
+    ireqMin: ireq.ireqMin,
+    ireqNeutral: ireq.ireqNeutral,
+    targetMin: targetMinClo,
+    targetMax: maxClo,
+  });
+  const extremityIreq = scaleIreqShapeToTargetRange(
+    calculateExtremityIreq(ireq, 'xc_skiing', tempC, windMs),
+    {
+      ireqMin: ireq.ireqMin,
+      ireqNeutral: ireq.ireqNeutral,
+      targetMin: targetMinClo,
+      targetMax: maxClo,
+    }
+  );
 
   return NextResponse.json({
     conditions: {
