@@ -64,6 +64,8 @@ export function useLocationSearch() {
     setLocationQuery(value);
   };
 
+  const dismiss = () => setShowSuggestions(false);
+
   const reset = () => {
     setLocation("");
     setLocationQuery("");
@@ -82,6 +84,7 @@ export function useLocationSearch() {
     setShowSuggestions,
     handleSelectLocation,
     handleLocationInputChange,
+    dismiss,
     reset,
   };
 }

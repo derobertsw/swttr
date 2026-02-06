@@ -15,6 +15,7 @@ interface LocationInputProps {
   onLocationInputChange: (value: string) => void;
   onLocationFocus: () => void;
   onSelectLocation: (suggestion: LocationSuggestion) => void;
+  onDismiss?: () => void;
 }
 
 export function LocationInput({
@@ -28,6 +29,7 @@ export function LocationInput({
   onLocationInputChange,
   onLocationFocus,
   onSelectLocation,
+  onDismiss,
 }: LocationInputProps) {
   return (
     <div className="w-full max-w-sm">
@@ -42,6 +44,7 @@ export function LocationInput({
         onLocationInputChange={onLocationInputChange}
         onLocationFocus={onLocationFocus}
         onSelectLocation={onSelectLocation}
+        onDismiss={onDismiss}
       />
     </div>
   );

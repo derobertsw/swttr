@@ -63,6 +63,7 @@ const HomeContent = () => {
               onLocationInputChange={locationSearch.handleLocationInputChange}
               onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
               onSelectLocation={locationSearch.handleSelectLocation}
+              onDismiss={locationSearch.dismiss}
             />
           ) : inputMode === "manual" && showSliders ? (
             <WeatherSelection
@@ -87,6 +88,7 @@ const HomeContent = () => {
               onLocationInputChange={locationSearch.handleLocationInputChange}
               onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
               onSelectLocation={locationSearch.handleSelectLocation}
+              onDismiss={locationSearch.dismiss}
             />
           ) : null}
           <p className="text-sm text-white/55 text-center mb-4">

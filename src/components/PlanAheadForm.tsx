@@ -30,6 +30,7 @@ interface PlanAheadFormProps {
   onLocationInputChange: (value: string) => void;
   onLocationFocus: () => void;
   onSelectLocation: (suggestion: LocationSuggestion) => void;
+  onDismiss?: () => void;
 }
 
 export function PlanAheadForm({
@@ -46,6 +47,7 @@ export function PlanAheadForm({
   onLocationInputChange,
   onLocationFocus,
   onSelectLocation,
+  onDismiss,
 }: PlanAheadFormProps) {
   return (
     <div className="flex w-full max-w-sm flex-col gap-6">
@@ -60,6 +62,7 @@ export function PlanAheadForm({
         onLocationInputChange={onLocationInputChange}
         onLocationFocus={onLocationFocus}
         onSelectLocation={onSelectLocation}
+        onDismiss={onDismiss}
       />
 
       <div className="flex flex-col gap-2">
