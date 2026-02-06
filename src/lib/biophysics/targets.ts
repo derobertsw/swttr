@@ -14,10 +14,7 @@ export interface ActivityTargetRangeResult {
   max: number;
 }
 
-type IreqShape = {
-  min: Record<string, number>;
-  neutral: Record<string, number>;
-};
+type NumericProps<T extends object> = { [K in keyof T]: number };
 
 interface ActivityRangeProfile {
   baseMaxBuffer: number;
@@ -79,15 +76,18 @@ export function calculateActivityTargetRange(input: ActivityTargetRangeInput): A
  * Scale regional/extremity IREQ values so body-part targets stay aligned with the
  * adjusted whole-body target range shown in the UI.
  */
-export function scaleIreqShapeToTargetRange<T extends IreqShape>(
-  value: T,
+export function scaleIreqShapeToTargetRange<
+  TMin extends object,
+  TNeutral extends object
+>(
+  value: { min: NumericProps<TMin>; neutral: NumericProps<TNeutral> },
   input: {
     ireqMin: number;
     ireqNeutral: number;
     targetMin: number;
     targetMax: number;
   }
-): T {
+): { min: NumericProps<TMin>; neutral: NumericProps<TNeutral> } {
   const minScale = input.ireqMin > 0
     ? clamp(input.targetMin / input.ireqMin, 0.8, 2.2)
     : 1;
@@ -95,15 +95,18 @@ export function scaleIreqShapeToTargetRange<T extends IreqShape>(
     ? clamp(input.targetMax / input.ireqNeutral, 0.8, 2.2)
     : 1;
 
-  const scaledMin = Object.fromEntries(
-    Object.entries(value.min).map(([key, num]) => [key, round2(num * minScale)])
-  ) as T['min'];
-  const scaledNeutral = Object.fromEntries(
-    Object.entries(value.neutral).map(([key, num]) => [key, round2(num * neutralScale)])
-  ) as T['neutral'];
+  const scaledMin = { ...value.min } as NumericProps<TMin>;
+  for (const key of Object.keys(scaledMin) as Array<keyof TMin>) {
+    scaledMin[key] = round2(scaledMin[key] * minScale);
+  }
+
+  const scaledNeutral = { ...value.neutral } as NumericProps<TNeutral>;
+  for (const key of Object.keys(scaledNeutral) as Array<keyof TNeutral>) {
+    scaledNeutral[key] = round2(scaledNeutral[key] * neutralScale);
+  }
 
   return {
     min: scaledMin,
     neutral: scaledNeutral,
-  } as T;
+  };
 }
