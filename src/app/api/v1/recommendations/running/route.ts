@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
 import { METABOLIC_RATES } from '@/lib/biophysics/constants';
+import { calculateActivityTargetRange } from '@/lib/biophysics/targets';
 import {
   validateRecommendationRequest,
   sortByBreathability,
@@ -32,7 +33,16 @@ export async function POST(request: NextRequest) {
     metabolicRate: METABOLIC_RATES.running_moderate,
   });
 
-  const maxClo = Math.min(ireq.ireqNeutral + 0.2, 1.4);
+  const targetRange = calculateActivityTargetRange({
+    activity: 'running',
+    ireqMin: ireq.ireqMin,
+    ireqNeutral: ireq.ireqNeutral,
+    dleHours: ireq.dleHours,
+    airTempC: tempC,
+    windSpeedMs: windMs,
+  });
+  const targetMinClo = targetRange.min;
+  const maxClo = targetRange.max;
   const minEvapPotential = 0.3;
 
   // Prepare common data
@@ -43,7 +53,7 @@ export async function POST(request: NextRequest) {
       message: 'No suitable garments found in database',
       ireq: { min: ireq.ireqMin, neutral: ireq.ireqNeutral },
       recommendations: {
-        target_clo_range: [ireq.ireqMin, maxClo],
+        target_clo_range: [targetMinClo, maxClo],
         min_evap_potential: minEvapPotential,
         guidance: getRunningGuidance(tempC, ireq),
       },
@@ -89,7 +99,7 @@ export async function POST(request: NextRequest) {
       min: ireq.ireqMin,
       neutral: ireq.ireqNeutral,
       dle_hours: ireq.dleHours,
-      target_range: [ireq.ireqMin, maxClo],
+      target_range: [targetMinClo, maxClo],
       regional: regionalIreq,
       extremity: extremityIreq,
     },

@@ -3,6 +3,7 @@ import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
 import { scoreEnsemble } from '@/lib/biophysics/scorer';
 import { METABOLIC_RATES } from '@/lib/biophysics/constants';
+import { calculateActivityTargetRange } from '@/lib/biophysics/targets';
 import {
   type GarmentRow,
   type CategorizedGarments,
@@ -196,10 +197,15 @@ export async function POST(request: NextRequest) {
 
   const totalPackWeightGrams = packItems.reduce((sum, g) => sum + (g.weight_grams ?? 0), 0);
 
-  const targetCloRange: [number, number] = [
-    Math.round(ireqDownhill.ireqMin * 100) / 100,
-    Math.round(ireqDownhill.ireqNeutral * 100) / 100,
-  ];
+  const downhillRange = calculateActivityTargetRange({
+    activity: 'ski_touring_downhill',
+    ireqMin: ireqDownhill.ireqMin,
+    ireqNeutral: ireqDownhill.ireqNeutral,
+    dleHours: ireqDownhill.dleHours,
+    airTempC: tempC,
+    windSpeedMs: windMs + DOWNHILL_SPEED_WIND,
+  });
+  const targetCloRange: [number, number] = [downhillRange.min, downhillRange.max];
 
   return NextResponse.json({
     conditions: {

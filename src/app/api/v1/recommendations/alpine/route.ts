@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateIreq } from '@/lib/biophysics/ireq';
 import { METABOLIC_RATES, getAlpineCloTargets } from '@/lib/biophysics/constants';
+import { calculateActivityTargetRange } from '@/lib/biophysics/targets';
 import {
   validateRecommendationRequest,
   sortByInsulation,
@@ -42,8 +43,17 @@ export async function POST(request: NextRequest) {
     metabolicRate: METABOLIC_RATES.chairlift,
   });
 
-  const targetCloMin = ireqSkiing.ireqMin * 0.6 + ireqChairlift.ireqMin * 0.4;
-  const targetCloMax = ireqChairlift.ireqNeutral;
+  const baseTargetMin = ireqSkiing.ireqMin * 0.6 + ireqChairlift.ireqMin * 0.4;
+  const alpineRange = calculateActivityTargetRange({
+    activity: 'alpine_skiing',
+    ireqMin: baseTargetMin,
+    ireqNeutral: ireqChairlift.ireqNeutral,
+    dleHours: ireqChairlift.dleHours,
+    airTempC: tempC,
+    windSpeedMs: windMs,
+  });
+  const targetCloMin = alpineRange.min;
+  const targetCloMax = alpineRange.max;
 
   const prepared = await prepareRouteData(validated, {
     activityFilter: { field: 'alpine_skiing_score', minScore: 5 },
