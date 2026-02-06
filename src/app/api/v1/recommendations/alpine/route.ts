@@ -79,38 +79,6 @@ export async function POST(request: NextRequest) {
     weather.precipitation ?? false
   );
 
-  const recommendedHandwear = selectHandwear(userHandwear, tempC, false);
-  const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, false);
-
-  const response = buildResponseComponents(
-    {
-      ensemble,
-      weather: {
-        temperature: tempC,
-        windSpeed: windMs,
-        humidity: weather.humidity ?? 50,
-        precipitation: weather.precipitation ?? false,
-        precipitationType: weather.precipitation_type,
-      },
-      activity: {
-        name: 'Alpine Skiing',
-        metabolicRate: METABOLIC_RATES.alpine_skiing,
-        hasStaticPeriods: true,
-        staticMetabolicRate: METABOLIC_RATES.chairlift,
-        windExposure: 'exposed',
-      },
-      activityKey: 'alpine_skiing',
-    },
-    recommendedHandwear,
-    recommendedHeadwear
-  );
-
-  // Alpine uses custom garment formatting (includes rcl override)
-  const alpineGarments = ensemble.map((g) => ({
-    ...formatGarmentResponse(g),
-    rcl: g.garment_thermal_properties?.rcl_whole_body,
-  }));
-
   const alpineTargets = getAlpineCloTargets(tempC);
 
   const baseRegionalIreq = {
@@ -148,6 +116,43 @@ export async function POST(request: NextRequest) {
     targetMin: targetCloMin,
     targetMax: targetCloMax,
   });
+
+  const recommendedHandwear = selectHandwear(
+    userHandwear,
+    tempC,
+    false,
+    extremityIreq.neutral.hands
+  );
+  const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, false);
+
+  const response = buildResponseComponents(
+    {
+      ensemble,
+      weather: {
+        temperature: tempC,
+        windSpeed: windMs,
+        humidity: weather.humidity ?? 50,
+        precipitation: weather.precipitation ?? false,
+        precipitationType: weather.precipitation_type,
+      },
+      activity: {
+        name: 'Alpine Skiing',
+        metabolicRate: METABOLIC_RATES.alpine_skiing,
+        hasStaticPeriods: true,
+        staticMetabolicRate: METABOLIC_RATES.chairlift,
+        windExposure: 'exposed',
+      },
+      activityKey: 'alpine_skiing',
+    },
+    recommendedHandwear,
+    recommendedHeadwear
+  );
+
+  // Alpine uses custom garment formatting (includes rcl override)
+  const alpineGarments = ensemble.map((g) => ({
+    ...formatGarmentResponse(g),
+    rcl: g.garment_thermal_properties?.rcl_whole_body,
+  }));
 
   return NextResponse.json({
     conditions: {

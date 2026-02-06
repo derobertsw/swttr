@@ -139,7 +139,6 @@ export async function POST(request: NextRequest) {
     fetchUserHeadwear(supabase, userId),
   ]);
 
-  const selectedHandwear = selectHandwear(userHandwear, tempC, false);
   const selectedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, false);
 
   // Uphill Ensemble
@@ -218,6 +217,12 @@ export async function POST(request: NextRequest) {
     targetMin: targetCloRange[0],
     targetMax: targetCloRange[1],
   });
+  const selectedHandwear = selectHandwear(
+    userHandwear,
+    tempC,
+    false,
+    extremityIreqDownhill.neutral.hands
+  );
 
   return NextResponse.json({
     conditions: {

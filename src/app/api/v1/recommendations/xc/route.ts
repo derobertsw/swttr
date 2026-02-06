@@ -75,8 +75,22 @@ export async function POST(request: NextRequest) {
 
   const { categorized, userHandwear, userHeadwear } = prepared;
   const ensemble = buildXCEnsemble(categorized, regionalIreq, minEvapPotential);
+  const extremityIreq = scaleIreqShapeToTargetRange(
+    calculateExtremityIreq(ireq, 'xc_skiing', tempC, windMs),
+    {
+      ireqMin: ireq.ireqMin,
+      ireqNeutral: ireq.ireqNeutral,
+      targetMin: targetMinClo,
+      targetMax: maxClo,
+    }
+  );
 
-  const recommendedHandwear = selectHandwear(userHandwear, tempC, true);
+  const recommendedHandwear = selectHandwear(
+    userHandwear,
+    tempC,
+    true,
+    extremityIreq.neutral.hands
+  );
   const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, true, {
     includeHelmet: false,
   });
@@ -100,16 +114,6 @@ export async function POST(request: NextRequest) {
     },
     recommendedHandwear,
     recommendedHeadwear
-  );
-
-  const extremityIreq = scaleIreqShapeToTargetRange(
-    calculateExtremityIreq(ireq, 'xc_skiing', tempC, windMs),
-    {
-      ireqMin: ireq.ireqMin,
-      ireqNeutral: ireq.ireqNeutral,
-      targetMin: targetMinClo,
-      targetMax: maxClo,
-    }
   );
 
   return NextResponse.json({

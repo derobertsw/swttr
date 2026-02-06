@@ -59,8 +59,22 @@ export async function POST(request: NextRequest) {
 
   const { categorized, userHandwear, userHeadwear } = prepared;
   const ensemble = buildBikingEnsemble(categorized, ireq, maxClo, minEvapPotential);
+  const extremityIreq = scaleIreqShapeToTargetRange(
+    calculateExtremityIreq(ireq, 'biking', tempC, windMs),
+    {
+      ireqMin: ireq.ireqMin,
+      ireqNeutral: ireq.ireqNeutral,
+      targetMin: targetMinClo,
+      targetMax: maxClo,
+    }
+  );
 
-  const recommendedHandwear = selectHandwear(userHandwear, tempC, true);
+  const recommendedHandwear = selectHandwear(
+    userHandwear,
+    tempC,
+    true,
+    extremityIreq.neutral.hands
+  );
   const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, true);
 
   const response = buildResponseComponents(
@@ -90,16 +104,6 @@ export async function POST(request: NextRequest) {
     targetMin: targetMinClo,
     targetMax: maxClo,
   });
-  const extremityIreq = scaleIreqShapeToTargetRange(
-    calculateExtremityIreq(ireq, 'biking', tempC, windMs),
-    {
-      ireqMin: ireq.ireqMin,
-      ireqNeutral: ireq.ireqNeutral,
-      targetMin: targetMinClo,
-      targetMax: maxClo,
-    }
-  );
-
   return NextResponse.json({
     conditions: {
       temperature: `${weather.temperature}°F`,
