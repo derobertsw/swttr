@@ -5,8 +5,6 @@ import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib
 import {
   validateRecommendationRequest,
   sortByBreathability,
-  getEnsembleClo,
-  findBreathableGarment,
   selectHandwear,
   selectHeadwearByCategory,
   type GarmentRow,
@@ -53,6 +51,12 @@ export async function POST(request: NextRequest) {
   const targetMinClo = targetRange.min;
   const maxClo = targetRange.max;
   const minEvapPotential = 0.25;
+  const regionalIreq = scaleIreqShapeToTargetRange(calculateRegionalIreq(ireq, 'xc_skiing'), {
+    ireqMin: ireq.ireqMin,
+    ireqNeutral: ireq.ireqNeutral,
+    targetMin: targetMinClo,
+    targetMax: maxClo,
+  });
 
   const prepared = await prepareRouteData(validated, {
     activityFilter: { field: 'xc_skiing_score', minScore: 6 },
@@ -70,10 +74,12 @@ export async function POST(request: NextRequest) {
   }
 
   const { categorized, userHandwear, userHeadwear } = prepared;
-  const ensemble = buildXCEnsemble(categorized, ireq, maxClo, minEvapPotential);
+  const ensemble = buildXCEnsemble(categorized, regionalIreq, minEvapPotential);
 
   const recommendedHandwear = selectHandwear(userHandwear, tempC, true);
-  const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, true);
+  const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, true, {
+    includeHelmet: false,
+  });
 
   const response = buildResponseComponents(
     {
@@ -96,12 +102,6 @@ export async function POST(request: NextRequest) {
     recommendedHeadwear
   );
 
-  const regionalIreq = scaleIreqShapeToTargetRange(calculateRegionalIreq(ireq, 'xc_skiing'), {
-    ireqMin: ireq.ireqMin,
-    ireqNeutral: ireq.ireqNeutral,
-    targetMin: targetMinClo,
-    targetMax: maxClo,
-  });
   const extremityIreq = scaleIreqShapeToTargetRange(
     calculateExtremityIreq(ireq, 'xc_skiing', tempC, windMs),
     {
@@ -132,56 +132,142 @@ export async function POST(request: NextRequest) {
   });
 }
 
-function buildXCEnsemble(
+export function buildXCEnsemble(
   categorized: CategorizedGarments,
-  ireq: { ireqMin: number; ireqNeutral: number },
-  maxClo: number,
+  regionalIreq: { min: { torso: number; legs: number }; neutral: { torso: number; legs: number } },
   minEvapPotential: number
 ): GarmentRow[] {
+  type Region = "torso" | "legs";
+  const EPSILON = 1e-6;
+  const regions: Region[] = ["torso", "legs"];
   const ensemble: GarmentRow[] = [];
+  const selectedIds = new Set<string>();
+  const regionClo: Record<Region, number> = { torso: 0, legs: 0 };
+  const regionMax: Record<Region, number> = {
+    torso: regionalIreq.neutral.torso,
+    legs: regionalIreq.neutral.legs,
+  };
+  const regionMin: Record<Region, number> = {
+    torso: regionalIreq.min.torso,
+    legs: regionalIreq.min.legs,
+  };
 
-  const torsoBaseLayers = categorized.baseLayers.filter((g) => g.covers_torso);
-  const legsBaseLayers = categorized.baseLayers.filter((g) => g.covers_legs);
+  const coversRegion = (garment: GarmentRow, region: Region): boolean =>
+    region === "torso" ? garment.covers_torso : garment.covers_legs;
 
-  const sortedTorsoBases = sortByBreathability(torsoBaseLayers);
-  if (sortedTorsoBases.length > 0) {
-    const suitableBase = findBreathableGarment(sortedTorsoBases, minEvapPotential);
-    ensemble.push(suitableBase ?? sortedTorsoBases[0]);
-  }
-
-  const sortedLegsBases = sortByBreathability(legsBaseLayers);
-  if (sortedLegsBases.length > 0) {
-    const suitableBase = findBreathableGarment(sortedLegsBases, minEvapPotential);
-    if (!ensemble.some((g) => g.id === suitableBase?.id)) {
-      ensemble.push(suitableBase ?? sortedLegsBases[0]);
+  const getRegionalClo = (garment: GarmentRow, region: Region): number => {
+    const thermal = garment.garment_thermal_properties;
+    if (!thermal) return 0;
+    if (region === "torso") {
+      return thermal.rcl_torso ?? thermal.rcl_whole_body ?? 0;
     }
-  }
+    return thermal.rcl_legs ?? thermal.rcl_whole_body ?? 0;
+  };
 
-  let currentClo = getEnsembleClo(ensemble);
+  const sortByBreathabilityThenClo = (garments: GarmentRow[], region: Region): GarmentRow[] => {
+    return [...garments].sort((a, b) => {
+      const evapA = a.garment_thermal_properties?.evap_potential ?? 0;
+      const evapB = b.garment_thermal_properties?.evap_potential ?? 0;
+      if (evapB !== evapA) return evapB - evapA;
+      return getRegionalClo(a, region) - getRegionalClo(b, region);
+    });
+  };
 
-  if (currentClo < ireq.ireqMin && categorized.midLayers.length > 0) {
-    const sortedMids = sortByBreathability(categorized.midLayers);
-    for (const mid of sortedMids) {
-      const midClo = mid.garment_thermal_properties?.rcl_whole_body ?? 0;
-      if (currentClo + midClo <= maxClo) {
-        ensemble.push(mid);
-        currentClo += midClo;
-        break;
+  const canFitRegionalBudget = (garment: GarmentRow): boolean => {
+    return regions.every((region) => {
+      if (!coversRegion(garment, region)) return true;
+      return regionClo[region] + getRegionalClo(garment, region) <= regionMax[region] + EPSILON;
+    });
+  };
+
+  const tryAddGarment = (garment: GarmentRow | undefined): boolean => {
+    if (!garment) return false;
+    if (selectedIds.has(garment.id)) return false;
+    if (!canFitRegionalBudget(garment)) return false;
+
+    ensemble.push(garment);
+    selectedIds.add(garment.id);
+    for (const region of regions) {
+      if (coversRegion(garment, region)) {
+        regionClo[region] += getRegionalClo(garment, region);
       }
     }
+    return true;
+  };
+
+  const getMinimumRegionalClo = (candidates: GarmentRow[], region: Region): number | null => {
+    const relevant = candidates
+      .filter((g) => coversRegion(g, region))
+      .map((g) => getRegionalClo(g, region))
+      .filter((clo) => clo > 0);
+    if (relevant.length === 0) return null;
+    return Math.min(...relevant);
+  };
+
+  const addBestLayerForRegion = (
+    candidates: GarmentRow[],
+    region: Region,
+    reserveForRegion = 0
+  ): void => {
+    const otherRegion: Region = region === "torso" ? "legs" : "torso";
+    const regionCandidates = candidates.filter((g) => coversRegion(g, region));
+    const singleRegionCandidates = regionCandidates.filter((g) => !coversRegion(g, otherRegion));
+    const multiRegionCandidates = regionCandidates.filter((g) => coversRegion(g, otherRegion));
+    const sorted = [
+      ...sortByBreathabilityThenClo(singleRegionCandidates, region),
+      ...sortByBreathabilityThenClo(multiRegionCandidates, region),
+    ];
+
+    const tryFromList = (list: GarmentRow[], requireBreathable: boolean): boolean => {
+      for (const garment of list) {
+        if (requireBreathable) {
+          const evap = garment.garment_thermal_properties?.evap_potential ?? 0;
+          if (evap < minEvapPotential) continue;
+        }
+        const nextRegionClo = regionClo[region] + getRegionalClo(garment, region);
+        if (nextRegionClo + reserveForRegion > regionMax[region] + EPSILON) continue;
+        if (tryAddGarment(garment)) return true;
+      }
+      return false;
+    };
+
+    if (tryFromList(sorted, true)) return;
+    if (tryFromList(sorted, false)) return;
+
+    for (const garment of sorted) {
+      const evap = garment.garment_thermal_properties?.evap_potential ?? 0;
+      if (evap >= minEvapPotential && tryAddGarment(garment)) return;
+    }
+  };
+
+  // Select base layer per region
+  for (const region of regions) {
+    const minMidClo = getMinimumRegionalClo(
+      [...categorized.midLayers, ...categorized.insulation],
+      region
+    ) ?? 0;
+    const minShellClo = getMinimumRegionalClo(categorized.shells, region) ?? 0;
+    addBestLayerForRegion(categorized.baseLayers, region, minMidClo + minShellClo);
   }
 
+  // Select mid layer per region; prioritize regions under minimum
+  const midCandidates = [...categorized.midLayers, ...categorized.insulation];
+  for (const region of regions) {
+    const minShellClo = getMinimumRegionalClo(categorized.shells, region) ?? 0;
+    addBestLayerForRegion(midCandidates, region, minShellClo);
+  }
+
+  // Select shell per region independently
   if (categorized.shells.length > 0) {
     const breathableShells = categorized.shells.filter(
       (s) => (s.garment_thermal_properties?.evap_potential ?? 0) >= 0.20
     );
     const shellCandidates = breathableShells.length > 0 ? breathableShells : categorized.shells;
-    const sortedShells = sortByBreathability(shellCandidates);
-    if (sortedShells.length > 0) {
-      const shell = sortedShells[0];
-      const shellClo = shell.garment_thermal_properties?.rcl_whole_body ?? 0;
-      if (currentClo + shellClo <= maxClo) {
-        ensemble.push(shell);
+    for (const region of regions) {
+      const regionShells = shellCandidates.filter((s) => coversRegion(s, region));
+      const sortedShells = sortByBreathability(regionShells);
+      for (const shell of sortedShells) {
+        if (tryAddGarment(shell)) break;
       }
     }
   }

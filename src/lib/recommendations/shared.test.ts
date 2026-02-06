@@ -62,11 +62,12 @@ describe('categorizeGarments', () => {
     const garments = [
       createMockGarment({ id: '1', category: 'insulation_synthetic' }),
       createMockGarment({ id: '2', category: 'insulation_down' }),
+      createMockGarment({ id: '3', category: 'outer_insulated' }),
     ];
 
     const result = categorizeGarments(garments);
 
-    expect(result.insulation).toHaveLength(2);
+    expect(result.insulation).toHaveLength(3);
   });
 
   it('should categorize shells correctly', () => {

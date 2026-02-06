@@ -24,6 +24,7 @@ export const CATEGORY_TO_LAYER_TYPE: Record<string, LayerType> = {
   mid_layer_heavy: "mid",
   insulation_synthetic: "mid",
   insulation_down: "mid",
+  outer_insulated: "mid",
   soft_shell: "outer",
   hard_shell: "outer",
   windbreaker: "outer",

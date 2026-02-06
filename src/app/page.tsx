@@ -97,6 +97,7 @@ const HomeContent = () => {
       ) : (
         <>
           <LayerDisplay
+            activity={activity}
             recommendation={recommendation}
             temperature={temperature}
             windspeed={windspeed}

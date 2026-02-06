@@ -26,6 +26,7 @@ import {
 } from "@/components/layers";
 
 interface LayerDisplayProps {
+  activity?: string;
   recommendation: Recommendation | null;
   temperature: number;
   windspeed: number;
@@ -50,7 +51,8 @@ function getCloValues(
   regionalIreq: RegionalIreqRange | undefined,
   extremityIreq: ExtremityIreqRange | undefined,
   handwear: RecommendedHandwear | null | undefined,
-  headwear: RecommendedHeadwear | null | undefined
+  headwear: RecommendedHeadwear | null | undefined,
+  includeHelmetClo = true
 ): CloValues {
   const region = BODY_PART_TO_REGION[bodyPart];
   const extremity = BODY_PART_TO_EXTREMITY[bodyPart];
@@ -69,7 +71,7 @@ function getCloValues(
       currentClo = handwear.rcl;
     } else if (extremity === "head" && headwear) {
       currentClo =
-        (headwear.helmet?.rcl ?? 0) +
+        (includeHelmetClo ? (headwear.helmet?.rcl ?? 0) : 0) +
         (headwear.head_warmth?.rcl ?? 0) +
         (headwear.neck_warmth?.rcl ?? 0);
     }
@@ -88,6 +90,7 @@ function getCloValues(
  * Supports both static recommendations and biophysics-based recommendations.
  */
 const LayerDisplay = ({
+  activity,
   recommendation,
   temperature,
   windspeed,
@@ -103,7 +106,10 @@ const LayerDisplay = ({
 
   const biophysicsGarments = biophysicsData?.recommendation?.garments;
   const handwear = biophysicsData?.recommendation?.handwear;
-  const headwear = biophysicsData?.recommendation?.headwear;
+  const shouldIgnoreHelmetForClo = activity === "xc-skiing";
+  const headwear = shouldIgnoreHelmetForClo && biophysicsData?.recommendation?.headwear
+    ? { ...biophysicsData.recommendation.headwear, helmet: null }
+    : biophysicsData?.recommendation?.headwear;
   const regionalClo = biophysicsData?.recommendation?.ensemble_properties?.regional_clo;
   const totalClo = biophysicsData?.recommendation?.ensemble_properties?.total_clo;
   const regionalIreq = biophysicsData?.ireq?.regional;
@@ -147,7 +153,8 @@ const LayerDisplay = ({
             regionalIreq,
             extremityIreq,
             handwear,
-            headwear
+            headwear,
+            !shouldIgnoreHelmetForClo
           );
 
           return (

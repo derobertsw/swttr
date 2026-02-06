@@ -479,6 +479,21 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("0.3/1.3 clo")).toBeInTheDocument();
     });
 
+    it("should exclude helmet insulation from head/neck clo for xc skiing", () => {
+      render(
+        <LayerDisplay
+          activity="xc-skiing"
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      expect(screen.queryByText("Helmet")).not.toBeInTheDocument();
+      expect(screen.getByText("0.4/0.6 clo")).toBeInTheDocument();
+    });
+
     it("should display layer labels for biophysics garments", () => {
       render(
         <LayerDisplay

@@ -5,7 +5,7 @@ import type { GarmentRow, CategorizedGarments } from './types';
 
 const BASE_LAYER_CATEGORIES = ['base_layer'];
 const MID_LAYER_CATEGORIES = ['mid_layer_light', 'mid_layer_heavy'];
-const INSULATION_CATEGORIES = ['insulation_synthetic', 'insulation_down'];
+const INSULATION_CATEGORIES = ['insulation_synthetic', 'insulation_down', 'outer_insulated'];
 const SHELL_CATEGORIES = ['soft_shell', 'hard_shell', 'windbreaker'];
 
 /**

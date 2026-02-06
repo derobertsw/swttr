@@ -66,9 +66,13 @@ export function selectHeadwear(
 export function selectHeadwearByCategory(
   headwear: HeadwearRow[],
   tempC: number,
-  isActive: boolean
+  isActive: boolean,
+  options?: { includeHelmet?: boolean }
 ): HeadwearRecommendations {
-  const helmets = headwear.filter((h) => HELMET_TYPES.includes(h.headwear_type));
+  const includeHelmet = options?.includeHelmet ?? true;
+  const helmets = includeHelmet
+    ? headwear.filter((h) => HELMET_TYPES.includes(h.headwear_type))
+    : [];
   const headWarmthItems = headwear.filter((h) => HEAD_WARMTH_TYPES.includes(h.headwear_type));
   const neckWarmthItems = headwear.filter((h) => NECK_WARMTH_TYPES.includes(h.headwear_type));
 
