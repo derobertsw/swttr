@@ -3,8 +3,6 @@ import {
   calculateIreq,
   fahrenheitToCelsius,
   mphToMs,
-  celsiusToFahrenheit,
-  msToMph,
 } from '@/lib/biophysics/ireq';
 import { METABOLIC_RATES } from '@/lib/biophysics/constants';
 

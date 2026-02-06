@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 interface ThermalGaugeProps {
   totalClo: number | undefined;
   targetRange: [number, number] | undefined;
@@ -40,6 +44,12 @@ function calculateThermalPosition(
  * Uses color gradient and marker to communicate thermal comfort at a glance.
  */
 export function ThermalGauge({ totalClo, targetRange }: ThermalGaugeProps) {
+  const [markerReady, setMarkerReady] = useState(false);
+
+  useEffect(() => {
+    setMarkerReady(true);
+  }, []);
+
   if (totalClo === undefined || !targetRange) return null;
 
   const [targetMin, targetNeutral] = targetRange;
@@ -78,7 +88,10 @@ export function ThermalGauge({ totalClo, targetRange }: ThermalGaugeProps) {
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center"
           style={{
             left: `${markerPercent}%`,
-            animation: "gauge-thumb-enter 0.4s ease-out",
+            opacity: markerReady ? 1 : 0,
+            transition: markerReady
+              ? "left 240ms ease-out, opacity 120ms ease-out"
+              : "none",
           }}
         >
           <div

@@ -236,7 +236,7 @@ export function ItemMappingEditor({
           <DialogHeader>
             <DialogTitle>Set Custom Name</DialogTitle>
             <DialogDescription>
-              Replace "{editing?.standardOption}" with your own gear name.
+              Replace &quot;{editing?.standardOption}&quot; with your own gear name.
             </DialogDescription>
           </DialogHeader>
           <Input

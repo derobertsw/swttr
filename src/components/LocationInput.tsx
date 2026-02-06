@@ -30,7 +30,7 @@ export function LocationInput({
   onSelectLocation,
 }: LocationInputProps) {
   return (
-    <div className="w-[300px]">
+    <div className="w-full max-w-sm">
       <LocationAutocomplete
         label={`Where are you ${activityName}?`}
         location={location}

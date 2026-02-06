@@ -3,13 +3,15 @@
  * Common Tailwind class patterns used throughout the app
  */
 
-// Frosted glass input styling
-export const FROSTED_INPUT = "bg-white/15 backdrop-blur-sm border-white/40 text-white/70";
-export const FROSTED_INPUT_PLACEHOLDER = "placeholder:text-white/70";
+// Frosted glass input styling with stronger contrast for outdoor readability
+export const FROSTED_INPUT =
+  "bg-white/22 backdrop-blur-md border-white/60 text-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]";
+export const FROSTED_INPUT_PLACEHOLDER = "placeholder:text-white/80";
 export const FROSTED_INPUT_FULL = `${FROSTED_INPUT} ${FROSTED_INPUT_PLACEHOLDER}`;
 
 // Suggestions dropdown styling
-export const SUGGESTIONS_DROPDOWN = "bg-background border rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.3)]";
+export const SUGGESTIONS_DROPDOWN =
+  "bg-white/95 text-slate-900 border border-white/60 backdrop-blur-xl rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.35)]";
 
 // Card shadow
 export const CARD_SHADOW = "shadow-[0_5px_14px_rgba(0,0,0,0.3)]";

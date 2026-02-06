@@ -204,31 +204,6 @@ export function calculateExtremityIreq(
 }
 
 /**
- * Estimate duration limited exposure (hours).
- * Simplified model based on USARIEM research.
- *
- * @param ireqMin - The minimum required insulation in clo
- * @param availableClo - The available clothing insulation in clo
- */
-function calculateDle(
-  ireqMin: number,
-  availableClo: number
-): number {
-  const cloDeficit = ireqMin - availableClo;
-
-  if (cloDeficit <= 0) {
-    return Infinity; // No time limit
-  }
-
-  // Rough approximation: every 0.5 clo deficit = ~1 hour less exposure
-  // at moderate activity in cold conditions
-  const baseHours = 8.0;
-  const dle = baseHours - cloDeficit * 2;
-
-  return Math.max(0.5, dle); // Minimum 30 minutes
-}
-
-/**
  * Convert Fahrenheit to Celsius
  */
 export function fahrenheitToCelsius(f: number): number {

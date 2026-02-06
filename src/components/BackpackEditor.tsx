@@ -5,6 +5,7 @@ import { Plus, X, PackagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BackpackItem } from "@/types/recommendations";
+import { FROSTED_INPUT, FROSTED_INPUT_FULL } from "@/lib/styling";
 
 interface BackpackEditorProps {
   items: BackpackItem[];
@@ -47,20 +48,20 @@ export function BackpackEditor({
     <div className="flex flex-col gap-5">
       <div className="flex gap-3">
         <div className="relative flex-1">
-          <PackagePlus className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <PackagePlus className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/70" />
           <Input
             placeholder="Add custom item..."
             value={newItem}
             onChange={(e) => setNewItem(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="pl-10 h-12 bg-white/15 backdrop-blur-sm border-white/40 text-white/70 placeholder:text-white/70"
+            className={`pl-10 h-12 ${FROSTED_INPUT_FULL}`}
           />
         </div>
         <Button
           onClick={handleAdd}
           size="icon"
           variant="outline"
-          className="h-12 w-12 bg-white/15 backdrop-blur-sm border-white/40 text-white/70 hover:bg-white/25 hover:text-white"
+          className={`h-12 w-12 ${FROSTED_INPUT} hover:bg-white/30 hover:text-white`}
         >
           <Plus className="size-5" />
         </Button>

@@ -23,7 +23,6 @@ export function MobileTabBar() {
   const pathname = usePathname();
   const router = useRouter();
   const [isGearUpLoading, setIsGearUpLoading] = useState(false);
-  const [activityName, setActivityName] = useState<string>("");
   const [activityValue, setActivityValue] = useState<string>("");
   const [isFabPulse, setIsFabPulse] = useState(false);
   const {
@@ -56,23 +55,17 @@ export function MobileTabBar() {
     const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.LAST_ACTIVITY) : null;
     if (stored) {
       setActivityValue(stored);
-      const storedName = ACTIVITIES.find((item) => item.value === stored)?.name ?? "";
-      setActivityName(storedName);
       return;
     }
     if (defaultActivity) {
       setActivityValue(defaultActivity);
-      const defaultName = ACTIVITIES.find((item) => item.value === defaultActivity)?.name ?? "";
-      setActivityName(defaultName);
     }
   }, [activityValue, defaultActivity]);
 
   useEffect(() => {
     const onActivityChange = (event: Event) => {
       const detail = (event as CustomEvent<{ name?: string; value?: string }>).detail;
-      const nextName = detail?.name ?? "";
       const nextValue = detail?.value ?? "";
-      setActivityName(nextName);
       setActivityValue(nextValue);
       setIsFabPulse(true);
       window.setTimeout(() => setIsFabPulse(false), 180);
@@ -80,17 +73,6 @@ export function MobileTabBar() {
     window.addEventListener("activityChange", onActivityChange);
     return () => window.removeEventListener("activityChange", onActivityChange);
   }, []);
-
-  const activityShort = useMemo(() => {
-    const resolvedName =
-      activityName || ACTIVITIES.find((item) => item.value === activityValue)?.name || "";
-    if (!resolvedName) return "";
-    if (resolvedName.includes("Hiking")) return "Hiking";
-    if (resolvedName.includes("Backcountry")) return "Backcountry";
-    if (resolvedName.includes("Alpine")) return "Alpine";
-    if (resolvedName.includes("XC")) return "XC";
-    return resolvedName.split(" ")[0];
-  }, [activityName, activityValue]);
 
   const ActivityGlyph = useMemo(() => {
     const match = ACTIVITIES.find((item) => item.value === activityValue);

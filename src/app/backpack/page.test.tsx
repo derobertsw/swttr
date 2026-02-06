@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen } from "@testing-library/react";
 import Backpack from "./page";
 
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
   usePathname: () => "/backpack",
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+}));
+
+// Keep page tests focused on page content and avoid layout side effects.
+vi.mock("@/components/PageLayout", () => ({
+  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 // Mock Clerk components

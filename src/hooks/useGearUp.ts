@@ -58,7 +58,7 @@ export function useGearUp() {
     }
   }, [searchParams]);
 
-  const getRecommendation = (temp: number): Recommendation | null => {
+  const getRecommendation = useCallback((temp: number): Recommendation | null => {
     const tempRange = getAdjustedTempRange(temp, sensitivity);
     const activityData =
       layerRecommendations[activity as keyof typeof layerRecommendations];
@@ -70,7 +70,7 @@ export function useGearUp() {
       }
     }
     return null;
-  };
+  }, [activity, sensitivity]);
 
   const resetToInitialState = useCallback(() => {
     setActivity(defaultActivity);
@@ -88,7 +88,7 @@ export function useGearUp() {
     setBiophysicsData(null);
   }, [locationSearch, defaultActivity, biophysics]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!activity) {
       toast.error("Please select an activity");
       return;
@@ -191,7 +191,19 @@ export function useGearUp() {
       }
       setLoading(false);
     }
-  };
+  }, [
+    activity,
+    biophysics,
+    date,
+    getRecommendation,
+    inputMode,
+    locationDenied,
+    locationSearch,
+    showSliders,
+    temperature,
+    time,
+    windspeed,
+  ]);
 
   // Listen for gearUp events from navigation
   useEffect(() => {

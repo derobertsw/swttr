@@ -7,6 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import { BackpackEditor } from "@/components/BackpackEditor";
 import { useBackpack } from "@/hooks/useBackpack";
 import { BACKPACK_ACTIVITIES } from "@/data/backpackConstants";
+import { FROSTED_INPUT } from "@/lib/styling";
 
 // Convert slider values to temp range string
 function toTempRange(min: number, max: number): string {
@@ -47,7 +48,7 @@ export default function Backpack() {
 
         <div className="flex flex-col gap-4">
           <Select value={activity} onValueChange={setActivity}>
-            <SelectTrigger className="w-[220px] h-12 bg-white/15 backdrop-blur-sm border-white/40 text-white/70">
+            <SelectTrigger className={`h-12 w-full max-w-sm ${FROSTED_INPUT}`}>
               <SelectValue placeholder="Activity" />
             </SelectTrigger>
             <SelectContent className="rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.3)]">

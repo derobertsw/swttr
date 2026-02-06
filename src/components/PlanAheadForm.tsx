@@ -48,7 +48,7 @@ export function PlanAheadForm({
   onSelectLocation,
 }: PlanAheadFormProps) {
   return (
-    <div className="flex flex-col gap-6 w-[300px]">
+    <div className="flex w-full max-w-sm flex-col gap-6">
       <LocationAutocomplete
         label="Location"
         location={location}
@@ -91,7 +91,7 @@ export function PlanAheadForm({
             type="time"
             value={time}
             onChange={(e) => onTimeChange(e.target.value)}
-            className={`w-[120px] h-12 ${FROSTED_INPUT}`}
+            className={`h-12 w-28 sm:w-32 ${FROSTED_INPUT}`}
           />
         </div>
       </div>

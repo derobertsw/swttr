@@ -104,7 +104,7 @@ export default function WeatherSelection({
   );
 
   return (
-    <div className="flex flex-col gap-6 w-[300px]">
+    <div className="flex w-full max-w-sm flex-col gap-6">
       <WeatherSlider
         id="temperature"
         label="Temperature"
@@ -123,15 +123,16 @@ export default function WeatherSelection({
         unit=" mph"
         onChange={onWindspeedChange}
       />
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Button
           variant="outline"
           onClick={fetchCurrentWeather}
           disabled={loading}
+          className="w-full sm:flex-1"
         >
           {loading ? "Loading..." : "Current Weather"}
         </Button>
-        <Button variant="outline" onClick={onPlanAhead}>
+        <Button variant="outline" onClick={onPlanAhead} className="w-full sm:flex-1">
           Plan Ahead
         </Button>
       </div>

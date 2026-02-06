@@ -43,7 +43,7 @@ export function LocationAutocomplete({
         </label>
       )}
       <div className="relative" ref={suggestionRef}>
-        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/75 z-10" />
         <Input
           id={id}
           placeholder={placeholder}

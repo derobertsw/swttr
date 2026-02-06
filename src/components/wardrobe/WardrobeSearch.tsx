@@ -26,7 +26,7 @@ export function WardrobeSearch({
   return (
     <div className="relative">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/70" />
         <Input
           placeholder="Search gear to add..."
           value={search}
