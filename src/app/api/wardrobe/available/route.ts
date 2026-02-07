@@ -1,6 +1,23 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 
+function extractRclWholeBody(
+  thermalData: unknown
+): number | undefined {
+  const data = Array.isArray(thermalData) ? thermalData[0] : thermalData;
+  if (!data || typeof data !== "object") return undefined;
+
+  const raw = (data as { rcl_whole_body?: unknown }).rcl_whole_body;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+
+  if (typeof raw === "string") {
+    const parsed = Number.parseFloat(raw);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return undefined;
+}
+
 /**
  * GET /api/wardrobe/available
  * Get all available calibrated items (garments, handwear, headwear)
@@ -40,7 +57,7 @@ export async function GET() {
         model_name: g.model_name,
         category: g.category,
         garment_type: g.garment_type,
-        rcl_clo: g.garment_thermal_properties?.[0]?.rcl_whole_body,
+        rcl_clo: extractRclWholeBody(g.garment_thermal_properties),
       })),
       ...(handwearResult.data || []).map((h) => ({
         id: h.id,

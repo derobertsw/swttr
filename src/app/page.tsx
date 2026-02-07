@@ -3,7 +3,6 @@
 import { Suspense } from "react";
 import PageLayout from "@/components/PageLayout";
 import ActivitySelection from "@/components/ActivitySelection";
-import WeatherSelection from "@/components/WeatherSelection";
 import LayerDisplay from "@/components/LayerDisplay";
 import { PlanAheadForm } from "@/components/PlanAheadForm";
 import { LocationInput } from "@/components/LocationInput";
@@ -17,14 +16,10 @@ const HomeContent = () => {
     activity,
     setActivity,
     temperature,
-    setTemperature,
     windspeed,
-    setWindspeed,
     recommendation,
     showResults,
-    showSliders,
     inputMode,
-    setInputMode,
     date,
     setDate,
     time,
@@ -58,14 +53,6 @@ const HomeContent = () => {
               onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
               onSelectLocation={locationSearch.handleSelectLocation}
               onDismiss={locationSearch.dismiss}
-            />
-          ) : inputMode === "manual" && showSliders ? (
-            <WeatherSelection
-              temperature={temperature}
-              windspeed={windspeed}
-              onTemperatureChange={setTemperature}
-              onWindspeedChange={setWindspeed}
-              onPlanAhead={() => setInputMode("planAhead")}
             />
           ) : inputMode === "planAhead" ? (
             <PlanAheadForm

@@ -1,3 +1,8 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 import { Recommendation } from "@/types/recommendations";
 import {
   BiophysicsRecommendation,
@@ -15,7 +20,12 @@ import {
   BODY_PART_TO_EXTREMITY,
   garmentsToLayerSet,
   createEmptyLayerSet,
+  CATEGORY_TO_LAYER_TYPE,
+  LAYER_LABELS,
 } from "@/lib/layers";
+import type { AvailableItem } from "@/types/wardrobe";
+import { STORAGE_KEYS } from "@/lib/storage";
+import { logWarn } from "@/lib/logger";
 import {
   WeatherHeader,
   ThermalGauge,
@@ -36,6 +46,191 @@ interface LayerDisplayProps {
 interface CloValues {
   currentClo: number | undefined;
   targetClo: number | undefined;
+}
+
+interface WardrobePurchaseSuggestion {
+  id: string;
+  name: string;
+  category: string;
+  layerType: "base" | "mid" | "outer";
+  targetArea: "Torso" | "Legs";
+  rcl: number;
+}
+
+const LEGS_GARMENT_TYPES = new Set(["pants", "shorts", "bib"]);
+
+const TORSO_CATEGORY_PRIORITY: Record<string, number> = {
+  base_layer: 90,
+  mid_layer_heavy: 100,
+  mid_layer_light: 85,
+  insulation_synthetic: 95,
+  insulation_down: 95,
+  outer_insulated: 92,
+  soft_shell: 55,
+  hard_shell: 45,
+  windbreaker: 35,
+};
+
+const LEGS_CATEGORY_PRIORITY: Record<string, number> = {
+  base_layer: 95,
+  mid_layer_heavy: 80,
+  mid_layer_light: 70,
+  insulation_synthetic: 65,
+  insulation_down: 60,
+  outer_insulated: 75,
+  soft_shell: 50,
+  hard_shell: 40,
+  windbreaker: 30,
+};
+
+function getItemClo(item: AvailableItem): number | null {
+  const raw = item.rcl_clo as unknown;
+
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw;
+  }
+
+  if (typeof raw === "string") {
+    const parsed = Number.parseFloat(raw);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function parseCloDeficitFromWarning(warning: string | undefined): number {
+  if (!warning) return 0;
+
+  const match = warning.match(/([0-9]+(?:\.[0-9]+)?)\s*clo\s*vs\s*([0-9]+(?:\.[0-9]+)?)\s*clo/i);
+  if (!match) return 0;
+
+  const current = Number.parseFloat(match[1]);
+  const required = Number.parseFloat(match[2]);
+  if (!Number.isFinite(current) || !Number.isFinite(required)) return 0;
+
+  return Math.max(0, required - current);
+}
+
+function getCategoryPriority(category: string, area: "torso" | "legs"): number {
+  return area === "torso"
+    ? (TORSO_CATEGORY_PRIORITY[category] ?? 20)
+    : (LEGS_CATEGORY_PRIORITY[category] ?? 20);
+}
+
+function getLayerType(category: string): "base" | "mid" | "outer" {
+  const mapped = CATEGORY_TO_LAYER_TYPE[category];
+  return mapped ?? "mid";
+}
+
+function isLegsGarment(item: AvailableItem): boolean {
+  if (item.type !== "garment") return false;
+  if (!item.garment_type) return false;
+  return LEGS_GARMENT_TYPES.has(item.garment_type);
+}
+
+function formatCategoryLabel(category: string): string {
+  return category
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function buildSuggestion(item: AvailableItem, area: "torso" | "legs"): WardrobePurchaseSuggestion {
+  const clo = getItemClo(item) ?? 0;
+
+  return {
+    id: item.id,
+    name: `${item.brand} ${item.model_name}`.trim(),
+    category: item.category,
+    layerType: getLayerType(item.category),
+    targetArea: area === "torso" ? "Torso" : "Legs",
+    rcl: clo,
+  };
+}
+
+function pickItemsForDeficit(
+  candidates: AvailableItem[],
+  area: "torso" | "legs",
+  deficit: number,
+  maxItems: number,
+  usedIds: Set<string>
+): WardrobePurchaseSuggestion[] {
+  if (deficit <= 0 || maxItems <= 0) return [];
+
+  const picks: WardrobePurchaseSuggestion[] = [];
+  let remaining = deficit;
+
+  while (picks.length < maxItems) {
+    const available = candidates.filter((item) => {
+      if (usedIds.has(item.id)) return false;
+      const clo = getItemClo(item);
+      return clo !== null && clo > 0;
+    });
+
+    if (available.length === 0) break;
+
+    available.sort((a, b) => {
+      const aPriority = getCategoryPriority(a.category, area);
+      const bPriority = getCategoryPriority(b.category, area);
+      const aClo = getItemClo(a) ?? 0;
+      const bClo = getItemClo(b) ?? 0;
+
+      const aDistance = aClo > remaining
+        ? (aClo - remaining) * 1.2
+        : (remaining - aClo);
+      const bDistance = bClo > remaining
+        ? (bClo - remaining) * 1.2
+        : (remaining - bClo);
+
+      const aCost = aDistance + ((100 - aPriority) / 100) * 0.25;
+      const bCost = bDistance + ((100 - bPriority) / 100) * 0.25;
+
+      if (aCost !== bCost) return aCost - bCost;
+      if (aDistance !== bDistance) return aDistance - bDistance;
+      if (aPriority !== bPriority) return bPriority - aPriority;
+      return bClo - aClo;
+    });
+
+    const best = available[0];
+    const bestClo = getItemClo(best) ?? 0;
+    usedIds.add(best.id);
+    picks.push(buildSuggestion(best, area));
+    remaining = Math.max(0, remaining - bestClo);
+
+    if (remaining <= 0.05) break;
+  }
+
+  return picks;
+}
+
+function buildWardrobeGapSuggestions(
+  availableItems: AvailableItem[],
+  ownedItemIds: Set<string>,
+  totalDeficit: number,
+  torsoDeficit: number,
+  legsDeficit: number
+): WardrobePurchaseSuggestion[] {
+  const candidates = availableItems.filter((item) => {
+    if (item.type !== "garment") return false;
+    if (ownedItemIds.has(item.id)) return false;
+    const clo = getItemClo(item);
+    return clo !== null && clo > 0;
+  });
+
+  const torsoCandidates = candidates.filter((item) => !isLegsGarment(item));
+  const legsCandidates = candidates.filter(isLegsGarment);
+
+  const fallbackTorsoDeficit = totalDeficit > 0 ? totalDeficit * 0.7 : 0;
+  const fallbackLegsDeficit = totalDeficit > 0 ? totalDeficit * 0.3 : 0;
+  const torsoNeed = Math.max(0, torsoDeficit, fallbackTorsoDeficit);
+  const legsNeed = Math.max(0, legsDeficit, fallbackLegsDeficit);
+
+  const usedIds = new Set<string>();
+  const torsoPicks = pickItemsForDeficit(torsoCandidates, "torso", torsoNeed, 2, usedIds);
+  const legsPicks = pickItemsForDeficit(legsCandidates, "legs", legsNeed, 1, usedIds);
+
+  return [...torsoPicks, ...legsPicks].slice(0, 3);
 }
 
 /**
@@ -93,8 +288,6 @@ const LayerDisplay = ({
   itemMappings,
   biophysicsData,
 }: LayerDisplayProps) => {
-  if (!recommendation && !biophysicsData) return null;
-
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
 
   const biophysicsGarments = biophysicsData?.recommendation?.garments;
@@ -107,6 +300,101 @@ const LayerDisplay = ({
   const totalClo = biophysicsData?.recommendation?.ensemble_properties?.total_clo;
   const regionalIreq = biophysicsData?.ireq?.regional;
   const extremityIreq = biophysicsData?.ireq?.extremity;
+  const wardrobeGapWarning = biophysicsData?.warnings?.find((warning) => {
+    const normalized = warning.toLowerCase();
+    return normalized.includes("insufficient overall insulation") || normalized.includes("heat loss risk");
+  });
+  const targetMinClo = biophysicsData?.ireq?.target_range?.[0];
+  const computedTotalDeficit =
+    targetMinClo !== undefined && totalClo !== undefined
+      ? Math.max(0, targetMinClo - totalClo)
+      : 0;
+  const warningDeficit = parseCloDeficitFromWarning(wardrobeGapWarning);
+  const totalDeficit = Math.max(computedTotalDeficit, warningDeficit);
+  const torsoDeficit =
+    regionalIreq?.neutral?.torso !== undefined && regionalClo?.torso !== undefined
+      ? Math.max(0, regionalIreq.neutral.torso - regionalClo.torso)
+      : 0;
+  const legsDeficit =
+    regionalIreq?.neutral?.legs !== undefined && regionalClo?.legs !== undefined
+      ? Math.max(0, regionalIreq.neutral.legs - regionalClo.legs)
+      : 0;
+
+  const [purchaseSuggestions, setPurchaseSuggestions] = useState<WardrobePurchaseSuggestion[]>([]);
+  const [purchaseSuggestionsLoading, setPurchaseSuggestionsLoading] = useState(false);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!wardrobeGapWarning || totalDeficit <= 0) {
+      setPurchaseSuggestions([]);
+      setPurchaseSuggestionsLoading(false);
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    const fetchSuggestions = async () => {
+      setPurchaseSuggestionsLoading(true);
+      try {
+        const availableResponse = await fetch("/api/wardrobe/available");
+        if (!availableResponse.ok) {
+          throw new Error(`Failed to fetch available wardrobe items (${availableResponse.status})`);
+        }
+
+        const availablePayload = await availableResponse.json() as { items?: AvailableItem[] };
+        const availableItems = Array.isArray(availablePayload.items) ? availablePayload.items : [];
+
+        const userId = localStorage.getItem(STORAGE_KEYS.USER_ID);
+        const ownedItemIds = new Set<string>();
+
+        if (userId) {
+          const wardrobeResponse = await fetch("/api/wardrobe/gear", {
+            headers: { "x-user-id": userId },
+          });
+
+          if (wardrobeResponse.ok) {
+            const wardrobePayload = await wardrobeResponse.json() as {
+              items?: Array<{ item_id?: string }>;
+            };
+
+            for (const item of wardrobePayload.items ?? []) {
+              if (item.item_id) ownedItemIds.add(item.item_id);
+            }
+          }
+        }
+
+        const suggestions = buildWardrobeGapSuggestions(
+          availableItems,
+          ownedItemIds,
+          totalDeficit,
+          torsoDeficit,
+          legsDeficit
+        );
+
+        if (!isCancelled) {
+          setPurchaseSuggestions(suggestions);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setPurchaseSuggestions([]);
+        }
+        logWarn("LayerDisplay.fetchWardrobeGapSuggestions", error);
+      } finally {
+        if (!isCancelled) {
+          setPurchaseSuggestionsLoading(false);
+        }
+      }
+    };
+
+    void fetchSuggestions();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [wardrobeGapWarning, totalDeficit, torsoDeficit, legsDeficit]);
+
+  if (!recommendation && !biophysicsData) return null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -128,6 +416,58 @@ const LayerDisplay = ({
         targetRange={biophysicsData?.ireq?.target_range}
         regionalClo={regionalClo}
       />
+
+      {wardrobeGapWarning && (
+        <div className="rounded-lg border-l-4 border-l-rose-500 border border-rose-200 bg-rose-50 px-4 py-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="size-4 mt-0.5 flex-shrink-0 text-rose-500" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-rose-800">Wardrobe Gap Detected</p>
+              <p className="text-sm text-rose-700 mt-0.5">{wardrobeGapWarning}</p>
+              <p className="text-sm text-rose-700 mt-2">
+                Add warmer base or mid layers in your wardrobe so future recommendations can meet target insulation.
+              </p>
+              {purchaseSuggestionsLoading ? (
+                <p className="text-sm text-rose-700 mt-3">
+                  Finding purchasable items in the wardrobe database...
+                </p>
+              ) : purchaseSuggestions.length > 0 ? (
+                <div className="mt-3 rounded-md border border-rose-200 bg-white/70 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-rose-800">
+                    Suggested Gear To Buy
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {purchaseSuggestions.map((item) => (
+                      <li key={item.id} className="text-sm text-rose-700 leading-relaxed">
+                        <span className="font-semibold">{item.name}</span>
+                        <span>
+                          {" · "}
+                          {item.targetArea} {LAYER_LABELS[item.layerType]}
+                          {" · "}
+                          {formatCategoryLabel(item.category)}
+                          {" · +"}
+                          {item.rcl.toFixed(2)}
+                          {" clo"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-sm text-rose-700 mt-3">
+                  No purchasable layer items were found in the current wardrobe database.
+                </p>
+              )}
+              <Link
+                href="/wardrobe"
+                className="mt-3 inline-flex text-sm font-semibold text-rose-700 underline underline-offset-2 hover:text-rose-800"
+              >
+                Update Wardrobe
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">

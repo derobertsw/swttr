@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import LayerDisplay from "./LayerDisplay";
 
@@ -540,6 +540,199 @@ describe("LayerDisplay", () => {
 
       expect(screen.getByText("Tips")).toBeInTheDocument();
       expect(screen.getByText("Layer up for the chairlift")).toBeInTheDocument();
+    });
+
+    it("should prominently recommend updating wardrobe when insulation is insufficient", async () => {
+      const fetchMock = vi.spyOn(global, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+        const url = input.toString();
+
+        if (url.includes("/api/wardrobe/available")) {
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: "g-owned",
+                  type: "garment",
+                  brand: "Owned",
+                  model_name: "Mega Mid",
+                  category: "mid_layer_heavy",
+                  garment_type: "jacket",
+                  rcl_clo: 0.6,
+                },
+                {
+                  id: "g-torso",
+                  type: "garment",
+                  brand: "Patagonia",
+                  model_name: "Nano-Air Hoody",
+                  category: "insulation_synthetic",
+                  garment_type: "jacket",
+                  rcl_clo: 0.55,
+                },
+                {
+                  id: "g-legs",
+                  type: "garment",
+                  brand: "Craft",
+                  model_name: "Thermal Tights",
+                  category: "base_layer",
+                  garment_type: "pants",
+                  rcl_clo: 0.32,
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+        if (url.includes("/api/wardrobe/gear")) {
+          return new Response(
+            JSON.stringify({
+              items: [{ item_id: "g-owned" }],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+
+      localStorage.setItem("swttr-user-id", "user-test");
+
+      const insufficientWardrobeData = {
+        ...mockBiophysicsData,
+        ireq: {
+          ...mockBiophysicsData.ireq,
+          target_range: [1.7, 2.2] as [number, number],
+        },
+        recommendation: {
+          ...mockBiophysicsData.recommendation,
+          ensemble_properties: {
+            ...mockBiophysicsData.recommendation.ensemble_properties,
+            total_clo: 1.1,
+          },
+        },
+        warnings: ["Insufficient overall insulation: 1.1 clo vs 1.7 clo required"],
+      };
+
+      try {
+        render(
+          <LayerDisplay
+            recommendation={null}
+            temperature={15}
+            windspeed={10}
+            biophysicsData={insufficientWardrobeData}
+          />
+        );
+
+        expect(screen.getByText("Wardrobe Gap Detected")).toBeInTheDocument();
+        expect(screen.getByText("Insufficient overall insulation: 1.1 clo vs 1.7 clo required")).toBeInTheDocument();
+        expect(await screen.findByText("Suggested Gear To Buy")).toBeInTheDocument();
+        expect(await screen.findByText("Patagonia Nano-Air Hoody")).toBeInTheDocument();
+        expect(await screen.findByText("Craft Thermal Tights")).toBeInTheDocument();
+        expect(screen.queryByText("Owned Mega Mid")).not.toBeInTheDocument();
+
+        const updateLink = screen.getByRole("link", { name: "Update Wardrobe" });
+        expect(updateLink).toHaveAttribute("href", "/wardrobe");
+      } finally {
+        fetchMock.mockRestore();
+        localStorage.removeItem("swttr-user-id");
+      }
+    });
+
+    it("should prioritize clo-fit over layer category when recommending purchase items", async () => {
+      const fetchMock = vi.spyOn(global, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+        const url = input.toString();
+
+        if (url.includes("/api/wardrobe/available")) {
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: "g-overshoot",
+                  type: "garment",
+                  brand: "WarmCo",
+                  model_name: "Heavy Mid",
+                  category: "mid_layer_heavy",
+                  garment_type: "jacket",
+                  rcl_clo: 1.2,
+                },
+                {
+                  id: "g-close",
+                  type: "garment",
+                  brand: "FitCo",
+                  model_name: "Close Match",
+                  category: "soft_shell",
+                  garment_type: "jacket",
+                  rcl_clo: 0.42,
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+        if (url.includes("/api/wardrobe/gear")) {
+          return new Response(JSON.stringify({ items: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+
+      localStorage.setItem("swttr-user-id", "user-test");
+
+      const insufficientWardrobeData = {
+        ...mockBiophysicsData,
+        ireq: {
+          ...mockBiophysicsData.ireq,
+          target_range: [1.5, 2.0] as [number, number],
+        },
+        recommendation: {
+          ...mockBiophysicsData.recommendation,
+          ensemble_properties: {
+            ...mockBiophysicsData.recommendation.ensemble_properties,
+            total_clo: 1.1,
+          },
+        },
+        warnings: ["Insufficient overall insulation: 1.1 clo vs 1.5 clo required"],
+      };
+
+      try {
+        render(
+          <LayerDisplay
+            recommendation={null}
+            temperature={20}
+            windspeed={5}
+            biophysicsData={insufficientWardrobeData}
+          />
+        );
+
+        expect(await screen.findByText("Suggested Gear To Buy")).toBeInTheDocument();
+        expect(await screen.findByText("FitCo Close Match")).toBeInTheDocument();
+      } finally {
+        fetchMock.mockRestore();
+        localStorage.removeItem("swttr-user-id");
+      }
+    });
+
+    it("should not show wardrobe gap alert when insulation warning is absent", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      expect(screen.queryByText("Wardrobe Gap Detected")).not.toBeInTheDocument();
     });
   });
 });

@@ -45,7 +45,6 @@ type GearUpAction =
   | { type: "SET_INPUT_MODE"; mode: InputMode }
   | { type: "SET_DATE"; date: Date | undefined }
   | { type: "SET_TIME"; time: string }
-  | { type: "SHOW_SLIDERS" }
   | { type: "LOCATION_DENIED" }
   | { type: "SUBMIT_START" }
   | { type: "SUBMIT_SUCCESS"; recommendation: Recommendation | null; biophysicsData: BiophysicsRecommendation | null; temperature: number; windspeed: number }
@@ -82,8 +81,6 @@ function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpState {
       return { ...state, date: action.date };
     case "SET_TIME":
       return { ...state, time: action.time };
-    case "SHOW_SLIDERS":
-      return { ...state, showSliders: true, locationDenied: false };
     case "LOCATION_DENIED":
       return { ...state, locationDenied: true, showSliders: false };
     case "SUBMIT_START":
@@ -184,23 +181,6 @@ async function submitPlanAhead(
     biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
     temperature: data.temperature,
     windspeed: data.windSpeed,
-  };
-}
-
-async function submitManual(
-  state: GearUpState,
-  activity: string,
-  sensitivity: TemperatureSensitivity,
-  biophysics: ReturnType<typeof useBiophysicsRecommendation>,
-): Promise<SubmitResult> {
-  const layers = getRecommendation(state.temperature, activity, sensitivity);
-  const bioData = await biophysics.fetch(activity, { temperature: state.temperature, windSpeed: state.windspeed });
-
-  return {
-    recommendation: layers,
-    biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
-    temperature: state.temperature,
-    windspeed: state.windspeed,
   };
 }
 
@@ -324,16 +304,7 @@ export function useGearUp() {
         logWarn("useGearUp.handleSubmit", error);
         dispatch({ type: "SUBMIT_ERROR" });
       }
-    } else if (state.showSliders) {
-      dispatch({ type: "SUBMIT_START" });
-      const result = await submitManual(state, activity, sensitivity, biophysics);
-      dispatch({ type: "SUBMIT_SUCCESS", ...result });
-    } else if (state.locationDenied) {
-      if (!locationSearch.selectedLocation) {
-        toast.error("Please enter a location");
-        return;
-      }
-
+    } else if (state.locationDenied && locationSearch.selectedLocation) {
       dispatch({ type: "SUBMIT_START" });
       const result = await submitLocationDenied(state, activity, sensitivity, locationSearch, biophysics);
       if (result) {
@@ -353,8 +324,8 @@ export function useGearUp() {
         dispatch({ type: "LOCATION_DENIED" });
         dispatch({ type: "SUBMIT_ERROR" });
       } else if (showSliders) {
-        toast.error("Could not get current weather. Please set manually.");
-        dispatch({ type: "SHOW_SLIDERS" });
+        toast.error("Could not get current weather. Please enter your location manually.");
+        dispatch({ type: "LOCATION_DENIED" });
         dispatch({ type: "SUBMIT_ERROR" });
       }
     }
@@ -401,7 +372,7 @@ export function useGearUp() {
               windspeed: weather.windSpeed,
             });
           } else {
-            dispatch({ type: "SHOW_SLIDERS" });
+            dispatch({ type: "LOCATION_DENIED" });
             dispatch({ type: "SUBMIT_ERROR" });
           }
         })();
@@ -415,7 +386,7 @@ export function useGearUp() {
       dispatch({ type: "LOCATION_DENIED" });
       return;
     }
-    dispatch({ type: "SHOW_SLIDERS" });
+    dispatch({ type: "LOCATION_DENIED" });
   }, [searchParams, activity, biophysics, sensitivity]);
 
   // Dispatch activity change events and persist to localStorage

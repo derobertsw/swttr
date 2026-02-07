@@ -148,7 +148,7 @@ describe("Home Page", () => {
   });
 
   describe("Gear Up button - weather fetch failure", () => {
-    it("should show sliders when geolocation is not supported", async () => {
+    it("should show location input when geolocation is not supported", async () => {
       Object.defineProperty(navigator, "geolocation", {
         value: undefined,
         writable: true,
@@ -160,8 +160,7 @@ describe("Home Page", () => {
       await user.click(screen.getByRole("button", { name: /gear up/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/temperature:/i)).toBeInTheDocument();
-        expect(screen.getByText(/wind speed:/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
       });
     });
 
@@ -180,7 +179,7 @@ describe("Home Page", () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          "Could not get current weather. Please set manually."
+          "Could not get current weather. Please enter your location manually."
         );
       });
     });
@@ -206,7 +205,7 @@ describe("Home Page", () => {
       });
     });
 
-    it("should prioritize location input over sliders when geoDenied query is set", async () => {
+    it("should show location input when geoDenied query is set", async () => {
       mockSearchParams.set("gearUp", "1");
       mockSearchParams.set("geoDenied", "1");
 
@@ -218,7 +217,7 @@ describe("Home Page", () => {
       expect(screen.queryByText(/temperature:/i)).not.toBeInTheDocument();
     });
 
-    it("should show sliders when API returns error", async () => {
+    it("should show location input when API returns error", async () => {
       const mockGeolocation = {
         getCurrentPosition: vi.fn((success) => {
           success({ coords: { latitude: 40.7128, longitude: -74.006 } });
@@ -254,13 +253,15 @@ describe("Home Page", () => {
       await user.click(screen.getByRole("button", { name: /gear up/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/temperature:/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
       });
     });
   });
 
-  describe("manual slider mode", () => {
-    it("should show results when Gear Up clicked with sliders visible", async () => {
+  describe("manual location mode", () => {
+    it("should retry current-location fetch when Gear Up is clicked again", async () => {
+      const { toast } = await import("sonner");
+
       Object.defineProperty(navigator, "geolocation", {
         value: undefined,
         writable: true,
@@ -269,18 +270,20 @@ describe("Home Page", () => {
       const user = userEvent.setup();
       render(<Home />);
 
-      // First click shows sliders
+      // First click shows location input fallback
       await user.click(screen.getByRole("button", { name: /gear up/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/temperature:/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
       });
 
-      // Second click uses slider values — shows results with weather display
+      // Second click without selecting location should prompt user
       await user.click(screen.getByRole("button", { name: /gear up/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/°F/)).toBeInTheDocument();
+        expect(toast.error).toHaveBeenCalledWith(
+          "Could not get current weather. Please enter your location manually."
+        );
       });
     });
   });
