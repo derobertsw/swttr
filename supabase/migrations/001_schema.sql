@@ -1,8 +1,8 @@
--- Biophysical Clothing Recommendation System
+-- Biophysical Clothing Recommendation System — Consolidated Schema
 -- Based on USARIEM Technical Reports T21-03 and T18-02, ISO 11079 (IREQ standard)
 
 -- ============================================
--- ENUM TYPES
+-- ENUM TYPES — Garments
 -- ============================================
 
 CREATE TYPE garment_category AS ENUM (
@@ -80,10 +80,45 @@ CREATE TYPE material_category AS ENUM (
 );
 
 -- ============================================
--- MAIN TABLES
+-- ENUM TYPES — Extremities
 -- ============================================
 
--- Main garment table
+CREATE TYPE handwear_type AS ENUM (
+    'liner_glove',
+    'light_glove',
+    'insulated_glove',
+    'mitten',
+    'lobster_mitten',
+    'shell_overmitten'
+);
+
+CREATE TYPE headwear_type AS ENUM (
+    'liner_beanie',
+    'midweight_beanie',
+    'heavy_beanie',
+    'balaclava_light',
+    'balaclava_heavy',
+    'headband',
+    'buff_thin',
+    'buff_heavy',
+    'facemask',
+    'ski_helmet'
+);
+
+-- ============================================
+-- ENUM TYPES — User Wardrobe
+-- ============================================
+
+CREATE TYPE wardrobe_item_type AS ENUM (
+    'garment',
+    'handwear',
+    'headwear'
+);
+
+-- ============================================
+-- GARMENT TABLES
+-- ============================================
+
 CREATE TABLE garments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
@@ -114,7 +149,6 @@ CREATE TABLE garments (
     UNIQUE(brand, model_name)
 );
 
--- Biophysical properties
 CREATE TABLE garment_thermal_properties (
     garment_id UUID PRIMARY KEY REFERENCES garments(id) ON DELETE CASCADE,
 
@@ -142,7 +176,6 @@ CREATE TABLE garment_thermal_properties (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Wind and water protection
 CREATE TABLE garment_protection (
     garment_id UUID PRIMARY KEY REFERENCES garments(id) ON DELETE CASCADE,
 
@@ -164,7 +197,6 @@ CREATE TABLE garment_protection (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Ventilation features (critical for ski touring)
 CREATE TABLE garment_ventilation (
     garment_id UUID PRIMARY KEY REFERENCES garments(id) ON DELETE CASCADE,
 
@@ -184,7 +216,6 @@ CREATE TABLE garment_ventilation (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Activity-specific ratings
 CREATE TABLE garment_activity_ratings (
     garment_id UUID PRIMARY KEY REFERENCES garments(id) ON DELETE CASCADE,
 
@@ -206,7 +237,6 @@ CREATE TABLE garment_activity_ratings (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Material composition for property estimation
 CREATE TABLE garment_materials (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     garment_id UUID REFERENCES garments(id) ON DELETE CASCADE,
@@ -225,7 +255,6 @@ CREATE TABLE garment_materials (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Reference table for material properties
 CREATE TABLE material_reference (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     material_name VARCHAR(200) NOT NULL,
@@ -246,7 +275,6 @@ CREATE TABLE material_reference (
     UNIQUE(material_name, manufacturer)
 );
 
--- Calibration data from military testing
 CREATE TABLE calibration_reference (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source_report VARCHAR(50),
@@ -270,9 +298,99 @@ CREATE TABLE calibration_reference (
 );
 
 -- ============================================
+-- EXTREMITY TABLES
+-- ============================================
+
+CREATE TABLE handwear (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    brand VARCHAR(100) NOT NULL,
+    model_name VARCHAR(200) NOT NULL,
+    year_released INT,
+    msrp_usd DECIMAL(8,2),
+
+    handwear_type handwear_type NOT NULL,
+
+    weight_grams_pair INT,
+
+    rcl_clo DECIMAL(3,2) NOT NULL,
+
+    -- Dexterity (1=mitten, 10=liner)
+    dexterity_score INT CHECK (dexterity_score BETWEEN 1 AND 10),
+
+    waterproof BOOLEAN DEFAULT false,
+    windproof BOOLEAN DEFAULT false,
+    touchscreen_compatible BOOLEAN DEFAULT false,
+
+    -- Temperature ranges (Celsius)
+    min_temp_active INT,
+    min_temp_static INT,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    UNIQUE(brand, model_name)
+);
+
+CREATE TABLE headwear (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    brand VARCHAR(100) NOT NULL,
+    model_name VARCHAR(200) NOT NULL,
+    year_released INT,
+    msrp_usd DECIMAL(8,2),
+
+    headwear_type headwear_type NOT NULL,
+
+    weight_grams INT,
+
+    covers_ears BOOLEAN DEFAULT true,
+    covers_neck BOOLEAN DEFAULT false,
+    covers_face BOOLEAN DEFAULT false,
+    helmet_compatible BOOLEAN DEFAULT false,
+
+    rcl_clo DECIMAL(3,2) NOT NULL,
+
+    windproof BOOLEAN DEFAULT false,
+
+    -- Temperature ranges (Celsius)
+    min_temp_active INT,
+    min_temp_static INT,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    UNIQUE(brand, model_name)
+);
+
+-- ============================================
+-- USER WARDROBE TABLE
+-- ============================================
+
+CREATE TABLE user_wardrobe (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(100) NOT NULL,
+
+    -- Item reference (polymorphic)
+    item_type wardrobe_item_type NOT NULL,
+    item_id UUID NOT NULL,
+
+    -- Optional user customization
+    nickname VARCHAR(100),
+
+    -- Temporarily exclude from recommendations
+    disabled BOOLEAN DEFAULT false,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    UNIQUE(user_id, item_type, item_id)
+);
+
+-- ============================================
 -- INDEXES
 -- ============================================
 
+-- Garments
 CREATE INDEX idx_garments_category ON garments(category);
 CREATE INDEX idx_garments_brand ON garments(brand);
 CREATE INDEX idx_garments_type ON garments(garment_type);
@@ -284,6 +402,20 @@ CREATE INDEX idx_activity_touring_down ON garment_activity_ratings(ski_touring_d
 CREATE INDEX idx_activity_alpine ON garment_activity_ratings(alpine_skiing_score);
 CREATE INDEX idx_garment_materials_garment ON garment_materials(garment_id);
 CREATE INDEX idx_material_reference_category ON material_reference(material_category);
+
+-- Extremities
+CREATE INDEX idx_handwear_type ON handwear(handwear_type);
+CREATE INDEX idx_handwear_brand ON handwear(brand);
+CREATE INDEX idx_handwear_rcl ON handwear(rcl_clo);
+CREATE INDEX idx_handwear_dexterity ON handwear(dexterity_score);
+CREATE INDEX idx_headwear_type ON headwear(headwear_type);
+CREATE INDEX idx_headwear_brand ON headwear(brand);
+CREATE INDEX idx_headwear_rcl ON headwear(rcl_clo);
+
+-- User wardrobe
+CREATE INDEX idx_user_wardrobe_user ON user_wardrobe(user_id);
+CREATE INDEX idx_user_wardrobe_type ON user_wardrobe(item_type);
+CREATE INDEX idx_user_wardrobe_disabled ON user_wardrobe(disabled);
 
 -- ============================================
 -- TRIGGERS FOR updated_at
@@ -322,11 +454,20 @@ CREATE TRIGGER update_activity_ratings_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_handwear_updated_at
+    BEFORE UPDATE ON handwear
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_headwear_updated_at
+    BEFORE UPDATE ON headwear
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================
--- ROW LEVEL SECURITY (optional, enable as needed)
+-- ROW LEVEL SECURITY
 -- ============================================
 
--- Enable RLS on tables
 ALTER TABLE garments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE garment_thermal_properties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE garment_protection ENABLE ROW LEVEL SECURITY;
@@ -335,8 +476,11 @@ ALTER TABLE garment_activity_ratings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE garment_materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE material_reference ENABLE ROW LEVEL SECURITY;
 ALTER TABLE calibration_reference ENABLE ROW LEVEL SECURITY;
+ALTER TABLE handwear ENABLE ROW LEVEL SECURITY;
+ALTER TABLE headwear ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_wardrobe ENABLE ROW LEVEL SECURITY;
 
--- Allow public read access (adjust as needed)
+-- Public read access for catalog tables
 CREATE POLICY "Allow public read access" ON garments FOR SELECT USING (true);
 CREATE POLICY "Allow public read access" ON garment_thermal_properties FOR SELECT USING (true);
 CREATE POLICY "Allow public read access" ON garment_protection FOR SELECT USING (true);
@@ -345,3 +489,18 @@ CREATE POLICY "Allow public read access" ON garment_activity_ratings FOR SELECT 
 CREATE POLICY "Allow public read access" ON garment_materials FOR SELECT USING (true);
 CREATE POLICY "Allow public read access" ON material_reference FOR SELECT USING (true);
 CREATE POLICY "Allow public read access" ON calibration_reference FOR SELECT USING (true);
+CREATE POLICY "Allow public read access" ON handwear FOR SELECT USING (true);
+CREATE POLICY "Allow public read access" ON headwear FOR SELECT USING (true);
+
+-- User wardrobe policies
+CREATE POLICY "Users can view own wardrobe" ON user_wardrobe
+    FOR SELECT USING (true);
+
+CREATE POLICY "Users can insert own wardrobe" ON user_wardrobe
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Users can delete own wardrobe" ON user_wardrobe
+    FOR DELETE USING (true);
+
+CREATE POLICY "Users can update own wardrobe" ON user_wardrobe
+    FOR UPDATE USING (true) WITH CHECK (true);
