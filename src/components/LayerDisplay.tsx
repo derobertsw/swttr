@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import { Recommendation } from "@/types/recommendations";
 import {
   BiophysicsRecommendation,
@@ -26,13 +26,14 @@ import {
 import type { AvailableItem } from "@/types/wardrobe";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { logWarn } from "@/lib/logger";
+import { Button } from "@/components/ui/button";
 import {
   WeatherHeader,
   ThermalGauge,
-  ThermalStatusCard,
   BodyPartSection,
   GuidanceSection,
 } from "@/components/layers";
+import { cn } from "@/lib/utils";
 
 interface LayerDisplayProps {
   activity?: string;
@@ -233,6 +234,78 @@ function buildWardrobeGapSuggestions(
   return [...torsoPicks, ...legsPicks].slice(0, 3);
 }
 
+interface ThermalDecisionState {
+  riskType: "comfortable" | "cold" | "overheat";
+  severity: "moderate" | "high";
+  delta: number;
+}
+
+function getThermalDecisionState(
+  totalClo: number | undefined,
+  targetRange: [number, number] | undefined
+): ThermalDecisionState | null {
+  if (totalClo === undefined || !targetRange) return null;
+
+  const [targetMin, targetMax] = targetRange;
+  if (totalClo >= targetMin && totalClo <= targetMax) {
+    return { riskType: "comfortable", severity: "moderate", delta: 0 };
+  }
+
+  const rangeWidth = Math.max(0.2, targetMax - targetMin);
+  if (totalClo < targetMin) {
+    const deficit = targetMin - totalClo;
+    return {
+      riskType: "cold",
+      severity: deficit <= rangeWidth ? "moderate" : "high",
+      delta: deficit,
+    };
+  }
+
+  const excess = totalClo - targetMax;
+  return {
+    riskType: "overheat",
+    severity: excess <= rangeWidth ? "moderate" : "high",
+    delta: excess,
+  };
+}
+
+function getThermalSummary(state: ThermalDecisionState | null): string {
+  if (!state) return "Layer guidance generated for current conditions.";
+  if (state.riskType === "comfortable") return "Insulation is within your comfort target.";
+  if (state.riskType === "cold") return `${state.severity === "high" ? "Significantly" : "Slightly"} under-insulated (+${state.delta.toFixed(1)} clo needed).`;
+  return `${state.severity === "high" ? "Significantly" : "Slightly"} over-insulated (-${state.delta.toFixed(1)} clo advised).`;
+}
+
+function getImmediateAction(state: ThermalDecisionState | null): string {
+  if (!state) return "Review body-part recommendations below.";
+  if (state.riskType === "comfortable") return "Current setup is in range; keep vents and exertion in mind.";
+  if (state.riskType === "cold") {
+    return state.severity === "high"
+      ? "Add a warmer base and an insulating mid-layer now."
+      : "Add a light-to-mid insulation layer now.";
+  }
+  return state.severity === "high"
+    ? "Remove a warm layer and open vents immediately."
+    : "Drop one layer or increase venting to avoid overheating.";
+}
+
+function getDecisionClasses(state: ThermalDecisionState | null, hasWardrobeGap: boolean): string {
+  if (!state) return "border-white/35 bg-white/90 text-slate-900";
+  if (state.riskType === "comfortable") {
+    return hasWardrobeGap
+      ? "border-amber-300 bg-amber-50 text-amber-950"
+      : "border-emerald-300 bg-emerald-50 text-emerald-950";
+  }
+  if (state.riskType === "cold") {
+    return state.severity === "high"
+      ? "border-rose-300 bg-rose-50 text-rose-950"
+      : "border-amber-300 bg-amber-50 text-amber-950";
+  }
+  return state.severity === "high"
+    ? "border-orange-300 bg-orange-50 text-orange-950"
+    : "border-amber-300 bg-amber-50 text-amber-950";
+}
+
 /**
  * Calculates current and target clo values for a body part based on biophysics data.
  */
@@ -322,6 +395,10 @@ const LayerDisplay = ({
 
   const [purchaseSuggestions, setPurchaseSuggestions] = useState<WardrobePurchaseSuggestion[]>([]);
   const [purchaseSuggestionsLoading, setPurchaseSuggestionsLoading] = useState(false);
+  const [showAllPurchaseSuggestions, setShowAllPurchaseSuggestions] = useState(false);
+  const thermalDecision = getThermalDecisionState(totalClo, biophysicsData?.ireq?.target_range);
+  const statusSummary = getThermalSummary(thermalDecision);
+  const immediateAction = getImmediateAction(thermalDecision);
 
   useEffect(() => {
     let isCancelled = false;
@@ -329,6 +406,7 @@ const LayerDisplay = ({
     if (!wardrobeGapWarning || totalDeficit <= 0) {
       setPurchaseSuggestions([]);
       setPurchaseSuggestionsLoading(false);
+      setShowAllPurchaseSuggestions(false);
       return () => {
         isCancelled = true;
       };
@@ -374,10 +452,12 @@ const LayerDisplay = ({
 
         if (!isCancelled) {
           setPurchaseSuggestions(suggestions);
+          setShowAllPurchaseSuggestions(false);
         }
       } catch (error) {
         if (!isCancelled) {
           setPurchaseSuggestions([]);
+          setShowAllPurchaseSuggestions(false);
         }
         logWarn("LayerDisplay.fetchWardrobeGapSuggestions", error);
       } finally {
@@ -396,6 +476,23 @@ const LayerDisplay = ({
 
   if (!recommendation && !biophysicsData) return null;
 
+  const hasWardrobeGap = Boolean(wardrobeGapWarning);
+  const decisionTitle = thermalDecision
+    ? thermalDecision.riskType === "comfortable"
+      ? "Comfort Range Achieved"
+      : thermalDecision.riskType === "cold"
+        ? `Cold Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
+        : `Overheating Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
+    : "Layer Guidance";
+  const visibleSuggestions = showAllPurchaseSuggestions
+    ? purchaseSuggestions.slice(1)
+    : [];
+  const hasExtraSuggestions = purchaseSuggestions.length > 1;
+  const topSuggestion = purchaseSuggestions[0];
+  const targetRangeLabel = biophysicsData?.ireq?.target_range
+    ? `${biophysicsData.ireq.target_range[0].toFixed(1)}-${biophysicsData.ireq.target_range[1].toFixed(1)} clo`
+    : "your target clo range";
+
   return (
     <div className="flex flex-col gap-8">
       <WeatherHeader
@@ -411,63 +508,109 @@ const LayerDisplay = ({
         targetRange={biophysicsData?.ireq?.target_range}
       />
 
-      <ThermalStatusCard
-        totalClo={totalClo}
-        targetRange={biophysicsData?.ireq?.target_range}
-        regionalClo={regionalClo}
-      />
+      <section
+        className={cn(
+          "rounded-xl border px-4 py-4 sm:px-5 sm:py-5",
+          getDecisionClasses(thermalDecision, hasWardrobeGap)
+        )}
+      >
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 opacity-80" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">Recommendation</p>
+            <h3 className="mt-0.5 text-xl font-semibold leading-tight">{decisionTitle}</h3>
+            <p className="mt-1.5 text-sm opacity-90">{statusSummary}</p>
 
-      {wardrobeGapWarning && (
-        <div className="rounded-lg border-l-4 border-l-rose-500 border border-rose-200 bg-rose-50 px-4 py-3">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="size-4 mt-0.5 flex-shrink-0 text-rose-500" />
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-rose-800">Wardrobe Gap Detected</p>
-              <p className="text-sm text-rose-700 mt-0.5">{wardrobeGapWarning}</p>
-              <p className="text-sm text-rose-700 mt-2">
-                Add warmer base or mid layers in your wardrobe so future recommendations can meet target insulation.
-              </p>
-              {purchaseSuggestionsLoading ? (
-                <p className="text-sm text-rose-700 mt-3">
-                  Finding purchasable items in the wardrobe database...
-                </p>
-              ) : purchaseSuggestions.length > 0 ? (
-                <div className="mt-3 rounded-md border border-rose-200 bg-white/70 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-rose-800">
-                    Suggested Gear To Buy
-                  </p>
-                  <ul className="mt-2 space-y-2">
-                    {purchaseSuggestions.map((item) => (
-                      <li key={item.id} className="text-sm text-rose-700 leading-relaxed">
-                        <span className="font-semibold">{item.name}</span>
-                        <span>
-                          {" · "}
-                          {item.targetArea} {LAYER_LABELS[item.layerType]}
-                          {" · "}
-                          {formatCategoryLabel(item.category)}
-                          {" · +"}
-                          {item.rcl.toFixed(2)}
-                          {" clo"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-lg border border-current/20 bg-white/45 px-3.5 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide opacity-75">Now</p>
+                <ul className="mt-2 list-disc pl-5 text-sm leading-relaxed">
+                  <li>{immediateAction}</li>
+                  {thermalDecision && thermalDecision.riskType !== "comfortable" && (
+                    <li>
+                      Stay near target range: {targetRangeLabel}
+                    </li>
+                  )}
+                </ul>
+              </div>
+
+              {hasWardrobeGap && (
+                <div className="rounded-lg border border-current/20 bg-white/45 px-3.5 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide opacity-75">Improve Wardrobe</p>
+                  <p className="mt-2 text-sm leading-relaxed">{wardrobeGapWarning}</p>
+                  {purchaseSuggestionsLoading ? (
+                    <p className="mt-2 text-sm">Finding purchasable items in the wardrobe database...</p>
+                  ) : purchaseSuggestions.length > 0 ? (
+                    <div className="mt-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide opacity-70">Suggested Gear To Buy</p>
+                      {topSuggestion && (
+                        <div className="mt-2 rounded-md border border-current/20 bg-white/55 p-2.5">
+                          <p className="text-sm font-semibold leading-snug">{topSuggestion.name}</p>
+                          <p className="mt-1 text-xs opacity-90">
+                            {topSuggestion.targetArea} {LAYER_LABELS[topSuggestion.layerType]}
+                            {" · "}
+                            {formatCategoryLabel(topSuggestion.category)}
+                            {" · +"}
+                            {topSuggestion.rcl.toFixed(2)}
+                            {" clo"}
+                          </p>
+                        </div>
+                      )}
+                      {showAllPurchaseSuggestions && visibleSuggestions.length > 0 && (
+                        <ul className="mt-2 space-y-2">
+                          {visibleSuggestions.map((item) => (
+                            <li key={item.id} className="text-sm leading-relaxed">
+                              <p className="font-semibold">{item.name}</p>
+                              <p className="opacity-90">
+                                {item.targetArea} {LAYER_LABELS[item.layerType]}
+                                {" · "}
+                                {formatCategoryLabel(item.category)}
+                                {" · +"}
+                                {item.rcl.toFixed(2)}
+                                {" clo"}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {hasExtraSuggestions && (
+                        <button
+                          type="button"
+                          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold underline underline-offset-2 hover:opacity-75"
+                          onClick={() => setShowAllPurchaseSuggestions((prev) => !prev)}
+                        >
+                          {showAllPurchaseSuggestions ? (
+                            <>
+                              Hide suggestions
+                              <ChevronUp className="size-3.5" />
+                            </>
+                          ) : (
+                            <>
+                              Show suggestions ({purchaseSuggestions.length})
+                              <ChevronDown className="size-3.5" />
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm">No purchasable layer items were found in the current wardrobe database.</p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-sm text-rose-700 mt-3">
-                  No purchasable layer items were found in the current wardrobe database.
-                </p>
               )}
-              <Link
-                href="/wardrobe"
-                className="mt-3 inline-flex text-sm font-semibold text-rose-700 underline underline-offset-2 hover:text-rose-800"
-              >
-                Update Wardrobe
-              </Link>
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <Button asChild className="flex-1 bg-slate-900 text-white hover:bg-slate-800">
+                <Link href="/wardrobe">
+                  Update Wardrobe
+                  <ArrowRight className="ml-1.5 size-4" />
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
-      )}
+      </section>
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">

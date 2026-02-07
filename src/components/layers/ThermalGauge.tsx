@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 interface ThermalGaugeProps {
   totalClo: number | undefined;
   targetRange: [number, number] | undefined;
@@ -31,12 +29,6 @@ function toPercent(value: number, lower: number, upper: number): number {
  * Uses color gradient and marker to communicate thermal comfort at a glance.
  */
 export function ThermalGauge({ totalClo, targetRange }: ThermalGaugeProps) {
-  const [markerReady, setMarkerReady] = useState(false);
-
-  useEffect(() => {
-    setMarkerReady(true);
-  }, []);
-
   if (totalClo === undefined || !targetRange) return null;
 
   const [targetMin, targetMax] = targetRange;
@@ -48,9 +40,9 @@ export function ThermalGauge({ totalClo, targetRange }: ThermalGaugeProps) {
 
   return (
     <div className="w-full">
-      <div className="flex justify-between text-xs text-slate-500 mb-1.5">
+      <div className="mb-1.5 flex justify-between text-xs text-white/70">
         <span>Cold</span>
-        <span className="text-slate-400">Comfortable</span>
+        <span className="text-white/75">Comfortable</span>
         <span>Hot</span>
       </div>
 
@@ -61,12 +53,10 @@ export function ThermalGauge({ totalClo, targetRange }: ThermalGaugeProps) {
         }}
       >
         <div
-          className="absolute inset-y-0 rounded-full"
+          className="absolute inset-y-0 rounded-full border border-white/35 bg-white/22 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
           style={{
             left: `${comfortStart}%`,
             width: `${comfortEnd - comfortStart}%`,
-            background: "rgba(255, 255, 255, 0.12)",
-            boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.15)",
           }}
         />
 
@@ -74,10 +64,6 @@ export function ThermalGauge({ totalClo, targetRange }: ThermalGaugeProps) {
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center"
           style={{
             left: `${markerPercent}%`,
-            opacity: markerReady ? 1 : 0,
-            transition: markerReady
-              ? "left 240ms ease-out, opacity 120ms ease-out"
-              : "none",
           }}
         >
           <div
@@ -87,8 +73,16 @@ export function ThermalGauge({ totalClo, targetRange }: ThermalGaugeProps) {
               boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15)",
             }}
           />
-          <span className="text-[10px] text-slate-500 mt-1.5 whitespace-nowrap font-medium">You</span>
+          <span className="mt-1.5 whitespace-nowrap rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-medium text-white/90">
+            You {totalClo.toFixed(1)} clo
+          </span>
         </div>
+      </div>
+
+      <div className="mt-1 flex items-center justify-center">
+        <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white/90">
+          Target {targetMin.toFixed(1)}-{targetMax.toFixed(1)} clo
+        </span>
       </div>
     </div>
   );

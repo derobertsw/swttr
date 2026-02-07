@@ -626,11 +626,12 @@ describe("LayerDisplay", () => {
           />
         );
 
-        expect(screen.getByText("Wardrobe Gap Detected")).toBeInTheDocument();
+        expect(screen.getByText("Improve Wardrobe")).toBeInTheDocument();
         expect(screen.getByText("Insufficient overall insulation: 1.1 clo vs 1.7 clo required")).toBeInTheDocument();
         expect(await screen.findByText("Suggested Gear To Buy")).toBeInTheDocument();
         expect(await screen.findByText("Patagonia Nano-Air Hoody")).toBeInTheDocument();
-        expect(await screen.findByText("Craft Thermal Tights")).toBeInTheDocument();
+        expect(screen.queryByText("Craft Thermal Tights")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /show suggestions/i })).toBeInTheDocument();
         expect(screen.queryByText("Owned Mega Mid")).not.toBeInTheDocument();
 
         const updateLink = screen.getByRole("link", { name: "Update Wardrobe" });
@@ -732,7 +733,7 @@ describe("LayerDisplay", () => {
         />
       );
 
-      expect(screen.queryByText("Wardrobe Gap Detected")).not.toBeInTheDocument();
+      expect(screen.queryByText("Improve Wardrobe")).not.toBeInTheDocument();
     });
   });
 });

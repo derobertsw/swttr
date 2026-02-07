@@ -53,7 +53,7 @@ export function WeatherHeader({
             </span>
           </div>
 
-          <div className="mt-2 flex items-center gap-1.5 text-[15px] text-white/75">
+          <div className="mt-2 flex items-center gap-1.5 text-sm text-white/70">
             {showFeelsLike && (
               <>
                 <span>Feels like {calculatedFeelsLike}°</span>
@@ -73,7 +73,7 @@ export function WeatherHeader({
         {score !== undefined && (
           <ScoreDisplay
             score={score}
-            size="lg"
+            size="md"
             totalClo={totalClo}
             targetRange={targetRange}
           />

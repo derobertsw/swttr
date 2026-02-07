@@ -42,7 +42,7 @@ const STATUS_CONFIG: Record<ThermalStatus, StatusConfig> = {
     dotClass: "bg-green-500",
   },
   cold_stress: {
-    label: "Cold Stress Likely",
+    label: "Cold Stress",
     description: "Insufficient insulation for these conditions",
     pillClass: "bg-blue-50 text-blue-700 border-blue-200",
     dotClass: "bg-blue-500",
@@ -81,7 +81,7 @@ const ScoreDisplay = ({ score, size = "md", className, totalClo, targetRange }: 
   const sizeClasses = {
     sm: "text-xs px-3 py-1.5 gap-1.5",
     md: "text-sm px-3.5 py-2 gap-2",
-    lg: "text-sm px-4.5 py-2.5 gap-2",
+    lg: "text-sm px-4 py-2 gap-2",
   };
 
   const dotSizeClasses = {
@@ -95,7 +95,7 @@ const ScoreDisplay = ({ score, size = "md", className, totalClo, targetRange }: 
       <PopoverTrigger asChild>
         <button
           className={cn(
-            "inline-flex items-center rounded-full border font-medium cursor-help transition-colors hover:bg-slate-50",
+            "inline-flex items-center whitespace-nowrap rounded-full border font-medium cursor-help transition-colors hover:bg-slate-50",
             config.pillClass,
             sizeClasses[size],
             className
