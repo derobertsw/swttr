@@ -106,7 +106,7 @@ const LayerDisplay = ({
 
   const biophysicsGarments = biophysicsData?.recommendation?.garments;
   const handwear = biophysicsData?.recommendation?.handwear;
-  const shouldIgnoreHelmetForClo = activity === "xc-skiing";
+  const shouldIgnoreHelmetForClo = activity === "xc_skiing";
   const headwear = shouldIgnoreHelmetForClo && biophysicsData?.recommendation?.headwear
     ? { ...biophysicsData.recommendation.headwear, helmet: null }
     : biophysicsData?.recommendation?.headwear;

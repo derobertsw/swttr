@@ -123,9 +123,9 @@ export interface BiophysicsRecommendation {
 export const BIOPHYSICS_ENDPOINTS: Record<string, string> = {
   'running': '/api/v1/recommendations/running',
   'biking': '/api/v1/recommendations/biking',
-  'alpine-skiing': '/api/v1/recommendations/alpine',
-  'xc-skiing': '/api/v1/recommendations/xc',
-  'backcountry-skiing': '/api/v1/recommendations/ski-touring',
+  'alpine_skiing': '/api/v1/recommendations/alpine',
+  'xc_skiing': '/api/v1/recommendations/xc',
+  'backcountry_skiing': '/api/v1/recommendations/ski-touring',
 };
 
 /**

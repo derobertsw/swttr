@@ -26,7 +26,7 @@ function formatTemp(temp: number): string {
 }
 
 export default function Backpack() {
-  const [activity, setActivity] = useState("backcountry-skiing");
+  const [activity, setActivity] = useState("backcountry_skiing");
   const [tempSlider, setTempSlider] = useState<number[]>([-20, 45]);
 
   const tempRange = useMemo(

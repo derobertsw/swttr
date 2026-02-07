@@ -29,7 +29,7 @@ describe("Preferences API Route", () => {
 
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("neutral");
-        expect(data.defaultActivity).toBe("alpine-skiing");
+        expect(data.defaultActivity).toBe("alpine_skiing");
       });
     });
 
@@ -44,7 +44,7 @@ describe("Preferences API Route", () => {
 
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("neutral");
-        expect(data.defaultActivity).toBe("alpine-skiing");
+        expect(data.defaultActivity).toBe("alpine_skiing");
       });
     });
 
@@ -57,7 +57,7 @@ describe("Preferences API Route", () => {
           single: vi.fn().mockResolvedValue({
             data: {
               temperature_sensitivity: "cold",
-              default_activity: "xc-skiing",
+              default_activity: "xc_skiing",
             },
             error: null,
           }),
@@ -73,7 +73,7 @@ describe("Preferences API Route", () => {
 
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("cold");
-        expect(data.defaultActivity).toBe("xc-skiing");
+        expect(data.defaultActivity).toBe("xc_skiing");
       });
 
       it("should return defaults when no user preferences exist (PGRST116)", async () => {
@@ -97,7 +97,7 @@ describe("Preferences API Route", () => {
 
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("neutral");
-        expect(data.defaultActivity).toBe("alpine-skiing");
+        expect(data.defaultActivity).toBe("alpine_skiing");
       });
 
       it("should return defaults on database error", async () => {
@@ -121,7 +121,7 @@ describe("Preferences API Route", () => {
 
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("neutral");
-        expect(data.defaultActivity).toBe("alpine-skiing");
+        expect(data.defaultActivity).toBe("alpine_skiing");
       });
 
       it("should return defaults on exception", async () => {
@@ -142,7 +142,7 @@ describe("Preferences API Route", () => {
 
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("neutral");
-        expect(data.defaultActivity).toBe("alpine-skiing");
+        expect(data.defaultActivity).toBe("alpine_skiing");
       });
     });
   });

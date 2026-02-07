@@ -8,7 +8,7 @@ function getUserId(request: NextRequest): string | null {
 
 const DEFAULT_PREFERENCES = {
   temperatureSensitivity: "neutral" as TemperatureSensitivity,
-  defaultActivity: "alpine-skiing",
+  defaultActivity: "alpine_skiing",
 };
 
 export async function GET(request: NextRequest) {
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       temperatureSensitivity: (data?.temperature_sensitivity || "neutral") as TemperatureSensitivity,
-      defaultActivity: data?.default_activity || "alpine-skiing",
+      defaultActivity: data?.default_activity || "alpine_skiing",
     });
   } catch (err) {
     console.error("Database error:", err);
@@ -64,7 +64,7 @@ export async function PUT(request: NextRequest) {
   if (!supabase || !userId) {
     return NextResponse.json({
       temperatureSensitivity: temperatureSensitivity || "neutral",
-      defaultActivity: defaultActivity || "alpine-skiing",
+      defaultActivity: defaultActivity || "alpine_skiing",
     });
   }
 
@@ -97,7 +97,7 @@ export async function PUT(request: NextRequest) {
       // Return what was sent - client already saved to localStorage
       return NextResponse.json({
         temperatureSensitivity: temperatureSensitivity || "neutral",
-        defaultActivity: defaultActivity || "alpine-skiing",
+        defaultActivity: defaultActivity || "alpine_skiing",
       });
     }
 
@@ -110,7 +110,7 @@ export async function PUT(request: NextRequest) {
     // Return what was sent - client already saved to localStorage
     return NextResponse.json({
       temperatureSensitivity: temperatureSensitivity || "neutral",
-      defaultActivity: defaultActivity || "alpine-skiing",
+      defaultActivity: defaultActivity || "alpine_skiing",
     });
   }
 }

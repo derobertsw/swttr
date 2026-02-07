@@ -6,7 +6,7 @@ import { PreferencesDrawer } from "./PreferencesDrawer";
 describe("PreferencesDrawer", () => {
   const defaultProps = {
     sensitivity: "neutral" as const,
-    defaultActivity: "alpine-skiing",
+    defaultActivity: "alpine_skiing",
     onSensitivityChange: vi.fn(),
     onDefaultActivityChange: vi.fn(),
     children: <button>Open Preferences</button>,

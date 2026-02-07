@@ -482,7 +482,7 @@ describe("LayerDisplay", () => {
     it("should exclude helmet insulation from head/neck clo for xc skiing", () => {
       render(
         <LayerDisplay
-          activity="xc-skiing"
+          activity="xc_skiing"
           recommendation={null}
           temperature={15}
           windspeed={10}

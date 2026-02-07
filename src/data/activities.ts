@@ -14,10 +14,10 @@ export interface Activity {
 export const ACTIVITIES: Activity[] = [
   { name: "Running", value: "running", icon: RunningIcon },
   { name: "Biking", value: "biking", icon: Bike },
-  { name: "Hiking / Snowshoeing", value: "hiking-snowshoeing", icon: Mountain },
-  { name: "Backcountry Skiing", value: "backcountry-skiing", icon: BackcountrySkiIcon, descriptor: "Uphill · Touring" },
-  { name: "Alpine Skiing", value: "alpine-skiing", icon: AlpineSkiIcon, descriptor: "Chairlifts · Resort" },
-  { name: "XC Skiing", value: "xc-skiing", icon: XCSkiIcon, descriptor: "High output · Aerobic" },
+  { name: "Hiking / Snowshoeing", value: "hiking_snowshoeing", icon: Mountain },
+  { name: "Backcountry Skiing", value: "backcountry_skiing", icon: BackcountrySkiIcon, descriptor: "Uphill · Touring" },
+  { name: "Alpine Skiing", value: "alpine_skiing", icon: AlpineSkiIcon, descriptor: "Chairlifts · Resort" },
+  { name: "XC Skiing", value: "xc_skiing", icon: XCSkiIcon, descriptor: "High output · Aerobic" },
 ];
 
-export const DEFAULT_ACTIVITY = "alpine-skiing";
+export const DEFAULT_ACTIVITY = "alpine_skiing";

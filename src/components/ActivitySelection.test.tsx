@@ -71,7 +71,7 @@ describe("ActivitySelection", () => {
 
   describe("initial value", () => {
     it("should start at the correct activity based on value prop", () => {
-      render(<ActivitySelection value="alpine-skiing" onChange={vi.fn()} />);
+      render(<ActivitySelection value="alpine_skiing" onChange={vi.fn()} />);
 
       const slides = screen.getAllByRole("group");
       const alpineSlide = slides[4];

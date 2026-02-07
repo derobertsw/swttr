@@ -1,18 +1,15 @@
 import { RecommendedGarment } from "@/types/biophysics";
 import { LayerSet, LayerItem } from "@/types/recommendations";
+import { BodyPart, BODY_PARTS as _BODY_PARTS } from "@/types/wardrobe";
 
 // Re-export for convenience
 export type { LayerSet, LayerItem };
+export type { BodyPart };
 
 /**
  * Layer type classification for garments
  */
 export type LayerType = "base" | "mid" | "outer";
-
-/**
- * Body part classification for layering
- */
-export type BodyPart = "torso" | "legs" | "hands" | "headNeck";
 
 /**
  * Mapping from garment categories to their layer types.
@@ -72,7 +69,7 @@ export const BODY_PART_TO_EXTREMITY: Record<BodyPart, "hands" | "head" | null> =
 /**
  * All body parts in display order
  */
-export const BODY_PARTS: readonly BodyPart[] = ["torso", "legs", "hands", "headNeck"] as const;
+export const BODY_PARTS = _BODY_PARTS;
 
 /**
  * Creates an empty LayerSet with no garments

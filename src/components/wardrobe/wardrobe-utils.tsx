@@ -1,5 +1,6 @@
 import { Shirt, Hand, HardHat, Layers, Flame, Shield, Wind, CloudRain, LucideProps } from "lucide-react";
 import type { WardrobeItem } from "@/types/wardrobe";
+import type { EstimationMethod } from "@/types/garments";
 
 // Custom pants icon (ski pants style) since lucide-react doesn't have one
 export function PantsIcon(props: LucideProps) {
@@ -63,6 +64,28 @@ export function formatCategory(category: string): string {
   return category
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function formatEstimationMethod(method: EstimationMethod | undefined): string {
+  if (!method) return "—";
+  const labels: Record<EstimationMethod, string> = {
+    lab_tested: "Lab Tested",
+    derived_from_similar: "Derived from Similar",
+    calculated_from_materials: "Calculated from Materials",
+  };
+  return labels[method] || method;
+}
+
+export function formatConfidence(score: number | undefined): string {
+  if (score === undefined) return "—";
+  if (score >= 0.9) return "High";
+  if (score >= 0.7) return "Medium";
+  return "Low";
+}
+
+export function formatValue(value: number | undefined | null, decimals: number = 3): string {
+  if (value === undefined || value === null) return "—";
+  return value.toFixed(decimals);
 }
 
 export function getClo(item: WardrobeItem): number | undefined {

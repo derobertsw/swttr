@@ -1,6 +1,6 @@
 export const BACKPACK_ACTIVITIES = [
-  { value: "backcountry-skiing", label: "Backcountry Skiing" },
-  { value: "xc-skiing", label: "XC Skiing" },
+  { value: "backcountry_skiing", label: "Backcountry Skiing" },
+  { value: "xc_skiing", label: "XC Skiing" },
 ] as const;
 
 export const BACKPACK_ACTIVITY_IDS: string[] = BACKPACK_ACTIVITIES.map((a) => a.value);

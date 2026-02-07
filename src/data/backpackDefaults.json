@@ -1,5 +1,5 @@
 {
-  "backcountry-skiing": {
+  "backcountry_skiing": {
     "-20--15": ["Hand warmers", "Extra goggles", "Face mask"],
     "-15--10": ["Hand warmers", "Extra goggles", "Face mask"],
     "-10--5": ["Hand warmers", "Extra goggles"],
@@ -14,7 +14,7 @@
     "35-40": ["Water bottle", "Sunscreen", "Sunglasses"],
     "40+": ["Water bottle", "Sunscreen", "Sunglasses"]
   },
-  "xc-skiing": {
+  "xc_skiing": {
     "-20--15": ["Hand warmers", "Extra gloves", "Thermos"],
     "-15--10": ["Hand warmers", "Extra gloves", "Thermos"],
     "-10--5": ["Hand warmers", "Thermos", "Snacks"],

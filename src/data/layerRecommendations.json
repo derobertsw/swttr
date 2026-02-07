@@ -1,5 +1,5 @@
 {
-  "alpine-skiing": {
+  "alpine_skiing": {
     "-20--15": {
       "torso": {
         "base": ["Heavy"],
@@ -170,7 +170,7 @@
       }
     }
   },
-  "xc-skiing": {
+  "xc_skiing": {
     "-20--15": {
       "torso": {
         "base": ["Heavy"],
@@ -341,7 +341,7 @@
       }
     }
   },
-  "hiking-snowshoeing": {
+  "hiking_snowshoeing": {
     "-20--15": {
       "torso": {
         "base": ["Heavy"],
