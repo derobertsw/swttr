@@ -8,16 +8,15 @@ export interface Activity {
   name: string;
   value: string;
   icon: LucideIcon;
-  descriptor?: string;
 }
 
 export const ACTIVITIES: Activity[] = [
   { name: "Running", value: "running", icon: RunningIcon },
   { name: "Biking", value: "biking", icon: Bike },
   { name: "Hiking / Snowshoeing", value: "hiking_snowshoeing", icon: Mountain },
-  { name: "Backcountry Skiing", value: "backcountry_skiing", icon: BackcountrySkiIcon, descriptor: "Uphill · Touring" },
-  { name: "Alpine Skiing", value: "alpine_skiing", icon: AlpineSkiIcon, descriptor: "Chairlifts · Resort" },
-  { name: "XC Skiing", value: "xc_skiing", icon: XCSkiIcon, descriptor: "High output · Aerobic" },
+  { name: "Backcountry Skiing", value: "backcountry_skiing", icon: BackcountrySkiIcon },
+  { name: "Alpine Skiing", value: "alpine_skiing", icon: AlpineSkiIcon },
+  { name: "XC Skiing", value: "xc_skiing", icon: XCSkiIcon },
 ];
 
 export const DEFAULT_ACTIVITY = "alpine_skiing";

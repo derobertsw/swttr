@@ -300,7 +300,7 @@ describe("Home Page", () => {
       mockSearchParams.set("mode", "planAhead");
       render(<Home />);
 
-      expect(screen.getByRole("button", { name: /pick a date/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /pick start date/i })).toBeInTheDocument();
     });
 
     it("should show time input in plan ahead mode", () => {

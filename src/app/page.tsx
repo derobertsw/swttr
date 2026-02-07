@@ -36,8 +36,11 @@ const HomeContent = () => {
     <PageLayout onLogoClick={resetToInitialState}>
       {!showResults ? (
         <>
-          <p className="text-base font-medium text-white/80 text-center mb-3">
-            Choose your activity
+          <p className="text-sm font-semibold text-white/75 text-center mb-2 uppercase tracking-wide">
+            1. Activity
+          </p>
+          <p className="text-base font-medium text-white/90 text-center mb-3">
+            Choose your trip activity
           </p>
           <ActivitySelection value={activity} onChange={setActivity} />
           {inputMode === "manual" && locationDenied ? (
@@ -72,7 +75,13 @@ const HomeContent = () => {
               onDismiss={locationSearch.dismiss}
             />
           ) : null}
-          <p className="text-sm text-white/55 text-center mb-4">
+          <p className="text-sm text-white/75 text-center mb-1">
+            Get recommendation for selected start time
+          </p>
+          <p className="text-xs text-white/60 text-center mb-4">
+            Multi-day plans will generate day-by-day packing guidance.
+          </p>
+          <p className="text-xs text-white/50 text-center mb-4">
             Built on thermal science
           </p>
           <div className="flex flex-col items-center" />

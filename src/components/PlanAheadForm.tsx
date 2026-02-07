@@ -9,7 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, CalendarDays, Route, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LocationSuggestion } from "@/types/recommendations";
 import { RefObject } from "react";
@@ -33,6 +33,17 @@ interface PlanAheadFormProps {
   onDismiss?: () => void;
 }
 
+function formatStartTimeLabel(time: string): string {
+  const [hoursRaw, minutesRaw] = time.split(":");
+  const hours = Number.parseInt(hoursRaw, 10);
+  const minutes = Number.parseInt(minutesRaw, 10);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return time;
+
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date);
+}
+
 export function PlanAheadForm({
   date,
   time,
@@ -49,10 +60,34 @@ export function PlanAheadForm({
   onSelectLocation,
   onDismiss,
 }: PlanAheadFormProps) {
+  const timeLabel = formatStartTimeLabel(time);
+
   return (
-    <div className="flex w-full max-w-sm flex-col gap-6">
+    <div className="flex w-full max-w-sm flex-col gap-5 pb-28">
+      <section className="rounded-xl border border-white/30 bg-white/10 p-3 backdrop-blur-lg">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Trip Mode</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className="rounded-lg border border-white/45 bg-white/25 px-3 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+          >
+            <p className="text-sm font-semibold text-white">Single Day</p>
+            <p className="text-[11px] text-white/75">Current support</p>
+          </button>
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-left opacity-80"
+          >
+            <p className="text-sm font-semibold text-white/85">Multi Day</p>
+            <p className="text-[11px] text-white/65">Coming soon</p>
+          </button>
+        </div>
+      </section>
+
       <LocationAutocomplete
-        label="Location"
+        label="2. Location"
         location={location}
         locationQuery={locationQuery}
         suggestions={suggestions}
@@ -66,7 +101,7 @@ export function PlanAheadForm({
       />
 
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-white/80">Date & Time</label>
+        <label className="text-sm font-medium text-white/80">3. Start</label>
         <div className="flex gap-2">
           <Popover>
             <PopoverTrigger asChild>
@@ -78,7 +113,7 @@ export function PlanAheadForm({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {date ? format(date, "MMM d, yyyy") : "Pick a date"}
+                {date ? format(date, "MMM d, yyyy") : "Pick start date"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className={`w-auto p-0 rounded-xl ${SUGGESTIONS_DROPDOWN}`}>
@@ -90,15 +125,53 @@ export function PlanAheadForm({
               />
             </PopoverContent>
           </Popover>
-          <Input
-            type="time"
-            value={time}
-            onChange={(e) => onTimeChange(e.target.value)}
-            className={`h-12 w-28 sm:w-32 ${FROSTED_INPUT}`}
-          />
+          <div className="w-40 sm:w-44">
+            <Input
+              type="time"
+              value={time}
+              onChange={(e) => onTimeChange(e.target.value)}
+              className={`h-12 tabular-nums ${FROSTED_INPUT}`}
+              aria-label="Start time"
+            />
+          </div>
         </div>
+        <p className="text-xs text-white/70">Start time: {timeLabel} (local)</p>
+        <p className="text-xs text-white/65">
+          Multi-day plans will include daily weather shifts and packing deltas.
+        </p>
       </div>
 
+      <section className="rounded-xl border border-white/30 bg-white/10 p-3.5 backdrop-blur-lg">
+        <p className="text-sm font-medium text-white/80">4. Duration</p>
+        <div className="mt-2 flex items-center justify-between rounded-lg border border-white/25 bg-white/5 px-3 py-2.5">
+          <div className="flex items-center gap-2 text-white/90">
+            <CalendarDays className="size-4" />
+            <span className="text-sm font-medium">1 day</span>
+          </div>
+          <span className="text-xs text-white/65">Multi-day coming soon</span>
+        </div>
+      </section>
+
+      <details className="rounded-xl border border-dashed border-white/30 bg-white/[0.06] p-3.5">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-white/80">
+          <span className="flex items-center gap-2">
+            <Route className="size-4" />
+            <span className="text-sm font-medium">5. Multi-day preview</span>
+          </span>
+          <ChevronDown className="size-4 opacity-70" />
+        </summary>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {["Day 1", "Day 2", "Day 3"].map((label) => (
+            <div
+              key={label}
+              className="rounded-lg border border-white/20 bg-white/5 px-2 py-2 text-center"
+            >
+              <p className="text-xs font-semibold text-white/80">{label}</p>
+              <p className="mt-1 text-[11px] text-white/60">Weather + layer delta</p>
+            </div>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }
