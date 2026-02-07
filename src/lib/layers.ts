@@ -1,15 +1,10 @@
 import { RecommendedGarment } from "@/types/biophysics";
 import { LayerSet, LayerItem } from "@/types/recommendations";
-import { BodyPart, BODY_PARTS as _BODY_PARTS } from "@/types/wardrobe";
+import { BodyPart, LayerType, BODY_PARTS as _BODY_PARTS } from "@/types/wardrobe";
 
 // Re-export for convenience
 export type { LayerSet, LayerItem };
-export type { BodyPart };
-
-/**
- * Layer type classification for garments
- */
-export type LayerType = "base" | "mid" | "outer";
+export type { BodyPart, LayerType };
 
 /**
  * Mapping from garment categories to their layer types.

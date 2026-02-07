@@ -3,20 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, Shirt, Backpack, Settings, Zap, Loader2 } from "lucide-react";
+import { CalendarDays, Shirt, Zap, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PreferencesDrawer } from "@/components/PreferencesDrawer";
-import { usePreferences } from "@/hooks/usePreferences";
-import { ACTIVITIES } from "@/data/activities";
+import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
 import { STORAGE_KEYS } from "@/lib/storage";
 
-const LEFT_ITEMS = [
+const TAB_ITEMS = [
   { href: "/?mode=planAhead", label: "Plan", icon: CalendarDays },
   { href: "/wardrobe", label: "Wardrobe", icon: Shirt },
-];
-
-const RIGHT_ITEMS = [
-  { href: "/backpack", label: "Backpack", icon: Backpack },
 ];
 
 export function MobileTabBar() {
@@ -25,12 +19,6 @@ export function MobileTabBar() {
   const [isGearUpLoading, setIsGearUpLoading] = useState(false);
   const [activityValue, setActivityValue] = useState<string>("");
   const [isFabPulse, setIsFabPulse] = useState(false);
-  const {
-    sensitivity,
-    defaultActivity,
-    updateSensitivity,
-    updateDefaultActivity,
-  } = usePreferences();
 
   const isLandingScreen = pathname === "/";
 
@@ -56,10 +44,8 @@ export function MobileTabBar() {
       setActivityValue(stored);
       return;
     }
-    if (defaultActivity) {
-      setActivityValue(defaultActivity);
-    }
-  }, [activityValue, defaultActivity]);
+    setActivityValue(DEFAULT_ACTIVITY);
+  }, [activityValue]);
 
   useEffect(() => {
     const onActivityChange = (event: Event) => {
@@ -118,23 +104,10 @@ export function MobileTabBar() {
       style={{ backgroundColor: "rgba(45, 107, 116, 0.62)" }}
     >
       <div className="relative h-16 backdrop-blur-lg">
-        <div className="grid h-16 grid-cols-5 items-center px-3 pb-1">
-          {LEFT_ITEMS.map(renderTab)}
-          <div />
-          {RIGHT_ITEMS.map(renderTab)}
-          <PreferencesDrawer
-            sensitivity={sensitivity}
-            defaultActivity={defaultActivity}
-            onSensitivityChange={updateSensitivity}
-            onDefaultActivityChange={updateDefaultActivity}
-          >
-            <button className="flex flex-col items-center gap-1 text-xs font-semibold leading-none tracking-wide transition-all text-white/70 translate-y-0.5">
-              <div className="flex items-center justify-center size-9 rounded-full">
-                <Settings className="size-5 opacity-80" />
-              </div>
-              <span className="opacity-85">Settings</span>
-            </button>
-          </PreferencesDrawer>
+        <div className="flex h-16 items-center justify-around px-3 pb-1">
+          {renderTab(TAB_ITEMS[0])}
+          <div className="w-16" />
+          {renderTab(TAB_ITEMS[1])}
         </div>
 
         <button

@@ -8,10 +8,7 @@ import LayerDisplay from "@/components/LayerDisplay";
 import { PlanAheadForm } from "@/components/PlanAheadForm";
 import { LocationInput } from "@/components/LocationInput";
 import { useItemMappings } from "@/hooks/useItemMappings";
-import { useBackpack } from "@/hooks/useBackpack";
 import { useGearUp } from "@/hooks/useGearUp";
-import { getAdjustedTempRange } from "@/lib/getTempRange";
-import { BACKPACK_ACTIVITY_IDS } from "@/data/backpackConstants";
 import { ACTIVITIES } from "@/data/activities";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -34,14 +31,11 @@ const HomeContent = () => {
     setTime,
     locationDenied,
     biophysicsData,
-    sensitivity,
     locationSearch,
     resetToInitialState,
   } = useGearUp();
 
   const { itemMappings } = useItemMappings();
-  const tempRangeForBackpack = getAdjustedTempRange(temperature, sensitivity);
-  const backpack = useBackpack(activity, tempRangeForBackpack);
 
   return (
     <PageLayout onLogoClick={resetToInitialState}>
@@ -104,9 +98,6 @@ const HomeContent = () => {
             temperature={temperature}
             windspeed={windspeed}
             itemMappings={itemMappings}
-            backpackItems={BACKPACK_ACTIVITY_IDS.includes(activity) ? backpack.items : undefined}
-            onRemoveBackpackItem={BACKPACK_ACTIVITY_IDS.includes(activity) ? backpack.removeItem : undefined}
-            onHideBackpackDefault={BACKPACK_ACTIVITY_IDS.includes(activity) ? backpack.hideDefault : undefined}
             biophysicsData={biophysicsData}
           />
         </>

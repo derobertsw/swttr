@@ -7,7 +7,6 @@ export const STORAGE_KEYS = {
   SENSITIVITY: "swttr-temperature-sensitivity",
   DEFAULT_ACTIVITY: "swttr-default-activity",
   LAST_ACTIVITY: "swttr-last-activity",
-  BACKPACK: "swttr-backpack",
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

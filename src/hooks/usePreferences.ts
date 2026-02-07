@@ -5,6 +5,7 @@ import { TemperatureSensitivity } from "@/types/preferences";
 import { DEFAULT_ACTIVITY } from "@/data/activities";
 import { useUserId } from "@/hooks/useUserId";
 import { STORAGE_KEYS } from "@/lib/storage";
+import { logWarn } from "@/lib/logger";
 
 const VALID_SENSITIVITIES: readonly TemperatureSensitivity[] = ["hot", "neutral", "cold"];
 
@@ -51,8 +52,8 @@ export function usePreferences() {
             localStorage.setItem(STORAGE_KEYS.DEFAULT_ACTIVITY, data.defaultActivity);
           }
         }
-      } catch {
-        // Already loaded from localStorage
+      } catch (err) {
+        logWarn("usePreferences.fetch", err);
       } finally {
         setLoading(false);
       }
@@ -76,8 +77,8 @@ export function usePreferences() {
             },
             body: JSON.stringify({ temperatureSensitivity: newSensitivity }),
           });
-        } catch {
-          // Saved to localStorage
+        } catch (err) {
+          logWarn("usePreferences.updateSensitivity", err);
         }
       }
     },
@@ -99,8 +100,8 @@ export function usePreferences() {
             },
             body: JSON.stringify({ defaultActivity: newActivity }),
           });
-        } catch {
-          // Saved to localStorage
+        } catch (err) {
+          logWarn("usePreferences.updateDefaultActivity", err);
         }
       }
     },

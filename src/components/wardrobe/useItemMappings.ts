@@ -8,6 +8,7 @@ import {
   makeItemMappingKey,
   UserItemMapping,
 } from "@/types/wardrobe";
+import { logWarn } from "@/lib/logger";
 
 const STORAGE_KEY = "swttr-item-mappings";
 
@@ -54,7 +55,7 @@ function loadFromLocalStorage(): Map<ItemMappingKey, string> {
       return map;
     }
   } catch (err) {
-    console.error("Failed to load from localStorage:", err);
+    logWarn("useItemMappings.loadFromLocalStorage", err);
   }
   return new Map();
 }
@@ -68,7 +69,7 @@ function saveToLocalStorage(mappings: Map<ItemMappingKey, string>): void {
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (err) {
-    console.error("Failed to save to localStorage:", err);
+    logWarn("useItemMappings.saveToLocalStorage", err);
   }
 }
 
@@ -97,7 +98,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
 
       // If database not configured, fall back to localStorage
       if (res.status === 503) {
-        console.log("Database unavailable (503), falling back to localStorage for fetch");
+        logWarn("useItemMappings.fetch", "Database unavailable (503), falling back to localStorage");
         setUseLocalStorage(true);
         const localMappings = loadFromLocalStorage();
         setMappings(localMappings);
@@ -125,9 +126,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
       setMappings(map);
       setUseLocalStorage(false);
     } catch (err) {
-      console.error("Failed to fetch item mappings:", err);
-      // Fall back to localStorage on any error
-      console.log("Database fetch failed, falling back to localStorage");
+      logWarn("useItemMappings.fetch", err);
       setUseLocalStorage(true);
       const localMappings = loadFromLocalStorage();
       setMappings(localMappings);
@@ -182,7 +181,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
 
         // If database not configured, fall back to localStorage
         if (res.status === 503) {
-          console.log("Database unavailable (503), falling back to localStorage for update");
+          logWarn("useItemMappings.update", "Database unavailable (503), falling back to localStorage");
           setUseLocalStorage(true);
           setMappings((prev) => {
             const next = new Map(prev);
@@ -201,9 +200,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
           return next;
         });
       } catch (err) {
-        console.error("Failed to update mapping:", err);
-        // Fall back to localStorage on error
-        console.log("Database update failed, falling back to localStorage");
+        logWarn("useItemMappings.update", err);
         setUseLocalStorage(true);
         setMappings((prev) => {
           const next = new Map(prev);
@@ -251,7 +248,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
 
         // If database not configured, fall back to localStorage
         if (res.status === 503) {
-          console.log("Database unavailable (503), falling back to localStorage for delete");
+          logWarn("useItemMappings.delete", "Database unavailable (503), falling back to localStorage");
           setUseLocalStorage(true);
           setMappings((prev) => {
             const next = new Map(prev);
@@ -270,9 +267,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
           return next;
         });
       } catch (err) {
-        console.error("Failed to delete mapping:", err);
-        // Fall back to localStorage on error
-        console.log("Database delete failed, falling back to localStorage");
+        logWarn("useItemMappings.delete", err);
         setUseLocalStorage(true);
         setMappings((prev) => {
           const next = new Map(prev);

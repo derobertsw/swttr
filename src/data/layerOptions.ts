@@ -1,4 +1,6 @@
 // Defines the valid layer options for each body part
+import type { BodyPart, LayerType } from "@/types/wardrobe";
+export type { BodyPart, LayerType };
 
 export const layerOptions = {
   torso: {
@@ -33,9 +35,6 @@ export const layerOptions = {
     outer: ["Helmet", "Goggles"],
   },
 } as const;
-
-export type BodyPart = keyof typeof layerOptions;
-export type LayerType = "base" | "mid" | "outer";
 
 export type TorsoBaseOption = (typeof layerOptions.torso.base)[number];
 export type TorsoMidOption = (typeof layerOptions.torso.mid)[number];

@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { logWarn } from "@/lib/logger";
 
 interface WeatherSliderProps {
   id: string;
@@ -64,7 +65,7 @@ function useCurrentWeather(
           toast.success("Weather updated to current conditions");
         } catch (error) {
           toast.error("Failed to fetch weather data");
-          console.error(error);
+          logWarn("WeatherSelection.fetchCurrentWeather", error);
         } finally {
           setLoading(false);
         }

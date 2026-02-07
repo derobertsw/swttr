@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Shirt, Backpack, Settings, HelpCircle, MessageSquare } from "lucide-react";
+import { CalendarDays, Shirt, Settings, HelpCircle, MessageSquare } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -20,7 +20,6 @@ import { usePreferences } from "@/hooks/usePreferences";
 const NAV_ITEMS = [
   { href: "/?mode=planAhead", label: "Plan", icon: CalendarDays },
   { href: "/wardrobe", label: "Wardrobe", icon: Shirt },
-  { href: "/backpack", label: "Backpack", icon: Backpack },
 ];
 
 const FOOTER_ITEMS = [

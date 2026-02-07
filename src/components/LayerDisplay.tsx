@@ -1,4 +1,4 @@
-import { BackpackItem, Recommendation } from "@/types/recommendations";
+import { Recommendation } from "@/types/recommendations";
 import {
   BiophysicsRecommendation,
   RecommendedHandwear,
@@ -21,7 +21,6 @@ import {
   ThermalGauge,
   ThermalStatusCard,
   BodyPartSection,
-  BackpackSection,
   GuidanceSection,
 } from "@/components/layers";
 
@@ -31,9 +30,6 @@ interface LayerDisplayProps {
   temperature: number;
   windspeed: number;
   itemMappings?: Map<string, string>;
-  backpackItems?: BackpackItem[];
-  onRemoveBackpackItem?: (name: string) => void;
-  onHideBackpackDefault?: (name: string) => void;
   biophysicsData?: BiophysicsRecommendation | null;
 }
 
@@ -95,9 +91,6 @@ const LayerDisplay = ({
   temperature,
   windspeed,
   itemMappings,
-  backpackItems,
-  onRemoveBackpackItem,
-  onHideBackpackDefault,
   biophysicsData,
 }: LayerDisplayProps) => {
   if (!recommendation && !biophysicsData) return null;
@@ -177,14 +170,6 @@ const LayerDisplay = ({
           );
         })}
       </div>
-
-      {backpackItems && (
-        <BackpackSection
-          items={backpackItems}
-          onRemoveCustom={onRemoveBackpackItem}
-          onHideDefault={onHideBackpackDefault}
-        />
-      )}
 
       {biophysicsData?.guidance && (
         <div className="flex flex-col gap-3">

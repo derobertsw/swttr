@@ -13,6 +13,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useBiophysicsRecommendation } from "@/hooks/useBiophysicsRecommendation";
 import { fetchCurrentWeather, fetchWeatherByCoords } from "@/hooks/useCurrentWeather";
 import { BiophysicsRecommendation } from "@/types/biophysics";
+import { logWarn } from "@/lib/logger";
 import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { TemperatureSensitivity } from "@/types/preferences";
@@ -320,7 +321,7 @@ export function useGearUp() {
         dispatch({ type: "SUBMIT_SUCCESS", ...result });
       } catch (error) {
         toast.error("Failed to fetch weather forecast");
-        console.error(error);
+        logWarn("useGearUp.handleSubmit", error);
         dispatch({ type: "SUBMIT_ERROR" });
       }
     } else if (state.showSliders) {

@@ -1,4 +1,3 @@
-export * from './backpack';
 export * from './biophysics';
 export * from './garments';
 export * from './preferences';

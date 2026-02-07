@@ -3,9 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Share2, HelpCircle, Menu, MessageSquare } from "lucide-react";
+import { Share2, HelpCircle, Menu, MessageSquare, Settings } from "lucide-react";
 import { toast } from "sonner";
+import { logWarn } from "@/lib/logger";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { PreferencesDrawer } from "@/components/PreferencesDrawer";
+import { usePreferences } from "@/hooks/usePreferences";
 import {
   Sheet,
   SheetContent,
@@ -23,6 +26,12 @@ interface HeaderProps {
 
 const Header = ({ onLogoClick }: HeaderProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const {
+    sensitivity,
+    defaultActivity,
+    updateSensitivity,
+    updateDefaultActivity,
+  } = usePreferences();
 
   const handleShare = async () => {
     const shareData = {
@@ -35,8 +44,8 @@ const Header = ({ onLogoClick }: HeaderProps) => {
       try {
         await navigator.share(shareData);
       } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          console.error("Share failed:", err);
+        if (err instanceof Error && err.name !== "AbortError") {
+          logWarn("Header.share", err);
         }
       }
     } else {
@@ -123,6 +132,17 @@ const Header = ({ onLogoClick }: HeaderProps) => {
                 <MessageSquare className="size-4" />
                 Feedback
               </a>
+              <PreferencesDrawer
+                sensitivity={sensitivity}
+                defaultActivity={defaultActivity}
+                onSensitivityChange={updateSensitivity}
+                onDefaultActivityChange={updateDefaultActivity}
+              >
+                <button className="flex items-center gap-3 text-sm font-medium hover:text-primary text-left">
+                  <Settings className="size-4" />
+                  Settings
+                </button>
+              </PreferencesDrawer>
               <button
                 onClick={handleShare}
                 className="flex items-center gap-3 text-sm font-medium hover:text-primary text-left"

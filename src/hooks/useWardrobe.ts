@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useUserId } from "@/hooks/useUserId";
+import { logWarn } from "@/lib/logger";
 import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
 import { normalizeSearch, getBodyPart, BODY_PART_ORDER } from "@/components/wardrobe/wardrobe-utils";
 
@@ -15,6 +16,12 @@ export function useWardrobe() {
   const [justAdded, setJustAdded] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<WardrobeItem | null>(null);
   const [recentlyRemoved, setRecentlyRemoved] = useState<WardrobeItem[]>([]);
+  const addTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    return () => clearTimeout(addTimerRef.current);
+  }, []);
+
   const [disabledCollapsed, setDisabledCollapsed] = useState<Record<string, boolean>>({
     torso: true,
     legs: true,
@@ -41,7 +48,7 @@ export function useWardrobe() {
         setAvailableItems(availableData.items || []);
         setWardrobeItems(wardrobeData.items || []);
       } catch (err) {
-        console.error("Failed to fetch data:", err);
+        logWarn("useWardrobe.fetchData", err);
       } finally {
         setLoading(false);
       }
@@ -121,20 +128,23 @@ export function useWardrobe() {
       if (res.ok) {
         setJustAdded(item.id);
         setAdding(null);
-        setTimeout(() => {
+        addTimerRef.current = setTimeout(() => {
           setJustAdded(null);
           fetch("/api/wardrobe/gear", {
             headers: { "x-user-id": userId },
-          }).then(r => r.json()).then(data => {
-            setWardrobeItems(data.items || []);
-          });
+          })
+            .then(r => r.json())
+            .then(data => {
+              setWardrobeItems(data.items || []);
+            })
+            .catch(err => logWarn("useWardrobe.addItem.refresh", err));
           setSearch("");
         }, 600);
       } else {
         setAdding(null);
       }
     } catch (err) {
-      console.error("Failed to add item:", err);
+      logWarn("useWardrobe.addItem", err);
       setAdding(null);
     }
   };
@@ -157,7 +167,7 @@ export function useWardrobe() {
         }
       }
     } catch (err) {
-      console.error("Failed to remove item:", err);
+      logWarn("useWardrobe.removeItem", err);
     }
   };
 
@@ -187,7 +197,7 @@ export function useWardrobe() {
         setRecentlyRemoved((prev) => prev.filter((r) => r.item_id !== item.item_id));
       }
     } catch (err) {
-      console.error("Failed to restore item:", err);
+      logWarn("useWardrobe.restoreItem", err);
     } finally {
       setAdding(null);
     }
@@ -221,7 +231,7 @@ export function useWardrobe() {
         );
       }
     } catch (err) {
-      console.error("Failed to toggle item:", err);
+      logWarn("useWardrobe.toggleDisabled", err);
     }
   };
 
