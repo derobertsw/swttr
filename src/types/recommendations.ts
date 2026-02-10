@@ -1,6 +1,7 @@
 export interface LayerItem {
   name: string;
   rcl?: number;
+  isGeneric?: boolean;
 }
 
 export interface LayerSet {

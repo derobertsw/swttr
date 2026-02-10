@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { Plus, Shirt, Footprints, Hand, HardHat, Flame, ChevronDown } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Shirt, Footprints, Hand, HardHat, Flame, ChevronDown } from "lucide-react";
 import { RecommendedHandwear, RecommendedHeadwear } from "@/types/biophysics";
 import { BodyPart, LayerSet, BODY_PART_LABELS, hasAnyLayers } from "@/lib/layers";
 import { cn } from "@/lib/utils";
@@ -20,6 +19,7 @@ interface BodyPartSectionProps {
   targetClo: number | undefined;
   itemMappings?: Map<string, string>;
   defaultCollapsed?: boolean;
+  onGenericCloChange?: (bodyPart: BodyPart, clo: number) => void;
 }
 
 function getEmptyStateMessage(bodyPart: BodyPart): string {
@@ -59,20 +59,32 @@ export function BodyPartSection({
   targetClo,
   itemMappings,
   defaultCollapsed = false,
+  onGenericCloChange,
 }: BodyPartSectionProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [genericCloContribution, setGenericCloContribution] = useState(0);
+
+  useEffect(() => {
+    onGenericCloChange?.(bodyPart, genericCloContribution);
+  }, [bodyPart, genericCloContribution, onGenericCloChange]);
 
   const hasHeadwear = headwear && (headwear.helmet || headwear.head_warmth || headwear.neck_warmth);
 
   const hasExtremityGear =
     (bodyPart === "hands" && handwear) || (bodyPart === "headNeck" && hasHeadwear);
 
-  const hasContent = hasAnyLayers(layers) || hasExtremityGear;
+  const effectiveCurrentClo =
+    currentClo !== undefined
+      ? currentClo + genericCloContribution
+      : genericCloContribution > 0
+        ? genericCloContribution
+        : undefined;
+  const hasContent = hasAnyLayers(layers) || hasExtremityGear || genericCloContribution > 0;
   const isOverTarget =
     targetClo !== undefined &&
-    currentClo !== undefined &&
+    effectiveCurrentClo !== undefined &&
     targetClo > 0 &&
-    currentClo / targetClo >= 1.2;
+    effectiveCurrentClo / targetClo >= 1.2;
 
   return (
     <div className="rounded-lg bg-white/40 backdrop-blur-[2px] p-5">
@@ -91,7 +103,7 @@ export function BodyPartSection({
               <Flame className="size-4" />
             </span>
           )}
-          {targetClo !== undefined && <CloProgressBar currentClo={currentClo} targetClo={targetClo} />}
+          {targetClo !== undefined && <CloProgressBar currentClo={effectiveCurrentClo} targetClo={targetClo} />}
           <ChevronDown
             className={cn(
               "size-4 text-slate-500 transition-transform duration-200",
@@ -109,26 +121,21 @@ export function BodyPartSection({
       >
         <div className="overflow-hidden">
           <div className="pt-3">
-            {!hasContent ? (
-              <Link
-                href="/wardrobe"
-                className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary transition-colors group"
-              >
-                <Plus className="size-4 text-slate-500 group-hover:text-primary" />
-                <span>{getEmptyStateMessage(bodyPart)}</span>
-              </Link>
-            ) : (
-              <ul className="space-y-4" style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                {bodyPart === "hands" && handwear && <HandwearDisplay handwear={handwear} />}
-                {bodyPart === "headNeck" && headwear && <HeadwearDisplay headwear={headwear} />}
-                <LayerItems
-                  layers={layers}
-                  bodyPart={bodyPart}
-                  biophysicsActive={biophysicsActive}
-                  itemMappings={itemMappings}
-                />
-              </ul>
+            {!hasContent && (
+              <p className="mb-3 text-sm text-slate-600">{getEmptyStateMessage(bodyPart)}</p>
             )}
+            <ul className="space-y-4" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {bodyPart === "hands" && handwear && <HandwearDisplay handwear={handwear} />}
+              {bodyPart === "headNeck" && headwear && <HeadwearDisplay headwear={headwear} />}
+              <LayerItems
+                layers={layers}
+                bodyPart={bodyPart}
+                biophysicsActive={biophysicsActive}
+                itemMappings={itemMappings}
+                enableEmptySlots={!(bodyPart === "hands" && handwear) && !(bodyPart === "headNeck" && hasHeadwear)}
+                onGenericCloChange={setGenericCloContribution}
+              />
+            </ul>
           </div>
         </div>
       </div>

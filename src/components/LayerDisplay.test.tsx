@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import LayerDisplay from "./LayerDisplay";
 
 const mockRecommendation = {
@@ -128,7 +128,7 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("Head and neck are exposed to the elements")).toBeInTheDocument();
     });
 
-    it("should not show mid layer label when mid is not present", () => {
+    it("should show generic mid slot when torso mid layer is not present", () => {
       const noMidRecommendation = {
         torso: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
         legs: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
@@ -137,10 +137,11 @@ describe("LayerDisplay", () => {
       };
 
       render(<LayerDisplay recommendation={noMidRecommendation} temperature={25} windspeed={10} />);
-      expect(screen.queryByText("Mid")).not.toBeInTheDocument();
+      expect(screen.getByText("Mid")).toBeInTheDocument();
+      expect(screen.getByText("No mid layer selected yet.")).toBeInTheDocument();
     });
 
-    it("should not show mid layer label when mid is empty array", () => {
+    it("should show generic mid slot when torso mid layer is an empty array", () => {
       const emptyMidRecommendation = {
         torso: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
         legs: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
@@ -149,7 +150,24 @@ describe("LayerDisplay", () => {
       };
 
       render(<LayerDisplay recommendation={emptyMidRecommendation} temperature={25} windspeed={10} />);
-      expect(screen.queryByText("Mid")).not.toBeInTheDocument();
+      expect(screen.getByText("Mid")).toBeInTheDocument();
+      expect(screen.getByText("No mid layer selected yet.")).toBeInTheDocument();
+    });
+
+    it("should allow adding a generic layer for an empty slot", () => {
+      const noMidRecommendation = {
+        torso: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
+        legs: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
+        hands: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
+        headNeck: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
+      };
+
+      render(<LayerDisplay recommendation={noMidRecommendation} temperature={25} windspeed={10} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Use Generic Mid" }));
+
+      expect(screen.getByText("Pullover")).toBeInTheDocument();
+      expect(screen.getByText("Add your actual gear")).toBeInTheDocument();
     });
   });
 
@@ -477,6 +495,42 @@ describe("LayerDisplay", () => {
 
       // Legs clo display: current / target
       expect(screen.getByText("0.3/1.3 clo")).toBeInTheDocument();
+    });
+
+    it("should include generic layer clo in the body-part progress bar", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      expect(screen.getByText("0.3/1.3 clo")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Use Generic Outer" }));
+
+      expect(screen.getByText("0.5/1.3 clo")).toBeInTheDocument();
+    });
+
+    it("should include generic layer clo in global total clo and thermal summary", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      expect(screen.getByText("You 1.7 clo")).toBeInTheDocument();
+      expect(screen.getByText("Significantly under-insulated (+1.1 clo needed).")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Use Generic Outer" }));
+
+      expect(screen.getByText("You 1.9 clo")).toBeInTheDocument();
+      expect(screen.getByText(/Significantly under-insulated \(\+0\.[89] clo needed\)\./)).toBeInTheDocument();
     });
 
     it("should exclude helmet insulation from head/neck clo for xc skiing", () => {

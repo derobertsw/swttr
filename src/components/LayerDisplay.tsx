@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import { Recommendation } from "@/types/recommendations";
@@ -374,6 +374,19 @@ const LayerDisplay = ({
   onReset,
 }: LayerDisplayProps) => {
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
+  const [genericCloByBodyPart, setGenericCloByBodyPart] = useState<Record<BodyPart, number>>({
+    torso: 0,
+    legs: 0,
+    hands: 0,
+    headNeck: 0,
+  });
+
+  const handleGenericCloChange = useCallback((bodyPart: BodyPart, clo: number) => {
+    setGenericCloByBodyPart((prev) => {
+      if (prev[bodyPart] === clo) return prev;
+      return { ...prev, [bodyPart]: clo };
+    });
+  }, []);
 
   const biophysicsGarments = biophysicsData?.recommendation?.garments;
   const handwear = biophysicsData?.recommendation?.handwear;
@@ -383,6 +396,13 @@ const LayerDisplay = ({
     : biophysicsData?.recommendation?.headwear;
   const regionalClo = biophysicsData?.recommendation?.ensemble_properties?.regional_clo;
   const totalClo = biophysicsData?.recommendation?.ensemble_properties?.total_clo;
+  const totalGenericClo = Object.values(genericCloByBodyPart).reduce((sum, clo) => sum + clo, 0);
+  const effectiveTotalClo =
+    totalClo !== undefined
+      ? totalClo + totalGenericClo
+      : totalGenericClo > 0
+        ? totalGenericClo
+        : undefined;
   const regionalIreq = biophysicsData?.ireq?.regional;
   const extremityIreq = biophysicsData?.ireq?.extremity;
   const wardrobeGapWarning = biophysicsData?.warnings?.find((warning) => {
@@ -391,17 +411,23 @@ const LayerDisplay = ({
   });
   const targetMinClo = biophysicsData?.ireq?.target_range?.[0];
   const computedTotalDeficit =
-    targetMinClo !== undefined && totalClo !== undefined
-      ? Math.max(0, targetMinClo - totalClo)
+    targetMinClo !== undefined && effectiveTotalClo !== undefined
+      ? Math.max(0, targetMinClo - effectiveTotalClo)
       : 0;
   const warningDeficit = parseCloDeficitFromWarning(wardrobeGapWarning);
   const getRegionalDeficit = (target?: number, current?: number): number => {
     if (target === undefined) return 0;
     return Math.max(0, target - (current ?? 0));
   };
-  const torsoDeficit = getRegionalDeficit(regionalIreq?.neutral?.torso, regionalClo?.torso);
+  const torsoDeficit = getRegionalDeficit(
+    regionalIreq?.neutral?.torso,
+    (regionalClo?.torso ?? 0) + genericCloByBodyPart.torso
+  );
   const armsDeficit = getRegionalDeficit(regionalIreq?.neutral?.arms, regionalClo?.arms);
-  const legsDeficit = getRegionalDeficit(regionalIreq?.neutral?.legs, regionalClo?.legs);
+  const legsDeficit = getRegionalDeficit(
+    regionalIreq?.neutral?.legs,
+    (regionalClo?.legs ?? 0) + genericCloByBodyPart.legs
+  );
   const maxRegionalDeficit = Math.max(torsoDeficit, armsDeficit, legsDeficit);
   const hasRegionalGap = maxRegionalDeficit > 0.12;
   const totalDeficit = Math.max(computedTotalDeficit, warningDeficit, torsoDeficit + legsDeficit);
@@ -414,7 +440,7 @@ const LayerDisplay = ({
   const [purchaseSuggestionsLoading, setPurchaseSuggestionsLoading] = useState(false);
   const [showAllPurchaseSuggestions, setShowAllPurchaseSuggestions] = useState(false);
   const thermalDecision = getThermalDecisionState(
-    totalClo,
+    effectiveTotalClo,
     biophysicsData?.ireq?.target_range,
     maxRegionalDeficit
   );
@@ -530,13 +556,13 @@ const LayerDisplay = ({
         temperature={temperature}
         windspeed={windspeed}
         score={biophysicsData?.recommendation?.thermal_comfort_score ?? biophysicsData?.recommendation?.score}
-        totalClo={totalClo}
+        totalClo={effectiveTotalClo}
         targetRange={biophysicsData?.ireq?.target_range}
         hasRegionalGap={hasRegionalGap}
       />
 
       <ThermalGauge
-        totalClo={totalClo}
+        totalClo={effectiveTotalClo}
         targetRange={biophysicsData?.ireq?.target_range}
       />
 
@@ -689,6 +715,7 @@ const LayerDisplay = ({
               targetClo={targetClo}
               itemMappings={itemMappings}
               defaultCollapsed={isComfortable}
+              onGenericCloChange={handleGenericCloChange}
             />
           );
         })}
