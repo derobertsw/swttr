@@ -6,6 +6,8 @@ import { logWarn } from "@/lib/logger";
 import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
 import { normalizeSearch, getBodyPart, BODY_PART_ORDER } from "@/components/wardrobe/wardrobe-utils";
 
+const SEARCH_RESULTS_LIMIT = 30;
+
 export function useWardrobe() {
   const userId = useUserId();
   const [availableItems, setAvailableItems] = useState<AvailableItem[]>([]);
@@ -73,6 +75,42 @@ export function useWardrobe() {
     });
   }, [availableItems, wardrobeItems, search, brandFilter]);
 
+  const rankedFilteredItems = useMemo(() => {
+    if (!search) return filteredItems;
+    const query = normalizeSearch(search).trim();
+    if (!query) return filteredItems;
+
+    const scoreItem = (item: AvailableItem) => {
+      const brand = normalizeSearch(item.brand);
+      const model = normalizeSearch(item.model_name);
+      const category = normalizeSearch(item.category ?? "");
+      const combined = `${brand} ${model} ${category}`;
+
+      if (combined === query) return 500;
+      if (model === query) return 450;
+      if (brand === query) return 400;
+      if (model.startsWith(query)) return 320;
+      if (brand.startsWith(query)) return 260;
+      if (category.startsWith(query)) return 220;
+      if (combined.includes(query)) return 120;
+      return 0;
+    };
+
+    return [...filteredItems].sort((a, b) => {
+      const scoreDelta = scoreItem(b) - scoreItem(a);
+      if (scoreDelta !== 0) return scoreDelta;
+
+      const brandCompare = a.brand.localeCompare(b.brand);
+      if (brandCompare !== 0) return brandCompare;
+      return a.model_name.localeCompare(b.model_name);
+    });
+  }, [filteredItems, search]);
+
+  const visibleSearchItems = useMemo(() => {
+    if (!search.trim()) return [];
+    return rankedFilteredItems.slice(0, SEARCH_RESULTS_LIMIT);
+  }, [rankedFilteredItems, search]);
+
   const availableBrands = useMemo(() => {
     const wardrobeIds = new Set(wardrobeItems.map((w) => w.item_id));
     const brands = new Set<string>();
@@ -90,11 +128,11 @@ export function useWardrobe() {
       handwear: [],
       headwear: [],
     };
-    filteredItems.forEach((item) => {
+    visibleSearchItems.forEach((item) => {
       groups[item.type].push(item);
     });
     return groups;
-  }, [filteredItems]);
+  }, [visibleSearchItems]);
 
   const groupedWardrobeItems = useMemo(() => {
     const groups: Record<string, WardrobeItem[]> = {};
@@ -261,6 +299,9 @@ export function useWardrobe() {
     justAdded,
     wardrobeItems,
     filteredItems,
+    visibleSearchItems,
+    totalMatches: search.trim() ? filteredItems.length : 0,
+    shownMatches: search.trim() ? visibleSearchItems.length : 0,
     groupedItems,
     groupedWardrobeItems,
     disabledItemsByPart,

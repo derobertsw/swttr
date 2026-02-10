@@ -9,6 +9,8 @@ interface WardrobeSearchProps {
   search: string;
   onSearchChange: (value: string) => void;
   filteredItems: AvailableItem[];
+  totalMatches: number;
+  shownMatches: number;
   groupedItems: Record<string, AvailableItem[]>;
   adding: string | null;
   justAdded: string | null;
@@ -22,6 +24,8 @@ export function WardrobeSearch({
   search,
   onSearchChange,
   filteredItems,
+  totalMatches,
+  shownMatches,
   groupedItems,
   adding,
   justAdded,
@@ -30,49 +34,74 @@ export function WardrobeSearch({
   onBrandFilterChange,
   availableBrands,
 }: WardrobeSearchProps) {
+  const hasSearch = search.trim().length > 0;
+
   return (
     <div className="relative">
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/70" />
         <Input
-          placeholder="Search gear to add..."
+          placeholder="Search by brand, model, or category..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className={`pl-10 h-12 ${FROSTED_INPUT_FULL}`}
+          className={`pl-10 pr-10 h-12 ${FROSTED_INPUT_FULL}`}
         />
+        {hasSearch && (
+          <button
+            type="button"
+            onClick={() => onSearchChange("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-white/75 hover:bg-white/15 hover:text-white transition-colors"
+            aria-label="Clear search"
+          >
+            <X className="size-4" />
+          </button>
+        )}
       </div>
 
       {availableBrands.length > 1 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {brandFilter && (
+        <div className="mt-2">
+          <p className="text-[11px] uppercase tracking-wide text-white/60">Filter by brand</p>
+          <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <button
               type="button"
               onClick={() => onBrandFilterChange(null)}
-              className="inline-flex items-center gap-1 rounded-full bg-white/25 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/35"
+              className={cn(
+                "whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition-colors",
+                !brandFilter
+                  ? "bg-white/25 text-white"
+                  : "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
+              )}
             >
-              {brandFilter}
-              <X className="size-3" />
+              All
             </button>
-          )}
-          {!brandFilter &&
-            availableBrands.map((brand) => (
+            {availableBrands.map((brand) => (
               <button
                 key={brand}
                 type="button"
                 onClick={() => onBrandFilterChange(brand)}
                 className={cn(
-                  "rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition-colors",
-                  "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
+                  "whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition-colors",
+                  brandFilter === brand
+                    ? "bg-white/25 text-white"
+                    : "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
                 )}
               >
                 {brand}
               </button>
             ))}
+          </div>
         </div>
       )}
 
-      {search && (
-        <div className={`absolute z-10 w-full mt-1.5 ${SUGGESTIONS_DROPDOWN} max-h-80 overflow-y-auto`}>
+      {hasSearch && (
+        <div className={`absolute z-20 w-full mt-1.5 ${SUGGESTIONS_DROPDOWN} max-h-[55vh] overflow-y-auto`}>
+          <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur-md">
+            <p className="text-xs font-medium text-slate-700">
+              {shownMatches}
+              {totalMatches > shownMatches ? ` of ${totalMatches}` : ""} results
+            </p>
+            <p className="text-[11px] text-slate-500">Tap + to add an item to your wardrobe</p>
+          </div>
           {filteredItems.length === 0 ? (
             <div className="p-4 text-sm text-muted-foreground text-center">
               No matching items found
@@ -128,6 +157,11 @@ export function WardrobeSearch({
                 </div>
               );
             })
+          )}
+          {totalMatches > shownMatches && (
+            <div className="border-t border-slate-200 px-3 py-2 text-[11px] text-slate-500">
+              Showing the top {shownMatches} matches. Keep typing to narrow results.
+            </div>
           )}
         </div>
       )}

@@ -19,6 +19,8 @@ export default function Wardrobe() {
     justAdded,
     wardrobeItems,
     filteredItems,
+    totalMatches,
+    shownMatches,
     groupedItems,
     groupedWardrobeItems,
     disabledItemsByPart,
@@ -45,6 +47,14 @@ export default function Wardrobe() {
           <p className="text-[13px] text-white/55 mt-1">
             Your gear powers your thermal recommendations.
           </p>
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-white/65">
+            <span className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5">
+              {wardrobeItems.length} in wardrobe
+            </span>
+            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5">
+              {filteredItems.length} available
+            </span>
+          </div>
         </header>
 
         {loading ? (
@@ -60,6 +70,8 @@ export default function Wardrobe() {
               search={search}
               onSearchChange={setSearch}
               filteredItems={filteredItems}
+              totalMatches={totalMatches}
+              shownMatches={shownMatches}
               groupedItems={groupedItems}
               adding={adding}
               justAdded={justAdded}
