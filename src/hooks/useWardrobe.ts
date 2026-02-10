@@ -22,6 +22,8 @@ export function useWardrobe() {
     return () => clearTimeout(addTimerRef.current);
   }, []);
 
+  const [brandFilter, setBrandFilter] = useState<string | null>(null);
+
   const [disabledCollapsed, setDisabledCollapsed] = useState<Record<string, boolean>>({
     torso: true,
     legs: true,
@@ -63,12 +65,24 @@ export function useWardrobe() {
 
     return availableItems.filter((item) => {
       if (wardrobeIds.has(item.id)) return false;
+      if (brandFilter && item.brand !== brandFilter) return false;
       if (!search) return true;
 
       const searchText = normalizeSearch(`${item.brand} ${item.model_name} ${item.category}`);
       return searchText.includes(searchNormalized);
     });
-  }, [availableItems, wardrobeItems, search]);
+  }, [availableItems, wardrobeItems, search, brandFilter]);
+
+  const availableBrands = useMemo(() => {
+    const wardrobeIds = new Set(wardrobeItems.map((w) => w.item_id));
+    const brands = new Set<string>();
+    for (const item of availableItems) {
+      if (!wardrobeIds.has(item.id)) {
+        brands.add(item.brand);
+      }
+    }
+    return Array.from(brands).sort();
+  }, [availableItems, wardrobeItems]);
 
   const groupedItems = useMemo(() => {
     const groups: Record<string, AvailableItem[]> = {
@@ -254,6 +268,9 @@ export function useWardrobe() {
     selectedItem,
     setSelectedItem,
     recentlyRemoved,
+    brandFilter,
+    setBrandFilter,
+    availableBrands,
     addItem,
     removeItem,
     restoreItem,

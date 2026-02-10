@@ -1,7 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { Plus, Shirt, Footprints, Hand, HardHat, Flame } from "lucide-react";
+import { Plus, Shirt, Footprints, Hand, HardHat, Flame, ChevronDown } from "lucide-react";
 import { RecommendedHandwear, RecommendedHeadwear } from "@/types/biophysics";
 import { BodyPart, LayerSet, BODY_PART_LABELS, hasAnyLayers } from "@/lib/layers";
+import { cn } from "@/lib/utils";
 import { CloProgressBar } from "./CloProgressBar";
 import { HandwearDisplay, HeadwearDisplay } from "./ExtremityDisplay";
 import { LayerItems } from "./LayerItems";
@@ -15,6 +19,7 @@ interface BodyPartSectionProps {
   currentClo: number | undefined;
   targetClo: number | undefined;
   itemMappings?: Map<string, string>;
+  defaultCollapsed?: boolean;
 }
 
 function getEmptyStateMessage(bodyPart: BodyPart): string {
@@ -53,7 +58,10 @@ export function BodyPartSection({
   currentClo,
   targetClo,
   itemMappings,
+  defaultCollapsed = false,
 }: BodyPartSectionProps) {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+
   const hasHeadwear = headwear && (headwear.helmet || headwear.head_warmth || headwear.neck_warmth);
 
   const hasExtremityGear =
@@ -68,7 +76,11 @@ export function BodyPartSection({
 
   return (
     <div className="rounded-lg bg-white/40 backdrop-blur-[2px] p-5">
-      <div className="flex items-center justify-between mb-3">
+      <button
+        type="button"
+        onClick={() => setCollapsed((prev) => !prev)}
+        className="flex w-full items-center justify-between"
+      >
         <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-800">
           {getBodyPartIcon(bodyPart)}
           {BODY_PART_LABELS[bodyPart]}
@@ -80,29 +92,46 @@ export function BodyPartSection({
             </span>
           )}
           {targetClo !== undefined && <CloProgressBar currentClo={currentClo} targetClo={targetClo} />}
+          <ChevronDown
+            className={cn(
+              "size-4 text-slate-500 transition-transform duration-200",
+              collapsed && "-rotate-90"
+            )}
+          />
+        </div>
+      </button>
+
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200 ease-out",
+          collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
+        )}
+      >
+        <div className="overflow-hidden">
+          <div className="pt-3">
+            {!hasContent ? (
+              <Link
+                href="/wardrobe"
+                className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary transition-colors group"
+              >
+                <Plus className="size-4 text-slate-500 group-hover:text-primary" />
+                <span>{getEmptyStateMessage(bodyPart)}</span>
+              </Link>
+            ) : (
+              <ul className="space-y-4" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {bodyPart === "hands" && handwear && <HandwearDisplay handwear={handwear} />}
+                {bodyPart === "headNeck" && headwear && <HeadwearDisplay headwear={headwear} />}
+                <LayerItems
+                  layers={layers}
+                  bodyPart={bodyPart}
+                  biophysicsActive={biophysicsActive}
+                  itemMappings={itemMappings}
+                />
+              </ul>
+            )}
+          </div>
         </div>
       </div>
-
-      {!hasContent ? (
-        <Link
-          href="/wardrobe"
-          className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary transition-colors group"
-        >
-          <Plus className="size-4 text-slate-500 group-hover:text-primary" />
-          <span>{getEmptyStateMessage(bodyPart)}</span>
-        </Link>
-      ) : (
-        <ul className="space-y-4" style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {bodyPart === "hands" && handwear && <HandwearDisplay handwear={handwear} />}
-          {bodyPart === "headNeck" && headwear && <HeadwearDisplay headwear={headwear} />}
-          <LayerItems
-            layers={layers}
-            bodyPart={bodyPart}
-            biophysicsActive={biophysicsActive}
-            itemMappings={itemMappings}
-          />
-        </ul>
-      )}
     </div>
   );
 }

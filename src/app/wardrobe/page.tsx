@@ -26,6 +26,9 @@ export default function Wardrobe() {
     selectedItem,
     setSelectedItem,
     recentlyRemoved,
+    brandFilter,
+    setBrandFilter,
+    availableBrands,
     addItem,
     removeItem,
     restoreItem,
@@ -61,6 +64,9 @@ export default function Wardrobe() {
               adding={adding}
               justAdded={justAdded}
               onAddItem={addItem}
+              brandFilter={brandFilter}
+              onBrandFilterChange={setBrandFilter}
+              availableBrands={availableBrands}
             />
 
             <div className="flex flex-col gap-4 mt-2">

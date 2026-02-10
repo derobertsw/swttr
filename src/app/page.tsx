@@ -36,62 +36,65 @@ const HomeContent = () => {
 
   return (
     <PageLayout onLogoClick={resetToInitialState}>
-      {!showResults ? (
-        <>
-          <p className="text-sm font-semibold text-white/75 text-center mb-2 uppercase tracking-wide">
-            1. Activity
-          </p>
-          <p className="text-base font-medium text-white/90 text-center mb-3">
-            Choose your trip activity
-          </p>
-          <ActivitySelection
-            value={activity}
-            onChange={setActivity}
-            exertion={exertion}
-            onExertionChange={setExertion}
-          />
-          {inputMode === "manual" && locationDenied ? (
-            <LocationInput
-              activityName={ACTIVITIES.find(a => a.value === activity)?.name.toLowerCase() || ""}
-              location={locationSearch.location}
-              locationQuery={locationSearch.locationQuery}
-              suggestions={locationSearch.suggestions}
-              showSuggestions={locationSearch.showSuggestions}
-              selectedLocation={locationSearch.selectedLocation}
-              suggestionRef={locationSearch.suggestionRef}
-              onLocationInputChange={locationSearch.handleLocationInputChange}
-              onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
-              onSelectLocation={locationSearch.handleSelectLocation}
-              onDismiss={locationSearch.dismiss}
+      <div
+        key={showResults ? "results" : "form"}
+        className="flex flex-col gap-6 sm:gap-7 items-center w-full animate-in fade-in duration-300"
+      >
+        {!showResults ? (
+          <>
+            <p className="text-sm font-semibold text-white/75 text-center mb-2 uppercase tracking-wide">
+              1. Activity
+            </p>
+            <p className="text-base font-medium text-white/90 text-center mb-3">
+              Choose your trip activity
+            </p>
+            <ActivitySelection
+              value={activity}
+              onChange={setActivity}
+              exertion={exertion}
+              onExertionChange={setExertion}
             />
-          ) : inputMode === "planAhead" ? (
-            <PlanAheadForm
-              date={date}
-              time={time}
-              location={locationSearch.location}
-              locationQuery={locationSearch.locationQuery}
-              suggestions={locationSearch.suggestions}
-              showSuggestions={locationSearch.showSuggestions}
-              selectedLocation={locationSearch.selectedLocation}
-              suggestionRef={locationSearch.suggestionRef}
-              onDateChange={setDate}
-              onTimeChange={setTime}
-              onLocationInputChange={locationSearch.handleLocationInputChange}
-              onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
-              onSelectLocation={locationSearch.handleSelectLocation}
-              onDismiss={locationSearch.dismiss}
-            />
-          ) : null}
-          <p className="text-sm text-white/75 text-center mt-4 mb-1">
-            Recommendations update from your activity, exertion, and start time.
-          </p>
-          <p className="text-xs text-white/55 text-center mb-4">
-            Built on thermal science
-          </p>
-          <div className="flex flex-col items-center" />
-        </>
-      ) : (
-        <>
+            {inputMode === "manual" && locationDenied ? (
+              <LocationInput
+                activityName={ACTIVITIES.find(a => a.value === activity)?.name.toLowerCase() || ""}
+                location={locationSearch.location}
+                locationQuery={locationSearch.locationQuery}
+                suggestions={locationSearch.suggestions}
+                showSuggestions={locationSearch.showSuggestions}
+                selectedLocation={locationSearch.selectedLocation}
+                suggestionRef={locationSearch.suggestionRef}
+                onLocationInputChange={locationSearch.handleLocationInputChange}
+                onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
+                onSelectLocation={locationSearch.handleSelectLocation}
+                onDismiss={locationSearch.dismiss}
+              />
+            ) : inputMode === "planAhead" ? (
+              <PlanAheadForm
+                date={date}
+                time={time}
+                location={locationSearch.location}
+                locationQuery={locationSearch.locationQuery}
+                suggestions={locationSearch.suggestions}
+                showSuggestions={locationSearch.showSuggestions}
+                selectedLocation={locationSearch.selectedLocation}
+                suggestionRef={locationSearch.suggestionRef}
+                onDateChange={setDate}
+                onTimeChange={setTime}
+                onLocationInputChange={locationSearch.handleLocationInputChange}
+                onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
+                onSelectLocation={locationSearch.handleSelectLocation}
+                onDismiss={locationSearch.dismiss}
+              />
+            ) : null}
+            <p className="text-sm text-white/75 text-center mt-4 mb-1">
+              Recommendations update from your activity, exertion, and start time.
+            </p>
+            <p className="text-xs text-white/55 text-center mb-4">
+              Built on thermal science
+            </p>
+            <div className="flex flex-col items-center" />
+          </>
+        ) : (
           <LayerDisplay
             activity={activity}
             recommendation={recommendation}
@@ -99,9 +102,10 @@ const HomeContent = () => {
             windspeed={windspeed}
             itemMappings={itemMappings}
             biophysicsData={biophysicsData}
+            onReset={resetToInitialState}
           />
-        </>
-      )}
+        )}
+      </div>
     </PageLayout>
   );
 };

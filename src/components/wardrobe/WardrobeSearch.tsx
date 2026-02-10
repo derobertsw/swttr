@@ -1,6 +1,7 @@
-import { Search, Plus, Check } from "lucide-react";
+import { Search, Plus, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { FROSTED_INPUT_FULL, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
+import { cn } from "@/lib/utils";
 import type { AvailableItem } from "@/types/wardrobe";
 import { typeIcons, typeLabels, getItemIcon, formatCategory } from "./wardrobe-utils";
 
@@ -12,6 +13,9 @@ interface WardrobeSearchProps {
   adding: string | null;
   justAdded: string | null;
   onAddItem: (item: AvailableItem) => void;
+  brandFilter: string | null;
+  onBrandFilterChange: (brand: string | null) => void;
+  availableBrands: string[];
 }
 
 export function WardrobeSearch({
@@ -22,6 +26,9 @@ export function WardrobeSearch({
   adding,
   justAdded,
   onAddItem,
+  brandFilter,
+  onBrandFilterChange,
+  availableBrands,
 }: WardrobeSearchProps) {
   return (
     <div className="relative">
@@ -34,6 +41,35 @@ export function WardrobeSearch({
           className={`pl-10 h-12 ${FROSTED_INPUT_FULL}`}
         />
       </div>
+
+      {availableBrands.length > 1 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {brandFilter && (
+            <button
+              type="button"
+              onClick={() => onBrandFilterChange(null)}
+              className="inline-flex items-center gap-1 rounded-full bg-white/25 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/35"
+            >
+              {brandFilter}
+              <X className="size-3" />
+            </button>
+          )}
+          {!brandFilter &&
+            availableBrands.map((brand) => (
+              <button
+                key={brand}
+                type="button"
+                onClick={() => onBrandFilterChange(brand)}
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition-colors",
+                  "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
+                )}
+              >
+                {brand}
+              </button>
+            ))}
+        </div>
+      )}
 
       {search && (
         <div className={`absolute z-10 w-full mt-1.5 ${SUGGESTIONS_DROPDOWN} max-h-80 overflow-y-auto`}>
