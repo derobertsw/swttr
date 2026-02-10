@@ -4,6 +4,7 @@ const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/api/geocode(.*)",
   "/api/weather(.*)",
   "/api/v1(.*)",
 ]);

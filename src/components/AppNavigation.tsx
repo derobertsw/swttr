@@ -67,11 +67,23 @@ export function MobileTabBar() {
   const renderTab = (item: { href: string; label: string; icon: typeof CalendarDays }) => {
     const wouldBeActive = item.href.startsWith("/?") ? pathname === "/" : pathname === item.href;
     const isActive = wouldBeActive;
+    const isPlanTab = item.href === "/?mode=planAhead";
+
+    const handleClick = (e: React.MouseEvent) => {
+      if (isPlanTab) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("navigatePlanAhead"));
+        if (pathname !== "/") {
+          router.push(item.href);
+        }
+      }
+    };
 
     return (
       <Link
         key={item.href}
         href={item.href}
+        onClick={handleClick}
         className={cn(
           "flex flex-col items-center gap-1 text-xs font-semibold leading-none tracking-wide transition-all",
           isActive ? "text-white" : "text-white/70",
