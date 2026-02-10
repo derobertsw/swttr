@@ -167,3 +167,8 @@ INSERT INTO headwear (brand, model_name, headwear_type, weight_grams, covers_ear
 ('Smartwool', 'Merino 150 Neck Gaiter', 'buff_thin', 30, false, true, false, true, 0.35, false, 5, 10),
 ('Smartwool', 'Merino 250 Neck Gaiter', 'buff_heavy', 50, false, true, false, true, 0.65, false, -10, 0)
 ON CONFLICT (brand, model_name) DO NOTHING;
+
+-- Helly Hansen Swift HT Gloves
+INSERT INTO handwear (brand, model_name, handwear_type, weight_grams_pair, rcl_clo, dexterity_score, waterproof, windproof, touchscreen_compatible, min_temp_active, min_temp_static)
+VALUES ('Helly Hansen', 'Swift HT Gloves', 'insulated_glove', 200, 1.50, 6, true, true, true, -15, -5)
+ON CONFLICT (brand, model_name) DO NOTHING;

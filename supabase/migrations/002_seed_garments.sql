@@ -1260,3 +1260,232 @@ FROM garments WHERE brand = 'Spyder' AND model_name = 'Sentinel Gore-Tex Pant';
 INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
 SELECT id, 3, 4, 8, 9, -30, 10, -20, 15, 'Premium Gore-Tex ski pant. Fully waterproof/windproof shell. Thigh vents for temperature regulation. Pair with base/mid layers for warmth.'
 FROM garments WHERE brand = 'Spyder' AND model_name = 'Sentinel Gore-Tex Pant';
+
+
+-- ============================================
+-- HELLY HANSEN
+-- ============================================
+
+-- Helly Hansen Lifa Active Crew
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Lifa Active Crew', 'base_layer', 'top_long_sleeve', true, true, false, false, 'none', 185, 60);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 0.32, 0.26, 0, 0.26, 7.0, 5.5, 0, 6.0, 0.42, 'derived_from_similar', 0.65
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Lifa Active Crew';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 9, 9, 4, 4, -5, 15, 5, 20, 'LIFA polypropylene wicks faster than any other fiber. Excellent for high-output cold weather. Too thin for static cold.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Lifa Active Crew';
+
+
+-- Helly Hansen Lifa Active Pant
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Lifa Active Pant', 'base_layer', 'pants', false, false, true, false, 'none', 160, 55);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 0, 0, 0.30, 0.08, 0, 0, 7.0, 1.8, 0.42, 'derived_from_similar', 0.65
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Lifa Active Pant';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 9, 9, 4, 4, -5, 15, 5, 20, 'Lightweight LIFA base layer bottom. Excellent moisture management for high output. Pair with shell for wind protection.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Lifa Active Pant';
+
+
+-- Helly Hansen Lifa Merino Midweight Crew
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Lifa Merino Midweight Crew', 'base_layer', 'top_long_sleeve', true, true, false, false, 'none', 275, 105);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 0.75, 0.62, 0, 0.50, 16.0, 14.0, 0, 11.5, 0.28, 'derived_from_similar', 0.70
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Lifa Merino Midweight Crew';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 6, 6, 7, 8, -20, 0, -10, 5, 'Merino exterior with LIFA wicking interior. Best of both worlds: warmth + moisture management. Great for resort skiing.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Lifa Merino Midweight Crew';
+
+
+-- Helly Hansen Lifa Merino Midweight Pant
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Lifa Merino Midweight Pant', 'base_layer', 'pants', false, false, true, false, 'none', 235, 105);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 0, 0, 0.70, 0.18, 0, 0, 16.0, 4.0, 0.28, 'derived_from_similar', 0.70
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Lifa Merino Midweight Pant';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 6, 6, 7, 8, -20, 0, -10, 5, 'Merino/LIFA midweight base layer bottom. Good warmth with excellent wicking. Ideal under ski pants in cold conditions.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Lifa Merino Midweight Pant';
+
+
+-- Helly Hansen Varde Fleece Jacket 2.0
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Varde Fleece Jacket 2.0', 'mid_layer_heavy', 'jacket', true, true, false, false, 'none', 540, 150);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 0.90, 0.78, 0, 0.85, 16.0, 14.0, 0, 15.0, 0.32, 'derived_from_similar', 0.65
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Varde Fleece Jacket 2.0';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 6, 6, 6, 7, -15, 5, -5, 10, 'Polartec Thermal Pro fleece. Warm and pill-resistant. Good midlayer under shell for resort skiing or standalone in mild cold.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Varde Fleece Jacket 2.0';
+
+
+-- Helly Hansen Odin Stretch Hooded Light Insulator 2.0
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Odin Stretch Hooded Light Insulator 2.0', 'insulation_synthetic', 'jacket', true, true, false, true, 'attached', 420, 230);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 1.15, 1.00, 0, 1.10, 22.0, 20.0, 0, 21.0, 0.30, 'derived_from_similar', 0.65
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Odin Stretch Hooded Light Insulator 2.0';
+
+INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating)
+SELECT id, 'wind_resistant', 'DWR_only'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Odin Stretch Hooded Light Insulator 2.0';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 7, 8, 6, 5, -15, 5, -5, 10, '40g PrimaLoft Gold Active+. 4-way stretch with fleece side panels. Excellent for ski touring and high-output backcountry use.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Odin Stretch Hooded Light Insulator 2.0';
+
+
+-- Helly Hansen Odin Stretch Hooded Insulator 2.0
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Odin Stretch Hooded Insulator 2.0', 'insulation_synthetic', 'jacket', true, true, false, true, 'attached', 580, 280);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 1.55, 1.35, 0, 1.48, 28.0, 25.0, 0, 27.0, 0.25, 'derived_from_similar', 0.65
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Odin Stretch Hooded Insulator 2.0';
+
+INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating)
+SELECT id, 'wind_resistant', 'DWR_only'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Odin Stretch Hooded Insulator 2.0';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 5, 6, 7, 7, -20, 0, -10, 5, '80g PrimaLoft Gold Active+. Warmer sibling of the Light version. Good belay jacket or cold weather midlayer with stretch.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Odin Stretch Hooded Insulator 2.0';
+
+
+-- Helly Hansen Sogn Shell 2.0 Jacket
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Sogn Shell 2.0 Jacket', 'hard_shell', 'jacket', true, true, false, true, 'helmet_compatible', 600, 415);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 0.22, 0.18, 0, 0.15, 28.0, 26.0, 0, 20.0, 0.18, 'derived_from_similar', 0.70
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Sogn Shell 2.0 Jacket';
+
+INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating, membrane_type, seam_construction)
+SELECT id, 'windproof', 'waterproof', 'Helly Tech Professional 3L', 'taped'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Sogn Shell 2.0 Jacket';
+
+INSERT INTO garment_ventilation (garment_id, has_pit_zips, ventilation_factor)
+SELECT id, true, 0.65
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Sogn Shell 2.0 Jacket';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 4, 5, 9, 8, -30, 10, -20, 15, '3L Helly Tech Pro shell. RECCO rescue system. Life Pocket keeps phone warm. Pair with insulation for cold days.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Sogn Shell 2.0 Jacket';
+
+
+-- Helly Hansen Swift 3L Shell Jacket
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Swift 3L Shell Jacket', 'hard_shell', 'jacket', true, true, false, true, 'helmet_compatible', 830, 440);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 0.25, 0.20, 0, 0.17, 30.0, 28.0, 0, 22.0, 0.16, 'derived_from_similar', 0.65
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Swift 3L Shell Jacket';
+
+INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating, membrane_type, seam_construction)
+SELECT id, 'windproof', 'waterproof', 'Helly Tech Professional 3L', 'taped'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Swift 3L Shell Jacket';
+
+INSERT INTO garment_ventilation (garment_id, has_pit_zips, ventilation_factor)
+SELECT id, true, 0.60
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Swift 3L Shell Jacket';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 4, 6, 9, 8, -30, 10, -20, 15, '3L stretch shell with RECCO. Heavier but more durable than Sogn. PFC-free DWR. Good for resort and backcountry descents.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Swift 3L Shell Jacket';
+
+
+-- Helly Hansen Sogn Bib Shell Pants
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Sogn Bib Shell Pants', 'hard_shell', 'bib', true, false, true, false, 'none', 860, 375);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 0.15, 0, 0.22, 0.14, 26.0, 0, 28.0, 20.0, 0.18, 'derived_from_similar', 0.65
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Sogn Bib Shell Pants';
+
+INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating, membrane_type, seam_construction)
+SELECT id, 'windproof', 'waterproof', 'Helly Tech Professional 3L', 'taped'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Sogn Bib Shell Pants';
+
+INSERT INTO garment_ventilation (garment_id, has_thigh_vents, ventilation_factor)
+SELECT id, true, 0.65
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Sogn Bib Shell Pants';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 3, 4, 8, 9, -30, 10, -20, 15, '3L shell bib with stretch back panel. Thigh vents and adjustable suspenders. Pair with base/mid layers for warmth.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Sogn Bib Shell Pants';
+
+
+-- Helly Hansen Alpha 4.0 Insulated Jacket
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Alpha 4.0 Insulated Jacket', 'outer_insulated', 'jacket', true, true, false, true, 'helmet_compatible', 1060, 485);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 1.50, 1.25, 0, 1.40, 36.0, 32.0, 0, 34.0, 0.18, 'derived_from_similar', 0.65
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Alpha 4.0 Insulated Jacket';
+
+INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating, membrane_type, seam_construction)
+SELECT id, 'windproof', 'waterproof', 'Helly Tech Professional 2L', 'taped'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Alpha 4.0 Insulated Jacket';
+
+INSERT INTO garment_ventilation (garment_id, has_pit_zips, ventilation_factor)
+SELECT id, true, 0.60
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Alpha 4.0 Insulated Jacket';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 3, 3, 7, 9, -25, -5, -15, 5, '80g/60g body-mapped PrimaLoft. H2Flow ventilation. RECCO rescue. Life Pocket+ keeps phone warm. Premium resort ski jacket.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Alpha 4.0 Insulated Jacket';
+
+
+-- Helly Hansen Alpha Infinity Insulated Jacket
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Alpha Infinity Insulated Jacket', 'outer_insulated', 'jacket', true, true, false, true, 'helmet_compatible', 950, 600);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 1.45, 1.20, 0, 1.35, 34.0, 30.0, 0, 32.0, 0.20, 'derived_from_similar', 0.60
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Alpha Infinity Insulated Jacket';
+
+INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating, membrane_type, seam_construction)
+SELECT id, 'windproof', 'waterproof', 'LIFA Infinity Pro', 'taped'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Alpha Infinity Insulated Jacket';
+
+INSERT INTO garment_ventilation (garment_id, has_pit_zips, ventilation_factor)
+SELECT id, true, 0.60
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Alpha Infinity Insulated Jacket';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 3, 3, 7, 9, -25, -5, -15, 5, 'PFC-free LIFA Infinity Pro membrane. 80g recycled PrimaLoft Black Eco. H2Flow ventilation. Premium eco-focused flagship.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Alpha Infinity Insulated Jacket';
+
+
+-- Helly Hansen Legendary Insulated Ski Pants
+INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Legendary Insulated Ski Pants', 'outer_insulated', 'pants', false, false, true, false, 'none', 570, 205);
+
+INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
+SELECT id, 0, 0, 1.00, 0.25, 0, 0, 32.0, 8.0, 0.22, 'derived_from_similar', 0.65
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Legendary Insulated Ski Pants';
+
+INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating, membrane_type, seam_construction)
+SELECT id, 'windproof', 'waterproof', 'Helly Tech Performance 2L', 'taped'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Legendary Insulated Ski Pants';
+
+INSERT INTO garment_ventilation (garment_id, has_thigh_vents, ventilation_factor)
+SELECT id, true, 0.70
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Legendary Insulated Ski Pants';
+
+INSERT INTO garment_activity_ratings (garment_id, xc_skiing_score, ski_touring_uphill_score, ski_touring_downhill_score, alpine_skiing_score, min_temp_active, max_temp_active, min_temp_static, max_temp_static, activity_notes)
+SELECT id, 3, 3, 7, 9, -25, 0, -15, 5, 'Body-mapped PrimaLoft 60g/40g insulation. Mechanical stretch. Inner thigh vents. Reinforced scuff guards. Best-selling HH ski pant.'
+FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Legendary Insulated Ski Pants';
