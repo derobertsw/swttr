@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import { Recommendation } from "@/types/recommendations";
 import {
   BiophysicsRecommendation,
@@ -42,6 +42,7 @@ interface LayerDisplayProps {
   windspeed: number;
   itemMappings?: Map<string, string>;
   biophysicsData?: BiophysicsRecommendation | null;
+  onReset?: () => void;
 }
 
 interface CloValues {
@@ -242,16 +243,26 @@ interface ThermalDecisionState {
 
 function getThermalDecisionState(
   totalClo: number | undefined,
-  targetRange: [number, number] | undefined
+  targetRange: [number, number] | undefined,
+  regionalDeficit = 0
 ): ThermalDecisionState | null {
   if (totalClo === undefined || !targetRange) return null;
 
   const [targetMin, targetMax] = targetRange;
+  const rangeWidth = Math.max(0.2, targetMax - targetMin);
+
+  if (regionalDeficit > 0.12) {
+    return {
+      riskType: "cold",
+      severity: regionalDeficit <= rangeWidth ? "moderate" : "high",
+      delta: regionalDeficit,
+    };
+  }
+
   if (totalClo >= targetMin && totalClo <= targetMax) {
     return { riskType: "comfortable", severity: "moderate", delta: 0 };
   }
 
-  const rangeWidth = Math.max(0.2, targetMax - targetMin);
   if (totalClo < targetMin) {
     const deficit = targetMin - totalClo;
     return {
@@ -360,6 +371,7 @@ const LayerDisplay = ({
   windspeed,
   itemMappings,
   biophysicsData,
+  onReset,
 }: LayerDisplayProps) => {
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
 
@@ -383,27 +395,36 @@ const LayerDisplay = ({
       ? Math.max(0, targetMinClo - totalClo)
       : 0;
   const warningDeficit = parseCloDeficitFromWarning(wardrobeGapWarning);
-  const totalDeficit = Math.max(computedTotalDeficit, warningDeficit);
-  const torsoDeficit =
-    regionalIreq?.neutral?.torso !== undefined && regionalClo?.torso !== undefined
-      ? Math.max(0, regionalIreq.neutral.torso - regionalClo.torso)
-      : 0;
-  const legsDeficit =
-    regionalIreq?.neutral?.legs !== undefined && regionalClo?.legs !== undefined
-      ? Math.max(0, regionalIreq.neutral.legs - regionalClo.legs)
-      : 0;
+  const getRegionalDeficit = (target?: number, current?: number): number => {
+    if (target === undefined) return 0;
+    return Math.max(0, target - (current ?? 0));
+  };
+  const torsoDeficit = getRegionalDeficit(regionalIreq?.neutral?.torso, regionalClo?.torso);
+  const armsDeficit = getRegionalDeficit(regionalIreq?.neutral?.arms, regionalClo?.arms);
+  const legsDeficit = getRegionalDeficit(regionalIreq?.neutral?.legs, regionalClo?.legs);
+  const maxRegionalDeficit = Math.max(torsoDeficit, armsDeficit, legsDeficit);
+  const hasRegionalGap = maxRegionalDeficit > 0.12;
+  const totalDeficit = Math.max(computedTotalDeficit, warningDeficit, torsoDeficit + legsDeficit);
+  const hasWardrobeGap = Boolean(wardrobeGapWarning) || hasRegionalGap;
+  const wardrobeGapMessage =
+    wardrobeGapWarning ??
+    "Current setup misses target insulation in one or more body regions. Add coverage where deficits are highest.";
 
   const [purchaseSuggestions, setPurchaseSuggestions] = useState<WardrobePurchaseSuggestion[]>([]);
   const [purchaseSuggestionsLoading, setPurchaseSuggestionsLoading] = useState(false);
   const [showAllPurchaseSuggestions, setShowAllPurchaseSuggestions] = useState(false);
-  const thermalDecision = getThermalDecisionState(totalClo, biophysicsData?.ireq?.target_range);
+  const thermalDecision = getThermalDecisionState(
+    totalClo,
+    biophysicsData?.ireq?.target_range,
+    maxRegionalDeficit
+  );
   const statusSummary = getThermalSummary(thermalDecision);
   const immediateAction = getImmediateAction(thermalDecision);
 
   useEffect(() => {
     let isCancelled = false;
 
-    if (!wardrobeGapWarning || totalDeficit <= 0) {
+    if (!hasWardrobeGap || totalDeficit <= 0) {
       setPurchaseSuggestions([]);
       setPurchaseSuggestionsLoading(false);
       setShowAllPurchaseSuggestions(false);
@@ -472,11 +493,10 @@ const LayerDisplay = ({
     return () => {
       isCancelled = true;
     };
-  }, [wardrobeGapWarning, totalDeficit, torsoDeficit, legsDeficit]);
+  }, [hasWardrobeGap, totalDeficit, torsoDeficit, legsDeficit]);
 
   if (!recommendation && !biophysicsData) return null;
 
-  const hasWardrobeGap = Boolean(wardrobeGapWarning);
   const decisionTitle = thermalDecision
     ? thermalDecision.riskType === "comfortable"
       ? "Comfort Range Achieved"
@@ -495,12 +515,24 @@ const LayerDisplay = ({
 
   return (
     <div className="flex flex-col gap-8">
+      {onReset && (
+        <button
+          type="button"
+          onClick={onReset}
+          className="flex items-center gap-1.5 self-start text-sm font-medium text-white/75 hover:text-white transition-colors -mt-2 mb--2"
+        >
+          <ArrowLeft className="size-4" />
+          Back
+        </button>
+      )}
+
       <WeatherHeader
         temperature={temperature}
         windspeed={windspeed}
         score={biophysicsData?.recommendation?.thermal_comfort_score ?? biophysicsData?.recommendation?.score}
         totalClo={totalClo}
         targetRange={biophysicsData?.ireq?.target_range}
+        hasRegionalGap={hasRegionalGap}
       />
 
       <ThermalGauge
@@ -537,7 +569,7 @@ const LayerDisplay = ({
               {hasWardrobeGap && (
                 <div className="rounded-lg border border-current/20 bg-white/45 px-3.5 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wide opacity-75">Improve Wardrobe</p>
-                  <p className="mt-2 text-sm leading-relaxed">{wardrobeGapWarning}</p>
+                  <p className="mt-2 text-sm leading-relaxed">{wardrobeGapMessage}</p>
                   {purchaseSuggestionsLoading ? (
                     <p className="mt-2 text-sm">Finding purchasable items in the wardrobe database...</p>
                   ) : purchaseSuggestions.length > 0 ? (
@@ -638,6 +670,13 @@ const LayerDisplay = ({
             !shouldIgnoreHelmetForClo
           );
 
+          const isComfortable =
+            biophysicsActive &&
+            currentClo !== undefined &&
+            targetClo !== undefined &&
+            targetClo > 0 &&
+            currentClo >= targetClo;
+
           return (
             <BodyPartSection
               key={part}
@@ -649,6 +688,7 @@ const LayerDisplay = ({
               currentClo={currentClo}
               targetClo={targetClo}
               itemMappings={itemMappings}
+              defaultCollapsed={isComfortable}
             />
           );
         })}

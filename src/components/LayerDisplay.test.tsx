@@ -515,6 +515,31 @@ describe("LayerDisplay", () => {
     });
 
     it("should display biophysics score", () => {
+      const inRangeData = {
+        ...mockBiophysicsData,
+        recommendation: {
+          ...mockBiophysicsData.recommendation,
+          ensemble_properties: {
+            ...mockBiophysicsData.recommendation.ensemble_properties,
+            regional_clo: { torso: 1.7, arms: 1.2, legs: 1.35 },
+          },
+        },
+      };
+
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={inRangeData}
+        />
+      );
+
+      // Score of 85 should display "Optimal" status via ScoreDisplay component
+      expect(screen.getByText("Optimal")).toBeInTheDocument();
+    });
+
+    it("should not show comfort achieved when total clo is in range but a region is under target", () => {
       render(
         <LayerDisplay
           recommendation={null}
@@ -524,8 +549,8 @@ describe("LayerDisplay", () => {
         />
       );
 
-      // Score of 85 should display "Optimal" status via ScoreDisplay component
-      expect(screen.getByText("Optimal")).toBeInTheDocument();
+      expect(screen.queryByText("Comfort Range Achieved")).not.toBeInTheDocument();
+      expect(screen.getByText(/Cold Risk/i)).toBeInTheDocument();
     });
 
     it("should display guidance tips when available", () => {
@@ -723,13 +748,24 @@ describe("LayerDisplay", () => {
       }
     });
 
-    it("should not show wardrobe gap alert when insulation warning is absent", () => {
+    it("should not show wardrobe gap alert when insulation warning is absent and regional targets are met", () => {
+      const noGapData = {
+        ...mockBiophysicsData,
+        recommendation: {
+          ...mockBiophysicsData.recommendation,
+          ensemble_properties: {
+            ...mockBiophysicsData.recommendation.ensemble_properties,
+            regional_clo: { torso: 1.7, arms: 1.2, legs: 1.35 },
+          },
+        },
+      };
+
       render(
         <LayerDisplay
           recommendation={null}
           temperature={15}
           windspeed={10}
-          biophysicsData={mockBiophysicsData}
+          biophysicsData={noGapData}
         />
       );
 

@@ -17,6 +17,7 @@ interface ScoreDisplayProps {
   className?: string;
   totalClo?: number;
   targetRange?: [number, number];
+  hasRegionalGap?: boolean;
 }
 
 type ThermalStatus = "optimal" | "comfortable" | "cold_stress" | "overheating";
@@ -59,10 +60,19 @@ const STATUS_CONFIG: Record<ThermalStatus, StatusConfig> = {
  * Displays thermal comfort as an integrated status pill with explanatory popover.
  * Uses meteorological language and Nordic-inspired colors for visual cohesion.
  */
-const ScoreDisplay = ({ score, size = "md", className, totalClo, targetRange }: ScoreDisplayProps) => {
+const ScoreDisplay = ({
+  score,
+  size = "md",
+  className,
+  totalClo,
+  targetRange,
+  hasRegionalGap = false,
+}: ScoreDisplayProps) => {
   const roundedScore = Math.round(score);
 
   const getStatus = (): ThermalStatus => {
+    if (hasRegionalGap) return "cold_stress";
+
     if (totalClo !== undefined && targetRange) {
       const [targetMin, targetMax] = targetRange;
       if (totalClo < targetMin) return "cold_stress";
@@ -118,6 +128,7 @@ const ScoreDisplay = ({ score, size = "md", className, totalClo, targetRange }: 
           </p>
           <p className="text-slate-500">
             Status logic: we first check your insulation against the IREQ target range.
+            Regional deficits override whole-body comfort status.
             If clo is below target minimum, status is cold stress. If clo is above
             target maximum + 0.3 clo, status is overheating risk. Otherwise score bands apply.
           </p>
