@@ -63,7 +63,7 @@ describe("PreferencesDrawer", () => {
       await user.click(screen.getByRole("button", { name: /open preferences/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/this will be pre-selected/i)).toBeInTheDocument();
+        expect(screen.getByText(/pre-selected each time you open swttr/i)).toBeInTheDocument();
       });
     });
   });
@@ -87,7 +87,7 @@ describe("PreferencesDrawer", () => {
       await user.click(screen.getByRole("button", { name: /open preferences/i }));
 
       await waitFor(() => {
-        expect(screen.getByText("Standard recommendations")).toBeInTheDocument();
+        expect(screen.getByText("Balanced recommendations for most people.")).toBeInTheDocument();
       });
     });
 
@@ -98,7 +98,7 @@ describe("PreferencesDrawer", () => {
       await user.click(screen.getByRole("button", { name: /open preferences/i }));
 
       await waitFor(() => {
-        expect(screen.getByText("Recommend lighter gear")).toBeInTheDocument();
+        expect(screen.getByText("You run warm. We bias toward lighter layers.")).toBeInTheDocument();
       });
     });
 
@@ -109,7 +109,7 @@ describe("PreferencesDrawer", () => {
       await user.click(screen.getByRole("button", { name: /open preferences/i }));
 
       await waitFor(() => {
-        expect(screen.getByText("Recommend warmer gear")).toBeInTheDocument();
+        expect(screen.getByText("You run cold. We bias toward warmer layers.")).toBeInTheDocument();
       });
     });
   });
@@ -122,8 +122,8 @@ describe("PreferencesDrawer", () => {
       await user.click(screen.getByRole("button", { name: /open preferences/i }));
 
       await waitFor(() => {
-        expect(screen.getByText("Height")).toBeInTheDocument();
-        expect(screen.getByText("Weight")).toBeInTheDocument();
+        expect(screen.getByText("Height (ft/in)")).toBeInTheDocument();
+        expect(screen.getByText("Weight (lb)")).toBeInTheDocument();
       });
     });
 
@@ -140,8 +140,8 @@ describe("PreferencesDrawer", () => {
       await user.click(screen.getByRole("button", { name: /open preferences/i }));
 
       await waitFor(() => {
-        expect(screen.getByText("Select height")).toBeInTheDocument();
-        expect(screen.getByText("Select weight")).toBeInTheDocument();
+        expect(screen.getByText("Height")).toBeInTheDocument();
+        expect(screen.getByText("Weight")).toBeInTheDocument();
       });
     });
   });

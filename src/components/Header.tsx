@@ -26,6 +26,7 @@ interface HeaderProps {
 
 const Header = ({ onLogoClick }: HeaderProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const {
     sensitivity,
     defaultActivity,
@@ -54,6 +55,13 @@ const Header = ({ onLogoClick }: HeaderProps) => {
       await navigator.clipboard.writeText(shareData.url);
       toast.success("Link copied to clipboard!");
     }
+  };
+
+  const openPreferencesFromMenu = () => {
+    setMobileMenuOpen(false);
+    window.setTimeout(() => {
+      setPreferencesOpen(true);
+    }, 120);
   };
 
   return (
@@ -134,20 +142,13 @@ const Header = ({ onLogoClick }: HeaderProps) => {
                 <MessageSquare className="size-4" />
                 Feedback
               </a>
-              <PreferencesDrawer
-                sensitivity={sensitivity}
-                defaultActivity={defaultActivity}
-                heightInches={bodyMetricsSelection.heightInches}
-                weightLbs={bodyMetricsSelection.weightLbs}
-                onSensitivityChange={updateSensitivity}
-                onDefaultActivityChange={updateDefaultActivity}
-                onBodyMetricsChange={updateBodyMetrics}
+              <button
+                onClick={openPreferencesFromMenu}
+                className="flex items-center gap-3 text-sm font-medium hover:text-primary text-left"
               >
-                <button className="flex items-center gap-3 text-sm font-medium hover:text-primary text-left">
-                  <Settings className="size-4" />
-                  Settings
-                </button>
-              </PreferencesDrawer>
+                <Settings className="size-4" />
+                Settings
+              </button>
               <button
                 onClick={handleShare}
                 className="flex items-center gap-3 text-sm font-medium hover:text-primary text-left"
@@ -159,6 +160,18 @@ const Header = ({ onLogoClick }: HeaderProps) => {
           </SheetContent>
         </Sheet>
       </div>
+
+      <PreferencesDrawer
+        sensitivity={sensitivity}
+        defaultActivity={defaultActivity}
+        heightInches={bodyMetricsSelection.heightInches}
+        weightLbs={bodyMetricsSelection.weightLbs}
+        onSensitivityChange={updateSensitivity}
+        onDefaultActivityChange={updateDefaultActivity}
+        onBodyMetricsChange={updateBodyMetrics}
+        open={preferencesOpen}
+        onOpenChange={setPreferencesOpen}
+      />
     </header>
   );
 };
