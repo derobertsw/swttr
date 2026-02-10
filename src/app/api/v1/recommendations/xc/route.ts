@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
+import {
+  calculateIreq,
+  calculateRegionalIreq,
+  calculateExtremityIreq,
+  DLE_ESTIMATION_METHOD,
+} from '@/lib/biophysics/ireq';
 import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
 import {
   exertionToXcIntensity,
@@ -119,6 +124,10 @@ export async function POST(request: NextRequest) {
         windExposure: 'normal',
       },
       activityKey: 'xc_skiing',
+      comfortContext: {
+        targetRange: [targetMinClo, maxClo],
+        regionalNeutralTarget: regionalIreq.neutral,
+      },
     },
     recommendedHandwear,
     recommendedHeadwear
@@ -135,6 +144,7 @@ export async function POST(request: NextRequest) {
       min: ireq.ireqMin,
       neutral: ireq.ireqNeutral,
       dle_hours: ireq.dleHours,
+      dle_method: DLE_ESTIMATION_METHOD,
       target_range: [targetMinClo, maxClo],
       regional: regionalIreq,
       extremity: extremityIreq,

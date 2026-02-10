@@ -5,6 +5,7 @@
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { scoreEnsemble, type WeatherConditions, type ActivityProfile, type GarmentWithProtection } from '@/lib/biophysics/scorer';
 import type { ActivityType } from '@/lib/biophysics/constants';
+import { calculateThermalComfortScore, getMaxRegionalDeficit, type RegionalCloValues } from '@/lib/biophysics/comfort';
 import type { GarmentRow, HandwearRow, HeadwearRecommendations } from './types';
 import { formatGarmentResponse, formatHandwearResponse, formatHeadwearResponse, ensembleToThermalGarments } from './formatting';
 
@@ -13,6 +14,10 @@ export interface EnsembleScoringInput {
   weather: WeatherConditions;
   activity: ActivityProfile;
   activityKey: ActivityType;
+  comfortContext?: {
+    targetRange: [number, number];
+    regionalNeutralTarget?: RegionalCloValues;
+  };
 }
 
 export interface ResponseComponents {
@@ -61,6 +66,26 @@ export function buildResponseComponents(
     input.activityKey
   );
 
+  const regionalClo = {
+    torso: ensembleProps.rcl.torso,
+    arms: ensembleProps.rcl.arm,
+    legs: ensembleProps.rcl.leg,
+  } satisfies RegionalCloValues;
+  const maxRegionalDeficit = getMaxRegionalDeficit(
+    regionalClo,
+    input.comfortContext?.regionalNeutralTarget
+  );
+  const comfortScore = input.comfortContext
+    ? calculateThermalComfortScore({
+      totalClo: ensembleProps.rcl.wholeBody,
+      targetRange: input.comfortContext.targetRange,
+      maxRegionalDeficit,
+    })
+    : null;
+  const fallbackComfortScore = Math.round(
+    ((score.componentScores.coldProtection + score.componentScores.overheatPrevention) / 2) * 10
+  ) / 10;
+
   return {
     conditions: {},
     recommendation: {
@@ -82,9 +107,7 @@ export function buildResponseComponents(
         permeability_index: ensembleProps.im,
       },
       score: score.totalScore,
-      thermal_comfort_score: Math.round(
-        ((score.componentScores.coldProtection + score.componentScores.overheatPrevention) / 2) * 10
-      ) / 10,
+      thermal_comfort_score: comfortScore ?? fallbackComfortScore,
       component_scores: score.componentScores,
     },
     warnings: score.warnings,

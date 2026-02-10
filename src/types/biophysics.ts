@@ -6,6 +6,7 @@ export interface IreqData {
   min: number;
   neutral: number;
   dle_hours?: number;
+  dle_method?: string;
 }
 
 export interface RegionalIreqData {
@@ -37,6 +38,7 @@ export interface IreqRange {
   uphill?: IreqData;
   downhill?: IreqData;
   dle_hours?: number;
+  dle_method?: string;
   target_range: [number, number];
   regional?: RegionalIreqRange;
   extremity?: ExtremityIreqRange;

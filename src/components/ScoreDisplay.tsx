@@ -3,6 +3,11 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import {
+  evaluateThermalComfort,
+  OVERHEAT_BUFFER_CLO,
+  REGIONAL_DEFICIT_CLO_THRESHOLD,
+} from "@/lib/biophysics/comfort";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -17,6 +22,7 @@ interface ScoreDisplayProps {
   className?: string;
   totalClo?: number;
   targetRange?: [number, number];
+  regionalDeficit?: number;
   hasRegionalGap?: boolean;
 }
 
@@ -66,18 +72,27 @@ const ScoreDisplay = ({
   className,
   totalClo,
   targetRange,
+  regionalDeficit,
   hasRegionalGap = false,
 }: ScoreDisplayProps) => {
   const roundedScore = Math.round(score);
 
   const getStatus = (): ThermalStatus => {
-    if (hasRegionalGap) return "cold_stress";
+    const inferredRegionalDeficit = regionalDeficit ?? (
+      hasRegionalGap ? REGIONAL_DEFICIT_CLO_THRESHOLD + 0.01 : 0
+    );
+    const decision = evaluateThermalComfort({
+      totalClo,
+      targetRange,
+      maxRegionalDeficit: inferredRegionalDeficit,
+    });
 
-    if (totalClo !== undefined && targetRange) {
-      const [targetMin, targetMax] = targetRange;
-      if (totalClo < targetMin) return "cold_stress";
-      // Allow a small buffer above target max before flagging overheating.
-      if (totalClo > targetMax + 0.3) return "overheating";
+    if (decision?.riskType === "cold") return "cold_stress";
+    if (decision?.riskType === "overheat") return "overheating";
+
+    if (decision?.riskType === "comfortable") {
+      if (roundedScore >= 85) return "optimal";
+      return "comfortable";
     }
 
     if (roundedScore >= 80) return "optimal";
@@ -127,10 +142,10 @@ const ScoreDisplay = ({
             {config.description}
           </p>
           <p className="text-slate-500">
-            Status logic: we first check your insulation against the IREQ target range.
-            Regional deficits override whole-body comfort status.
-            If clo is below target minimum, status is cold stress. If clo is above
-            target maximum + 0.3 clo, status is overheating risk. Otherwise score bands apply.
+            Status logic uses the same thermal decision kernel as recommendation scoring.
+            Regional deficits above {REGIONAL_DEFICIT_CLO_THRESHOLD.toFixed(2)} clo override
+            whole-body comfort status. Overheating only triggers above target max +
+            {OVERHEAT_BUFFER_CLO.toFixed(1)} clo.
           </p>
           {totalClo !== undefined && targetRange && (
             <p className="text-slate-500">
@@ -140,19 +155,19 @@ const ScoreDisplay = ({
           <div className="space-y-1.5 pt-2 border-t border-slate-100">
             <div className="flex items-center gap-2 text-slate-600">
               <span className="size-2 rounded-full bg-teal-500" />
-              <span>Optimal: in range + score 80+</span>
+              <span>Optimal: in range + score 85+</span>
             </div>
             <div className="flex items-center gap-2 text-slate-600">
               <span className="size-2 rounded-full bg-green-500" />
-              <span>Comfortable: in range + score 60-79</span>
+              <span>Comfortable: in range below 85</span>
             </div>
             <div className="flex items-center gap-2 text-slate-600">
               <span className="size-2 rounded-full bg-blue-500" />
-              <span>Cold stress: clo below target minimum</span>
+              <span>Cold stress: below min or regional deficit</span>
             </div>
             <div className="flex items-center gap-2 text-slate-600">
               <span className="size-2 rounded-full bg-amber-500" />
-              <span>Overheating: clo above target max + 0.3</span>
+              <span>Overheating: clo above target max + {OVERHEAT_BUFFER_CLO.toFixed(1)}</span>
             </div>
           </div>
         </div>

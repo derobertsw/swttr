@@ -7,6 +7,7 @@ interface WeatherHeaderProps {
   score?: number;
   totalClo?: number;
   targetRange?: [number, number];
+  regionalDeficit?: number;
   hasRegionalGap?: boolean;
 }
 
@@ -37,6 +38,7 @@ export function WeatherHeader({
   score,
   totalClo,
   targetRange,
+  regionalDeficit,
   hasRegionalGap,
 }: WeatherHeaderProps) {
   const calculatedFeelsLike = feelsLike ?? calculateFeelsLike(temperature, windspeed);
@@ -78,6 +80,7 @@ export function WeatherHeader({
             size="md"
             totalClo={totalClo}
             targetRange={targetRange}
+            regionalDeficit={regionalDeficit}
             hasRegionalGap={hasRegionalGap}
           />
         )}

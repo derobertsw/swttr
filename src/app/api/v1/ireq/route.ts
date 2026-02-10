@@ -3,6 +3,7 @@ import {
   calculateIreq,
   fahrenheitToCelsius,
   mphToMs,
+  DLE_ESTIMATION_METHOD,
 } from '@/lib/biophysics/ireq';
 import { METABOLIC_RATES } from '@/lib/biophysics/constants';
 
@@ -89,7 +90,11 @@ export async function GET(request: NextRequest) {
       duration_limited_exposure: {
         value: ireq.dleHours === Infinity ? null : ireq.dleHours,
         unit: 'hours',
-        description: 'Max exposure time at minimum insulation',
+        description: 'Heuristic exposure estimate at minimum insulation',
+      },
+      dle_method: {
+        value: DLE_ESTIMATION_METHOD,
+        description: 'DLE is currently an exposure-planning heuristic, not a direct ISO derivation',
       },
     },
     reference: {

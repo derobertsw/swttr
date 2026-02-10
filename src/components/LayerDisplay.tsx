@@ -23,6 +23,7 @@ import {
   CATEGORY_TO_LAYER_TYPE,
   LAYER_LABELS,
 } from "@/lib/layers";
+import { calculateThermalComfortScore, evaluateThermalComfort } from "@/lib/biophysics/comfort";
 import type { AvailableItem } from "@/types/wardrobe";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { logWarn } from "@/lib/logger";
@@ -235,50 +236,7 @@ function buildWardrobeGapSuggestions(
   return [...torsoPicks, ...legsPicks].slice(0, 3);
 }
 
-interface ThermalDecisionState {
-  riskType: "comfortable" | "cold" | "overheat";
-  severity: "moderate" | "high";
-  delta: number;
-}
-
-function getThermalDecisionState(
-  totalClo: number | undefined,
-  targetRange: [number, number] | undefined,
-  regionalDeficit = 0
-): ThermalDecisionState | null {
-  if (totalClo === undefined || !targetRange) return null;
-
-  const [targetMin, targetMax] = targetRange;
-  const rangeWidth = Math.max(0.2, targetMax - targetMin);
-
-  if (regionalDeficit > 0.12) {
-    return {
-      riskType: "cold",
-      severity: regionalDeficit <= rangeWidth ? "moderate" : "high",
-      delta: regionalDeficit,
-    };
-  }
-
-  if (totalClo >= targetMin && totalClo <= targetMax) {
-    return { riskType: "comfortable", severity: "moderate", delta: 0 };
-  }
-
-  if (totalClo < targetMin) {
-    const deficit = targetMin - totalClo;
-    return {
-      riskType: "cold",
-      severity: deficit <= rangeWidth ? "moderate" : "high",
-      delta: deficit,
-    };
-  }
-
-  const excess = totalClo - targetMax;
-  return {
-    riskType: "overheat",
-    severity: excess <= rangeWidth ? "moderate" : "high",
-    delta: excess,
-  };
-}
+type ThermalDecisionState = NonNullable<ReturnType<typeof evaluateThermalComfort>>;
 
 function getThermalSummary(state: ThermalDecisionState | null): string {
   if (!state) return "Layer guidance generated for current conditions.";
@@ -439,11 +397,18 @@ const LayerDisplay = ({
   const [purchaseSuggestions, setPurchaseSuggestions] = useState<WardrobePurchaseSuggestion[]>([]);
   const [purchaseSuggestionsLoading, setPurchaseSuggestionsLoading] = useState(false);
   const [showAllPurchaseSuggestions, setShowAllPurchaseSuggestions] = useState(false);
-  const thermalDecision = getThermalDecisionState(
-    effectiveTotalClo,
-    biophysicsData?.ireq?.target_range,
-    maxRegionalDeficit
-  );
+  const thermalDecision = evaluateThermalComfort({
+    totalClo: effectiveTotalClo,
+    targetRange: biophysicsData?.ireq?.target_range,
+    maxRegionalDeficit,
+  });
+  const thermalComfortScore = calculateThermalComfortScore({
+    totalClo: effectiveTotalClo,
+    targetRange: biophysicsData?.ireq?.target_range,
+    maxRegionalDeficit,
+  })
+    ?? biophysicsData?.recommendation?.thermal_comfort_score
+    ?? biophysicsData?.recommendation?.score;
   const statusSummary = getThermalSummary(thermalDecision);
   const immediateAction = getImmediateAction(thermalDecision);
 
@@ -555,9 +520,10 @@ const LayerDisplay = ({
       <WeatherHeader
         temperature={temperature}
         windspeed={windspeed}
-        score={biophysicsData?.recommendation?.thermal_comfort_score ?? biophysicsData?.recommendation?.score}
+        score={thermalComfortScore}
         totalClo={effectiveTotalClo}
         targetRange={biophysicsData?.ireq?.target_range}
+        regionalDeficit={maxRegionalDeficit}
         hasRegionalGap={hasRegionalGap}
       />
 

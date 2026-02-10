@@ -47,7 +47,7 @@ const faqs = [
   {
     question: "What is the target clo range?",
     answer:
-      "The algorithm computes two baselines: the minimum insulation (for a skin temperature of 30\u00b0C \u2014 the cold-stress threshold) and the neutral insulation (for 33.7\u00b0C \u2014 full comfort). The target range is then adjusted based on environmental stress factors: colder temperatures widen the range upward, higher wind adds a buffer, and shorter safe-exposure durations push the minimum higher. This gives you a practical band \u2014 anywhere in the range means you'll be comfortable, with the low end being slightly cool and the high end slightly warm.",
+      "The algorithm computes two baselines: the minimum insulation (for a skin temperature of 30\u00b0C \u2014 the cold-stress threshold) and the neutral insulation (for 33.7\u00b0C \u2014 full comfort). The target range is then adjusted based on environmental stress factors: colder temperatures widen the range upward, higher wind adds a buffer, and shorter exposure estimates push the minimum higher. This gives you a practical band \u2014 anywhere in the range means you'll be comfortable, with the low end being slightly cool and the high end slightly warm. (Exposure duration is currently modeled as a bounded heuristic.)",
   },
   {
     question: "How does SWTTR pick garments from my wardrobe?",

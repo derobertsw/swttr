@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
-import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
+import {
+  calculateIreq,
+  calculateRegionalIreq,
+  calculateExtremityIreq,
+  DLE_ESTIMATION_METHOD,
+} from '@/lib/biophysics/ireq';
 import { scoreEnsemble } from '@/lib/biophysics/scorer';
 import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
+import { calculateThermalComfortScore, getMaxRegionalDeficit } from '@/lib/biophysics/comfort';
 import {
   type ExertionLevel,
   getMetabolicRateForActivity,
@@ -155,6 +161,7 @@ export async function POST(request: NextRequest) {
         downhill: { min: ireqDownhill.ireqMin, neutral: ireqDownhill.ireqNeutral, dle_hours: ireqDownhill.dleHours },
         transition: { min: ireqTransition.ireqMin, neutral: ireqTransition.ireqNeutral, dle_hours: ireqTransition.dleHours },
         dle_hours: ireqDownhill.dleHours,
+        dle_method: DLE_ESTIMATION_METHOD,
       },
       guidance: generateTouringGuidance(tempC, ireqUphill, ireqDownhill),
     });
@@ -244,6 +251,16 @@ export async function POST(request: NextRequest) {
     targetMin: targetCloRange[0],
     targetMax: targetCloRange[1],
   });
+  const regionalClo = {
+    torso: Math.round(uphillThermalProperties.rcl.torso * 100) / 100,
+    arms: Math.round(uphillThermalProperties.rcl.arm * 100) / 100,
+    legs: Math.round(uphillThermalProperties.rcl.leg * 100) / 100,
+  };
+  const thermalComfortScore = calculateThermalComfortScore({
+    totalClo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
+    targetRange: targetCloRange,
+    maxRegionalDeficit: getMaxRegionalDeficit(regionalClo, regionalIreqDownhill.neutral),
+  });
   const selectedHandwear = selectHandwear(
     userHandwear,
     tempC,
@@ -262,6 +279,7 @@ export async function POST(request: NextRequest) {
       uphill: { min: ireqUphill.ireqMin, neutral: ireqUphill.ireqNeutral, dle_hours: ireqUphill.dleHours },
       downhill: { min: ireqDownhill.ireqMin, neutral: ireqDownhill.ireqNeutral, dle_hours: ireqDownhill.dleHours },
       dle_hours: ireqDownhill.dleHours,
+      dle_method: DLE_ESTIMATION_METHOD,
       target_range: targetCloRange,
       regional: regionalIreqDownhill,
       extremity: extremityIreqDownhill,
@@ -276,16 +294,12 @@ export async function POST(request: NextRequest) {
       },
       ensemble_properties: {
         total_clo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
-        regional_clo: {
-          torso: Math.round(uphillThermalProperties.rcl.torso * 100) / 100,
-          arms: Math.round(uphillThermalProperties.rcl.arm * 100) / 100,
-          legs: Math.round(uphillThermalProperties.rcl.leg * 100) / 100,
-        },
+        regional_clo: regionalClo,
         evap_potential: Math.round(uphillThermalProperties.evapPotential * 1000) / 1000,
         permeability_index: Math.round(uphillThermalProperties.im * 100) / 100,
       },
       score: uphillScore.totalScore,
-      thermal_comfort_score: Math.round(
+      thermal_comfort_score: thermalComfortScore ?? Math.round(
         ((uphillScore.componentScores.coldProtection + uphillScore.componentScores.overheatPrevention) / 2) * 10
       ) / 10,
       component_scores: uphillScore.componentScores,

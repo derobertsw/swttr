@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
+import {
+  calculateIreq,
+  calculateRegionalIreq,
+  calculateExtremityIreq,
+  DLE_ESTIMATION_METHOD,
+} from '@/lib/biophysics/ireq';
 import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
 import { getMetabolicRateForActivity, parseExertionLevel } from '@/lib/biophysics/exertion';
 import {
@@ -69,6 +74,12 @@ export async function POST(request: NextRequest) {
 
   const { categorized, userHandwear, userHeadwear } = prepared;
   const ensemble = buildBikingEnsemble(categorized, ireq, maxClo, minEvapPotential);
+  const regionalIreq = scaleIreqShapeToTargetRange(calculateRegionalIreq(ireq, 'biking'), {
+    ireqMin: ireq.ireqMin,
+    ireqNeutral: ireq.ireqNeutral,
+    targetMin: targetMinClo,
+    targetMax: maxClo,
+  });
   const extremityIreq = scaleIreqShapeToTargetRange(
     calculateExtremityIreq(ireq, 'biking', tempC, windMs),
     {
@@ -103,17 +114,15 @@ export async function POST(request: NextRequest) {
         windExposure: 'exposed',
       },
       activityKey: 'biking',
+      comfortContext: {
+        targetRange: [targetMinClo, maxClo],
+        regionalNeutralTarget: regionalIreq.neutral,
+      },
     },
     recommendedHandwear,
     recommendedHeadwear
   );
 
-  const regionalIreq = scaleIreqShapeToTargetRange(calculateRegionalIreq(ireq, 'biking'), {
-    ireqMin: ireq.ireqMin,
-    ireqNeutral: ireq.ireqNeutral,
-    targetMin: targetMinClo,
-    targetMax: maxClo,
-  });
   return NextResponse.json({
     conditions: {
       temperature: `${weather.temperature}°F`,
@@ -124,6 +133,7 @@ export async function POST(request: NextRequest) {
       min: ireq.ireqMin,
       neutral: ireq.ireqNeutral,
       dle_hours: ireq.dleHours,
+      dle_method: DLE_ESTIMATION_METHOD,
       target_range: [targetMinClo, maxClo],
       regional: regionalIreq,
       extremity: extremityIreq,

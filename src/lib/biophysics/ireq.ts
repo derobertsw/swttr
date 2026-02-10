@@ -14,6 +14,8 @@ import {
 } from './constants';
 import type { IreqResult } from '@/types/garments';
 
+export const DLE_ESTIMATION_METHOD = 'heuristic_exposure_estimate_v1';
+
 export interface IreqInput {
   airTemp: number;           // °C
   meanRadiantTemp?: number;  // °C (defaults to airTemp outdoors)
@@ -112,15 +114,15 @@ function calculateRequiredInsulation(
   return iClM2kw;
 }
 
-function estimateDleHours(
+function estimateExposureLimitHoursHeuristic(
   ireqMin: number,
   ireqNeutral: number,
   airTempC: number,
   windSpeedMs: number,
   metabolicRate: number
 ): number {
-  // DLE proxy based on environmental strain and physiological buffer.
-  // Intended as a bounded planning estimate (0.5h to 8h).
+  // This is an exposure-planning heuristic, not a direct ISO DLE derivation.
+  // We keep it bounded to avoid extreme recommendations in edge conditions.
   if (ireqMin <= 0) {
     return 8;
   }
@@ -195,7 +197,13 @@ export function calculateIreq(input: IreqInput): IreqResult {
     ireqMin: Math.round(results.ireqMin * 100) / 100,
     ireqNeutral: Math.round(results.ireqNeutral * 100) / 100,
     dleHours: Math.round(
-      estimateDleHours(results.ireqMin, results.ireqNeutral, airTemp, windSpeed, metabolicRate) * 100
+      estimateExposureLimitHoursHeuristic(
+        results.ireqMin,
+        results.ireqNeutral,
+        airTemp,
+        windSpeed,
+        metabolicRate
+      ) * 100
     ) / 100,
   };
 }

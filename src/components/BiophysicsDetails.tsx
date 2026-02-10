@@ -107,13 +107,16 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
                 </div>
                 {typeof dleHours === "number" && Number.isFinite(dleHours) && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-12">DLE:</span>
+                    <span className="text-xs text-muted-foreground w-12">DLE*:</span>
                     <span className="font-mono text-xs">
                       {dleHours.toFixed(2)} h
                     </span>
                   </div>
                 )}
               </div>
+              <p className="text-[10px] text-muted-foreground mt-2">
+                * DLE is currently a bounded exposure-planning heuristic.
+              </p>
             </div>
 
             {/* Ensemble Properties */}

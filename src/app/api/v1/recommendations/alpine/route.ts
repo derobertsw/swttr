@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { calculateIreq } from '@/lib/biophysics/ireq';
-import { METABOLIC_RATES, getAlpineCloTargets } from '@/lib/biophysics/constants';
+import {
+  calculateIreq,
+  calculateRegionalIreq,
+  calculateExtremityIreq,
+  DLE_ESTIMATION_METHOD,
+} from '@/lib/biophysics/ireq';
+import { METABOLIC_RATES } from '@/lib/biophysics/constants';
 import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
 import { getMetabolicRateForActivity, parseExertionLevel } from '@/lib/biophysics/exertion';
 import {
@@ -69,6 +74,11 @@ export async function POST(request: NextRequest) {
   });
   const targetCloMin = alpineRange.min;
   const targetCloMax = alpineRange.max;
+  const alpineBaselineIreq = {
+    ireqMin: baseTargetMin,
+    ireqNeutral: ireqChairlift.ireqNeutral,
+    dleHours: ireqChairlift.dleHours,
+  };
 
   const prepared = await prepareRouteData(validated, {
     activityFilter: { field: 'alpine_skiing_score', minScore: 5 },
@@ -80,6 +90,7 @@ export async function POST(request: NextRequest) {
         skiing: { min: ireqSkiing.ireqMin, neutral: ireqSkiing.ireqNeutral, dle_hours: ireqSkiing.dleHours },
         chairlift: { min: ireqChairlift.ireqMin, neutral: ireqChairlift.ireqNeutral, dle_hours: ireqChairlift.dleHours },
         dle_hours: ireqChairlift.dleHours,
+        dle_method: DLE_ESTIMATION_METHOD,
         target_range: [targetCloMin, targetCloMax],
       },
       guidance: getAlpineGuidance(tempC, weather.precipitation),
@@ -94,44 +105,24 @@ export async function POST(request: NextRequest) {
     weather.precipitation ?? false
   );
 
-  const alpineTargets = getAlpineCloTargets(tempC);
-
-  const baseRegionalIreq = {
-    min: {
-      torso: alpineTargets.torso.min,
-      arms: alpineTargets.torso.min * 0.85,
-      legs: alpineTargets.legs.min,
-    },
-    neutral: {
-      torso: alpineTargets.torso.neutral,
-      arms: alpineTargets.torso.neutral * 0.85,
-      legs: alpineTargets.legs.neutral,
-    },
-  };
-
-  const baseExtremityIreq = {
-    min: {
-      hands: alpineTargets.hands.min,
-      head: alpineTargets.head.min,
-    },
-    neutral: {
-      hands: alpineTargets.hands.neutral,
-      head: alpineTargets.head.neutral,
-    },
-  };
-  const regionalIreq = scaleIreqShapeToTargetRange(baseRegionalIreq, {
-    ireqMin: baseTargetMin,
-    ireqNeutral: ireqChairlift.ireqNeutral,
-    targetMin: targetCloMin,
-    targetMax: targetCloMax,
-  });
-  const extremityIreq = scaleIreqShapeToTargetRange(baseExtremityIreq, {
-    ireqMin: baseTargetMin,
-    ireqNeutral: ireqChairlift.ireqNeutral,
-    targetMin: targetCloMin,
-    targetMax: targetCloMax,
-  });
-
+  const regionalIreq = scaleIreqShapeToTargetRange(
+    calculateRegionalIreq(alpineBaselineIreq, 'alpine_skiing'),
+    {
+      ireqMin: baseTargetMin,
+      ireqNeutral: ireqChairlift.ireqNeutral,
+      targetMin: targetCloMin,
+      targetMax: targetCloMax,
+    }
+  );
+  const extremityIreq = scaleIreqShapeToTargetRange(
+    calculateExtremityIreq(alpineBaselineIreq, 'alpine_skiing', tempC, windMs),
+    {
+      ireqMin: baseTargetMin,
+      ireqNeutral: ireqChairlift.ireqNeutral,
+      targetMin: targetCloMin,
+      targetMax: targetCloMax,
+    }
+  );
   const recommendedHandwear = selectHandwear(
     userHandwear,
     tempC,
@@ -158,6 +149,10 @@ export async function POST(request: NextRequest) {
         windExposure: 'exposed',
       },
       activityKey: 'alpine_skiing',
+      comfortContext: {
+        targetRange: [targetCloMin, targetCloMax],
+        regionalNeutralTarget: regionalIreq.neutral,
+      },
     },
     recommendedHandwear,
     recommendedHeadwear
@@ -180,6 +175,7 @@ export async function POST(request: NextRequest) {
       skiing: { min: ireqSkiing.ireqMin, neutral: ireqSkiing.ireqNeutral, dle_hours: ireqSkiing.dleHours },
       chairlift: { min: ireqChairlift.ireqMin, neutral: ireqChairlift.ireqNeutral, dle_hours: ireqChairlift.dleHours },
       dle_hours: ireqChairlift.dleHours,
+      dle_method: DLE_ESTIMATION_METHOD,
       target_range: [Math.round(targetCloMin * 100) / 100, Math.round(targetCloMax * 100) / 100],
       regional: regionalIreq,
       extremity: extremityIreq,
