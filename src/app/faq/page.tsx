@@ -12,37 +12,72 @@ const faqs = [
   {
     question: "How does SWTTR determine what to wear?",
     answer:
-      "SWTTR uses a biophysics-based algorithm grounded in ISO 11079 (IREQ - Required Insulation) standards and USARIEM thermal comfort research. It calculates the exact insulation needed based on temperature, wind speed, humidity, and your activity's metabolic rate. The algorithm considers different insulation needs for body regions (torso, arms, legs) and extremities (hands, head), then selects garments from your wardrobe to meet those targets.",
+      "SWTTR calculates how much insulation your body needs using the IREQ (Required Clothing Insulation) method from ISO 11079. It models your body's heat balance — metabolic heat production minus heat lost to cold air, wind, and radiation — then solves for the clothing insulation (in clo units) required to maintain a comfortable skin temperature of 33.7\u00b0C. The algorithm accounts for your specific activity's metabolic rate and exertion level, then selects garments from your wardrobe whose combined insulation meets those targets.",
+  },
+  {
+    question: "What goes into the calculation?",
+    answer:
+      "The inputs are temperature, wind speed, your activity type, and your exertion level. From these, the algorithm computes: (1) your metabolic heat output based on activity and effort, (2) respiratory heat losses from breathing cold air, (3) convective heat loss from wind (using the coefficient 8.3 \u00d7 wind\u2070\u00b7\u2076), and (4) radiative heat loss. It iteratively solves for the insulation that keeps skin temperature at the comfort target. The result is a clo target — the total clothing insulation you need.",
+  },
+  {
+    question: "How does exertion level affect recommendations?",
+    answer:
+      "Each activity has specific metabolic rates for easy, moderate, and hard effort. For example, running moderate is about 6 MET (350 W/m\u00b2) while alpine skiing moderate is 2.5 MET (145 W/m\u00b2). Higher exertion means your body generates more heat, so you need less insulation. This is why XC skiing recommendations are lighter than alpine skiing at the same temperature \u2014 you're producing 2\u20133x more body heat. The algorithm also adjusts metabolic rate based on body size using the DuBois surface area formula.",
+  },
+  {
+    question: "Why are there different targets for torso, arms, and legs?",
+    answer:
+      "Your body doesn't lose heat evenly. During running, your legs do most of the work and generate more heat, so they need less insulation (torso multiplier: 0.75x, legs: 1.05x). During alpine skiing, your legs are more exposed to cold air on the chairlift (legs: 1.2x). XC skiing puts extra demand on legs too (1.15x). These regional multipliers distribute the whole-body insulation target to where you actually need it.",
+  },
+  {
+    question: "Why do hands and head need special treatment?",
+    answer:
+      "Extremities lose heat disproportionately fast due to their high surface-area-to-volume ratio and because your body restricts blood flow to them in cold conditions (vasoconstriction). The algorithm applies higher insulation multipliers for extremities \u2014 for alpine skiing, hands need about 1.45x the base insulation and head needs 1.15x. These targets increase further in extreme cold (+2% per degree below -10\u00b0C) and high wind (+3% per m/s), since extremities are more exposed.",
   },
   {
     question: "What is the thermal comfort score?",
     answer:
-      "The score (0-100) indicates how well your recommended outfit matches the calculated insulation requirements. Green (80+) means excellent thermal balance, amber (60-79) is acceptable with minor trade-offs, and red (below 60) suggests potential discomfort. The score factors in thermal insulation, moisture management, wind/water protection, weight, and mobility.",
+      "The score (0\u2013100) is a weighted composite of five factors: cold protection (are you warm enough?), overheat prevention (not too warm?), breathability (can sweat escape?), weather protection (wind/rain coverage), and weight. The weights change by activity \u2014 for running, overheat prevention is weighted 45% because sweating in heavy layers is the primary risk, while alpine skiing weights cold protection at 35% since you're mostly static. The thermal comfort subscore specifically measures how close your insulation is to the \u201cjust right\u201d zone between minimum and neutral targets.",
   },
   {
     question: "What are clo values?",
     answer:
-      "Clo is a unit of thermal resistance used to measure clothing insulation. 1 clo equals the insulation needed to keep a resting person comfortable at 21°C (70°F). A t-shirt is about 0.1 clo, while a heavy winter jacket might be 1.5+ clo. SWTTR shows current vs target clo values for each body region so you can see if you're adequately insulated.",
+      "Clo is a standard unit of thermal resistance for clothing (ISO 9920). 1 clo is the insulation that keeps a resting person comfortable at 21\u00b0C (70\u00b0F) \u2014 roughly a business suit. A thin base layer is about 0.25\u20130.35 clo, a midweight fleece is 0.6\u20131.0 clo, and a heavy insulated jacket can be 1.5+ clo. Importantly, individual garment clo values don't simply add up \u2014 SWTTR uses USARIEM regression equations to predict how layers interact (air gaps, compression), typically yielding 80\u201396% of the simple sum depending on body region.",
+  },
+  {
+    question: "What is the target clo range?",
+    answer:
+      "The algorithm computes two baselines: the minimum insulation (for a skin temperature of 30\u00b0C \u2014 the cold-stress threshold) and the neutral insulation (for 33.7\u00b0C \u2014 full comfort). The target range is then adjusted based on environmental stress factors: colder temperatures widen the range upward, higher wind adds a buffer, and shorter safe-exposure durations push the minimum higher. This gives you a practical band \u2014 anywhere in the range means you'll be comfortable, with the low end being slightly cool and the high end slightly warm.",
+  },
+  {
+    question: "How does SWTTR pick garments from my wardrobe?",
+    answer:
+      "The algorithm builds an ensemble layer by layer. It starts with a base layer (targeting roughly 30% of minimum clo), adds mid-layers and insulation until the regional targets are met, then adds a shell for weather protection. For high-exertion activities like XC skiing, it prioritizes breathable garments (evaporative potential above 0.25) to prevent overheating from trapped sweat. For alpine skiing, it prioritizes warmth and waterproofness. Each garment's actual thermal properties \u2014 regional clo values, breathability, wind/water ratings \u2014 drive the selection, not just generic categories.",
   },
   {
     question: "What activities are supported?",
     answer:
-      "SWTTR's biophysics algorithm currently supports Alpine Skiing, Backcountry Skiing, XC Skiing, Running, and Biking with activity-specific metabolic rates and regional insulation targets. Other activities use temperature-based recommendations.",
+      "The biophysics engine supports Alpine Skiing, Backcountry Skiing (with separate uphill/downhill ensembles), XC Skiing, Running, Biking, and Hiking/Snowshoeing. Each has tuned metabolic rates, regional insulation multipliers, breathability thresholds, and scoring weights. Alpine skiing also uses empirical temperature-bracket targets that blend skiing effort (60%) with chairlift exposure (40%) to account for the stop-and-go nature of resort skiing.",
   },
   {
-    question: "How do I add my gear?",
+    question: "What makes backcountry skiing recommendations different?",
     answer:
-      "Visit the Wardrobe page to add calibrated gear from our database. Search for items by brand or name, and click to add them to your wardrobe. When you get recommendations, SWTTR will select from your wardrobe items based on their actual thermal properties (clo values, breathability, wind/water protection).",
+      "Backcountry skiing generates two separate ensembles: one for the uphill skin (high exertion, ~4 MET moderate) and one for the downhill descent (low exertion, ~2.5 MET). The uphill ensemble prioritizes breathability and lighter insulation since you're generating significant heat, while the downhill ensemble adds warmth for the static, wind-exposed descent. This dual-ensemble approach reflects the reality that you typically add or remove layers at the transition.",
+  },
+  {
+    question: "How does SWTTR handle breathability?",
+    answer:
+      "The algorithm tracks evaporative resistance (how easily sweat vapor passes through each layer) alongside thermal insulation. It calculates an overall permeability index using the ISO 9920 formula, then derives an evaporative potential (moisture transmission per unit of insulation). For high-exertion activities, garments below the breathability threshold are deprioritized. If overall breathability is below 70% of the target for your activity, you'll see a warning about overheating risk from moisture buildup.",
   },
   {
     question: "What does 'Plan Ahead' do?",
     answer:
-      "Plan Ahead lets you get clothing recommendations for a future date and location. Enter a city, select a date and time, and SWTTR will fetch the weather forecast and provide appropriate recommendations.",
+      "Plan Ahead lets you get clothing recommendations for a future date and location. Enter a city, select a date and time, and SWTTR fetches the forecast from Open-Meteo and runs the full biophysics calculation against those conditions. Works best within a 7-day window for forecast accuracy.",
   },
   {
-    question: "How accurate are the weather forecasts?",
+    question: "How do I add my gear?",
     answer:
-      "SWTTR uses Open-Meteo for weather data, which provides reliable forecasts. For best accuracy, plan ahead recommendations work best within a 7-day window.",
+      "Visit the Wardrobe page to search and add calibrated gear from the database. Each item has measured thermal properties: regional clo values, evaporative resistance, wind/water protection ratings, and activity-specific suitability scores. When you get recommendations, SWTTR selects from your wardrobe based on these actual properties rather than generic assumptions.",
   },
   {
     question: "Do I need an account to use SWTTR?",
@@ -50,19 +85,14 @@ const faqs = [
       "No account is required to get clothing recommendations. Your wardrobe is stored locally in your browser. Signing in allows you to sync your wardrobe across devices.",
   },
   {
-    question: "What temperature unit does SWTTR use?",
-    answer:
-      "SWTTR currently displays temperatures in Fahrenheit. Support for Celsius is planned for a future update.",
-  },
-  {
     question: "Why might recommendations differ from what I'd normally wear?",
     answer:
-      "The algorithm is based on standardized thermal comfort research, but comfort varies by individual. Some people run hot while others run cold. Use the recommendations as a scientific starting point, then adjust based on your experience. The clo targets help you understand the reasoning behind each suggestion.",
+      "The algorithm is calibrated to standardized thermal comfort research (ISO 11079, USARIEM), which represents average human physiology. Individual variation is real \u2014 some people have higher resting metabolic rates, better cold tolerance, or different body compositions. Use the clo targets as a scientific baseline: if you consistently run cold, aim for the upper end of the target range; if you run hot, the lower end. The regional breakdown helps you see exactly where to add or remove insulation.",
   },
   {
-    question: "Why don't hands and head show current clo values?",
+    question: "What temperature unit does SWTTR use?",
     answer:
-      "The algorithm calculates target insulation for extremities (hands and head) based on activity and conditions, but we're still building out the handwear and headwear catalog with calibrated thermal data. For now, you'll see the target clo to aim for, and can add items to your wardrobe once they become available. Torso layers show both current and target values since those garments are fully calibrated.",
+      "SWTTR displays temperatures in Fahrenheit. Internally, all biophysics calculations use Celsius and m/s (as required by ISO 11079), with conversions handled automatically.",
   },
 ];
 
@@ -71,17 +101,23 @@ export default function FAQ() {
     <PageLayout>
       <div className="flex flex-col gap-6 w-full max-w-2xl">
         <header>
-          <h2 className="text-2xl font-semibold">Frequently Asked Questions</h2>
-          <p className="text-muted-foreground">
-            Common questions about using SWTTR.
+          <h2 className="text-2xl font-semibold text-white/90 tracking-wide">
+            Frequently Asked Questions
+          </h2>
+          <p className="text-[13px] text-white/55 mt-1">
+            How SWTTR works and how to get the most out of it.
           </p>
         </header>
 
         <Accordion type="single" collapsible className="w-full">
           {faqs.map((faq, index) => (
-            <AccordionItem key={index} value={`item-${index}`}>
-              <AccordionTrigger>{faq.question}</AccordionTrigger>
-              <AccordionContent>{faq.answer}</AccordionContent>
+            <AccordionItem key={index} value={`item-${index}`} className="border-white/20">
+              <AccordionTrigger className="text-white/90 text-[15px] leading-snug hover:no-underline hover:text-white">
+                {faq.question}
+              </AccordionTrigger>
+              <AccordionContent className="text-white/70 text-[13px] leading-relaxed">
+                {faq.answer}
+              </AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
