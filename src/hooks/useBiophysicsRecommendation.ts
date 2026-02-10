@@ -6,6 +6,10 @@ import {
   BIOPHYSICS_ENDPOINTS,
   isBiophysicsSupported,
 } from "@/types/biophysics";
+import {
+  type ExertionLevel,
+  exertionToXcIntensity,
+} from "@/lib/biophysics/exertion";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { logWarn } from "@/lib/logger";
 
@@ -15,7 +19,8 @@ export interface UseBiophysicsResult {
   error: Error | null;
   fetch: (
     activity: string,
-    weather: { temperature: number; windSpeed: number; humidity?: number }
+    weather: { temperature: number; windSpeed: number; humidity?: number },
+    exertion: ExertionLevel
   ) => Promise<BiophysicsRecommendation | null>;
   reset: () => void;
 }
@@ -35,7 +40,8 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
   const fetchBiophysics = useCallback(
     async (
       activity: string,
-      weather: { temperature: number; windSpeed: number; humidity?: number }
+      weather: { temperature: number; windSpeed: number; humidity?: number },
+      exertion: ExertionLevel
     ): Promise<BiophysicsRecommendation | null> => {
       // Return null for unsupported activities
       if (!isBiophysicsSupported(activity)) {
@@ -68,6 +74,9 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
               wind_speed: weather.windSpeed,
               humidity: weather.humidity ?? 50,
             },
+            exertion,
+            // Backward-compatible alias for routes that still inspect "intensity".
+            intensity: exertionToXcIntensity(exertion),
           }),
         });
 

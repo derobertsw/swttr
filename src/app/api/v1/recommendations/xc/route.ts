@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
-import { METABOLIC_RATES } from '@/lib/biophysics/constants';
 import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
+import {
+  exertionToXcIntensity,
+  getMetabolicRateForActivity,
+  parseExertionLevel,
+} from '@/lib/biophysics/exertion';
 import {
   validateRecommendationRequest,
   sortByBreathability,
@@ -25,19 +29,15 @@ export async function POST(request: NextRequest) {
 
   const { weather, tempC, windMs, body } = validated;
 
-  const intensity = (body.intensity ?? 'moderate') as 'easy' | 'moderate' | 'racing';
-  const intensityToRate: Record<'easy' | 'moderate' | 'racing', keyof typeof METABOLIC_RATES> = {
-    easy: 'xc_skiing_easy',
-    moderate: 'xc_skiing_moderate',
-    racing: 'xc_skiing_racing',
-  };
-  const metabolicRateKey = intensityToRate[intensity];
+  const exertion = parseExertionLevel(body.exertion ?? body.intensity);
+  const intensity = exertionToXcIntensity(exertion);
+  const metabolicRate = getMetabolicRateForActivity('xc_skiing', exertion);
 
   const ireq = calculateIreq({
     airTemp: tempC,
     windSpeed: windMs,
     relativeHumidity: weather.humidity ?? 50,
-    metabolicRate: METABOLIC_RATES[metabolicRateKey],
+    metabolicRate,
   });
 
   const targetRange = calculateActivityTargetRange({
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
       },
       activity: {
         name: 'XC Skiing',
-        metabolicRate: METABOLIC_RATES[metabolicRateKey],
+        metabolicRate,
         hasStaticPeriods: false,
         windExposure: 'normal',
       },
@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
     conditions: {
       temperature: `${weather.temperature}°F`,
       wind_speed: `${weather.wind_speed} mph`,
+      exertion,
       intensity,
     },
     ireq: {

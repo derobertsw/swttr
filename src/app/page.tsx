@@ -15,6 +15,8 @@ const HomeContent = () => {
   const {
     activity,
     setActivity,
+    exertion,
+    setExertion,
     temperature,
     windspeed,
     recommendation,
@@ -42,7 +44,12 @@ const HomeContent = () => {
           <p className="text-base font-medium text-white/90 text-center mb-3">
             Choose your trip activity
           </p>
-          <ActivitySelection value={activity} onChange={setActivity} />
+          <ActivitySelection
+            value={activity}
+            onChange={setActivity}
+            exertion={exertion}
+            onExertionChange={setExertion}
+          />
           {inputMode === "manual" && locationDenied ? (
             <LocationInput
               activityName={ACTIVITIES.find(a => a.value === activity)?.name.toLowerCase() || ""}

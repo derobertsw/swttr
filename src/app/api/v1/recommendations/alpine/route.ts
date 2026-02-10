@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { calculateIreq } from '@/lib/biophysics/ireq';
 import { METABOLIC_RATES, getAlpineCloTargets } from '@/lib/biophysics/constants';
 import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
+import { getMetabolicRateForActivity, parseExertionLevel } from '@/lib/biophysics/exertion';
 import {
   validateRecommendationRequest,
   sortByInsulation,
@@ -26,14 +27,16 @@ export async function POST(request: NextRequest) {
   const validated = await validateRecommendationRequest(request);
   if (validated instanceof NextResponse) return validated;
 
-  const { weather, tempC, windMs } = validated;
+  const { weather, tempC, windMs, body } = validated;
+  const exertion = parseExertionLevel(body.exertion ?? body.intensity);
+  const skiingMetabolicRate = getMetabolicRateForActivity('alpine_skiing', exertion);
 
   // Calculate IREQ for both skiing and chairlift
   const ireqSkiing = calculateIreq({
     airTemp: tempC,
     windSpeed: windMs + 5,
     relativeHumidity: weather.humidity ?? 50,
-    metabolicRate: METABOLIC_RATES.alpine_skiing,
+    metabolicRate: skiingMetabolicRate,
   });
 
   const ireqChairlift = calculateIreq({
@@ -137,7 +140,7 @@ export async function POST(request: NextRequest) {
       },
       activity: {
         name: 'Alpine Skiing',
-        metabolicRate: METABOLIC_RATES.alpine_skiing,
+        metabolicRate: skiingMetabolicRate,
         hasStaticPeriods: true,
         staticMetabolicRate: METABOLIC_RATES.chairlift,
         windExposure: 'exposed',
@@ -158,6 +161,7 @@ export async function POST(request: NextRequest) {
     conditions: {
       temperature: `${weather.temperature}°F`,
       wind_speed: `${weather.wind_speed} mph`,
+      exertion,
       precipitation: weather.precipitation ?? false,
     },
     ireq: {

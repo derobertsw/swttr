@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import ActivitySelection from "./ActivitySelection";
 
 // Mock next/navigation for components that use PageLayout -> AppNavigation
@@ -10,9 +11,22 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("ActivitySelection", () => {
+  const renderSelection = (
+    overrides?: Partial<ComponentProps<typeof ActivitySelection>>
+  ) =>
+    render(
+      <ActivitySelection
+        value="running"
+        onChange={vi.fn()}
+        exertion="moderate"
+        onExertionChange={vi.fn()}
+        {...overrides}
+      />
+    );
+
   describe("rendering", () => {
     it("should render the carousel", () => {
-      render(<ActivitySelection value="running" onChange={vi.fn()} />);
+      renderSelection();
       expect(screen.getByRole("region", { name: "" })).toHaveAttribute(
         "aria-roledescription",
         "carousel"
@@ -20,13 +34,13 @@ describe("ActivitySelection", () => {
     });
 
     it("should render all activity slides", () => {
-      render(<ActivitySelection value="running" onChange={vi.fn()} />);
+      renderSelection();
       const slides = screen.getAllByRole("group");
       expect(slides).toHaveLength(6);
     });
 
     it("should show activity names", () => {
-      render(<ActivitySelection value="running" onChange={vi.fn()} />);
+      renderSelection();
       expect(screen.getByText("Running")).toBeInTheDocument();
       expect(screen.getByText("Biking")).toBeInTheDocument();
       expect(screen.getByText("Hiking / Snowshoeing")).toBeInTheDocument();
@@ -36,10 +50,16 @@ describe("ActivitySelection", () => {
     });
 
     it("should render pagination dots", () => {
-      render(<ActivitySelection value="running" onChange={vi.fn()} />);
+      renderSelection();
       expect(screen.getByRole("button", { name: /select running/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /select biking/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /select alpine skiing/i })).toBeInTheDocument();
+    });
+
+    it("should render exertion slider", () => {
+      renderSelection();
+      expect(screen.getByRole("slider")).toBeInTheDocument();
+      expect(screen.getAllByText("Moderate").length).toBeGreaterThan(0);
     });
   });
 
@@ -47,7 +67,7 @@ describe("ActivitySelection", () => {
     it("should call onChange when a pagination dot is clicked", async () => {
       const mockOnChange = vi.fn();
       const user = userEvent.setup();
-      render(<ActivitySelection value="running" onChange={mockOnChange} />);
+      renderSelection({ onChange: mockOnChange });
 
       await user.click(screen.getByRole("button", { name: /select biking/i }));
 
@@ -57,7 +77,7 @@ describe("ActivitySelection", () => {
     it("should call onChange when clicking on an activity card", async () => {
       const mockOnChange = vi.fn();
       const user = userEvent.setup();
-      render(<ActivitySelection value="running" onChange={mockOnChange} />);
+      renderSelection({ onChange: mockOnChange });
 
       const slides = screen.getAllByRole("group");
       const bikingSlide = slides[1];
@@ -67,11 +87,23 @@ describe("ActivitySelection", () => {
 
       expect(mockOnChange).toHaveBeenCalledWith("biking");
     });
+
+    it("should call onExertionChange when slider is moved with keyboard", async () => {
+      const mockOnExertionChange = vi.fn();
+      const user = userEvent.setup();
+      renderSelection({ onExertionChange: mockOnExertionChange });
+
+      const slider = screen.getByRole("slider");
+      slider.focus();
+      await user.keyboard("{ArrowRight}");
+
+      expect(mockOnExertionChange).toHaveBeenCalledWith("hard");
+    });
   });
 
   describe("initial value", () => {
     it("should start at the correct activity based on value prop", () => {
-      render(<ActivitySelection value="alpine_skiing" onChange={vi.fn()} />);
+      renderSelection({ value: "alpine_skiing" });
 
       const slides = screen.getAllByRole("group");
       const alpineSlide = slides[4];
@@ -81,7 +113,7 @@ describe("ActivitySelection", () => {
     });
 
     it("should highlight first activity when value is running", () => {
-      render(<ActivitySelection value="running" onChange={vi.fn()} />);
+      renderSelection();
 
       const slides = screen.getAllByRole("group");
       const runningSlide = slides[0];

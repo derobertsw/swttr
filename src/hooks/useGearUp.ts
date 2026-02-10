@@ -17,6 +17,10 @@ import { logWarn } from "@/lib/logger";
 import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { TemperatureSensitivity } from "@/types/preferences";
+import {
+  type ExertionLevel,
+  DEFAULT_EXERTION_LEVEL,
+} from "@/lib/biophysics/exertion";
 
 // ---------------------------------------------------------------------------
 // State & Actions
@@ -156,6 +160,7 @@ interface SubmitResult {
 async function submitPlanAhead(
   state: GearUpState,
   activity: string,
+  exertion: ExertionLevel,
   sensitivity: TemperatureSensitivity,
   locationSearch: ReturnType<typeof useLocationSearch>,
   biophysics: ReturnType<typeof useBiophysicsRecommendation>,
@@ -174,7 +179,11 @@ async function submitPlanAhead(
 
   const data = await response.json();
   const layers = getRecommendation(data.temperature, activity, sensitivity);
-  const bioData = await biophysics.fetch(activity, { temperature: data.temperature, windSpeed: data.windSpeed });
+  const bioData = await biophysics.fetch(
+    activity,
+    { temperature: data.temperature, windSpeed: data.windSpeed },
+    exertion
+  );
 
   return {
     recommendation: layers,
@@ -187,6 +196,7 @@ async function submitPlanAhead(
 async function submitLocationDenied(
   state: GearUpState,
   activity: string,
+  exertion: ExertionLevel,
   sensitivity: TemperatureSensitivity,
   locationSearch: ReturnType<typeof useLocationSearch>,
   biophysics: ReturnType<typeof useBiophysicsRecommendation>,
@@ -199,7 +209,11 @@ async function submitLocationDenied(
 
   if (weather) {
     const layers = getRecommendation(weather.temperature, activity, sensitivity);
-    const bioData = await biophysics.fetch(activity, { temperature: weather.temperature, windSpeed: weather.windSpeed });
+    const bioData = await biophysics.fetch(
+      activity,
+      { temperature: weather.temperature, windSpeed: weather.windSpeed },
+      exertion
+    );
 
     return {
       recommendation: layers,
@@ -213,6 +227,7 @@ async function submitLocationDenied(
 
 async function submitCurrentLocation(
   activity: string,
+  exertion: ExertionLevel,
   sensitivity: TemperatureSensitivity,
   biophysics: ReturnType<typeof useBiophysicsRecommendation>,
 ): Promise<{ result: SubmitResult | null; locationDenied?: boolean; showSliders?: boolean }> {
@@ -220,7 +235,11 @@ async function submitCurrentLocation(
 
   if (result.data) {
     const layers = getRecommendation(result.data.temperature, activity, sensitivity);
-    const bioData = await biophysics.fetch(activity, { temperature: result.data.temperature, windSpeed: result.data.windSpeed });
+    const bioData = await biophysics.fetch(
+      activity,
+      { temperature: result.data.temperature, windSpeed: result.data.windSpeed },
+      exertion
+    );
 
     return {
       result: {
@@ -247,6 +266,7 @@ export function useGearUp() {
 
   // Activity stays as useState — drives effects and is passed to sub-hooks
   const [activity, setActivity] = useState(DEFAULT_ACTIVITY);
+  const [exertion, setExertion] = useState<ExertionLevel>(DEFAULT_EXERTION_LEVEL);
   const [hasSetInitialActivity, setHasSetInitialActivity] = useState(false);
 
   const initialMode: InputMode = searchParams.get("mode") === "planAhead" ? "planAhead" : "manual";
@@ -309,7 +329,14 @@ export function useGearUp() {
 
       dispatch({ type: "SUBMIT_START" });
       try {
-        const result = await submitPlanAhead(state, activity, sensitivity, locationSearch, biophysics);
+        const result = await submitPlanAhead(
+          state,
+          activity,
+          exertion,
+          sensitivity,
+          locationSearch,
+          biophysics
+        );
         dispatch({ type: "SUBMIT_SUCCESS", ...result });
       } catch (error) {
         toast.error("Failed to fetch weather forecast");
@@ -318,7 +345,14 @@ export function useGearUp() {
       }
     } else if (state.locationDenied && locationSearch.selectedLocation) {
       dispatch({ type: "SUBMIT_START" });
-      const result = await submitLocationDenied(state, activity, sensitivity, locationSearch, biophysics);
+      const result = await submitLocationDenied(
+        state,
+        activity,
+        exertion,
+        sensitivity,
+        locationSearch,
+        biophysics
+      );
       if (result) {
         dispatch({ type: "SUBMIT_SUCCESS", ...result });
       } else {
@@ -327,7 +361,12 @@ export function useGearUp() {
       }
     } else {
       dispatch({ type: "SUBMIT_START" });
-      const { result, locationDenied, showSliders } = await submitCurrentLocation(activity, sensitivity, biophysics);
+      const { result, locationDenied, showSliders } = await submitCurrentLocation(
+        activity,
+        exertion,
+        sensitivity,
+        biophysics
+      );
 
       if (result) {
         dispatch({ type: "SUBMIT_SUCCESS", ...result });
@@ -341,7 +380,7 @@ export function useGearUp() {
         dispatch({ type: "SUBMIT_ERROR" });
       }
     }
-  }, [activity, biophysics, state, locationSearch, sensitivity]);
+  }, [activity, biophysics, exertion, state, locationSearch, sensitivity]);
 
   // Listen for gearUp events from navigation
   useEffect(() => {
@@ -375,7 +414,7 @@ export function useGearUp() {
             const bioData = await biophysics.fetch(activity, {
               temperature: weather.temperature,
               windSpeed: weather.windSpeed,
-            });
+            }, exertion);
             dispatch({
               type: "SUBMIT_SUCCESS",
               recommendation: layers,
@@ -399,7 +438,7 @@ export function useGearUp() {
       return;
     }
     dispatch({ type: "LOCATION_DENIED" });
-  }, [searchParams, activity, biophysics, sensitivity]);
+  }, [searchParams, activity, biophysics, exertion, sensitivity]);
 
   // Dispatch activity change events and persist to localStorage
   useEffect(() => {
@@ -420,6 +459,7 @@ export function useGearUp() {
 
   const resetToInitialState = useCallback(() => {
     setActivity(defaultActivity);
+    setExertion(DEFAULT_EXERTION_LEVEL);
     dispatch({ type: "RESET" });
     locationSearch.reset();
     biophysics.reset();
@@ -429,6 +469,8 @@ export function useGearUp() {
     // State
     activity,
     setActivity,
+    exertion,
+    setExertion,
     temperature: state.temperature,
     setTemperature,
     windspeed: state.windspeed,

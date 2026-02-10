@@ -168,4 +168,36 @@ describe('Alpine Recommendations API Route', () => {
     expect(names).toContain('TestBrand Torso Mid');
     expect(names).toContain('TestBrand Legs Insulation');
   });
+
+  it('reduces skiing insulation requirement at higher exertion', async () => {
+    const garments = [
+      createMockGarment({
+        id: 'base-1',
+        model_name: 'Base',
+        category: 'base_layer',
+        covers_torso: true,
+        covers_legs: true,
+      }),
+    ];
+    const mockSupabase = createMockSupabase({ garments });
+    mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
+
+    const easyResponse = await POST(
+      createRequest({
+        weather: { temperature: 15, wind_speed: 10 },
+        exertion: 'easy',
+      })
+    );
+    const hardResponse = await POST(
+      createRequest({
+        weather: { temperature: 15, wind_speed: 10 },
+        exertion: 'hard',
+      })
+    );
+
+    const easyData = await easyResponse.json();
+    const hardData = await hardResponse.json();
+
+    expect(hardData.ireq.skiing.min).toBeLessThan(easyData.ireq.skiing.min);
+  });
 });

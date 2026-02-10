@@ -8,14 +8,30 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel";
+import { Slider } from "@/components/ui/slider";
 import { ACTIVITIES } from "@/data/activities";
+import {
+  type ExertionLevel,
+  EXERTION_LABELS,
+  EXERTION_DESCRIPTIONS,
+  EXERTION_LEVELS,
+  exertionToSliderValue,
+  sliderValueToExertion,
+} from "@/lib/biophysics/exertion";
 
 interface ActivitySelectionProps {
   value: string;
   onChange: (value: string) => void;
+  exertion: ExertionLevel;
+  onExertionChange: (value: ExertionLevel) => void;
 }
 
-const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
+const ActivitySelection = ({
+  value,
+  onChange,
+  exertion,
+  onExertionChange,
+}: ActivitySelectionProps) => {
   const [api, setApi] = React.useState<CarouselApi>();
   const [current, setCurrent] = React.useState(0);
   const [hideDots, setHideDots] = React.useState(false);
@@ -168,6 +184,31 @@ const ActivitySelection = ({ value, onChange }: ActivitySelectionProps) => {
             aria-label={`Select ${activity.name}`}
           />
         ))}
+      </div>
+      <div className="mt-6 space-y-2 px-1">
+        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-white/70">
+          <span>2. Exertion</span>
+          <span>{EXERTION_LABELS[exertion]}</span>
+        </div>
+        <p className="text-xs text-white/60">{EXERTION_DESCRIPTIONS[exertion]}</p>
+        <Slider
+          min={1}
+          max={3}
+          step={1}
+          value={[exertionToSliderValue(exertion)]}
+          aria-label="Exertion level"
+          onValueChange={(values) => {
+            const next = sliderValueToExertion(values[0]);
+            if (next !== exertion) {
+              onExertionChange(next);
+            }
+          }}
+        />
+        <div className="flex justify-between text-[11px] text-white/55">
+          {EXERTION_LEVELS.map((level) => (
+            <span key={level}>{EXERTION_LABELS[level]}</span>
+          ))}
+        </div>
       </div>
     </div>
   );

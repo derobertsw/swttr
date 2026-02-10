@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/lib/biophysics/ireq';
 import { scoreEnsemble } from '@/lib/biophysics/scorer';
-import { METABOLIC_RATES } from '@/lib/biophysics/constants';
 import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
+import {
+  type ExertionLevel,
+  getMetabolicRateForActivity,
+  parseExertionLevel,
+} from '@/lib/biophysics/exertion';
 import {
   type GarmentRow,
   type CategorizedGarments,
@@ -31,7 +35,6 @@ const UPHILL_MIN_EVAP_POTENTIAL = 0.20;
 const UPHILL_WIND_FACTOR = 0.3;
 const DOWNHILL_SPEED_WIND = 5;
 const TRANSITION_WIND_FACTOR = 1.5;
-const TRANSITION_METABOLIC_RATE = 90;
 const SHELL_WIND_THRESHOLD = 8;
 
 // ============================================
@@ -52,6 +55,12 @@ interface IreqResult {
   ireqNeutral: number;
 }
 
+function getTransitionMetabolicRate(exertion: ExertionLevel): number {
+  if (exertion === 'easy') return 80;
+  if (exertion === 'hard') return 100;
+  return 90;
+}
+
 // ============================================
 // MAIN ROUTE HANDLER
 // ============================================
@@ -68,29 +77,33 @@ export async function POST(request: NextRequest) {
   if (validated instanceof NextResponse) return validated;
 
   const { supabase, userId, weather, tempC, windMs, body } = validated;
+  const exertion = parseExertionLevel(body.exertion ?? body.intensity);
   const shouldPrioritizeLightPack = (body.prioritize_light_pack as boolean) ?? false;
   const defaultHumidity = weather.humidity ?? 50;
+  const uphillMetabolicRate = getMetabolicRateForActivity('ski_touring_uphill', exertion);
+  const downhillMetabolicRate = getMetabolicRateForActivity('ski_touring_downhill', exertion);
+  const transitionMetabolicRate = getTransitionMetabolicRate(exertion);
 
   // IREQ Calculations
   const ireqUphill = calculateIreq({
     airTemp: tempC,
     windSpeed: windMs * UPHILL_WIND_FACTOR,
     relativeHumidity: defaultHumidity,
-    metabolicRate: METABOLIC_RATES.ski_touring_uphill,
+    metabolicRate: uphillMetabolicRate,
   });
 
   const ireqDownhill = calculateIreq({
     airTemp: tempC,
     windSpeed: windMs + DOWNHILL_SPEED_WIND,
     relativeHumidity: defaultHumidity,
-    metabolicRate: METABOLIC_RATES.ski_touring_downhill,
+    metabolicRate: downhillMetabolicRate,
   });
 
   const ireqTransition = calculateIreq({
     airTemp: tempC,
     windSpeed: windMs * TRANSITION_WIND_FACTOR,
     relativeHumidity: defaultHumidity,
-    metabolicRate: TRANSITION_METABOLIC_RATE,
+    metabolicRate: transitionMetabolicRate,
   });
 
   const baseRegionalIreqDownhill = calculateRegionalIreq(ireqDownhill, 'ski_touring_downhill');
@@ -173,14 +186,14 @@ export async function POST(request: NextRequest) {
   const uphillScore = scoreEnsemble(
     uphillThermalGarments,
     { temperature: tempC, windSpeed: windMs * UPHILL_WIND_FACTOR, humidity: defaultHumidity, precipitation: false },
-    { name: 'Ski Touring Uphill', metabolicRate: METABOLIC_RATES.ski_touring_uphill, hasStaticPeriods: false, windExposure: 'sheltered' },
+    { name: 'Ski Touring Uphill', metabolicRate: uphillMetabolicRate, hasStaticPeriods: false, windExposure: 'sheltered' },
     'ski_touring_uphill'
   );
 
   const downhillScore = scoreEnsemble(
     downhillThermalGarments,
     { temperature: tempC, windSpeed: windMs + DOWNHILL_SPEED_WIND, humidity: defaultHumidity, precipitation: weather.precipitation ?? false },
-    { name: 'Ski Touring Downhill', metabolicRate: METABOLIC_RATES.ski_touring_downhill, hasStaticPeriods: false, windExposure: 'exposed' },
+    { name: 'Ski Touring Downhill', metabolicRate: downhillMetabolicRate, hasStaticPeriods: false, windExposure: 'exposed' },
     'ski_touring_downhill'
   );
 
@@ -228,6 +241,7 @@ export async function POST(request: NextRequest) {
     conditions: {
       temperature: `${weather.temperature}°F`,
       wind_speed: `${weather.wind_speed} mph`,
+      exertion,
       precipitation: weather.precipitation ?? false,
     },
     ireq: {
