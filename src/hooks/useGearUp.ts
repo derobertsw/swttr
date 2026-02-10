@@ -16,7 +16,7 @@ import { BiophysicsRecommendation } from "@/types/biophysics";
 import { logWarn } from "@/lib/logger";
 import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
 import { STORAGE_KEYS } from "@/lib/storage";
-import { TemperatureSensitivity } from "@/types/preferences";
+import { TemperatureSensitivity, UserBodyMetrics } from "@/types/preferences";
 import {
   type ExertionLevel,
   DEFAULT_EXERTION_LEVEL,
@@ -161,6 +161,7 @@ async function submitPlanAhead(
   state: GearUpState,
   activity: string,
   exertion: ExertionLevel,
+  bodyMetrics: UserBodyMetrics,
   sensitivity: TemperatureSensitivity,
   locationSearch: ReturnType<typeof useLocationSearch>,
   biophysics: ReturnType<typeof useBiophysicsRecommendation>,
@@ -182,7 +183,8 @@ async function submitPlanAhead(
   const bioData = await biophysics.fetch(
     activity,
     { temperature: data.temperature, windSpeed: data.windSpeed },
-    exertion
+    exertion,
+    bodyMetrics
   );
 
   return {
@@ -197,6 +199,7 @@ async function submitLocationDenied(
   state: GearUpState,
   activity: string,
   exertion: ExertionLevel,
+  bodyMetrics: UserBodyMetrics,
   sensitivity: TemperatureSensitivity,
   locationSearch: ReturnType<typeof useLocationSearch>,
   biophysics: ReturnType<typeof useBiophysicsRecommendation>,
@@ -212,7 +215,8 @@ async function submitLocationDenied(
     const bioData = await biophysics.fetch(
       activity,
       { temperature: weather.temperature, windSpeed: weather.windSpeed },
-      exertion
+      exertion,
+      bodyMetrics
     );
 
     return {
@@ -228,6 +232,7 @@ async function submitLocationDenied(
 async function submitCurrentLocation(
   activity: string,
   exertion: ExertionLevel,
+  bodyMetrics: UserBodyMetrics,
   sensitivity: TemperatureSensitivity,
   biophysics: ReturnType<typeof useBiophysicsRecommendation>,
 ): Promise<{ result: SubmitResult | null; locationDenied?: boolean; showSliders?: boolean }> {
@@ -238,7 +243,8 @@ async function submitCurrentLocation(
     const bioData = await biophysics.fetch(
       activity,
       { temperature: result.data.temperature, windSpeed: result.data.windSpeed },
-      exertion
+      exertion,
+      bodyMetrics
     );
 
     return {
@@ -262,7 +268,7 @@ async function submitCurrentLocation(
 
 export function useGearUp() {
   const searchParams = useSearchParams();
-  const { sensitivity, defaultActivity } = usePreferences();
+  const { sensitivity, defaultActivity, bodyMetrics } = usePreferences();
 
   // Activity stays as useState — drives effects and is passed to sub-hooks
   const [activity, setActivity] = useState(DEFAULT_ACTIVITY);
@@ -333,6 +339,7 @@ export function useGearUp() {
           state,
           activity,
           exertion,
+          bodyMetrics,
           sensitivity,
           locationSearch,
           biophysics
@@ -349,6 +356,7 @@ export function useGearUp() {
         state,
         activity,
         exertion,
+        bodyMetrics,
         sensitivity,
         locationSearch,
         biophysics
@@ -364,6 +372,7 @@ export function useGearUp() {
       const { result, locationDenied, showSliders } = await submitCurrentLocation(
         activity,
         exertion,
+        bodyMetrics,
         sensitivity,
         biophysics
       );
@@ -380,7 +389,7 @@ export function useGearUp() {
         dispatch({ type: "SUBMIT_ERROR" });
       }
     }
-  }, [activity, biophysics, exertion, state, locationSearch, sensitivity]);
+  }, [activity, biophysics, bodyMetrics, exertion, state, locationSearch, sensitivity]);
 
   // Listen for gearUp events from navigation
   useEffect(() => {
@@ -414,7 +423,7 @@ export function useGearUp() {
             const bioData = await biophysics.fetch(activity, {
               temperature: weather.temperature,
               windSpeed: weather.windSpeed,
-            }, exertion);
+            }, exertion, bodyMetrics);
             dispatch({
               type: "SUBMIT_SUCCESS",
               recommendation: layers,
@@ -438,7 +447,7 @@ export function useGearUp() {
       return;
     }
     dispatch({ type: "LOCATION_DENIED" });
-  }, [searchParams, activity, biophysics, exertion, sensitivity]);
+  }, [searchParams, activity, biophysics, bodyMetrics, exertion, sensitivity]);
 
   // Dispatch activity change events and persist to localStorage
   useEffect(() => {

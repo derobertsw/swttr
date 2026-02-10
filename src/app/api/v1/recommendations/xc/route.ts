@@ -7,6 +7,10 @@ import {
   parseExertionLevel,
 } from '@/lib/biophysics/exertion';
 import {
+  applyBodySizeMetabolicAdjustment,
+  parseBodyMetricsFromRequestBody,
+} from '@/lib/biophysics/bodyMetrics';
+import {
   validateRecommendationRequest,
   sortByBreathability,
   selectHandwear,
@@ -31,7 +35,11 @@ export async function POST(request: NextRequest) {
 
   const exertion = parseExertionLevel(body.exertion ?? body.intensity);
   const intensity = exertionToXcIntensity(exertion);
-  const metabolicRate = getMetabolicRateForActivity('xc_skiing', exertion);
+  const bodyMetrics = parseBodyMetricsFromRequestBody(body);
+  const metabolicRate = applyBodySizeMetabolicAdjustment(
+    getMetabolicRateForActivity('xc_skiing', exertion),
+    bodyMetrics
+  );
 
   const ireq = calculateIreq({
     airTemp: tempC,

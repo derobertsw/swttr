@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 import { TemperatureSensitivity } from "@/types/preferences";
+import { sanitizeOptionalBodyMetrics } from "@/lib/biophysics/bodyMetrics";
 
 function getUserId(request: NextRequest): string | null {
   return request.headers.get("x-user-id");
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
   try {
     const { data, error } = await supabase
       .from("user_preferences")
-      .select("temperature_sensitivity, default_activity")
+      .select("*")
       .eq("user_id", userId)
       .single();
 
@@ -34,10 +35,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(DEFAULT_PREFERENCES);
     }
 
-    return NextResponse.json({
+    const savedOptionalMetrics = sanitizeOptionalBodyMetrics({
+      heightInches: data?.height_inches,
+      weightLbs: data?.weight_lbs,
+    });
+
+    const response: {
+      temperatureSensitivity: TemperatureSensitivity;
+      defaultActivity: string;
+      heightInches?: number;
+      weightLbs?: number;
+    } = {
       temperatureSensitivity: (data?.temperature_sensitivity || "neutral") as TemperatureSensitivity,
       defaultActivity: data?.default_activity || "alpine_skiing",
-    });
+    };
+
+    if (savedOptionalMetrics.heightInches !== undefined) {
+      response.heightInches = savedOptionalMetrics.heightInches;
+    }
+    if (savedOptionalMetrics.weightLbs !== undefined) {
+      response.weightLbs = savedOptionalMetrics.weightLbs;
+    }
+
+    return NextResponse.json(response);
   } catch (err) {
     console.error("Database error:", err);
     // Return defaults instead of failing
@@ -50,27 +70,47 @@ export async function PUT(request: NextRequest) {
   const userId = getUserId(request);
 
   // Parse body first to return what was sent
-  let body: { temperatureSensitivity?: TemperatureSensitivity; defaultActivity?: string };
+  let body: {
+    temperatureSensitivity?: TemperatureSensitivity;
+    defaultActivity?: string;
+    heightInches?: number;
+    weightLbs?: number;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { temperatureSensitivity, defaultActivity } = body;
+  const { temperatureSensitivity, defaultActivity, heightInches, weightLbs } = body;
+  const sanitizedMetrics = sanitizeOptionalBodyMetrics({ heightInches, weightLbs });
+  const hasHeightInput = heightInches !== undefined;
+  const hasWeightInput = weightLbs !== undefined;
 
   // If no database or user, just acknowledge the request
   // Client saves to localStorage anyway
   if (!supabase || !userId) {
-    return NextResponse.json({
+    const response: {
+      temperatureSensitivity: TemperatureSensitivity;
+      defaultActivity: string;
+      heightInches?: number;
+      weightLbs?: number;
+    } = {
       temperatureSensitivity: temperatureSensitivity || "neutral",
       defaultActivity: defaultActivity || "alpine_skiing",
-    });
+    };
+    if (hasHeightInput && sanitizedMetrics.heightInches !== undefined) {
+      response.heightInches = sanitizedMetrics.heightInches;
+    }
+    if (hasWeightInput && sanitizedMetrics.weightLbs !== undefined) {
+      response.weightLbs = sanitizedMetrics.weightLbs;
+    }
+    return NextResponse.json(response);
   }
 
   try {
     // Build update object with only provided fields
-    const updateData: Record<string, string> = { user_id: userId };
+    const updateData: Record<string, string | number> = { user_id: userId };
 
     if (temperatureSensitivity) {
       if (!["hot", "neutral", "cold"].includes(temperatureSensitivity)) {
@@ -86,6 +126,13 @@ export async function PUT(request: NextRequest) {
       updateData.default_activity = defaultActivity;
     }
 
+    if (hasHeightInput && sanitizedMetrics.heightInches !== undefined) {
+      updateData.height_inches = sanitizedMetrics.heightInches;
+    }
+    if (hasWeightInput && sanitizedMetrics.weightLbs !== undefined) {
+      updateData.weight_lbs = sanitizedMetrics.weightLbs;
+    }
+
     const { data, error } = await supabase
       .from("user_preferences")
       .upsert(updateData, { onConflict: "user_id" })
@@ -95,22 +142,63 @@ export async function PUT(request: NextRequest) {
     if (error) {
       console.error("Failed to upsert preferences:", error);
       // Return what was sent - client already saved to localStorage
-      return NextResponse.json({
+      const response: {
+        temperatureSensitivity: TemperatureSensitivity;
+        defaultActivity: string;
+        heightInches?: number;
+        weightLbs?: number;
+      } = {
         temperatureSensitivity: temperatureSensitivity || "neutral",
         defaultActivity: defaultActivity || "alpine_skiing",
-      });
+      };
+      if (hasHeightInput && sanitizedMetrics.heightInches !== undefined) {
+        response.heightInches = sanitizedMetrics.heightInches;
+      }
+      if (hasWeightInput && sanitizedMetrics.weightLbs !== undefined) {
+        response.weightLbs = sanitizedMetrics.weightLbs;
+      }
+      return NextResponse.json(response);
     }
 
-    return NextResponse.json({
+    const savedMetrics = sanitizeOptionalBodyMetrics({
+      heightInches: data.height_inches,
+      weightLbs: data.weight_lbs,
+    });
+
+    const response: {
+      temperatureSensitivity: TemperatureSensitivity;
+      defaultActivity: string;
+      heightInches?: number;
+      weightLbs?: number;
+    } = {
       temperatureSensitivity: data.temperature_sensitivity as TemperatureSensitivity,
       defaultActivity: data.default_activity,
-    });
+    };
+    if (savedMetrics.heightInches !== undefined) {
+      response.heightInches = savedMetrics.heightInches;
+    }
+    if (savedMetrics.weightLbs !== undefined) {
+      response.weightLbs = savedMetrics.weightLbs;
+    }
+    return NextResponse.json(response);
   } catch (err) {
     console.error("Error saving preferences:", err);
     // Return what was sent - client already saved to localStorage
-    return NextResponse.json({
+    const response: {
+      temperatureSensitivity: TemperatureSensitivity;
+      defaultActivity: string;
+      heightInches?: number;
+      weightLbs?: number;
+    } = {
       temperatureSensitivity: temperatureSensitivity || "neutral",
       defaultActivity: defaultActivity || "alpine_skiing",
-    });
+    };
+    if (hasHeightInput && sanitizedMetrics.heightInches !== undefined) {
+      response.heightInches = sanitizedMetrics.heightInches;
+    }
+    if (hasWeightInput && sanitizedMetrics.weightLbs !== undefined) {
+      response.weightLbs = sanitizedMetrics.weightLbs;
+    }
+    return NextResponse.json(response);
   }
 }

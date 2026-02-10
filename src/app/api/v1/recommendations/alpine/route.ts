@@ -4,6 +4,10 @@ import { METABOLIC_RATES, getAlpineCloTargets } from '@/lib/biophysics/constants
 import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
 import { getMetabolicRateForActivity, parseExertionLevel } from '@/lib/biophysics/exertion';
 import {
+  applyBodySizeMetabolicAdjustment,
+  parseBodyMetricsFromRequestBody,
+} from '@/lib/biophysics/bodyMetrics';
+import {
   validateRecommendationRequest,
   sortByInsulation,
   sortByWaterproofness,
@@ -29,7 +33,15 @@ export async function POST(request: NextRequest) {
 
   const { weather, tempC, windMs, body } = validated;
   const exertion = parseExertionLevel(body.exertion ?? body.intensity);
-  const skiingMetabolicRate = getMetabolicRateForActivity('alpine_skiing', exertion);
+  const bodyMetrics = parseBodyMetricsFromRequestBody(body);
+  const skiingMetabolicRate = applyBodySizeMetabolicAdjustment(
+    getMetabolicRateForActivity('alpine_skiing', exertion),
+    bodyMetrics
+  );
+  const chairliftMetabolicRate = applyBodySizeMetabolicAdjustment(
+    METABOLIC_RATES.chairlift,
+    bodyMetrics
+  );
 
   // Calculate IREQ for both skiing and chairlift
   const ireqSkiing = calculateIreq({
@@ -43,7 +55,7 @@ export async function POST(request: NextRequest) {
     airTemp: tempC,
     windSpeed: windMs,
     relativeHumidity: weather.humidity ?? 50,
-    metabolicRate: METABOLIC_RATES.chairlift,
+    metabolicRate: chairliftMetabolicRate,
   });
 
   const baseTargetMin = ireqSkiing.ireqMin * 0.6 + ireqChairlift.ireqMin * 0.4;
@@ -142,7 +154,7 @@ export async function POST(request: NextRequest) {
         name: 'Alpine Skiing',
         metabolicRate: skiingMetabolicRate,
         hasStaticPeriods: true,
-        staticMetabolicRate: METABOLIC_RATES.chairlift,
+        staticMetabolicRate: chairliftMetabolicRate,
         windExposure: 'exposed',
       },
       activityKey: 'alpine_skiing',

@@ -3,6 +3,10 @@ import { calculateIreq, calculateRegionalIreq, calculateExtremityIreq } from '@/
 import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
 import { getMetabolicRateForActivity, parseExertionLevel } from '@/lib/biophysics/exertion';
 import {
+  applyBodySizeMetabolicAdjustment,
+  parseBodyMetricsFromRequestBody,
+} from '@/lib/biophysics/bodyMetrics';
+import {
   validateRecommendationRequest,
   sortByBreathability,
   getEnsembleClo,
@@ -25,7 +29,11 @@ export async function POST(request: NextRequest) {
 
   const { weather, tempC, windMs, body } = validated;
   const exertion = parseExertionLevel(body.exertion ?? body.intensity);
-  const metabolicRate = getMetabolicRateForActivity('biking', exertion);
+  const bodyMetrics = parseBodyMetricsFromRequestBody(body);
+  const metabolicRate = applyBodySizeMetabolicAdjustment(
+    getMetabolicRateForActivity('biking', exertion),
+    bodyMetrics
+  );
 
   const ireq = calculateIreq({
     airTemp: tempC,

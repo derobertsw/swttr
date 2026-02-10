@@ -9,6 +9,10 @@ import {
   parseExertionLevel,
 } from '@/lib/biophysics/exertion';
 import {
+  applyBodySizeMetabolicAdjustment,
+  parseBodyMetricsFromRequestBody,
+} from '@/lib/biophysics/bodyMetrics';
+import {
   type GarmentRow,
   type CategorizedGarments,
   validateRecommendationRequest,
@@ -78,11 +82,21 @@ export async function POST(request: NextRequest) {
 
   const { supabase, userId, weather, tempC, windMs, body } = validated;
   const exertion = parseExertionLevel(body.exertion ?? body.intensity);
+  const bodyMetrics = parseBodyMetricsFromRequestBody(body);
   const shouldPrioritizeLightPack = (body.prioritize_light_pack as boolean) ?? false;
   const defaultHumidity = weather.humidity ?? 50;
-  const uphillMetabolicRate = getMetabolicRateForActivity('ski_touring_uphill', exertion);
-  const downhillMetabolicRate = getMetabolicRateForActivity('ski_touring_downhill', exertion);
-  const transitionMetabolicRate = getTransitionMetabolicRate(exertion);
+  const uphillMetabolicRate = applyBodySizeMetabolicAdjustment(
+    getMetabolicRateForActivity('ski_touring_uphill', exertion),
+    bodyMetrics
+  );
+  const downhillMetabolicRate = applyBodySizeMetabolicAdjustment(
+    getMetabolicRateForActivity('ski_touring_downhill', exertion),
+    bodyMetrics
+  );
+  const transitionMetabolicRate = applyBodySizeMetabolicAdjustment(
+    getTransitionMetabolicRate(exertion),
+    bodyMetrics
+  );
 
   // IREQ Calculations
   const ireqUphill = calculateIreq({

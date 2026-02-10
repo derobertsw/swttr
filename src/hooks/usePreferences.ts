@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { TemperatureSensitivity } from "@/types/preferences";
+import { TemperatureSensitivity, UserBodyMetrics } from "@/types/preferences";
 import { DEFAULT_ACTIVITY } from "@/data/activities";
 import { useUserId } from "@/hooks/useUserId";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { logWarn } from "@/lib/logger";
+import {
+  sanitizeBodyMetrics,
+  sanitizeOptionalBodyMetrics,
+} from "@/lib/biophysics/bodyMetrics";
 
 const VALID_SENSITIVITIES: readonly TemperatureSensitivity[] = ["hot", "neutral", "cold"];
 
@@ -17,7 +21,9 @@ export function usePreferences() {
   const userId = useUserId();
   const [sensitivity, setSensitivity] = useState<TemperatureSensitivity>("neutral");
   const [defaultActivity, setDefaultActivity] = useState<string>(DEFAULT_ACTIVITY);
+  const [bodyMetricsSelection, setBodyMetricsSelection] = useState<Partial<UserBodyMetrics>>({});
   const [loading, setLoading] = useState(true);
+  const bodyMetrics = sanitizeBodyMetrics(bodyMetricsSelection);
 
   useEffect(() => {
     // Load from localStorage first for immediate display
@@ -29,6 +35,16 @@ export function usePreferences() {
     const storedActivity = localStorage.getItem(STORAGE_KEYS.DEFAULT_ACTIVITY);
     if (storedActivity) {
       setDefaultActivity(storedActivity);
+    }
+
+    const storedHeight = localStorage.getItem(STORAGE_KEYS.HEIGHT_INCHES);
+    const storedWeight = localStorage.getItem(STORAGE_KEYS.WEIGHT_LBS);
+    const optional = sanitizeOptionalBodyMetrics({
+      heightInches: storedHeight,
+      weightLbs: storedWeight,
+    });
+    if (optional.heightInches !== undefined || optional.weightLbs !== undefined) {
+      setBodyMetricsSelection(optional);
     }
   }, []);
 
@@ -50,6 +66,23 @@ export function usePreferences() {
           if (data.defaultActivity) {
             setDefaultActivity(data.defaultActivity);
             localStorage.setItem(STORAGE_KEYS.DEFAULT_ACTIVITY, data.defaultActivity);
+          }
+          if (data.heightInches !== undefined || data.weightLbs !== undefined) {
+            const optional = sanitizeOptionalBodyMetrics({
+              heightInches: data.heightInches,
+              weightLbs: data.weightLbs,
+            });
+            setBodyMetricsSelection(optional);
+            if (optional.heightInches !== undefined) {
+              localStorage.setItem(STORAGE_KEYS.HEIGHT_INCHES, String(optional.heightInches));
+            } else {
+              localStorage.removeItem(STORAGE_KEYS.HEIGHT_INCHES);
+            }
+            if (optional.weightLbs !== undefined) {
+              localStorage.setItem(STORAGE_KEYS.WEIGHT_LBS, String(optional.weightLbs));
+            } else {
+              localStorage.removeItem(STORAGE_KEYS.WEIGHT_LBS);
+            }
           }
         }
       } catch (err) {
@@ -108,11 +141,55 @@ export function usePreferences() {
     [userId]
   );
 
+  const updateBodyMetrics = useCallback(
+    async (nextMetrics: Partial<UserBodyMetrics>) => {
+      const sanitizedUpdate = sanitizeOptionalBodyMetrics(nextMetrics);
+      const merged = sanitizeOptionalBodyMetrics({
+        heightInches: sanitizedUpdate.heightInches ?? bodyMetricsSelection.heightInches,
+        weightLbs: sanitizedUpdate.weightLbs ?? bodyMetricsSelection.weightLbs,
+      });
+      setBodyMetricsSelection(merged);
+
+      if (merged.heightInches !== undefined) {
+        localStorage.setItem(STORAGE_KEYS.HEIGHT_INCHES, String(merged.heightInches));
+      }
+      if (merged.weightLbs !== undefined) {
+        localStorage.setItem(STORAGE_KEYS.WEIGHT_LBS, String(merged.weightLbs));
+      }
+
+      if (userId) {
+        try {
+          const payload: Record<string, number> = {};
+          if (sanitizedUpdate.heightInches !== undefined) {
+            payload.heightInches = sanitizedUpdate.heightInches;
+          }
+          if (sanitizedUpdate.weightLbs !== undefined) {
+            payload.weightLbs = sanitizedUpdate.weightLbs;
+          }
+          await fetch("/api/preferences", {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              "x-user-id": userId,
+            },
+            body: JSON.stringify(payload),
+          });
+        } catch (err) {
+          logWarn("usePreferences.updateBodyMetrics", err);
+        }
+      }
+    },
+    [bodyMetricsSelection, userId]
+  );
+
   return {
     sensitivity,
     defaultActivity,
+    bodyMetrics,
+    bodyMetricsSelection,
     updateSensitivity,
     updateDefaultActivity,
+    updateBodyMetrics,
     loading,
   };
 }

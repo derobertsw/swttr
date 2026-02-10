@@ -29,8 +29,10 @@ const Header = ({ onLogoClick }: HeaderProps) => {
   const {
     sensitivity,
     defaultActivity,
+    bodyMetricsSelection,
     updateSensitivity,
     updateDefaultActivity,
+    updateBodyMetrics,
   } = usePreferences();
 
   const handleShare = async () => {
@@ -135,8 +137,11 @@ const Header = ({ onLogoClick }: HeaderProps) => {
               <PreferencesDrawer
                 sensitivity={sensitivity}
                 defaultActivity={defaultActivity}
+                heightInches={bodyMetricsSelection.heightInches}
+                weightLbs={bodyMetricsSelection.weightLbs}
                 onSensitivityChange={updateSensitivity}
                 onDefaultActivityChange={updateDefaultActivity}
+                onBodyMetricsChange={updateBodyMetrics}
               >
                 <button className="flex items-center gap-3 text-sm font-medium hover:text-primary text-left">
                   <Settings className="size-4" />

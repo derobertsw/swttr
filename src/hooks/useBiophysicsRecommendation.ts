@@ -10,6 +10,7 @@ import {
   type ExertionLevel,
   exertionToXcIntensity,
 } from "@/lib/biophysics/exertion";
+import type { UserBodyMetrics } from "@/types/preferences";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { logWarn } from "@/lib/logger";
 
@@ -20,7 +21,8 @@ export interface UseBiophysicsResult {
   fetch: (
     activity: string,
     weather: { temperature: number; windSpeed: number; humidity?: number },
-    exertion: ExertionLevel
+    exertion: ExertionLevel,
+    bodyMetrics: UserBodyMetrics
   ) => Promise<BiophysicsRecommendation | null>;
   reset: () => void;
 }
@@ -41,7 +43,8 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
     async (
       activity: string,
       weather: { temperature: number; windSpeed: number; humidity?: number },
-      exertion: ExertionLevel
+      exertion: ExertionLevel,
+      bodyMetrics: UserBodyMetrics
     ): Promise<BiophysicsRecommendation | null> => {
       // Return null for unsupported activities
       if (!isBiophysicsSupported(activity)) {
@@ -77,6 +80,8 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
             exertion,
             // Backward-compatible alias for routes that still inspect "intensity".
             intensity: exertionToXcIntensity(exertion),
+            height_inches: bodyMetrics.heightInches,
+            weight_lbs: bodyMetrics.weightLbs,
           }),
         });
 

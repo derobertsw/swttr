@@ -200,4 +200,38 @@ describe('Alpine Recommendations API Route', () => {
 
     expect(hardData.ireq.skiing.min).toBeLessThan(easyData.ireq.skiing.min);
   });
+
+  it('reduces skiing insulation requirement for larger body-size profile', async () => {
+    const garments = [
+      createMockGarment({
+        id: 'base-1',
+        model_name: 'Base',
+        category: 'base_layer',
+        covers_torso: true,
+        covers_legs: true,
+      }),
+    ];
+    const mockSupabase = createMockSupabase({ garments });
+    mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
+
+    const lighterResponse = await POST(
+      createRequest({
+        weather: { temperature: 15, wind_speed: 10 },
+        height_inches: 69,
+        weight_lbs: 120,
+      })
+    );
+    const heavierResponse = await POST(
+      createRequest({
+        weather: { temperature: 15, wind_speed: 10 },
+        height_inches: 69,
+        weight_lbs: 230,
+      })
+    );
+
+    const lighterData = await lighterResponse.json();
+    const heavierData = await heavierResponse.json();
+
+    expect(heavierData.ireq.skiing.min).toBeLessThan(lighterData.ireq.skiing.min);
+  });
 });

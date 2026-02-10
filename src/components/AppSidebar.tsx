@@ -37,8 +37,10 @@ export function AppSidebar() {
   const {
     sensitivity,
     defaultActivity,
+    bodyMetricsSelection,
     updateSensitivity,
     updateDefaultActivity,
+    updateBodyMetrics,
   } = usePreferences();
 
   return (
@@ -72,8 +74,11 @@ export function AppSidebar() {
                 <PreferencesDrawer
                   sensitivity={sensitivity}
                   defaultActivity={defaultActivity}
+                  heightInches={bodyMetricsSelection.heightInches}
+                  weightLbs={bodyMetricsSelection.weightLbs}
                   onSensitivityChange={updateSensitivity}
                   onDefaultActivityChange={updateDefaultActivity}
+                  onBodyMetricsChange={updateBodyMetrics}
                 >
                   <SidebarMenuButton tooltip="Preferences">
                     <Settings />

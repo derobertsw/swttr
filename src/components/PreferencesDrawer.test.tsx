@@ -7,8 +7,11 @@ describe("PreferencesDrawer", () => {
   const defaultProps = {
     sensitivity: "neutral" as const,
     defaultActivity: "alpine_skiing",
+    heightInches: 69,
+    weightLbs: 170,
     onSensitivityChange: vi.fn(),
     onDefaultActivityChange: vi.fn(),
+    onBodyMetricsChange: vi.fn(),
     children: <button>Open Preferences</button>,
   };
 
@@ -107,6 +110,38 @@ describe("PreferencesDrawer", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Recommend warmer gear")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("body metrics selectors", () => {
+    it("should show height and weight labels", async () => {
+      const user = userEvent.setup();
+      render(<PreferencesDrawer {...defaultProps} />);
+
+      await user.click(screen.getByRole("button", { name: /open preferences/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Height")).toBeInTheDocument();
+        expect(screen.getByText("Weight")).toBeInTheDocument();
+      });
+    });
+
+    it("should allow unpopulated height and weight selectors", async () => {
+      const user = userEvent.setup();
+      render(
+        <PreferencesDrawer
+          {...defaultProps}
+          heightInches={undefined}
+          weightLbs={undefined}
+        />
+      );
+
+      await user.click(screen.getByRole("button", { name: /open preferences/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Select height")).toBeInTheDocument();
+        expect(screen.getByText("Select weight")).toBeInTheDocument();
       });
     });
   });

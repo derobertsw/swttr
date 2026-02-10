@@ -30,6 +30,8 @@ describe("Preferences API Route", () => {
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("neutral");
         expect(data.defaultActivity).toBe("alpine_skiing");
+        expect(data.heightInches).toBeUndefined();
+        expect(data.weightLbs).toBeUndefined();
       });
     });
 
@@ -45,6 +47,8 @@ describe("Preferences API Route", () => {
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("neutral");
         expect(data.defaultActivity).toBe("alpine_skiing");
+        expect(data.heightInches).toBeUndefined();
+        expect(data.weightLbs).toBeUndefined();
       });
     });
 
@@ -58,6 +62,8 @@ describe("Preferences API Route", () => {
             data: {
               temperature_sensitivity: "cold",
               default_activity: "xc_skiing",
+              height_inches: 72,
+              weight_lbs: 185,
             },
             error: null,
           }),
@@ -74,6 +80,8 @@ describe("Preferences API Route", () => {
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("cold");
         expect(data.defaultActivity).toBe("xc_skiing");
+        expect(data.heightInches).toBe(72);
+        expect(data.weightLbs).toBe(185);
       });
 
       it("should return defaults when no user preferences exist (PGRST116)", async () => {
@@ -98,6 +106,8 @@ describe("Preferences API Route", () => {
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("neutral");
         expect(data.defaultActivity).toBe("alpine_skiing");
+        expect(data.heightInches).toBeUndefined();
+        expect(data.weightLbs).toBeUndefined();
       });
 
       it("should return defaults on database error", async () => {
@@ -122,6 +132,8 @@ describe("Preferences API Route", () => {
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("neutral");
         expect(data.defaultActivity).toBe("alpine_skiing");
+        expect(data.heightInches).toBeUndefined();
+        expect(data.weightLbs).toBeUndefined();
       });
 
       it("should return defaults on exception", async () => {
@@ -143,6 +155,8 @@ describe("Preferences API Route", () => {
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("neutral");
         expect(data.defaultActivity).toBe("alpine_skiing");
+        expect(data.heightInches).toBeUndefined();
+        expect(data.weightLbs).toBeUndefined();
       });
     });
   });
@@ -170,6 +184,8 @@ describe("Preferences API Route", () => {
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("hot");
         expect(data.defaultActivity).toBe("running");
+        expect(data.heightInches).toBeUndefined();
+        expect(data.weightLbs).toBeUndefined();
       });
     });
 
@@ -188,6 +204,25 @@ describe("Preferences API Route", () => {
 
         expect(response.status).toBe(200);
         expect(data.temperatureSensitivity).toBe("cold");
+        expect(data.heightInches).toBeUndefined();
+        expect(data.weightLbs).toBeUndefined();
+      });
+
+      it("should acknowledge and sanitize a single body metric", async () => {
+        mockGetSupabase.mockReturnValue(null);
+
+        const request = new NextRequest("http://localhost:3000/api/preferences", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ heightInches: 71 }),
+        });
+
+        const response = await PUT(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.heightInches).toBe(71);
+        expect(data.weightLbs).toBeUndefined();
       });
     });
 
