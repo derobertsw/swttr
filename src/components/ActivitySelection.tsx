@@ -8,15 +8,12 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel";
-import { Slider } from "@/components/ui/slider";
 import { ACTIVITIES } from "@/data/activities";
 import {
   type ExertionLevel,
   EXERTION_LABELS,
   EXERTION_DESCRIPTIONS,
   EXERTION_LEVELS,
-  exertionToSliderValue,
-  sliderValueToExertion,
 } from "@/lib/biophysics/exertion";
 
 interface ActivitySelectionProps {
@@ -101,6 +98,10 @@ const ActivitySelection = ({
 
   return (
     <div className="mx-auto w-full max-w-md" role="radiogroup" aria-label="Activity">
+      <div className="mb-2 flex items-center justify-between px-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
+        <span>Swipe or tap to select</span>
+        <span>{current + 1} / {ACTIVITIES.length}</span>
+      </div>
       <Carousel
         className="w-full"
         opts={{ loop: true, startIndex: initialIndex >= 0 ? initialIndex : 0 }}
@@ -185,29 +186,39 @@ const ActivitySelection = ({
           />
         ))}
       </div>
-      <div className="mt-6 space-y-2 px-1">
+      <div className="mt-6 rounded-xl border border-white/20 bg-white/[0.06] p-3.5 backdrop-blur-sm">
         <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-white/70">
           <span>2. Exertion</span>
-          <span>{EXERTION_LABELS[exertion]}</span>
+          <span className="rounded-full border border-white/25 bg-white/10 px-2 py-0.5 text-[11px]">
+            {EXERTION_LABELS[exertion]}
+          </span>
         </div>
-        <p className="text-xs text-white/60">{EXERTION_DESCRIPTIONS[exertion]}</p>
-        <Slider
-          min={1}
-          max={3}
-          step={1}
-          value={[exertionToSliderValue(exertion)]}
+        <p className="mt-1 text-xs text-white/65">{EXERTION_DESCRIPTIONS[exertion]}</p>
+        <div
+          className="mt-3 grid grid-cols-3 gap-2"
+          role="radiogroup"
           aria-label="Exertion level"
-          onValueChange={(values) => {
-            const next = sliderValueToExertion(values[0]);
-            if (next !== exertion) {
-              onExertionChange(next);
-            }
-          }}
-        />
-        <div className="flex justify-between text-[11px] text-white/55">
-          {EXERTION_LEVELS.map((level) => (
-            <span key={level}>{EXERTION_LABELS[level]}</span>
-          ))}
+        >
+          {EXERTION_LEVELS.map((level) => {
+            const isSelected = level === exertion;
+            return (
+              <button
+                key={level}
+                type="button"
+                onClick={() => onExertionChange(level)}
+                role="radio"
+                aria-checked={isSelected}
+                className={cn(
+                  "rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors",
+                  isSelected
+                    ? "border-white/55 bg-white/20 text-white"
+                    : "border-white/20 bg-white/[0.03] text-white/75 hover:bg-white/[0.08]"
+                )}
+              >
+                {EXERTION_LABELS[level]}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

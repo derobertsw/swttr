@@ -56,9 +56,12 @@ describe("ActivitySelection", () => {
       expect(screen.getByRole("button", { name: /select alpine skiing/i })).toBeInTheDocument();
     });
 
-    it("should render exertion slider", () => {
+    it("should render exertion selector", () => {
       renderSelection();
-      expect(screen.getByRole("slider")).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: /exertion level/i })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /easy/i })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /moderate/i })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /hard/i })).toBeInTheDocument();
       expect(screen.getAllByText("Moderate").length).toBeGreaterThan(0);
     });
   });
@@ -88,14 +91,12 @@ describe("ActivitySelection", () => {
       expect(mockOnChange).toHaveBeenCalledWith("biking");
     });
 
-    it("should call onExertionChange when slider is moved with keyboard", async () => {
+    it("should call onExertionChange when exertion option is clicked", async () => {
       const mockOnExertionChange = vi.fn();
       const user = userEvent.setup();
       renderSelection({ onExertionChange: mockOnExertionChange });
 
-      const slider = screen.getByRole("slider");
-      slider.focus();
-      await user.keyboard("{ArrowRight}");
+      await user.click(screen.getByRole("radio", { name: /hard/i }));
 
       expect(mockOnExertionChange).toHaveBeenCalledWith("hard");
     });

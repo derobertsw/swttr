@@ -82,13 +82,10 @@ const HomeContent = () => {
               onDismiss={locationSearch.dismiss}
             />
           ) : null}
-          <p className="text-sm text-white/75 text-center mb-1">
-            Get recommendation for selected start time
+          <p className="text-sm text-white/75 text-center mt-4 mb-1">
+            Recommendations update from your activity, exertion, and start time.
           </p>
-          <p className="text-xs text-white/60 text-center mb-4">
-            Multi-day plans will generate day-by-day packing guidance.
-          </p>
-          <p className="text-xs text-white/50 text-center mb-4">
+          <p className="text-xs text-white/55 text-center mb-4">
             Built on thermal science
           </p>
           <div className="flex flex-col items-center" />
