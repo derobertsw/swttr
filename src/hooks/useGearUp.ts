@@ -268,12 +268,20 @@ async function submitCurrentLocation(
 
 export function useGearUp() {
   const searchParams = useSearchParams();
-  const { sensitivity, defaultActivity, bodyMetrics } = usePreferences();
+  const {
+    sensitivity,
+    defaultActivity,
+    hasStoredDefaultActivity,
+    bodyMetrics,
+    loading: preferencesLoading,
+  } = usePreferences();
 
   // Activity stays as useState — drives effects and is passed to sub-hooks
-  const [activity, setActivity] = useState(DEFAULT_ACTIVITY);
+  const [activity, setActivityState] = useState<string>(defaultActivity || DEFAULT_ACTIVITY);
   const [exertion, setExertion] = useState<ExertionLevel>(DEFAULT_EXERTION_LEVEL);
-  const [hasSetInitialActivity, setHasSetInitialActivity] = useState(false);
+  const [hasSetInitialActivity, setHasSetInitialActivity] = useState<boolean>(
+    () => hasStoredDefaultActivity
+  );
 
   const initialMode: InputMode = searchParams.get("mode") === "planAhead" ? "planAhead" : "manual";
   const [state, dispatch] = useReducer(gearUpReducer, initialMode, createInitialState);
@@ -281,6 +289,13 @@ export function useGearUp() {
   const locationSearch = useLocationSearch();
   const biophysics = useBiophysicsRecommendation();
   const didAutoGearUp = useRef(false);
+  const isActivityInitializing =
+    !hasSetInitialActivity && !hasStoredDefaultActivity && preferencesLoading;
+
+  const setActivity = useCallback((nextActivity: string) => {
+    setHasSetInitialActivity(true);
+    setActivityState(nextActivity);
+  }, []);
 
   // Setter wrappers for consumers
   const setTemperature = useCallback((t: number) => dispatch({ type: "SET_TEMPERATURE", temperature: t }), []);
@@ -289,13 +304,14 @@ export function useGearUp() {
   const setDate = useCallback((d: Date | undefined) => dispatch({ type: "SET_DATE", date: d }), []);
   const setTime = useCallback((t: string) => dispatch({ type: "SET_TIME", time: t }), []);
 
-  // Set initial activity from preferences when it loads
+  // Set initial activity once from stored/server preferences.
   useEffect(() => {
-    if (!hasSetInitialActivity && defaultActivity) {
-      setActivity(defaultActivity);
-      setHasSetInitialActivity(true);
-    }
-  }, [defaultActivity, hasSetInitialActivity]);
+    if (hasSetInitialActivity || !defaultActivity) return;
+    if (!hasStoredDefaultActivity && preferencesLoading) return;
+
+    setActivityState(defaultActivity);
+    setHasSetInitialActivity(true);
+  }, [defaultActivity, hasSetInitialActivity, hasStoredDefaultActivity, preferencesLoading]);
 
   // Update input mode when URL param changes
   useEffect(() => {
@@ -467,7 +483,8 @@ export function useGearUp() {
   }, [state.loading]);
 
   const resetToInitialState = useCallback(() => {
-    setActivity(defaultActivity);
+    setActivityState(defaultActivity || DEFAULT_ACTIVITY);
+    setHasSetInitialActivity(true);
     setExertion(DEFAULT_EXERTION_LEVEL);
     dispatch({ type: "RESET" });
     locationSearch.reset();
@@ -478,6 +495,7 @@ export function useGearUp() {
     // State
     activity,
     setActivity,
+    activityInitializing: isActivityInitializing,
     exertion,
     setExertion,
     temperature: state.temperature,

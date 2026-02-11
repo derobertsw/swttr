@@ -15,6 +15,7 @@ const HomeContent = () => {
   const {
     activity,
     setActivity,
+    activityInitializing,
     exertion,
     setExertion,
     temperature,
@@ -48,12 +49,26 @@ const HomeContent = () => {
             <p className="text-base font-medium text-white/90 text-center mb-3">
               Choose your trip activity
             </p>
-            <ActivitySelection
-              value={activity}
-              onChange={setActivity}
-              exertion={exertion}
-              onExertionChange={setExertion}
-            />
+            {activityInitializing ? (
+              <div className="mx-auto w-full max-w-md">
+                <div className="mb-2 flex items-center justify-between px-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
+                  <span>Loading activity</span>
+                  <span>{ACTIVITIES.length} options</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 py-6">
+                  <Skeleton className="h-36 rounded-xl bg-white/15" />
+                  <Skeleton className="h-44 rounded-xl bg-white/20" />
+                  <Skeleton className="h-36 rounded-xl bg-white/15" />
+                </div>
+              </div>
+            ) : (
+              <ActivitySelection
+                value={activity}
+                onChange={setActivity}
+                exertion={exertion}
+                onExertionChange={setExertion}
+              />
+            )}
             {inputMode === "manual" && locationDenied ? (
               <LocationInput
                 activityName={ACTIVITIES.find(a => a.value === activity)?.name.toLowerCase() || ""}

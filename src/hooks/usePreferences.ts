@@ -17,36 +17,40 @@ function isTemperatureSensitivity(value: string): value is TemperatureSensitivit
   return (VALID_SENSITIVITIES as readonly string[]).includes(value);
 }
 
+function getStoredSensitivity(): TemperatureSensitivity {
+  if (typeof window === "undefined") return "neutral";
+  const stored = localStorage.getItem(STORAGE_KEYS.SENSITIVITY);
+  return stored && isTemperatureSensitivity(stored) ? stored : "neutral";
+}
+
+function getStoredDefaultActivity(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(STORAGE_KEYS.DEFAULT_ACTIVITY);
+}
+
+function getStoredBodyMetrics(): Partial<UserBodyMetrics> {
+  if (typeof window === "undefined") return {};
+
+  const storedHeight = localStorage.getItem(STORAGE_KEYS.HEIGHT_INCHES);
+  const storedWeight = localStorage.getItem(STORAGE_KEYS.WEIGHT_LBS);
+  return sanitizeOptionalBodyMetrics({
+    heightInches: storedHeight ? Number(storedHeight) : undefined,
+    weightLbs: storedWeight ? Number(storedWeight) : undefined,
+  });
+}
+
 export function usePreferences() {
   const userId = useUserId();
-  const [sensitivity, setSensitivity] = useState<TemperatureSensitivity>("neutral");
-  const [defaultActivity, setDefaultActivity] = useState<string>(DEFAULT_ACTIVITY);
-  const [bodyMetricsSelection, setBodyMetricsSelection] = useState<Partial<UserBodyMetrics>>({});
+  const [sensitivity, setSensitivity] = useState<TemperatureSensitivity>(() => getStoredSensitivity());
+  const [defaultActivity, setDefaultActivity] = useState<string>(
+    () => getStoredDefaultActivity() ?? DEFAULT_ACTIVITY
+  );
+  const [hasStoredDefaultActivity] = useState<boolean>(() => getStoredDefaultActivity() !== null);
+  const [bodyMetricsSelection, setBodyMetricsSelection] = useState<Partial<UserBodyMetrics>>(
+    () => getStoredBodyMetrics()
+  );
   const [loading, setLoading] = useState(true);
   const bodyMetrics = sanitizeBodyMetrics(bodyMetricsSelection);
-
-  useEffect(() => {
-    // Load from localStorage first for immediate display
-    const storedSensitivity = localStorage.getItem(STORAGE_KEYS.SENSITIVITY);
-    if (storedSensitivity && isTemperatureSensitivity(storedSensitivity)) {
-      setSensitivity(storedSensitivity);
-    }
-
-    const storedActivity = localStorage.getItem(STORAGE_KEYS.DEFAULT_ACTIVITY);
-    if (storedActivity) {
-      setDefaultActivity(storedActivity);
-    }
-
-    const storedHeight = localStorage.getItem(STORAGE_KEYS.HEIGHT_INCHES);
-    const storedWeight = localStorage.getItem(STORAGE_KEYS.WEIGHT_LBS);
-    const optional = sanitizeOptionalBodyMetrics({
-      heightInches: storedHeight ? Number(storedHeight) : undefined,
-      weightLbs: storedWeight ? Number(storedWeight) : undefined,
-    });
-    if (optional.heightInches !== undefined || optional.weightLbs !== undefined) {
-      setBodyMetricsSelection(optional);
-    }
-  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -185,6 +189,7 @@ export function usePreferences() {
   return {
     sensitivity,
     defaultActivity,
+    hasStoredDefaultActivity,
     bodyMetrics,
     bodyMetricsSelection,
     updateSensitivity,
