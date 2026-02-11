@@ -279,9 +279,7 @@ export function useGearUp() {
   // Activity stays as useState — drives effects and is passed to sub-hooks
   const [activity, setActivityState] = useState<string>(defaultActivity || DEFAULT_ACTIVITY);
   const [exertion, setExertion] = useState<ExertionLevel>(DEFAULT_EXERTION_LEVEL);
-  const [hasSetInitialActivity, setHasSetInitialActivity] = useState<boolean>(
-    () => hasStoredDefaultActivity
-  );
+  const [hasSetInitialActivity, setHasSetInitialActivity] = useState<boolean>(false);
 
   const initialMode: InputMode = searchParams.get("mode") === "planAhead" ? "planAhead" : "manual";
   const [state, dispatch] = useReducer(gearUpReducer, initialMode, createInitialState);
@@ -289,8 +287,7 @@ export function useGearUp() {
   const locationSearch = useLocationSearch();
   const biophysics = useBiophysicsRecommendation();
   const didAutoGearUp = useRef(false);
-  const isActivityInitializing =
-    !hasSetInitialActivity && !hasStoredDefaultActivity && preferencesLoading;
+  const isActivityInitializing = !hasSetInitialActivity;
 
   const setActivity = useCallback((nextActivity: string) => {
     setHasSetInitialActivity(true);
@@ -307,7 +304,14 @@ export function useGearUp() {
   // Set initial activity once from stored/server preferences.
   useEffect(() => {
     if (hasSetInitialActivity || !defaultActivity) return;
-    if (!hasStoredDefaultActivity && preferencesLoading) return;
+
+    if (hasStoredDefaultActivity) {
+      setActivityState(defaultActivity);
+      setHasSetInitialActivity(true);
+      return;
+    }
+
+    if (preferencesLoading) return;
 
     setActivityState(defaultActivity);
     setHasSetInitialActivity(true);
