@@ -11,7 +11,7 @@ import {
   exertionToXcIntensity,
 } from "@/lib/biophysics/exertion";
 import type { UserBodyMetrics } from "@/types/preferences";
-import { STORAGE_KEYS } from "@/lib/storage";
+import { getOrCreateUserId } from "@/hooks/useUserId";
 import { logWarn } from "@/lib/logger";
 
 export interface UseBiophysicsResult {
@@ -56,10 +56,8 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
       setLoading(true);
       setError(null);
 
-      // Get user ID to use wardrobe items
-      const userId = typeof window !== "undefined"
-        ? localStorage.getItem(STORAGE_KEYS.USER_ID)
-        : null;
+      // Ensure a stable user ID exists before requesting recommendations.
+      const userId = getOrCreateUserId();
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
@@ -80,6 +78,7 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
             exertion,
             // Backward-compatible alias for routes that still inspect "intensity".
             intensity: exertionToXcIntensity(exertion),
+            use_wardrobe_only: Boolean(userId),
             height_inches: bodyMetrics.heightInches,
             weight_lbs: bodyMetrics.weightLbs,
           }),

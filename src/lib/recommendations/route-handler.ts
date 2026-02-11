@@ -10,6 +10,7 @@ import { categorizeGarments } from './categorization';
 
 export interface ActivityRouteConfig {
   activityFilter?: { field: string; minScore: number };
+  forceWardrobeOnly?: boolean;
 }
 
 export interface PreparedRouteData {
@@ -33,7 +34,12 @@ export async function prepareRouteData(
 
   // Check if user has wardrobe items
   const wardrobeIds = await getUserWardrobeGarmentIds(supabase, userId);
-  const useWardrobe = wardrobeIds !== null && wardrobeIds.length > 0;
+  const hasWardrobe = wardrobeIds !== null && wardrobeIds.length > 0;
+  const useWardrobe = hasWardrobe;
+
+  if (config.forceWardrobeOnly && !hasWardrobe) {
+    return NextResponse.json({ allGarments: [] }, { status: 200 });
+  }
 
   // Fetch suitable garments
   const { data: allGarments, error } = await fetchGarmentsWithDetails(supabase, {

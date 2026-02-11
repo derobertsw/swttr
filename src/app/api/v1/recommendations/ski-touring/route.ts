@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
   const exertion = parseExertionLevel(body.exertion ?? body.intensity);
   const bodyMetrics = parseBodyMetricsFromRequestBody(body);
   const shouldPrioritizeLightPack = (body.prioritize_light_pack as boolean) ?? false;
+  const useWardrobeOnly = body.use_wardrobe_only === true;
   const defaultHumidity = weather.humidity ?? 50;
   const uphillMetabolicRate = applyBodySizeMetabolicAdjustment(
     getMetabolicRateForActivity('ski_touring_uphill', exertion),
@@ -154,7 +155,21 @@ export async function POST(request: NextRequest) {
 
   // Wardrobe and Garment Fetching
   const wardrobeGarmentIds = await getUserWardrobeGarmentIds(supabase, userId);
-  const hasUserWardrobe = wardrobeGarmentIds && wardrobeGarmentIds.length > 0;
+  const hasUserWardrobe = Boolean(wardrobeGarmentIds && wardrobeGarmentIds.length > 0);
+
+  if (useWardrobeOnly && !hasUserWardrobe) {
+    return NextResponse.json({
+      message: 'No suitable garments found in database',
+      ireq: {
+        uphill: { min: ireqUphill.ireqMin, neutral: ireqUphill.ireqNeutral, dle_hours: ireqUphill.dleHours },
+        downhill: { min: ireqDownhill.ireqMin, neutral: ireqDownhill.ireqNeutral, dle_hours: ireqDownhill.dleHours },
+        transition: { min: ireqTransition.ireqMin, neutral: ireqTransition.ireqNeutral, dle_hours: ireqTransition.dleHours },
+        dle_hours: ireqDownhill.dleHours,
+        dle_method: DLE_ESTIMATION_METHOD,
+      },
+      guidance: generateTouringGuidance(tempC, ireqUphill, ireqDownhill),
+    });
+  }
 
   const { data: fetchedGarments, error: garmentFetchError } = await fetchGarmentsWithDetails(
     supabase, { wardrobeIds: hasUserWardrobe ? wardrobeGarmentIds : null }

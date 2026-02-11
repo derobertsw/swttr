@@ -59,7 +59,9 @@ export async function POST(request: NextRequest) {
   const maxClo = targetRange.max;
   const minEvapPotential = 0.25;
 
-  const prepared = await prepareRouteData(validated, {});
+  const prepared = await prepareRouteData(validated, {
+    forceWardrobeOnly: body.use_wardrobe_only === true,
+  });
   if (!isPreparedData(prepared)) {
     return NextResponse.json({
       message: 'No suitable garments found in database',

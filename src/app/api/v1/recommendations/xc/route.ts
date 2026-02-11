@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
 
   const prepared = await prepareRouteData(validated, {
     activityFilter: { field: 'xc_skiing_score', minScore: 6 },
+    forceWardrobeOnly: body.use_wardrobe_only === true,
   });
   if (!isPreparedData(prepared)) {
     return NextResponse.json({

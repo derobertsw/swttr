@@ -61,7 +61,9 @@ export async function POST(request: NextRequest) {
   const minEvapPotential = 0.3;
 
   // Prepare common data
-  const prepared = await prepareRouteData(validated, {});
+  const prepared = await prepareRouteData(validated, {
+    forceWardrobeOnly: body.use_wardrobe_only === true,
+  });
   if (!isPreparedData(prepared)) {
     // Empty garments case
     return NextResponse.json({
