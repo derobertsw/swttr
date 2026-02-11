@@ -429,16 +429,16 @@ describe("LayerDisplay", () => {
       );
 
       // Torso garments
-      expect(screen.getByText("Merino Base Layer")).toBeInTheDocument();
+      expect(screen.getAllByText("Merino Base Layer").length).toBeGreaterThan(0);
       expect(screen.getByText("0.35 clo")).toBeInTheDocument();
-      expect(screen.getByText("Down Puffy")).toBeInTheDocument();
+      expect(screen.getAllByText("Down Puffy").length).toBeGreaterThan(0);
       expect(screen.getByText("1.20 clo")).toBeInTheDocument();
-      expect(screen.getByText("Gore-Tex Shell")).toBeInTheDocument();
+      expect(screen.getAllByText("Gore-Tex Shell").length).toBeGreaterThan(0);
       // Note: 0.15 clo appears twice (Gore-Tex Shell and Smith Vantage helmet)
       expect(screen.getAllByText("0.15 clo").length).toBeGreaterThanOrEqual(1);
 
       // Legs garments
-      expect(screen.getByText("Thermal Tights")).toBeInTheDocument();
+      expect(screen.getAllByText("Thermal Tights").length).toBeGreaterThan(0);
       // Note: 0.25 clo appears twice (Thermal Tights and Merino Beanie)
       expect(screen.getAllByText("0.25 clo").length).toBeGreaterThanOrEqual(1);
     });
@@ -604,7 +604,7 @@ describe("LayerDisplay", () => {
       );
 
       expect(screen.queryByText("Comfort Range Achieved")).not.toBeInTheDocument();
-      expect(screen.getByText(/Cold Risk/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Cold Risk/i).length).toBeGreaterThan(0);
     });
 
     it("should display guidance tips when available", () => {
@@ -652,11 +652,13 @@ describe("LayerDisplay", () => {
         />
       );
 
-      expect(screen.getByText("Backcountry Focus")).toBeInTheDocument();
-      expect(screen.getByText("Uphill (Skin Track)")).toBeInTheDocument();
-      expect(screen.getByText("Way Down Layer Plan")).toBeInTheDocument();
+      expect(screen.getAllByText("Climb").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Descent").length).toBeGreaterThan(0);
+      expect(screen.getByText("1.7 clo")).toBeInTheDocument();
+      expect(screen.getByText("2.4 clo")).toBeInTheDocument();
+      expect(screen.getByText("Descent Layer Plan")).toBeInTheDocument();
       expect(screen.getByText("Patagonia Nano Puff")).toBeInTheDocument();
-      expect(screen.getByText("Downhill target insulation: 2.2-2.8 clo")).toBeInTheDocument();
+      expect(screen.getByText("Descent target insulation: 2.2-2.8 clo")).toBeInTheDocument();
       expect(screen.getByText("Total additional packed layer weight: 320 g")).toBeInTheDocument();
     });
 

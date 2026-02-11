@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, ChevronUp, Info } from "lucide-react";
 import { Recommendation } from "@/types/recommendations";
 import {
   BiophysicsRecommendation,
@@ -16,6 +16,7 @@ import BiophysicsDetails from "@/components/BiophysicsDetails";
 import {
   BodyPart,
   BODY_PARTS,
+  BODY_PART_LABELS,
   BODY_PART_TO_REGION,
   BODY_PART_TO_EXTREMITY,
   garmentsToLayerSet,
@@ -28,6 +29,14 @@ import type { AvailableItem } from "@/types/wardrobe";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { logWarn } from "@/lib/logger";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   WeatherHeader,
   ThermalGauge,
@@ -451,6 +460,27 @@ const LayerDisplay = ({
     ?? biophysicsData?.recommendation?.score;
   const statusSummary = getThermalSummary(thermalDecision);
   const immediateAction = getImmediateAction(thermalDecision);
+  const regionalDeficitSummary = BODY_PARTS
+    .map((part) => {
+      const { currentClo, targetClo } = getCloValues(
+        part,
+        regionalClo,
+        regionalIreq,
+        extremityIreq,
+        handwear,
+        headwear,
+        !shouldIgnoreHelmetForClo
+      );
+      const adjustedCurrent = (currentClo ?? 0) + genericCloByBodyPart[part];
+      const deficit = targetClo !== undefined ? Math.max(0, targetClo - adjustedCurrent) : 0;
+      return {
+        part,
+        label: BODY_PART_LABELS[part],
+        deficit,
+      };
+    })
+    .sort((a, b) => b.deficit - a.deficit);
+  const topDeficitArea = regionalDeficitSummary.find((item) => item.deficit > 0.12);
 
   useEffect(() => {
     let isCancelled = false;
@@ -539,7 +569,15 @@ const LayerDisplay = ({
     ? purchaseSuggestions.slice(1)
     : [];
   const hasExtraSuggestions = purchaseSuggestions.length > 1;
+  const showRiskCard = biophysicsActive
+    ? Boolean(thermalDecision && thermalDecision.riskType !== "comfortable")
+    : true;
   const topSuggestion = purchaseSuggestions[0];
+  const uphillTargetRange = biophysicsData?.ireq?.target_range;
+  const downhillTargetRange = biophysicsData?.ireq?.downhill_target_range
+    ?? (biophysicsData?.ireq?.downhill
+      ? [biophysicsData.ireq.downhill.min, biophysicsData.ireq.downhill.neutral] as [number, number]
+      : undefined);
   const targetRangeLabel = biophysicsData?.ireq?.target_range
     ? formatCloRangeLabel(biophysicsData.ireq.target_range)
     : null;
@@ -548,6 +586,13 @@ const LayerDisplay = ({
     : biophysicsData?.ireq?.downhill
       ? `${biophysicsData.ireq.downhill.min.toFixed(1)}-${biophysicsData.ireq.downhill.neutral.toFixed(1)} clo`
       : null;
+  const topSummaryChipLabel = topDeficitArea
+    ? `${topDeficitArea.label} +${topDeficitArea.deficit.toFixed(1)} clo`
+    : null;
+  const showDualComfortGauges = isBackcountrySkiing
+    && biophysicsActive
+    && estimatedDescentClo !== undefined
+    && downhillTargetRange !== undefined;
 
   return (
     <div className="flex flex-col gap-8">
@@ -555,7 +600,7 @@ const LayerDisplay = ({
         <button
           type="button"
           onClick={onReset}
-          className="flex items-center gap-1.5 self-start text-sm font-medium text-white/75 hover:text-white transition-colors -mt-2 mb--2"
+          className="flex items-center gap-1.5 self-start -mt-2 -mb-2 text-sm font-medium text-white/75 transition-colors hover:text-white"
         >
           <ArrowLeft className="size-4" />
           Back
@@ -572,38 +617,109 @@ const LayerDisplay = ({
         hasRegionalGap={hasRegionalGap}
       />
 
-      <ThermalGauge
-        totalClo={effectiveTotalClo}
-        targetRange={biophysicsData?.ireq?.target_range}
-      />
+      {showDualComfortGauges ? (
+        <section className="rounded-xl border border-white/20 bg-white/[0.06] px-3 py-3 sm:px-4">
+          <div className="space-y-4">
+            <div>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">
+                Climb
+              </p>
+              <ThermalGauge
+                totalClo={effectiveTotalClo}
+                targetRange={uphillTargetRange}
+                markerLabel=""
+                targetLabel="Target"
+              />
+            </div>
+            <div className="border-t border-white/15 pt-4">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">
+                Descent
+              </p>
+              <ThermalGauge
+                totalClo={estimatedDescentClo}
+                targetRange={downhillTargetRange}
+                markerLabel=""
+                targetLabel="Target"
+              />
+            </div>
+          </div>
+        </section>
+      ) : (
+        <ThermalGauge
+          totalClo={effectiveTotalClo}
+          targetRange={uphillTargetRange}
+        />
+      )}
 
-      <section
-        className={cn(
-          "rounded-xl border px-4 py-4 sm:px-5 sm:py-5",
-          getDecisionClasses(thermalDecision, hasWardrobeGap)
-        )}
-      >
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 opacity-80" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">Recommendation</p>
-            <h3 className="mt-0.5 text-xl font-semibold leading-tight">{decisionTitle}</h3>
-            <p className="mt-1.5 text-sm opacity-90">{statusSummary}</p>
+      {biophysicsActive && (
+        <div className="-mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+          {thermalDecision && (
+            <span className="rounded-full border border-white/25 bg-white/10 px-2.5 py-1 font-semibold text-white/85">
+              {decisionTitle}
+            </span>
+          )}
+          {topSummaryChipLabel && (
+            <span
+              className="rounded-full border border-sky-300/35 bg-sky-100/10 px-2.5 py-1 font-semibold text-sky-100"
+            >
+              {topSummaryChipLabel}
+            </span>
+          )}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="View thermal snapshot details"
+                className="inline-flex size-7 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white/80 transition-colors hover:bg-white/20"
+              >
+                <Info className="size-4" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72">
+              <PopoverHeader>
+                <PopoverTitle>Thermal Snapshot</PopoverTitle>
+                <PopoverDescription>
+                  Quick context for the current recommendation.
+                </PopoverDescription>
+              </PopoverHeader>
+              <div className="mt-3 space-y-2 text-xs text-slate-600">
+                {effectiveTotalClo !== undefined && (
+                  <p>Current insulation: {effectiveTotalClo.toFixed(1)} clo</p>
+                )}
+                {targetRangeLabel && (
+                  <p>Target insulation: {targetRangeLabel}</p>
+                )}
+                {topDeficitArea ? (
+                  <p>Biggest regional gap: {topDeficitArea.label} (+{topDeficitArea.deficit.toFixed(1)} clo)</p>
+                ) : (
+                  <p>No major regional insulation gaps detected.</p>
+                )}
+                {hasDescentGap && (
+                  <p>Descent shortfall: +{descentDeficit.toFixed(1)} clo</p>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
 
-            <div className="mt-4 grid gap-3">
-              {isBackcountrySkiing && (
-                <div className="rounded-lg border border-current/20 bg-white/45 px-3.5 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide opacity-75">Backcountry Focus</p>
-                  <p className="mt-2 text-sm leading-relaxed">
-                    Layer recommendations and clo targets here are tuned for the uphill skin track.
-                    Use the descent section below to add only the layers needed for the way down.
-                  </p>
-                </div>
-              )}
+      {showRiskCard && (
+        <section
+          className={cn(
+            "rounded-xl border px-4 py-4 sm:px-5 sm:py-5",
+            getDecisionClasses(thermalDecision, false)
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 opacity-80" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">Current Risk</p>
+              <h3 className="mt-0.5 text-xl font-semibold leading-tight">{decisionTitle}</h3>
+              <p className="mt-1.5 text-sm opacity-90">{statusSummary}</p>
 
-              <div className="rounded-lg border border-current/20 bg-white/45 px-3.5 py-3">
+              <div className="mt-4 rounded-lg border border-current/20 bg-white/60 px-3.5 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide opacity-75">
-                  {isBackcountrySkiing ? "Uphill (Skin Track)" : "Now"}
+                  {isBackcountrySkiing ? "Climb" : "Now"}
                 </p>
                 <ul className="mt-2 list-disc pl-5 text-sm leading-relaxed">
                   <li>{immediateAction}</li>
@@ -614,90 +730,97 @@ const LayerDisplay = ({
                   )}
                 </ul>
               </div>
-
-              {hasWardrobeGap && (
-                <div className="rounded-lg border border-current/20 bg-white/45 px-3.5 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide opacity-75">Improve Wardrobe</p>
-                  <p className="mt-2 text-sm leading-relaxed">{wardrobeGapMessage}</p>
-                  {purchaseSuggestionsLoading ? (
-                    <p className="mt-2 text-sm">Finding purchasable items in the wardrobe database...</p>
-                  ) : purchaseSuggestions.length > 0 ? (
-                    <div className="mt-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide opacity-70">Suggested Gear To Buy</p>
-                      {topSuggestion && (
-                        <div className="mt-2 rounded-md border border-current/20 bg-white/55 p-2.5">
-                          <p className="text-sm font-semibold leading-snug">{topSuggestion.name}</p>
-                          <p className="mt-1 text-xs opacity-90">
-                            {topSuggestion.targetArea} {LAYER_LABELS[topSuggestion.layerType]}
-                            {" · "}
-                            {formatCategoryLabel(topSuggestion.category)}
-                            {" · +"}
-                            {topSuggestion.rcl.toFixed(2)}
-                            {" clo"}
-                          </p>
-                        </div>
-                      )}
-                      {showAllPurchaseSuggestions && visibleSuggestions.length > 0 && (
-                        <ul className="mt-2 space-y-2">
-                          {visibleSuggestions.map((item) => (
-                            <li key={item.id} className="text-sm leading-relaxed">
-                              <p className="font-semibold">{item.name}</p>
-                              <p className="opacity-90">
-                                {item.targetArea} {LAYER_LABELS[item.layerType]}
-                                {" · "}
-                                {formatCategoryLabel(item.category)}
-                                {" · +"}
-                                {item.rcl.toFixed(2)}
-                                {" clo"}
-                              </p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {hasExtraSuggestions && (
-                        <button
-                          type="button"
-                          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold underline underline-offset-2 hover:opacity-75"
-                          onClick={() => setShowAllPurchaseSuggestions((prev) => !prev)}
-                        >
-                          {showAllPurchaseSuggestions ? (
-                            <>
-                              Hide suggestions
-                              <ChevronUp className="size-3.5" />
-                            </>
-                          ) : (
-                            <>
-                              Show suggestions ({purchaseSuggestions.length})
-                              <ChevronDown className="size-3.5" />
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm">No purchasable layer items were found in the current wardrobe database.</p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 flex gap-2">
-              <Button asChild className="flex-1 bg-slate-900 text-white hover:bg-slate-800">
-                <Link href="/wardrobe">
-                  Update Wardrobe
-                  <ArrowRight className="ml-1.5 size-4" />
-                </Link>
-              </Button>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {hasWardrobeGap && (
+        <section className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-4 text-amber-950 sm:px-5 sm:py-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 opacity-80" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">Wardrobe Gap</p>
+              <h3 className="mt-0.5 text-xl font-semibold leading-tight">Improve Wardrobe</h3>
+              <p className="mt-1.5 text-sm opacity-90">{wardrobeGapMessage}</p>
+              {purchaseSuggestionsLoading ? (
+                <p className="mt-3 text-sm">Finding purchasable items in the wardrobe database...</p>
+              ) : purchaseSuggestions.length > 0 ? (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide opacity-70">Suggested Gear To Buy</p>
+                  {topSuggestion && (
+                    <div className="mt-2 rounded-md border border-current/20 bg-white/55 p-2.5">
+                      <p className="text-sm font-semibold leading-snug">{topSuggestion.name}</p>
+                      <p className="mt-1 text-xs opacity-90">
+                        {topSuggestion.targetArea} {LAYER_LABELS[topSuggestion.layerType]}
+                        {" · "}
+                        {formatCategoryLabel(topSuggestion.category)}
+                        {" · +"}
+                        {topSuggestion.rcl.toFixed(2)}
+                        {" clo"}
+                      </p>
+                    </div>
+                  )}
+                  {showAllPurchaseSuggestions && visibleSuggestions.length > 0 && (
+                    <ul className="mt-2 space-y-2">
+                      {visibleSuggestions.map((item) => (
+                        <li key={item.id} className="text-sm leading-relaxed">
+                          <p className="font-semibold">{item.name}</p>
+                          <p className="opacity-90">
+                            {item.targetArea} {LAYER_LABELS[item.layerType]}
+                            {" · "}
+                            {formatCategoryLabel(item.category)}
+                            {" · +"}
+                            {item.rcl.toFixed(2)}
+                            {" clo"}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {hasExtraSuggestions && (
+                    <button
+                      type="button"
+                      className="mt-2 inline-flex items-center gap-1 rounded-full border border-current/30 bg-white/40 px-2 py-1 text-xs font-semibold hover:bg-white/55"
+                      onClick={() => setShowAllPurchaseSuggestions((prev) => !prev)}
+                    >
+                      {showAllPurchaseSuggestions ? (
+                        <>
+                          Hide suggestions
+                          <ChevronUp className="size-3.5" />
+                        </>
+                      ) : (
+                        <>
+                          Show suggestions ({purchaseSuggestions.length})
+                          <ChevronDown className="size-3.5" />
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm">No purchasable layer items were found in the current wardrobe database.</p>
+              )}
+
+              <div className="mt-4 flex gap-2">
+                <Button asChild className="flex-1 bg-slate-900 text-white hover:bg-slate-800">
+                  <Link href="/wardrobe">
+                    Update Wardrobe
+                    <ArrowRight className="ml-1.5 size-4" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">
           Detailed Layer Breakdown
         </h3>
       </div>
+      <p className="-mt-4 text-xs text-white/60">Tap a body area to collapse or expand details.</p>
       <div className="flex flex-col gap-6">
         {BODY_PARTS.map((part) => {
           const wardrobeLayers =
@@ -754,10 +877,10 @@ const LayerDisplay = ({
       {isBackcountrySkiing && biophysicsActive && (
         <section className="rounded-lg border border-white/25 bg-white/15 p-4">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-white/85">
-            Way Down Layer Plan
+            Descent Layer Plan
           </h3>
           <p className="mt-2 text-sm text-white/80 leading-relaxed">
-            Maximize reuse from the climb: keep your uphill layers on, then add only the pack layers below for transition and descent.
+            Maximize reuse from the climb: keep your climb layers on, then add only the pack layers below for transition and descent.
           </p>
           {hasDescentGap && estimatedDescentClo !== undefined && downhillTargetMinClo !== undefined && (
             <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950">
@@ -770,7 +893,7 @@ const LayerDisplay = ({
           )}
           {downhillTargetRangeLabel && (
             <p className="mt-2 text-xs text-white/70">
-              Downhill target insulation: {downhillTargetRangeLabel}
+              Descent target insulation: {downhillTargetRangeLabel}
             </p>
           )}
 
@@ -781,7 +904,7 @@ const LayerDisplay = ({
                   <li key={item.id} className="rounded-md border border-white/20 bg-white/10 p-2.5">
                     <p className="text-sm font-semibold text-white/90">{item.name}</p>
                     <p className="mt-1 text-xs text-white/70">
-                      Add over uphill kit
+                      Add over climb kit
                       {typeof item.rcl_clo === "number" ? ` · +${item.rcl_clo.toFixed(2)} clo` : ""}
                       {typeof item.weight_g === "number" ? ` · ${Math.round(item.weight_g)} g` : ""}
                     </p>
@@ -794,18 +917,23 @@ const LayerDisplay = ({
                 </p>
               )}
             </>
+          ) : hasDescentGap ? (
+            <p className="mt-3 text-sm text-white/75">
+              No pack-layer add-ons are available yet. Add insulation via Suggested Gear To Buy above.
+            </p>
           ) : (
             <p className="mt-3 text-sm text-white/75">
-              No extra descent layers are required right now. Start with the uphill setup and adjust with venting/shell use as conditions change.
+              No extra descent layers are required right now. Start with the climb setup and adjust with venting/shell use as conditions change.
             </p>
           )}
         </section>
       )}
 
       {biophysicsData?.recommendation && (
-        <details className="rounded-lg border border-white/25 bg-white/10 p-4">
-          <summary className="cursor-pointer text-sm font-semibold tracking-wide text-white/85">
-            Advanced Biophysics Details
+        <details className="group rounded-xl border border-white/25 bg-white/10 p-4">
+          <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold tracking-wide text-white/85 transition-colors hover:text-white [&::-webkit-details-marker]:hidden">
+            <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
+            <span>Advanced Biophysics Details</span>
           </summary>
           <div className="mt-4">
             <BiophysicsDetails data={biophysicsData} />
