@@ -40,8 +40,8 @@ export function usePreferences() {
     const storedHeight = localStorage.getItem(STORAGE_KEYS.HEIGHT_INCHES);
     const storedWeight = localStorage.getItem(STORAGE_KEYS.WEIGHT_LBS);
     const optional = sanitizeOptionalBodyMetrics({
-      heightInches: storedHeight,
-      weightLbs: storedWeight,
+      heightInches: storedHeight ? Number(storedHeight) : undefined,
+      weightLbs: storedWeight ? Number(storedWeight) : undefined,
     });
     if (optional.heightInches !== undefined || optional.weightLbs !== undefined) {
       setBodyMetricsSelection(optional);

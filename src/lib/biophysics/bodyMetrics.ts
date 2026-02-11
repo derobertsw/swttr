@@ -60,8 +60,8 @@ export function parseBodyMetricsFromRequestBody(
   body: Record<string, unknown>
 ): UserBodyMetrics {
   return sanitizeBodyMetrics({
-    heightInches: body.height_inches,
-    weightLbs: body.weight_lbs,
+    heightInches: body.height_inches as number | undefined,
+    weightLbs: body.weight_lbs as number | undefined,
   });
 }
 
