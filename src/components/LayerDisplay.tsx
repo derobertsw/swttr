@@ -86,6 +86,11 @@ const LEGS_CATEGORY_PRIORITY: Record<string, number> = {
   windbreaker: 30,
 };
 
+function formatCloRangeLabel(range?: [number, number]): string | null {
+  if (!range || range.length !== 2) return null;
+  return `${range[0].toFixed(1)}-${range[1].toFixed(1)} clo`;
+}
+
 function getItemClo(item: AvailableItem): number | null {
   const raw = item.rcl_clo as unknown;
 
@@ -114,6 +119,13 @@ function parseCloDeficitFromWarning(warning: string | undefined): number {
   if (!Number.isFinite(current) || !Number.isFinite(required)) return 0;
 
   return Math.max(0, required - current);
+}
+
+function parseMaxCloDeficitFromWarnings(warnings: string[] | undefined): number {
+  if (!warnings || warnings.length === 0) return 0;
+  return warnings.reduce((maxDeficit, warning) => {
+    return Math.max(maxDeficit, parseCloDeficitFromWarning(warning));
+  }, 0);
 }
 
 function getCategoryPriority(category: string, area: "torso" | "legs"): number {
@@ -331,6 +343,7 @@ const LayerDisplay = ({
   biophysicsData,
   onReset,
 }: LayerDisplayProps) => {
+  const isBackcountrySkiing = activity === "backcountry_skiing";
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
   const [genericCloByBodyPart, setGenericCloByBodyPart] = useState<Record<BodyPart, number>>({
     torso: 0,
@@ -363,16 +376,33 @@ const LayerDisplay = ({
         : undefined;
   const regionalIreq = biophysicsData?.ireq?.regional;
   const extremityIreq = biophysicsData?.ireq?.extremity;
-  const wardrobeGapWarning = biophysicsData?.warnings?.find((warning) => {
+  const totalPackWeight = biophysicsData?.pack_items?.total_weight_g;
+  const descentPackItems = biophysicsData?.pack_items?.garments ?? [];
+  const descentPackClo = descentPackItems.reduce((sum, item) => {
+    return sum + (typeof item.rcl_clo === "number" ? item.rcl_clo : 0);
+  }, 0);
+  const downhillTargetMinClo = biophysicsData?.ireq?.downhill_target_range?.[0]
+    ?? biophysicsData?.ireq?.downhill?.min;
+  const estimatedDescentClo = totalClo !== undefined ? totalClo + descentPackClo : undefined;
+  const descentDeficit =
+    isBackcountrySkiing &&
+    downhillTargetMinClo !== undefined &&
+    estimatedDescentClo !== undefined
+      ? Math.max(0, downhillTargetMinClo - estimatedDescentClo)
+      : 0;
+  const hasDescentGap = descentDeficit > 0.12;
+  const insulationWarnings = (biophysicsData?.warnings ?? []).filter((warning) => {
     const normalized = warning.toLowerCase();
     return normalized.includes("insufficient overall insulation") || normalized.includes("heat loss risk");
   });
+  const wardrobeGapWarning = insulationWarnings.find((warning) => warning.toLowerCase().includes("descent"))
+    ?? insulationWarnings[0];
   const targetMinClo = biophysicsData?.ireq?.target_range?.[0];
   const computedTotalDeficit =
     targetMinClo !== undefined && effectiveTotalClo !== undefined
       ? Math.max(0, targetMinClo - effectiveTotalClo)
       : 0;
-  const warningDeficit = parseCloDeficitFromWarning(wardrobeGapWarning);
+  const warningDeficit = parseMaxCloDeficitFromWarnings(insulationWarnings);
   const getRegionalDeficit = (target?: number, current?: number): number => {
     if (target === undefined) return 0;
     return Math.max(0, target - (current ?? 0));
@@ -388,9 +418,19 @@ const LayerDisplay = ({
   );
   const maxRegionalDeficit = Math.max(torsoDeficit, armsDeficit, legsDeficit);
   const hasRegionalGap = maxRegionalDeficit > 0.12;
-  const totalDeficit = Math.max(computedTotalDeficit, warningDeficit, torsoDeficit + legsDeficit);
-  const hasWardrobeGap = Boolean(wardrobeGapWarning) || hasRegionalGap;
+  const totalDeficit = Math.max(
+    computedTotalDeficit,
+    warningDeficit,
+    torsoDeficit + legsDeficit,
+    descentDeficit
+  );
+  const hasWardrobeGap = Boolean(wardrobeGapWarning) || hasRegionalGap || hasDescentGap;
+  const descentGapMessage =
+    hasDescentGap && estimatedDescentClo !== undefined && downhillTargetMinClo !== undefined
+      ? `Insufficient insulation for the way down with current wardrobe layers: ${estimatedDescentClo.toFixed(1)} clo vs ${downhillTargetMinClo.toFixed(1)} clo needed (${descentDeficit.toFixed(1)} clo short).`
+      : null;
   const wardrobeGapMessage =
+    descentGapMessage ??
     wardrobeGapWarning ??
     "Current setup misses target insulation in one or more body regions. Add coverage where deficits are highest.";
 
@@ -501,8 +541,13 @@ const LayerDisplay = ({
   const hasExtraSuggestions = purchaseSuggestions.length > 1;
   const topSuggestion = purchaseSuggestions[0];
   const targetRangeLabel = biophysicsData?.ireq?.target_range
-    ? `${biophysicsData.ireq.target_range[0].toFixed(1)}-${biophysicsData.ireq.target_range[1].toFixed(1)} clo`
-    : "your target clo range";
+    ? formatCloRangeLabel(biophysicsData.ireq.target_range)
+    : null;
+  const downhillTargetRangeLabel = biophysicsData?.ireq?.downhill_target_range
+    ? formatCloRangeLabel(biophysicsData.ireq.downhill_target_range)
+    : biophysicsData?.ireq?.downhill
+      ? `${biophysicsData.ireq.downhill.min.toFixed(1)}-${biophysicsData.ireq.downhill.neutral.toFixed(1)} clo`
+      : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -546,13 +591,25 @@ const LayerDisplay = ({
             <p className="mt-1.5 text-sm opacity-90">{statusSummary}</p>
 
             <div className="mt-4 grid gap-3">
+              {isBackcountrySkiing && (
+                <div className="rounded-lg border border-current/20 bg-white/45 px-3.5 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide opacity-75">Backcountry Focus</p>
+                  <p className="mt-2 text-sm leading-relaxed">
+                    Layer recommendations and clo targets here are tuned for the uphill skin track.
+                    Use the descent section below to add only the layers needed for the way down.
+                  </p>
+                </div>
+              )}
+
               <div className="rounded-lg border border-current/20 bg-white/45 px-3.5 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide opacity-75">Now</p>
+                <p className="text-xs font-semibold uppercase tracking-wide opacity-75">
+                  {isBackcountrySkiing ? "Uphill (Skin Track)" : "Now"}
+                </p>
                 <ul className="mt-2 list-disc pl-5 text-sm leading-relaxed">
                   <li>{immediateAction}</li>
                   {thermalDecision && thermalDecision.riskType !== "comfortable" && (
                     <li>
-                      Stay near target range: {targetRangeLabel}
+                      Stay near target range: {targetRangeLabel ?? "your target clo range"}
                     </li>
                   )}
                 </ul>
@@ -692,6 +749,57 @@ const LayerDisplay = ({
           <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">Actionable Guidance</h3>
           <GuidanceSection tips={biophysicsData.guidance} />
         </div>
+      )}
+
+      {isBackcountrySkiing && biophysicsActive && (
+        <section className="rounded-lg border border-white/25 bg-white/15 p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-white/85">
+            Way Down Layer Plan
+          </h3>
+          <p className="mt-2 text-sm text-white/80 leading-relaxed">
+            Maximize reuse from the climb: keep your uphill layers on, then add only the pack layers below for transition and descent.
+          </p>
+          {hasDescentGap && estimatedDescentClo !== undefined && downhillTargetMinClo !== undefined && (
+            <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950">
+              <p className="text-xs font-semibold uppercase tracking-wide">Descent Warning</p>
+              <p className="mt-1 text-sm leading-relaxed">
+                Current descent setup is short: {estimatedDescentClo.toFixed(1)} clo vs {downhillTargetMinClo.toFixed(1)} clo needed.
+                Add insulation from Suggested Gear To Buy above.
+              </p>
+            </div>
+          )}
+          {downhillTargetRangeLabel && (
+            <p className="mt-2 text-xs text-white/70">
+              Downhill target insulation: {downhillTargetRangeLabel}
+            </p>
+          )}
+
+          {descentPackItems.length > 0 ? (
+            <>
+              <ul className="mt-3 space-y-2">
+                {descentPackItems.map((item) => (
+                  <li key={item.id} className="rounded-md border border-white/20 bg-white/10 p-2.5">
+                    <p className="text-sm font-semibold text-white/90">{item.name}</p>
+                    <p className="mt-1 text-xs text-white/70">
+                      Add over uphill kit
+                      {typeof item.rcl_clo === "number" ? ` · +${item.rcl_clo.toFixed(2)} clo` : ""}
+                      {typeof item.weight_g === "number" ? ` · ${Math.round(item.weight_g)} g` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              {typeof totalPackWeight === "number" && Number.isFinite(totalPackWeight) && (
+                <p className="mt-2 text-xs text-white/70">
+                  Total additional packed layer weight: {Math.round(totalPackWeight)} g
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-white/75">
+              No extra descent layers are required right now. Start with the uphill setup and adjust with venting/shell use as conditions change.
+            </p>
+          )}
+        </section>
       )}
 
       {biophysicsData?.recommendation && (

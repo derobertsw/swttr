@@ -126,10 +126,31 @@ export async function POST(request: NextRequest) {
     metabolicRate: transitionMetabolicRate,
   });
 
-  const baseRegionalIreqDownhill = calculateRegionalIreq(ireqDownhill, 'ski_touring_downhill');
-  const baseExtremityIreqDownhill = calculateExtremityIreq(
-    ireqDownhill, 'ski_touring_downhill', tempC, windMs + DOWNHILL_SPEED_WIND
+  const uphillRange = calculateActivityTargetRange({
+    activity: 'ski_touring_uphill',
+    ireqMin: ireqUphill.ireqMin,
+    ireqNeutral: ireqUphill.ireqNeutral,
+    dleHours: ireqUphill.dleHours,
+    airTempC: tempC,
+    windSpeedMs: windMs * UPHILL_WIND_FACTOR,
+  });
+  const uphillTargetCloRange: [number, number] = [uphillRange.min, uphillRange.max];
+  const baseRegionalIreqUphill = calculateRegionalIreq(ireqUphill, 'ski_touring_uphill');
+  const baseExtremityIreqUphill = calculateExtremityIreq(
+    ireqUphill, 'ski_touring_uphill', tempC, windMs * UPHILL_WIND_FACTOR
   );
+  const regionalIreqUphill = scaleIreqShapeToTargetRange(baseRegionalIreqUphill, {
+    ireqMin: ireqUphill.ireqMin,
+    ireqNeutral: ireqUphill.ireqNeutral,
+    targetMin: uphillTargetCloRange[0],
+    targetMax: uphillTargetCloRange[1],
+  });
+  const extremityIreqUphill = scaleIreqShapeToTargetRange(baseExtremityIreqUphill, {
+    ireqMin: ireqUphill.ireqMin,
+    ireqNeutral: ireqUphill.ireqNeutral,
+    targetMin: uphillTargetCloRange[0],
+    targetMax: uphillTargetCloRange[1],
+  });
 
   // Wardrobe and Garment Fetching
   const wardrobeGarmentIds = await getUserWardrobeGarmentIds(supabase, userId);
@@ -186,14 +207,16 @@ export async function POST(request: NextRequest) {
   const uphillTotalClo = uphillThermalProperties.rcl.wholeBody;
 
   // Pack Items
+  const packInsulationCandidates = hasUserWardrobe ? categorizedGarments.insulation : [];
+  const packShellCandidates = hasUserWardrobe ? categorizedGarments.shells : [];
   const additionalCloNeeded = Math.max(0, ireqDownhill.ireqNeutral - uphillTotalClo);
   const packInsulationLayer = selectPackableInsulation(
-    categorizedGarments.insulation, additionalCloNeeded, shouldPrioritizeLightPack
+    packInsulationCandidates, additionalCloNeeded, shouldPrioritizeLightPack
   );
 
   const needsShellLayer = weather.precipitation || windMs > SHELL_WIND_THRESHOLD;
   const packShellLayer = needsShellLayer
-    ? selectShellForConditions(categorizedGarments.shells, weather.precipitation ?? false)
+    ? selectShellForConditions(packShellCandidates, weather.precipitation ?? false)
     : null;
 
   // Downhill Ensemble (for scoring)
@@ -202,6 +225,7 @@ export async function POST(request: NextRequest) {
   if (packShellLayer && !uphillEnsemble.includes(packShellLayer)) downhillEnsemble.push(packShellLayer);
 
   const downhillThermalGarments = ensembleToThermalGarments(downhillEnsemble);
+  const downhillThermalProperties = predictEnsembleThermal(downhillThermalGarments);
 
   // Scoring
   const uphillScore = scoreEnsemble(
@@ -238,19 +262,17 @@ export async function POST(request: NextRequest) {
     airTempC: tempC,
     windSpeedMs: windMs + DOWNHILL_SPEED_WIND,
   });
-  const targetCloRange: [number, number] = [downhillRange.min, downhillRange.max];
-  const regionalIreqDownhill = scaleIreqShapeToTargetRange(baseRegionalIreqDownhill, {
-    ireqMin: ireqDownhill.ireqMin,
-    ireqNeutral: ireqDownhill.ireqNeutral,
-    targetMin: targetCloRange[0],
-    targetMax: targetCloRange[1],
-  });
-  const extremityIreqDownhill = scaleIreqShapeToTargetRange(baseExtremityIreqDownhill, {
-    ireqMin: ireqDownhill.ireqMin,
-    ireqNeutral: ireqDownhill.ireqNeutral,
-    targetMin: targetCloRange[0],
-    targetMax: targetCloRange[1],
-  });
+  const downhillTargetCloRange: [number, number] = [downhillRange.min, downhillRange.max];
+  const descentCloDeficit = Math.max(
+    0,
+    downhillTargetCloRange[0] - downhillThermalProperties.rcl.wholeBody
+  );
+  const descentWarnings: string[] = [];
+  if (descentCloDeficit > 0.05) {
+    descentWarnings.push(
+      `Insufficient overall insulation for descent: ${downhillThermalProperties.rcl.wholeBody.toFixed(1)} clo vs ${downhillTargetCloRange[0].toFixed(1)} clo required`
+    );
+  }
   const regionalClo = {
     torso: Math.round(uphillThermalProperties.rcl.torso * 100) / 100,
     arms: Math.round(uphillThermalProperties.rcl.arm * 100) / 100,
@@ -258,14 +280,14 @@ export async function POST(request: NextRequest) {
   };
   const thermalComfortScore = calculateThermalComfortScore({
     totalClo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
-    targetRange: targetCloRange,
-    maxRegionalDeficit: getMaxRegionalDeficit(regionalClo, regionalIreqDownhill.neutral),
+    targetRange: uphillTargetCloRange,
+    maxRegionalDeficit: getMaxRegionalDeficit(regionalClo, regionalIreqUphill.neutral),
   });
   const selectedHandwear = selectHandwear(
     userHandwear,
     tempC,
     false,
-    extremityIreqDownhill.neutral.hands
+    extremityIreqUphill.neutral.hands
   );
 
   return NextResponse.json({
@@ -278,11 +300,12 @@ export async function POST(request: NextRequest) {
     ireq: {
       uphill: { min: ireqUphill.ireqMin, neutral: ireqUphill.ireqNeutral, dle_hours: ireqUphill.dleHours },
       downhill: { min: ireqDownhill.ireqMin, neutral: ireqDownhill.ireqNeutral, dle_hours: ireqDownhill.dleHours },
+      downhill_target_range: downhillTargetCloRange,
       dle_hours: ireqDownhill.dleHours,
       dle_method: DLE_ESTIMATION_METHOD,
-      target_range: targetCloRange,
-      regional: regionalIreqDownhill,
-      extremity: extremityIreqDownhill,
+      target_range: uphillTargetCloRange,
+      regional: regionalIreqUphill,
+      extremity: extremityIreqUphill,
     },
     recommendation: {
       garments: uphillEnsemble.map(formatGarmentResponse),
@@ -305,11 +328,16 @@ export async function POST(request: NextRequest) {
       component_scores: uphillScore.componentScores,
     },
     pack_items: {
-      garments: packItems.map((g) => ({ id: g.id, name: `${g.brand} ${g.model_name}`, weight_g: g.weight_grams })),
+      garments: packItems.map((g) => ({
+        id: g.id,
+        name: `${g.brand} ${g.model_name}`,
+        weight_g: g.weight_grams,
+        rcl_clo: g.garment_thermal_properties?.rcl_whole_body,
+      })),
       total_weight_g: totalPackWeightGrams,
     },
     transition_protocol: transitionProtocol,
-    warnings: [...uphillScore.warnings, ...downhillScore.warnings],
+    warnings: [...uphillScore.warnings, ...downhillScore.warnings, ...descentWarnings],
     guidance: generateTouringGuidance(tempC, ireqUphill, ireqDownhill),
   });
 }

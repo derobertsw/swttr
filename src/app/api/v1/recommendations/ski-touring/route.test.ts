@@ -594,6 +594,12 @@ describe('Ski Touring Recommendations API Route', () => {
         expect(Array.isArray(packItems.garments)).toBe(true);
       });
 
+      it('should keep descent pack plan wardrobe-only when user wardrobe is empty', () => {
+        const packItems = responseData.pack_items as Record<string, unknown>;
+        const garments = packItems.garments as Array<Record<string, unknown>>;
+        expect(garments).toHaveLength(0);
+      });
+
       it('should include total_weight_g', () => {
         const packItems = responseData.pack_items as Record<string, unknown>;
         expect(typeof packItems.total_weight_g).toBe('number');

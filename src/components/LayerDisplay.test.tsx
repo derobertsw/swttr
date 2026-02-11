@@ -621,6 +621,141 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("Layer up for the chairlift")).toBeInTheDocument();
     });
 
+    it("should show uphill copy and descent add-on layers for backcountry skiing", () => {
+      const touringData = {
+        ...mockBiophysicsData,
+        ireq: {
+          ...mockBiophysicsData.ireq,
+          downhill: { min: 2.1, neutral: 2.6 },
+          downhill_target_range: [2.2, 2.8] as [number, number],
+        },
+        pack_items: {
+          garments: [
+            {
+              id: "pack-1",
+              name: "Patagonia Nano Puff",
+              weight_g: 320,
+              rcl_clo: 0.7,
+            },
+          ],
+          total_weight_g: 320,
+        },
+      };
+
+      render(
+        <LayerDisplay
+          activity="backcountry_skiing"
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={touringData}
+        />
+      );
+
+      expect(screen.getByText("Backcountry Focus")).toBeInTheDocument();
+      expect(screen.getByText("Uphill (Skin Track)")).toBeInTheDocument();
+      expect(screen.getByText("Way Down Layer Plan")).toBeInTheDocument();
+      expect(screen.getByText("Patagonia Nano Puff")).toBeInTheDocument();
+      expect(screen.getByText("Downhill target insulation: 2.2-2.8 clo")).toBeInTheDocument();
+      expect(screen.getByText("Total additional packed layer weight: 320 g")).toBeInTheDocument();
+    });
+
+    it("should warn and show suggested gear when descent insulation is insufficient", async () => {
+      const fetchMock = vi.spyOn(global, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+        const url = input.toString();
+
+        if (url.includes("/api/wardrobe/available")) {
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: "g-down-1",
+                  type: "garment",
+                  brand: "Arc'teryx",
+                  model_name: "Atom Hoody",
+                  category: "insulation_synthetic",
+                  garment_type: "jacket",
+                  rcl_clo: 0.6,
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+        if (url.includes("/api/wardrobe/gear")) {
+          return new Response(JSON.stringify({ items: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+
+      localStorage.setItem("swttr-user-id", "user-test");
+
+      const descentGapData = {
+        ...mockBiophysicsData,
+        ireq: {
+          ...mockBiophysicsData.ireq,
+          target_range: [1.5, 2.0] as [number, number],
+          regional: {
+            min: { torso: 1.0, arms: 0.8, legs: 0.1 },
+            neutral: { torso: 1.5, arms: 1.2, legs: 0.2 },
+          },
+          downhill: { min: 2.6, neutral: 3.0 },
+          downhill_target_range: [2.6, 3.0] as [number, number],
+        },
+        recommendation: {
+          ...mockBiophysicsData.recommendation,
+          ensemble_properties: {
+            ...mockBiophysicsData.recommendation.ensemble_properties,
+            total_clo: 1.7,
+            regional_clo: { torso: 1.7, arms: 1.2, legs: 0.25 },
+          },
+        },
+        pack_items: {
+          garments: [
+            {
+              id: "pack-2",
+              name: "Light Wind Shell",
+              weight_g: 120,
+              rcl_clo: 0.3,
+            },
+          ],
+          total_weight_g: 120,
+        },
+        warnings: [],
+      };
+
+      try {
+        render(
+          <LayerDisplay
+            activity="backcountry_skiing"
+            recommendation={null}
+            temperature={15}
+            windspeed={10}
+            biophysicsData={descentGapData}
+          />
+        );
+
+        expect(screen.getByText("Descent Warning")).toBeInTheDocument();
+        expect(screen.getByText("Improve Wardrobe")).toBeInTheDocument();
+        expect(
+          screen.getByText("Insufficient insulation for the way down with current wardrobe layers: 2.0 clo vs 2.6 clo needed (0.6 clo short).")
+        ).toBeInTheDocument();
+        expect(await screen.findByText("Suggested Gear To Buy")).toBeInTheDocument();
+        expect(await screen.findByText("Arc'teryx Atom Hoody")).toBeInTheDocument();
+      } finally {
+        fetchMock.mockRestore();
+        localStorage.removeItem("swttr-user-id");
+      }
+    });
+
     it("should prominently recommend updating wardrobe when insulation is insufficient", async () => {
       const fetchMock = vi.spyOn(global, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
         const url = input.toString();

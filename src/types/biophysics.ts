@@ -37,6 +37,7 @@ export interface IreqRange {
   rest?: IreqData;
   uphill?: IreqData;
   downhill?: IreqData;
+  downhill_target_range?: [number, number];
   dle_hours?: number;
   dle_method?: string;
   target_range: [number, number];
@@ -63,6 +64,25 @@ export interface EnsembleProperties {
   regional_clo?: RegionalClo;
   evap_potential: number;
   permeability_index: number;
+}
+
+export interface PackItemGarment {
+  id: string;
+  name: string;
+  weight_g?: number;
+  rcl_clo?: number;
+}
+
+export interface PackItems {
+  garments: PackItemGarment[];
+  total_weight_g: number;
+}
+
+export interface TransitionProtocol {
+  priority: "urgent" | "quick" | "normal";
+  time_limit_minutes: number | null;
+  steps: string[];
+  warnings: string[];
 }
 
 export interface RecommendedGarment {
@@ -117,6 +137,8 @@ export interface BiophysicsRecommendation {
   };
   warnings: string[];
   guidance: string[];
+  pack_items?: PackItems;
+  transition_protocol?: TransitionProtocol;
 }
 
 /**
