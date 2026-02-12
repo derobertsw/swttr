@@ -204,6 +204,96 @@ describe("Weather API Route", () => {
     });
   });
 
+  describe("multi-day forecast weather", () => {
+    it("should fetch hourly forecast range when startDate is provided", async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            hourly: {
+              time: [
+                "2024-01-15T06:00",
+                "2024-01-15T07:00",
+              ],
+              temperature_2m: [28.4, 30.2],
+              wind_speed_10m: [5.1, 7.8],
+              precipitation_probability: [10, 65],
+            },
+          }),
+      });
+
+      const request = new NextRequest(
+        "http://localhost:3000/api/weather?lat=40.7128&lon=-74.006&startDate=2024-01-15&days=3"
+      );
+
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.isForecast).toBe(true);
+      expect(data.isMultiDay).toBe(true);
+      expect(data.startDate).toBe("2024-01-15");
+      expect(data.endDate).toBe("2024-01-17");
+      expect(data.hourly).toEqual([
+        {
+          time: "2024-01-15T06:00",
+          temperature: 28,
+          windSpeed: 5,
+          precipitationProbability: 10,
+        },
+        {
+          time: "2024-01-15T07:00",
+          temperature: 30,
+          windSpeed: 8,
+          precipitationProbability: 65,
+        },
+      ]);
+    });
+
+    it("should call Open-Meteo API with range dates for multi-day requests", async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            hourly: {
+              time: ["2024-01-15T06:00"],
+              temperature_2m: [30],
+              wind_speed_10m: [5],
+              precipitation_probability: [10],
+            },
+          }),
+      });
+
+      const request = new NextRequest(
+        "http://localhost:3000/api/weather?lat=40.7128&lon=-74.006&startDate=2024-01-15&days=2"
+      );
+
+      await GET(request);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("start_date=2024-01-15")
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("end_date=2024-01-16")
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("precipitation_probability")
+      );
+    });
+
+    it("should return 400 for invalid days in multi-day requests", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/weather?lat=40.7128&lon=-74.006&startDate=2024-01-15&days=0"
+      );
+
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid days. Must be an integer between 1 and 7.");
+    });
+  });
+
   describe("error handling", () => {
     it("should return 500 when external API fails for current weather", async () => {
       global.fetch = vi.fn().mockResolvedValue({

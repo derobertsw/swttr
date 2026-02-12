@@ -19,6 +19,7 @@ import { FROSTED_INPUT, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
 interface PlanAheadFormProps {
   date: Date | undefined;
   time: string;
+  durationDays: number;
   location: string;
   locationQuery: string;
   suggestions: LocationSuggestion[];
@@ -27,6 +28,7 @@ interface PlanAheadFormProps {
   suggestionRef: RefObject<HTMLDivElement | null>;
   onDateChange: (date: Date | undefined) => void;
   onTimeChange: (time: string) => void;
+  onDurationDaysChange: (days: number) => void;
   onLocationInputChange: (value: string) => void;
   onLocationFocus: () => void;
   onSelectLocation: (suggestion: LocationSuggestion) => void;
@@ -47,6 +49,7 @@ function formatStartTimeLabel(time: string): string {
 export function PlanAheadForm({
   date,
   time,
+  durationDays,
   location,
   locationQuery,
   suggestions,
@@ -55,12 +58,15 @@ export function PlanAheadForm({
   suggestionRef,
   onDateChange,
   onTimeChange,
+  onDurationDaysChange,
   onLocationInputChange,
   onLocationFocus,
   onSelectLocation,
   onDismiss,
 }: PlanAheadFormProps) {
   const timeLabel = formatStartTimeLabel(time);
+  const isMultiDay = durationDays > 1;
+  const durationLabel = durationDays === 1 ? "1 day" : `${durationDays} days`;
 
   return (
     <div className="flex w-full max-w-sm flex-col gap-5 pb-28">
@@ -69,19 +75,29 @@ export function PlanAheadForm({
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button
             type="button"
-            className="rounded-lg border border-white/45 bg-white/25 px-3 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+            onClick={() => onDurationDaysChange(1)}
+            className={cn(
+              "rounded-lg px-3 py-2 text-left transition",
+              !isMultiDay
+                ? "border border-white/45 bg-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+                : "border border-white/20 bg-white/5"
+            )}
           >
             <p className="text-sm font-semibold text-white">Single Day</p>
-            <p className="text-[11px] text-white/75">Current support</p>
+            <p className="text-[11px] text-white/70">Focused one-day setup</p>
           </button>
           <button
             type="button"
-            disabled
-            aria-disabled="true"
-            className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-left opacity-80"
+            onClick={() => onDurationDaysChange(durationDays > 1 ? durationDays : 3)}
+            className={cn(
+              "rounded-lg px-3 py-2 text-left transition",
+              isMultiDay
+                ? "border border-white/45 bg-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+                : "border border-white/20 bg-white/5"
+            )}
           >
-            <p className="text-sm font-semibold text-white/85">Multi Day</p>
-            <p className="text-[11px] text-white/65">Coming soon</p>
+            <p className="text-sm font-semibold text-white">Multi Day</p>
+            <p className="text-[11px] text-white/70">Daypart weather-aware</p>
           </button>
         </div>
       </section>
@@ -137,18 +153,52 @@ export function PlanAheadForm({
         </div>
         <p className="text-xs text-white/70">Start time: {timeLabel} (local)</p>
         <p className="text-xs text-white/65">
-          Multi-day plans will include daily weather shifts and packing deltas.
+          Plan builder uses daytime forecast windows (6am-9pm) to avoid overnight bias.
         </p>
       </div>
 
       <section className="rounded-xl border border-white/30 bg-white/10 p-3.5 backdrop-blur-lg">
         <p className="text-sm font-medium text-white/80">4. Duration</p>
-        <div className="mt-2 flex items-center justify-between rounded-lg border border-white/25 bg-white/5 px-3 py-2.5">
-          <div className="flex items-center gap-2 text-white/90">
-            <CalendarDays className="size-4" />
-            <span className="text-sm font-medium">1 day</span>
+        <div className="mt-2 rounded-lg border border-white/25 bg-white/5 px-3 py-3">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => onDurationDaysChange(Math.max(1, durationDays - 1))}
+              className="size-8 rounded-md border border-white/25 text-white/85 transition hover:bg-white/10"
+              aria-label="Decrease duration"
+            >
+              -
+            </button>
+            <div className="flex items-center gap-2 text-white/90">
+              <CalendarDays className="size-4" />
+              <span className="text-sm font-medium">{durationLabel}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onDurationDaysChange(Math.min(7, durationDays + 1))}
+              className="size-8 rounded-md border border-white/25 text-white/85 transition hover:bg-white/10"
+              aria-label="Increase duration"
+            >
+              +
+            </button>
           </div>
-          <span className="text-xs text-white/65">Multi-day coming soon</span>
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {[1, 3, 5, 7].map((days) => (
+              <button
+                key={days}
+                type="button"
+                onClick={() => onDurationDaysChange(days)}
+                className={cn(
+                  "rounded-md border px-2 py-1 text-xs font-medium transition",
+                  durationDays === days
+                    ? "border-white/60 bg-white/20 text-white"
+                    : "border-white/20 bg-white/5 text-white/70 hover:bg-white/10"
+                )}
+              >
+                {days}d
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -161,7 +211,7 @@ export function PlanAheadForm({
           <ChevronDown className="size-4 opacity-70" />
         </summary>
         <div className="mt-3 grid grid-cols-3 gap-2">
-          {["Day 1", "Day 2", "Day 3"].map((label) => (
+          {Array.from({ length: Math.min(durationDays, 5) }, (_, index) => `Day ${index + 1}`).map((label) => (
             <div
               key={label}
               className="rounded-lg border border-white/20 bg-white/5 px-2 py-2 text-center"

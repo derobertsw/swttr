@@ -1,10 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 
+function isValidDateString(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+}
+
+function addDaysToDateString(dateString: string, daysToAdd: number): string {
+  const [year, month, day] = dateString.split("-").map((part) => Number.parseInt(part, 10));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + daysToAdd);
+
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const lat = searchParams.get("lat");
   const lon = searchParams.get("lon");
   const dateTime = searchParams.get("datetime"); // ISO format: 2024-01-15T14:00
+  const startDate = searchParams.get("startDate");
+  const daysParam = searchParams.get("days");
 
   if (!lat || !lon) {
     return NextResponse.json(
@@ -14,6 +32,61 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if (startDate) {
+      if (!isValidDateString(startDate)) {
+        return NextResponse.json(
+          { error: "Invalid startDate. Use YYYY-MM-DD format." },
+          { status: 400 }
+        );
+      }
+
+      const parsedDays = Number.parseInt(daysParam ?? "3", 10);
+      if (Number.isNaN(parsedDays) || parsedDays < 1 || parsedDays > 7) {
+        return NextResponse.json(
+          { error: "Invalid days. Must be an integer between 1 and 7." },
+          { status: 400 }
+        );
+      }
+
+      const endDate = addDaysToDateString(startDate, parsedDays - 1);
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&start_date=${startDate}&end_date=${endDate}&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch weather data");
+      }
+
+      const data = await response.json();
+      const hourlyTime: string[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
+      const hourlyTemps: number[] = Array.isArray(data?.hourly?.temperature_2m) ? data.hourly.temperature_2m : [];
+      const hourlyWinds: number[] = Array.isArray(data?.hourly?.wind_speed_10m) ? data.hourly.wind_speed_10m : [];
+      const hourlyPrecip: number[] = Array.isArray(data?.hourly?.precipitation_probability) ? data.hourly.precipitation_probability : [];
+
+      const hourly = hourlyTime
+        .map((time: string, index: number) => ({
+          time,
+          temperature: Math.round(Number(hourlyTemps[index] ?? 0)),
+          windSpeed: Math.round(Number(hourlyWinds[index] ?? 0)),
+          precipitationProbability: Math.round(Number(hourlyPrecip[index] ?? 0)),
+        }))
+        .filter((entry) => {
+          return (
+            typeof entry.time === "string" &&
+            Number.isFinite(entry.temperature) &&
+            Number.isFinite(entry.windSpeed) &&
+            Number.isFinite(entry.precipitationProbability)
+          );
+        });
+
+      return NextResponse.json({
+        startDate,
+        endDate,
+        hourly,
+        isForecast: true,
+        isMultiDay: true,
+      });
+    }
+
     // If datetime is provided, fetch hourly forecast; otherwise fetch current weather
     if (dateTime) {
       const date = dateTime.split("T")[0];
@@ -33,9 +106,10 @@ export async function GET(request: NextRequest) {
 
       if (hourIndex === -1) {
         // Fall back to closest available hour
+        const fallbackIndex = Math.min(12, Math.max(0, data.hourly.temperature_2m.length - 1));
         return NextResponse.json({
-          temperature: Math.round(data.hourly.temperature_2m[12]), // noon as fallback
-          windSpeed: Math.round(data.hourly.wind_speed_10m[12]),
+          temperature: Math.round(data.hourly.temperature_2m[fallbackIndex]), // noon as fallback
+          windSpeed: Math.round(data.hourly.wind_speed_10m[fallbackIndex]),
           isForecast: true,
         });
       }

@@ -13,10 +13,12 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useBiophysicsRecommendation } from "@/hooks/useBiophysicsRecommendation";
 import { fetchCurrentWeather, fetchWeatherByCoords } from "@/hooks/useCurrentWeather";
 import { BiophysicsRecommendation } from "@/types/biophysics";
+import { ForecastHour, MultiDayLayerPlan } from "@/types/plan";
 import { logWarn } from "@/lib/logger";
 import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { TemperatureSensitivity, UserBodyMetrics } from "@/types/preferences";
+import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 import {
   type ExertionLevel,
   DEFAULT_EXERTION_LEVEL,
@@ -34,12 +36,14 @@ interface GearUpState {
   inputMode: InputMode;
   date: Date | undefined;
   time: string;
+  durationDays: number;
   showSliders: boolean;
   showResults: boolean;
   locationDenied: boolean;
   loading: boolean;
   recommendation: Recommendation | null;
   biophysicsData: BiophysicsRecommendation | null;
+  multiDayPlan: MultiDayLayerPlan | null;
 }
 
 type GearUpAction =
@@ -49,9 +53,11 @@ type GearUpAction =
   | { type: "SET_INPUT_MODE"; mode: InputMode }
   | { type: "SET_DATE"; date: Date | undefined }
   | { type: "SET_TIME"; time: string }
+  | { type: "SET_DURATION_DAYS"; durationDays: number }
   | { type: "LOCATION_DENIED" }
   | { type: "SUBMIT_START" }
   | { type: "SUBMIT_SUCCESS"; recommendation: Recommendation | null; biophysicsData: BiophysicsRecommendation | null; temperature: number; windspeed: number }
+  | { type: "SUBMIT_PLAN_SUCCESS"; plan: MultiDayLayerPlan; recommendation: Recommendation | null; temperature: number; windspeed: number }
   | { type: "SUBMIT_ERROR" }
   | { type: "RESET"; defaultActivity?: string };
 
@@ -62,12 +68,14 @@ function createInitialState(inputMode: InputMode): GearUpState {
     inputMode,
     date: undefined,
     time: "12:00",
+    durationDays: 3,
     showSliders: false,
     showResults: false,
     locationDenied: false,
     loading: false,
     recommendation: null,
     biophysicsData: null,
+    multiDayPlan: null,
   };
 }
 
@@ -85,6 +93,8 @@ function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpState {
       return { ...state, date: action.date };
     case "SET_TIME":
       return { ...state, time: action.time };
+    case "SET_DURATION_DAYS":
+      return { ...state, durationDays: action.durationDays };
     case "LOCATION_DENIED":
       return { ...state, locationDenied: true, showSliders: false };
     case "SUBMIT_START":
@@ -97,6 +107,18 @@ function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpState {
         windspeed: action.windspeed,
         recommendation: action.recommendation,
         biophysicsData: action.biophysicsData,
+        multiDayPlan: null,
+        showResults: true,
+      };
+    case "SUBMIT_PLAN_SUCCESS":
+      return {
+        ...state,
+        loading: false,
+        temperature: action.temperature,
+        windspeed: action.windspeed,
+        recommendation: action.recommendation,
+        biophysicsData: null,
+        multiDayPlan: action.plan,
         showResults: true,
       };
     case "SUBMIT_ERROR":
@@ -157,41 +179,59 @@ interface SubmitResult {
   windspeed: number;
 }
 
+interface PlanSubmitResult {
+  plan: MultiDayLayerPlan;
+  recommendation: Recommendation | null;
+  temperature: number;
+  windspeed: number;
+}
+
 async function submitPlanAhead(
   state: GearUpState,
   activity: string,
-  exertion: ExertionLevel,
-  bodyMetrics: UserBodyMetrics,
   sensitivity: TemperatureSensitivity,
   locationSearch: ReturnType<typeof useLocationSearch>,
-  biophysics: ReturnType<typeof useBiophysicsRecommendation>,
-): Promise<SubmitResult> {
+): Promise<PlanSubmitResult> {
   const dateStr = format(state.date!, "yyyy-MM-dd");
-  const dateTime = `${dateStr}T${state.time}`;
   const { selectedLocation } = locationSearch;
 
   const response = await fetch(
-    `/api/weather?lat=${selectedLocation!.latitude}&lon=${selectedLocation!.longitude}&datetime=${dateTime}`
+    `/api/weather?lat=${selectedLocation!.latitude}&lon=${selectedLocation!.longitude}&startDate=${dateStr}&days=${state.durationDays}`
   );
 
   if (!response.ok) {
     throw new Error("Failed to fetch forecast");
   }
 
-  const data = await response.json();
-  const layers = getRecommendation(data.temperature, activity, sensitivity);
-  const bioData = await biophysics.fetch(
-    activity,
-    { temperature: data.temperature, windSpeed: data.windSpeed },
-    exertion,
-    bodyMetrics
-  );
+  const data = await response.json() as {
+    hourly?: ForecastHour[];
+    startDate?: string;
+    endDate?: string;
+  };
+
+  const hourly = Array.isArray(data.hourly) ? data.hourly : [];
+  const parsedStartHour = Number.parseInt(state.time.split(":")[0] ?? "", 10);
+  const plan = buildMultiDayLayerPlan({
+    startDate: state.date!,
+    durationDays: state.durationDays,
+    startHour: Number.isFinite(parsedStartHour) ? parsedStartHour : undefined,
+    hourlyForecast: hourly,
+    getRecommendation: (effectiveTemperature) =>
+      getRecommendation(effectiveTemperature, activity, sensitivity),
+  });
+
+  if (plan.days.length === 0) {
+    throw new Error("No daytime forecast data returned for the selected window");
+  }
+
+  const firstDay = plan.days[0];
+  const baseline = firstDay.baseline;
 
   return {
-    recommendation: layers,
-    biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
-    temperature: data.temperature,
-    windspeed: data.windSpeed,
+    plan,
+    recommendation: baseline.recommendation,
+    temperature: baseline.effectiveTemperature,
+    windspeed: baseline.maxWindSpeed,
   };
 }
 
@@ -300,6 +340,10 @@ export function useGearUp() {
   const setInputMode = useCallback((m: InputMode) => dispatch({ type: "SET_INPUT_MODE", mode: m }), []);
   const setDate = useCallback((d: Date | undefined) => dispatch({ type: "SET_DATE", date: d }), []);
   const setTime = useCallback((t: string) => dispatch({ type: "SET_TIME", time: t }), []);
+  const setDurationDays = useCallback((days: number) => {
+    const clampedDays = Math.min(7, Math.max(1, Math.round(days)));
+    dispatch({ type: "SET_DURATION_DAYS", durationDays: clampedDays });
+  }, []);
 
   // Set initial activity once from stored/server preferences.
   useEffect(() => {
@@ -358,13 +402,10 @@ export function useGearUp() {
         const result = await submitPlanAhead(
           state,
           activity,
-          exertion,
-          bodyMetrics,
           sensitivity,
           locationSearch,
-          biophysics
         );
-        dispatch({ type: "SUBMIT_SUCCESS", ...result });
+        dispatch({ type: "SUBMIT_PLAN_SUCCESS", ...result });
       } catch (error) {
         toast.error("Failed to fetch weather forecast");
         logWarn("useGearUp.handleSubmit", error);
@@ -515,9 +556,12 @@ export function useGearUp() {
     setDate,
     time: state.time,
     setTime,
+    durationDays: state.durationDays,
+    setDurationDays,
     loading: state.loading,
     locationDenied: state.locationDenied,
     biophysicsData: state.biophysicsData,
+    multiDayPlan: state.multiDayPlan,
     sensitivity,
 
     // Location search (pass-through)

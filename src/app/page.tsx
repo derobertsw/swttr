@@ -5,6 +5,7 @@ import PageLayout from "@/components/PageLayout";
 import ActivitySelection from "@/components/ActivitySelection";
 import LayerDisplay from "@/components/LayerDisplay";
 import { PlanAheadForm } from "@/components/PlanAheadForm";
+import MultiDayPlanDisplay from "@/components/MultiDayPlanDisplay";
 import { LocationInput } from "@/components/LocationInput";
 import { useItemMappings } from "@/hooks/useItemMappings";
 import { useGearUp } from "@/hooks/useGearUp";
@@ -27,8 +28,11 @@ const HomeContent = () => {
     setDate,
     time,
     setTime,
+    durationDays,
+    setDurationDays,
     locationDenied,
     biophysicsData,
+    multiDayPlan,
     locationSearch,
     resetToInitialState,
   } = useGearUp();
@@ -87,6 +91,7 @@ const HomeContent = () => {
               <PlanAheadForm
                 date={date}
                 time={time}
+                durationDays={durationDays}
                 location={locationSearch.location}
                 locationQuery={locationSearch.locationQuery}
                 suggestions={locationSearch.suggestions}
@@ -95,6 +100,7 @@ const HomeContent = () => {
                 suggestionRef={locationSearch.suggestionRef}
                 onDateChange={setDate}
                 onTimeChange={setTime}
+                onDurationDaysChange={setDurationDays}
                 onLocationInputChange={locationSearch.handleLocationInputChange}
                 onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
                 onSelectLocation={locationSearch.handleSelectLocation}
@@ -109,6 +115,12 @@ const HomeContent = () => {
             </p>
             <div className="flex flex-col items-center" />
           </>
+        ) : inputMode === "planAhead" && multiDayPlan ? (
+          <MultiDayPlanDisplay
+            plan={multiDayPlan}
+            itemMappings={itemMappings}
+            onReset={resetToInitialState}
+          />
         ) : (
           <LayerDisplay
             activity={activity}
