@@ -85,9 +85,33 @@ export function BodyPartSection({
     effectiveCurrentClo !== undefined &&
     targetClo > 0 &&
     effectiveCurrentClo / targetClo >= 1.2;
+  const deficitClo =
+    targetClo !== undefined
+      ? Math.max(0, targetClo - (effectiveCurrentClo ?? 0))
+      : 0;
+  const surplusClo =
+    targetClo !== undefined && effectiveCurrentClo !== undefined
+      ? Math.max(0, effectiveCurrentClo - targetClo)
+      : 0;
+  const statusLabel =
+    targetClo === undefined
+      ? null
+      : deficitClo > 0.15
+        ? `Need +${deficitClo.toFixed(1)} clo`
+        : surplusClo > 0.35
+          ? `Over by ${surplusClo.toFixed(1)} clo`
+          : "Near target";
+  const statusClass =
+    targetClo === undefined
+      ? "text-slate-500"
+      : deficitClo > 0.15
+        ? "text-sky-700"
+        : surplusClo > 0.35
+          ? "text-amber-700"
+          : "text-emerald-700";
 
   return (
-    <div className="rounded-lg bg-white/40 backdrop-blur-[2px] p-5">
+    <div className="rounded-xl border border-white/35 bg-white/55 backdrop-blur-[3px] p-4 sm:p-5">
       <button
         type="button"
         onClick={() => setCollapsed((prev) => !prev)}
@@ -98,6 +122,11 @@ export function BodyPartSection({
           {BODY_PART_LABELS[bodyPart]}
         </h3>
         <div className="flex items-center gap-2">
+          {statusLabel && (
+            <span className={cn("rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold", statusClass)}>
+              {statusLabel}
+            </span>
+          )}
           {isOverTarget && (
             <span className="inline-flex items-center text-amber-600" title="Overheating risk">
               <Flame className="size-4" />
@@ -122,7 +151,7 @@ export function BodyPartSection({
         <div className="overflow-hidden">
           <div className="pt-3">
             {!hasContent && (
-              <p className="mb-3 text-sm text-slate-600">{getEmptyStateMessage(bodyPart)}</p>
+              <p className="mb-3 text-sm text-slate-700">{getEmptyStateMessage(bodyPart)}</p>
             )}
             <ul className="space-y-4" style={{ listStyle: "none", padding: 0, margin: 0 }}>
               {bodyPart === "hands" && handwear && <HandwearDisplay handwear={handwear} />}

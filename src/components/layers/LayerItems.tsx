@@ -28,8 +28,8 @@ interface LayerItemDisplayProps {
 
 function LayerItemDisplay({ item }: LayerItemDisplayProps) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-slate-900 font-medium leading-snug">
+    <div className="flex flex-col gap-1.5">
+      <span className="text-slate-900 font-semibold leading-snug">
         {item.name}
         {item.isGeneric && (
           <span className="ml-2 rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
@@ -38,7 +38,7 @@ function LayerItemDisplay({ item }: LayerItemDisplayProps) {
         )}
       </span>
       {item.rcl !== undefined && (
-        <span className="text-xs text-slate-500">{item.rcl.toFixed(2)} clo</span>
+        <span className="text-xs text-slate-600">{item.rcl.toFixed(2)} clo</span>
       )}
     </div>
   );
@@ -55,7 +55,7 @@ function LayerGroup({ label, items }: LayerGroupProps) {
   return (
     <li className="flex flex-col gap-1">
       <span className="text-xs uppercase text-slate-900/60 tracking-wide">{label}</span>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2.5">
         {items.map((item, index) => (
           <LayerItemDisplay key={`${item.name}-${index}`} item={item} />
         ))}
@@ -190,14 +190,14 @@ export function LayerItems({
         }
 
         return (
-          <li key={slotKey} className="flex flex-col gap-2 rounded-md border border-dashed border-slate-300 bg-slate-50/80 p-3">
+          <li key={slotKey} className="flex flex-col gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50/90 p-3">
             <span className="text-xs uppercase text-slate-900/60 tracking-wide">{LAYER_LABELS[layerType]}</span>
             <p className="text-sm text-slate-700">
               No {LAYER_LABELS[layerType].toLowerCase()} layer selected yet.
             </p>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
               <select
-                className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-800"
+                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800"
                 aria-label={`${BODY_PART_LABELS[bodyPart]} ${LAYER_LABELS[layerType]} generic option`}
                 value={selectedOptionBySlot[slotKey] ?? genericOptions[0]}
                 onChange={(event) => {
@@ -211,10 +211,17 @@ export function LayerItems({
                   </option>
                 ))}
               </select>
-              <Button type="button" variant="outline" size="sm" onClick={() => addGenericItem(layerType)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 w-full sm:w-auto"
+                onClick={() => addGenericItem(layerType)}
+              >
                 Use Generic {LAYER_LABELS[layerType]}
               </Button>
             </div>
+            <p className="text-xs text-slate-600">Quick placeholder until you add your actual gear.</p>
             <Link
               href="/wardrobe"
               className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"

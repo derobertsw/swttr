@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Home from "./page";
+import { STORAGE_KEYS } from "@/lib/storage";
 
 // Mock sonner toast
 vi.mock("sonner", () => ({
@@ -46,7 +47,9 @@ describe("Home Page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     originalGeolocation = navigator.geolocation;
-    localStorageMock.getItem.mockReturnValue("test-user-id");
+    localStorageMock.getItem.mockImplementation((key: string) =>
+      key === STORAGE_KEYS.USER_ID ? "test-user-id" : null
+    );
     // Reset search params
     mockSearchParams.delete("mode");
     mockSearchParams.delete("gearUp");
@@ -82,9 +85,9 @@ describe("Home Page", () => {
   });
 
   describe("initial rendering", () => {
-    it("should render activity selector carousel", () => {
+    it("should render activity selector carousel", async () => {
       render(<Home />);
-      expect(screen.getByRole("region")).toHaveAttribute(
+      expect(await screen.findByRole("region")).toHaveAttribute(
         "aria-roledescription",
         "carousel"
       );
