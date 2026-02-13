@@ -32,6 +32,8 @@ export interface AvailableItem {
   type: "garment" | "handwear" | "headwear";
   brand: string;
   model_name: string;
+  brand_logo_url?: string;
+  item_image_url?: string;
   category: string;
   garment_type?: string;
   rcl_clo?: number;
@@ -47,6 +49,8 @@ export interface WardrobeItem {
   details: {
     brand: string;
     model_name: string;
+    brand_logo_url?: string;
+    item_image_url?: string;
     category?: string;
     garment_type?: string;
     handwear_type?: string;

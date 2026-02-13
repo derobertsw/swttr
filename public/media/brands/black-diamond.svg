@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="220" viewBox="0 0 640 220" role="img" aria-label="Black Diamond logo">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#1f2937"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="220" rx="28" fill="url(#bg)"/>
+  <circle cx="74" cy="110" r="30" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.35)"/>
+  <text x="74" y="118" text-anchor="middle" fill="white" font-size="16" font-family="ui-sans-serif, system-ui" font-weight="700">BD</text>
+  <text x="124" y="123" fill="white" font-size="50" font-family="ui-sans-serif, system-ui" font-weight="700" letter-spacing="0.04em">Black Diamond</text>
+</svg>

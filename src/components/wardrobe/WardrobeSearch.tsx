@@ -4,6 +4,13 @@ import { Input } from "@/components/ui/input";
 import { FROSTED_INPUT_FULL, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
 import type { AvailableItem } from "@/types/wardrobe";
 import { typeIcons, typeLabels, getItemIcon, formatCategory } from "./wardrobe-utils";
+import {
+  getAvailableMediaRef,
+  getBrandInitials,
+  resolveBrandLogoUrl,
+  resolveItemImageUrl,
+  toCssBackgroundImage,
+} from "./media";
 
 interface WardrobeSearchProps {
   search: string;
@@ -304,34 +311,69 @@ export function WardrobeSearch({
                     const isAdding = adding === item.id;
                     const wasJustAdded = justAdded === item.id;
                     const disableAdd = isAdding || wasJustAdded;
+                    const media = getAvailableMediaRef(item);
+                    const itemImageUrl = resolveItemImageUrl(media);
+                    const brandLogoUrl = resolveBrandLogoUrl(media);
+                    const brand = item.brand || "Unknown brand";
+
                     return (
                       <button
                         key={item.id}
                         onClick={() => onAddItem(item)}
                         disabled={disableAdd}
-                        className="w-full px-3 py-2.5 text-left hover:bg-muted/50 flex items-center gap-3 disabled:opacity-70 transition-colors"
+                        className="w-full px-3 py-2.5 text-left hover:bg-muted/50 flex items-center gap-2.5 disabled:opacity-70 transition-colors"
                       >
-                        <ItemIcon className="size-5 text-muted-foreground/60 flex-shrink-0" />
+                        <div className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-slate-300/40 bg-[linear-gradient(145deg,rgba(241,248,253,0.95),rgba(211,226,236,0.82))]">
+                          <div
+                            aria-hidden="true"
+                            className="absolute inset-0 bg-cover bg-center"
+                            style={{ backgroundImage: toCssBackgroundImage(itemImageUrl) }}
+                          />
+                          <div
+                            aria-hidden="true"
+                            className="absolute inset-0 bg-[linear-gradient(165deg,rgba(255,255,255,0.3),rgba(15,23,42,0.12))]"
+                          />
+                          <ItemIcon className="absolute bottom-1 right-1 size-3.5 text-slate-700/70" />
+                        </div>
+
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">
-                            {item.brand} {item.model_name}
+                            {item.model_name}
                           </div>
                           <div className="text-xs text-muted-foreground/65 mt-0.5">
                             {formatCategory(item.category)}
-                            {item.rcl_clo && (
+                            {typeof item.rcl_clo === "number" && (
                               <span className="font-mono ml-1.5 opacity-80">· {item.rcl_clo.toFixed(2)} clo</span>
                             )}
                           </div>
                         </div>
-                        <div className="size-8 flex items-center justify-center flex-shrink-0">
-                          {wasJustAdded ? (
-                            <Check
-                              className="size-5 text-emerald-500"
-                              style={{ animation: "checkmark-pop 0.3s ease-out forwards" }}
+
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <div
+                            className="relative flex h-8 w-14 items-center justify-center overflow-hidden rounded-md border border-slate-300/45 bg-white/78 px-1.5 shadow-sm"
+                            title={brand}
+                            aria-label={`${brand} logo`}
+                          >
+                            <span className="pointer-events-none text-[8px] font-semibold uppercase tracking-[0.14em] text-slate-700/78">
+                              {getBrandInitials(brand)}
+                            </span>
+                            <div
+                              aria-hidden="true"
+                              className="absolute inset-0 bg-contain bg-center bg-no-repeat p-1"
+                              style={{ backgroundImage: toCssBackgroundImage(brandLogoUrl) }}
                             />
-                          ) : (
-                            <Plus className="size-4 text-muted-foreground/70 hover:text-muted-foreground transition-colors" />
-                          )}
+                          </div>
+
+                          <div className="size-8 flex items-center justify-center">
+                            {wasJustAdded ? (
+                              <Check
+                                className="size-5 text-emerald-500"
+                                style={{ animation: "checkmark-pop 0.3s ease-out forwards" }}
+                              />
+                            ) : (
+                              <Plus className="size-4 text-muted-foreground/70 hover:text-muted-foreground transition-colors" />
+                            )}
+                          </div>
                         </div>
                       </button>
                     );

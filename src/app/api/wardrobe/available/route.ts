@@ -34,17 +34,17 @@ export async function GET() {
     const [garmentsResult, handwearResult, headwearResult] = await Promise.all([
       supabase
         .from("garments")
-        .select("id, brand, model_name, category, garment_type, garment_thermal_properties(rcl_whole_body)")
+        .select("id, brand, model_name, brand_logo_url, item_image_url, category, garment_type, garment_thermal_properties(rcl_whole_body)")
         .order("brand")
         .order("model_name"),
       supabase
         .from("handwear")
-        .select("id, brand, model_name, handwear_type, rcl_clo, dexterity_score")
+        .select("id, brand, model_name, brand_logo_url, item_image_url, handwear_type, rcl_clo, dexterity_score")
         .order("brand")
         .order("model_name"),
       supabase
         .from("headwear")
-        .select("id, brand, model_name, headwear_type, rcl_clo, covers_ears, covers_neck, covers_face")
+        .select("id, brand, model_name, brand_logo_url, item_image_url, headwear_type, rcl_clo, covers_ears, covers_neck, covers_face")
         .order("brand")
         .order("model_name"),
     ]);
@@ -55,6 +55,8 @@ export async function GET() {
         type: "garment" as const,
         brand: g.brand,
         model_name: g.model_name,
+        brand_logo_url: g.brand_logo_url,
+        item_image_url: g.item_image_url,
         category: g.category,
         garment_type: g.garment_type,
         rcl_clo: extractRclWholeBody(g.garment_thermal_properties),
@@ -64,6 +66,8 @@ export async function GET() {
         type: "handwear" as const,
         brand: h.brand,
         model_name: h.model_name,
+        brand_logo_url: h.brand_logo_url,
+        item_image_url: h.item_image_url,
         category: h.handwear_type,
         rcl_clo: h.rcl_clo,
         dexterity_score: h.dexterity_score,
@@ -73,6 +77,8 @@ export async function GET() {
         type: "headwear" as const,
         brand: h.brand,
         model_name: h.model_name,
+        brand_logo_url: h.brand_logo_url,
+        item_image_url: h.item_image_url,
         category: h.headwear_type,
         rcl_clo: h.rcl_clo,
         covers_ears: h.covers_ears,
