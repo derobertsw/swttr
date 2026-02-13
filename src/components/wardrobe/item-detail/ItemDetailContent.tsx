@@ -12,7 +12,7 @@ export function ItemDetailContent({ item }: { item: WardrobeItem }) {
     "";
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3 pb-2">
       {category && <CategoryBadge category={category} />}
 
       {item.item_type === "garment" && <GarmentDetails details={item.details} />}

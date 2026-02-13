@@ -12,16 +12,16 @@ export function DataQualityTable({
   return (
     <>
       <SectionHeader>Data Quality</SectionHeader>
-      <div className="border rounded-lg overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-border/70">
         <table className="w-full text-sm">
-          <tbody className="divide-y">
-            <tr>
+          <tbody>
+            <tr className="bg-background/75">
               <td className="px-3 py-1.5 text-muted-foreground">Method</td>
-              <td className="px-3 py-1.5 text-right">{formatEstimationMethod(estimationMethod)}</td>
+              <td className="px-3 py-1.5 text-right font-medium">{formatEstimationMethod(estimationMethod)}</td>
             </tr>
-            <tr>
+            <tr className="bg-muted/10">
               <td className="px-3 py-1.5 text-muted-foreground">Confidence</td>
-              <td className="px-3 py-1.5 text-right">{formatConfidence(confidenceScore)}</td>
+              <td className="px-3 py-1.5 text-right font-medium">{formatConfidence(confidenceScore)}</td>
             </tr>
           </tbody>
         </table>
