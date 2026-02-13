@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { SwipeableItem } from "@/components/SwipeableItem";
 import type { WardrobeItem } from "@/types/wardrobe";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,13 @@ export function WardrobeItemCard({ item, isDisabled, onDelete, onToggleDisabled,
     "";
   const categoryLabel = category ? formatCategory(category) : "Uncategorized";
   const clo = getClo(item);
+  const metadataLine = [
+    item.details.brand || "Unknown brand",
+    categoryLabel,
+    clo !== undefined ? `${clo.toFixed(2)} clo` : null,
+  ]
+    .filter(Boolean)
+    .join(" • ");
 
   return (
     <SwipeableItem
@@ -28,59 +36,36 @@ export function WardrobeItemCard({ item, isDisabled, onDelete, onToggleDisabled,
       onToggleDisabled={onToggleDisabled}
       isDisabled={isDisabled}
     >
-      <div className={cn("flex items-start gap-3 px-3", isDisabled ? "py-3 opacity-70" : "py-3.5")}>
-        <Icon className="mt-0.5 size-5 text-muted-foreground flex-shrink-0" />
-        <div className="flex-1 min-w-0">
+      <div className={cn("flex items-start gap-3 px-3", isDisabled ? "py-2 opacity-78" : "py-2.5")}>
+        <Icon className="mt-0.5 size-5 text-slate-500/90 shrink-0" />
+        <div className="min-w-0 flex-1">
           <p
             className={cn(
               "truncate leading-tight",
-              isDisabled
-                ? "text-[15px] font-medium text-card-foreground/65"
-                : "text-[17px] font-semibold text-card-foreground"
+              isDisabled ? "text-[16px] font-medium text-slate-900/70" : "text-[16px] font-semibold text-slate-900"
             )}
           >
             {item.details.model_name}
           </p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <span
-              className={cn(
-                "rounded-full border px-2 py-0.5 text-[11px]",
-                isDisabled
-                  ? "border-border/60 bg-muted/35 text-muted-foreground/70"
-                  : "border-border bg-muted/60 text-muted-foreground"
-              )}
-            >
-              {item.details.brand || "Unknown brand"}
-            </span>
-            <span
-              className={cn(
-                "rounded-full border px-2 py-0.5 text-[11px]",
-                isDisabled
-                  ? "border-border/50 bg-muted/25 text-muted-foreground/65"
-                  : "border-border/80 bg-muted/40 text-muted-foreground"
-              )}
-            >
-              {categoryLabel}
-            </span>
-            {clo !== undefined && (
-              <span
-                className={cn(
-                  "rounded-full border px-2 py-0.5 font-mono text-[11px]",
-                  isDisabled
-                    ? "border-border/50 bg-muted/25 text-muted-foreground/65"
-                    : "border-border/80 bg-muted/45 text-muted-foreground"
-                )}
-              >
-                {clo.toFixed(2)} clo
-              </span>
+          <p
+            className={cn(
+              "mt-1 truncate text-[13px]",
+              isDisabled ? "text-slate-600/75" : "text-slate-700/82"
             )}
-          </div>
+          >
+            {metadataLine}
+          </p>
           {isDisabled && (
-            <div className="mt-1.5 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+            <div className="mt-1 text-[10px] uppercase tracking-wide text-slate-600/80">
               Excluded from recommendations
             </div>
           )}
         </div>
+        {onClick && (
+          <div className="ml-2 mt-0.5 shrink-0 text-slate-500/75">
+            <ChevronRight className="size-4" />
+          </div>
+        )}
       </div>
     </SwipeableItem>
   );

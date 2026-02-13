@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Trash2, Ban, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface SwipeAction {
   icon: React.ReactNode;
@@ -147,7 +148,10 @@ export function SwipeableItem({
 
       {/* Main content */}
       <div
-        className="relative bg-card border rounded-lg touch-pan-y cursor-pointer"
+        className={cn(
+          "relative rounded-xl border border-white/45 bg-[linear-gradient(120deg,rgba(246,251,255,0.86),rgba(232,241,249,0.8))] shadow-[0_6px_16px_rgba(11,20,35,0.14)] backdrop-blur-[1px] touch-pan-y",
+          onClick ? "cursor-pointer" : "cursor-default"
+        )}
         style={{
           transform: `translateX(${translateX}px)`,
           transition: isDragging ? "none" : "transform 0.2s ease-out",

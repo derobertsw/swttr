@@ -5,8 +5,32 @@ import { useUserId } from "@/hooks/useUserId";
 import { logWarn } from "@/lib/logger";
 import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
 import { normalizeSearch, getBodyPart, BODY_PART_ORDER } from "@/components/wardrobe/wardrobe-utils";
+import { CATEGORY_TO_LAYER_TYPE } from "@/lib/layers";
 
 const SEARCH_RESULTS_LIMIT = 30;
+type SearchBodyPartFilter = "all" | "torso" | "legs" | "hands" | "headNeck";
+type SearchLayerFilter = "all" | "base" | "mid" | "outer";
+type SearchSort = "bestMatch" | "alpha" | "clo";
+const LEGS_GARMENT_TYPES = new Set(["pants", "shorts", "bib"]);
+
+function inferAvailableBodyPart(item: AvailableItem): Exclude<SearchBodyPartFilter, "all"> {
+  if (item.type === "handwear") return "hands";
+  if (item.type === "headwear") return "headNeck";
+  if (item.garment_type && LEGS_GARMENT_TYPES.has(item.garment_type.toLowerCase())) return "legs";
+  return "torso";
+}
+
+function inferAvailableLayer(item: AvailableItem): Exclude<SearchLayerFilter, "all"> {
+  const category = (item.category ?? "").toLowerCase();
+  const mapped = CATEGORY_TO_LAYER_TYPE[category];
+  if (mapped) return mapped;
+
+  if (category.includes("base") || category.includes("liner")) return "base";
+  if (category.includes("shell") || category.includes("hard") || category.includes("soft") || category.includes("wind")) {
+    return "outer";
+  }
+  return "mid";
+}
 
 export function useWardrobe() {
   const userId = useUserId();
@@ -25,6 +49,9 @@ export function useWardrobe() {
   }, []);
 
   const [brandFilter, setBrandFilter] = useState<string | null>(null);
+  const [searchBodyPartFilter, setSearchBodyPartFilter] = useState<SearchBodyPartFilter>("all");
+  const [searchLayerFilter, setSearchLayerFilter] = useState<SearchLayerFilter>("all");
+  const [searchSort, setSearchSort] = useState<SearchSort>("bestMatch");
 
   const [disabledCollapsed, setDisabledCollapsed] = useState<Record<string, boolean>>({
     torso: true,
@@ -61,24 +88,55 @@ export function useWardrobe() {
     fetchData();
   }, [userId]);
 
+  const wardrobeItemIds = useMemo(() => new Set(wardrobeItems.map((w) => w.item_id)), [wardrobeItems]);
+
+  const baseFilteredItems = useMemo(() => {
+    return availableItems.filter((item) => {
+      const inWardrobe = wardrobeItemIds.has(item.id);
+      if (inWardrobe) return false;
+      if (brandFilter && item.brand !== brandFilter) return false;
+      if (searchBodyPartFilter !== "all" && inferAvailableBodyPart(item) !== searchBodyPartFilter) return false;
+      if (searchLayerFilter !== "all" && inferAvailableLayer(item) !== searchLayerFilter) return false;
+      return true;
+    });
+  }, [
+    availableItems,
+    wardrobeItemIds,
+    brandFilter,
+    searchBodyPartFilter,
+    searchLayerFilter,
+  ]);
+
   const filteredItems = useMemo(() => {
-    const wardrobeIds = new Set(wardrobeItems.map((w) => w.item_id));
     const searchNormalized = normalizeSearch(search);
 
-    return availableItems.filter((item) => {
-      if (wardrobeIds.has(item.id)) return false;
-      if (brandFilter && item.brand !== brandFilter) return false;
+    return baseFilteredItems.filter((item) => {
       if (!search) return true;
 
       const searchText = normalizeSearch(`${item.brand} ${item.model_name} ${item.category}`);
       return searchText.includes(searchNormalized);
     });
-  }, [availableItems, wardrobeItems, search, brandFilter]);
+  }, [baseFilteredItems, search]);
 
   const rankedFilteredItems = useMemo(() => {
-    if (!search) return filteredItems;
+    const alphaSorted = [...filteredItems].sort((a, b) => {
+      const brandCompare = a.brand.localeCompare(b.brand);
+      if (brandCompare !== 0) return brandCompare;
+      return a.model_name.localeCompare(b.model_name);
+    });
+
+    if (searchSort === "alpha") return alphaSorted;
+    if (searchSort === "clo") {
+      return [...alphaSorted].sort((a, b) => {
+        const cloA = typeof a.rcl_clo === "number" ? a.rcl_clo : -1;
+        const cloB = typeof b.rcl_clo === "number" ? b.rcl_clo : -1;
+        if (cloA !== cloB) return cloB - cloA;
+        return 0;
+      });
+    }
+
     const query = normalizeSearch(search).trim();
-    if (!query) return filteredItems;
+    if (!query) return alphaSorted;
 
     const scoreItem = (item: AvailableItem) => {
       const brand = normalizeSearch(item.brand);
@@ -104,7 +162,7 @@ export function useWardrobe() {
       if (brandCompare !== 0) return brandCompare;
       return a.model_name.localeCompare(b.model_name);
     });
-  }, [filteredItems, search]);
+  }, [filteredItems, search, searchSort]);
 
   const visibleSearchItems = useMemo(() => {
     if (!search.trim()) return [];
@@ -112,15 +170,18 @@ export function useWardrobe() {
   }, [rankedFilteredItems, search]);
 
   const availableBrands = useMemo(() => {
-    const wardrobeIds = new Set(wardrobeItems.map((w) => w.item_id));
     const brands = new Set<string>();
-    for (const item of availableItems) {
-      if (!wardrobeIds.has(item.id)) {
-        brands.add(item.brand);
-      }
+    for (const item of baseFilteredItems) {
+      brands.add(item.brand);
     }
     return Array.from(brands).sort();
-  }, [availableItems, wardrobeItems]);
+  }, [baseFilteredItems]);
+
+  useEffect(() => {
+    if (brandFilter && !availableBrands.includes(brandFilter)) {
+      setBrandFilter(null);
+    }
+  }, [availableBrands, brandFilter]);
 
   const groupedItems = useMemo(() => {
     const groups: Record<string, AvailableItem[]> = {
@@ -291,6 +352,13 @@ export function useWardrobe() {
     setDisabledCollapsed(prev => ({ ...prev, [part]: !prev[part] }));
   };
 
+  const clearSearchFilters = () => {
+    setBrandFilter(null);
+    setSearchBodyPartFilter("all");
+    setSearchLayerFilter("all");
+    setSearchSort("bestMatch");
+  };
+
   return {
     loading,
     search,
@@ -311,7 +379,14 @@ export function useWardrobe() {
     recentlyRemoved,
     brandFilter,
     setBrandFilter,
+    searchBodyPartFilter,
+    setSearchBodyPartFilter,
+    searchLayerFilter,
+    setSearchLayerFilter,
+    searchSort,
+    setSearchSort,
     availableBrands,
+    clearSearchFilters,
     addItem,
     removeItem,
     restoreItem,
