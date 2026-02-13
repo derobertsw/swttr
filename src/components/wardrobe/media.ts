@@ -27,7 +27,7 @@ interface MediaRef {
   itemImageUrl?: string;
 }
 
-const MEDIA_URL_REVISION = "2026-02-13-logos-v4";
+const MEDIA_URL_REVISION = "2026-02-13-logos-v5";
 
 function isLegacyBrandWrapper(url?: string): boolean {
   return typeof url === "string" && url.startsWith("/media/brands/");

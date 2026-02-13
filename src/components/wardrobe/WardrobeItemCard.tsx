@@ -43,11 +43,17 @@ export function WardrobeItemCard({
   const itemImageUrl = resolveItemImageUrl(media);
   const brandLogoUrl = resolveBrandLogoUrl(media);
   const cloLabel = clo !== undefined ? `${clo.toFixed(2)} clo` : null;
+  const handleCardClick = () => {
+    if (showSwipeHint) {
+      onDismissSwipeHint?.();
+    }
+    onClick?.();
+  };
 
   return (
     <SwipeableItem
       onDelete={onDelete}
-      onClick={onClick}
+      onClick={onClick ? handleCardClick : undefined}
       onToggleDisabled={onToggleDisabled}
       isDisabled={isDisabled}
       onSwipeOpen={showSwipeHint ? onDismissSwipeHint : undefined}
@@ -60,7 +66,7 @@ export function WardrobeItemCard({
               event.stopPropagation();
               onDismissSwipeHint?.();
             }}
-            className="absolute -top-2 right-7 rounded-full border border-slate-200/70 bg-white/88 px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-sm backdrop-blur-sm"
+            className="absolute right-7 top-1 rounded-full border border-slate-200/70 bg-white/88 px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-sm backdrop-blur-sm"
             aria-label="Dismiss swipe hint"
           >
             Swipe left for actions

@@ -15,7 +15,7 @@ const BRAND_LOGO_BY_KEY: Record<string, string> = {
   "black diamond": "https://upload.wikimedia.org/wikipedia/commons/d/d2/Black_Diamond_logo.png",
   "helly hansen": "https://upload.wikimedia.org/wikipedia/commons/3/33/Hellyhansen_logo.png",
   lululemon: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Lululemon_Athletica_logo.svg/240px-Lululemon_Athletica_logo.svg.png",
-  norrona: "https://whatthelogo.com/storage/logos/norrona-102690.webp",
+  norrona: "/media/brands/norrona.svg",
   "outdoor research": "https://upload.wikimedia.org/wikipedia/en/thumb/1/1e/Outdoor_Research_logo.png/250px-Outdoor_Research_logo.png",
   patagonia: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Patagonia_%28Unternehmen%29_logo.svg/640px-Patagonia_%28Unternehmen%29_logo.svg.png",
   smartwool: "https://upload.wikimedia.org/wikipedia/en/thumb/2/25/Smartwool_logo.svg/250px-Smartwool_logo.svg.png",

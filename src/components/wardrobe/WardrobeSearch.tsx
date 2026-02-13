@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Search, Plus, Check, X, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { FROSTED_INPUT_FULL, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
+import { FROSTED_INPUT, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
 import type { AvailableItem } from "@/types/wardrobe";
 import { typeIcons, typeLabels, getItemIcon, formatCategory } from "./wardrobe-utils";
 import {
@@ -144,12 +144,12 @@ export function WardrobeSearch({
   return (
     <div className="relative">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/70" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/62" />
         <Input
           placeholder="Search by brand, model, or category..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className={`pl-10 pr-10 h-11 ${FROSTED_INPUT_FULL}`}
+          className={`h-10 border-white/45 bg-white/18 pl-10 pr-10 text-white/90 placeholder:text-white/68 ${FROSTED_INPUT}`}
         />
         {hasSearch && (
           <button
@@ -166,7 +166,7 @@ export function WardrobeSearch({
       <button
         type="button"
         onClick={() => setFiltersExpanded((current) => !current)}
-        className="mt-1.5 flex w-full items-center justify-between rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-left transition-colors hover:border-white/30 hover:bg-white/12 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/35"
+        className="mt-1 flex w-full items-center justify-between rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-left transition-colors hover:border-white/30 hover:bg-white/12 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/35"
         aria-expanded={filtersExpanded}
         aria-controls="wardrobe-filter-panel"
       >
@@ -192,7 +192,7 @@ export function WardrobeSearch({
       </button>
 
       {activeFilters.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
           {activeFilters.map((filter) => (
             <button
               key={filter.key}
@@ -219,7 +219,7 @@ export function WardrobeSearch({
       {filtersExpanded && (
         <div
           id="wardrobe-filter-panel"
-          className="mt-1.5 rounded-lg border border-white/20 bg-white/10 p-1.5"
+          className="mt-1 rounded-lg border border-white/20 bg-white/10 p-1.5"
         >
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             <label className="flex flex-col gap-1">
@@ -321,7 +321,7 @@ export function WardrobeSearch({
                         key={item.id}
                         onClick={() => onAddItem(item)}
                         disabled={disableAdd}
-                        className="w-full px-3 py-2.5 text-left hover:bg-muted/50 flex items-center gap-2.5 disabled:opacity-70 transition-colors"
+                        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 disabled:opacity-70"
                       >
                         <div className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-slate-300/40 bg-[linear-gradient(145deg,rgba(241,248,253,0.95),rgba(211,226,236,0.82))]">
                           <div
@@ -333,28 +333,32 @@ export function WardrobeSearch({
                             aria-hidden="true"
                             className="absolute inset-0 bg-[linear-gradient(165deg,rgba(255,255,255,0.3),rgba(15,23,42,0.12))]"
                           />
+                          <div
+                            aria-hidden="true"
+                            className="absolute inset-0 opacity-50 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.38),transparent_52%)]"
+                          />
                           <ItemIcon className="absolute bottom-1 right-1 size-3.5 text-slate-700/70" />
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">
+                          <div className="truncate text-[14px] font-semibold leading-tight text-slate-900">
                             {item.model_name}
                           </div>
-                          <div className="text-xs text-muted-foreground/65 mt-0.5">
+                          <div className="mt-0.5 truncate text-[12px] text-slate-700/76">
                             {formatCategory(item.category)}
                             {typeof item.rcl_clo === "number" && (
-                              <span className="font-mono ml-1.5 opacity-80">· {item.rcl_clo.toFixed(2)} clo</span>
+                              <span className="ml-1.5 font-medium opacity-80">· {item.rcl_clo.toFixed(2)} clo</span>
                             )}
                           </div>
                         </div>
 
                         <div className="flex shrink-0 items-center gap-1.5">
                           <div
-                            className="relative flex h-8 w-14 items-center justify-center overflow-hidden rounded-md border border-slate-300/45 bg-white/78 px-1.5 shadow-sm"
+                            className="relative flex h-8 w-16 items-center justify-center overflow-hidden rounded-lg border border-slate-300/35 bg-white/72 px-1 shadow-[0_1px_4px_rgba(15,23,42,0.12)]"
                             title={brand}
                             aria-label={`${brand} logo`}
                           >
-                            <span className="pointer-events-none text-[8px] font-semibold uppercase tracking-[0.14em] text-slate-700/78">
+                            <span className="pointer-events-none text-[8px] font-semibold uppercase tracking-[0.14em] text-slate-700/72">
                               {getBrandInitials(brand)}
                             </span>
                             <div

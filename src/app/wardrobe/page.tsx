@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { CircleHelp, RotateCcw, X } from "lucide-react";
@@ -9,6 +10,8 @@ import { WardrobeSearch } from "@/components/wardrobe/WardrobeSearch";
 import { BodyPartSection } from "@/components/wardrobe/BodyPartSection";
 import { ItemDetailCard } from "@/components/wardrobe";
 import { BODY_PART_ORDER, getItemIcon, formatCategory, getClo } from "@/components/wardrobe/wardrobe-utils";
+
+const SWIPE_HINT_STORAGE_KEY = "swttr-wardrobe-swipe-hint-dismissed-v1";
 
 export default function Wardrobe() {
   const {
@@ -45,6 +48,25 @@ export default function Wardrobe() {
     toggleDisabled,
     toggleDisabledCollapsed,
   } = useWardrobe();
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (wardrobeItems.length === 0) {
+      setShowSwipeHint(false);
+      return;
+    }
+
+    const dismissed = window.localStorage.getItem(SWIPE_HINT_STORAGE_KEY) === "1";
+    setShowSwipeHint(!dismissed);
+  }, [wardrobeItems.length]);
+
+  const dismissSwipeHint = useCallback(() => {
+    setShowSwipeHint(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SWIPE_HINT_STORAGE_KEY, "1");
+    }
+  }, []);
 
   return (
     <PageLayout>
@@ -104,11 +126,12 @@ export default function Wardrobe() {
                   {wardrobeItems.length > 0 && (
                     <button
                       type="button"
-                      className="inline-flex items-center rounded-full border border-white/25 bg-white/10 p-1 text-white/65 transition-colors hover:text-white"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/70 transition-colors hover:text-white"
                       aria-label="How to interact with wardrobe cards"
                       title="Tap a card for details. Swipe left to disable or remove."
                     >
                       <CircleHelp className="size-3.5" />
+                      <span>Card interactions</span>
                     </button>
                   )}
                 </div>
@@ -122,20 +145,34 @@ export default function Wardrobe() {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-6">
-                    {BODY_PART_ORDER.map((part, index) => (
-                      <BodyPartSection
-                        key={part}
-                        part={part}
-                        items={groupedWardrobeItems[part]}
-                        disabledItems={disabledItemsByPart[part]}
-                        isFirst={index === 0}
-                        isCollapsed={disabledCollapsed[part] ?? true}
-                        onToggleCollapsed={() => toggleDisabledCollapsed(part)}
-                        onRemoveItem={removeItem}
-                        onToggleDisabled={toggleDisabled}
-                        onItemClick={setSelectedItem}
-                      />
-                    ))}
+                    {(() => {
+                      let swipeHintAssigned = false;
+                      return BODY_PART_ORDER.map((part, index) => {
+                        const activeItems = groupedWardrobeItems[part];
+                        const shouldShowSwipeHint =
+                          showSwipeHint && !swipeHintAssigned && activeItems.length > 0;
+                        if (shouldShowSwipeHint) {
+                          swipeHintAssigned = true;
+                        }
+
+                        return (
+                          <BodyPartSection
+                            key={part}
+                            part={part}
+                            items={activeItems}
+                            disabledItems={disabledItemsByPart[part]}
+                            isFirst={index === 0}
+                            isCollapsed={disabledCollapsed[part] ?? true}
+                            onToggleCollapsed={() => toggleDisabledCollapsed(part)}
+                            onRemoveItem={removeItem}
+                            onToggleDisabled={toggleDisabled}
+                            onItemClick={setSelectedItem}
+                            showSwipeHintOnFirstItem={shouldShowSwipeHint}
+                            onDismissSwipeHint={dismissSwipeHint}
+                          />
+                        );
+                      });
+                    })()}
                   </div>
                 )}
               </div>

@@ -14,6 +14,8 @@ interface BodyPartSectionProps {
   onRemoveItem: (id: string) => void;
   onToggleDisabled: (id: string, currentDisabled: boolean) => void;
   onItemClick?: (item: WardrobeItem) => void;
+  showSwipeHintOnFirstItem?: boolean;
+  onDismissSwipeHint?: () => void;
 }
 
 export function BodyPartSection({
@@ -26,16 +28,18 @@ export function BodyPartSection({
   onRemoveItem,
   onToggleDisabled,
   onItemClick,
+  showSwipeHintOnFirstItem = false,
+  onDismissSwipeHint,
 }: BodyPartSectionProps) {
   const EmptyIcon = getEmptyStateIcon(part);
   const sectionCount = items.length + disabledItems.length;
 
   return (
     <section className="flex flex-col gap-1.5 scroll-mt-20">
-      <div className={cn("sticky top-1 z-10 -mx-1", !isFirst && "mt-1.5")}>
-        <h4 className="flex items-center justify-between rounded-md border border-white/12 bg-slate-900/16 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-white/84 backdrop-blur-md">
+      <div className={cn("sticky top-0 z-10", !isFirst && "pt-1")}>
+        <h4 className="flex items-center justify-between rounded-md border border-white/12 bg-slate-900/20 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/84 backdrop-blur-md">
           <span>{part}</span>
-          <span className="rounded-full border border-white/20 bg-white/10 px-1.5 py-px text-[10px] text-white/65">
+          <span className="rounded-full border border-white/20 bg-white/10 px-1.5 py-[1px] text-[10px] text-white/65">
             {sectionCount}
           </span>
         </h4>
@@ -51,7 +55,7 @@ export function BodyPartSection({
         </div>
       ) : (
         <>
-          {items.map((item) => (
+          {items.map((item, index) => (
             <WardrobeItemCard
               key={item.id}
               item={item}
@@ -59,6 +63,8 @@ export function BodyPartSection({
               onDelete={() => onRemoveItem(item.id)}
               onToggleDisabled={() => onToggleDisabled(item.id, false)}
               onClick={onItemClick ? () => onItemClick(item) : undefined}
+              showSwipeHint={showSwipeHintOnFirstItem && index === 0}
+              onDismissSwipeHint={onDismissSwipeHint}
             />
           ))}
 
