@@ -70,6 +70,10 @@ interface WardrobePurchaseSuggestion {
 }
 
 const LEGS_GARMENT_TYPES = new Set(["pants", "shorts", "bib"]);
+const BODY_PART_ORDER_INDEX = BODY_PARTS.reduce((acc, part, index) => {
+  acc[part] = index;
+  return acc;
+}, {} as Record<BodyPart, number>);
 
 const TORSO_CATEGORY_PRIORITY: Record<string, number> = {
   base_layer: 90,
@@ -297,6 +301,7 @@ function getDecisionClasses(state: ThermalDecisionState | null, hasWardrobeGap: 
 }
 
 type CloStatusKind = "need" | "over" | "inRange";
+type BreakdownSortMode = "bodyArea" | "gap";
 
 interface CloStatus {
   kind: CloStatusKind;
@@ -410,6 +415,66 @@ function getCloValues(
 }
 
 /**
+ * Compact body-part clo status grid for the descent layer plan.
+ */
+function DescentBodyPartGrid({
+  breakdown,
+  headwear,
+  handwear,
+}: {
+  breakdown: NonNullable<BiophysicsRecommendation["descent_breakdown"]>;
+  headwear: RecommendedHeadwear | null | undefined;
+  handwear: RecommendedHandwear | null | undefined;
+}) {
+  const rows: { label: string; current: number; target: number }[] = [
+    { label: "Torso", current: breakdown.regional_clo.torso, target: breakdown.regional_ireq.neutral.torso },
+    { label: "Arms", current: breakdown.regional_clo.arms, target: breakdown.regional_ireq.neutral.arms },
+    { label: "Legs", current: breakdown.regional_clo.legs, target: breakdown.regional_ireq.neutral.legs },
+    {
+      label: "Hands",
+      current: handwear?.rcl ?? 0,
+      target: breakdown.extremity_ireq.neutral.hands,
+    },
+    {
+      label: "Head/Neck",
+      current:
+        (headwear?.helmet?.rcl ?? 0) +
+        (headwear?.head_warmth?.rcl ?? 0) +
+        (headwear?.neck_warmth?.rcl ?? 0),
+      target: breakdown.extremity_ireq.neutral.head,
+    },
+  ];
+
+  return (
+    <div className="mt-3 grid grid-cols-5 gap-1.5">
+      {rows.map((row) => {
+        const delta = row.current - row.target;
+        const isShort = delta < -0.15;
+        const isOver = delta > 0.35;
+        const statusColor = isShort
+          ? "border-sky-400/60 bg-sky-500/20 text-sky-200"
+          : isOver
+            ? "border-amber-400/60 bg-amber-500/20 text-amber-200"
+            : "border-emerald-400/60 bg-emerald-500/20 text-emerald-200";
+        return (
+          <div
+            key={row.label}
+            className={cn(
+              "rounded-lg border px-2 py-1.5 text-center",
+              statusColor
+            )}
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">{row.label}</p>
+            <p className="text-xs font-bold tabular-nums">{row.current.toFixed(1)}</p>
+            <p className="text-[10px] opacity-70 tabular-nums">/ {row.target.toFixed(1)}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * Displays layered clothing recommendations organized by body part.
  * Supports both static recommendations and biophysics-based recommendations.
  */
@@ -425,6 +490,9 @@ const LayerDisplay = ({
   const { userId } = useAuth();
   const isBackcountrySkiing = activity === "backcountry_skiing";
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
+  const [breakdownSortMode, setBreakdownSortMode] = useState<BreakdownSortMode>(
+    isBackcountrySkiing ? "gap" : "bodyArea"
+  );
   const [genericCloByBodyPart, setGenericCloByBodyPart] = useState<Record<BodyPart, number>>({
     torso: 0,
     legs: 0,
@@ -458,12 +526,14 @@ const LayerDisplay = ({
   const extremityIreq = biophysicsData?.ireq?.extremity;
   const totalPackWeight = biophysicsData?.pack_items?.total_weight_g;
   const descentPackItems = biophysicsData?.pack_items?.garments ?? [];
+  const descentHeadwear = biophysicsData?.descent_headwear;
+  const descentHelmetClo = descentHeadwear?.helmet?.rcl ?? 0;
   const descentPackClo = descentPackItems.reduce((sum, item) => {
     return sum + (typeof item.rcl_clo === "number" ? item.rcl_clo : 0);
   }, 0);
   const downhillTargetMinClo = biophysicsData?.ireq?.downhill_target_range?.[0]
     ?? biophysicsData?.ireq?.downhill?.min;
-  const estimatedDescentClo = effectiveTotalClo !== undefined ? effectiveTotalClo + descentPackClo : undefined;
+  const estimatedDescentClo = effectiveTotalClo !== undefined ? effectiveTotalClo + descentPackClo + descentHelmetClo : undefined;
   const descentDeficit =
     isBackcountrySkiing &&
     downhillTargetMinClo !== undefined &&
@@ -680,9 +750,50 @@ const LayerDisplay = ({
     ? `${topDeficitArea.label} +${topDeficitArea.deficit.toFixed(1)} clo`
     : null;
   const showInlineSnapshotRow = biophysicsActive && (!showDualComfortGauges || showDecisionChip || Boolean(topSummaryChipLabel));
+  const bodyPartSections = BODY_PARTS.map((part) => {
+    const wardrobeLayers =
+      (part === "torso" || part === "legs") && biophysicsGarments
+        ? garmentsToLayerSet(biophysicsGarments, part)
+        : createEmptyLayerSet();
+
+    const layers = biophysicsActive
+      ? wardrobeLayers
+      : recommendation?.[part] ?? createEmptyLayerSet();
+
+    const { currentClo, targetClo } = getCloValues(
+      part,
+      regionalClo,
+      regionalIreq,
+      extremityIreq,
+      handwear,
+      headwear,
+      !shouldIgnoreHelmetForClo
+    );
+
+    const adjustedCurrent = (currentClo ?? 0) + genericCloByBodyPart[part];
+    const urgencyDelta =
+      targetClo !== undefined
+        ? Math.max(Math.abs(adjustedCurrent - targetClo), 0)
+        : 0;
+
+    return {
+      part,
+      layers,
+      currentClo,
+      targetClo,
+      urgencyDelta,
+    };
+  });
+  const orderedBodyPartSections =
+    showDualComfortGauges && breakdownSortMode === "gap"
+      ? [...bodyPartSections].sort((a, b) => {
+        if (b.urgencyDelta !== a.urgencyDelta) return b.urgencyDelta - a.urgencyDelta;
+        return BODY_PART_ORDER_INDEX[a.part] - BODY_PART_ORDER_INDEX[b.part];
+      })
+      : bodyPartSections;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 pb-24">
       {onReset && (
         <button
           type="button"
@@ -995,56 +1106,47 @@ const LayerDisplay = ({
         </section>
       )}
 
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">
-          Detailed Layer Breakdown
-        </h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">
+            Detailed Layer Breakdown
+          </h3>
+          {showDualComfortGauges && (
+            <span className="rounded-full border border-white/25 bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/80">
+              Climb setup
+            </span>
+          )}
+        </div>
+        {showDualComfortGauges && (
+          <button
+            type="button"
+            onClick={() => setBreakdownSortMode((prev) => (prev === "gap" ? "bodyArea" : "gap"))}
+            className="rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/80 transition-colors hover:bg-white/15"
+          >
+            Sort: {breakdownSortMode === "gap" ? "Biggest gap" : "Body area"}
+          </button>
+        )}
       </div>
-      <p className="-mt-4 text-xs text-white/60">Tap a body area to collapse or expand details.</p>
+      <p className="-mt-4 text-xs text-white/60">
+        {showDualComfortGauges
+          ? `Tap a body area for details. Sorted by ${breakdownSortMode === "gap" ? "biggest gap" : "body area"}.`
+          : "Tap a body area to collapse or expand details."}
+      </p>
       <div className="flex flex-col gap-6">
-        {BODY_PARTS.map((part) => {
-          const wardrobeLayers =
-            (part === "torso" || part === "legs") && biophysicsGarments
-              ? garmentsToLayerSet(biophysicsGarments, part)
-              : createEmptyLayerSet();
-
-          const layers = biophysicsActive
-            ? wardrobeLayers
-            : recommendation?.[part] ?? createEmptyLayerSet();
-
-          const { currentClo, targetClo } = getCloValues(
-            part,
-            regionalClo,
-            regionalIreq,
-            extremityIreq,
-            handwear,
-            headwear,
-            !shouldIgnoreHelmetForClo
-          );
-
-          const isComfortable =
-            biophysicsActive &&
-            currentClo !== undefined &&
-            targetClo !== undefined &&
-            targetClo > 0 &&
-            currentClo >= targetClo;
-
-          return (
-            <BodyPartSection
-              key={part}
-              bodyPart={part}
-              layers={layers}
-              biophysicsActive={biophysicsActive}
-              handwear={handwear}
-              headwear={headwear}
-              currentClo={currentClo}
-              targetClo={targetClo}
-              itemMappings={itemMappings}
-              defaultCollapsed={isComfortable}
-              onGenericCloChange={handleGenericCloChange}
-            />
-          );
-        })}
+        {orderedBodyPartSections.map(({ part, layers, currentClo, targetClo }) => (
+          <BodyPartSection
+            key={part}
+            bodyPart={part}
+            layers={layers}
+            biophysicsActive={biophysicsActive}
+            handwear={handwear}
+            headwear={headwear}
+            currentClo={currentClo}
+            targetClo={targetClo}
+            itemMappings={itemMappings}
+            onGenericCloChange={handleGenericCloChange}
+          />
+        ))}
       </div>
 
       {biophysicsData?.guidance && (
@@ -1075,6 +1177,22 @@ const LayerDisplay = ({
             <p className="mt-2 text-xs text-white/70">
               Descent target insulation: {downhillTargetRangeLabel}
             </p>
+          )}
+
+          {biophysicsData?.descent_breakdown && (
+            <DescentBodyPartGrid
+              breakdown={biophysicsData.descent_breakdown}
+              headwear={descentHeadwear}
+              handwear={biophysicsData.descent_handwear}
+            />
+          )}
+
+          {descentHeadwear?.helmet && (
+            <div className="mt-3 rounded-md border border-white/20 bg-white/10 p-2.5">
+              <p className="text-xs uppercase text-white/60 tracking-wide">Helmet</p>
+              <p className="text-sm font-semibold text-white/90">{descentHeadwear.helmet.name}</p>
+              <p className="mt-0.5 text-xs text-white/70">{descentHeadwear.helmet.rcl.toFixed(2)} clo</p>
+            </div>
           )}
 
           {descentPackItems.length > 0 ? (

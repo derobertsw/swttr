@@ -105,7 +105,7 @@ export function selectHeadwearByCategory(
   isActive: boolean,
   options?: { includeHelmet?: boolean }
 ): HeadwearRecommendations {
-  const includeHelmet = options?.includeHelmet ?? true;
+  const includeHelmet = options?.includeHelmet ?? false;
   const helmets = includeHelmet
     ? headwear.filter((h) => HELMET_TYPES.includes(h.headwear_type))
     : [];

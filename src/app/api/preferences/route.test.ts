@@ -26,7 +26,7 @@ describe("Preferences API Route", () => {
 
   describe("GET", () => {
     describe("when database is not configured", () => {
-      it("should return default preferences", async () => {
+      it("should return empty object so client keeps localStorage values", async () => {
         mockGetSupabase.mockReturnValue(null);
 
         const request = new NextRequest("http://localhost:3000/api/preferences");
@@ -35,15 +35,13 @@ describe("Preferences API Route", () => {
         const data = await response.json();
 
         expect(response.status).toBe(200);
-        expect(data.temperatureSensitivity).toBe("neutral");
-        expect(data.defaultActivity).toBe("alpine_skiing");
-        expect(data.heightInches).toBeUndefined();
-        expect(data.weightLbs).toBeUndefined();
+        expect(data.temperatureSensitivity).toBeUndefined();
+        expect(data.defaultActivity).toBeUndefined();
       });
     });
 
     describe("when user ID is missing", () => {
-      it("should return default preferences", async () => {
+      it("should return empty object so client keeps localStorage values", async () => {
         mockGetSupabase.mockReturnValue(null);
         mockGetAuthUserId.mockResolvedValue(null);
 
@@ -53,10 +51,8 @@ describe("Preferences API Route", () => {
         const data = await response.json();
 
         expect(response.status).toBe(200);
-        expect(data.temperatureSensitivity).toBe("neutral");
-        expect(data.defaultActivity).toBe("alpine_skiing");
-        expect(data.heightInches).toBeUndefined();
-        expect(data.weightLbs).toBeUndefined();
+        expect(data.temperatureSensitivity).toBeUndefined();
+        expect(data.defaultActivity).toBeUndefined();
       });
     });
 
@@ -90,7 +86,7 @@ describe("Preferences API Route", () => {
         expect(data.weightLbs).toBe(185);
       });
 
-      it("should return defaults when no user preferences exist (PGRST116)", async () => {
+      it("should return empty object when no user preferences exist (PGRST116)", async () => {
         const mockSupabase = {
           from: vi.fn().mockReturnThis(),
           select: vi.fn().mockReturnThis(),
@@ -108,13 +104,13 @@ describe("Preferences API Route", () => {
         const data = await response.json();
 
         expect(response.status).toBe(200);
-        expect(data.temperatureSensitivity).toBe("neutral");
-        expect(data.defaultActivity).toBe("alpine_skiing");
+        expect(data.temperatureSensitivity).toBeUndefined();
+        expect(data.defaultActivity).toBeUndefined();
         expect(data.heightInches).toBeUndefined();
         expect(data.weightLbs).toBeUndefined();
       });
 
-      it("should return defaults on database error", async () => {
+      it("should return empty object on database error", async () => {
         const mockSupabase = {
           from: vi.fn().mockReturnThis(),
           select: vi.fn().mockReturnThis(),
@@ -132,13 +128,13 @@ describe("Preferences API Route", () => {
         const data = await response.json();
 
         expect(response.status).toBe(200);
-        expect(data.temperatureSensitivity).toBe("neutral");
-        expect(data.defaultActivity).toBe("alpine_skiing");
+        expect(data.temperatureSensitivity).toBeUndefined();
+        expect(data.defaultActivity).toBeUndefined();
         expect(data.heightInches).toBeUndefined();
         expect(data.weightLbs).toBeUndefined();
       });
 
-      it("should return defaults on exception", async () => {
+      it("should return empty object on exception", async () => {
         const mockSupabase = {
           from: vi.fn().mockReturnThis(),
           select: vi.fn().mockReturnThis(),
@@ -153,8 +149,8 @@ describe("Preferences API Route", () => {
         const data = await response.json();
 
         expect(response.status).toBe(200);
-        expect(data.temperatureSensitivity).toBe("neutral");
-        expect(data.defaultActivity).toBe("alpine_skiing");
+        expect(data.temperatureSensitivity).toBeUndefined();
+        expect(data.defaultActivity).toBeUndefined();
         expect(data.heightInches).toBeUndefined();
         expect(data.weightLbs).toBeUndefined();
       });

@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Shirt, Footprints, Hand, HardHat, Flame, ChevronDown } from "lucide-react";
+import { Shirt, Footprints, Hand, HardHat, ChevronRight } from "lucide-react";
 import { RecommendedHandwear, RecommendedHeadwear } from "@/types/biophysics";
 import { BodyPart, LayerSet, BODY_PART_LABELS, hasAnyLayers } from "@/lib/layers";
 import { cn } from "@/lib/utils";
-import { CloProgressBar } from "./CloProgressBar";
 import { HandwearDisplay, HeadwearDisplay } from "./ExtremityDisplay";
 import { LayerItems } from "./LayerItems";
 
@@ -82,11 +81,6 @@ export function BodyPartSection({
         ? genericCloContribution
         : undefined;
   const hasContent = hasAnyLayers(layers) || hasExtremityGear || genericCloContribution > 0;
-  const isOverTarget =
-    targetClo !== undefined &&
-    effectiveCurrentClo !== undefined &&
-    targetClo > 0 &&
-    effectiveCurrentClo / targetClo >= 1.2;
   const deficitClo =
     targetClo !== undefined
       ? Math.max(0, targetClo - (effectiveCurrentClo ?? 0))
@@ -102,8 +96,16 @@ export function BodyPartSection({
         ? `Need +${deficitClo.toFixed(1)} clo`
         : surplusClo > 0.35
           ? `Over by ${surplusClo.toFixed(1)} clo`
-          : "Near target";
+          : "On target";
   const statusClass =
+    targetClo === undefined
+      ? "border-slate-300/70 bg-slate-100/70 text-slate-600"
+      : deficitClo > 0.15
+        ? "border-sky-300/80 bg-sky-50/90 text-sky-800"
+        : surplusClo > 0.35
+          ? "border-amber-300/80 bg-amber-50/90 text-amber-800"
+          : "border-emerald-300/80 bg-emerald-50/90 text-emerald-800";
+  const cloValueClass =
     targetClo === undefined
       ? "text-slate-500"
       : deficitClo > 0.15
@@ -111,36 +113,52 @@ export function BodyPartSection({
         : surplusClo > 0.35
           ? "text-amber-700"
           : "text-emerald-700";
+  const cloValueLabel =
+    targetClo !== undefined
+      ? `${(effectiveCurrentClo ?? 0).toFixed(1)}/${targetClo.toFixed(1)} clo`
+      : effectiveCurrentClo !== undefined
+        ? `${effectiveCurrentClo.toFixed(1)} clo`
+        : null;
   const shouldSuggestGenericLayers =
     targetClo === undefined || deficitClo > GENERIC_LAYER_SUGGESTION_DEFICIT_CLO;
 
   return (
-    <div className="rounded-xl border border-white/35 bg-white/55 backdrop-blur-[3px] p-4 sm:p-5">
+    <div
+      className={cn(
+        "rounded-xl border border-white/35 bg-white/55 p-4 backdrop-blur-[3px] sm:p-5",
+        collapsed && "cursor-pointer"
+      )}
+      onClick={collapsed ? () => setCollapsed(false) : undefined}
+    >
       <button
         type="button"
-        onClick={() => setCollapsed((prev) => !prev)}
-        className="flex w-full items-center justify-between"
+        onClick={(event) => {
+          event.stopPropagation();
+          setCollapsed((prev) => !prev);
+        }}
+        className="flex w-full items-start justify-between gap-3 text-left"
       >
         <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-800">
           {getBodyPartIcon(bodyPart)}
           {BODY_PART_LABELS[bodyPart]}
         </h3>
-        <div className="flex items-center gap-2">
-          {statusLabel && (
-            <span className={cn("rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold", statusClass)}>
-              {statusLabel}
-            </span>
-          )}
-          {isOverTarget && (
-            <span className="inline-flex items-center text-amber-600" title="Overheating risk">
-              <Flame className="size-4" />
-            </span>
-          )}
-          {targetClo !== undefined && <CloProgressBar currentClo={effectiveCurrentClo} targetClo={targetClo} />}
-          <ChevronDown
+        <div className="flex items-start gap-2">
+          <div className="flex flex-col items-end gap-1">
+            {statusLabel && (
+              <span className={cn("rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", statusClass)}>
+                {statusLabel}
+              </span>
+            )}
+            {cloValueLabel && (
+              <span className={cn("text-[11px] font-medium tabular-nums", cloValueClass)}>
+                {cloValueLabel}
+              </span>
+            )}
+          </div>
+          <ChevronRight
             className={cn(
-              "size-4 text-slate-500 transition-transform duration-200",
-              collapsed && "-rotate-90"
+              "mt-0.5 size-4 text-slate-500 transition-transform duration-200",
+              !collapsed && "rotate-90"
             )}
           />
         </div>

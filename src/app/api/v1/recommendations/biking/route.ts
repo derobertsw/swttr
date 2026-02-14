@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     true,
     extremityIreq.neutral.hands
   );
-  const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, true);
+  const recommendedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, true, { includeHelmet: false });
 
   const response = buildResponseComponents(
     {

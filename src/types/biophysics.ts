@@ -137,6 +137,14 @@ export interface BiophysicsRecommendation {
   };
   warnings: string[];
   guidance: string[];
+  descent_headwear?: RecommendedHeadwear | null;
+  descent_handwear?: RecommendedHandwear | null;
+  descent_breakdown?: {
+    total_clo: number;
+    regional_clo: RegionalClo;
+    regional_ireq: RegionalIreqRange;
+    extremity_ireq: ExtremityIreqRange;
+  };
   pack_items?: PackItems;
   transition_protocol?: TransitionProtocol;
 }

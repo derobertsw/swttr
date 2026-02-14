@@ -4,18 +4,13 @@ import { TemperatureSensitivity } from "@/types/preferences";
 import { sanitizeOptionalBodyMetrics } from "@/lib/biophysics/bodyMetrics";
 import { getAuthUserId } from "@/lib/auth";
 
-const DEFAULT_PREFERENCES = {
-  temperatureSensitivity: "neutral" as TemperatureSensitivity,
-  defaultActivity: "alpine_skiing",
-};
-
 export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   const userId = await getAuthUserId();
 
-  // Return defaults if no database or no user ID
+  // No database or no user — return empty so client keeps localStorage values
   if (!supabase || !userId) {
-    return NextResponse.json(DEFAULT_PREFERENCES);
+    return NextResponse.json({});
   }
 
   try {
@@ -25,11 +20,14 @@ export async function GET(request: NextRequest) {
       .eq("user_id", userId)
       .single();
 
-    // PGRST116 = no rows found, which is fine - use defaults
-    if (error && error.code !== "PGRST116") {
+    // PGRST116 = no rows found — return empty so client keeps localStorage values
+    if (error?.code === "PGRST116") {
+      return NextResponse.json({});
+    }
+
+    if (error) {
       console.error("Failed to fetch preferences:", error);
-      // Return defaults instead of failing
-      return NextResponse.json(DEFAULT_PREFERENCES);
+      return NextResponse.json({});
     }
 
     const savedOptionalMetrics = sanitizeOptionalBodyMetrics({
@@ -38,15 +36,18 @@ export async function GET(request: NextRequest) {
     });
 
     const response: {
-      temperatureSensitivity: TemperatureSensitivity;
-      defaultActivity: string;
+      temperatureSensitivity?: TemperatureSensitivity;
+      defaultActivity?: string;
       heightInches?: number;
       weightLbs?: number;
-    } = {
-      temperatureSensitivity: (data?.temperature_sensitivity || "neutral") as TemperatureSensitivity,
-      defaultActivity: data?.default_activity || "alpine_skiing",
-    };
+    } = {};
 
+    if (data?.temperature_sensitivity) {
+      response.temperatureSensitivity = data.temperature_sensitivity as TemperatureSensitivity;
+    }
+    if (data?.default_activity) {
+      response.defaultActivity = data.default_activity;
+    }
     if (savedOptionalMetrics.heightInches !== undefined) {
       response.heightInches = savedOptionalMetrics.heightInches;
     }
@@ -57,8 +58,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response);
   } catch (err) {
     console.error("Database error:", err);
-    // Return defaults instead of failing
-    return NextResponse.json(DEFAULT_PREFERENCES);
+    return NextResponse.json({});
   }
 }
 

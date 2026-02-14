@@ -209,7 +209,10 @@ export async function POST(request: NextRequest) {
     fetchUserHeadwear(supabase, userId),
   ]);
 
-  const selectedHeadwear = selectHeadwearByCategory(userHeadwear, tempC, false);
+  // Climb: no helmet (conditional), active warmth selection
+  const climbHeadwear = selectHeadwearByCategory(userHeadwear, tempC, true, { includeHelmet: false });
+  // Descent: helmet mandatory, static warmth selection
+  const descentHeadwear = selectHeadwearByCategory(userHeadwear, tempC, false, { includeHelmet: true });
 
   // Uphill Ensemble
   const categorizedGarments = categorizeGarments(suitableGarments);
@@ -281,6 +284,32 @@ export async function POST(request: NextRequest) {
     windSpeedMs: windMs + DOWNHILL_SPEED_WIND,
   });
   const downhillTargetCloRange: [number, number] = [downhillRange.min, downhillRange.max];
+
+  // Downhill regional & extremity IREQ
+  const baseRegionalIreqDownhill = calculateRegionalIreq(ireqDownhill, 'ski_touring_downhill');
+  const baseExtremityIreqDownhill = calculateExtremityIreq(
+    ireqDownhill, 'ski_touring_downhill', tempC, windMs + DOWNHILL_SPEED_WIND
+  );
+  const regionalIreqDownhill = scaleIreqShapeToTargetRange(baseRegionalIreqDownhill, {
+    ireqMin: ireqDownhill.ireqMin,
+    ireqNeutral: ireqDownhill.ireqNeutral,
+    targetMin: downhillTargetCloRange[0],
+    targetMax: downhillTargetCloRange[1],
+  });
+  const extremityIreqDownhill = scaleIreqShapeToTargetRange(baseExtremityIreqDownhill, {
+    ireqMin: ireqDownhill.ireqMin,
+    ireqNeutral: ireqDownhill.ireqNeutral,
+    targetMin: downhillTargetCloRange[0],
+    targetMax: downhillTargetCloRange[1],
+  });
+
+  // Downhill regional clo (climb garments + pack items)
+  const downhillRegionalClo = {
+    torso: Math.round(downhillThermalProperties.rcl.torso * 100) / 100,
+    arms: Math.round(downhillThermalProperties.rcl.arm * 100) / 100,
+    legs: Math.round(downhillThermalProperties.rcl.leg * 100) / 100,
+  };
+
   const descentCloDeficit = Math.max(
     0,
     downhillTargetCloRange[0] - downhillThermalProperties.rcl.wholeBody
@@ -307,6 +336,12 @@ export async function POST(request: NextRequest) {
     false,
     extremityIreqUphill.neutral.hands
   );
+  const descentHandwear = selectHandwear(
+    userHandwear,
+    tempC,
+    false,
+    extremityIreqDownhill.neutral.hands
+  );
 
   return NextResponse.json({
     conditions: {
@@ -329,9 +364,9 @@ export async function POST(request: NextRequest) {
       garments: uphillEnsemble.map(formatGarmentResponse),
       handwear: selectedHandwear ? formatHandwearResponse(selectedHandwear) : null,
       headwear: {
-        helmet: selectedHeadwear.helmet ? formatHeadwearResponse(selectedHeadwear.helmet) : null,
-        head_warmth: selectedHeadwear.headWarmth ? formatHeadwearResponse(selectedHeadwear.headWarmth) : null,
-        neck_warmth: selectedHeadwear.neckWarmth ? formatHeadwearResponse(selectedHeadwear.neckWarmth) : null,
+        helmet: climbHeadwear.helmet ? formatHeadwearResponse(climbHeadwear.helmet) : null,
+        head_warmth: climbHeadwear.headWarmth ? formatHeadwearResponse(climbHeadwear.headWarmth) : null,
+        neck_warmth: climbHeadwear.neckWarmth ? formatHeadwearResponse(climbHeadwear.neckWarmth) : null,
       },
       ensemble_properties: {
         total_clo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
@@ -344,6 +379,18 @@ export async function POST(request: NextRequest) {
         ((uphillScore.componentScores.coldProtection + uphillScore.componentScores.overheatPrevention) / 2) * 10
       ) / 10,
       component_scores: uphillScore.componentScores,
+    },
+    descent_headwear: {
+      helmet: descentHeadwear.helmet ? formatHeadwearResponse(descentHeadwear.helmet) : null,
+      head_warmth: descentHeadwear.headWarmth ? formatHeadwearResponse(descentHeadwear.headWarmth) : null,
+      neck_warmth: descentHeadwear.neckWarmth ? formatHeadwearResponse(descentHeadwear.neckWarmth) : null,
+    },
+    descent_handwear: descentHandwear ? formatHandwearResponse(descentHandwear) : null,
+    descent_breakdown: {
+      total_clo: Math.round(downhillThermalProperties.rcl.wholeBody * 100) / 100,
+      regional_clo: downhillRegionalClo,
+      regional_ireq: regionalIreqDownhill,
+      extremity_ireq: extremityIreqDownhill,
     },
     pack_items: {
       garments: packItems.map((g) => ({

@@ -52,6 +52,13 @@ export function usePreferences() {
     setLocalHydrated(true);
   }, []);
 
+  // For non-logged-in users, mark loading done once localStorage is hydrated
+  useEffect(() => {
+    if (userId === null && localHydrated) {
+      setLoading(false);
+    }
+  }, [userId, localHydrated]);
+
   useEffect(() => {
     if (!userId) return;
 
@@ -61,12 +68,15 @@ export function usePreferences() {
 
         if (res.ok) {
           const data = await res.json();
+          // Only overwrite localStorage when the server has saved data.
+          // An empty response means no DB row exists — keep localStorage values.
           if (data.temperatureSensitivity) {
             setSensitivity(data.temperatureSensitivity);
             localStorage.setItem(STORAGE_KEYS.SENSITIVITY, data.temperatureSensitivity);
           }
           if (data.defaultActivity) {
             setDefaultActivity(data.defaultActivity);
+            setHasStoredDefaultActivity(true);
             localStorage.setItem(STORAGE_KEYS.DEFAULT_ACTIVITY, data.defaultActivity);
           }
           if (data.heightInches !== undefined || data.weightLbs !== undefined) {
@@ -77,13 +87,9 @@ export function usePreferences() {
             setBodyMetricsSelection(optional);
             if (optional.heightInches !== undefined) {
               localStorage.setItem(STORAGE_KEYS.HEIGHT_INCHES, String(optional.heightInches));
-            } else {
-              localStorage.removeItem(STORAGE_KEYS.HEIGHT_INCHES);
             }
             if (optional.weightLbs !== undefined) {
               localStorage.setItem(STORAGE_KEYS.WEIGHT_LBS, String(optional.weightLbs));
-            } else {
-              localStorage.removeItem(STORAGE_KEYS.WEIGHT_LBS);
             }
           }
         }
