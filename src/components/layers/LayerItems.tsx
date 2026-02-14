@@ -28,8 +28,8 @@ interface LayerItemDisplayProps {
 
 function LayerItemDisplay({ item }: LayerItemDisplayProps) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-slate-900 font-semibold leading-snug">
+    <div className="flex items-start justify-between gap-3 rounded-md border border-slate-200/80 bg-white/45 px-2.5 py-2">
+      <span className="min-w-0 text-slate-900 font-semibold leading-snug">
         {item.name}
         {item.isGeneric && (
           <span className="ml-2 rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
@@ -38,7 +38,9 @@ function LayerItemDisplay({ item }: LayerItemDisplayProps) {
         )}
       </span>
       {item.rcl !== undefined && (
-        <span className="text-xs text-slate-600">{item.rcl.toFixed(2)} clo</span>
+        <span className="shrink-0 rounded-full border border-slate-300/80 bg-slate-50/90 px-2 py-0.5 text-[11px] font-medium tabular-nums text-slate-700">
+          {item.rcl.toFixed(2)} clo
+        </span>
       )}
     </div>
   );
@@ -53,9 +55,9 @@ function LayerGroup({ label, items }: LayerGroupProps) {
   const hasGenericItem = items.some((item) => item.isGeneric);
 
   return (
-    <li className="flex flex-col gap-1">
+    <li className="flex flex-col gap-1.5">
       <span className="text-xs uppercase text-slate-900/60 tracking-wide">{label}</span>
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-2">
         {items.map((item, index) => (
           <LayerItemDisplay key={`${item.name}-${index}`} item={item} />
         ))}

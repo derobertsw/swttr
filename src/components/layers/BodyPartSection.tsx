@@ -125,7 +125,7 @@ export function BodyPartSection({
   return (
     <div
       className={cn(
-        "rounded-xl border border-white/35 bg-white/55 p-4 backdrop-blur-[3px] sm:p-5",
+        "rounded-xl border border-white/35 bg-white/55 p-3.5 backdrop-blur-[3px] sm:p-4",
         collapsed && "cursor-pointer"
       )}
       onClick={collapsed ? () => setCollapsed(false) : undefined}
@@ -171,11 +171,11 @@ export function BodyPartSection({
         )}
       >
         <div className="overflow-hidden">
-          <div className="pt-3">
+          <div className="pt-2.5">
             {!hasContent && (
               <p className="mb-3 text-sm text-slate-700">{getEmptyStateMessage(bodyPart)}</p>
             )}
-            <ul className="space-y-4" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            <ul className="space-y-3" style={{ listStyle: "none", padding: 0, margin: 0 }}>
               {bodyPart === "hands" && handwear && <HandwearDisplay handwear={handwear} />}
               {bodyPart === "headNeck" && headwear && <HeadwearDisplay headwear={headwear} />}
               <LayerItems
