@@ -223,7 +223,10 @@ export async function POST(request: NextRequest) {
 
   // Pack Items
   const packInsulationCandidates = hasUserWardrobe ? categorizedGarments.insulation : [];
-  const packShellCandidates = hasUserWardrobe ? categorizedGarments.shells : [];
+  const uphillIds = new Set(uphillEnsemble.map((g) => g.id));
+  const packShellCandidates = hasUserWardrobe
+    ? categorizedGarments.shells.filter((s) => !uphillIds.has(s.id))
+    : [];
   const additionalCloNeeded = Math.max(0, ireqDownhill.ireqNeutral - uphillTotalClo);
   const packInsulationLayer = selectPackableInsulation(
     packInsulationCandidates, additionalCloNeeded, shouldPrioritizeLightPack
@@ -410,21 +413,34 @@ function buildUphillEnsemble(
     }
   }
 
-  const breathableSoftShells = categorizedGarments.shells.filter((s) => {
-    return s.category === 'soft_shell' &&
-      (s.garment_thermal_properties?.evap_potential ?? 0) >= UPHILL_MIN_EVAP_POTENTIAL;
-  });
+  // Select shells separately for torso and legs
+  const torsoShells = categorizedGarments.shells.filter((s) => s.covers_torso);
+  const legsShells = categorizedGarments.shells.filter((s) => s.covers_legs);
 
-  const shellCandidates = breathableSoftShells.length > 0
-    ? breathableSoftShells
-    : categorizedGarments.shells;
+  const pickShell = (candidates: GarmentRow[]): GarmentRow | null => {
+    const breathable = candidates.filter(
+      (s) => s.category === 'soft_shell' &&
+        (s.garment_thermal_properties?.evap_potential ?? 0) >= UPHILL_MIN_EVAP_POTENTIAL
+    );
+    const pool = breathable.length > 0 ? breathable : candidates;
+    if (pool.length === 0) return null;
+    return sortByBreathability(pool)[0];
+  };
 
-  if (shellCandidates.length > 0) {
-    const shellsSorted = sortByBreathability(shellCandidates);
-    const bestShell = shellsSorted[0];
-    const shellClo = bestShell.garment_thermal_properties?.rcl_whole_body ?? 0;
+  const torsoShell = pickShell(torsoShells);
+  if (torsoShell) {
+    const shellClo = torsoShell.garment_thermal_properties?.rcl_whole_body ?? 0;
     if (currentClo + shellClo <= targetMaxClo) {
-      ensemble.push(bestShell);
+      ensemble.push(torsoShell);
+      currentClo += shellClo;
+    }
+  }
+
+  const legsShell = pickShell(legsShells);
+  if (legsShell && !ensemble.some((g) => g.id === legsShell.id)) {
+    const shellClo = legsShell.garment_thermal_properties?.rcl_whole_body ?? 0;
+    if (currentClo + shellClo <= targetMaxClo) {
+      ensemble.push(legsShell);
     }
   }
 
