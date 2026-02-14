@@ -24,7 +24,12 @@ import {
   CATEGORY_TO_LAYER_TYPE,
   LAYER_LABELS,
 } from "@/lib/layers";
-import { calculateThermalComfortScore, evaluateThermalComfort } from "@/lib/biophysics/comfort";
+import {
+  EXTREMITY_DEFICIT_CLO_THRESHOLD,
+  REGIONAL_DEFICIT_CLO_THRESHOLD,
+  calculateThermalComfortScore,
+  evaluateThermalComfort,
+} from "@/lib/biophysics/comfort";
 import { ACTIVITIES } from "@/data/activities";
 import type { AvailableItem } from "@/types/wardrobe";
 import { useAuth } from "@clerk/nextjs";
@@ -574,15 +579,27 @@ const LayerDisplay = ({
     regionalIreq?.neutral?.legs,
     (regionalClo?.legs ?? 0) + genericCloByBodyPart.legs
   );
+  const handsDeficit = getRegionalDeficit(
+    extremityIreq?.neutral?.hands,
+    (handwear?.rcl ?? 0) + genericCloByBodyPart.hands
+  );
+  const headDeficit = getRegionalDeficit(
+    extremityIreq?.neutral?.head,
+    ((headwear?.helmet?.rcl ?? 0) + (headwear?.head_warmth?.rcl ?? 0) + (headwear?.neck_warmth?.rcl ?? 0))
+      + genericCloByBodyPart.headNeck
+  );
   const maxRegionalDeficit = Math.max(torsoDeficit, armsDeficit, legsDeficit);
-  const hasRegionalGap = maxRegionalDeficit > 0.12;
+  const maxExtremityDeficit = Math.max(handsDeficit, headDeficit);
+  const hasRegionalGap = maxRegionalDeficit > REGIONAL_DEFICIT_CLO_THRESHOLD;
+  const hasExtremityGap = maxExtremityDeficit > EXTREMITY_DEFICIT_CLO_THRESHOLD;
   const totalDeficit = Math.max(
     computedTotalDeficit,
     warningDeficit,
     torsoDeficit + legsDeficit,
+    handsDeficit + headDeficit,
     descentDeficit
   );
-  const hasWardrobeGap = Boolean(wardrobeGapWarning) || hasRegionalGap || hasDescentGap;
+  const hasWardrobeGap = Boolean(wardrobeGapWarning) || hasRegionalGap || hasExtremityGap || hasDescentGap;
   const descentGapMessage =
     hasDescentGap && estimatedDescentClo !== undefined && downhillTargetMinClo !== undefined
       ? `Insufficient insulation for the way down with current wardrobe layers: ${estimatedDescentClo.toFixed(1)} clo vs ${downhillTargetMinClo.toFixed(1)} clo needed (${descentDeficit.toFixed(1)} clo short).`
@@ -599,11 +616,13 @@ const LayerDisplay = ({
     totalClo: effectiveTotalClo,
     targetRange: biophysicsData?.ireq?.target_range,
     maxRegionalDeficit,
+    maxExtremityDeficit,
   });
   const thermalComfortScore = calculateThermalComfortScore({
     totalClo: effectiveTotalClo,
     targetRange: biophysicsData?.ireq?.target_range,
     maxRegionalDeficit,
+    maxExtremityDeficit,
   })
     ?? biophysicsData?.recommendation?.thermal_comfort_score
     ?? biophysicsData?.recommendation?.score;
@@ -849,6 +868,8 @@ const LayerDisplay = ({
         targetRange={biophysicsData?.ireq?.target_range}
         regionalDeficit={maxRegionalDeficit}
         hasRegionalGap={hasRegionalGap}
+        extremityDeficit={maxExtremityDeficit}
+        hasExtremityGap={hasExtremityGap}
       />
 
       {showDualComfortGauges ? (

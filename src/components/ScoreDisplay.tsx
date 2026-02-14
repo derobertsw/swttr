@@ -3,6 +3,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import {
+  EXTREMITY_DEFICIT_CLO_THRESHOLD,
   evaluateThermalComfort,
   OVERHEAT_BUFFER_CLO,
   REGIONAL_DEFICIT_CLO_THRESHOLD,
@@ -24,6 +25,8 @@ interface ScoreDisplayProps {
   targetRange?: [number, number];
   regionalDeficit?: number;
   hasRegionalGap?: boolean;
+  extremityDeficit?: number;
+  hasExtremityGap?: boolean;
 }
 
 type ThermalStatus = "optimal" | "comfortable" | "cold_stress" | "overheating";
@@ -74,6 +77,8 @@ const ScoreDisplay = ({
   targetRange,
   regionalDeficit,
   hasRegionalGap = false,
+  extremityDeficit,
+  hasExtremityGap = false,
 }: ScoreDisplayProps) => {
   const roundedScore = Math.round(score);
 
@@ -81,10 +86,14 @@ const ScoreDisplay = ({
     const inferredRegionalDeficit = regionalDeficit ?? (
       hasRegionalGap ? REGIONAL_DEFICIT_CLO_THRESHOLD + 0.01 : 0
     );
+    const inferredExtremityDeficit = extremityDeficit ?? (
+      hasExtremityGap ? EXTREMITY_DEFICIT_CLO_THRESHOLD + 0.01 : 0
+    );
     const decision = evaluateThermalComfort({
       totalClo,
       targetRange,
       maxRegionalDeficit: inferredRegionalDeficit,
+      maxExtremityDeficit: inferredExtremityDeficit,
     });
 
     if (decision?.riskType === "cold") return "cold_stress";
@@ -143,8 +152,9 @@ const ScoreDisplay = ({
           </p>
           <p className="text-slate-500">
             Status logic uses the same thermal decision kernel as recommendation scoring.
-            Regional deficits above {REGIONAL_DEFICIT_CLO_THRESHOLD.toFixed(2)} clo override
-            whole-body comfort status. Overheating only triggers above target max +
+            Regional deficits above {REGIONAL_DEFICIT_CLO_THRESHOLD.toFixed(2)} clo or
+            extremity deficits above {EXTREMITY_DEFICIT_CLO_THRESHOLD.toFixed(2)} clo
+            override whole-body comfort status. Overheating only triggers above target max +
             {OVERHEAT_BUFFER_CLO.toFixed(1)} clo.
           </p>
           {totalClo !== undefined && targetRange && (
@@ -163,7 +173,7 @@ const ScoreDisplay = ({
             </div>
             <div className="flex items-center gap-2 text-slate-600">
               <span className="size-2 rounded-full bg-blue-500" />
-              <span>Cold stress: below min or regional deficit</span>
+              <span>Cold stress: below min or local deficit (torso/arms/legs/hands/head)</span>
             </div>
             <div className="flex items-center gap-2 text-slate-600">
               <span className="size-2 rounded-full bg-amber-500" />

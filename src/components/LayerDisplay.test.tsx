@@ -633,6 +633,10 @@ describe("LayerDisplay", () => {
         ...mockBiophysicsData,
         recommendation: {
           ...mockBiophysicsData.recommendation,
+          handwear: {
+            ...mockBiophysicsData.recommendation.handwear,
+            rcl: 0.85,
+          },
           ensemble_properties: {
             ...mockBiophysicsData.recommendation.ensemble_properties,
             regional_clo: { torso: 1.7, arms: 1.2, legs: 1.35 },
@@ -1068,6 +1072,10 @@ describe("LayerDisplay", () => {
         ...mockBiophysicsData,
         recommendation: {
           ...mockBiophysicsData.recommendation,
+          handwear: {
+            ...mockBiophysicsData.recommendation.handwear,
+            rcl: 0.85,
+          },
           ensemble_properties: {
             ...mockBiophysicsData.recommendation.ensemble_properties,
             regional_clo: { torso: 1.7, arms: 1.2, legs: 1.35 },

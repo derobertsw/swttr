@@ -9,6 +9,8 @@ interface WeatherHeaderProps {
   targetRange?: [number, number];
   regionalDeficit?: number;
   hasRegionalGap?: boolean;
+  extremityDeficit?: number;
+  hasExtremityGap?: boolean;
 }
 
 /**
@@ -40,6 +42,8 @@ export function WeatherHeader({
   targetRange,
   regionalDeficit,
   hasRegionalGap,
+  extremityDeficit,
+  hasExtremityGap,
 }: WeatherHeaderProps) {
   const calculatedFeelsLike = feelsLike ?? calculateFeelsLike(temperature, windspeed);
   const showFeelsLike = calculatedFeelsLike !== temperature;
@@ -82,6 +86,8 @@ export function WeatherHeader({
             targetRange={targetRange}
             regionalDeficit={regionalDeficit}
             hasRegionalGap={hasRegionalGap}
+            extremityDeficit={extremityDeficit}
+            hasExtremityGap={hasExtremityGap}
           />
         )}
       </div>

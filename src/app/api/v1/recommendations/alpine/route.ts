@@ -13,6 +13,12 @@ import {
   parseBodyMetricsFromRequestBody,
 } from '@/lib/biophysics/bodyMetrics';
 import {
+  COWEDA_VALIDATION_SOURCE,
+  applyCowedaBufferToExtremityTargets,
+  applyCowedaBufferToTargetRange,
+  calculateCowedaValidationBuffer,
+} from '@/lib/biophysics/coweda';
+import {
   validateRecommendationRequest,
   sortByInsulation,
   sortByWaterproofness,
@@ -72,8 +78,15 @@ export async function POST(request: NextRequest) {
     airTempC: tempC,
     windSpeedMs: windMs,
   });
-  const targetCloMin = alpineRange.min;
-  const targetCloMax = alpineRange.max;
+  const blendedMetabolicRate = (skiingMetabolicRate * 0.6) + (chairliftMetabolicRate * 0.4);
+  const validationBuffer = calculateCowedaValidationBuffer({
+    airTempC: tempC,
+    relativeHumidity: weather.humidity ?? 50,
+    metabolicRate: blendedMetabolicRate,
+  });
+  const adjustedAlpineRange = applyCowedaBufferToTargetRange(alpineRange, validationBuffer);
+  const targetCloMin = adjustedAlpineRange.min;
+  const targetCloMax = adjustedAlpineRange.max;
   const alpineBaselineIreq = {
     ireqMin: baseTargetMin,
     ireqNeutral: ireqChairlift.ireqNeutral,
@@ -93,6 +106,13 @@ export async function POST(request: NextRequest) {
         dle_hours: ireqChairlift.dleHours,
         dle_method: DLE_ESTIMATION_METHOD,
         target_range: [targetCloMin, targetCloMax],
+        validation_buffer_clo: {
+          whole_body: validationBuffer.wholeBody,
+          cold_risk: validationBuffer.coldRisk,
+          extremity: validationBuffer.extremity,
+          context: validationBuffer.context,
+        },
+        validation_source: COWEDA_VALIDATION_SOURCE,
       },
       guidance: getAlpineGuidance(tempC, weather.precipitation),
     });
@@ -115,7 +135,10 @@ export async function POST(request: NextRequest) {
       targetMax: targetCloMax,
     }
   );
-  const extremityIreq = calculateExtremityIreq(alpineBaselineIreq, 'alpine_skiing', tempC, windMs);
+  const extremityIreq = applyCowedaBufferToExtremityTargets(
+    calculateExtremityIreq(alpineBaselineIreq, 'alpine_skiing', tempC, windMs),
+    validationBuffer
+  );
   const recommendedHandwear = selectHandwear(
     userHandwear,
     tempC,
@@ -145,6 +168,7 @@ export async function POST(request: NextRequest) {
       comfortContext: {
         targetRange: [targetCloMin, targetCloMax],
         regionalNeutralTarget: regionalIreq.neutral,
+        extremityNeutralTarget: extremityIreq.neutral,
       },
     },
     recommendedHandwear,
@@ -172,6 +196,13 @@ export async function POST(request: NextRequest) {
       target_range: [Math.round(targetCloMin * 100) / 100, Math.round(targetCloMax * 100) / 100],
       regional: regionalIreq,
       extremity: extremityIreq,
+      validation_buffer_clo: {
+        whole_body: validationBuffer.wholeBody,
+        cold_risk: validationBuffer.coldRisk,
+        extremity: validationBuffer.extremity,
+        context: validationBuffer.context,
+      },
+      validation_source: COWEDA_VALIDATION_SOURCE,
     },
     recommendation: {
       ...response.recommendation,

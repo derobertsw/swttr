@@ -5,7 +5,13 @@
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { scoreEnsemble, type WeatherConditions, type ActivityProfile, type GarmentWithProtection } from '@/lib/biophysics/scorer';
 import type { ActivityType } from '@/lib/biophysics/constants';
-import { calculateThermalComfortScore, getMaxRegionalDeficit, type RegionalCloValues } from '@/lib/biophysics/comfort';
+import {
+  calculateThermalComfortScore,
+  getMaxRegionalDeficit,
+  getMaxExtremityDeficit,
+  type RegionalCloValues,
+  type ExtremityCloValues,
+} from '@/lib/biophysics/comfort';
 import type { GarmentRow, HandwearRow, HeadwearRecommendations } from './types';
 import { formatGarmentResponse, formatHandwearResponse, formatHeadwearResponse, ensembleToThermalGarments } from './formatting';
 
@@ -17,6 +23,7 @@ export interface EnsembleScoringInput {
   comfortContext?: {
     targetRange: [number, number];
     regionalNeutralTarget?: RegionalCloValues;
+    extremityNeutralTarget?: ExtremityCloValues;
   };
 }
 
@@ -75,11 +82,20 @@ export function buildResponseComponents(
     regionalClo,
     input.comfortContext?.regionalNeutralTarget
   );
+  const extremityClo = {
+    hands: handwear?.rcl_clo ?? 0,
+    head: (headwear.helmet?.rcl_clo ?? 0) + (headwear.headWarmth?.rcl_clo ?? 0) + (headwear.neckWarmth?.rcl_clo ?? 0),
+  } satisfies ExtremityCloValues;
+  const maxExtremityDeficit = getMaxExtremityDeficit(
+    extremityClo,
+    input.comfortContext?.extremityNeutralTarget
+  );
   const comfortScore = input.comfortContext
     ? calculateThermalComfortScore({
       totalClo: ensembleProps.rcl.wholeBody,
       targetRange: input.comfortContext.targetRange,
       maxRegionalDeficit,
+      maxExtremityDeficit,
     })
     : null;
   const fallbackComfortScore = Math.round(

@@ -8,7 +8,7 @@ import {
 } from '@/lib/biophysics/ireq';
 import { scoreEnsemble } from '@/lib/biophysics/scorer';
 import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
-import { calculateThermalComfortScore, getMaxRegionalDeficit } from '@/lib/biophysics/comfort';
+import { calculateThermalComfortScore, getMaxExtremityDeficit, getMaxRegionalDeficit } from '@/lib/biophysics/comfort';
 import {
   type ExertionLevel,
   getMetabolicRateForActivity,
@@ -18,6 +18,12 @@ import {
   applyBodySizeMetabolicAdjustment,
   parseBodyMetricsFromRequestBody,
 } from '@/lib/biophysics/bodyMetrics';
+import {
+  COWEDA_VALIDATION_SOURCE,
+  applyCowedaBufferToExtremityTargets,
+  applyCowedaBufferToTargetRange,
+  calculateCowedaValidationBuffer,
+} from '@/lib/biophysics/coweda';
 import {
   type GarmentRow,
   type CategorizedGarments,
@@ -125,6 +131,16 @@ export async function POST(request: NextRequest) {
     relativeHumidity: defaultHumidity,
     metabolicRate: transitionMetabolicRate,
   });
+  const uphillValidationBuffer = calculateCowedaValidationBuffer({
+    airTempC: tempC,
+    relativeHumidity: defaultHumidity,
+    metabolicRate: uphillMetabolicRate,
+  });
+  const downhillValidationBuffer = calculateCowedaValidationBuffer({
+    airTempC: tempC,
+    relativeHumidity: defaultHumidity,
+    metabolicRate: downhillMetabolicRate,
+  });
 
   const uphillRange = calculateActivityTargetRange({
     activity: 'ski_touring_uphill',
@@ -134,10 +150,12 @@ export async function POST(request: NextRequest) {
     airTempC: tempC,
     windSpeedMs: windMs * UPHILL_WIND_FACTOR,
   });
-  const uphillTargetCloRange: [number, number] = [uphillRange.min, uphillRange.max];
+  const adjustedUphillRange = applyCowedaBufferToTargetRange(uphillRange, uphillValidationBuffer);
+  const uphillTargetCloRange: [number, number] = [adjustedUphillRange.min, adjustedUphillRange.max];
   const baseRegionalIreqUphill = calculateRegionalIreq(ireqUphill, 'ski_touring_uphill');
-  const extremityIreqUphill = calculateExtremityIreq(
-    ireqUphill, 'ski_touring_uphill', tempC, windMs * UPHILL_WIND_FACTOR
+  const extremityIreqUphill = applyCowedaBufferToExtremityTargets(
+    calculateExtremityIreq(ireqUphill, 'ski_touring_uphill', tempC, windMs * UPHILL_WIND_FACTOR),
+    uphillValidationBuffer
   );
   const regionalIreqUphill = scaleIreqShapeToTargetRange(baseRegionalIreqUphill, {
     ireqMin: ireqUphill.ireqMin,
@@ -159,6 +177,22 @@ export async function POST(request: NextRequest) {
         transition: { min: ireqTransition.ireqMin, neutral: ireqTransition.ireqNeutral, dle_hours: ireqTransition.dleHours },
         dle_hours: ireqDownhill.dleHours,
         dle_method: DLE_ESTIMATION_METHOD,
+        target_range: uphillTargetCloRange,
+        validation_buffer_clo: {
+          uphill: {
+            whole_body: uphillValidationBuffer.wholeBody,
+            cold_risk: uphillValidationBuffer.coldRisk,
+            extremity: uphillValidationBuffer.extremity,
+            context: uphillValidationBuffer.context,
+          },
+          downhill: {
+            whole_body: downhillValidationBuffer.wholeBody,
+            cold_risk: downhillValidationBuffer.coldRisk,
+            extremity: downhillValidationBuffer.extremity,
+            context: downhillValidationBuffer.context,
+          },
+        },
+        validation_source: COWEDA_VALIDATION_SOURCE,
       },
       guidance: generateTouringGuidance(tempC, ireqUphill, ireqDownhill),
     });
@@ -191,6 +225,22 @@ export async function POST(request: NextRequest) {
         transition: { min: ireqTransition.ireqMin, neutral: ireqTransition.ireqNeutral, dle_hours: ireqTransition.dleHours },
         dle_hours: ireqDownhill.dleHours,
         dle_method: DLE_ESTIMATION_METHOD,
+        target_range: uphillTargetCloRange,
+        validation_buffer_clo: {
+          uphill: {
+            whole_body: uphillValidationBuffer.wholeBody,
+            cold_risk: uphillValidationBuffer.coldRisk,
+            extremity: uphillValidationBuffer.extremity,
+            context: uphillValidationBuffer.context,
+          },
+          downhill: {
+            whole_body: downhillValidationBuffer.wholeBody,
+            cold_risk: downhillValidationBuffer.coldRisk,
+            extremity: downhillValidationBuffer.extremity,
+            context: downhillValidationBuffer.context,
+          },
+        },
+        validation_source: COWEDA_VALIDATION_SOURCE,
       },
       guidance: generateTouringGuidance(tempC, ireqUphill, ireqDownhill),
     });
@@ -277,12 +327,14 @@ export async function POST(request: NextRequest) {
     airTempC: tempC,
     windSpeedMs: windMs + DOWNHILL_SPEED_WIND,
   });
-  const downhillTargetCloRange: [number, number] = [downhillRange.min, downhillRange.max];
+  const adjustedDownhillRange = applyCowedaBufferToTargetRange(downhillRange, downhillValidationBuffer);
+  const downhillTargetCloRange: [number, number] = [adjustedDownhillRange.min, adjustedDownhillRange.max];
 
   // Downhill regional & extremity IREQ
   const baseRegionalIreqDownhill = calculateRegionalIreq(ireqDownhill, 'ski_touring_downhill');
-  const extremityIreqDownhill = calculateExtremityIreq(
-    ireqDownhill, 'ski_touring_downhill', tempC, windMs + DOWNHILL_SPEED_WIND
+  const extremityIreqDownhill = applyCowedaBufferToExtremityTargets(
+    calculateExtremityIreq(ireqDownhill, 'ski_touring_downhill', tempC, windMs + DOWNHILL_SPEED_WIND),
+    downhillValidationBuffer
   );
   const regionalIreqDownhill = scaleIreqShapeToTargetRange(baseRegionalIreqDownhill, {
     ireqMin: ireqDownhill.ireqMin,
@@ -313,17 +365,24 @@ export async function POST(request: NextRequest) {
     arms: Math.round(uphillThermalProperties.rcl.arm * 100) / 100,
     legs: Math.round(uphillThermalProperties.rcl.leg * 100) / 100,
   };
-  const thermalComfortScore = calculateThermalComfortScore({
-    totalClo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
-    targetRange: uphillTargetCloRange,
-    maxRegionalDeficit: getMaxRegionalDeficit(regionalClo, regionalIreqUphill.neutral),
-  });
   const selectedHandwear = selectHandwear(
     userHandwear,
     tempC,
     false,
     extremityIreqUphill.neutral.hands
   );
+  const thermalComfortScore = calculateThermalComfortScore({
+    totalClo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
+    targetRange: uphillTargetCloRange,
+    maxRegionalDeficit: getMaxRegionalDeficit(regionalClo, regionalIreqUphill.neutral),
+    maxExtremityDeficit: getMaxExtremityDeficit(
+      {
+        hands: selectedHandwear?.rcl_clo ?? 0,
+        head: (climbHeadwear.helmet?.rcl_clo ?? 0) + (climbHeadwear.headWarmth?.rcl_clo ?? 0) + (climbHeadwear.neckWarmth?.rcl_clo ?? 0),
+      },
+      extremityIreqUphill.neutral
+    ),
+  });
   // Gloves carry over from the climb — only select warmer descent gloves if climb pair is insufficient
   const descentHandwear = selectedHandwear && selectedHandwear.rcl_clo >= extremityIreqDownhill.neutral.hands
     ? selectedHandwear
@@ -345,6 +404,21 @@ export async function POST(request: NextRequest) {
       target_range: uphillTargetCloRange,
       regional: regionalIreqUphill,
       extremity: extremityIreqUphill,
+      validation_buffer_clo: {
+        uphill: {
+          whole_body: uphillValidationBuffer.wholeBody,
+          cold_risk: uphillValidationBuffer.coldRisk,
+          extremity: uphillValidationBuffer.extremity,
+          context: uphillValidationBuffer.context,
+        },
+        downhill: {
+          whole_body: downhillValidationBuffer.wholeBody,
+          cold_risk: downhillValidationBuffer.coldRisk,
+          extremity: downhillValidationBuffer.extremity,
+          context: downhillValidationBuffer.context,
+        },
+      },
+      validation_source: COWEDA_VALIDATION_SOURCE,
     },
     recommendation: {
       garments: uphillEnsemble.map(formatGarmentResponse),

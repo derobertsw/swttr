@@ -12,7 +12,7 @@ const faqs = [
   {
     question: "How does SWTTR determine what to wear?",
     answer:
-      "SWTTR calculates how much insulation your body needs using the IREQ (Required Clothing Insulation) method from ISO 11079. It models your body's heat balance — metabolic heat production minus heat lost to cold air, wind, and radiation — then solves for the clothing insulation (in clo units) required to maintain a comfortable skin temperature of 33.7\u00b0C. The algorithm accounts for your specific activity's metabolic rate and exertion level, then selects garments from your wardrobe whose combined insulation meets those targets.",
+      "SWTTR calculates how much insulation your body needs using the IREQ (Required Clothing Insulation) method from ISO 11079. It models your body's heat balance — metabolic heat production minus heat lost to cold air, wind, and radiation — then solves for the clothing insulation (in clo units) required to maintain a comfortable skin temperature of 33.7\u00b0C. The algorithm accounts for your specific activity's metabolic rate and exertion level, then applies CoWEDA validation-based safety buffers (from published skin-temperature MAE) before selecting garments from your wardrobe.",
   },
   {
     question: "What goes into the calculation?",
@@ -37,7 +37,7 @@ const faqs = [
   {
     question: "What is the thermal comfort score?",
     answer:
-      "The score (0\u2013100) is a weighted composite of five factors: cold protection (are you warm enough?), overheat prevention (not too warm?), breathability (can sweat escape?), weather protection (wind/rain coverage), and weight. The weights change by activity \u2014 for running, overheat prevention is weighted 45% because sweating in heavy layers is the primary risk, while alpine skiing weights cold protection at 35% since you're mostly static. The thermal comfort subscore specifically measures how close your insulation is to the \u201cjust right\u201d zone between minimum and neutral targets.",
+      "The score (0\u2013100) is a weighted composite of five factors: cold protection, overheat prevention, breathability, weather protection, and weight. The thermal comfort kernel then checks whether your setup is in the target range and whether local body-part deficits are present. A hands/head deficit can force a cold-risk status even when whole-body clo is nominally in range, reflecting CoWEDA's extremity-focused cold-injury risk findings.",
   },
   {
     question: "What are clo values?",
@@ -47,7 +47,7 @@ const faqs = [
   {
     question: "What is the target clo range?",
     answer:
-      "The algorithm computes two baselines: the minimum insulation (for a skin temperature of 30\u00b0C \u2014 the cold-stress threshold) and the neutral insulation (for 33.7\u00b0C \u2014 full comfort). The target range is then adjusted based on environmental stress factors: colder temperatures widen the range upward, higher wind adds a buffer, and shorter exposure estimates push the minimum higher. This gives you a practical band \u2014 anywhere in the range means you'll be comfortable, with the low end being slightly cool and the high end slightly warm. (Exposure duration is currently modeled as a bounded heuristic.)",
+      "The algorithm computes two baselines: the minimum insulation (for a skin temperature of 30\u00b0C \u2014 the cold-stress threshold) and the neutral insulation (for 33.7\u00b0C \u2014 full comfort). The target range is then adjusted based on environmental stress factors (temperature, wind, and exposure planning) and a CoWEDA validation uncertainty buffer derived from published skin-temperature prediction error. This yields a safer practical band, with additional extremity margin for hands/head.",
   },
   {
     question: "How does SWTTR pick garments from my wardrobe?",

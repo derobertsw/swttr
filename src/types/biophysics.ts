@@ -43,6 +43,25 @@ export interface IreqRange {
   target_range: [number, number];
   regional?: RegionalIreqRange;
   extremity?: ExtremityIreqRange;
+  validation_buffer_clo?: {
+    whole_body?: number;
+    cold_risk?: number;
+    extremity?: number;
+    context?: "rest" | "exercise";
+    uphill?: {
+      whole_body: number;
+      cold_risk: number;
+      extremity: number;
+      context: "rest" | "exercise";
+    };
+    downhill?: {
+      whole_body: number;
+      cold_risk: number;
+      extremity: number;
+      context: "rest" | "exercise";
+    };
+  };
+  validation_source?: string;
 }
 
 export interface ComponentScores {

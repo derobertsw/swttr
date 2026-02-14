@@ -12,6 +12,12 @@ import {
   parseBodyMetricsFromRequestBody,
 } from '@/lib/biophysics/bodyMetrics';
 import {
+  COWEDA_VALIDATION_SOURCE,
+  applyCowedaBufferToExtremityTargets,
+  applyCowedaBufferToTargetRange,
+  calculateCowedaValidationBuffer,
+} from '@/lib/biophysics/coweda';
+import {
   validateRecommendationRequest,
   sortByBreathability,
   getEnsembleClo,
@@ -55,8 +61,14 @@ export async function POST(request: NextRequest) {
     airTempC: tempC,
     windSpeedMs: windMs,
   });
-  const targetMinClo = targetRange.min;
-  const maxClo = targetRange.max;
+  const validationBuffer = calculateCowedaValidationBuffer({
+    airTempC: tempC,
+    relativeHumidity: weather.humidity ?? 50,
+    metabolicRate,
+  });
+  const adjustedTargetRange = applyCowedaBufferToTargetRange(targetRange, validationBuffer);
+  const targetMinClo = adjustedTargetRange.min;
+  const maxClo = adjustedTargetRange.max;
   const minEvapPotential = 0.25;
 
   const prepared = await prepareRouteData(validated, {
@@ -82,7 +94,10 @@ export async function POST(request: NextRequest) {
     targetMin: targetMinClo,
     targetMax: maxClo,
   });
-  const extremityIreq = calculateExtremityIreq(ireq, 'biking', tempC, windMs);
+  const extremityIreq = applyCowedaBufferToExtremityTargets(
+    calculateExtremityIreq(ireq, 'biking', tempC, windMs),
+    validationBuffer
+  );
 
   const recommendedHandwear = selectHandwear(
     userHandwear,
@@ -111,6 +126,7 @@ export async function POST(request: NextRequest) {
       comfortContext: {
         targetRange: [targetMinClo, maxClo],
         regionalNeutralTarget: regionalIreq.neutral,
+        extremityNeutralTarget: extremityIreq.neutral,
       },
     },
     recommendedHandwear,
@@ -131,6 +147,13 @@ export async function POST(request: NextRequest) {
       target_range: [targetMinClo, maxClo],
       regional: regionalIreq,
       extremity: extremityIreq,
+      validation_buffer_clo: {
+        whole_body: validationBuffer.wholeBody,
+        cold_risk: validationBuffer.coldRisk,
+        extremity: validationBuffer.extremity,
+        context: validationBuffer.context,
+      },
+      validation_source: COWEDA_VALIDATION_SOURCE,
     },
     recommendation: response.recommendation,
     warnings: response.warnings,
