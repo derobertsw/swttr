@@ -1,30 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { STORAGE_KEYS } from "@/lib/storage";
-
-export function getOrCreateUserId(): string | null {
-  if (typeof window === "undefined") return null;
-
-  let id = localStorage.getItem(STORAGE_KEYS.USER_ID);
-  if (!id) {
-    id = `user-${crypto.randomUUID()}`;
-    localStorage.setItem(STORAGE_KEYS.USER_ID, id);
-  }
-  return id;
-}
+import { useAuth } from "@clerk/nextjs";
 
 /**
- * Hook for managing persistent user ID
- * Creates a new UUID if none exists in localStorage
+ * Hook that returns the Clerk user ID when signed in, or null otherwise.
+ * Replaces the previous localStorage UUID approach so data syncs across devices.
  */
 export function useUserId(): string | null {
-  const [userId, setUserId] = useState<string | null>(() => getOrCreateUserId());
+  const { userId, isLoaded } = useAuth();
 
-  useEffect(() => {
-    if (userId) return;
-    setUserId(getOrCreateUserId());
-  }, [userId]);
-
-  return userId;
+  if (!isLoaded) return null;
+  return userId ?? null;
 }

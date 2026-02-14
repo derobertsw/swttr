@@ -57,9 +57,7 @@ export function usePreferences() {
 
     const fetchPreferences = async () => {
       try {
-        const res = await fetch("/api/preferences", {
-          headers: { "x-user-id": userId },
-        });
+        const res = await fetch("/api/preferences");
 
         if (res.ok) {
           const data = await res.json();
@@ -110,7 +108,6 @@ export function usePreferences() {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              "x-user-id": userId,
             },
             body: JSON.stringify({ temperatureSensitivity: newSensitivity }),
           });
@@ -133,7 +130,6 @@ export function usePreferences() {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              "x-user-id": userId,
             },
             body: JSON.stringify({ defaultActivity: newActivity }),
           });
@@ -174,7 +170,6 @@ export function usePreferences() {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              "x-user-id": userId,
             },
             body: JSON.stringify(payload),
           });

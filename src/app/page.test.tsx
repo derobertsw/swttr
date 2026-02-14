@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Home from "./page";
-import { STORAGE_KEYS } from "@/lib/storage";
 
 // Mock sonner toast
 vi.mock("sonner", () => ({
@@ -26,6 +25,7 @@ vi.mock("@clerk/nextjs", () => ({
   SignedOut: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   UserButton: () => <div data-testid="user-button">UserButton</div>,
   ClerkProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useAuth: () => ({ userId: "test-user-id", isLoaded: true, isSignedIn: true }),
 }));
 
 // Mock fetch globally
@@ -47,9 +47,7 @@ describe("Home Page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     originalGeolocation = navigator.geolocation;
-    localStorageMock.getItem.mockImplementation((key: string) =>
-      key === STORAGE_KEYS.USER_ID ? "test-user-id" : null
-    );
+    localStorageMock.getItem.mockReturnValue(null);
     // Reset search params
     mockSearchParams.delete("mode");
     mockSearchParams.delete("gearUp");

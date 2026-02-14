@@ -7,6 +7,11 @@ vi.mock('@/lib/supabase', () => ({
   getSupabase: vi.fn(),
 }));
 
+// Mock Clerk auth (used by validation.ts)
+vi.mock('@/lib/auth', () => ({
+  getAuthUserId: vi.fn().mockResolvedValue(null),
+}));
+
 import { getSupabase } from '@/lib/supabase';
 const mockGetSupabase = vi.mocked(getSupabase);
 
@@ -892,13 +897,15 @@ describe('Ski Touring Recommendations API Route', () => {
       expect(response.status).toBe(200);
     });
 
-    it('should accept user ID header for wardrobe filtering', async () => {
+    it('should accept authenticated user for wardrobe filtering', async () => {
+      const { getAuthUserId } = await import('@/lib/auth');
+      vi.mocked(getAuthUserId).mockResolvedValueOnce('test-user-123');
+
       const mockSupabase = createMockSupabase();
       mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
 
       const request = createRequest(
         { weather: { temperature: 25, wind_speed: 10 } },
-        { 'x-user-id': 'test-user-123' }
       );
 
       const response = await POST(request);

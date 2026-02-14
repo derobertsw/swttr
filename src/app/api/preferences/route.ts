@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 import { TemperatureSensitivity } from "@/types/preferences";
 import { sanitizeOptionalBodyMetrics } from "@/lib/biophysics/bodyMetrics";
-
-function getUserId(request: NextRequest): string | null {
-  return request.headers.get("x-user-id");
-}
+import { getAuthUserId } from "@/lib/auth";
 
 const DEFAULT_PREFERENCES = {
   temperatureSensitivity: "neutral" as TemperatureSensitivity,
@@ -14,7 +11,7 @@ const DEFAULT_PREFERENCES = {
 
 export async function GET(request: NextRequest) {
   const supabase = getSupabase();
-  const userId = getUserId(request);
+  const userId = await getAuthUserId();
 
   // Return defaults if no database or no user ID
   if (!supabase || !userId) {
@@ -67,7 +64,7 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   const supabase = getSupabase();
-  const userId = getUserId(request);
+  const userId = await getAuthUserId();
 
   // Parse body first to return what was sent
   let body: {

@@ -68,9 +68,7 @@ export function useWardrobe() {
       try {
         const [availableRes, wardrobeRes] = await Promise.all([
           fetch("/api/wardrobe/available"),
-          fetch("/api/wardrobe/gear", {
-            headers: { "x-user-id": userId },
-          }),
+          fetch("/api/wardrobe/gear"),
         ]);
 
         const availableData = await availableRes.json();
@@ -230,7 +228,6 @@ export function useWardrobe() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": userId,
         },
         body: JSON.stringify({
           item_type: item.type,
@@ -243,9 +240,7 @@ export function useWardrobe() {
         setAdding(null);
         addTimerRef.current = setTimeout(() => {
           setJustAdded(null);
-          fetch("/api/wardrobe/gear", {
-            headers: { "x-user-id": userId },
-          })
+          fetch("/api/wardrobe/gear")
             .then(r => r.json())
             .then(data => {
               setWardrobeItems(data.items || []);
@@ -270,7 +265,6 @@ export function useWardrobe() {
     try {
       const res = await fetch(`/api/wardrobe/gear?id=${wardrobeId}`, {
         method: "DELETE",
-        headers: { "x-user-id": userId },
       });
 
       if (res.ok) {
@@ -293,7 +287,6 @@ export function useWardrobe() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": userId,
         },
         body: JSON.stringify({
           item_type: item.item_type,
@@ -302,9 +295,7 @@ export function useWardrobe() {
       });
 
       if (res.ok) {
-        const wardrobeRes = await fetch("/api/wardrobe/gear", {
-          headers: { "x-user-id": userId },
-        });
+        const wardrobeRes = await fetch("/api/wardrobe/gear");
         const wardrobeData = await wardrobeRes.json();
         setWardrobeItems(wardrobeData.items || []);
         setRecentlyRemoved((prev) => prev.filter((r) => r.item_id !== item.item_id));
@@ -328,7 +319,6 @@ export function useWardrobe() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": userId,
         },
         body: JSON.stringify({
           id: wardrobeId,

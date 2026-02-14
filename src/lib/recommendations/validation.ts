@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
 import { fahrenheitToCelsius, mphToMs } from '@/lib/biophysics/ireq';
+import { getAuthUserId } from '@/lib/auth';
 
 export interface WeatherInput {
   temperature: number;
@@ -34,7 +35,7 @@ export async function validateRecommendationRequest(
     return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
   }
 
-  const userId = request.headers.get('x-user-id');
+  const userId = await getAuthUserId();
   const body = await request.json();
 
   if (!body.weather?.temperature || body.weather?.wind_speed === undefined) {

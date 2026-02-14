@@ -22,6 +22,8 @@ interface BodyPartSectionProps {
   onGenericCloChange?: (bodyPart: BodyPart, clo: number) => void;
 }
 
+const GENERIC_LAYER_SUGGESTION_DEFICIT_CLO = 0.15;
+
 function getEmptyStateMessage(bodyPart: BodyPart): string {
   switch (bodyPart) {
     case "torso":
@@ -109,6 +111,8 @@ export function BodyPartSection({
         : surplusClo > 0.35
           ? "text-amber-700"
           : "text-emerald-700";
+  const shouldSuggestGenericLayers =
+    targetClo === undefined || deficitClo > GENERIC_LAYER_SUGGESTION_DEFICIT_CLO;
 
   return (
     <div className="rounded-xl border border-white/35 bg-white/55 backdrop-blur-[3px] p-4 sm:p-5">
@@ -161,7 +165,11 @@ export function BodyPartSection({
                 bodyPart={bodyPart}
                 biophysicsActive={biophysicsActive}
                 itemMappings={itemMappings}
-                enableEmptySlots={!(bodyPart === "hands" && handwear) && !(bodyPart === "headNeck" && hasHeadwear)}
+                enableEmptySlots={
+                  shouldSuggestGenericLayers
+                  && !(bodyPart === "hands" && handwear)
+                  && !(bodyPart === "headNeck" && hasHeadwear)
+                }
                 onGenericCloChange={setGenericCloContribution}
               />
             </ul>

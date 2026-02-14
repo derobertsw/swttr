@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { getAuthUserId } from "@/lib/auth";
 
 type ItemType = "garment" | "handwear" | "headwear";
-
-function getUserId(request: NextRequest): string | null {
-  return request.headers.get("x-user-id");
-}
 
 /**
  * GET /api/wardrobe/gear
@@ -13,7 +10,7 @@ function getUserId(request: NextRequest): string | null {
  */
 export async function GET(request: NextRequest) {
   const supabase = getSupabase();
-  const userId = getUserId(request);
+  const userId = await getAuthUserId();
 
   if (!supabase) {
     return NextResponse.json({ items: [] });
@@ -92,7 +89,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
-  const userId = getUserId(request);
+  const userId = await getAuthUserId();
 
   if (!supabase) {
     return NextResponse.json(
@@ -187,7 +184,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   const supabase = getSupabase();
-  const userId = getUserId(request);
+  const userId = await getAuthUserId();
 
   if (!supabase) {
     return NextResponse.json(
@@ -249,7 +246,7 @@ export async function PATCH(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   const supabase = getSupabase();
-  const userId = getUserId(request);
+  const userId = await getAuthUserId();
 
   if (!supabase) {
     return NextResponse.json(

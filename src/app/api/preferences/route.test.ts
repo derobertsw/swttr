@@ -7,12 +7,21 @@ vi.mock("@/lib/supabase", () => ({
   getSupabase: vi.fn(),
 }));
 
+// Mock Clerk auth
+vi.mock("@/lib/auth", () => ({
+  getAuthUserId: vi.fn(),
+}));
+
 import { getSupabase } from "@/lib/supabase";
+import { getAuthUserId } from "@/lib/auth";
 const mockGetSupabase = vi.mocked(getSupabase);
+const mockGetAuthUserId = vi.mocked(getAuthUserId);
 
 describe("Preferences API Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: authenticated user
+    mockGetAuthUserId.mockResolvedValue("test-user");
   });
 
   describe("GET", () => {
@@ -20,9 +29,7 @@ describe("Preferences API Route", () => {
       it("should return default preferences", async () => {
         mockGetSupabase.mockReturnValue(null);
 
-        const request = new NextRequest("http://localhost:3000/api/preferences", {
-          headers: { "x-user-id": "test-user" },
-        });
+        const request = new NextRequest("http://localhost:3000/api/preferences");
 
         const response = await GET(request);
         const data = await response.json();
@@ -38,6 +45,7 @@ describe("Preferences API Route", () => {
     describe("when user ID is missing", () => {
       it("should return default preferences", async () => {
         mockGetSupabase.mockReturnValue(null);
+        mockGetAuthUserId.mockResolvedValue(null);
 
         const request = new NextRequest("http://localhost:3000/api/preferences");
 
@@ -70,9 +78,7 @@ describe("Preferences API Route", () => {
         };
         mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
 
-        const request = new NextRequest("http://localhost:3000/api/preferences", {
-          headers: { "x-user-id": "test-user" },
-        });
+        const request = new NextRequest("http://localhost:3000/api/preferences");
 
         const response = await GET(request);
         const data = await response.json();
@@ -96,9 +102,7 @@ describe("Preferences API Route", () => {
         };
         mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
 
-        const request = new NextRequest("http://localhost:3000/api/preferences", {
-          headers: { "x-user-id": "test-user" },
-        });
+        const request = new NextRequest("http://localhost:3000/api/preferences");
 
         const response = await GET(request);
         const data = await response.json();
@@ -122,9 +126,7 @@ describe("Preferences API Route", () => {
         };
         mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
 
-        const request = new NextRequest("http://localhost:3000/api/preferences", {
-          headers: { "x-user-id": "test-user" },
-        });
+        const request = new NextRequest("http://localhost:3000/api/preferences");
 
         const response = await GET(request);
         const data = await response.json();
@@ -145,9 +147,7 @@ describe("Preferences API Route", () => {
         };
         mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
 
-        const request = new NextRequest("http://localhost:3000/api/preferences", {
-          headers: { "x-user-id": "test-user" },
-        });
+        const request = new NextRequest("http://localhost:3000/api/preferences");
 
         const response = await GET(request);
         const data = await response.json();
@@ -169,7 +169,6 @@ describe("Preferences API Route", () => {
         const request = new NextRequest("http://localhost:3000/api/preferences", {
           method: "PUT",
           headers: {
-            "x-user-id": "test-user",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -192,6 +191,7 @@ describe("Preferences API Route", () => {
     describe("when user ID is missing", () => {
       it("should acknowledge the request with sent values", async () => {
         mockGetSupabase.mockReturnValue(null);
+        mockGetAuthUserId.mockResolvedValue(null);
 
         const request = new NextRequest("http://localhost:3000/api/preferences", {
           method: "PUT",
@@ -210,6 +210,7 @@ describe("Preferences API Route", () => {
 
       it("should acknowledge and sanitize a single body metric", async () => {
         mockGetSupabase.mockReturnValue(null);
+        mockGetAuthUserId.mockResolvedValue(null);
 
         const request = new NextRequest("http://localhost:3000/api/preferences", {
           method: "PUT",
@@ -229,6 +230,7 @@ describe("Preferences API Route", () => {
     describe("validation", () => {
       it("should return 400 for invalid JSON", async () => {
         mockGetSupabase.mockReturnValue(null);
+        mockGetAuthUserId.mockResolvedValue(null);
 
         const request = new NextRequest("http://localhost:3000/api/preferences", {
           method: "PUT",
@@ -255,7 +257,6 @@ describe("Preferences API Route", () => {
         const request = new NextRequest("http://localhost:3000/api/preferences", {
           method: "PUT",
           headers: {
-            "x-user-id": "test-user",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ temperatureSensitivity: "invalid" }),
@@ -289,7 +290,6 @@ describe("Preferences API Route", () => {
         const request = new NextRequest("http://localhost:3000/api/preferences", {
           method: "PUT",
           headers: {
-            "x-user-id": "test-user",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -321,7 +321,6 @@ describe("Preferences API Route", () => {
         const request = new NextRequest("http://localhost:3000/api/preferences", {
           method: "PUT",
           headers: {
-            "x-user-id": "test-user",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ temperatureSensitivity: "cold" }),

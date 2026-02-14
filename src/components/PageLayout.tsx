@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import { AppSidebar } from "@/components/AppSidebar";
 import { MobileTabBar } from "@/components/AppNavigation";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { useMigrateUser } from "@/hooks/useMigrateUser";
 
 interface PageLayoutProps {
   children: ReactNode;
@@ -12,6 +13,8 @@ interface PageLayoutProps {
 }
 
 const PageLayout = ({ children, onLogoClick }: PageLayoutProps) => {
+  useMigrateUser();
+
   return (
     <>
       <SidebarProvider>

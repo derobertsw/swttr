@@ -92,9 +92,7 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
     setError(null);
 
     try {
-      const res = await fetch("/api/wardrobe/items", {
-        headers: { "x-user-id": userId },
-      });
+      const res = await fetch("/api/wardrobe/items");
 
       // If database not configured, fall back to localStorage
       if (res.status === 503) {
@@ -169,7 +167,6 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            "x-user-id": userId,
           },
           body: JSON.stringify({
             bodyPart,
@@ -243,7 +240,6 @@ export function useItemMappings(userId: string | null): UseItemMappingsResult {
 
         const res = await fetch(`/api/wardrobe/items?${params}`, {
           method: "DELETE",
-          headers: { "x-user-id": userId },
         });
 
         // If database not configured, fall back to localStorage

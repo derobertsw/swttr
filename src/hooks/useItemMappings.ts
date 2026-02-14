@@ -5,11 +5,9 @@ import { UserItemMapping } from "@/types/wardrobe";
 import { useUserId } from "@/hooks/useUserId";
 import { logWarn } from "@/lib/logger";
 
-async function fetchItemMappings(userId: string): Promise<Map<string, string>> {
+async function fetchItemMappings(): Promise<Map<string, string>> {
   try {
-    const res = await fetch("/api/wardrobe/items", {
-      headers: { "x-user-id": userId },
-    });
+    const res = await fetch("/api/wardrobe/items");
 
     if (!res.ok) {
       logWarn("useItemMappings", "API returned non-ok status");
@@ -38,14 +36,14 @@ export function useItemMappings() {
 
   useEffect(() => {
     if (userId) {
-      fetchItemMappings(userId).then(setItemMappings);
+      fetchItemMappings().then(setItemMappings);
     }
   }, [userId]);
 
   useEffect(() => {
     const handleFocus = () => {
       if (userId) {
-        fetchItemMappings(userId).then(setItemMappings);
+        fetchItemMappings().then(setItemMappings);
       }
     };
 

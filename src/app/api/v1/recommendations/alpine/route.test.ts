@@ -6,6 +6,10 @@ vi.mock('@/lib/supabase', () => ({
   getSupabase: vi.fn(),
 }));
 
+vi.mock('@/lib/auth', () => ({
+  getAuthUserId: vi.fn().mockResolvedValue(null),
+}));
+
 import { getSupabase } from '@/lib/supabase';
 const mockGetSupabase = vi.mocked(getSupabase);
 

@@ -11,7 +11,7 @@ import {
   exertionToXcIntensity,
 } from "@/lib/biophysics/exertion";
 import type { UserBodyMetrics } from "@/types/preferences";
-import { getOrCreateUserId } from "@/hooks/useUserId";
+import { useAuth } from "@clerk/nextjs";
 import { logWarn } from "@/lib/logger";
 
 export interface UseBiophysicsResult {
@@ -35,6 +35,7 @@ export interface UseBiophysicsResult {
  * If user has wardrobe items, uses only those for recommendations.
  */
 export function useBiophysicsRecommendation(): UseBiophysicsResult {
+  const { userId } = useAuth();
   const [data, setData] = useState<BiophysicsRecommendation | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -56,19 +57,12 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
       setLoading(true);
       setError(null);
 
-      // Ensure a stable user ID exists before requesting recommendations.
-      const userId = getOrCreateUserId();
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      if (userId) {
-        headers["x-user-id"] = userId;
-      }
-
       try {
         const response = await fetch(endpoint, {
           method: "POST",
-          headers,
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             weather: {
               temperature: weather.temperature,
@@ -109,7 +103,7 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
         setLoading(false);
       }
     },
-    []
+    [userId]
   );
 
   const reset = useCallback(() => {

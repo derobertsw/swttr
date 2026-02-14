@@ -539,6 +539,60 @@ describe("LayerDisplay", () => {
       expect(screen.getByText(/Significantly under-insulated \(\+0\.[89] clo needed\)\./)).toBeInTheDocument();
     });
 
+    it("should not suggest generic torso layers when torso is already near target", () => {
+      const nearTargetNoMidData = {
+        ...mockBiophysicsData,
+        ireq: {
+          ...mockBiophysicsData.ireq,
+          target_range: [0.5, 0.7] as [number, number],
+          regional: {
+            min: { torso: 0.4, arms: 0.1, legs: 0.1 },
+            neutral: { torso: 0.6, arms: 0.1, legs: 0.1 },
+          },
+        },
+        recommendation: {
+          ...mockBiophysicsData.recommendation,
+          garments: [
+            {
+              id: "torso-base",
+              name: "Patagonia Capilene Cool Lightweight",
+              category: "base_layer",
+              rcl: 0.22,
+              covers_torso: true,
+              covers_legs: false,
+            },
+            {
+              id: "torso-outer",
+              name: "Lululemon Pace Breaker Jacket",
+              category: "soft_shell",
+              rcl: 0.19,
+              covers_torso: true,
+              covers_legs: false,
+            },
+          ],
+          handwear: null,
+          headwear: null,
+          ensemble_properties: {
+            ...mockBiophysicsData.recommendation.ensemble_properties,
+            total_clo: 0.5,
+            regional_clo: { torso: 0.5, arms: 0.1, legs: 0.1 },
+          },
+        },
+        warnings: [],
+      };
+
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={32}
+          windspeed={4}
+          biophysicsData={nearTargetNoMidData}
+        />
+      );
+
+      expect(screen.queryByRole("button", { name: "Use Generic Mid" })).not.toBeInTheDocument();
+    });
+
     it("should exclude helmet insulation from head/neck clo for xc skiing", () => {
       render(
         <LayerDisplay
@@ -707,7 +761,7 @@ describe("LayerDisplay", () => {
         });
       });
 
-      localStorage.setItem("swttr-user-id", "user-test");
+
 
       const descentGapData = {
         ...mockBiophysicsData,
@@ -763,7 +817,7 @@ describe("LayerDisplay", () => {
         expect(screen.getByRole("link", { name: "Add descent layer" })).toHaveAttribute("href", "/wardrobe");
       } finally {
         fetchMock.mockRestore();
-        localStorage.removeItem("swttr-user-id");
+
       }
     });
 
@@ -823,7 +877,7 @@ describe("LayerDisplay", () => {
         });
       });
 
-      localStorage.setItem("swttr-user-id", "user-test");
+
 
       const insufficientWardrobeData = {
         ...mockBiophysicsData,
@@ -863,7 +917,7 @@ describe("LayerDisplay", () => {
         expect(updateLink).toHaveAttribute("href", "/wardrobe");
       } finally {
         fetchMock.mockRestore();
-        localStorage.removeItem("swttr-user-id");
+
       }
     });
 
@@ -912,7 +966,7 @@ describe("LayerDisplay", () => {
         });
       });
 
-      localStorage.setItem("swttr-user-id", "user-test");
+
 
       const insufficientWardrobeData = {
         ...mockBiophysicsData,
@@ -944,7 +998,7 @@ describe("LayerDisplay", () => {
         expect(await screen.findByText("FitCo Close Match")).toBeInTheDocument();
       } finally {
         fetchMock.mockRestore();
-        localStorage.removeItem("swttr-user-id");
+
       }
     });
 
