@@ -667,20 +667,6 @@ describe("LayerDisplay", () => {
       expect(screen.getAllByText(/Cold Risk/i).length).toBeGreaterThan(0);
     });
 
-    it("should display guidance tips when available", () => {
-      render(
-        <LayerDisplay
-          recommendation={null}
-          temperature={15}
-          windspeed={10}
-          biophysicsData={mockBiophysicsData}
-        />
-      );
-
-      expect(screen.getByText("Tips")).toBeInTheDocument();
-      expect(screen.getByText("Layer up for the chairlift")).toBeInTheDocument();
-    });
-
     it("should show uphill copy and descent add-on layers for backcountry skiing", () => {
       const touringData = {
         ...mockBiophysicsData,
@@ -719,10 +705,85 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("You're in range on climb, in range on descent.")).toBeInTheDocument();
       expect(screen.getByText("Current setup: 1.7 clo · Descent with pack: 2.4 clo")).toBeInTheDocument();
       expect(screen.queryByText(/Climb Cold Risk/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Descent.*Risk/)).not.toBeInTheDocument();
       expect(screen.getByText("Descent Layer Plan")).toBeInTheDocument();
       expect(screen.getByText("Patagonia Nano Puff")).toBeInTheDocument();
       expect(screen.getByText("Descent target insulation: 2.2-2.8 clo")).toBeInTheDocument();
       expect(screen.getByText("Total additional packed layer weight: 320 g")).toBeInTheDocument();
+    });
+
+    it("should show descent overheating risk card when descent clo exceeds target", () => {
+      const overheatedDescentData = {
+        ...mockBiophysicsData,
+        ireq: {
+          ...mockBiophysicsData.ireq,
+          downhill: { min: 1.2, neutral: 1.6 },
+          downhill_target_range: [1.2, 1.6] as [number, number],
+        },
+        pack_items: {
+          garments: [
+            {
+              id: "pack-1",
+              name: "Patagonia Nano Puff",
+              weight_g: 320,
+              rcl_clo: 0.7,
+            },
+          ],
+          total_weight_g: 320,
+        },
+      };
+
+      render(
+        <LayerDisplay
+          activity="backcountry_skiing"
+          recommendation={null}
+          temperature={25}
+          windspeed={5}
+          biophysicsData={overheatedDescentData}
+        />
+      );
+
+      // total_clo 1.7 + pack 0.7 + no helmet = 2.4 descent clo vs 1.6 max target → over by 0.8
+      expect(screen.getByText("Descent Risk")).toBeInTheDocument();
+      expect(screen.getByText(/Descent Overheating Risk/)).toBeInTheDocument();
+      expect(screen.getByText(/over-insulated/)).toBeInTheDocument();
+    });
+
+    it("should show descent cold risk card when descent clo is below target", () => {
+      const coldDescentData = {
+        ...mockBiophysicsData,
+        ireq: {
+          ...mockBiophysicsData.ireq,
+          downhill: { min: 3.0, neutral: 3.5 },
+          downhill_target_range: [3.0, 3.5] as [number, number],
+        },
+        pack_items: {
+          garments: [
+            {
+              id: "pack-1",
+              name: "Light Wind Shell",
+              weight_g: 120,
+              rcl_clo: 0.2,
+            },
+          ],
+          total_weight_g: 120,
+        },
+      };
+
+      render(
+        <LayerDisplay
+          activity="backcountry_skiing"
+          recommendation={null}
+          temperature={0}
+          windspeed={15}
+          biophysicsData={coldDescentData}
+        />
+      );
+
+      // total_clo 1.7 + pack 0.2 + no helmet = 1.9 descent clo vs 3.0 min target → short by 1.1
+      expect(screen.getAllByText("Descent Risk").length).toBeGreaterThan(0);
+      expect(screen.getByText(/Descent Cold Risk/)).toBeInTheDocument();
+      expect(screen.getByText(/under-insulated/)).toBeInTheDocument();
     });
 
     it("should warn and show suggested gear when descent insulation is insufficient", async () => {
@@ -809,7 +870,7 @@ describe("LayerDisplay", () => {
         );
 
         expect(screen.getByText("Descent Warning")).toBeInTheDocument();
-        expect(screen.getByText("Descent Risk")).toBeInTheDocument();
+        expect(screen.getAllByText("Descent Risk").length).toBeGreaterThan(0);
         expect(screen.getByText("Current: 2.0 clo")).toBeInTheDocument();
         expect(screen.getByText("Descent target: 2.6-3.0 clo (+0.6 needed)")).toBeInTheDocument();
         expect(await screen.findByText("Suggested Gear To Buy")).toBeInTheDocument();

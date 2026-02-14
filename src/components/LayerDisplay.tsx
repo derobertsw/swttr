@@ -41,7 +41,6 @@ import {
   WeatherHeader,
   ThermalGauge,
   BodyPartSection,
-  GuidanceSection,
 } from "@/components/layers";
 import { cn } from "@/lib/utils";
 
@@ -706,6 +705,7 @@ const LayerDisplay = ({
   const climbStatus = showDualComfortGauges ? getCloStatus(effectiveTotalClo, uphillTargetRange) : null;
   const descentStatus = showDualComfortGauges ? getCloStatus(estimatedDescentClo, downhillTargetRange) : null;
   const climbDecision = showDualComfortGauges ? getDecisionFromCloStatus(climbStatus) : null;
+  const descentDecision = showDualComfortGauges ? getDecisionFromCloStatus(descentStatus) : null;
   const decisionForRiskCard = showDualComfortGauges ? climbDecision : thermalDecision;
   const backcountrySummaryLine = climbStatus && descentStatus
     ? `You're ${climbStatus.phrase} on climb, ${descentStatus.phrase} on descent.`
@@ -727,6 +727,13 @@ const LayerDisplay = ({
         ? `Climb Cold Risk — ${decisionForRiskCard.severity === "high" ? "High" : "Moderate"}`
         : `Climb Overheating Risk — ${decisionForRiskCard.severity === "high" ? "High" : "Moderate"}`
     : "Climb Guidance";
+  const descentRiskTitle = descentDecision
+    ? descentDecision.riskType === "comfortable"
+      ? "Descent In Target Range"
+      : descentDecision.riskType === "cold"
+        ? `Descent Cold Risk — ${descentDecision.severity === "high" ? "High" : "Moderate"}`
+        : `Descent Overheating Risk — ${descentDecision.severity === "high" ? "High" : "Moderate"}`
+    : "Descent Guidance";
   const riskCardTitle = showDualComfortGauges ? climbRiskTitle : decisionTitle;
   const visibleSuggestions = showAllPurchaseSuggestions
     ? purchaseSuggestions.slice(1)
@@ -735,8 +742,12 @@ const LayerDisplay = ({
   const showRiskCard = biophysicsActive
     ? Boolean(decisionForRiskCard && decisionForRiskCard.riskType !== "comfortable")
     : true;
+  const showDescentRiskCard = showDualComfortGauges
+    && Boolean(descentDecision && descentDecision.riskType !== "comfortable");
   const statusSummary = getThermalSummary(decisionForRiskCard);
   const immediateAction = getImmediateAction(decisionForRiskCard);
+  const descentStatusSummary = getThermalSummary(descentDecision);
+  const descentImmediateAction = getImmediateAction(descentDecision);
   const topSuggestion = purchaseSuggestions[0];
   const targetRangeLabel = biophysicsData?.ireq?.target_range
     ? formatCloRangeLabel(biophysicsData.ireq.target_range)
@@ -980,20 +991,42 @@ const LayerDisplay = ({
               </p>
               <h3 className="mt-0.5 text-xl font-semibold leading-tight">{riskCardTitle}</h3>
               <p className="mt-1.5 text-sm opacity-90">{statusSummary}</p>
+              <ul className="mt-3 list-disc pl-5 text-sm leading-relaxed opacity-90">
+                <li>{immediateAction}</li>
+                {decisionForRiskCard && decisionForRiskCard.riskType !== "comfortable" && (
+                  <li>
+                    Stay near target range: {targetRangeLabel ?? "your target clo range"}
+                  </li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
 
-              <div className="mt-4 rounded-lg border border-current/20 bg-white/60 px-3.5 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide opacity-75">
-                  {isBackcountrySkiing ? "Climb" : "Now"}
-                </p>
-                <ul className="mt-2 list-disc pl-5 text-sm leading-relaxed">
-                  <li>{immediateAction}</li>
-                  {decisionForRiskCard && decisionForRiskCard.riskType !== "comfortable" && (
-                    <li>
-                      Stay near target range: {targetRangeLabel ?? "your target clo range"}
-                    </li>
-                  )}
-                </ul>
-              </div>
+      {showDescentRiskCard && (
+        <section
+          className={cn(
+            "rounded-xl border px-4 py-4 sm:px-5 sm:py-5",
+            getDecisionClasses(descentDecision, false)
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 opacity-80" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">
+                Descent Risk
+              </p>
+              <h3 className="mt-0.5 text-xl font-semibold leading-tight">{descentRiskTitle}</h3>
+              <p className="mt-1.5 text-sm opacity-90">{descentStatusSummary}</p>
+              <ul className="mt-3 list-disc pl-5 text-sm leading-relaxed opacity-90">
+                <li>{descentImmediateAction}</li>
+                {descentDecision && descentDecision.riskType !== "comfortable" && (
+                  <li>
+                    Descent target range: {downhillTargetRangeLabel ?? "your descent clo range"}
+                  </li>
+                )}
+              </ul>
             </div>
           </div>
         </section>
@@ -1148,13 +1181,6 @@ const LayerDisplay = ({
           />
         ))}
       </div>
-
-      {biophysicsData?.guidance && (
-        <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">Actionable Guidance</h3>
-          <GuidanceSection tips={biophysicsData.guidance} />
-        </div>
-      )}
 
       {isBackcountrySkiing && biophysicsActive && (
         <section className="rounded-lg border border-white/25 bg-white/15 p-4">
