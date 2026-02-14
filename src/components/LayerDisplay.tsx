@@ -25,6 +25,7 @@ import {
   LAYER_LABELS,
 } from "@/lib/layers";
 import { calculateThermalComfortScore, evaluateThermalComfort } from "@/lib/biophysics/comfort";
+import { ACTIVITIES } from "@/data/activities";
 import type { AvailableItem } from "@/types/wardrobe";
 import { useAuth } from "@clerk/nextjs";
 import { logWarn } from "@/lib/logger";
@@ -73,6 +74,14 @@ const BODY_PART_ORDER_INDEX = BODY_PARTS.reduce((acc, part, index) => {
   acc[part] = index;
   return acc;
 }, {} as Record<BodyPart, number>);
+const ACTIVITY_HEADER_LABELS: Record<string, string> = {
+  running: "Running",
+  biking: "Biking",
+  hiking_snowshoeing: "Hiking",
+  backcountry_skiing: "Backcountry",
+  alpine_skiing: "Alpine",
+  xc_skiing: "XC",
+};
 
 const TORSO_CATEGORY_PRIORITY: Record<string, number> = {
   base_layer: 90,
@@ -802,18 +811,34 @@ const LayerDisplay = ({
         return BODY_PART_ORDER_INDEX[a.part] - BODY_PART_ORDER_INDEX[b.part];
       })
       : bodyPartSections;
+  const selectedActivity = activity
+    ? ACTIVITIES.find((candidate) => candidate.value === activity)
+    : null;
+  const selectedActivityLabel = selectedActivity
+    ? (ACTIVITY_HEADER_LABELS[selectedActivity.value] ?? selectedActivity.name)
+    : null;
 
   return (
     <div className="flex flex-col gap-8 pb-24">
-      {onReset && (
-        <button
-          type="button"
-          onClick={onReset}
-          className="flex items-center gap-1.5 self-start -mt-2 -mb-2 text-sm font-medium text-white/75 transition-colors hover:text-white"
-        >
-          <ArrowLeft className="size-4" />
-          Back
-        </button>
+      {(onReset || selectedActivity) && (
+        <div className="-mt-2 -mb-2 flex items-center justify-between gap-2">
+          {onReset ? (
+            <button
+              type="button"
+              onClick={onReset}
+              className="flex items-center gap-1.5 text-sm font-medium text-white/75 transition-colors hover:text-white"
+            >
+              <ArrowLeft className="size-4" />
+              Back
+            </button>
+          ) : <span />}
+          {selectedActivity && selectedActivityLabel && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/[0.08] px-2.5 py-1 text-[11px] font-semibold text-white/75">
+              <selectedActivity.icon className="size-3.5" />
+              <span className="max-w-[7.25rem] truncate sm:max-w-none">{selectedActivityLabel}</span>
+            </span>
+          )}
+        </div>
       )}
 
       <WeatherHeader
