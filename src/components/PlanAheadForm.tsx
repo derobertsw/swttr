@@ -9,7 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, CalendarDays, Route, ChevronDown } from "lucide-react";
+import { CalendarIcon, CalendarDays, Locate, Loader2, Route, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LocationSuggestion } from "@/types/recommendations";
 import { RefObject } from "react";
@@ -20,15 +20,18 @@ interface PlanAheadFormProps {
   date: Date | undefined;
   time: string;
   durationDays: number;
+  loading?: boolean;
   location: string;
   locationQuery: string;
   suggestions: LocationSuggestion[];
   showSuggestions: boolean;
   selectedLocation: LocationSuggestion | null;
+  isSearching?: boolean;
   suggestionRef: RefObject<HTMLDivElement | null>;
   onDateChange: (date: Date | undefined) => void;
   onTimeChange: (time: string) => void;
   onDurationDaysChange: (days: number) => void;
+  onGoNow?: () => void;
   onLocationInputChange: (value: string) => void;
   onLocationFocus: () => void;
   onSelectLocation: (suggestion: LocationSuggestion) => void;
@@ -50,15 +53,18 @@ export function PlanAheadForm({
   date,
   time,
   durationDays,
+  loading = false,
   location,
   locationQuery,
   suggestions,
   showSuggestions,
   selectedLocation,
+  isSearching,
   suggestionRef,
   onDateChange,
   onTimeChange,
   onDurationDaysChange,
+  onGoNow,
   onLocationInputChange,
   onLocationFocus,
   onSelectLocation,
@@ -102,6 +108,29 @@ export function PlanAheadForm({
         </div>
       </section>
 
+      {onGoNow && (
+        <>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onGoNow}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/15 px-4 py-3 text-sm font-semibold text-white backdrop-blur-lg transition hover:bg-white/25 disabled:opacity-50"
+          >
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Locate className="size-4" />
+            )}
+            Go Now — Use Current Location
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-white/20" />
+            <span className="text-xs font-medium text-white/50">or plan ahead</span>
+            <div className="h-px flex-1 bg-white/20" />
+          </div>
+        </>
+      )}
+
       <LocationAutocomplete
         label="2. Location"
         location={location}
@@ -109,6 +138,7 @@ export function PlanAheadForm({
         suggestions={suggestions}
         showSuggestions={showSuggestions}
         selectedLocation={selectedLocation}
+        isSearching={isSearching}
         suggestionRef={suggestionRef}
         onLocationInputChange={onLocationInputChange}
         onLocationFocus={onLocationFocus}
@@ -157,71 +187,75 @@ export function PlanAheadForm({
         </p>
       </div>
 
-      <section className="rounded-xl border border-white/30 bg-white/10 p-3.5 backdrop-blur-lg">
-        <p className="text-sm font-medium text-white/80">4. Duration</p>
-        <div className="mt-2 rounded-lg border border-white/25 bg-white/5 px-3 py-3">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => onDurationDaysChange(Math.max(1, durationDays - 1))}
-              className="size-8 rounded-md border border-white/25 text-white/85 transition hover:bg-white/10"
-              aria-label="Decrease duration"
-            >
-              -
-            </button>
-            <div className="flex items-center gap-2 text-white/90">
-              <CalendarDays className="size-4" />
-              <span className="text-sm font-medium">{durationLabel}</span>
+      {isMultiDay && (
+        <>
+          <section className="rounded-xl border border-white/30 bg-white/10 p-3.5 backdrop-blur-lg">
+            <p className="text-sm font-medium text-white/80">4. Duration</p>
+            <div className="mt-2 rounded-lg border border-white/25 bg-white/5 px-3 py-3">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => onDurationDaysChange(Math.max(2, durationDays - 1))}
+                  className="size-8 rounded-md border border-white/25 text-white/85 transition hover:bg-white/10"
+                  aria-label="Decrease duration"
+                >
+                  -
+                </button>
+                <div className="flex items-center gap-2 text-white/90">
+                  <CalendarDays className="size-4" />
+                  <span className="text-sm font-medium">{durationLabel}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onDurationDaysChange(Math.min(7, durationDays + 1))}
+                  className="size-8 rounded-md border border-white/25 text-white/85 transition hover:bg-white/10"
+                  aria-label="Increase duration"
+                >
+                  +
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {[2, 3, 5, 7].map((days) => (
+                  <button
+                    key={days}
+                    type="button"
+                    onClick={() => onDurationDaysChange(days)}
+                    className={cn(
+                      "rounded-md border px-2 py-1 text-xs font-medium transition",
+                      durationDays === days
+                        ? "border-white/60 bg-white/20 text-white"
+                        : "border-white/20 bg-white/5 text-white/70 hover:bg-white/10"
+                    )}
+                  >
+                    {days}d
+                  </button>
+                ))}
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => onDurationDaysChange(Math.min(7, durationDays + 1))}
-              className="size-8 rounded-md border border-white/25 text-white/85 transition hover:bg-white/10"
-              aria-label="Increase duration"
-            >
-              +
-            </button>
-          </div>
-          <div className="mt-3 grid grid-cols-4 gap-2">
-            {[1, 3, 5, 7].map((days) => (
-              <button
-                key={days}
-                type="button"
-                onClick={() => onDurationDaysChange(days)}
-                className={cn(
-                  "rounded-md border px-2 py-1 text-xs font-medium transition",
-                  durationDays === days
-                    ? "border-white/60 bg-white/20 text-white"
-                    : "border-white/20 bg-white/5 text-white/70 hover:bg-white/10"
-                )}
-              >
-                {days}d
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
+          </section>
 
-      <details className="rounded-xl border border-dashed border-white/30 bg-white/[0.06] p-3.5">
-        <summary className="flex cursor-pointer list-none items-center justify-between text-white/80">
-          <span className="flex items-center gap-2">
-            <Route className="size-4" />
-            <span className="text-sm font-medium">5. Multi-day preview</span>
-          </span>
-          <ChevronDown className="size-4 opacity-70" />
-        </summary>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {Array.from({ length: Math.min(durationDays, 5) }, (_, index) => `Day ${index + 1}`).map((label) => (
-            <div
-              key={label}
-              className="rounded-lg border border-white/20 bg-white/5 px-2 py-2 text-center"
-            >
-              <p className="text-xs font-semibold text-white/80">{label}</p>
-              <p className="mt-1 text-[11px] text-white/60">Weather + layer delta</p>
+          <details className="rounded-xl border border-dashed border-white/30 bg-white/[0.06] p-3.5">
+            <summary className="flex cursor-pointer list-none items-center justify-between text-white/80">
+              <span className="flex items-center gap-2">
+                <Route className="size-4" />
+                <span className="text-sm font-medium">5. Multi-day preview</span>
+              </span>
+              <ChevronDown className="size-4 opacity-70" />
+            </summary>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {Array.from({ length: Math.min(durationDays, 5) }, (_, index) => `Day ${index + 1}`).map((label) => (
+                <div
+                  key={label}
+                  className="rounded-lg border border-white/20 bg-white/5 px-2 py-2 text-center"
+                >
+                  <p className="text-xs font-semibold text-white/80">{label}</p>
+                  <p className="mt-1 text-[11px] text-white/60">Weather + layer delta</p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </details>
+          </details>
+        </>
+      )}
     </div>
   );
 }

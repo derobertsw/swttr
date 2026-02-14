@@ -1,7 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { MapPin } from "lucide-react";
+import { Loader2, MapPin } from "lucide-react";
 import { LocationSuggestion } from "@/types/recommendations";
 import { RefObject, useEffect, useRef, useState } from "react";
 import { FROSTED_INPUT_FULL, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
@@ -15,6 +15,7 @@ interface LocationAutocompleteProps {
   suggestions: LocationSuggestion[];
   showSuggestions: boolean;
   selectedLocation: LocationSuggestion | null;
+  isSearching?: boolean;
   suggestionRef: RefObject<HTMLDivElement | null>;
   onLocationInputChange: (value: string) => void;
   onLocationFocus: () => void;
@@ -31,6 +32,7 @@ export function LocationAutocomplete({
   suggestions,
   showSuggestions,
   selectedLocation,
+  isSearching = false,
   suggestionRef,
   onLocationInputChange,
   onLocationFocus,
@@ -108,7 +110,11 @@ export function LocationAutocomplete({
         </label>
       )}
       <div className="relative" ref={suggestionRef}>
-        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/75 z-10" />
+        {isSearching ? (
+          <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/75 z-10 animate-spin" />
+        ) : (
+          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/75 z-10" />
+        )}
         <Input
           id={id}
           role="combobox"

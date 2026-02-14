@@ -11,6 +11,7 @@ interface LocationInputProps {
   suggestions: LocationSuggestion[];
   showSuggestions: boolean;
   selectedLocation: LocationSuggestion | null;
+  isSearching?: boolean;
   suggestionRef: RefObject<HTMLDivElement | null>;
   onLocationInputChange: (value: string) => void;
   onLocationFocus: () => void;
@@ -25,6 +26,7 @@ export function LocationInput({
   suggestions,
   showSuggestions,
   selectedLocation,
+  isSearching,
   suggestionRef,
   onLocationInputChange,
   onLocationFocus,
@@ -40,6 +42,7 @@ export function LocationInput({
         suggestions={suggestions}
         showSuggestions={showSuggestions}
         selectedLocation={selectedLocation}
+        isSearching={isSearching}
         suggestionRef={suggestionRef}
         onLocationInputChange={onLocationInputChange}
         onLocationFocus={onLocationFocus}

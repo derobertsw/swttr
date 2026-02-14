@@ -399,13 +399,32 @@ export function useGearUp() {
 
       dispatch({ type: "SUBMIT_START" });
       try {
-        const result = await submitPlanAhead(
-          state,
-          activity,
-          sensitivity,
-          locationSearch,
-        );
-        dispatch({ type: "SUBMIT_PLAN_SUCCESS", ...result });
+        if (state.durationDays === 1) {
+          // Single-day plan-ahead: use regular layer display with biophysics
+          const result = await submitLocationDenied(
+            state,
+            activity,
+            exertion,
+            bodyMetrics,
+            sensitivity,
+            locationSearch,
+            biophysics
+          );
+          if (result) {
+            dispatch({ type: "SUBMIT_SUCCESS", ...result });
+          } else {
+            toast.error("Could not get weather for this location.");
+            dispatch({ type: "SUBMIT_ERROR" });
+          }
+        } else {
+          const result = await submitPlanAhead(
+            state,
+            activity,
+            sensitivity,
+            locationSearch,
+          );
+          dispatch({ type: "SUBMIT_PLAN_SUCCESS", ...result });
+        }
       } catch (error) {
         toast.error("Failed to fetch weather forecast");
         logWarn("useGearUp.handleSubmit", error);
@@ -527,6 +546,30 @@ export function useGearUp() {
     window.dispatchEvent(new CustomEvent("gearUpLoading", { detail: state.loading }));
   }, [state.loading]);
 
+  const handleGoNow = useCallback(async () => {
+    if (!activity) {
+      toast.error("Please select an activity");
+      return;
+    }
+    dispatch({ type: "SUBMIT_START" });
+    const { result, locationDenied: denied } = await submitCurrentLocation(
+      activity,
+      exertion,
+      bodyMetrics,
+      sensitivity,
+      biophysics
+    );
+    if (result) {
+      dispatch({ type: "SUBMIT_SUCCESS", ...result });
+    } else if (denied) {
+      toast.error("Location access denied. Please enter a location or use Plan Ahead.");
+      dispatch({ type: "SUBMIT_ERROR" });
+    } else {
+      toast.error("Could not get current weather.");
+      dispatch({ type: "SUBMIT_ERROR" });
+    }
+  }, [activity, biophysics, bodyMetrics, exertion, sensitivity]);
+
   const resetToInitialState = useCallback(() => {
     setActivityState(defaultActivity || DEFAULT_ACTIVITY);
     setHasSetInitialActivity(true);
@@ -569,6 +612,7 @@ export function useGearUp() {
 
     // Actions
     handleSubmit,
+    handleGoNow,
     resetToInitialState,
   };
 }

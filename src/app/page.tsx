@@ -30,10 +30,12 @@ const HomeContent = () => {
     setTime,
     durationDays,
     setDurationDays,
+    loading,
     locationDenied,
     biophysicsData,
     multiDayPlan,
     locationSearch,
+    handleGoNow,
     resetToInitialState,
   } = useGearUp();
 
@@ -81,6 +83,7 @@ const HomeContent = () => {
                 suggestions={locationSearch.suggestions}
                 showSuggestions={locationSearch.showSuggestions}
                 selectedLocation={locationSearch.selectedLocation}
+                isSearching={locationSearch.isSearching}
                 suggestionRef={locationSearch.suggestionRef}
                 onLocationInputChange={locationSearch.handleLocationInputChange}
                 onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
@@ -92,15 +95,18 @@ const HomeContent = () => {
                 date={date}
                 time={time}
                 durationDays={durationDays}
+                loading={loading}
                 location={locationSearch.location}
                 locationQuery={locationSearch.locationQuery}
                 suggestions={locationSearch.suggestions}
                 showSuggestions={locationSearch.showSuggestions}
                 selectedLocation={locationSearch.selectedLocation}
+                isSearching={locationSearch.isSearching}
                 suggestionRef={locationSearch.suggestionRef}
                 onDateChange={setDate}
                 onTimeChange={setTime}
                 onDurationDaysChange={setDurationDays}
+                onGoNow={handleGoNow}
                 onLocationInputChange={locationSearch.handleLocationInputChange}
                 onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
                 onSelectLocation={locationSearch.handleSelectLocation}

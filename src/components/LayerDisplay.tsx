@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, ChevronUp, Info } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, ChevronUp, Info, Loader2 } from "lucide-react";
 import { Recommendation } from "@/types/recommendations";
 import {
   BiophysicsRecommendation,
@@ -744,7 +744,16 @@ const LayerDisplay = ({
               <h3 className="mt-0.5 text-xl font-semibold leading-tight">Improve Wardrobe</h3>
               <p className="mt-1.5 text-sm opacity-90">{wardrobeGapMessage}</p>
               {purchaseSuggestionsLoading ? (
-                <p className="mt-3 text-sm">Finding purchasable items in the wardrobe database...</p>
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-amber-800/70">
+                    <Loader2 className="size-3.5 animate-spin" />
+                    <span>Finding gear suggestions...</span>
+                  </div>
+                  <div className="rounded-md border border-current/20 bg-white/55 p-2.5">
+                    <div className="h-4 w-3/4 animate-pulse rounded bg-amber-900/12" />
+                    <div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-amber-900/8" />
+                  </div>
+                </div>
               ) : purchaseSuggestions.length > 0 ? (
                 <div className="mt-3">
                   <p className="text-xs font-semibold uppercase tracking-wide opacity-70">Suggested Gear To Buy</p>

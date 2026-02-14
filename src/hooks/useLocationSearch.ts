@@ -10,15 +10,19 @@ export function useLocationSearch() {
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const suggestionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchSuggestions = async () => {
-      if (locationQuery.length < 2) {
-        setSuggestions([]);
-        return;
-      }
+    if (locationQuery.length < 2) {
+      setSuggestions([]);
+      setIsSearching(false);
+      return;
+    }
 
+    setIsSearching(true);
+
+    const fetchSuggestions = async () => {
       try {
         const response = await fetch(`/api/geocode?q=${encodeURIComponent(locationQuery)}`);
         const data = await response.json();
@@ -26,6 +30,8 @@ export function useLocationSearch() {
         setShowSuggestions(true);
       } catch (error) {
         logWarn("useLocationSearch", error);
+      } finally {
+        setIsSearching(false);
       }
     };
 
@@ -80,6 +86,7 @@ export function useLocationSearch() {
     suggestions,
     showSuggestions,
     selectedLocation,
+    isSearching,
     suggestionRef,
     setShowSuggestions,
     handleSelectLocation,
