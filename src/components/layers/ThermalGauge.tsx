@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface ThermalGaugeProps {
@@ -10,6 +11,8 @@ interface ThermalGaugeProps {
   showStatusPill?: boolean;
   hideMarkerLabel?: boolean;
 }
+
+const LONG_PRESS_MS = 400;
 
 /**
  * Build a dynamic clo domain around the algorithm's target range.
@@ -42,6 +45,23 @@ export function ThermalGauge({
   showStatusPill = true,
   hideMarkerLabel = false,
 }: ThermalGaugeProps) {
+  const [showClo, setShowClo] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startPress = useCallback(() => {
+    timerRef.current = setTimeout(() => {
+      setShowClo(true);
+    }, LONG_PRESS_MS);
+  }, []);
+
+  const endPress = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setShowClo(false);
+  }, []);
+
   if (totalClo === undefined || !targetRange) return null;
 
   const [targetMin, targetMax] = targetRange;
@@ -77,8 +97,10 @@ export function ThermalGauge({
     ? `${markerLabel} ${totalClo.toFixed(1)} clo`
     : `${totalClo.toFixed(1)} clo`;
 
+  const showMarker = !hideMarkerLabel || showClo;
+
   return (
-    <div className="w-full">
+    <div className="w-full select-none">
       {showStatusPill && (
         <div className={cn("mb-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold", statusClass)}>
           {statusText}
@@ -91,10 +113,16 @@ export function ThermalGauge({
       </div>
 
       <div
-        className="relative h-2.5 rounded-full mb-6"
+        className="relative h-2.5 rounded-full mb-6 touch-none"
         style={{
           background: "linear-gradient(to right, #6BAADB 0%, #7DC4A8 35%, #A8C9A0 50%, #C9C490 65%, #D4B87A 100%)",
         }}
+        onMouseDown={hideMarkerLabel ? startPress : undefined}
+        onMouseUp={hideMarkerLabel ? endPress : undefined}
+        onMouseLeave={hideMarkerLabel ? endPress : undefined}
+        onTouchStart={hideMarkerLabel ? startPress : undefined}
+        onTouchEnd={hideMarkerLabel ? endPress : undefined}
+        onTouchCancel={hideMarkerLabel ? endPress : undefined}
       >
         <div
           className="absolute inset-y-0 rounded-full border border-white/35 bg-white/22 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
@@ -110,11 +138,12 @@ export function ThermalGauge({
             left: `${markerPercent}%`,
           }}
         >
-          {!hideMarkerLabel && (
+          {showMarker && (
             <span
               className={cn(
-                "absolute -top-7 left-0 whitespace-nowrap rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-medium text-white/95",
-                markerLabelClass
+                "absolute -top-7 left-0 whitespace-nowrap rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-medium text-white/95 transition-opacity duration-150",
+                markerLabelClass,
+                showClo && hideMarkerLabel ? "animate-in fade-in" : ""
               )}
             >
               {markerText}
