@@ -26,7 +26,7 @@ import {
 } from "@/lib/layers";
 import { calculateThermalComfortScore, evaluateThermalComfort } from "@/lib/biophysics/comfort";
 import type { AvailableItem } from "@/types/wardrobe";
-import { STORAGE_KEYS } from "@/lib/storage";
+import { useAuth } from "@clerk/nextjs";
 import { logWarn } from "@/lib/logger";
 import { Button } from "@/components/ui/button";
 import {
@@ -422,6 +422,7 @@ const LayerDisplay = ({
   biophysicsData,
   onReset,
 }: LayerDisplayProps) => {
+  const { userId } = useAuth();
   const isBackcountrySkiing = activity === "backcountry_skiing";
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
   const [genericCloByBodyPart, setGenericCloByBodyPart] = useState<Record<BodyPart, number>>({
@@ -573,13 +574,10 @@ const LayerDisplay = ({
         const availablePayload = await availableResponse.json() as { items?: AvailableItem[] };
         const availableItems = Array.isArray(availablePayload.items) ? availablePayload.items : [];
 
-        const userId = localStorage.getItem(STORAGE_KEYS.USER_ID);
         const ownedItemIds = new Set<string>();
 
         if (userId) {
-          const wardrobeResponse = await fetch("/api/wardrobe/gear", {
-            headers: { "x-user-id": userId },
-          });
+          const wardrobeResponse = await fetch("/api/wardrobe/gear");
 
           if (wardrobeResponse.ok) {
             const wardrobePayload = await wardrobeResponse.json() as {
@@ -622,7 +620,7 @@ const LayerDisplay = ({
     return () => {
       isCancelled = true;
     };
-  }, [hasWardrobeGap, totalDeficit, torsoDeficit, legsDeficit]);
+  }, [hasWardrobeGap, totalDeficit, torsoDeficit, legsDeficit, userId]);
 
   if (!recommendation && !biophysicsData) return null;
 

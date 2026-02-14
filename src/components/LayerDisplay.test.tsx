@@ -2,6 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import LayerDisplay from "./LayerDisplay";
 
+// Mock Clerk — default to signed-in user
+const mockUseAuth = vi.fn(() => ({ userId: "test-user", isLoaded: true, isSignedIn: true }));
+vi.mock("@clerk/nextjs", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 const mockRecommendation = {
   torso: {
     base: [{ name: "Wool base layer" }],
