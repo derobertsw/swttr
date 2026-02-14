@@ -228,8 +228,11 @@ export async function POST(request: NextRequest) {
     packInsulationCandidates, additionalCloNeeded, shouldPrioritizeLightPack
   );
 
-  // Hard shell is mandatory for descent — always select one for the pack
-  const packShellLayer = selectShellForConditions(packShellCandidates, true);
+  // Add a hard shell for descent if the climb ensemble doesn't already include one
+  const climbHasHardShell = uphillEnsemble.some((g) => g.category === 'hard_shell');
+  const packShellLayer = climbHasHardShell
+    ? null
+    : selectShellForConditions(packShellCandidates, true);
 
   // Downhill Ensemble (for scoring): climb layers + pack insulation + mandatory shell
   const downhillEnsemble = [...uphillEnsemble];
@@ -321,12 +324,10 @@ export async function POST(request: NextRequest) {
     false,
     extremityIreqUphill.neutral.hands
   );
-  const descentHandwear = selectHandwear(
-    userHandwear,
-    tempC,
-    false,
-    extremityIreqDownhill.neutral.hands
-  );
+  // Gloves carry over from the climb — only select warmer descent gloves if climb pair is insufficient
+  const descentHandwear = selectedHandwear && selectedHandwear.rcl_clo >= extremityIreqDownhill.neutral.hands
+    ? selectedHandwear
+    : selectHandwear(userHandwear, tempC, false, extremityIreqDownhill.neutral.hands) ?? selectedHandwear;
 
   return NextResponse.json({
     conditions: {

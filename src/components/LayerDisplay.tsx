@@ -1195,6 +1195,36 @@ const LayerDisplay = ({
             </div>
           )}
 
+          {descentHeadwear?.head_warmth && descentHeadwear.head_warmth.name !== headwear?.head_warmth?.name && (
+            <div className="mt-3 rounded-md border border-white/20 bg-white/10 p-2.5">
+              <p className="text-xs uppercase text-white/60 tracking-wide">Head</p>
+              <p className="text-sm font-semibold text-white/90">{descentHeadwear.head_warmth.name}</p>
+              <p className="mt-0.5 text-xs text-white/70">
+                Swap for descent · {descentHeadwear.head_warmth.rcl.toFixed(2)} clo
+              </p>
+            </div>
+          )}
+
+          {descentHeadwear?.neck_warmth && descentHeadwear.neck_warmth.name !== headwear?.neck_warmth?.name && (
+            <div className="mt-3 rounded-md border border-white/20 bg-white/10 p-2.5">
+              <p className="text-xs uppercase text-white/60 tracking-wide">Neck</p>
+              <p className="text-sm font-semibold text-white/90">{descentHeadwear.neck_warmth.name}</p>
+              <p className="mt-0.5 text-xs text-white/70">
+                Swap for descent · {descentHeadwear.neck_warmth.rcl.toFixed(2)} clo
+              </p>
+            </div>
+          )}
+
+          {biophysicsData?.descent_handwear && biophysicsData.descent_handwear.name !== handwear?.name && (
+            <div className="mt-3 rounded-md border border-white/20 bg-white/10 p-2.5">
+              <p className="text-xs uppercase text-white/60 tracking-wide">Gloves</p>
+              <p className="text-sm font-semibold text-white/90">{biophysicsData.descent_handwear.name}</p>
+              <p className="mt-0.5 text-xs text-white/70">
+                Swap from climb gloves · {biophysicsData.descent_handwear.rcl.toFixed(2)} clo
+              </p>
+            </div>
+          )}
+
           {descentPackItems.length > 0 ? (
             <>
               <ul className="mt-3 space-y-2">
