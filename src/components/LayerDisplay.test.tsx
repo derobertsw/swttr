@@ -654,8 +654,11 @@ describe("LayerDisplay", () => {
 
       expect(screen.getAllByText("Climb").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Descent").length).toBeGreaterThan(0);
-      expect(screen.getByText("1.7 clo")).toBeInTheDocument();
-      expect(screen.getByText("2.4 clo")).toBeInTheDocument();
+      expect(screen.getByText("Climb: In target range")).toBeInTheDocument();
+      expect(screen.getByText("Descent: In target range")).toBeInTheDocument();
+      expect(screen.getByText("You're in range on climb, in range on descent.")).toBeInTheDocument();
+      expect(screen.getByText("Current setup: 1.7 clo · Descent with pack: 2.4 clo")).toBeInTheDocument();
+      expect(screen.queryByText(/Climb Cold Risk/i)).not.toBeInTheDocument();
       expect(screen.getByText("Descent Layer Plan")).toBeInTheDocument();
       expect(screen.getByText("Patagonia Nano Puff")).toBeInTheDocument();
       expect(screen.getByText("Descent target insulation: 2.2-2.8 clo")).toBeInTheDocument();
@@ -746,12 +749,12 @@ describe("LayerDisplay", () => {
         );
 
         expect(screen.getByText("Descent Warning")).toBeInTheDocument();
-        expect(screen.getByText("Improve Wardrobe")).toBeInTheDocument();
-        expect(
-          screen.getByText("Insufficient insulation for the way down with current wardrobe layers: 2.0 clo vs 2.6 clo needed (0.6 clo short).")
-        ).toBeInTheDocument();
+        expect(screen.getByText("Descent Risk")).toBeInTheDocument();
+        expect(screen.getByText("Current: 2.0 clo")).toBeInTheDocument();
+        expect(screen.getByText("Descent target: 2.6-3.0 clo (+0.6 needed)")).toBeInTheDocument();
         expect(await screen.findByText("Suggested Gear To Buy")).toBeInTheDocument();
         expect(await screen.findByText("Arc'teryx Atom Hoody")).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "Add descent layer" })).toHaveAttribute("href", "/wardrobe");
       } finally {
         fetchMock.mockRestore();
         localStorage.removeItem("swttr-user-id");

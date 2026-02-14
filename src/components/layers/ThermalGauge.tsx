@@ -7,6 +7,8 @@ interface ThermalGaugeProps {
   targetRange: [number, number] | undefined;
   markerLabel?: string;
   targetLabel?: string;
+  showStatusPill?: boolean;
+  hideMarkerLabel?: boolean;
 }
 
 /**
@@ -37,6 +39,8 @@ export function ThermalGauge({
   targetRange,
   markerLabel = "You",
   targetLabel = "Target",
+  showStatusPill = true,
+  hideMarkerLabel = false,
 }: ThermalGaugeProps) {
   if (totalClo === undefined || !targetRange) return null;
 
@@ -75,9 +79,11 @@ export function ThermalGauge({
 
   return (
     <div className="w-full">
-      <div className={cn("mb-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold", statusClass)}>
-        {statusText}
-      </div>
+      {showStatusPill && (
+        <div className={cn("mb-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold", statusClass)}>
+          {statusText}
+        </div>
+      )}
       <div className="mb-1.5 flex justify-between text-xs text-white/70">
         <span>Cold</span>
         <span className="text-white/75">Comfortable</span>
@@ -104,14 +110,16 @@ export function ThermalGauge({
             left: `${markerPercent}%`,
           }}
         >
-          <span
-            className={cn(
-              "absolute -top-7 left-0 whitespace-nowrap rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-medium text-white/95",
-              markerLabelClass
-            )}
-          >
-            {markerText}
-          </span>
+          {!hideMarkerLabel && (
+            <span
+              className={cn(
+                "absolute -top-7 left-0 whitespace-nowrap rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-medium text-white/95",
+                markerLabelClass
+              )}
+            >
+              {markerText}
+            </span>
+          )}
           <div
             className="w-6 h-6 rounded-full bg-white border-[2.5px] border-slate-700"
             style={{

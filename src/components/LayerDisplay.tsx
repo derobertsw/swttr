@@ -296,6 +296,76 @@ function getDecisionClasses(state: ThermalDecisionState | null, hasWardrobeGap: 
     : "border-amber-300 bg-amber-50 text-amber-950";
 }
 
+type CloStatusKind = "need" | "over" | "inRange";
+
+interface CloStatus {
+  kind: CloStatusKind;
+  delta: number;
+  label: string;
+  phrase: string;
+  className: string;
+}
+
+function getCloStatus(
+  totalClo: number | undefined,
+  targetRange: [number, number] | undefined
+): CloStatus | null {
+  if (totalClo === undefined || !targetRange) return null;
+
+  const [targetMin, targetMax] = targetRange;
+  const CLO_EPSILON = 0.05;
+  const deficitRaw = targetMin - totalClo;
+  const surplusRaw = totalClo - targetMax;
+  const deficit = deficitRaw > CLO_EPSILON ? deficitRaw : 0;
+  const surplus = surplusRaw > CLO_EPSILON ? surplusRaw : 0;
+
+  if (deficit > 0) {
+    return {
+      kind: "need",
+      delta: deficit,
+      label: `Need +${deficit.toFixed(1)} clo`,
+      phrase: "cold",
+      className: "border-sky-200 bg-sky-50/95 text-sky-800",
+    };
+  }
+
+  if (surplus > 0) {
+    return {
+      kind: "over",
+      delta: surplus,
+      label: `Over +${surplus.toFixed(1)} clo`,
+      phrase: "warm",
+      className: "border-amber-200 bg-amber-50/95 text-amber-800",
+    };
+  }
+
+  return {
+    kind: "inRange",
+    delta: 0,
+    label: "In target range",
+    phrase: "in range",
+    className: "border-emerald-200 bg-emerald-50/95 text-emerald-800",
+  };
+}
+
+function getDecisionFromCloStatus(status: CloStatus | null): ThermalDecisionState | null {
+  if (!status) return null;
+
+  if (status.kind === "inRange") {
+    return {
+      riskType: "comfortable",
+      severity: "moderate",
+      delta: 0,
+    };
+  }
+
+  return {
+    riskType: status.kind === "need" ? "cold" : "overheat",
+    severity: status.delta >= 0.35 ? "high" : "moderate",
+    delta: status.delta,
+  };
+}
+
 /**
  * Calculates current and target clo values for a body part based on biophysics data.
  */
@@ -392,7 +462,7 @@ const LayerDisplay = ({
   }, 0);
   const downhillTargetMinClo = biophysicsData?.ireq?.downhill_target_range?.[0]
     ?? biophysicsData?.ireq?.downhill?.min;
-  const estimatedDescentClo = totalClo !== undefined ? totalClo + descentPackClo : undefined;
+  const estimatedDescentClo = effectiveTotalClo !== undefined ? effectiveTotalClo + descentPackClo : undefined;
   const descentDeficit =
     isBackcountrySkiing &&
     downhillTargetMinClo !== undefined &&
@@ -458,8 +528,6 @@ const LayerDisplay = ({
   })
     ?? biophysicsData?.recommendation?.thermal_comfort_score
     ?? biophysicsData?.recommendation?.score;
-  const statusSummary = getThermalSummary(thermalDecision);
-  const immediateAction = getImmediateAction(thermalDecision);
   const regionalDeficitSummary = BODY_PARTS
     .map((part) => {
       const { currentClo, targetClo } = getCloValues(
@@ -558,26 +626,50 @@ const LayerDisplay = ({
 
   if (!recommendation && !biophysicsData) return null;
 
-  const decisionTitle = thermalDecision
-    ? thermalDecision.riskType === "comfortable"
-      ? "Comfort Range Achieved"
-      : thermalDecision.riskType === "cold"
-        ? `Cold Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
-        : `Overheating Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
-    : "Layer Guidance";
-  const visibleSuggestions = showAllPurchaseSuggestions
-    ? purchaseSuggestions.slice(1)
-    : [];
-  const hasExtraSuggestions = purchaseSuggestions.length > 1;
-  const showRiskCard = biophysicsActive
-    ? Boolean(thermalDecision && thermalDecision.riskType !== "comfortable")
-    : true;
-  const topSuggestion = purchaseSuggestions[0];
   const uphillTargetRange = biophysicsData?.ireq?.target_range;
   const downhillTargetRange = biophysicsData?.ireq?.downhill_target_range
     ?? (biophysicsData?.ireq?.downhill
       ? [biophysicsData.ireq.downhill.min, biophysicsData.ireq.downhill.neutral] as [number, number]
       : undefined);
+  const showDualComfortGauges = isBackcountrySkiing
+    && biophysicsActive
+    && estimatedDescentClo !== undefined
+    && downhillTargetRange !== undefined;
+  const climbStatus = showDualComfortGauges ? getCloStatus(effectiveTotalClo, uphillTargetRange) : null;
+  const descentStatus = showDualComfortGauges ? getCloStatus(estimatedDescentClo, downhillTargetRange) : null;
+  const climbDecision = showDualComfortGauges ? getDecisionFromCloStatus(climbStatus) : null;
+  const decisionForRiskCard = showDualComfortGauges ? climbDecision : thermalDecision;
+  const backcountrySummaryLine = climbStatus && descentStatus
+    ? `You're ${climbStatus.phrase} on climb, ${descentStatus.phrase} on descent.`
+    : null;
+  const showDecisionChip = Boolean(thermalDecision) && !showDualComfortGauges;
+  const isBackcountryDescentGap = showDualComfortGauges && hasDescentGap;
+
+  const decisionTitle = thermalDecision
+    ? thermalDecision.riskType === "comfortable"
+      ? "In Target Range"
+      : thermalDecision.riskType === "cold"
+        ? `Cold Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
+        : `Overheating Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
+    : "Layer Guidance";
+  const climbRiskTitle = decisionForRiskCard
+    ? decisionForRiskCard.riskType === "comfortable"
+      ? "Climb In Target Range"
+      : decisionForRiskCard.riskType === "cold"
+        ? `Climb Cold Risk — ${decisionForRiskCard.severity === "high" ? "High" : "Moderate"}`
+        : `Climb Overheating Risk — ${decisionForRiskCard.severity === "high" ? "High" : "Moderate"}`
+    : "Climb Guidance";
+  const riskCardTitle = showDualComfortGauges ? climbRiskTitle : decisionTitle;
+  const visibleSuggestions = showAllPurchaseSuggestions
+    ? purchaseSuggestions.slice(1)
+    : [];
+  const hasExtraSuggestions = purchaseSuggestions.length > 1;
+  const showRiskCard = biophysicsActive
+    ? Boolean(decisionForRiskCard && decisionForRiskCard.riskType !== "comfortable")
+    : true;
+  const statusSummary = getThermalSummary(decisionForRiskCard);
+  const immediateAction = getImmediateAction(decisionForRiskCard);
+  const topSuggestion = purchaseSuggestions[0];
   const targetRangeLabel = biophysicsData?.ireq?.target_range
     ? formatCloRangeLabel(biophysicsData.ireq.target_range)
     : null;
@@ -589,10 +681,7 @@ const LayerDisplay = ({
   const topSummaryChipLabel = topDeficitArea
     ? `${topDeficitArea.label} +${topDeficitArea.deficit.toFixed(1)} clo`
     : null;
-  const showDualComfortGauges = isBackcountrySkiing
-    && biophysicsActive
-    && estimatedDescentClo !== undefined
-    && downhillTargetRange !== undefined;
+  const showInlineSnapshotRow = biophysicsActive && (!showDualComfortGauges || showDecisionChip || Boolean(topSummaryChipLabel));
 
   return (
     <div className="flex flex-col gap-8">
@@ -610,7 +699,7 @@ const LayerDisplay = ({
       <WeatherHeader
         temperature={temperature}
         windspeed={windspeed}
-        score={thermalComfortScore}
+        score={showDualComfortGauges ? undefined : thermalComfortScore}
         totalClo={effectiveTotalClo}
         targetRange={biophysicsData?.ireq?.target_range}
         regionalDeficit={maxRegionalDeficit}
@@ -620,6 +709,66 @@ const LayerDisplay = ({
       {showDualComfortGauges ? (
         <section className="rounded-xl border border-white/20 bg-white/[0.06] px-3 py-3 sm:px-4">
           <div className="space-y-4">
+            {climbStatus && descentStatus && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-semibold", climbStatus.className)}>
+                      Climb: {climbStatus.label}
+                    </span>
+                    <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-semibold", descentStatus.className)}>
+                      Descent: {descentStatus.label}
+                    </span>
+                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="View thermal snapshot details"
+                        className="inline-flex size-7 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white/80 transition-colors hover:bg-white/20"
+                      >
+                        <Info className="size-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72">
+                      <PopoverHeader>
+                        <PopoverTitle>Thermal Snapshot</PopoverTitle>
+                        <PopoverDescription>
+                          Quick context for the current recommendation.
+                        </PopoverDescription>
+                      </PopoverHeader>
+                      <div className="mt-3 space-y-2 text-xs text-slate-600">
+                        {effectiveTotalClo !== undefined && (
+                          <p>Current insulation: {effectiveTotalClo.toFixed(1)} clo</p>
+                        )}
+                        {targetRangeLabel && (
+                          <p>Target insulation: {targetRangeLabel}</p>
+                        )}
+                        {topDeficitArea ? (
+                          <p>Biggest regional gap: {topDeficitArea.label} (+{topDeficitArea.deficit.toFixed(1)} clo)</p>
+                        ) : (
+                          <p>No major regional insulation gaps detected.</p>
+                        )}
+                        {hasDescentGap && (
+                          <p>Descent shortfall: +{descentDeficit.toFixed(1)} clo</p>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                {backcountrySummaryLine && (
+                  <p className="text-sm font-medium text-white/88">{backcountrySummaryLine}</p>
+                )}
+                {effectiveTotalClo !== undefined && (
+                  <p className="text-xs text-white/68">
+                    Current setup: {effectiveTotalClo.toFixed(1)} clo
+                    {descentPackClo > 0 && estimatedDescentClo !== undefined
+                      ? ` · Descent with pack: ${estimatedDescentClo.toFixed(1)} clo`
+                      : ""}
+                  </p>
+                )}
+              </div>
+            )}
             <div>
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">
                 Climb
@@ -628,7 +777,9 @@ const LayerDisplay = ({
                 totalClo={effectiveTotalClo}
                 targetRange={uphillTargetRange}
                 markerLabel=""
-                targetLabel="Target"
+                targetLabel="Climb target"
+                showStatusPill={false}
+                hideMarkerLabel
               />
             </div>
             <div className="border-t border-white/15 pt-4">
@@ -639,7 +790,9 @@ const LayerDisplay = ({
                 totalClo={estimatedDescentClo}
                 targetRange={downhillTargetRange}
                 markerLabel=""
-                targetLabel="Target"
+                targetLabel="Descent target"
+                showStatusPill={false}
+                hideMarkerLabel
               />
             </div>
           </div>
@@ -651,9 +804,9 @@ const LayerDisplay = ({
         />
       )}
 
-      {biophysicsActive && (
+      {showInlineSnapshotRow && (
         <div className="-mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-          {thermalDecision && (
+          {showDecisionChip && (
             <span className="rounded-full border border-white/25 bg-white/10 px-2.5 py-1 font-semibold text-white/85">
               {decisionTitle}
             </span>
@@ -707,14 +860,16 @@ const LayerDisplay = ({
         <section
           className={cn(
             "rounded-xl border px-4 py-4 sm:px-5 sm:py-5",
-            getDecisionClasses(thermalDecision, false)
+            getDecisionClasses(decisionForRiskCard, false)
           )}
         >
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 opacity-80" />
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">Current Risk</p>
-              <h3 className="mt-0.5 text-xl font-semibold leading-tight">{decisionTitle}</h3>
+              <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">
+                {showDualComfortGauges ? "Climb Risk" : "Current Risk"}
+              </p>
+              <h3 className="mt-0.5 text-xl font-semibold leading-tight">{riskCardTitle}</h3>
               <p className="mt-1.5 text-sm opacity-90">{statusSummary}</p>
 
               <div className="mt-4 rounded-lg border border-current/20 bg-white/60 px-3.5 py-3">
@@ -723,7 +878,7 @@ const LayerDisplay = ({
                 </p>
                 <ul className="mt-2 list-disc pl-5 text-sm leading-relaxed">
                   <li>{immediateAction}</li>
-                  {thermalDecision && thermalDecision.riskType !== "comfortable" && (
+                  {decisionForRiskCard && decisionForRiskCard.riskType !== "comfortable" && (
                     <li>
                       Stay near target range: {targetRangeLabel ?? "your target clo range"}
                     </li>
@@ -740,9 +895,27 @@ const LayerDisplay = ({
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 opacity-80" />
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">Wardrobe Gap</p>
-              <h3 className="mt-0.5 text-xl font-semibold leading-tight">Improve Wardrobe</h3>
-              <p className="mt-1.5 text-sm opacity-90">{wardrobeGapMessage}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">
+                {isBackcountryDescentGap ? "Backcountry" : "Wardrobe Gap"}
+              </p>
+              <h3 className="mt-0.5 text-xl font-semibold leading-tight">
+                {isBackcountryDescentGap ? "Descent Risk" : "Improve Wardrobe"}
+              </h3>
+              {isBackcountryDescentGap && estimatedDescentClo !== undefined ? (
+                <>
+                  <p className="mt-1.5 text-sm font-medium opacity-90">Add one packable insulation layer for descent.</p>
+                  <ul className="mt-2 list-disc pl-5 text-sm leading-relaxed opacity-90">
+                    <li>Current: {estimatedDescentClo.toFixed(1)} clo</li>
+                    <li>
+                      Descent target: {downhillTargetRangeLabel ?? `${downhillTargetMinClo?.toFixed(1) ?? "?"}+ clo`}
+                      {" "}
+                      (+{descentDeficit.toFixed(1)} needed)
+                    </li>
+                  </ul>
+                </>
+              ) : (
+                <p className="mt-1.5 text-sm opacity-90">{wardrobeGapMessage}</p>
+              )}
               {purchaseSuggestionsLoading ? (
                 <div className="mt-3 space-y-2">
                   <div className="flex items-center gap-2 text-sm text-amber-800/70">
@@ -814,7 +987,7 @@ const LayerDisplay = ({
               <div className="mt-4 flex gap-2">
                 <Button asChild className="flex-1 bg-slate-900 text-white hover:bg-slate-800">
                   <Link href="/wardrobe">
-                    Update Wardrobe
+                    {isBackcountryDescentGap ? "Add descent layer" : "Update Wardrobe"}
                     <ArrowRight className="ml-1.5 size-4" />
                   </Link>
                 </Button>
