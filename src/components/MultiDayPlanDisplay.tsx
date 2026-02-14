@@ -9,7 +9,7 @@ import { DailyLayerPlan, MultiDayLayerPlan } from "@/types/plan";
 import { Recommendation } from "@/types/recommendations";
 import { WardrobeItem } from "@/types/wardrobe";
 import { CATEGORY_TO_LAYER_TYPE } from "@/lib/layers";
-import { useUserId } from "@/hooks/useUserId";
+import { useAuth } from "@clerk/nextjs";
 
 type BodyPartKey = "torso" | "legs" | "hands" | "headNeck";
 type LayerType = "base" | "mid" | "outer";
@@ -429,7 +429,7 @@ export default function MultiDayPlanDisplay({
   itemMappings,
   onReset,
 }: MultiDayPlanDisplayProps) {
-  const userId = useUserId();
+  const { userId } = useAuth();
   const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([]);
   const [packingView, setPackingView] = useState<PackingView>("packOnce");
   const [activeFilter, setActiveFilter] = useState<PackingFilter>("all");
@@ -445,9 +445,7 @@ export default function MultiDayPlanDisplay({
 
     const fetchWardrobeItems = async () => {
       try {
-        const response = await fetch("/api/wardrobe/gear", {
-          headers: { "x-user-id": userId },
-        });
+        const response = await fetch("/api/wardrobe/gear");
         if (!response.ok) {
           if (!isCancelled) setWardrobeItems([]);
           return;
