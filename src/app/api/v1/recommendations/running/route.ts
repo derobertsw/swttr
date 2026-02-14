@@ -85,15 +85,7 @@ export async function POST(request: NextRequest) {
     targetMin: targetMinClo,
     targetMax: maxClo,
   });
-  const extremityIreq = scaleIreqShapeToTargetRange(
-    calculateExtremityIreq(ireq, 'running', tempC, windMs),
-    {
-      ireqMin: ireq.ireqMin,
-      ireqNeutral: ireq.ireqNeutral,
-      targetMin: targetMinClo,
-      targetMax: maxClo,
-    }
-  );
+  const extremityIreq = calculateExtremityIreq(ireq, 'running', tempC, windMs);
 
   const recommendedHandwear = selectHandwear(
     userHandwear,

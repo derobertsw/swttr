@@ -89,15 +89,7 @@ export async function POST(request: NextRequest) {
 
   const { categorized, userHandwear, userHeadwear } = prepared;
   const ensemble = buildXCEnsemble(categorized, regionalIreq, minEvapPotential);
-  const extremityIreq = scaleIreqShapeToTargetRange(
-    calculateExtremityIreq(ireq, 'xc_skiing', tempC, windMs),
-    {
-      ireqMin: ireq.ireqMin,
-      ireqNeutral: ireq.ireqNeutral,
-      targetMin: targetMinClo,
-      targetMax: maxClo,
-    }
-  );
+  const extremityIreq = calculateExtremityIreq(ireq, 'xc_skiing', tempC, windMs);
 
   const recommendedHandwear = selectHandwear(
     userHandwear,

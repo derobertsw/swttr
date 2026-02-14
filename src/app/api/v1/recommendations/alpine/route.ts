@@ -115,15 +115,7 @@ export async function POST(request: NextRequest) {
       targetMax: targetCloMax,
     }
   );
-  const extremityIreq = scaleIreqShapeToTargetRange(
-    calculateExtremityIreq(alpineBaselineIreq, 'alpine_skiing', tempC, windMs),
-    {
-      ireqMin: baseTargetMin,
-      ireqNeutral: ireqChairlift.ireqNeutral,
-      targetMin: targetCloMin,
-      targetMax: targetCloMax,
-    }
-  );
+  const extremityIreq = calculateExtremityIreq(alpineBaselineIreq, 'alpine_skiing', tempC, windMs);
   const recommendedHandwear = selectHandwear(
     userHandwear,
     tempC,

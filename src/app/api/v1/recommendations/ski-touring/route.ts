@@ -45,7 +45,6 @@ const UPHILL_MIN_EVAP_POTENTIAL = 0.20;
 const UPHILL_WIND_FACTOR = 0.3;
 const DOWNHILL_SPEED_WIND = 5;
 const TRANSITION_WIND_FACTOR = 1.5;
-const SHELL_WIND_THRESHOLD = 8;
 
 // ============================================
 // TYPES
@@ -137,16 +136,10 @@ export async function POST(request: NextRequest) {
   });
   const uphillTargetCloRange: [number, number] = [uphillRange.min, uphillRange.max];
   const baseRegionalIreqUphill = calculateRegionalIreq(ireqUphill, 'ski_touring_uphill');
-  const baseExtremityIreqUphill = calculateExtremityIreq(
+  const extremityIreqUphill = calculateExtremityIreq(
     ireqUphill, 'ski_touring_uphill', tempC, windMs * UPHILL_WIND_FACTOR
   );
   const regionalIreqUphill = scaleIreqShapeToTargetRange(baseRegionalIreqUphill, {
-    ireqMin: ireqUphill.ireqMin,
-    ireqNeutral: ireqUphill.ireqNeutral,
-    targetMin: uphillTargetCloRange[0],
-    targetMax: uphillTargetCloRange[1],
-  });
-  const extremityIreqUphill = scaleIreqShapeToTargetRange(baseExtremityIreqUphill, {
     ireqMin: ireqUphill.ireqMin,
     ireqNeutral: ireqUphill.ireqNeutral,
     targetMin: uphillTargetCloRange[0],
@@ -235,15 +228,13 @@ export async function POST(request: NextRequest) {
     packInsulationCandidates, additionalCloNeeded, shouldPrioritizeLightPack
   );
 
-  const needsShellLayer = weather.precipitation || windMs > SHELL_WIND_THRESHOLD;
-  const packShellLayer = needsShellLayer
-    ? selectShellForConditions(packShellCandidates, weather.precipitation ?? false)
-    : null;
+  // Hard shell is mandatory for descent — always select one for the pack
+  const packShellLayer = selectShellForConditions(packShellCandidates, true);
 
-  // Downhill Ensemble (for scoring)
+  // Downhill Ensemble (for scoring): climb layers + pack insulation + mandatory shell
   const downhillEnsemble = [...uphillEnsemble];
   if (packInsulationLayer) downhillEnsemble.push(packInsulationLayer);
-  if (packShellLayer && !uphillEnsemble.includes(packShellLayer)) downhillEnsemble.push(packShellLayer);
+  if (packShellLayer && !uphillEnsemble.some((g) => g.id === packShellLayer.id)) downhillEnsemble.push(packShellLayer);
 
   const downhillThermalGarments = ensembleToThermalGarments(downhillEnsemble);
   const downhillThermalProperties = predictEnsembleThermal(downhillThermalGarments);
@@ -287,16 +278,10 @@ export async function POST(request: NextRequest) {
 
   // Downhill regional & extremity IREQ
   const baseRegionalIreqDownhill = calculateRegionalIreq(ireqDownhill, 'ski_touring_downhill');
-  const baseExtremityIreqDownhill = calculateExtremityIreq(
+  const extremityIreqDownhill = calculateExtremityIreq(
     ireqDownhill, 'ski_touring_downhill', tempC, windMs + DOWNHILL_SPEED_WIND
   );
   const regionalIreqDownhill = scaleIreqShapeToTargetRange(baseRegionalIreqDownhill, {
-    ireqMin: ireqDownhill.ireqMin,
-    ireqNeutral: ireqDownhill.ireqNeutral,
-    targetMin: downhillTargetCloRange[0],
-    targetMax: downhillTargetCloRange[1],
-  });
-  const extremityIreqDownhill = scaleIreqShapeToTargetRange(baseExtremityIreqDownhill, {
     ireqMin: ireqDownhill.ireqMin,
     ireqNeutral: ireqDownhill.ireqNeutral,
     targetMin: downhillTargetCloRange[0],
@@ -465,13 +450,11 @@ function buildUphillEnsemble(
   const legsShells = categorizedGarments.shells.filter((s) => s.covers_legs);
 
   const pickShell = (candidates: GarmentRow[]): GarmentRow | null => {
-    const breathable = candidates.filter(
-      (s) => s.category === 'soft_shell' &&
-        (s.garment_thermal_properties?.evap_potential ?? 0) >= UPHILL_MIN_EVAP_POTENTIAL
-    );
-    const pool = breathable.length > 0 ? breathable : candidates;
-    if (pool.length === 0) return null;
-    return sortByBreathability(pool)[0];
+    if (candidates.length === 0) return null;
+    // Prefer hard shells for protection on the climb
+    const hardShells = candidates.filter((s) => s.category === 'hard_shell');
+    if (hardShells.length > 0) return sortByBreathability(hardShells)[0];
+    return sortByBreathability(candidates)[0];
   };
 
   const torsoShell = pickShell(torsoShells);
