@@ -47,6 +47,7 @@ import {
   WeatherHeader,
   ThermalGauge,
   BodyPartSection,
+  WeatherEditDrawer,
 } from "@/components/layers";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +59,8 @@ interface LayerDisplayProps {
   itemMappings?: Map<string, string>;
   biophysicsData?: BiophysicsRecommendation | null;
   onReset?: () => void;
+  onWeatherChange?: (lat: number, lon: number, datetime?: string) => Promise<void>;
+  weatherLoading?: boolean;
 }
 
 interface CloValues {
@@ -499,8 +502,11 @@ const LayerDisplay = ({
   itemMappings,
   biophysicsData,
   onReset,
+  onWeatherChange,
+  weatherLoading,
 }: LayerDisplayProps) => {
   const { userId } = useAuth();
+  const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
   const isBackcountrySkiing = activity === "backcountry_skiing";
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
   const [breakdownSortMode, setBreakdownSortMode] = useState<BreakdownSortMode>(
@@ -860,17 +866,46 @@ const LayerDisplay = ({
         </div>
       )}
 
-      <WeatherHeader
-        temperature={temperature}
-        windspeed={windspeed}
-        score={showDualComfortGauges ? undefined : thermalComfortScore}
-        totalClo={effectiveTotalClo}
-        targetRange={biophysicsData?.ireq?.target_range}
-        regionalDeficit={maxRegionalDeficit}
-        hasRegionalGap={hasRegionalGap}
-        extremityDeficit={maxExtremityDeficit}
-        hasExtremityGap={hasExtremityGap}
-      />
+      {onWeatherChange ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setWeatherDrawerOpen(true)}
+            className="w-full text-left transition-opacity hover:opacity-80 active:opacity-70"
+          >
+            <WeatherHeader
+              temperature={temperature}
+              windspeed={windspeed}
+              score={showDualComfortGauges ? undefined : thermalComfortScore}
+              totalClo={effectiveTotalClo}
+              targetRange={biophysicsData?.ireq?.target_range}
+              regionalDeficit={maxRegionalDeficit}
+              hasRegionalGap={hasRegionalGap}
+              extremityDeficit={maxExtremityDeficit}
+              hasExtremityGap={hasExtremityGap}
+              interactive
+            />
+          </button>
+          <WeatherEditDrawer
+            open={weatherDrawerOpen}
+            onOpenChange={setWeatherDrawerOpen}
+            onSubmit={onWeatherChange}
+            loading={weatherLoading}
+          />
+        </>
+      ) : (
+        <WeatherHeader
+          temperature={temperature}
+          windspeed={windspeed}
+          score={showDualComfortGauges ? undefined : thermalComfortScore}
+          totalClo={effectiveTotalClo}
+          targetRange={biophysicsData?.ireq?.target_range}
+          regionalDeficit={maxRegionalDeficit}
+          hasRegionalGap={hasRegionalGap}
+          extremityDeficit={maxExtremityDeficit}
+          hasExtremityGap={hasExtremityGap}
+        />
+      )}
 
       {showDualComfortGauges ? (
         <section className="rounded-xl border border-white/20 bg-white/[0.06] px-3 py-3 sm:px-4">

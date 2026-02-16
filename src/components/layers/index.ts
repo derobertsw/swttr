@@ -6,3 +6,4 @@ export { HandwearDisplay, HeadwearDisplay } from "./ExtremityDisplay";
 export { LayerItems } from "./LayerItems";
 export { BodyPartSection } from "./BodyPartSection";
 export { GuidanceSection } from "./GuidanceSection";
+export { WeatherEditDrawer } from "./WeatherEditDrawer";

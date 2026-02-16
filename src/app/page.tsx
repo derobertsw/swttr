@@ -36,6 +36,7 @@ const HomeContent = () => {
     multiDayPlan,
     locationSearch,
     handleGoNow,
+    handleWeatherChange,
     resetToInitialState,
   } = useGearUp();
 
@@ -136,6 +137,8 @@ const HomeContent = () => {
             itemMappings={itemMappings}
             biophysicsData={biophysicsData}
             onReset={resetToInitialState}
+            onWeatherChange={handleWeatherChange}
+            weatherLoading={loading}
           />
         )}
       </div>

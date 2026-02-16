@@ -546,6 +546,42 @@ export function useGearUp() {
     window.dispatchEvent(new CustomEvent("gearUpLoading", { detail: state.loading }));
   }, [state.loading]);
 
+  const handleWeatherChange = useCallback(async (
+    latitude: number,
+    longitude: number,
+    datetime?: string
+  ) => {
+    dispatch({ type: "SUBMIT_START" });
+    try {
+      const url = datetime
+        ? `/api/weather?lat=${latitude}&lon=${longitude}&datetime=${datetime}`
+        : `/api/weather?lat=${latitude}&lon=${longitude}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch weather");
+      const weather = await response.json() as { temperature: number; windSpeed: number };
+
+      const layers = getRecommendation(weather.temperature, activity, sensitivity);
+      const bioData = await biophysics.fetch(
+        activity,
+        { temperature: weather.temperature, windSpeed: weather.windSpeed },
+        exertion,
+        bodyMetrics
+      );
+
+      dispatch({
+        type: "SUBMIT_SUCCESS",
+        recommendation: layers,
+        biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
+        temperature: weather.temperature,
+        windspeed: weather.windSpeed,
+      });
+    } catch (error) {
+      toast.error("Failed to update weather");
+      logWarn("useGearUp.handleWeatherChange", error);
+      dispatch({ type: "SUBMIT_ERROR" });
+    }
+  }, [activity, biophysics, bodyMetrics, exertion, sensitivity]);
+
   const handleGoNow = useCallback(async () => {
     if (!activity) {
       toast.error("Please select an activity");
@@ -613,6 +649,7 @@ export function useGearUp() {
     // Actions
     handleSubmit,
     handleGoNow,
+    handleWeatherChange,
     resetToInitialState,
   };
 }

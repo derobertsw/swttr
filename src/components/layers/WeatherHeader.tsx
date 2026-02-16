@@ -1,3 +1,4 @@
+import { Pencil } from "lucide-react";
 import ScoreDisplay from "@/components/ScoreDisplay";
 
 interface WeatherHeaderProps {
@@ -11,6 +12,7 @@ interface WeatherHeaderProps {
   hasRegionalGap?: boolean;
   extremityDeficit?: number;
   hasExtremityGap?: boolean;
+  interactive?: boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export function WeatherHeader({
   hasRegionalGap,
   extremityDeficit,
   hasExtremityGap,
+  interactive,
 }: WeatherHeaderProps) {
   const calculatedFeelsLike = feelsLike ?? calculateFeelsLike(temperature, windspeed);
   const showFeelsLike = calculatedFeelsLike !== temperature;
@@ -69,6 +72,15 @@ export function WeatherHeader({
               </>
             )}
             <span>Wind {windspeed} mph</span>
+            {interactive && (
+              <>
+                <span className="opacity-50">·</span>
+                <span className="inline-flex items-center gap-1">
+                  <Pencil className="size-3" />
+                  Edit
+                </span>
+              </>
+            )}
           </div>
 
           {temperature < 32 && (
