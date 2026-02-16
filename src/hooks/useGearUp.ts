@@ -582,6 +582,32 @@ export function useGearUp() {
     }
   }, [activity, biophysics, bodyMetrics, exertion, sensitivity]);
 
+  const handleActivityChange = useCallback(async (newActivity: string) => {
+    setActivity(newActivity);
+    dispatch({ type: "SUBMIT_START" });
+    try {
+      const layers = getRecommendation(state.temperature, newActivity, sensitivity);
+      const bioData = await biophysics.fetch(
+        newActivity,
+        { temperature: state.temperature, windSpeed: state.windspeed },
+        exertion,
+        bodyMetrics
+      );
+
+      dispatch({
+        type: "SUBMIT_SUCCESS",
+        recommendation: layers,
+        biophysicsData: normalizeBiophysicsForActivity(newActivity, bioData),
+        temperature: state.temperature,
+        windspeed: state.windspeed,
+      });
+    } catch (error) {
+      toast.error("Failed to update activity");
+      logWarn("useGearUp.handleActivityChange", error);
+      dispatch({ type: "SUBMIT_ERROR" });
+    }
+  }, [setActivity, state.temperature, state.windspeed, sensitivity, biophysics, exertion, bodyMetrics]);
+
   const handleGoNow = useCallback(async () => {
     if (!activity) {
       toast.error("Please select an activity");
@@ -650,6 +676,7 @@ export function useGearUp() {
     handleSubmit,
     handleGoNow,
     handleWeatherChange,
+    handleActivityChange,
     resetToInitialState,
   };
 }

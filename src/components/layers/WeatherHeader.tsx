@@ -1,5 +1,6 @@
 import { Pencil } from "lucide-react";
 import ScoreDisplay from "@/components/ScoreDisplay";
+import { cn } from "@/lib/utils";
 
 interface WeatherHeaderProps {
   temperature: number;
@@ -13,6 +14,7 @@ interface WeatherHeaderProps {
   extremityDeficit?: number;
   hasExtremityGap?: boolean;
   interactive?: boolean;
+  onEditWeather?: () => void;
 }
 
 /**
@@ -47,11 +49,13 @@ export function WeatherHeader({
   extremityDeficit,
   hasExtremityGap,
   interactive,
+  onEditWeather,
 }: WeatherHeaderProps) {
   const calculatedFeelsLike = feelsLike ?? calculateFeelsLike(temperature, windspeed);
   const showFeelsLike = calculatedFeelsLike !== temperature;
+  const isInteractive = interactive && typeof onEditWeather === "function";
 
-  return (
+  const content = (
     <div className="pb-6 border-b border-white/20">
       <div className="flex items-start justify-between">
         <div className="flex flex-col">
@@ -72,15 +76,6 @@ export function WeatherHeader({
               </>
             )}
             <span>Wind {windspeed} mph</span>
-            {interactive && (
-              <>
-                <span className="opacity-50">·</span>
-                <span className="inline-flex items-center gap-1">
-                  <Pencil className="size-3" />
-                  Edit
-                </span>
-              </>
-            )}
           </div>
 
           {temperature < 32 && (
@@ -104,5 +99,30 @@ export function WeatherHeader({
         )}
       </div>
     </div>
+  );
+
+  if (!isInteractive) {
+    return content;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onEditWeather}
+      aria-label="Change weather location, date, or time"
+      className={cn(
+        "group w-full rounded-2xl border border-white/20 bg-white/[0.05] p-3 text-left transition-colors",
+        "hover:bg-white/[0.09] active:bg-white/[0.12]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/65 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800"
+      )}
+    >
+      {content}
+      <div className="pt-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white/85 transition-colors group-hover:bg-white/15">
+          <Pencil className="size-3.5" />
+          Change location or time
+        </span>
+      </div>
+    </button>
   );
 }

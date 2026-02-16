@@ -37,6 +37,7 @@ const HomeContent = () => {
     locationSearch,
     handleGoNow,
     handleWeatherChange,
+    handleActivityChange,
     resetToInitialState,
   } = useGearUp();
 
@@ -138,6 +139,7 @@ const HomeContent = () => {
             biophysicsData={biophysicsData}
             onReset={resetToInitialState}
             onWeatherChange={handleWeatherChange}
+            onActivityChange={handleActivityChange}
             weatherLoading={loading}
           />
         )}

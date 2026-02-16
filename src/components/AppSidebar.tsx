@@ -45,9 +45,16 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
-        <Link href="/">
-          <h1 className="site-header text-xl group-data-[collapsible=icon]:hidden">SWTTR</h1>
+      <SidebarHeader className="p-4 pb-3">
+        <Link href="/" className="group-data-[collapsible=icon]:hidden">
+          <div className="rounded-xl border border-slate-300/70 bg-white/75 px-3 py-2 shadow-sm backdrop-blur-[2px]">
+            <h1 className="leading-none text-[1.6rem] font-extrabold tracking-[0.24em] text-slate-900">
+              SWTTR
+            </h1>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600/85">
+              Thermal Layering
+            </p>
+          </div>
         </Link>
       </SidebarHeader>
       <SidebarContent>

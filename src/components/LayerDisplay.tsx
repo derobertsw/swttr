@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, ChevronUp, Info, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, ChevronUp, Info, Loader2 } from "lucide-react";
 import { Recommendation } from "@/types/recommendations";
 import {
   BiophysicsRecommendation,
@@ -60,6 +60,7 @@ interface LayerDisplayProps {
   biophysicsData?: BiophysicsRecommendation | null;
   onReset?: () => void;
   onWeatherChange?: (lat: number, lon: number, datetime?: string) => Promise<void>;
+  onActivityChange?: (activity: string) => Promise<void>;
   weatherLoading?: boolean;
 }
 
@@ -503,10 +504,12 @@ const LayerDisplay = ({
   biophysicsData,
   onReset,
   onWeatherChange,
+  onActivityChange,
   weatherLoading,
 }: LayerDisplayProps) => {
   const { userId } = useAuth();
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
+  const [activityPopoverOpen, setActivityPopoverOpen] = useState(false);
   const isBackcountrySkiing = activity === "backcountry_skiing";
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
   const [breakdownSortMode, setBreakdownSortMode] = useState<BreakdownSortMode>(
@@ -858,34 +861,70 @@ const LayerDisplay = ({
             </button>
           ) : <span />}
           {selectedActivity && selectedActivityLabel && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/[0.08] px-2.5 py-1 text-[11px] font-semibold text-white/75">
-              <selectedActivity.icon className="size-3.5" />
-              <span className="max-w-[7.25rem] truncate sm:max-w-none">{selectedActivityLabel}</span>
-            </span>
+            onActivityChange ? (
+              <Popover open={activityPopoverOpen} onOpenChange={(open) => { if (!weatherLoading) setActivityPopoverOpen(open); }}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={weatherLoading}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/[0.08] px-2.5 py-1 text-[11px] font-semibold text-white/75 transition-colors hover:bg-white/[0.14]"
+                  >
+                    {weatherLoading ? <Loader2 className="size-3.5 animate-spin" /> : <selectedActivity.icon className="size-3.5" />}
+                    <span className="max-w-[7.25rem] truncate sm:max-w-none">{selectedActivityLabel}</span>
+                    <ChevronDown className="size-3 opacity-60" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-52 p-1" align="end">
+                  {ACTIVITIES.map((act) => (
+                    <button
+                      key={act.value}
+                      type="button"
+                      className={cn(
+                        "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors hover:bg-slate-100",
+                        act.value === activity && "bg-slate-50 font-semibold"
+                      )}
+                      onClick={() => {
+                        setActivityPopoverOpen(false);
+                        if (act.value !== activity) {
+                          void onActivityChange(act.value);
+                        }
+                      }}
+                    >
+                      <act.icon className="size-4 shrink-0 text-slate-500" />
+                      <span className="flex-1 text-left">{act.name}</span>
+                      {act.value === activity && (
+                        <Check className="size-3.5 text-slate-500" />
+                      )}
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/[0.08] px-2.5 py-1 text-[11px] font-semibold text-white/75">
+                <selectedActivity.icon className="size-3.5" />
+                <span className="max-w-[7.25rem] truncate sm:max-w-none">{selectedActivityLabel}</span>
+              </span>
+            )
           )}
         </div>
       )}
 
+      <div className={cn("flex flex-col gap-8 transition-opacity duration-200", weatherLoading && "opacity-50 pointer-events-none")}>
       {onWeatherChange ? (
         <>
-          <button
-            type="button"
-            onClick={() => setWeatherDrawerOpen(true)}
-            className="w-full text-left transition-opacity hover:opacity-80 active:opacity-70"
-          >
-            <WeatherHeader
-              temperature={temperature}
-              windspeed={windspeed}
-              score={showDualComfortGauges ? undefined : thermalComfortScore}
-              totalClo={effectiveTotalClo}
-              targetRange={biophysicsData?.ireq?.target_range}
-              regionalDeficit={maxRegionalDeficit}
-              hasRegionalGap={hasRegionalGap}
-              extremityDeficit={maxExtremityDeficit}
-              hasExtremityGap={hasExtremityGap}
-              interactive
-            />
-          </button>
+          <WeatherHeader
+            temperature={temperature}
+            windspeed={windspeed}
+            score={showDualComfortGauges ? undefined : thermalComfortScore}
+            totalClo={effectiveTotalClo}
+            targetRange={biophysicsData?.ireq?.target_range}
+            regionalDeficit={maxRegionalDeficit}
+            hasRegionalGap={hasRegionalGap}
+            extremityDeficit={maxExtremityDeficit}
+            hasExtremityGap={hasExtremityGap}
+            interactive
+            onEditWeather={() => setWeatherDrawerOpen(true)}
+          />
           <WeatherEditDrawer
             open={weatherDrawerOpen}
             onOpenChange={setWeatherDrawerOpen}
@@ -1375,6 +1414,7 @@ const LayerDisplay = ({
           </div>
         </details>
       )}
+      </div>
     </div>
   );
 };

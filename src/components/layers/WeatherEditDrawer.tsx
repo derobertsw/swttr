@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Clock3, Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -36,6 +36,15 @@ function getDefaultTime(): string {
   return `${hours}:00`;
 }
 
+function formatSelectedLocationName(
+  location: { name: string; region?: string | null; country: string } | null
+): string {
+  if (!location) return "No location selected yet";
+  return location.region
+    ? `${location.name}, ${location.region}, ${location.country}`
+    : `${location.name}, ${location.country}`;
+}
+
 export function WeatherEditDrawer({
   open,
   onOpenChange,
@@ -45,6 +54,12 @@ export function WeatherEditDrawer({
   const locationSearch = useLocationSearch();
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState(getDefaultTime);
+  const selectedLocationLabel = formatSelectedLocationName(locationSearch.selectedLocation);
+  const selectedTimeLabel = useMemo(() => {
+    if (!date) return "Using current conditions (now)";
+    const timeSuffix = time ? ` at ${time}` : "";
+    return `${format(date, "EEE, MMM d")}${timeSuffix}`;
+  }, [date, time]);
 
   const canSubmit = locationSearch.selectedLocation !== null && !loading;
 
@@ -63,17 +78,34 @@ export function WeatherEditDrawer({
     onOpenChange(false);
   };
 
+  const resetToNow = () => {
+    setDate(undefined);
+    setTime(getDefaultTime());
+  };
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent>
-        <DrawerHeader>
-          <DrawerTitle>Change Weather</DrawerTitle>
+      <DrawerContent className="max-h-[84vh]">
+        <DrawerHeader className="pb-2">
+          <DrawerTitle>Update Weather</DrawerTitle>
           <DrawerDescription>
-            Search for a location and optionally set a date and time.
+            Change location and optionally set forecast date/time.
           </DrawerDescription>
         </DrawerHeader>
 
         <div className="flex flex-col gap-4 px-4 pb-2">
+          <div className="rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Selection Preview</p>
+            <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-slate-800">
+              <MapPin className="size-3.5 text-slate-500" />
+              {selectedLocationLabel}
+            </p>
+            <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-slate-600">
+              <Clock3 className="size-3.5 text-slate-500" />
+              {selectedTimeLabel}
+            </p>
+          </div>
+
           <LocationAutocomplete
             id="weather-edit-location"
             label="Location"
@@ -97,7 +129,7 @@ export function WeatherEditDrawer({
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-muted-foreground">
-              Date & Time <span className="text-xs opacity-70">(optional — defaults to now)</span>
+              Date & Time <span className="text-xs opacity-70">(optional)</span>
             </label>
             <div className="flex gap-2">
               <Popover>
@@ -132,24 +164,57 @@ export function WeatherEditDrawer({
                 />
               </div>
             </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                onClick={resetToNow}
+              >
+                Use now
+              </Button>
+              {date && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs"
+                  onClick={() => setDate(undefined)}
+                >
+                  Clear date
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
-        <DrawerFooter>
-          <Button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="w-full"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Updating...
-              </>
-            ) : (
-              "Update Weather"
-            )}
-          </Button>
+        <DrawerFooter className="border-t border-slate-200 bg-white/95">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className="flex-1"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Apply Weather"
+              )}
+            </Button>
+          </div>
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
