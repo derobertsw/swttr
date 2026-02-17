@@ -1,4 +1,4 @@
-import { Pencil } from "lucide-react";
+import { ChevronRight, Pencil } from "lucide-react";
 import ScoreDisplay from "@/components/ScoreDisplay";
 import { cn } from "@/lib/utils";
 
@@ -118,9 +118,15 @@ export function WeatherHeader({
     >
       {content}
       <div className="pt-3">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white/85 transition-colors group-hover:bg-white/15">
-          <Pencil className="size-3.5" />
-          Change location or time
+        <span className="inline-flex w-full items-center justify-between rounded-xl border border-white/30 bg-white/10 px-3 py-2 text-white/85 transition-colors group-hover:bg-white/15">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
+            <Pencil className="size-3.5" />
+            Change location or time
+          </span>
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-white/70">
+            Tap
+            <ChevronRight className="size-3.5" />
+          </span>
         </span>
       </div>
     </button>
