@@ -6,7 +6,6 @@ import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Share2, HelpCircle, Menu, MessageSquare, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { logWarn } from "@/lib/logger";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
 import {
@@ -67,9 +66,6 @@ const Header = ({ onLogoClick }: HeaderProps) => {
   return (
     <header className="flex w-full items-center justify-between gap-4">
       <div className="flex items-center gap-2">
-        {/* Desktop sidebar toggle */}
-        <SidebarTrigger className="hidden md:flex" />
-
         {/* Mobile: show logo */}
         <Link href="/" onClick={onLogoClick} className="md:hidden">
           <h1 className="site-header">SWTTR</h1>

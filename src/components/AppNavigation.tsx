@@ -238,10 +238,10 @@ export function DesktopActionDock() {
         href={item.href}
         onClick={(e) => onTabClick(item, e)}
         className={cn(
-          "inline-flex h-12 min-w-[120px] items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors",
+          "inline-flex h-10 min-w-[102px] items-center justify-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition-colors",
           isActive
-            ? "border-white/45 bg-white/20 text-white"
-            : "border-white/20 bg-white/[0.06] text-white/80 hover:bg-white/[0.14]"
+            ? "border-white/45 bg-white/22 text-white shadow-[0_6px_14px_rgba(0,0,0,0.16)]"
+            : "border-white/18 bg-transparent text-white/78 hover:bg-white/[0.12]"
         )}
       >
         <item.icon className="size-4" />
@@ -253,13 +253,13 @@ export function DesktopActionDock() {
   return (
     <nav
       className={cn(
-        "pointer-events-none fixed bottom-6 z-50 hidden -translate-x-1/2 md:block",
+        "pointer-events-none fixed bottom-3 z-50 hidden -translate-x-1/2 md:block xl:bottom-4",
         "left-[calc((100vw+var(--sidebar-width))/2)]",
         "peer-data-[state=collapsed]:left-[calc((100vw+var(--sidebar-width-icon))/2)]",
         isLandingScreen ? "text-white/90" : "text-white"
       )}
     >
-      <div className="pointer-events-auto inline-flex items-center gap-2 rounded-2xl border border-white/25 bg-[rgba(32,71,95,0.66)] p-2 shadow-[0_18px_36px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+      <div className="pointer-events-auto inline-flex max-w-[min(640px,calc(100vw-var(--sidebar-width)-2.25rem))] items-center gap-2 rounded-2xl border border-white/25 bg-[linear-gradient(135deg,rgba(54,86,116,0.8)_0%,rgba(38,86,108,0.78)_100%)] p-2 shadow-[0_18px_34px_rgba(0,0,0,0.3)] backdrop-blur-xl">
         {renderDesktopTab(TAB_ITEMS[0])}
         <button
           type="button"
@@ -267,7 +267,7 @@ export function DesktopActionDock() {
           onClick={onGearUpClick}
           disabled={isGearUpLoading}
           className={cn(
-            "inline-flex h-14 min-w-[218px] items-center justify-center gap-2 rounded-xl bg-black px-6 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(0,0,0,0.4)] transition-transform duration-200 hover:bg-black/90",
+            "inline-flex h-12 min-w-[220px] items-center justify-center gap-2 rounded-xl border border-white/10 bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] px-6 text-sm font-semibold text-white shadow-[0_14px_26px_rgba(0,0,0,0.44)] transition-transform duration-200 hover:bg-[#030712]",
             isFabPulse && "scale-[1.03]"
           )}
         >

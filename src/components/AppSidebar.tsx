@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDays, Shirt, Settings, HelpCircle, MessageSquare } from "lucide-react";
@@ -13,6 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -44,20 +46,32 @@ export function AppSidebar() {
   } = usePreferences();
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar
+      collapsible="icon"
+      className="md:border-r md:border-white/20 md:bg-[rgba(239,245,251,0.86)] md:backdrop-blur-lg"
+      style={
+        {
+          "--sidebar-width": "15rem",
+          "--sidebar-width-icon": "3.25rem",
+        } as CSSProperties
+      }
+    >
       <SidebarHeader className="p-4 pb-3">
-        <Link href="/" className="group-data-[collapsible=icon]:hidden">
-          <div className="rounded-xl border border-slate-300/70 bg-white/75 px-3 py-2 shadow-sm backdrop-blur-[2px]">
-            <h1 className="leading-none text-[1.6rem] font-extrabold tracking-[0.24em] text-slate-900">
-              SWTTR
-            </h1>
-            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600/85">
-              Thermal Layering
-            </p>
-          </div>
-        </Link>
+        <div className="flex items-start justify-between gap-2">
+          <Link href="/" className="group-data-[collapsible=icon]:hidden">
+            <div className="rounded-xl border border-slate-300/70 bg-white/85 px-3 py-2 shadow-sm backdrop-blur-[2px]">
+              <h1 className="leading-none text-[1.6rem] font-extrabold tracking-[0.24em] text-slate-900">
+                SWTTR
+              </h1>
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600/85">
+                Thermal Layering
+              </p>
+            </div>
+          </Link>
+          <SidebarTrigger className="hidden md:inline-flex size-8 rounded-md border border-slate-300/70 bg-white/70 text-slate-700 hover:bg-white/90" />
+        </div>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="px-2 pb-3 pt-1">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -67,6 +81,7 @@ export function AppSidebar() {
                     asChild
                     isActive={item.href.startsWith("/?") ? pathname === "/" : pathname === item.href}
                     tooltip={item.label}
+                    className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
                   >
                     <Link href={item.href}>
                       <item.icon />
@@ -87,7 +102,10 @@ export function AppSidebar() {
                   onDefaultActivityChange={updateDefaultActivity}
                   onBodyMetricsChange={updateBodyMetrics}
                 >
-                  <SidebarMenuButton tooltip="Preferences">
+                  <SidebarMenuButton
+                    tooltip="Preferences"
+                    className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
+                  >
                     <Settings />
                     <span>Preferences</span>
                   </SidebarMenuButton>
@@ -97,7 +115,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarFooter>
+        <SidebarFooter className="px-0">
           <SidebarMenu>
             {FOOTER_ITEMS.map((item) => (
               <SidebarMenuItem key={item.href}>
@@ -105,6 +123,7 @@ export function AppSidebar() {
                   asChild
                   isActive={pathname === item.href}
                   tooltip={item.label}
+                  className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
                 >
                   {item.external ? (
                     <a href={item.href} target="_blank" rel="noopener noreferrer">
