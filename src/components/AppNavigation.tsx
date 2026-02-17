@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarDays, Shirt, Zap, Loader2 } from "lucide-react";
@@ -13,12 +13,17 @@ const TAB_ITEMS = [
   { href: "/wardrobe", label: "Wardrobe", icon: Shirt },
 ];
 
-export function MobileTabBar() {
-  const pathname = usePathname();
-  const router = useRouter();
+type TabItem = (typeof TAB_ITEMS)[number];
+
+interface RouterLike {
+  push: (href: string) => void;
+}
+
+function useNavigationState(pathname: string, router: RouterLike) {
   const [isGearUpLoading, setIsGearUpLoading] = useState(false);
   const [activityValue, setActivityValue] = useState<string>("");
   const [isFabPulse, setIsFabPulse] = useState(false);
+  const pulseTimeoutRef = useRef<number | null>(null);
 
   const isLandingScreen = pathname === "/";
 
@@ -53,10 +58,20 @@ export function MobileTabBar() {
       const nextValue = detail?.value ?? "";
       setActivityValue(nextValue);
       setIsFabPulse(true);
-      window.setTimeout(() => setIsFabPulse(false), 180);
+      if (pulseTimeoutRef.current !== null) {
+        window.clearTimeout(pulseTimeoutRef.current);
+      }
+      pulseTimeoutRef.current = window.setTimeout(() => {
+        setIsFabPulse(false);
+      }, 180);
     };
     window.addEventListener("activityChange", onActivityChange);
-    return () => window.removeEventListener("activityChange", onActivityChange);
+    return () => {
+      window.removeEventListener("activityChange", onActivityChange);
+      if (pulseTimeoutRef.current !== null) {
+        window.clearTimeout(pulseTimeoutRef.current);
+      }
+    };
   }, []);
 
   const ActivityGlyph = useMemo(() => {
@@ -64,26 +79,85 @@ export function MobileTabBar() {
     return match?.icon ?? Zap;
   }, [activityValue]);
 
-  const renderTab = (item: { href: string; label: string; icon: typeof CalendarDays }) => {
-    const wouldBeActive = item.href.startsWith("/?") ? pathname === "/" : pathname === item.href;
-    const isActive = wouldBeActive;
-    const isPlanTab = item.href === "/?mode=planAhead";
+  const isTabActive = useCallback(
+    (href: string) => (href.startsWith("/?") ? pathname === "/" : pathname === href),
+    [pathname]
+  );
 
-    const handleClick = (e: React.MouseEvent) => {
-      if (isPlanTab) {
+  const onTabClick = useCallback(
+    (item: TabItem, e: React.MouseEvent) => {
+      if (item.href === "/?mode=planAhead") {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent("navigatePlanAhead"));
         if (pathname !== "/") {
           router.push(item.href);
         }
       }
-    };
+    },
+    [pathname, router]
+  );
+
+  const onGearUpClick = useCallback(() => {
+    if (isGearUpLoading) return;
+    if (pathname === "/") {
+      window.dispatchEvent(new CustomEvent("gearUp"));
+      return;
+    }
+    if (!navigator.geolocation) {
+      router.push("/?gearUp=1&geoDenied=1");
+      return;
+    }
+    setIsGearUpLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        sessionStorage.setItem(
+          "swttr-gearup-coords",
+          JSON.stringify({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          })
+        );
+        router.push("/?gearUp=1");
+      },
+      () => {
+        sessionStorage.removeItem("swttr-gearup-coords");
+        router.push("/?gearUp=1&geoDenied=1");
+      }
+    );
+  }, [isGearUpLoading, pathname, router]);
+
+  return {
+    ActivityGlyph,
+    isLandingScreen,
+    isGearUpLoading,
+    isFabPulse,
+    isTabActive,
+    onTabClick,
+    onGearUpClick,
+  };
+}
+
+export function MobileTabBar() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const {
+    ActivityGlyph,
+    isLandingScreen,
+    isGearUpLoading,
+    isFabPulse,
+    isTabActive,
+    onTabClick,
+    onGearUpClick,
+  } = useNavigationState(pathname, router);
+
+  const renderTab = (item: { href: string; label: string; icon: typeof CalendarDays }) => {
+    const isActive = isTabActive(item.href);
 
     return (
       <Link
         key={item.href}
         href={item.href}
-        onClick={handleClick}
+        onClick={(e) => onTabClick(item, e)}
         className={cn(
           "flex flex-col items-center gap-1 text-xs font-semibold leading-none tracking-wide transition-all",
           isActive ? "text-white" : "text-white/70",
@@ -129,34 +203,7 @@ export function MobileTabBar() {
             isFabPulse && "scale-110"
           )}
           aria-label="Gear Up"
-          onClick={() => {
-            if (isGearUpLoading) return;
-            if (pathname === "/") {
-              window.dispatchEvent(new CustomEvent("gearUp"));
-              return;
-            }
-            if (!navigator.geolocation) {
-              router.push("/?gearUp=1&geoDenied=1");
-              return;
-            }
-            setIsGearUpLoading(true);
-            navigator.geolocation.getCurrentPosition(
-              (position) => {
-                sessionStorage.setItem(
-                  "swttr-gearup-coords",
-                  JSON.stringify({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                  })
-                );
-                router.push("/?gearUp=1");
-              },
-              () => {
-                sessionStorage.removeItem("swttr-gearup-coords");
-                router.push("/?gearUp=1&geoDenied=1");
-              }
-            );
-          }}
+          onClick={onGearUpClick}
           disabled={isGearUpLoading}
         >
           {isGearUpLoading ? <Loader2 className="size-6 animate-spin" /> : <ActivityGlyph className="size-6" />}
@@ -164,6 +211,70 @@ export function MobileTabBar() {
         <span className="pointer-events-none absolute left-1/2 top-7 -translate-x-1/2 text-[11px] font-semibold text-white">
           Gear Up
         </span>
+      </div>
+    </nav>
+  );
+}
+
+export function DesktopActionDock() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const {
+    ActivityGlyph,
+    isLandingScreen,
+    isGearUpLoading,
+    isFabPulse,
+    isTabActive,
+    onTabClick,
+    onGearUpClick,
+  } = useNavigationState(pathname, router);
+
+  const renderDesktopTab = (item: TabItem) => {
+    const isActive = isTabActive(item.href);
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={(e) => onTabClick(item, e)}
+        className={cn(
+          "inline-flex h-12 min-w-[120px] items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors",
+          isActive
+            ? "border-white/45 bg-white/20 text-white"
+            : "border-white/20 bg-white/[0.06] text-white/80 hover:bg-white/[0.14]"
+        )}
+      >
+        <item.icon className="size-4" />
+        <span>{item.label}</span>
+      </Link>
+    );
+  };
+
+  return (
+    <nav
+      className={cn(
+        "pointer-events-none fixed bottom-6 z-50 hidden -translate-x-1/2 md:block",
+        "left-[calc((100vw+var(--sidebar-width))/2)]",
+        "peer-data-[state=collapsed]:left-[calc((100vw+var(--sidebar-width-icon))/2)]",
+        isLandingScreen ? "text-white/90" : "text-white"
+      )}
+    >
+      <div className="pointer-events-auto inline-flex items-center gap-2 rounded-2xl border border-white/25 bg-[rgba(32,71,95,0.66)] p-2 shadow-[0_18px_36px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+        {renderDesktopTab(TAB_ITEMS[0])}
+        <button
+          type="button"
+          aria-label="Start recommendation"
+          onClick={onGearUpClick}
+          disabled={isGearUpLoading}
+          className={cn(
+            "inline-flex h-14 min-w-[218px] items-center justify-center gap-2 rounded-xl bg-black px-6 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(0,0,0,0.4)] transition-transform duration-200 hover:bg-black/90",
+            isFabPulse && "scale-[1.03]"
+          )}
+        >
+          {isGearUpLoading ? <Loader2 className="size-5 animate-spin" /> : <ActivityGlyph className="size-5" />}
+          <span className="tracking-wide">Gear Up</span>
+        </button>
+        {renderDesktopTab(TAB_ITEMS[1])}
       </div>
     </nav>
   );
