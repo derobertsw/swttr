@@ -134,7 +134,7 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("Head and neck are exposed to the elements")).toBeInTheDocument();
     });
 
-    it("should show generic mid slot when torso mid layer is not present", () => {
+    it("should show mid layer group with add button when torso mid layer is not present", () => {
       const noMidRecommendation = {
         torso: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
         legs: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
@@ -144,10 +144,10 @@ describe("LayerDisplay", () => {
 
       render(<LayerDisplay recommendation={noMidRecommendation} temperature={25} windspeed={10} />);
       expect(screen.getByText("Mid")).toBeInTheDocument();
-      expect(screen.getByText("No mid layer selected yet.")).toBeInTheDocument();
+      expect(screen.getByText("Add mid")).toBeInTheDocument();
     });
 
-    it("should show generic mid slot when torso mid layer is an empty array", () => {
+    it("should show mid layer group with add button when torso mid layer is an empty array", () => {
       const emptyMidRecommendation = {
         torso: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
         legs: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
@@ -157,10 +157,10 @@ describe("LayerDisplay", () => {
 
       render(<LayerDisplay recommendation={emptyMidRecommendation} temperature={25} windspeed={10} />);
       expect(screen.getByText("Mid")).toBeInTheDocument();
-      expect(screen.getByText("No mid layer selected yet.")).toBeInTheDocument();
+      expect(screen.getByText("Add mid")).toBeInTheDocument();
     });
 
-    it("should allow adding a generic layer for an empty slot", () => {
+    it("should show add buttons for each layer type when empty", () => {
       const noMidRecommendation = {
         torso: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
         legs: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
@@ -170,10 +170,9 @@ describe("LayerDisplay", () => {
 
       render(<LayerDisplay recommendation={noMidRecommendation} temperature={25} windspeed={10} />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Use Generic Mid" }));
-
-      expect(screen.getByText("Pullover")).toBeInTheDocument();
-      expect(screen.getByText("Add your actual gear")).toBeInTheDocument();
+      // Should have add buttons for each layer type (base, mid, outer per body part)
+      const addButtons = screen.getAllByText(/^Add (base|mid|outer)$/);
+      expect(addButtons.length).toBeGreaterThan(0);
     });
   });
 
@@ -463,7 +462,7 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("0.65 clo")).toBeInTheDocument();
     });
 
-    it("should display headwear categories with clo values", () => {
+    it("should display headwear items as interactive layers", () => {
       render(
         <LayerDisplay
           recommendation={null}
@@ -473,16 +472,9 @@ describe("LayerDisplay", () => {
         />
       );
 
-      // Helmet category
-      expect(screen.getByText("Helmet")).toBeInTheDocument();
+      // Headwear items are now rendered as interactive layer items
       expect(screen.getByText("Smith Vantage")).toBeInTheDocument();
-
-      // Head warmth category
-      expect(screen.getByText("Head")).toBeInTheDocument();
       expect(screen.getByText("Merino Beanie")).toBeInTheDocument();
-
-      // Neck warmth category
-      expect(screen.getByText("Neck")).toBeInTheDocument();
       expect(screen.getByText("Buff Neck Gaiter")).toBeInTheDocument();
     });
 
@@ -503,7 +495,7 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("0.3/1.3 clo")).toBeInTheDocument();
     });
 
-    it("should include generic layer clo in the body-part progress bar", () => {
+    it("should show body-part clo values from biophysics data", () => {
       render(
         <LayerDisplay
           recommendation={null}
@@ -514,13 +506,9 @@ describe("LayerDisplay", () => {
       );
 
       expect(screen.getByText("0.3/1.3 clo")).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole("button", { name: "Use Generic Outer" }));
-
-      expect(screen.getByText("0.5/1.3 clo")).toBeInTheDocument();
     });
 
-    it("should include generic layer clo in global total clo and thermal summary", () => {
+    it("should show global total clo and risk alert icon from biophysics data", () => {
       render(
         <LayerDisplay
           recommendation={null}
@@ -531,15 +519,11 @@ describe("LayerDisplay", () => {
       );
 
       expect(screen.getByText("You 1.7 clo")).toBeInTheDocument();
-      expect(screen.getByText("Significantly under-insulated (+1.1 clo needed).")).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole("button", { name: "Use Generic Outer" }));
-
-      expect(screen.getByText("You 1.9 clo")).toBeInTheDocument();
-      expect(screen.getByText(/Significantly under-insulated \(\+0\.[89] clo needed\)\./)).toBeInTheDocument();
+      // Risk details are now behind a popover icon, check the icon is present
+      expect(screen.getByLabelText(/Cold Risk/)).toBeInTheDocument();
     });
 
-    it("should not suggest generic torso layers when torso is already near target", () => {
+    it("should show add buttons instead of generic layer suggestion when near target", () => {
       const nearTargetNoMidData = {
         ...mockBiophysicsData,
         ireq: {
@@ -590,7 +574,9 @@ describe("LayerDisplay", () => {
         />
       );
 
+      // Verify no generic layer buttons exist — replaced by add buttons
       expect(screen.queryByRole("button", { name: "Use Generic Mid" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Use Generic Outer" })).not.toBeInTheDocument();
     });
 
     it("should exclude helmet insulation from head/neck clo for xc skiing", () => {
@@ -748,9 +734,8 @@ describe("LayerDisplay", () => {
       );
 
       // total_clo 1.7 + pack 0.7 + no helmet = 2.4 descent clo vs 1.6 max target → over by 0.8
-      expect(screen.getByText("Descent Risk")).toBeInTheDocument();
-      expect(screen.getByText(/Descent Overheating Risk/)).toBeInTheDocument();
-      expect(screen.getByText(/over-insulated/)).toBeInTheDocument();
+      // Risk details now shown via alert icon popover next to descent gauge
+      expect(screen.getByLabelText(/Descent Overheating Risk/)).toBeInTheDocument();
     });
 
     it("should show descent cold risk card when descent clo is below target", () => {
@@ -785,9 +770,8 @@ describe("LayerDisplay", () => {
       );
 
       // total_clo 1.7 + pack 0.2 + no helmet = 1.9 descent clo vs 3.0 min target → short by 1.1
-      expect(screen.getAllByText("Descent Risk").length).toBeGreaterThan(0);
-      expect(screen.getByText(/Descent Cold Risk/)).toBeInTheDocument();
-      expect(screen.getByText(/under-insulated/)).toBeInTheDocument();
+      // Risk details now shown via alert icon popover next to descent gauge
+      expect(screen.getByLabelText(/Descent Cold Risk/)).toBeInTheDocument();
     });
 
     it("should warn and show suggested gear when descent insulation is insufficient", async () => {

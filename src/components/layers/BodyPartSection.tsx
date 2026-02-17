@@ -1,27 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Shirt, Footprints, Hand, HardHat, ChevronRight } from "lucide-react";
-import { RecommendedHandwear, RecommendedHeadwear } from "@/types/biophysics";
-import { BodyPart, LayerSet, BODY_PART_LABELS, hasAnyLayers } from "@/lib/layers";
+import { BodyPart, LayerType, LayerSet, BODY_PART_LABELS, hasAnyLayers } from "@/lib/layers";
 import { cn } from "@/lib/utils";
-import { HandwearDisplay, HeadwearDisplay } from "./ExtremityDisplay";
 import { LayerItems } from "./LayerItems";
 
 interface BodyPartSectionProps {
   bodyPart: BodyPart;
   layers: LayerSet;
   biophysicsActive: boolean;
-  handwear: RecommendedHandwear | null | undefined;
-  headwear: RecommendedHeadwear | null | undefined;
   currentClo: number | undefined;
   targetClo: number | undefined;
   itemMappings?: Map<string, string>;
   defaultCollapsed?: boolean;
-  onGenericCloChange?: (bodyPart: BodyPart, clo: number) => void;
+  onItemTap: (layerType: LayerType, index: number) => void;
+  onItemRemove: (layerType: LayerType, index: number) => void;
+  onAddLayer: (layerType: LayerType) => void;
 }
-
-const GENERIC_LAYER_SUGGESTION_DEFICIT_CLO = 0.15;
 
 function getEmptyStateMessage(bodyPart: BodyPart): string {
   switch (bodyPart) {
@@ -54,33 +50,18 @@ export function BodyPartSection({
   bodyPart,
   layers,
   biophysicsActive,
-  handwear,
-  headwear,
   currentClo,
   targetClo,
   itemMappings,
   defaultCollapsed = false,
-  onGenericCloChange,
+  onItemTap,
+  onItemRemove,
+  onAddLayer,
 }: BodyPartSectionProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
-  const [genericCloContribution, setGenericCloContribution] = useState(0);
 
-  useEffect(() => {
-    onGenericCloChange?.(bodyPart, genericCloContribution);
-  }, [bodyPart, genericCloContribution, onGenericCloChange]);
-
-  const hasHeadwear = headwear && (headwear.helmet || headwear.head_warmth || headwear.neck_warmth);
-
-  const hasExtremityGear =
-    (bodyPart === "hands" && handwear) || (bodyPart === "headNeck" && hasHeadwear);
-
-  const effectiveCurrentClo =
-    currentClo !== undefined
-      ? currentClo + genericCloContribution
-      : genericCloContribution > 0
-        ? genericCloContribution
-        : undefined;
-  const hasContent = hasAnyLayers(layers) || hasExtremityGear || genericCloContribution > 0;
+  const effectiveCurrentClo = currentClo;
+  const hasContent = hasAnyLayers(layers);
   const deficitClo =
     targetClo !== undefined
       ? Math.max(0, targetClo - (effectiveCurrentClo ?? 0))
@@ -119,8 +100,6 @@ export function BodyPartSection({
       : effectiveCurrentClo !== undefined
         ? `${effectiveCurrentClo.toFixed(1)} clo`
         : null;
-  const shouldSuggestGenericLayers =
-    targetClo === undefined || deficitClo > GENERIC_LAYER_SUGGESTION_DEFICIT_CLO;
 
   return (
     <div
@@ -176,19 +155,14 @@ export function BodyPartSection({
               <p className="mb-3 text-sm text-slate-700">{getEmptyStateMessage(bodyPart)}</p>
             )}
             <ul className="space-y-3" style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {bodyPart === "hands" && handwear && <HandwearDisplay handwear={handwear} />}
-              {bodyPart === "headNeck" && headwear && <HeadwearDisplay headwear={headwear} />}
               <LayerItems
                 layers={layers}
                 bodyPart={bodyPart}
                 biophysicsActive={biophysicsActive}
                 itemMappings={itemMappings}
-                enableEmptySlots={
-                  shouldSuggestGenericLayers
-                  && !(bodyPart === "hands" && handwear)
-                  && !(bodyPart === "headNeck" && hasHeadwear)
-                }
-                onGenericCloChange={setGenericCloContribution}
+                onItemTap={onItemTap}
+                onItemRemove={onItemRemove}
+                onAddLayer={onAddLayer}
               />
             </ul>
           </div>

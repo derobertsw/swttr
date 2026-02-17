@@ -1,7 +1,7 @@
 import type { GarmentThermalProperties } from "@/types/garments";
 
 // Body parts and their layer types
-export const BODY_PARTS = ["torso", "legs", "hands", "headNeck"] as const;
+export const BODY_PARTS = ["torso", "legs", "headNeck", "hands"] as const;
 export type BodyPart = (typeof BODY_PARTS)[number];
 
 export type LayerType = "base" | "mid" | "outer";

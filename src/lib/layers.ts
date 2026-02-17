@@ -113,7 +113,7 @@ export function garmentsToLayerSet(
 
     const layerType = CATEGORY_TO_LAYER_TYPE[garment.category];
     if (layerType) {
-      layers[layerType]?.push({ name: garment.name, rcl: garment.rcl });
+      layers[layerType]?.push({ name: garment.name, rcl: garment.rcl, sourceId: garment.id });
     }
   }
 

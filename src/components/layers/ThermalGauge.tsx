@@ -10,6 +10,10 @@ interface ThermalGaugeProps {
   targetLabel?: string;
   showStatusPill?: boolean;
   hideMarkerLabel?: boolean;
+  /** Highlights the marker circle with risk color */
+  riskType?: "cold" | "overheat" | null;
+  /** Rendered above the marker circle (e.g. a Popover trigger) */
+  riskAlert?: React.ReactNode;
 }
 
 const LONG_PRESS_MS = 400;
@@ -44,6 +48,8 @@ export function ThermalGauge({
   targetLabel = "Target",
   showStatusPill = true,
   hideMarkerLabel = false,
+  riskType,
+  riskAlert,
 }: ThermalGaugeProps) {
   const [showClo, setShowClo] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -138,6 +144,17 @@ export function ThermalGauge({
             left: `${markerPercent}%`,
           }}
         >
+          {riskAlert && (
+            <div
+              className={cn(
+                "absolute left-0 whitespace-nowrap",
+                markerLabelClass,
+                showMarker ? "-top-[3.25rem]" : "-top-7"
+              )}
+            >
+              {riskAlert}
+            </div>
+          )}
           {showMarker && (
             <span
               className={cn(
@@ -150,10 +167,21 @@ export function ThermalGauge({
             </span>
           )}
           <div
-            className="w-6 h-6 rounded-full bg-white border-[2.5px] border-slate-700"
+            className={cn(
+              "w-6 h-6 rounded-full bg-white border-[2.5px]",
+              riskType === "cold"
+                ? "border-sky-500"
+                : riskType === "overheat"
+                  ? "border-amber-500"
+                  : "border-slate-700"
+            )}
             style={{
               outline: "2px solid white",
-              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15)",
+              boxShadow: riskType === "cold"
+                ? "0 0 12px rgba(56, 189, 248, 0.5), 0 2px 8px rgba(0, 0, 0, 0.25)"
+                : riskType === "overheat"
+                  ? "0 0 12px rgba(251, 191, 36, 0.5), 0 2px 8px rgba(0, 0, 0, 0.25)"
+                  : "0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15)",
             }}
           />
         </div>
