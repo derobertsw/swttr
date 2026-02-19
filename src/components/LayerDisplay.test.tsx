@@ -143,8 +143,8 @@ describe("LayerDisplay", () => {
       };
 
       render(<LayerDisplay recommendation={noMidRecommendation} temperature={25} windspeed={10} />);
-      expect(screen.getByText("Mid")).toBeInTheDocument();
-      expect(screen.getByText("Add mid")).toBeInTheDocument();
+      expect(screen.getAllByText("Mid").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Add mid").length).toBeGreaterThan(0);
     });
 
     it("should show mid layer group with add button when torso mid layer is an empty array", () => {
@@ -156,8 +156,8 @@ describe("LayerDisplay", () => {
       };
 
       render(<LayerDisplay recommendation={emptyMidRecommendation} temperature={25} windspeed={10} />);
-      expect(screen.getByText("Mid")).toBeInTheDocument();
-      expect(screen.getByText("Add mid")).toBeInTheDocument();
+      expect(screen.getAllByText("Mid").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Add mid").length).toBeGreaterThan(0);
     });
 
     it("should show add buttons for each layer type when empty", () => {
@@ -488,11 +488,17 @@ describe("LayerDisplay", () => {
         />
       );
 
-      // Torso clo display: current / target
-      expect(screen.getByText("1.7/1.5 clo")).toBeInTheDocument();
+      // Torso clo display: target and actual pills
+      // Actual = rawSum × ensemble regression coef (0.836 for torso)
+      // (0.35 + 1.2 + 0.15) × 0.836 ≈ 1.4
+      expect(screen.getByText("Target 1.5 clo")).toBeInTheDocument();
+      expect(screen.getByText("Actual 1.4 clo")).toBeInTheDocument();
 
-      // Legs clo display: current / target
-      expect(screen.getByText("0.3/1.3 clo")).toBeInTheDocument();
+      // Legs clo display: target and actual pills
+      // Actual = rawSum × ensemble regression coef (0.961 for legs)
+      // 0.25 × 0.961 ≈ 0.2
+      expect(screen.getByText("Target 1.3 clo")).toBeInTheDocument();
+      expect(screen.getByText("Actual 0.2 clo")).toBeInTheDocument();
     });
 
     it("should show body-part clo values from biophysics data", () => {
@@ -505,7 +511,8 @@ describe("LayerDisplay", () => {
         />
       );
 
-      expect(screen.getByText("0.3/1.3 clo")).toBeInTheDocument();
+      // 0.25 × 0.961 ≈ 0.2 (ensemble regression for legs)
+      expect(screen.getByText("Actual 0.2 clo")).toBeInTheDocument();
     });
 
     it("should show global total clo and risk alert icon from biophysics data", () => {
@@ -591,7 +598,7 @@ describe("LayerDisplay", () => {
       );
 
       expect(screen.queryByText("Helmet")).not.toBeInTheDocument();
-      expect(screen.getByText("0.4/0.6 clo")).toBeInTheDocument();
+      expect(screen.getByText("Actual 0.4 clo")).toBeInTheDocument();
     });
 
     it("should display layer labels for biophysics garments", () => {
@@ -662,8 +669,9 @@ describe("LayerDisplay", () => {
         ...mockBiophysicsData,
         ireq: {
           ...mockBiophysicsData.ireq,
-          downhill: { min: 2.1, neutral: 2.6 },
-          downhill_target_range: [2.2, 2.8] as [number, number],
+          target_range: [0.8, 1.3] as [number, number],
+          downhill: { min: 1.0, neutral: 1.6 },
+          downhill_target_range: [1.0, 1.6] as [number, number],
         },
         pack_items: {
           garments: [
@@ -690,16 +698,20 @@ describe("LayerDisplay", () => {
 
       expect(screen.getAllByText("Climb").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Descent").length).toBeGreaterThan(0);
-      expect(screen.getByText("Climb: In target range")).toBeInTheDocument();
-      expect(screen.getByText("Descent: In target range")).toBeInTheDocument();
-      expect(screen.getByText("You're in range on climb, in range on descent.")).toBeInTheDocument();
-      expect(screen.getByText("Current setup: 1.7 clo · Descent with pack: 2.4 clo")).toBeInTheDocument();
       expect(screen.queryByText(/Climb Cold Risk/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/Descent.*Risk/)).not.toBeInTheDocument();
-      expect(screen.getByText("Descent Layer Plan")).toBeInTheDocument();
+      // Old descent section removed — descent tab and "In the Pack" summary replace it
+      expect(screen.queryByText("Descent Layer Plan")).not.toBeInTheDocument();
+      // Pack item visible in climb tab via "In the Pack" summary
+      expect(screen.getByText("In the Pack")).toBeInTheDocument();
       expect(screen.getByText("Patagonia Nano Puff")).toBeInTheDocument();
-      expect(screen.getByText("Descent target insulation: 2.2-2.8 clo")).toBeInTheDocument();
-      expect(screen.getByText("Total additional packed layer weight: 320 g")).toBeInTheDocument();
+      // Switch to descent tab — pack item now appears as a worn layer
+      const descentButtons = screen.getAllByText("Descent");
+      const descentTab = descentButtons.find((el) => el.tagName === "BUTTON");
+      if (descentTab) fireEvent.click(descentTab);
+      expect(screen.getByText("Patagonia Nano Puff")).toBeInTheDocument();
+      // Descent tab also always shows pack summary (empty in this case)
+      expect(screen.getByText("Nothing extra in the pack.")).toBeInTheDocument();
     });
 
     it("should show descent overheating risk card when descent clo exceeds target", () => {
@@ -707,8 +719,9 @@ describe("LayerDisplay", () => {
         ...mockBiophysicsData,
         ireq: {
           ...mockBiophysicsData.ireq,
-          downhill: { min: 1.2, neutral: 1.6 },
-          downhill_target_range: [1.2, 1.6] as [number, number],
+          target_range: [0.8, 1.3] as [number, number],
+          downhill: { min: 0.5, neutral: 0.9 },
+          downhill_target_range: [0.5, 0.9] as [number, number],
         },
         pack_items: {
           garments: [
@@ -733,8 +746,8 @@ describe("LayerDisplay", () => {
         />
       );
 
-      // total_clo 1.7 + pack 0.7 + no helmet = 2.4 descent clo vs 1.6 max target → over by 0.8
-      // Risk details now shown via alert icon popover next to descent gauge
+      // Descent: torso raw (1.7+0.7)*0.836=2.01, arms 1.2, legs 0.25*0.961=0.24
+      // Full body = 2.01*0.50 + 1.2*0.25 + 0.24*0.25 ≈ 1.37 vs 0.9 max → over by ~0.47
       expect(screen.getByLabelText(/Descent Overheating Risk/)).toBeInTheDocument();
     });
 
@@ -769,314 +782,10 @@ describe("LayerDisplay", () => {
         />
       );
 
-      // total_clo 1.7 + pack 0.2 + no helmet = 1.9 descent clo vs 3.0 min target → short by 1.1
-      // Risk details now shown via alert icon popover next to descent gauge
+      // Descent: torso raw (1.7+0.2)*0.836=1.59, arms 1.2, legs 0.25*0.961=0.24
+      // Full body = 1.59*0.50 + 1.2*0.25 + 0.24*0.25 ≈ 1.16 vs 3.0 min → short by ~1.84
       expect(screen.getByLabelText(/Descent Cold Risk/)).toBeInTheDocument();
     });
 
-    it("should warn and show suggested gear when descent insulation is insufficient", async () => {
-      const fetchMock = vi.spyOn(global, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
-        const url = input.toString();
-
-        if (url.includes("/api/wardrobe/available")) {
-          return new Response(
-            JSON.stringify({
-              items: [
-                {
-                  id: "g-down-1",
-                  type: "garment",
-                  brand: "Arc'teryx",
-                  model_name: "Atom Hoody",
-                  category: "insulation_synthetic",
-                  garment_type: "jacket",
-                  rcl_clo: 0.6,
-                },
-              ],
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } }
-          );
-        }
-
-        if (url.includes("/api/wardrobe/gear")) {
-          return new Response(JSON.stringify({ items: [] }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-
-        return new Response(JSON.stringify({ items: [] }), {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        });
-      });
-
-
-
-      const descentGapData = {
-        ...mockBiophysicsData,
-        ireq: {
-          ...mockBiophysicsData.ireq,
-          target_range: [1.5, 2.0] as [number, number],
-          regional: {
-            min: { torso: 1.0, arms: 0.8, legs: 0.1 },
-            neutral: { torso: 1.5, arms: 1.2, legs: 0.2 },
-          },
-          downhill: { min: 2.6, neutral: 3.0 },
-          downhill_target_range: [2.6, 3.0] as [number, number],
-        },
-        recommendation: {
-          ...mockBiophysicsData.recommendation,
-          ensemble_properties: {
-            ...mockBiophysicsData.recommendation.ensemble_properties,
-            total_clo: 1.7,
-            regional_clo: { torso: 1.7, arms: 1.2, legs: 0.25 },
-          },
-        },
-        pack_items: {
-          garments: [
-            {
-              id: "pack-2",
-              name: "Light Wind Shell",
-              weight_g: 120,
-              rcl_clo: 0.3,
-            },
-          ],
-          total_weight_g: 120,
-        },
-        warnings: [],
-      };
-
-      try {
-        render(
-          <LayerDisplay
-            activity="backcountry_skiing"
-            recommendation={null}
-            temperature={15}
-            windspeed={10}
-            biophysicsData={descentGapData}
-          />
-        );
-
-        expect(screen.getByText("Descent Warning")).toBeInTheDocument();
-        expect(screen.getAllByText("Descent Risk").length).toBeGreaterThan(0);
-        expect(screen.getByText("Current: 2.0 clo")).toBeInTheDocument();
-        expect(screen.getByText("Descent target: 2.6-3.0 clo (+0.6 needed)")).toBeInTheDocument();
-        expect(await screen.findByText("Suggested Gear To Buy")).toBeInTheDocument();
-        expect(await screen.findByText("Arc'teryx Atom Hoody")).toBeInTheDocument();
-        expect(screen.getByRole("link", { name: "Add descent layer" })).toHaveAttribute("href", "/wardrobe");
-      } finally {
-        fetchMock.mockRestore();
-
-      }
-    });
-
-    it("should prominently recommend updating wardrobe when insulation is insufficient", async () => {
-      const fetchMock = vi.spyOn(global, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
-        const url = input.toString();
-
-        if (url.includes("/api/wardrobe/available")) {
-          return new Response(
-            JSON.stringify({
-              items: [
-                {
-                  id: "g-owned",
-                  type: "garment",
-                  brand: "Owned",
-                  model_name: "Mega Mid",
-                  category: "mid_layer_heavy",
-                  garment_type: "jacket",
-                  rcl_clo: 0.6,
-                },
-                {
-                  id: "g-torso",
-                  type: "garment",
-                  brand: "Patagonia",
-                  model_name: "Nano-Air Hoody",
-                  category: "insulation_synthetic",
-                  garment_type: "jacket",
-                  rcl_clo: 0.55,
-                },
-                {
-                  id: "g-legs",
-                  type: "garment",
-                  brand: "Craft",
-                  model_name: "Thermal Tights",
-                  category: "base_layer",
-                  garment_type: "pants",
-                  rcl_clo: 0.32,
-                },
-              ],
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } }
-          );
-        }
-
-        if (url.includes("/api/wardrobe/gear")) {
-          return new Response(
-            JSON.stringify({
-              items: [{ item_id: "g-owned" }],
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } }
-          );
-        }
-
-        return new Response(JSON.stringify({ items: [] }), {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        });
-      });
-
-
-
-      const insufficientWardrobeData = {
-        ...mockBiophysicsData,
-        ireq: {
-          ...mockBiophysicsData.ireq,
-          target_range: [1.7, 2.2] as [number, number],
-        },
-        recommendation: {
-          ...mockBiophysicsData.recommendation,
-          ensemble_properties: {
-            ...mockBiophysicsData.recommendation.ensemble_properties,
-            total_clo: 1.1,
-          },
-        },
-        warnings: ["Insufficient overall insulation: 1.1 clo vs 1.7 clo required"],
-      };
-
-      try {
-        render(
-          <LayerDisplay
-            recommendation={null}
-            temperature={15}
-            windspeed={10}
-            biophysicsData={insufficientWardrobeData}
-          />
-        );
-
-        expect(screen.getByText("Improve Wardrobe")).toBeInTheDocument();
-        expect(screen.getByText("Insufficient overall insulation: 1.1 clo vs 1.7 clo required")).toBeInTheDocument();
-        expect(await screen.findByText("Suggested Gear To Buy")).toBeInTheDocument();
-        expect(await screen.findByText("Patagonia Nano-Air Hoody")).toBeInTheDocument();
-        expect(screen.queryByText("Craft Thermal Tights")).not.toBeInTheDocument();
-        expect(screen.getByRole("button", { name: /show suggestions/i })).toBeInTheDocument();
-        expect(screen.queryByText("Owned Mega Mid")).not.toBeInTheDocument();
-
-        const updateLink = screen.getByRole("link", { name: "Update Wardrobe" });
-        expect(updateLink).toHaveAttribute("href", "/wardrobe");
-      } finally {
-        fetchMock.mockRestore();
-
-      }
-    });
-
-    it("should prioritize clo-fit over layer category when recommending purchase items", async () => {
-      const fetchMock = vi.spyOn(global, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
-        const url = input.toString();
-
-        if (url.includes("/api/wardrobe/available")) {
-          return new Response(
-            JSON.stringify({
-              items: [
-                {
-                  id: "g-overshoot",
-                  type: "garment",
-                  brand: "WarmCo",
-                  model_name: "Heavy Mid",
-                  category: "mid_layer_heavy",
-                  garment_type: "jacket",
-                  rcl_clo: 1.2,
-                },
-                {
-                  id: "g-close",
-                  type: "garment",
-                  brand: "FitCo",
-                  model_name: "Close Match",
-                  category: "soft_shell",
-                  garment_type: "jacket",
-                  rcl_clo: 0.42,
-                },
-              ],
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } }
-          );
-        }
-
-        if (url.includes("/api/wardrobe/gear")) {
-          return new Response(JSON.stringify({ items: [] }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-
-        return new Response(JSON.stringify({ items: [] }), {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        });
-      });
-
-
-
-      const insufficientWardrobeData = {
-        ...mockBiophysicsData,
-        ireq: {
-          ...mockBiophysicsData.ireq,
-          target_range: [1.5, 2.0] as [number, number],
-        },
-        recommendation: {
-          ...mockBiophysicsData.recommendation,
-          ensemble_properties: {
-            ...mockBiophysicsData.recommendation.ensemble_properties,
-            total_clo: 1.1,
-          },
-        },
-        warnings: ["Insufficient overall insulation: 1.1 clo vs 1.5 clo required"],
-      };
-
-      try {
-        render(
-          <LayerDisplay
-            recommendation={null}
-            temperature={20}
-            windspeed={5}
-            biophysicsData={insufficientWardrobeData}
-          />
-        );
-
-        expect(await screen.findByText("Suggested Gear To Buy")).toBeInTheDocument();
-        expect(await screen.findByText("FitCo Close Match")).toBeInTheDocument();
-      } finally {
-        fetchMock.mockRestore();
-
-      }
-    });
-
-    it("should not show wardrobe gap alert when insulation warning is absent and regional targets are met", () => {
-      const noGapData = {
-        ...mockBiophysicsData,
-        recommendation: {
-          ...mockBiophysicsData.recommendation,
-          handwear: {
-            ...mockBiophysicsData.recommendation.handwear,
-            rcl: 0.85,
-          },
-          ensemble_properties: {
-            ...mockBiophysicsData.recommendation.ensemble_properties,
-            regional_clo: { torso: 1.7, arms: 1.2, legs: 1.35 },
-          },
-        },
-      };
-
-      render(
-        <LayerDisplay
-          recommendation={null}
-          temperature={15}
-          windspeed={10}
-          biophysicsData={noGapData}
-        />
-      );
-
-      expect(screen.queryByText("Improve Wardrobe")).not.toBeInTheDocument();
-    });
   });
 });

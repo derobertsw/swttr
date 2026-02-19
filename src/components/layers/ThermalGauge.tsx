@@ -1,19 +1,26 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+export interface CloBreakdownLine {
+  label: string;
+  detail: string;
+}
+
+export interface CloBreakdown {
+  lines: CloBreakdownLine[];
+  total: number;
+}
 
 interface ThermalGaugeProps {
   totalClo: number | undefined;
   targetRange: [number, number] | undefined;
   markerLabel?: string;
-  targetLabel?: string;
   showStatusPill?: boolean;
   hideMarkerLabel?: boolean;
-  /** Highlights the marker circle with risk color */
-  riskType?: "cold" | "overheat" | null;
-  /** Rendered above the marker circle (e.g. a Popover trigger) */
-  riskAlert?: React.ReactNode;
+  cloBreakdown?: CloBreakdown;
 }
 
 const LONG_PRESS_MS = 400;
@@ -45,13 +52,12 @@ export function ThermalGauge({
   totalClo,
   targetRange,
   markerLabel = "You",
-  targetLabel = "Target",
   showStatusPill = true,
   hideMarkerLabel = false,
-  riskType,
-  riskAlert,
+  cloBreakdown,
 }: ThermalGaugeProps) {
   const [showClo, setShowClo] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startPress = useCallback(() => {
@@ -89,10 +95,10 @@ export function ThermalGauge({
         : "In target range";
   const statusClass =
     deficit > 0
-      ? "border-sky-200 bg-sky-50/95 text-sky-800"
+      ? "border-sky-500 bg-sky-200 text-sky-950"
       : surplus > 0
-        ? "border-amber-200 bg-amber-50/95 text-amber-800"
-        : "border-emerald-200 bg-emerald-50/95 text-emerald-800";
+        ? "border-amber-500 bg-amber-200 text-amber-950"
+        : "border-emerald-500 bg-emerald-200 text-emerald-950";
   const markerLabelClass =
     markerPercent < 10
       ? "translate-x-0"
@@ -144,17 +150,6 @@ export function ThermalGauge({
             left: `${markerPercent}%`,
           }}
         >
-          {riskAlert && (
-            <div
-              className={cn(
-                "absolute left-0 whitespace-nowrap",
-                markerLabelClass,
-                showMarker ? "-top-[3.25rem]" : "-top-7"
-              )}
-            >
-              {riskAlert}
-            </div>
-          )}
           {showMarker && (
             <span
               className={cn(
@@ -167,31 +162,57 @@ export function ThermalGauge({
             </span>
           )}
           <div
-            className={cn(
-              "w-6 h-6 rounded-full bg-white border-[2.5px]",
-              riskType === "cold"
-                ? "border-sky-500"
-                : riskType === "overheat"
-                  ? "border-amber-500"
-                  : "border-slate-700"
-            )}
+            className="w-6 h-6 rounded-full bg-white border-[2.5px] border-slate-700"
             style={{
               outline: "2px solid white",
-              boxShadow: riskType === "cold"
-                ? "0 0 12px rgba(56, 189, 248, 0.5), 0 2px 8px rgba(0, 0, 0, 0.25)"
-                : riskType === "overheat"
-                  ? "0 0 12px rgba(251, 191, 36, 0.5), 0 2px 8px rgba(0, 0, 0, 0.25)"
-                  : "0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15)",
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15)",
             }}
           />
         </div>
       </div>
 
-      <div className="mt-1 flex items-center justify-center">
-        <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white/90">
-          {targetLabel} {targetMin.toFixed(1)}-{targetMax.toFixed(1)} clo
+      <div className="mt-1 flex items-center justify-center gap-1.5">
+        <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-white/80">
+          Target {targetMin.toFixed(1)}-{targetMax.toFixed(1)} clo
         </span>
+        <span className={cn(
+          "rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums",
+          deficit > 0
+            ? "border-sky-400 bg-sky-500/40 text-sky-100"
+            : surplus > 0
+              ? "border-amber-400 bg-amber-500/40 text-amber-100"
+              : "border-emerald-400 bg-emerald-500/40 text-emerald-100"
+        )}>
+          Actual {totalClo.toFixed(1)} clo
+        </span>
+        {cloBreakdown && (
+          <button
+            type="button"
+            onClick={() => setShowBreakdown((prev) => !prev)}
+            className="flex items-center justify-center rounded-full text-white/50 hover:text-white/80 transition-colors"
+            aria-label="Show insulation breakdown"
+          >
+            <HelpCircle className="size-3.5" />
+          </button>
+        )}
       </div>
+
+      {showBreakdown && cloBreakdown && (
+        <div className="mt-2 rounded-lg bg-black/25 px-3 py-2 text-[10px] tabular-nums text-white/75">
+          <div className="space-y-0.5 font-mono">
+            {cloBreakdown.lines.map((line) => (
+              <div key={line.label} className="flex justify-between">
+                <span>{line.label}</span>
+                <span>{line.detail}</span>
+              </div>
+            ))}
+            <div className="mt-1 border-t border-white/15 pt-1 flex justify-between font-semibold text-white/90">
+              <span>Total</span>
+              <span>{cloBreakdown.total.toFixed(2)} clo</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -198,6 +198,19 @@ export function useMutableLayers(
     []
   );
 
+  const setLayerItems = useCallback(
+    (bodyPart: BodyPart, layerType: LayerType, items: LayerItem[]) => {
+      setMutableLayers((prev) => ({
+        ...prev,
+        [bodyPart]: {
+          ...prev[bodyPart],
+          [layerType]: [...items],
+        },
+      }));
+    },
+    []
+  );
+
   return {
     mutableLayers,
     inUseItemIds,
@@ -207,5 +220,6 @@ export function useMutableLayers(
     addItem,
     removeItem,
     replaceItem,
+    setLayerItems,
   };
 }

@@ -17,8 +17,6 @@ export interface PickerItem {
 }
 
 const LEGS_GARMENT_TYPES = new Set(["pants", "shorts", "bib"]);
-const SWTTR_BRANDS = new Set(["patagonia", "norrona", "norrøna"]);
-
 function inferAvailableBodyPart(item: AvailableItem): BodyPart {
   if (item.type === "handwear") return "hands";
   if (item.type === "headwear") return "headNeck";
@@ -53,6 +51,36 @@ function wardrobeLayerType(item: WardrobeItem): LayerType | null {
   }
   if (category) return "mid";
   return null;
+}
+
+/**
+ * Check if an item's native layer type is compatible with the target layer slot.
+ * Items can be placed in their native layer or one step outward:
+ *   base → base, mid
+ *   mid  → base, mid, outer
+ *   outer → mid, outer
+ */
+function isLayerCompatible(itemLayer: LayerType | null, targetLayer: LayerType): boolean {
+  if (itemLayer === null) return false;
+  if (itemLayer === targetLayer) return true;
+  if (itemLayer === "base" && targetLayer === "mid") return true;
+  if (itemLayer === "mid" && (targetLayer === "outer" || targetLayer === "base")) return true;
+  if (itemLayer === "outer" && targetLayer === "mid") return true;
+  return false;
+}
+
+/**
+ * Get regional clo value for a wardrobe item matching its body part.
+ * Falls back to whole-body rcl_clo if regional values aren't available.
+ */
+function getRegionalClo(item: WardrobeItem, bodyPart: BodyPart): number {
+  const tp = item.details.garment_thermal_properties;
+  const props = Array.isArray(tp) ? tp[0] : tp;
+  if (props) {
+    if (bodyPart === "legs" && props.rcl_legs != null) return props.rcl_legs;
+    if (bodyPart === "torso" && props.rcl_torso != null) return props.rcl_torso;
+  }
+  return getClo(item) ?? 0;
 }
 
 export function useLayerPicker(inUseItemIds: Set<string>) {
@@ -105,50 +133,44 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
           if (item.disabled) return false;
           if (wardrobeBodyPart(item) !== bodyPart) return false;
           const lt = wardrobeLayerType(item);
-          return lt === layerType;
-        })
-        .map((item) => {
-          const clo = getClo(item) ?? 0;
-          return {
-            id: item.item_id,
-            name: item.nickname || item.details.model_name,
-            brand: item.details.brand,
-            rcl: clo,
-            isInUse: inUseItemIds.has(item.item_id),
-            isOwned: true,
-          };
-        })
-        .sort((a, b) => b.rcl - a.rcl);
-
-      // Filter and map available items (exclude those already in wardrobe, brand-restricted)
-      let rItems: PickerItem[] = availableItems
-        .filter((item) => {
-          if (wardrobeItemIds.has(item.id)) return false;
-          if (!SWTTR_BRANDS.has((item.brand ?? "").toLowerCase())) return false;
-          if (inferAvailableBodyPart(item) !== bodyPart) return false;
-          return inferAvailableLayer(item) === layerType;
+          return isLayerCompatible(lt, layerType);
         })
         .map((item) => ({
-          id: item.id,
-          name: item.model_name,
-          brand: item.brand,
-          rcl: item.rcl_clo ?? 0,
-          isInUse: inUseItemIds.has(item.id),
-          isOwned: false,
+          id: item.item_id,
+          name: item.nickname || item.details.model_name,
+          brand: item.details.brand,
+          rcl: getRegionalClo(item, bodyPart),
+          isInUse: inUseItemIds.has(item.item_id),
+          isOwned: true,
         }))
         .sort((a, b) => b.rcl - a.rcl);
 
-      // Only show recommended items closer to target than the best wardrobe option
+      // Filter and map available items (exclude those already in wardrobe)
+      const rItems: PickerItem[] = availableItems
+        .filter((item) => {
+          if (wardrobeItemIds.has(item.id)) return false;
+          if (inferAvailableBodyPart(item) !== bodyPart) return false;
+          return isLayerCompatible(inferAvailableLayer(item), layerType);
+        })
+        .map((item) => {
+          const regionalRcl = bodyPart === "legs" ? item.rcl_legs
+            : bodyPart === "torso" ? item.rcl_torso
+            : undefined;
+          return {
+            id: item.id,
+            name: item.model_name,
+            brand: item.brand,
+            rcl: regionalRcl ?? item.rcl_clo ?? 0,
+            isInUse: inUseItemIds.has(item.id),
+            isOwned: false,
+          };
+        });
+
+      // Sort recommendations by proximity to target (closest first), then by clo descending
       if (targetClo !== undefined) {
-        const available = wItems.filter((w) => !w.isInUse);
-        if (available.length > 0) {
-          const bestWardrobeDistance = Math.min(
-            ...available.map((w) => Math.abs(w.rcl - targetClo))
-          );
-          rItems = rItems.filter(
-            (r) => Math.abs(r.rcl - targetClo) < bestWardrobeDistance
-          );
-        }
+        rItems.sort((a, b) => Math.abs(a.rcl - targetClo) - Math.abs(b.rcl - targetClo));
+      } else {
+        rItems.sort((a, b) => b.rcl - a.rcl);
       }
 
       return { wardrobeItems: wItems, recommendedItems: rItems.slice(0, 3) };

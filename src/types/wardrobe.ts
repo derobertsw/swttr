@@ -37,6 +37,8 @@ export interface AvailableItem {
   category: string;
   garment_type?: string;
   rcl_clo?: number;
+  rcl_torso?: number;
+  rcl_legs?: number;
   dexterity_score?: number;
 }
 

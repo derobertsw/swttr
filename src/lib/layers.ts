@@ -113,7 +113,12 @@ export function garmentsToLayerSet(
 
     const layerType = CATEGORY_TO_LAYER_TYPE[garment.category];
     if (layerType) {
-      layers[layerType]?.push({ name: garment.name, rcl: garment.rcl, sourceId: garment.id });
+      // Use regional clo for the specific body part so displayed values
+      // match the regional deficit/surplus calculations
+      const regionalRcl = bodyPart === "legs" ? garment.rcl_legs
+        : bodyPart === "torso" ? garment.rcl_torso
+        : undefined;
+      layers[layerType]?.push({ name: garment.name, rcl: regionalRcl ?? garment.rcl, sourceId: garment.id });
     }
   }
 
