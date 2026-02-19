@@ -49,5 +49,6 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SWTTR uses your location to fetch current weather conditions for clothing recommendations.</string>
+
 </dict>
 </plist>

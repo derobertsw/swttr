@@ -6,6 +6,7 @@ const config: CapacitorConfig = {
   webDir: "capacitor-web",
   server: {
     url: "https://swttr.vercel.app",
+    allowNavigation: ["swttr.vercel.app", "*.swttr.vercel.app"],
   },
   plugins: {
     StatusBar: {
