@@ -47,14 +47,14 @@ const HomeContent = () => {
     <PageLayout onLogoClick={resetToInitialState}>
       <div
         key={showResults ? "results" : "form"}
-        className="flex flex-col gap-6 sm:gap-7 items-center w-full animate-in fade-in duration-300"
+        className="flex w-full flex-col items-center gap-6 animate-in fade-in duration-300 sm:gap-7"
       >
         {!showResults ? (
           <>
-            <p className="text-sm font-semibold text-white/75 text-center mb-2 uppercase tracking-wide">
+            <p className="mb-1 text-center text-[12px] font-semibold uppercase tracking-[0.2em] text-white/70">
               1. Activity
             </p>
-            <p className="text-base font-medium text-white/90 text-center mb-3">
+            <p className="mb-3 text-center text-[1.95rem] font-semibold leading-tight text-white/95 tracking-[-0.01em]">
               Choose your trip activity
             </p>
             {activityInitializing ? (
@@ -115,13 +115,12 @@ const HomeContent = () => {
                 onDismiss={locationSearch.dismiss}
               />
             ) : null}
-            <p className="text-sm text-white/75 text-center mt-4 mb-1">
+            <p className="mt-4 text-center text-base text-white/80 sm:text-lg">
               Recommendations update from your activity, exertion, and start time.
             </p>
-            <p className="text-xs text-white/55 text-center mb-4">
+            <p className="mb-4 text-center text-sm text-white/55">
               Built on thermal science
             </p>
-            <div className="flex flex-col items-center" />
           </>
         ) : inputMode === "planAhead" && multiDayPlan ? (
           <MultiDayPlanDisplay
