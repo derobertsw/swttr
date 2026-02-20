@@ -7,6 +7,7 @@ import { CalendarDays, Shirt, Zap, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
 import { STORAGE_KEYS } from "@/lib/storage";
+import { useNativeTabShell } from "@/hooks/useNativeTabShell";
 
 const TAB_ITEMS = [
   { href: "/?mode=planAhead", label: "Plan", icon: CalendarDays },
@@ -138,6 +139,7 @@ function useNavigationState(pathname: string, router: RouterLike) {
 }
 
 export function MobileTabBar() {
+  const isNativeTabShell = useNativeTabShell();
   const pathname = usePathname();
   const router = useRouter();
   const {
@@ -181,6 +183,10 @@ export function MobileTabBar() {
     );
   };
 
+  if (isNativeTabShell) {
+    return null;
+  }
+
   return (
     <nav
       className={cn(
@@ -216,6 +222,7 @@ export function MobileTabBar() {
 }
 
 export function DesktopActionDock() {
+  const isNativeTabShell = useNativeTabShell();
   const pathname = usePathname();
   const router = useRouter();
   const {
@@ -248,6 +255,10 @@ export function DesktopActionDock() {
       </Link>
     );
   };
+
+  if (isNativeTabShell) {
+    return null;
+  }
 
   return (
     <nav
