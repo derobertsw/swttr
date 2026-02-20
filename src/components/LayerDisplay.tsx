@@ -647,7 +647,7 @@ const LayerDisplay = ({
     return {
       part,
       layers,
-      currentClo: adjustedCurrent || currentClo,
+      currentClo: adjustedCurrent,
       targetClo,
       urgencyDelta,
     };
@@ -676,7 +676,7 @@ const LayerDisplay = ({
         return {
           part,
           layers,
-          currentClo: currentClo || descentCloValues.currentClo,
+          currentClo: currentClo,
           targetClo: descentCloValues.targetClo,
         };
       })

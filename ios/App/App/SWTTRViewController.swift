@@ -1,6 +1,107 @@
 import UIKit
 import WebKit
 
+// MARK: - Testable policy types
+
+struct SWTTRNavigationPolicy {
+    let allowedHosts: Set<String>
+
+    func isAllowedHost(_ host: String) -> Bool {
+        for allowed in allowedHosts where !allowed.isEmpty {
+            if host == allowed || host.hasSuffix(".\(allowed)") {
+                return true
+            }
+        }
+        return false
+    }
+
+    func isClerkHost(_ host: String) -> Bool {
+        let lower = host.lowercased()
+        return lower == "clerk.com"
+            || lower.hasSuffix(".clerk.com")
+            || lower == "clerk.dev"
+            || lower.hasSuffix(".clerk.dev")
+            || lower.hasSuffix(".clerk.accounts.dev")
+    }
+
+    func isAuthFlowURL(_ url: URL) -> Bool {
+        let path = url.path.lowercased()
+        let query = (url.query ?? "").lowercased()
+        let host = (url.host ?? "").lowercased()
+
+        if isClerkHost(host) {
+            return true
+        }
+        if path.contains("/sign-in")
+            || path.contains("/sign-up")
+            || path.contains("/sso-callback")
+            || path.contains("/oauth")
+            || path.contains("/authenticate") {
+            return true
+        }
+        if query.contains("__clerk")
+            || query.contains("clerk")
+            || query.contains("sso")
+            || query.contains("oauth")
+            || query.contains("redirect_url") {
+            return true
+        }
+        return false
+    }
+
+    enum NavigationDecision {
+        case allow
+        case openExternal
+    }
+
+    func decide(targetURL: URL, isMainFrame: Bool) -> NavigationDecision {
+        guard let host = targetURL.host else { return .allow }
+
+        if isAllowedHost(host) || isClerkHost(host) || isAuthFlowURL(targetURL) {
+            return .allow
+        }
+
+        return isMainFrame ? .openExternal : .allow
+    }
+}
+
+struct SWTTRPulseTracker {
+    private(set) var lastPulsedActivityValue: String?
+    private(set) var lastPulsedEventID: String?
+    private(set) var lastPulseTimestamp: CFTimeInterval = 0
+
+    mutating func shouldPulse(
+        activityValue: String,
+        source: String,
+        eventID: String?,
+        userInitiated: Bool,
+        now: CFTimeInterval = CACurrentMediaTime()
+    ) -> Bool {
+        guard source == "activityChange" else { return false }
+        guard userInitiated else { return false }
+
+        let normalizedEventID: String? = {
+            guard let eventID, !eventID.isEmpty else { return nil }
+            return eventID
+        }()
+
+        if let normalizedEventID, normalizedEventID == lastPulsedEventID {
+            return false
+        }
+
+        if activityValue == lastPulsedActivityValue, now - lastPulseTimestamp < 1.1 {
+            return false
+        }
+
+        lastPulsedActivityValue = activityValue
+        lastPulsedEventID = normalizedEventID
+        lastPulseTimestamp = now
+        return true
+    }
+}
+
+// MARK: - Shell config
+
 private struct SWTTRShellConfig {
     let remoteURL: URL
     let appURL: URL
@@ -71,6 +172,7 @@ private final class SWTTRScriptMessageProxy: NSObject, WKScriptMessageHandler {
 final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
     private let shell: SWTTRShellConfig
     private let initialPath: String
+    private lazy var navigationPolicy = SWTTRNavigationPolicy(allowedHosts: shell.allowedHosts)
     fileprivate weak var eventDelegate: SWTTRWebTabEventDelegate?
 
     private let activityChangeHandlerName = "swttrActivityChange"
@@ -427,79 +529,30 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
         }
     }
 
-    private func isAllowedHost(_ host: String) -> Bool {
-        for allowed in shell.allowedHosts where !allowed.isEmpty {
-            if host == allowed || host.hasSuffix(".\(allowed)") {
-                return true
-            }
-        }
-        return false
-    }
-
-    private func isClerkHost(_ host: String) -> Bool {
-        let lower = host.lowercased()
-        return lower == "clerk.com"
-            || lower.hasSuffix(".clerk.com")
-            || lower == "clerk.dev"
-            || lower.hasSuffix(".clerk.dev")
-            || lower.hasSuffix(".clerk.accounts.dev")
-    }
-
-    private func isAuthFlowURL(_ url: URL) -> Bool {
-        let path = url.path.lowercased()
-        let query = (url.query ?? "").lowercased()
-        let host = (url.host ?? "").lowercased()
-
-        if isClerkHost(host) {
-            return true
-        }
-        if path.contains("/sign-in")
-            || path.contains("/sign-up")
-            || path.contains("/sso-callback")
-            || path.contains("/oauth")
-            || path.contains("/authenticate") {
-            return true
-        }
-        if query.contains("__clerk")
-            || query.contains("clerk")
-            || query.contains("sso")
-            || query.contains("oauth")
-            || query.contains("redirect_url") {
-            return true
-        }
-        return false
-    }
-
     private func isOnHomeRoute() -> Bool {
         guard let url = webView.url, let host = url.host else { return false }
-        if !isAllowedHost(host) { return false }
+        if !navigationPolicy.isAllowedHost(host) { return false }
         return url.path == "/"
     }
 
     // MARK: - WKNavigationDelegate
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard let url = navigationAction.request.url, let host = url.host else {
+        guard let url = navigationAction.request.url else {
             decisionHandler(.allow)
             return
         }
 
-        let currentURLIsAuthFlow = webView.url.map(isAuthFlowURL) ?? false
-        let targetURLIsAuthFlow = isAuthFlowURL(url)
-        let hostIsClerk = isClerkHost(host)
+        let isMainFrame = navigationAction.targetFrame?.isMainFrame == true
+        let decision = navigationPolicy.decide(targetURL: url, isMainFrame: isMainFrame)
 
-        if isAllowedHost(host) || hostIsClerk || currentURLIsAuthFlow || targetURLIsAuthFlow {
+        switch decision {
+        case .allow:
             decisionHandler(.allow)
-            return
-        }
-
-        if navigationAction.targetFrame?.isMainFrame == true {
+        case .openExternal:
             UIApplication.shared.open(url)
             decisionHandler(.cancel)
-            return
         }
-
-        decisionHandler(.allow)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -534,9 +587,7 @@ class SWTTRViewController: UITabBarController, UITabBarControllerDelegate, SWTTR
     private var activityIconCache: [String: UIImage] = [:]
     private var pendingNonUserActivityValue: String?
     private var pendingNonUserApply: DispatchWorkItem?
-    private var lastPulsedActivityValue: String?
-    private var lastPulsedEventID: String?
-    private var lastPulseTimestamp: CFTimeInterval = 0
+    private var pulseTracker = SWTTRPulseTracker()
     private let selectionFeedback = UISelectionFeedbackGenerator()
     private let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
 
@@ -714,30 +765,7 @@ class SWTTRViewController: UITabBarController, UITabBarControllerDelegate, SWTTR
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
     }
 
-    private func shouldPulseForActivityChange(activityValue: String, source: String, eventID: String?, userInitiated: Bool) -> Bool {
-        guard source == "activityChange" else { return false }
-        guard userInitiated else { return false }
-
-        let normalizedEventID: String? = {
-            guard let eventID, !eventID.isEmpty else { return nil }
-            return eventID
-        }()
-
-        let now = CACurrentMediaTime()
-        if let normalizedEventID, normalizedEventID == lastPulsedEventID {
-            return false
-        }
-
-        // Prevent double pulses when duplicated change messages arrive in a short burst.
-        if activityValue == lastPulsedActivityValue, now - lastPulseTimestamp < 1.1 {
-            return false
-        }
-
-        lastPulsedActivityValue = activityValue
-        lastPulsedEventID = normalizedEventID
-        lastPulseTimestamp = now
-        return true
-    }
+    // Pulse deduplication is handled by `pulseTracker` (SWTTRPulseTracker)
 
     @objc private func handleGearFabTap() {
         performGearUpAction()
@@ -787,7 +815,7 @@ class SWTTRViewController: UITabBarController, UITabBarControllerDelegate, SWTTR
             queueNonUserActivityVisualState(activityValue)
         }
 
-        if didChange && shouldPulseForActivityChange(
+        if didChange && pulseTracker.shouldPulse(
             activityValue: activityValue,
             source: source,
             eventID: eventID,

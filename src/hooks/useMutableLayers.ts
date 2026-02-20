@@ -89,12 +89,6 @@ export function useMutableLayers(
   handwear: RecommendedHandwear | null | undefined,
   headwear: RecommendedHeadwear | null | undefined,
 ) {
-  // Keep latest handwear/headwear in refs so the garments-change effect uses current values
-  const handwearRef = useRef(handwear);
-  const headwearRef = useRef(headwear);
-  handwearRef.current = handwear;
-  headwearRef.current = headwear;
-
   const [mutableLayers, setMutableLayers] = useState<MutableLayers>(() => {
     const garments = biophysicsData?.recommendation?.garments;
     return buildLayersFromData(garments, handwear, headwear);
@@ -111,14 +105,22 @@ export function useMutableLayers(
     };
   });
 
-  // Track garments reference to detect when biophysics changes
+  // Track recommendation data references to detect when biophysics changes
   const prevGarmentsRef = useRef(biophysicsData?.recommendation?.garments);
+  const prevHandwearRef = useRef(handwear);
+  const prevHeadwearRef = useRef(headwear);
 
   useEffect(() => {
     const garments = biophysicsData?.recommendation?.garments;
-    if (garments !== prevGarmentsRef.current) {
+    if (
+      garments !== prevGarmentsRef.current ||
+      handwear !== prevHandwearRef.current ||
+      headwear !== prevHeadwearRef.current
+    ) {
       prevGarmentsRef.current = garments;
-      const layers = buildLayersFromData(garments, handwearRef.current, headwearRef.current);
+      prevHandwearRef.current = handwear;
+      prevHeadwearRef.current = headwear;
+      const layers = buildLayersFromData(garments, handwear, headwear);
       setMutableLayers(layers);
       setOriginalCloByBodyPart({
         torso: sumClo(layers.torso),
@@ -127,7 +129,7 @@ export function useMutableLayers(
         headNeck: sumClo(layers.headNeck),
       });
     }
-  }, [biophysicsData?.recommendation?.garments]);
+  }, [biophysicsData?.recommendation?.garments, handwear, headwear]);
 
   const layerEditDelta = useMemo<Record<BodyPart, number>>(() => {
     const delta: Record<BodyPart, number> = { torso: 0, legs: 0, hands: 0, headNeck: 0 };
