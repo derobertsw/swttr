@@ -5,22 +5,22 @@
 
 // Frosted glass input styling with stronger contrast for outdoor readability
 export const FROSTED_INPUT =
-  "bg-white/22 backdrop-blur-md border-white/60 text-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]";
-export const FROSTED_INPUT_PLACEHOLDER = "placeholder:text-white/80";
+  "bg-white/[0.16] backdrop-blur-xl border-white/45 text-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] focus-visible:border-white/70 focus-visible:ring-2 focus-visible:ring-white/30";
+export const FROSTED_INPUT_PLACEHOLDER = "placeholder:text-white/70";
 export const FROSTED_INPUT_FULL = `${FROSTED_INPUT} ${FROSTED_INPUT_PLACEHOLDER}`;
 
 // Suggestions dropdown styling
 export const SUGGESTIONS_DROPDOWN =
-  "bg-white/95 text-slate-900 border border-white/60 backdrop-blur-xl rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.35)]";
+  "bg-[rgba(247,249,255,0.94)] text-slate-900 border border-white/80 backdrop-blur-2xl rounded-2xl shadow-[0_14px_34px_rgba(9,15,30,0.3)]";
 
 // Card shadow
-export const CARD_SHADOW = "shadow-[0_5px_14px_rgba(0,0,0,0.3)]";
+export const CARD_SHADOW = "shadow-[0_8px_24px_rgba(0,0,0,0.28)]";
 
 // Layer display card
-export const LAYER_CARD = "rounded-lg bg-white/40 backdrop-blur-[2px] p-5";
+export const LAYER_CARD = "rounded-xl bg-white/35 backdrop-blur-sm p-5";
 
 // Label styling
-export const FORM_LABEL = "text-sm font-medium text-white/80";
+export const FORM_LABEL = "text-sm font-medium text-white/82";
 
 // Icon positioning in inputs
 export const INPUT_ICON_LEFT = "absolute left-3 top-1/2 -translate-y-1/2";

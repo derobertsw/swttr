@@ -97,8 +97,8 @@ const ActivitySelection = ({
   }, [api, current]);
 
   return (
-    <div className="mx-auto w-full max-w-md" role="radiogroup" aria-label="Activity">
-      <div className="mb-2 flex items-center justify-between px-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
+    <div className="mx-auto w-full max-w-[420px]" role="radiogroup" aria-label="Activity">
+      <div className="mb-2 flex items-center justify-between px-1 text-[11px] uppercase tracking-[0.18em] text-white/62">
         <span>Swipe or tap to select</span>
         <span>{current + 1} / {ACTIVITIES.length}</span>
       </div>
@@ -107,11 +107,11 @@ const ActivitySelection = ({
         opts={{ loop: true, startIndex: initialIndex >= 0 ? initialIndex : 0 }}
         setApi={setApi}
       >
-        <CarouselContent className="py-6">
+        <CarouselContent className="py-5">
           {ACTIVITIES.map((activity, index) => {
             const isSelected = index === current;
             return (
-              <CarouselItem className="basis-1/3" key={activity.value}>
+              <CarouselItem className="basis-[37%] sm:basis-1/3" key={activity.value}>
                 <button
                   type="button"
                   role="radio"
@@ -119,10 +119,10 @@ const ActivitySelection = ({
                   aria-label={activity.name}
                   tabIndex={isSelected ? 0 : -1}
                   className={cn(
-                    "w-full rounded-xl border-2 bg-card text-card-foreground cursor-pointer transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/85 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800",
+                    "w-full cursor-pointer rounded-[1.35rem] border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/85 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800",
                     isSelected
-                      ? "scale-110 border-gray-300/60 shadow-[0_5px_14px_rgba(0,0,0,0.17)] bg-white"
-                      : "scale-[0.92] opacity-80 border-transparent shadow-none"
+                      ? "scale-110 border-white/55 bg-[linear-gradient(180deg,#ffffff_0%,#f4f7fc_100%)] text-slate-900 shadow-[0_18px_30px_rgba(7,13,22,0.28)]"
+                      : "scale-[0.92] border-white/22 bg-white/[0.12] text-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] backdrop-blur-xl"
                   )}
                   onClick={() => {
                     if (isSelected) return;
@@ -151,14 +151,14 @@ const ActivitySelection = ({
                       className={cn(
                         "transition-all duration-200",
                         isSelected
-                          ? "size-12 text-primary"
-                          : "size-9 text-muted-foreground/60"
+                          ? "size-12 text-slate-900"
+                          : "size-9 text-white/72"
                       )}
                     />
                     <span
                       className={cn(
                         "text-center font-medium transition-all duration-200",
-                        isSelected ? "text-base" : "text-sm text-muted-foreground"
+                        isSelected ? "text-base text-slate-900" : "text-sm text-white/78"
                       )}
                     >
                       {activity.name}
@@ -171,7 +171,7 @@ const ActivitySelection = ({
         </CarouselContent>
       </Carousel>
       {/* Pagination dots */}
-      <div className={cn("flex justify-center gap-2 mt-1 opacity-75 transition-opacity", hideDots && "opacity-0")}>
+      <div className={cn("mt-1 flex justify-center gap-2 opacity-75 transition-opacity", hideDots && "opacity-0")}>
         {ACTIVITIES.map((activity, index) => (
           <button
             key={activity.value}
@@ -186,39 +186,41 @@ const ActivitySelection = ({
           />
         ))}
       </div>
-      <div className="mt-6 rounded-xl border border-white/20 bg-white/[0.06] p-3.5 backdrop-blur-sm">
-        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-white/70">
+      <div className="mt-7 rounded-[1.6rem] border border-white/25 bg-white/[0.1] p-4 shadow-[0_12px_30px_rgba(8,16,34,0.18)] backdrop-blur-xl">
+        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-white/74">
           <span>2. Exertion</span>
-          <span className="rounded-full border border-white/25 bg-white/10 px-2 py-0.5 text-[11px]">
+          <span className="rounded-full border border-white/30 bg-white/[0.16] px-2.5 py-0.5 text-[11px] text-white/90">
             {EXERTION_LABELS[exertion]}
           </span>
         </div>
-        <p className="mt-1 text-xs text-white/65">{EXERTION_DESCRIPTIONS[exertion]}</p>
-        <div
-          className="mt-3 grid grid-cols-3 gap-2"
-          role="radiogroup"
-          aria-label="Exertion level"
-        >
-          {EXERTION_LEVELS.map((level) => {
-            const isSelected = level === exertion;
-            return (
-              <button
-                key={level}
-                type="button"
-                onClick={() => onExertionChange(level)}
-                role="radio"
-                aria-checked={isSelected}
-                className={cn(
-                  "rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors",
-                  isSelected
-                    ? "border-white/55 bg-white/20 text-white"
-                    : "border-white/20 bg-white/[0.03] text-white/75 hover:bg-white/[0.08]"
-                )}
-              >
-                {EXERTION_LABELS[level]}
-              </button>
-            );
-          })}
+        <p className="mt-1 text-xs text-white/68">{EXERTION_DESCRIPTIONS[exertion]}</p>
+        <div className="mt-3 rounded-2xl border border-white/30 bg-white/[0.06] p-1.5">
+          <div
+            className="grid grid-cols-3 gap-1.5"
+            role="radiogroup"
+            aria-label="Exertion level"
+          >
+            {EXERTION_LEVELS.map((level) => {
+              const isSelected = level === exertion;
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => onExertionChange(level)}
+                  role="radio"
+                  aria-checked={isSelected}
+                  className={cn(
+                    "rounded-xl px-2 py-2 text-sm font-semibold transition-all",
+                    isSelected
+                      ? "bg-white text-slate-900 shadow-[0_4px_10px_rgba(12,23,39,0.2)]"
+                      : "text-white/74 hover:bg-white/[0.1]"
+                  )}
+                >
+                  {EXERTION_LABELS[level]}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

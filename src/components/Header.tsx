@@ -93,7 +93,11 @@ const Header = ({ onLogoClick }: HeaderProps) => {
         {/* Mobile: hamburger menu */}
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild className="md:hidden">
-            <Button variant="ghost" size="icon">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 rounded-full text-white/95 hover:bg-white/10"
+            >
               <Menu className="size-5 text-white/95" />
               <span className="sr-only">Open menu</span>
             </Button>

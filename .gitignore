@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Capacitor
+/capacitor-web
+ios/App/App.xcworkspace/xcuserdata/

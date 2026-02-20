@@ -159,14 +159,14 @@ export function MobileTabBar() {
         href={item.href}
         onClick={(e) => onTabClick(item, e)}
         className={cn(
-          "flex flex-col items-center gap-1 text-xs font-semibold leading-none tracking-wide transition-all",
+          "flex flex-col items-center gap-1 text-[11px] font-medium leading-none tracking-[0.01em] transition-colors",
           isActive ? "text-white" : "text-white/70",
           !isActive && isLandingScreen && "translate-y-0.5"
         )}
       >
         <div
           className={cn(
-            "flex items-center justify-center size-9 rounded-full transition-all",
+            "flex size-8 items-center justify-center rounded-full transition-all",
             isActive ? "bg-white/22 shadow-[0_4px_12px_rgba(0,0,0,0.2)]" : "bg-transparent"
           )}
         >
@@ -184,13 +184,12 @@ export function MobileTabBar() {
   return (
     <nav
       className={cn(
-        "md:hidden fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]",
+        "md:hidden fixed bottom-0 left-0 right-0 z-50 pb-[calc(env(safe-area-inset-bottom)+0.4rem)]",
         isLandingScreen ? "text-white/60" : "text-white/80"
       )}
-      style={{ backgroundColor: "rgba(45, 107, 116, 0.62)" }}
     >
-      <div className="relative h-16 backdrop-blur-lg">
-        <div className="flex h-16 items-center justify-around px-3 pb-1">
+      <div className="relative h-[74px] border-t border-white/20 bg-[rgba(17,45,62,0.74)] backdrop-blur-2xl">
+        <div className="flex h-full items-center justify-around px-3 pb-1 pt-1.5">
           {renderTab(TAB_ITEMS[0])}
           <div className="w-16" />
           {renderTab(TAB_ITEMS[1])}
@@ -199,7 +198,7 @@ export function MobileTabBar() {
         <button
           type="button"
           className={cn(
-            "absolute left-1/2 top-0 flex h-[58px] w-[58px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black text-white shadow-[0_12px_28px_rgba(0,0,0,0.4)] transition-transform duration-200",
+            "absolute left-1/2 top-0 flex h-[60px] w-[60px] -translate-x-1/2 -translate-y-[56%] items-center justify-center rounded-full border border-white/25 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.16)_0%,rgba(255,255,255,0.04)_28%,rgba(5,10,20,0.92)_100%)] text-white shadow-[0_16px_28px_rgba(0,0,0,0.42)] transition-transform duration-200",
             isFabPulse && "scale-110"
           )}
           aria-label="Gear Up"
@@ -208,7 +207,7 @@ export function MobileTabBar() {
         >
           {isGearUpLoading ? <Loader2 className="size-6 animate-spin" /> : <ActivityGlyph className="size-6" />}
         </button>
-        <span className="pointer-events-none absolute left-1/2 top-7 -translate-x-1/2 text-[11px] font-semibold text-white">
+        <span className="pointer-events-none absolute left-1/2 top-8 -translate-x-1/2 text-[11px] font-semibold tracking-[0.01em] text-white">
           Gear Up
         </span>
       </div>
