@@ -2,6 +2,9 @@ export interface LayerItem {
   name: string;
   rcl?: number;
   isGeneric?: boolean;
+  sourceId?: string;
+  isRecommended?: boolean;
+  brand?: string;
 }
 
 export interface LayerSet {

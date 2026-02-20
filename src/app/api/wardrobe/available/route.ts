@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 
-function extractRclWholeBody(
-  thermalData: unknown
+function extractNumericField(
+  thermalData: unknown,
+  field: string
 ): number | undefined {
   const data = Array.isArray(thermalData) ? thermalData[0] : thermalData;
   if (!data || typeof data !== "object") return undefined;
 
-  const raw = (data as { rcl_whole_body?: unknown }).rcl_whole_body;
+  const raw = (data as Record<string, unknown>)[field];
   if (typeof raw === "number" && Number.isFinite(raw)) return raw;
 
   if (typeof raw === "string") {
@@ -34,7 +35,7 @@ export async function GET() {
     const [garmentsResult, handwearResult, headwearResult] = await Promise.all([
       supabase
         .from("garments")
-        .select("id, brand, model_name, brand_logo_url, item_image_url, category, garment_type, garment_thermal_properties(rcl_whole_body)")
+        .select("id, brand, model_name, brand_logo_url, item_image_url, category, garment_type, garment_thermal_properties(rcl_whole_body, rcl_torso, rcl_legs)")
         .order("brand")
         .order("model_name"),
       supabase
@@ -59,7 +60,9 @@ export async function GET() {
         item_image_url: g.item_image_url,
         category: g.category,
         garment_type: g.garment_type,
-        rcl_clo: extractRclWholeBody(g.garment_thermal_properties),
+        rcl_clo: extractNumericField(g.garment_thermal_properties, "rcl_whole_body"),
+        rcl_torso: extractNumericField(g.garment_thermal_properties, "rcl_torso"),
+        rcl_legs: extractNumericField(g.garment_thermal_properties, "rcl_legs"),
       })),
       ...(handwearResult.data || []).map((h) => ({
         id: h.id,
