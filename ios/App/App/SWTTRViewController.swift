@@ -25,13 +25,21 @@ struct SWTTRNavigationPolicy {
     }
 
     func isAuthFlowURL(_ url: URL) -> Bool {
-        let path = url.path.lowercased()
-        let query = (url.query ?? "").lowercased()
         let host = (url.host ?? "").lowercased()
 
+        // Always allow Clerk-owned hosts
         if isClerkHost(host) {
             return true
         }
+
+        // Only allow auth-like paths/queries on trusted hosts
+        guard isAllowedHost(host) else {
+            return false
+        }
+
+        let path = url.path.lowercased()
+        let query = (url.query ?? "").lowercased()
+
         if path.contains("/sign-in")
             || path.contains("/sign-up")
             || path.contains("/sso-callback")

@@ -72,36 +72,44 @@ final class SWTTRNavigationPolicyTests: XCTestCase {
     // MARK: - isAuthFlowURL
 
     func testAuthFlowSignInPath() {
-        let policy = SWTTRNavigationPolicy(allowedHosts: [])
+        let policy = SWTTRNavigationPolicy(allowedHosts: ["swttr.vercel.app"])
         let url = URL(string: "https://swttr.vercel.app/sign-in")!
         XCTAssertTrue(policy.isAuthFlowURL(url))
     }
 
     func testAuthFlowSignUpPath() {
-        let policy = SWTTRNavigationPolicy(allowedHosts: [])
+        let policy = SWTTRNavigationPolicy(allowedHosts: ["swttr.vercel.app"])
         let url = URL(string: "https://swttr.vercel.app/sign-up")!
         XCTAssertTrue(policy.isAuthFlowURL(url))
     }
 
     func testAuthFlowSSOCallbackPath() {
-        let policy = SWTTRNavigationPolicy(allowedHosts: [])
+        let policy = SWTTRNavigationPolicy(allowedHosts: ["swttr.vercel.app"])
         let url = URL(string: "https://swttr.vercel.app/sso-callback?code=abc")!
         XCTAssertTrue(policy.isAuthFlowURL(url))
     }
 
-    func testAuthFlowOAuthPath() {
-        let policy = SWTTRNavigationPolicy(allowedHosts: [])
+    func testAuthFlowOAuthPathOnUntrustedHost() {
+        // Auth-like paths on untrusted hosts must NOT be allowed
+        let policy = SWTTRNavigationPolicy(allowedHosts: ["swttr.vercel.app"])
         let url = URL(string: "https://accounts.google.com/oauth/v2/auth")!
-        XCTAssertTrue(policy.isAuthFlowURL(url))
+        XCTAssertFalse(policy.isAuthFlowURL(url))
+    }
+
+    func testAuthFlowOAuthPathOnUntrustedHostWithEmptyAllowlist() {
+        let policy = SWTTRNavigationPolicy(allowedHosts: [])
+        let url = URL(string: "https://evil.com/oauth/callback")!
+        XCTAssertFalse(policy.isAuthFlowURL(url))
     }
 
     func testAuthFlowClerkQuery() {
-        let policy = SWTTRNavigationPolicy(allowedHosts: [])
+        let policy = SWTTRNavigationPolicy(allowedHosts: ["swttr.vercel.app"])
         let url = URL(string: "https://swttr.vercel.app/?__clerk_status=done")!
         XCTAssertTrue(policy.isAuthFlowURL(url))
     }
 
     func testAuthFlowClerkHost() {
+        // Clerk hosts are always allowed regardless of allowedHosts
         let policy = SWTTRNavigationPolicy(allowedHosts: [])
         let url = URL(string: "https://accounts.clerk.com/v1/verify")!
         XCTAssertTrue(policy.isAuthFlowURL(url))
@@ -129,9 +137,17 @@ final class SWTTRNavigationPolicyTests: XCTestCase {
         XCTAssertEqual(decision, .allow)
     }
 
-    func testDecideAllowsAuthFlowTarget() {
+    func testDecideBlocksAuthLikeURLOnUntrustedHost() {
+        // Auth-like paths on untrusted hosts must NOT be allowed in-webview
         let policy = SWTTRNavigationPolicy(allowedHosts: ["swttr.vercel.app"])
         let url = URL(string: "https://accounts.google.com/oauth/v2/auth?redirect_url=x")!
+        let decision = policy.decide(targetURL: url, isMainFrame: true)
+        XCTAssertEqual(decision, .openExternal)
+    }
+
+    func testDecideAllowsAuthFlowOnClerkHost() {
+        let policy = SWTTRNavigationPolicy(allowedHosts: ["swttr.vercel.app"])
+        let url = URL(string: "https://accounts.clerk.com/oauth/callback")!
         let decision = policy.decide(targetURL: url, isMainFrame: true)
         XCTAssertEqual(decision, .allow)
     }

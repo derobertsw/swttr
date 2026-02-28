@@ -343,9 +343,13 @@ const LayerDisplay = ({
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
   const shouldIgnoreHelmetForClo = activity === "xc_skiing";
   const handwear = biophysicsData?.recommendation?.handwear;
-  const headwear = shouldIgnoreHelmetForClo && biophysicsData?.recommendation?.headwear
-    ? { ...biophysicsData.recommendation.headwear, helmet: null }
-    : biophysicsData?.recommendation?.headwear;
+  const rawHeadwear = biophysicsData?.recommendation?.headwear;
+  const headwear = useMemo(
+    () => shouldIgnoreHelmetForClo && rawHeadwear
+      ? { ...rawHeadwear, helmet: null }
+      : rawHeadwear,
+    [shouldIgnoreHelmetForClo, rawHeadwear]
+  );
   const {
     mutableLayers,
     layerEditDelta,
