@@ -525,7 +525,10 @@ describe("LayerDisplay", () => {
         />
       );
 
-      expect(screen.getByText("You 1.7 clo")).toBeInTheDocument();
+      // effectiveTotalClo is now computed from mutable layers with ensemble regression:
+      // torso raw 1.7 × 0.836 = 1.42, legs raw 0.25 × 0.961 = 0.24, arms 1.2
+      // weighted: 1.42×0.5 + 1.2×0.25 + 0.24×0.25 ≈ 1.1
+      expect(screen.getByText("Actual 1.1 clo")).toBeInTheDocument();
       // Risk details are now behind a popover icon, check the icon is present
       expect(screen.getByLabelText(/Cold Risk/)).toBeInTheDocument();
     });
@@ -624,8 +627,24 @@ describe("LayerDisplay", () => {
     it("should display biophysics score", () => {
       const inRangeData = {
         ...mockBiophysicsData,
+        ireq: {
+          ...mockBiophysicsData.ireq,
+          // Lower target range so effectiveTotalClo (~1.3) falls in range
+          target_range: [1.0, 1.5] as [number, number],
+        },
         recommendation: {
           ...mockBiophysicsData.recommendation,
+          garments: [
+            ...mockBiophysicsData.recommendation.garments,
+            {
+              id: "garment-5",
+              name: "Insulated Ski Pants",
+              category: "insulation_synthetic",
+              rcl: 1.1,
+              covers_torso: false,
+              covers_legs: true,
+            },
+          ],
           handwear: {
             ...mockBiophysicsData.recommendation.handwear,
             rcl: 0.85,
@@ -646,7 +665,8 @@ describe("LayerDisplay", () => {
         />
       );
 
-      // Score of 85 should display "Optimal" status via ScoreDisplay component
+      // With adjusted garments and target range, effectiveTotalClo is in range
+      // and no significant regional deficits → score ≥ 85 → "Optimal"
       expect(screen.getByText("Optimal")).toBeInTheDocument();
     });
 

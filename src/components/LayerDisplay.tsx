@@ -213,6 +213,47 @@ function getCloValues(
   return { currentClo: undefined, targetClo: undefined };
 }
 
+/**
+ * Calculate whole-body clo from regional values and mutable layers.
+ * Uses the same weighted average method as the backend for consistency.
+ */
+function calculateWholeBodyClo(
+  regionalClo: RegionalClo | undefined,
+  mutableLayers: MutableLayers,
+  biophysicsActive: boolean
+): number | undefined {
+  if (!regionalClo) return undefined;
+
+  // Calculate torso clo from mutable layers if biophysics is active
+  let torsoClo = regionalClo.torso;
+  if (biophysicsActive) {
+    const rawSum = (["base", "mid", "outer"] as LayerType[]).reduce((sum, lt) => {
+      const items = mutableLayers.torso[lt];
+      return sum + (items ? items.reduce((s, item) => s + (item.rcl ?? 0), 0) : 0);
+    }, 0);
+    const coef = ENSEMBLE_REGRESSION.thermal.torso.coef;
+    torsoClo = rawSum * coef;
+  }
+
+  // Calculate legs clo from mutable layers if biophysics is active
+  let legsClo = regionalClo.legs;
+  if (biophysicsActive) {
+    const rawSum = (["base", "mid", "outer"] as LayerType[]).reduce((sum, lt) => {
+      const items = mutableLayers.legs[lt];
+      return sum + (items ? items.reduce((s, item) => s + (item.rcl ?? 0), 0) : 0);
+    }, 0);
+    const coef = ENSEMBLE_REGRESSION.thermal.leg.coef;
+    legsClo = rawSum * coef;
+  }
+
+  // Arms aren't independently editable, use API value
+  const armsClo = regionalClo.arms;
+
+  // Apply regional weights
+  const wt = REGIONAL_WEIGHTS;
+  return torsoClo * wt.torso + armsClo * wt.arm + legsClo * wt.leg;
+}
+
 type MutableLayers = Record<BodyPart, LayerSet>;
 const LAYER_TYPES: LayerType[] = ["base", "mid", "outer"];
 
@@ -302,9 +343,13 @@ const LayerDisplay = ({
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
   const shouldIgnoreHelmetForClo = activity === "xc_skiing";
   const handwear = biophysicsData?.recommendation?.handwear;
-  const headwear = shouldIgnoreHelmetForClo && biophysicsData?.recommendation?.headwear
-    ? { ...biophysicsData.recommendation.headwear, helmet: null }
-    : biophysicsData?.recommendation?.headwear;
+  const rawHeadwear = biophysicsData?.recommendation?.headwear;
+  const headwear = useMemo(
+    () => shouldIgnoreHelmetForClo && rawHeadwear
+      ? { ...rawHeadwear, helmet: null }
+      : rawHeadwear,
+    [shouldIgnoreHelmetForClo, rawHeadwear]
+  );
   const {
     mutableLayers,
     layerEditDelta,
@@ -488,12 +533,6 @@ const LayerDisplay = ({
 
   const regionalClo = biophysicsData?.recommendation?.ensemble_properties?.regional_clo;
   const totalClo = biophysicsData?.recommendation?.ensemble_properties?.total_clo;
-  const effectiveTotalClo =
-    totalClo !== undefined
-      ? totalClo + totalLayerEditDelta
-      : totalLayerEditDelta !== 0
-        ? totalLayerEditDelta
-        : undefined;
   const regionalIreq = biophysicsData?.ireq?.regional;
   const extremityIreq = biophysicsData?.ireq?.extremity;
   const descentPackItems = biophysicsData?.pack_items?.garments ?? [];
@@ -504,69 +543,8 @@ const LayerDisplay = ({
   }, 0);
   const downhillTargetMinClo = biophysicsData?.ireq?.downhill_target_range?.[0]
     ?? biophysicsData?.ireq?.downhill?.min;
-  // Preliminary descent clo from API data (used for early guards); refined after descentBodyPartSections
-  let estimatedDescentClo: number | undefined = effectiveTotalClo !== undefined ? effectiveTotalClo + descentPackClo + descentHelmetClo : undefined;
-  const getRegionalDeficit = (target?: number, current?: number): number => {
-    if (target === undefined) return 0;
-    return Math.max(0, target - (current ?? 0));
-  };
-  const torsoDeficit = getRegionalDeficit(
-    regionalIreq?.neutral?.torso,
-    (regionalClo?.torso ?? 0) + layerEditDelta.torso
-  );
-  const armsDeficit = getRegionalDeficit(regionalIreq?.neutral?.arms, regionalClo?.arms);
-  const legsDeficit = getRegionalDeficit(
-    regionalIreq?.neutral?.legs,
-    (regionalClo?.legs ?? 0) + layerEditDelta.legs
-  );
-  const handsDeficit = getRegionalDeficit(
-    extremityIreq?.neutral?.hands,
-    (handwear?.rcl ?? 0) + layerEditDelta.hands
-  );
-  const headDeficit = getRegionalDeficit(
-    extremityIreq?.neutral?.head,
-    ((headwear?.helmet?.rcl ?? 0) + (headwear?.head_warmth?.rcl ?? 0) + (headwear?.neck_warmth?.rcl ?? 0))
-      + layerEditDelta.headNeck
-  );
-  const maxRegionalDeficit = Math.max(torsoDeficit, armsDeficit, legsDeficit);
-  const maxExtremityDeficit = Math.max(handsDeficit, headDeficit);
-  const hasRegionalGap = maxRegionalDeficit > REGIONAL_DEFICIT_CLO_THRESHOLD;
-  const hasExtremityGap = maxExtremityDeficit > EXTREMITY_DEFICIT_CLO_THRESHOLD;
-  const thermalDecision = evaluateThermalComfort({
-    totalClo: effectiveTotalClo,
-    targetRange: biophysicsData?.ireq?.target_range,
-    maxRegionalDeficit,
-    maxExtremityDeficit,
-  });
-  const thermalComfortScore = calculateThermalComfortScore({
-    totalClo: effectiveTotalClo,
-    targetRange: biophysicsData?.ireq?.target_range,
-    maxRegionalDeficit,
-    maxExtremityDeficit,
-  })
-    ?? biophysicsData?.recommendation?.thermal_comfort_score
-    ?? biophysicsData?.recommendation?.score;
-  const regionalDeficitSummary = BODY_PARTS
-    .map((part) => {
-      const { currentClo, targetClo } = getCloValues(
-        part,
-        regionalClo,
-        regionalIreq,
-        extremityIreq,
-        handwear,
-        headwear,
-        !shouldIgnoreHelmetForClo
-      );
-      const adjustedCurrent = (currentClo ?? 0) + layerEditDelta[part];
-      const deficit = targetClo !== undefined ? Math.max(0, targetClo - adjustedCurrent) : 0;
-      return {
-        part,
-        label: BODY_PART_LABELS[part],
-        deficit,
-      };
-    })
-    .sort((a, b) => b.deficit - a.deficit);
-  const topDeficitArea = regionalDeficitSummary.find((item) => item.deficit > 0.12);
+  // Preliminary descent clo from API data (used for early guards); refined after bodyPartSections and descentBodyPartSections
+  let estimatedDescentClo: number | undefined = totalClo !== undefined ? totalClo + descentPackClo + descentHelmetClo : undefined;
 
   if (!recommendation && !biophysicsData) return null;
 
@@ -579,32 +557,6 @@ const LayerDisplay = ({
     && biophysicsActive
     && estimatedDescentClo !== undefined
     && downhillTargetRange !== undefined;
-  const climbStatus = showDualComfortGauges ? getCloStatus(effectiveTotalClo, uphillTargetRange) : null;
-  const climbDecision = showDualComfortGauges ? getDecisionFromCloStatus(climbStatus) : null;
-  // descentStatus/descentDecision computed after estimatedDescentClo is refined (below descentBodyPartSections)
-  const decisionForRiskCard = showDualComfortGauges ? climbDecision : thermalDecision;
-  const decisionTitle = thermalDecision
-    ? thermalDecision.riskType === "comfortable"
-      ? "In Target Range"
-      : thermalDecision.riskType === "cold"
-        ? `Cold Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
-        : `Overheating Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
-    : "Layer Guidance";
-  const climbRiskTitle = decisionForRiskCard
-    ? decisionForRiskCard.riskType === "comfortable"
-      ? "Climb In Target Range"
-      : decisionForRiskCard.riskType === "cold"
-        ? `Climb Cold Risk — ${decisionForRiskCard.severity === "high" ? "High" : "Moderate"}`
-        : `Climb Overheating Risk — ${decisionForRiskCard.severity === "high" ? "High" : "Moderate"}`
-    : "Climb Guidance";
-  // descentRiskTitle computed after descentDecision (below descentBodyPartSections)
-  const riskCardTitle = showDualComfortGauges ? climbRiskTitle : decisionTitle;
-  const showRiskCard = biophysicsActive
-    ? Boolean(decisionForRiskCard && decisionForRiskCard.riskType !== "comfortable")
-    : true;
-  // showDescentRiskCard, descentStatusSummary, descentImmediateAction computed after descentDecision
-  const statusSummary = getThermalSummary(decisionForRiskCard);
-  const immediateAction = getImmediateAction(decisionForRiskCard);
   const bodyPartSections = BODY_PARTS.map((part) => {
     // Use mutable layers for torso/legs when biophysics is active
     const layers = biophysicsActive
@@ -652,6 +604,84 @@ const LayerDisplay = ({
       urgencyDelta,
     };
   });
+
+  // Calculate regional and extremity deficits from bodyPartSections
+  // This ensures deficits use the same properly-calculated values as the breakdown
+  const getRegionalDeficit = (target?: number, current?: number): number => {
+    if (target === undefined) return 0;
+    return Math.max(0, target - (current ?? 0));
+  };
+  const torsoSection = bodyPartSections.find((s) => s.part === "torso");
+  const legsSection = bodyPartSections.find((s) => s.part === "legs");
+  const handsSection = bodyPartSections.find((s) => s.part === "hands");
+  const headNeckSection = bodyPartSections.find((s) => s.part === "headNeck");
+
+  const torsoDeficit = getRegionalDeficit(torsoSection?.targetClo, torsoSection?.currentClo);
+  const armsDeficit = getRegionalDeficit(regionalIreq?.neutral?.arms, regionalClo?.arms);
+  const legsDeficit = getRegionalDeficit(legsSection?.targetClo, legsSection?.currentClo);
+  const handsDeficit = getRegionalDeficit(handsSection?.targetClo, handsSection?.currentClo);
+  const headDeficit = getRegionalDeficit(headNeckSection?.targetClo, headNeckSection?.currentClo);
+
+  const maxRegionalDeficit = Math.max(torsoDeficit, armsDeficit, legsDeficit);
+  const maxExtremityDeficit = Math.max(handsDeficit, headDeficit);
+  const hasRegionalGap = maxRegionalDeficit > REGIONAL_DEFICIT_CLO_THRESHOLD;
+  const hasExtremityGap = maxExtremityDeficit > EXTREMITY_DEFICIT_CLO_THRESHOLD;
+
+  // Calculate effectiveTotalClo using the same method as the breakdown
+  // This ensures the "Actual" badge matches the breakdown "Total"
+  const effectiveTotalClo = biophysicsActive && regionalClo
+    ? (() => {
+        const torso = torsoSection?.currentClo ?? regionalClo.torso;
+        const arms = regionalClo.arms;
+        const legs = legsSection?.currentClo ?? regionalClo.legs;
+        const wt = REGIONAL_WEIGHTS;
+        return torso * wt.torso + arms * wt.arm + legs * wt.leg;
+      })()
+    : totalClo;
+
+  const thermalDecision = evaluateThermalComfort({
+    totalClo: effectiveTotalClo,
+    targetRange: biophysicsData?.ireq?.target_range,
+    maxRegionalDeficit,
+    maxExtremityDeficit,
+  });
+
+  const thermalComfortScore = calculateThermalComfortScore({
+    totalClo: effectiveTotalClo,
+    targetRange: biophysicsData?.ireq?.target_range,
+    maxRegionalDeficit,
+    maxExtremityDeficit,
+  })
+    ?? biophysicsData?.recommendation?.thermal_comfort_score
+    ?? biophysicsData?.recommendation?.score;
+
+  // Calculate climb/descent decisions for dual-gauge view
+  const climbStatus = showDualComfortGauges ? getCloStatus(effectiveTotalClo, uphillTargetRange) : null;
+  const climbDecision = showDualComfortGauges ? getDecisionFromCloStatus(climbStatus) : null;
+
+  // Determine which decision to use for risk card
+  const decisionForRiskCard = showDualComfortGauges ? climbDecision : thermalDecision;
+  const decisionTitle = thermalDecision
+    ? thermalDecision.riskType === "comfortable"
+      ? "In Target Range"
+      : thermalDecision.riskType === "cold"
+        ? `Cold Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
+        : `Overheating Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
+    : "Layer Guidance";
+  const climbRiskTitle = decisionForRiskCard
+    ? decisionForRiskCard.riskType === "comfortable"
+      ? "Climb In Target Range"
+      : decisionForRiskCard.riskType === "cold"
+        ? `Climb Cold Risk — ${decisionForRiskCard.severity === "high" ? "High" : "Moderate"}`
+        : `Climb Overheating Risk — ${decisionForRiskCard.severity === "high" ? "High" : "Moderate"}`
+    : "Climb Guidance";
+  const riskCardTitle = showDualComfortGauges ? climbRiskTitle : decisionTitle;
+  const showRiskCard = biophysicsActive
+    ? Boolean(decisionForRiskCard && decisionForRiskCard.riskType !== "comfortable")
+    : true;
+  const statusSummary = getThermalSummary(decisionForRiskCard);
+  const immediateAction = getImmediateAction(decisionForRiskCard);
+
   const descentBreakdown = biophysicsData?.descent_breakdown;
   const descentBodyPartSections = showDualComfortGauges
     ? BODY_PARTS.map((part) => {
@@ -1033,6 +1063,7 @@ const LayerDisplay = ({
             totalClo={effectiveTotalClo}
             targetRange={uphillTargetRange}
             showStatusPill={false}
+            hideMarkerLabel
             cloBreakdown={climbCloBreakdown}
           />
           {showRiskCard && decisionForRiskCard && decisionForRiskCard.riskType !== "comfortable" && (
