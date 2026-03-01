@@ -109,7 +109,7 @@ export function useWardrobe() {
     const searchNormalized = normalizeSearch(search);
 
     return baseFilteredItems.filter((item) => {
-      if (!search) return true;
+      if (!search || !searchNormalized.trim()) return true;
 
       const searchText = normalizeSearch(`${item.brand} ${item.model_name} ${item.category}`);
       return searchText.includes(searchNormalized);
@@ -163,7 +163,7 @@ export function useWardrobe() {
   }, [filteredItems, search, searchSort]);
 
   const visibleSearchItems = useMemo(() => {
-    if (!search.trim()) return [];
+    if (!search.trim() || !normalizeSearch(search).trim()) return [];
     return rankedFilteredItems.slice(0, SEARCH_RESULTS_LIMIT);
   }, [rankedFilteredItems, search]);
 
