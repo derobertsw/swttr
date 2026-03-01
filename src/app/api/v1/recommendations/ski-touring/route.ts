@@ -506,10 +506,22 @@ function buildUphillEnsemble(
   );
 
   if (currentClo < targetMinClo && categorizedGarments.midLayers.length > 0) {
-    const midsSorted = sortByBreathability(categorizedGarments.midLayers);
     const relaxedEvap = minEvapPotential * 0.8;
 
-    for (const mid of midsSorted) {
+    const torsoMids = sortByBreathability(categorizedGarments.midLayers.filter((g) => g.covers_torso));
+    for (const mid of torsoMids) {
+      const midClo = mid.garment_thermal_properties?.rcl_whole_body ?? 0;
+      const midEvap = mid.garment_thermal_properties?.evap_potential ?? 0;
+      if (currentClo + midClo <= targetMaxClo && midEvap >= relaxedEvap) {
+        ensemble.push(mid);
+        currentClo += midClo;
+        break;
+      }
+    }
+
+    const legsMids = sortByBreathability(categorizedGarments.midLayers.filter((g) => g.covers_legs));
+    for (const mid of legsMids) {
+      if (ensemble.some((g) => g.id === mid.id)) continue;
       const midClo = mid.garment_thermal_properties?.rcl_whole_body ?? 0;
       const midEvap = mid.garment_thermal_properties?.evap_potential ?? 0;
       if (currentClo + midClo <= targetMaxClo && midEvap >= relaxedEvap) {

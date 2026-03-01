@@ -264,6 +264,7 @@ function buildAlpineEnsemble(
 
   for (const mid of allMids) {
     if (currentClo >= minClo) break;
+    if (!mid.covers_torso && !mid.covers_legs) continue;
     addMidIfFits(mid);
   }
 
