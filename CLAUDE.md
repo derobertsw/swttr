@@ -14,6 +14,10 @@ Run `npm run build` before pushing to catch Vercel build errors locally. Common 
 
 Before adding new items to the database (e.g., gear, garments), check if similar items already exist to avoid duplicates.
 
+## Architecture
+
+All calculations (e.g., clo values, risk assessments, weather processing) should be performed on the API side. Avoid doing calculations on the frontend.
+
 ## Dev Server
 
 When starting the dev server, first check if the port (3000) is already in use and kill any stale processes. Also remove any stale lock files before running install commands.
