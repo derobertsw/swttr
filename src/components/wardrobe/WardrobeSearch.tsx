@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Search, Plus, Check, X, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { FROSTED_INPUT, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
@@ -54,6 +55,74 @@ const SORT_LABELS: Record<WardrobeSearchProps["searchSort"], string> = {
   alpha: "A-Z",
   clo: "Highest clo",
 };
+
+function LongPressName({ name }: { name: string }) {
+  const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const preventClickRef = useRef(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = useCallback(() => {
+    timerRef.current = setTimeout(() => {
+      preventClickRef.current = true;
+      if (ref.current) {
+        const rect = ref.current.getBoundingClientRect();
+        setTooltip({ x: rect.left + rect.width / 2, y: rect.top });
+      }
+    }, 500);
+  }, []);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    clearTimer();
+    setTooltip(null);
+  }, [clearTimer]);
+
+  const handleClickCapture = useCallback((e: React.MouseEvent) => {
+    if (preventClickRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      preventClickRef.current = false;
+    }
+  }, []);
+
+  return (
+    <>
+      <div
+        ref={ref}
+        className="truncate text-[14px] font-semibold leading-tight text-slate-900"
+        title={name}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchMove={clearTimer}
+        onTouchCancel={handleTouchEnd}
+        onClickCapture={handleClickCapture}
+      >
+        {name}
+      </div>
+      {tooltip &&
+        createPortal(
+          <div
+            className="fixed z-[100] max-w-[80vw] rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white shadow-lg"
+            style={{
+              left: tooltip.x,
+              top: tooltip.y,
+              transform: "translate(-50%, calc(-100% - 8px))",
+            }}
+          >
+            {name}
+          </div>,
+          document.body
+        )}
+    </>
+  );
+}
 
 export function WardrobeSearch({
   search,
@@ -341,9 +410,7 @@ export function WardrobeSearch({
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="truncate text-[14px] font-semibold leading-tight text-slate-900">
-                            {item.model_name}
-                          </div>
+                          <LongPressName name={item.model_name} />
                           <div className="mt-0.5 truncate text-[12px] text-slate-700/76">
                             {formatCategory(item.category)}
                             {typeof item.rcl_clo === "number" && (
