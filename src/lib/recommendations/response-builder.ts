@@ -4,7 +4,7 @@
  */
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { scoreEnsemble, type WeatherConditions, type ActivityProfile, type GarmentWithProtection } from '@/lib/biophysics/scorer';
-import type { ActivityType } from '@/lib/biophysics/constants';
+import { HOOD_CLO_VALUES, type ActivityType, type HoodType } from '@/lib/biophysics/constants';
 import {
   calculateThermalComfortScore,
   getMaxRegionalDeficit,
@@ -82,9 +82,22 @@ export function buildResponseComponents(
     regionalClo,
     input.comfortContext?.regionalNeutralTarget
   );
+  // Sum hood clo contributions from garments in the ensemble.
+  // When a helmet is selected, only helmet_compatible hoods count
+  // (attached/removable hoods can't be worn under a helmet).
+  const hasHelmet = headwear.helmet != null;
+  let hoodClo = 0;
+  for (const g of input.ensemble) {
+    if (g.hood_type && g.hood_type in HOOD_CLO_VALUES && g.hood_type !== 'none') {
+      if (!hasHelmet || g.hood_type === 'helmet_compatible') {
+        hoodClo += HOOD_CLO_VALUES[g.hood_type as HoodType];
+      }
+    }
+  }
+
   const extremityClo = {
     hands: handwear?.rcl_clo ?? 0,
-    head: (headwear.helmet?.rcl_clo ?? 0) + (headwear.headWarmth?.rcl_clo ?? 0) + (headwear.neckWarmth?.rcl_clo ?? 0),
+    head: (headwear.helmet?.rcl_clo ?? 0) + (headwear.headWarmth?.rcl_clo ?? 0) + (headwear.neckWarmth?.rcl_clo ?? 0) + hoodClo,
   } satisfies ExtremityCloValues;
   const maxExtremityDeficit = getMaxExtremityDeficit(
     extremityClo,

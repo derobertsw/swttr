@@ -35,6 +35,7 @@ export interface GarmentRow {
   covers_torso: boolean;
   covers_arms: boolean;
   covers_legs: boolean;
+  hood_type?: string;
   weight_grams?: number;
   garment_thermal_properties?: GarmentThermalProps;
   garment_protection?: GarmentProtectionProps;
