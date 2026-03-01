@@ -55,7 +55,11 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    body = await request.json();
+    const parsed = await request.json();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return NextResponse.json({ error: "Request body must be a JSON object" }, { status: 400 });
+    }
+    body = parsed;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
