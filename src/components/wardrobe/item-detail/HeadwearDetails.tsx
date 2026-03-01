@@ -15,7 +15,7 @@ export function HeadwearDetails({ details }: { details: WardrobeItem["details"] 
         </div>
         <div className="rounded-lg border border-border/60 bg-background/65 px-2.5 py-2">
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Coverage</p>
-          <p className="mt-1 text-sm font-semibold">{coverage.length > 0 ? `${coverage.length} areas` : "N/A"}</p>
+          <p className="mt-1 text-sm font-semibold">{coverage.length > 0 ? `${coverage.length} areas` : "—"}</p>
           <p className="truncate text-[11px] text-muted-foreground">
             {coverage.length > 0 ? coverage.join(" • ") : "No coverage metadata"}
           </p>
@@ -23,7 +23,7 @@ export function HeadwearDetails({ details }: { details: WardrobeItem["details"] 
         <div className="rounded-lg border border-border/60 bg-background/65 px-2.5 py-2">
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Type</p>
           <p className="mt-1 truncate text-sm font-semibold">
-            {details.headwear_type?.replace(/_/g, " ") ?? "N/A"}
+            {details.headwear_type?.replace(/_/g, " ") ?? "—"}
           </p>
         </div>
       </div>
@@ -44,15 +44,15 @@ export function HeadwearDetails({ details }: { details: WardrobeItem["details"] 
           <tbody>
             <tr className="bg-background/75">
               <td className="px-3 py-1.5 text-muted-foreground">Ears</td>
-              <td className="px-3 py-1.5 text-right font-medium">{details.covers_ears ? "Covered" : "N/A"}</td>
+              <td className="px-3 py-1.5 text-right font-medium">{details.covers_ears ? "Covered" : "—"}</td>
             </tr>
             <tr className="bg-muted/10">
               <td className="px-3 py-1.5 text-muted-foreground">Neck</td>
-              <td className="px-3 py-1.5 text-right font-medium">{details.covers_neck ? "Covered" : "N/A"}</td>
+              <td className="px-3 py-1.5 text-right font-medium">{details.covers_neck ? "Covered" : "—"}</td>
             </tr>
             <tr className="bg-background/75">
               <td className="px-3 py-1.5 text-muted-foreground">Face</td>
-              <td className="px-3 py-1.5 text-right font-medium">{details.covers_face ? "Covered" : "N/A"}</td>
+              <td className="px-3 py-1.5 text-right font-medium">{details.covers_face ? "Covered" : "—"}</td>
             </tr>
           </tbody>
         </table>

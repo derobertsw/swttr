@@ -4,7 +4,7 @@ export function formatDetailValue(
   value: number | undefined | null,
   decimals: number = 2
 ): string {
-  if (value === undefined || value === null) return "N/A";
+  if (value === undefined || value === null) return "—";
   return value.toFixed(decimals);
 }
 

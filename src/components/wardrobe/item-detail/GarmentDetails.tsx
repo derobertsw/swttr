@@ -11,7 +11,7 @@ export function GarmentDetails({ details }: { details: WardrobeItem["details"] }
     ? details.garment_thermal_properties[0]
     : details.garment_thermal_properties;
   const coverageAreas = getGarmentCoverageAreas(details);
-  const coverageSummary = coverageAreas.length > 0 ? `${coverageAreas.length} areas` : "N/A";
+  const coverageSummary = coverageAreas.length > 0 ? `${coverageAreas.length} areas` : "—";
   const coverageDetail = coverageAreas.length > 0 ? coverageAreas.join(" • ") : "No coverage metadata";
 
   return (

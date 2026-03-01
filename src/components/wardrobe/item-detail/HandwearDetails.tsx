@@ -14,13 +14,13 @@ export function HandwearDetails({ details }: { details: WardrobeItem["details"] 
         <div className="rounded-lg border border-border/60 bg-background/65 px-2.5 py-2">
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Dexterity</p>
           <p className="mt-1 text-sm font-semibold">
-            {details.dexterity_score !== undefined ? `${details.dexterity_score}/10` : "N/A"}
+            {details.dexterity_score !== undefined ? `${details.dexterity_score}/10` : "—"}
           </p>
         </div>
         <div className="rounded-lg border border-border/60 bg-background/65 px-2.5 py-2">
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Type</p>
           <p className="mt-1 truncate text-sm font-semibold">
-            {details.handwear_type?.replace(/_/g, " ") ?? "N/A"}
+            {details.handwear_type?.replace(/_/g, " ") ?? "—"}
           </p>
         </div>
       </div>
@@ -42,7 +42,7 @@ export function HandwearDetails({ details }: { details: WardrobeItem["details"] 
             <tr className="bg-background/75">
               <td className="px-3 py-1.5 text-muted-foreground">Dexterity Score</td>
               <td className="px-3 py-1.5 text-right font-mono font-medium">
-                {details.dexterity_score !== undefined ? `${details.dexterity_score}/10` : "N/A"}
+                {details.dexterity_score !== undefined ? `${details.dexterity_score}/10` : "—"}
               </td>
             </tr>
           </tbody>
