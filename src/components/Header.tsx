@@ -84,7 +84,7 @@ const Header = ({ onLogoClick }: HeaderProps) => {
             </UserButton>
           </SignedIn>
           <SignedOut>
-            <Link href="/sign-in" className="text-sm hover:underline">
+            <Link href="/sign-in" className="text-sm text-white/90 hover:text-white hover:underline">
               Sign In
             </Link>
           </SignedOut>
