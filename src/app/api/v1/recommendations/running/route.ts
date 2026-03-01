@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
   });
 }
 
-function buildRunningEnsemble(
+export function buildRunningEnsemble(
   categorized: CategorizedGarments,
   ireq: { ireqMin: number; ireqNeutral: number },
   maxClo: number,
@@ -192,8 +192,19 @@ function buildRunningEnsemble(
   let currentClo = getEnsembleClo(ensemble);
 
   if (currentClo < ireq.ireqMin && categorized.midLayers.length > 0) {
-    const sortedMids = sortByBreathability(categorized.midLayers);
-    for (const mid of sortedMids) {
+    const torsoMids = sortByBreathability(categorized.midLayers.filter((g) => g.covers_torso));
+    for (const mid of torsoMids) {
+      const midClo = mid.garment_thermal_properties?.rcl_whole_body ?? 0;
+      if (currentClo + midClo <= maxClo) {
+        ensemble.push(mid);
+        currentClo += midClo;
+        break;
+      }
+    }
+
+    const legsMids = sortByBreathability(categorized.midLayers.filter((g) => g.covers_legs));
+    for (const mid of legsMids) {
+      if (ensemble.some((g) => g.id === mid.id)) continue;
       const midClo = mid.garment_thermal_properties?.rcl_whole_body ?? 0;
       if (currentClo + midClo <= maxClo) {
         ensemble.push(mid);
@@ -204,8 +215,19 @@ function buildRunningEnsemble(
   }
 
   if (categorized.shells.length > 0 && (currentClo < ireq.ireqMin || ireq.ireqMin > 1.0)) {
-    const sortedShells = sortByBreathability(categorized.shells);
-    for (const shell of sortedShells) {
+    const torsoShells = sortByBreathability(categorized.shells.filter((s) => s.covers_torso));
+    for (const shell of torsoShells) {
+      const shellClo = shell.garment_thermal_properties?.rcl_whole_body ?? 0;
+      if (currentClo + shellClo <= maxClo) {
+        ensemble.push(shell);
+        currentClo += shellClo;
+        break;
+      }
+    }
+
+    const legsShells = sortByBreathability(categorized.shells.filter((s) => s.covers_legs));
+    for (const shell of legsShells) {
+      if (ensemble.some((g) => g.id === shell.id)) continue;
       const shellClo = shell.garment_thermal_properties?.rcl_whole_body ?? 0;
       if (currentClo + shellClo <= maxClo) {
         ensemble.push(shell);
