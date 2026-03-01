@@ -4,21 +4,18 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useUserId } from "@/hooks/useUserId";
 import { logWarn } from "@/lib/logger";
 import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
-import { normalizeSearch, getBodyPart, BODY_PART_ORDER } from "@/components/wardrobe/wardrobe-utils";
+import {
+  normalizeSearch,
+  getBodyPart,
+  BODY_PART_ORDER,
+  inferAvailableBodyPart,
+} from "@/components/wardrobe/wardrobe-utils";
 import { CATEGORY_TO_LAYER_TYPE } from "@/lib/layers";
 
 const SEARCH_RESULTS_LIMIT = 30;
 type SearchBodyPartFilter = "all" | "torso" | "legs" | "hands" | "headNeck";
 type SearchLayerFilter = "all" | "base" | "mid" | "outer";
 type SearchSort = "bestMatch" | "alpha" | "clo";
-const LEGS_GARMENT_TYPES = new Set(["pants", "shorts", "bib"]);
-
-function inferAvailableBodyPart(item: AvailableItem): Exclude<SearchBodyPartFilter, "all"> {
-  if (item.type === "handwear") return "hands";
-  if (item.type === "headwear") return "headNeck";
-  if (item.garment_type && LEGS_GARMENT_TYPES.has(item.garment_type.toLowerCase())) return "legs";
-  return "torso";
-}
 
 function inferAvailableLayer(item: AvailableItem): Exclude<SearchLayerFilter, "all"> {
   const category = (item.category ?? "").toLowerCase();

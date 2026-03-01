@@ -1,5 +1,5 @@
 import { Shirt, Hand, HardHat, Layers, Flame, Shield, Wind, CloudRain, LucideProps } from "lucide-react";
-import type { WardrobeItem } from "@/types/wardrobe";
+import type { WardrobeItem, AvailableItem } from "@/types/wardrobe";
 import type { EstimationMethod } from "@/types/garments";
 
 // Custom pants icon (ski pants style) since lucide-react doesn't have one
@@ -23,6 +23,35 @@ export function PantsIcon(props: LucideProps) {
 }
 
 export const LEGS_GARMENT_TYPES = ["pants", "shorts", "bib"];
+
+/**
+ * Convert display body part name to filter key
+ * Maps "head & neck" to "headNeck" for consistency with search filters
+ */
+export function bodyPartToFilterKey(
+  displayName: string
+): "torso" | "legs" | "hands" | "headNeck" {
+  if (displayName === "head & neck") return "headNeck";
+  return displayName as "torso" | "legs" | "hands";
+}
+
+/**
+ * Infer the body part category for an available item
+ * Used for filtering items by body part
+ */
+export function inferAvailableBodyPart(
+  item: AvailableItem
+): "torso" | "legs" | "hands" | "headNeck" {
+  if (item.type === "handwear") return "hands";
+  if (item.type === "headwear") return "headNeck";
+
+  const garmentType = item.garment_type?.toLowerCase();
+  if (garmentType && LEGS_GARMENT_TYPES.includes(garmentType)) {
+    return "legs";
+  }
+
+  return "torso";
+}
 
 export const typeIcons = {
   garment: Shirt,

@@ -4,7 +4,11 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useUserId } from "@/hooks/useUserId";
 import { logWarn } from "@/lib/logger";
 import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
-import { getClo, getBodyPart } from "@/components/wardrobe/wardrobe-utils";
+import {
+  getClo,
+  getBodyPart,
+  inferAvailableBodyPart,
+} from "@/components/wardrobe/wardrobe-utils";
 import { CATEGORY_TO_LAYER_TYPE, BodyPart, LayerType } from "@/lib/layers";
 
 export interface PickerItem {
@@ -14,14 +18,6 @@ export interface PickerItem {
   rcl: number;
   isInUse: boolean;
   isOwned: boolean;
-}
-
-const LEGS_GARMENT_TYPES = new Set(["pants", "shorts", "bib"]);
-function inferAvailableBodyPart(item: AvailableItem): BodyPart {
-  if (item.type === "handwear") return "hands";
-  if (item.type === "headwear") return "headNeck";
-  if (item.garment_type && LEGS_GARMENT_TYPES.has(item.garment_type.toLowerCase())) return "legs";
-  return "torso";
 }
 
 function inferAvailableLayer(item: AvailableItem): LayerType {

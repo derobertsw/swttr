@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { CircleHelp, RotateCcw, X } from "lucide-react";
@@ -9,6 +9,7 @@ import { useWardrobe } from "@/hooks/useWardrobe";
 import { WardrobeSearch } from "@/components/wardrobe/WardrobeSearch";
 import { BodyPartSection } from "@/components/wardrobe/BodyPartSection";
 import { ItemDetailCard } from "@/components/wardrobe";
+import { BodyPartPickerDrawer } from "@/components/wardrobe/BodyPartPickerDrawer";
 import { BODY_PART_ORDER, getItemIcon, formatCategory, getClo } from "@/components/wardrobe/wardrobe-utils";
 
 const SWIPE_HINT_STORAGE_KEY = "swttr-wardrobe-swipe-hint-dismissed-v1";
@@ -49,6 +50,12 @@ export default function Wardrobe() {
     toggleDisabledCollapsed,
   } = useWardrobe();
   const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const [pickerBodyPart, setPickerBodyPart] = useState<string | null>(null);
+
+  const wardrobeItemIds = useMemo(
+    () => new Set(wardrobeItems.map((item) => item.item_id)),
+    [wardrobeItems]
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -169,6 +176,7 @@ export default function Wardrobe() {
                             onItemClick={setSelectedItem}
                             showSwipeHintOnFirstItem={shouldShowSwipeHint}
                             onDismissSwipeHint={dismissSwipeHint}
+                            onHeadingClick={() => setPickerBodyPart(part)}
                           />
                         );
                       });
@@ -251,6 +259,21 @@ export default function Wardrobe() {
           if (!open) setSelectedItem(null);
         }}
       />
+
+      {pickerBodyPart && (
+        <BodyPartPickerDrawer
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setPickerBodyPart(null);
+          }}
+          bodyPart={pickerBodyPart}
+          availableItems={filteredItems}
+          wardrobeItemIds={wardrobeItemIds}
+          adding={adding}
+          justAdded={justAdded}
+          onAddItem={addItem}
+        />
+      )}
     </PageLayout>
   );
 }
