@@ -119,5 +119,6 @@ export function normalizeSearch(text: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/ø/g, "o")
     .replace(/æ/g, "ae")
-    .replace(/å/g, "a");
+    .replace(/å/g, "a")
+    .replace(/[^a-z0-9\s]/g, "");
 }
