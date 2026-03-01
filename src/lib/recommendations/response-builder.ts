@@ -82,11 +82,16 @@ export function buildResponseComponents(
     regionalClo,
     input.comfortContext?.regionalNeutralTarget
   );
-  // Sum hood clo contributions from garments in the ensemble
+  // Sum hood clo contributions from garments in the ensemble.
+  // When a helmet is selected, only helmet_compatible hoods count
+  // (attached/removable hoods can't be worn under a helmet).
+  const hasHelmet = headwear.helmet != null;
   let hoodClo = 0;
   for (const g of input.ensemble) {
-    if (g.hood_type && g.hood_type in HOOD_CLO_VALUES) {
-      hoodClo += HOOD_CLO_VALUES[g.hood_type as HoodType];
+    if (g.hood_type && g.hood_type in HOOD_CLO_VALUES && g.hood_type !== 'none') {
+      if (!hasHelmet || g.hood_type === 'helmet_compatible') {
+        hoodClo += HOOD_CLO_VALUES[g.hood_type as HoodType];
+      }
     }
   }
 
