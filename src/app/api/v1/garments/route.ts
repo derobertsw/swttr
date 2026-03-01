@@ -69,6 +69,22 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Infer arm coverage from garment type if not explicitly provided
+  const armCoveringTypes: GarmentType[] = ['top_long_sleeve', 'jacket', 'one_piece'];
+  const coversArms = body.covers_arms ?? armCoveringTypes.includes(body.garment_type);
+
+  // Validate arm clo consistency: arm-covering garments must have rcl_arms
+  if (coversArms && body.thermal_properties) {
+    const armClo = body.thermal_properties.rcl_arms;
+    const torsoClo = body.thermal_properties.rcl_torso;
+    if ((armClo === undefined || armClo === null || armClo === 0) && torsoClo > 0) {
+      return NextResponse.json(
+        { error: 'Arm-covering garments (long sleeve, jacket, one piece) must have rcl_arms > 0 when rcl_torso > 0' },
+        { status: 400 }
+      );
+    }
+  }
+
   // Insert garment
   const garmentData: {
     brand: string;
@@ -92,7 +108,7 @@ export async function POST(request: NextRequest) {
     year_released: body.year_released,
     msrp_usd: body.msrp_usd,
     covers_torso: body.covers_torso ?? false,
-    covers_arms: body.covers_arms ?? false,
+    covers_arms: coversArms,
     covers_legs: body.covers_legs ?? false,
     covers_head: body.covers_head ?? false,
     hood_type: body.hood_type ?? 'none',

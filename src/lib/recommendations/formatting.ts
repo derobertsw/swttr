@@ -14,10 +14,12 @@ export function formatGarmentResponse(garment: GarmentRow): {
   category: string;
   rcl?: number;
   rcl_torso?: number;
+  rcl_arms?: number;
   rcl_legs?: number;
   recl?: number;
   evap_potential?: number;
   covers_torso: boolean;
+  covers_arms: boolean;
   covers_legs: boolean;
 } {
   return {
@@ -26,10 +28,12 @@ export function formatGarmentResponse(garment: GarmentRow): {
     category: garment.category,
     rcl: garment.garment_thermal_properties?.rcl_whole_body,
     rcl_torso: garment.garment_thermal_properties?.rcl_torso,
+    rcl_arms: garment.garment_thermal_properties?.rcl_arms,
     rcl_legs: garment.garment_thermal_properties?.rcl_legs,
     recl: garment.garment_thermal_properties?.recl_whole_body,
     evap_potential: garment.garment_thermal_properties?.evap_potential,
     covers_torso: garment.covers_torso,
+    covers_arms: garment.covers_arms,
     covers_legs: garment.covers_legs,
   };
 }

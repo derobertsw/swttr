@@ -374,11 +374,36 @@ describe('formatGarmentResponse', () => {
       name: 'Patagonia Capilene',
       category: 'base_layer',
       rcl: 0.45,
+      rcl_torso: undefined,
+      rcl_arms: undefined,
+      rcl_legs: undefined,
       recl: undefined,
       evap_potential: 0.38,
       covers_torso: true,
+      covers_arms: true,
       covers_legs: false,
     });
+  });
+
+  it('should include arm clo values when present', () => {
+    const garment = createMockGarment({
+      id: 'mid-123',
+      brand: 'Patagonia',
+      model_name: 'Capilene Midweight',
+      covers_arms: true,
+      garment_thermal_properties: {
+        rcl_whole_body: 0.45,
+        rcl_torso: 0.69,
+        rcl_arms: 0.55,
+        rcl_legs: 0,
+        evap_potential: 0.32,
+      },
+    });
+
+    const result = formatGarmentResponse(garment);
+
+    expect(result.rcl_arms).toBe(0.55);
+    expect(result.covers_arms).toBe(true);
   });
 
   it('should handle missing thermal properties', () => {
@@ -391,6 +416,7 @@ describe('formatGarmentResponse', () => {
     const result = formatGarmentResponse(garment);
 
     expect(result.rcl).toBeUndefined();
+    expect(result.rcl_arms).toBeUndefined();
     expect(result.evap_potential).toBeUndefined();
   });
 
