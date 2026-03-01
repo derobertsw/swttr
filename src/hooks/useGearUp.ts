@@ -13,12 +13,11 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useBiophysicsRecommendation } from "@/hooks/useBiophysicsRecommendation";
 import { fetchCurrentWeather, fetchWeatherByCoords } from "@/hooks/useCurrentWeather";
 import { BiophysicsRecommendation } from "@/types/biophysics";
-import { ForecastHour, MultiDayLayerPlan } from "@/types/plan";
+import { MultiDayLayerPlan } from "@/types/plan";
 import { logWarn } from "@/lib/logger";
 import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { TemperatureSensitivity, UserBodyMetrics } from "@/types/preferences";
-import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 import {
   type ExertionLevel,
   DEFAULT_EXERTION_LEVEL,
@@ -194,44 +193,41 @@ async function submitPlanAhead(
 ): Promise<PlanSubmitResult> {
   const dateStr = format(state.date!, "yyyy-MM-dd");
   const { selectedLocation } = locationSearch;
+  const parsedStartHour = Number.parseInt(state.time.split(":")[0] ?? "", 10);
 
-  const response = await fetch(
-    `/api/weather?lat=${selectedLocation!.latitude}&lon=${selectedLocation!.longitude}&startDate=${dateStr}&days=${state.durationDays}`
-  );
+  const response = await fetch("/api/plan-ahead", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      activity,
+      sensitivity,
+      lat: selectedLocation!.latitude,
+      lon: selectedLocation!.longitude,
+      startDate: dateStr,
+      durationDays: state.durationDays,
+      startHour: Number.isFinite(parsedStartHour) ? parsedStartHour : undefined,
+    }),
+  });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch forecast");
+    const errorData = await response.json().catch(() => ({})) as { error?: string };
+    throw new Error(errorData.error ?? "Failed to build plan");
   }
 
   const data = await response.json() as {
-    hourly?: ForecastHour[];
-    startDate?: string;
-    endDate?: string;
+    plan: MultiDayLayerPlan;
+    baseline: {
+      recommendation: Recommendation | null;
+      effectiveTemperature: number;
+      maxWindSpeed: number;
+    };
   };
 
-  const hourly = Array.isArray(data.hourly) ? data.hourly : [];
-  const parsedStartHour = Number.parseInt(state.time.split(":")[0] ?? "", 10);
-  const plan = buildMultiDayLayerPlan({
-    startDate: state.date!,
-    durationDays: state.durationDays,
-    startHour: Number.isFinite(parsedStartHour) ? parsedStartHour : undefined,
-    hourlyForecast: hourly,
-    getRecommendation: (effectiveTemperature) =>
-      getRecommendation(effectiveTemperature, activity, sensitivity),
-  });
-
-  if (plan.days.length === 0) {
-    throw new Error("No daytime forecast data returned for the selected window");
-  }
-
-  const firstDay = plan.days[0];
-  const baseline = firstDay.baseline;
-
   return {
-    plan,
-    recommendation: baseline.recommendation,
-    temperature: baseline.effectiveTemperature,
-    windspeed: baseline.maxWindSpeed,
+    plan: data.plan,
+    recommendation: data.baseline.recommendation,
+    temperature: data.baseline.effectiveTemperature,
+    windspeed: data.baseline.maxWindSpeed,
   };
 }
 
