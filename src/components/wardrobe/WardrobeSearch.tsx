@@ -82,15 +82,13 @@ function LongPressName({ name }: { name: string }) {
   const handleTouchEnd = useCallback(() => {
     clearTimer();
     setTooltip(null);
-    setTimeout(() => {
-      preventClickRef.current = false;
-    }, 50);
   }, [clearTimer]);
 
   const handleClickCapture = useCallback((e: React.MouseEvent) => {
     if (preventClickRef.current) {
       e.preventDefault();
       e.stopPropagation();
+      preventClickRef.current = false;
     }
   }, []);
 
