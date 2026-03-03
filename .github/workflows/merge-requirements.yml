@@ -1,0 +1,34 @@
+name: Merge Requirements
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-test-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify test plan checkboxes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+
+            // Find the Test Plan section
+            const testPlanMatch = body.match(/## Test Plan[\s\S]*?(?=\n## |\n---|$)/i);
+            if (!testPlanMatch) {
+              core.setFailed('PR must include a "## Test Plan" section.');
+              return;
+            }
+
+            const section = testPlanMatch[0];
+            const unchecked = (section.match(/- \[ \]/g) || []).length;
+            const checked = (section.match(/- \[x\]/gi) || []).length;
+
+            if (checked + unchecked === 0) {
+              core.setFailed('Test Plan section must contain at least one checkbox item.');
+            } else if (unchecked > 0) {
+              core.setFailed(`${unchecked} test plan item(s) still unchecked.`);
+            } else {
+              core.info(`All ${checked} test plan items are checked.`);
+            }
