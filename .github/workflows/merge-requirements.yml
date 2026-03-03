@@ -13,11 +13,12 @@ jobs:
         with:
           script: |
             const body = context.payload.pull_request.body || '';
+            const help = '\n\nYour PR description must include a "## Test Plan" section with checkbox items:\n\n## Test Plan\n- [ ] Verified feature works locally\n- [ ] Tested edge cases\n\nCheck off each item (replace [ ] with [x]) once completed. All items must be checked to merge.';
 
             // Find the Test Plan section
             const testPlanMatch = body.match(/## Test Plan[\s\S]*?(?=\n## |\n---|$)/i);
             if (!testPlanMatch) {
-              core.setFailed('PR must include a "## Test Plan" section.');
+              core.setFailed('PR must include a "## Test Plan" section.' + help);
               return;
             }
 
@@ -26,9 +27,9 @@ jobs:
             const checked = (section.match(/- \[x\]/gi) || []).length;
 
             if (checked + unchecked === 0) {
-              core.setFailed('Test Plan section must contain at least one checkbox item.');
+              core.setFailed('Test Plan section must contain at least one checkbox item.' + help);
             } else if (unchecked > 0) {
-              core.setFailed(`${unchecked} test plan item(s) still unchecked.`);
+              core.setFailed(`${unchecked} of ${checked + unchecked} test plan item(s) still unchecked. Check off each item in your PR description (replace [ ] with [x]) before merging.`);
             } else {
               core.info(`All ${checked} test plan items are checked.`);
             }
