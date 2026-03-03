@@ -161,6 +161,11 @@ export async function POST(request: NextRequest) {
   });
 }
 
+/**
+ * Build a garment ensemble for biking, prioritizing breathability.
+ * Selects base layers, mid-layers, and shells for torso and legs
+ * while respecting IREQ targets and preventing duplicate garments.
+ */
 export function buildBikingEnsemble(
   categorized: CategorizedGarments,
   ireq: { ireqMin: number; ireqNeutral: number },

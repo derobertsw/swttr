@@ -41,6 +41,7 @@ function wardrobeBodyPart(item: WardrobeItem): BodyPart {
   return raw as BodyPart;
 }
 
+/** Map a wardrobe item to its layer type (base/mid/outer) based on category or item type. */
 function wardrobeLayerType(item: WardrobeItem): LayerType | null {
   const category = (item.details.category ?? "").toLowerCase();
   const mapped = CATEGORY_TO_LAYER_TYPE[category];
