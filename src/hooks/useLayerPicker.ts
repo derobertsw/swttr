@@ -32,6 +32,8 @@ function inferAvailableLayer(item: AvailableItem): LayerType {
   if (category.includes("shell") || category.includes("hard") || category.includes("soft") || category.includes("wind")) {
     return "outer";
   }
+  if (!category && item.type === "headwear") return "base";
+  if (!category && item.type === "handwear") return "outer";
   return "mid";
 }
 
