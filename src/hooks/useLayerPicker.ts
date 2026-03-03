@@ -32,6 +32,8 @@ function inferAvailableLayer(item: AvailableItem): LayerType {
   if (category.includes("shell") || category.includes("hard") || category.includes("soft") || category.includes("wind")) {
     return "outer";
   }
+  if (!category && item.type === "headwear") return "base";
+  if (!category && item.type === "handwear") return "outer";
   return "mid";
 }
 
@@ -41,6 +43,7 @@ function wardrobeBodyPart(item: WardrobeItem): BodyPart {
   return raw as BodyPart;
 }
 
+/** Map a wardrobe item to its layer type (base/mid/outer) based on category or item type. */
 function wardrobeLayerType(item: WardrobeItem): LayerType | null {
   const category = (item.details.category ?? "").toLowerCase();
   const mapped = CATEGORY_TO_LAYER_TYPE[category];
@@ -52,7 +55,7 @@ function wardrobeLayerType(item: WardrobeItem): LayerType | null {
   if (category) return "mid";
   // Extremity items lack garment categories — infer from item type
   if (item.item_type === "handwear") return "outer";
-  if (item.item_type === "headwear") return "outer";
+  if (item.item_type === "headwear") return "base";
   return null;
 }
 
