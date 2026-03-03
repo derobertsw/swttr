@@ -115,4 +115,31 @@ describe("buildRunningEnsemble", () => {
     expect(ids).toContain("torso-shell");
     expect(ids).toContain("legs-shell");
   });
+
+  it("does not duplicate a garment that covers both torso and legs", () => {
+    const dualCoverBase = createGarment({
+      id: "dual-base",
+      category: "base_layer",
+      covers_torso: true,
+      covers_legs: true,
+      garment_thermal_properties: { rcl_whole_body: 0.2, evap_potential: 0.2 },
+    });
+
+    const categorized: CategorizedGarments = {
+      baseLayers: [dualCoverBase],
+      midLayers: [],
+      insulation: [],
+      shells: [],
+    };
+
+    const ensemble = buildRunningEnsemble(
+      categorized,
+      { ireqMin: 0.3, ireqNeutral: 0.5 },
+      1.5,
+      0.3
+    );
+
+    const ids = ensemble.map((g) => g.id);
+    expect(ids).toEqual(["dual-base"]);
+  });
 });

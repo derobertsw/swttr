@@ -184,8 +184,9 @@ export function buildRunningEnsemble(
   const sortedLegsBases = sortByBreathability(legsBaseLayers);
   if (sortedLegsBases.length > 0) {
     const suitableBase = findBreathableGarment(sortedLegsBases, minEvapPotential);
-    if (!ensemble.some((g) => g.id === suitableBase?.id)) {
-      ensemble.push(suitableBase ?? sortedLegsBases[0]);
+    const legsBase = suitableBase ?? sortedLegsBases[0];
+    if (!ensemble.some((g) => g.id === legsBase.id)) {
+      ensemble.push(legsBase);
     }
   }
 
