@@ -52,7 +52,7 @@ function wardrobeLayerType(item: WardrobeItem): LayerType | null {
   if (category) return "mid";
   // Extremity items lack garment categories — infer from item type
   if (item.item_type === "handwear") return "outer";
-  if (item.item_type === "headwear") return "outer";
+  if (item.item_type === "headwear") return "base";
   return null;
 }
 
