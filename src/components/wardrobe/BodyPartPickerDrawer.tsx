@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Plus, Check } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -23,16 +24,8 @@ import {
   inferAvailableBodyPart,
   typeIcons,
   typeLabels,
-  getItemIcon,
   formatCategory,
 } from "./wardrobe-utils";
-import {
-  getAvailableMediaRef,
-  getBrandInitials,
-  resolveBrandLogoUrl,
-  resolveItemImageUrl,
-  toCssBackgroundImage,
-} from "./media";
 
 interface BodyPartPickerDrawerProps {
   open: boolean;
@@ -43,6 +36,7 @@ interface BodyPartPickerDrawerProps {
   adding: string | null;
   justAdded: string | null;
   onAddItem: (item: AvailableItem) => void;
+  onCreateCustom?: () => void;
 }
 
 export function BodyPartPickerDrawer({
@@ -54,6 +48,7 @@ export function BodyPartPickerDrawer({
   adding,
   justAdded,
   onAddItem,
+  onCreateCustom,
 }: BodyPartPickerDrawerProps) {
   const isMobile = useIsMobile();
 
@@ -95,6 +90,26 @@ export function BodyPartPickerDrawer({
 
   const content = (
     <div className="max-h-[60vh] overflow-y-auto">
+      {onCreateCustom && (
+        <button
+          onClick={() => {
+            onOpenChange(false);
+            onCreateCustom();
+          }}
+          className="mb-3 flex w-full items-center gap-3 rounded-md border-2 border-emerald-300/60 bg-emerald-50/90 px-3 py-3 transition-colors hover:bg-emerald-100/90"
+        >
+          <Plus className="size-5 flex-shrink-0 text-emerald-600" />
+          <div className="flex-1 text-left">
+            <p className="text-[15px] font-semibold text-emerald-900">
+              Create Custom Item
+            </p>
+            <p className="text-[11px] text-emerald-700/90">
+              Add a generic {bodyPart} item with your own name
+            </p>
+          </div>
+        </button>
+      )}
+
       {filteredItems.length === 0 ? (
         <div className="py-8 text-center">
           <p className="text-sm text-muted-foreground">
@@ -117,79 +132,88 @@ export function BodyPartPickerDrawer({
                 </div>
                 <div className="space-y-0.5">
                   {items.map((item) => {
-                    const ItemIcon = getItemIcon(
-                      item.type,
-                      item.garment_type,
-                      item.category
-                    );
                     const isAdding = adding === item.id;
                     const wasJustAdded = justAdded === item.id;
                     const disableAdd = isAdding || wasJustAdded;
-                    const media = getAvailableMediaRef(item);
-                    const itemImageUrl = resolveItemImageUrl(media);
-                    const brandLogoUrl = resolveBrandLogoUrl(media);
                     const brand = item.brand || "Unknown brand";
+                    const categoryLabel = item.category
+                      ? formatCategory(item.category)
+                      : "Uncategorized";
+                    const clo = item.rcl_clo;
 
                     return (
                       <button
                         key={item.id}
                         onClick={() => onAddItem(item)}
                         disabled={disableAdd}
-                        className="flex w-full items-center gap-2.5 rounded-md px-2 py-2.5 text-left transition-colors hover:bg-muted/50 disabled:opacity-70 active:bg-muted/60"
+                        className="flex w-full items-center gap-3 rounded-md bg-white px-3 py-3 text-left transition-colors hover:bg-slate-50/80 disabled:opacity-70 active:bg-slate-100/60"
                       >
-                        <div className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-slate-300/40 bg-[linear-gradient(145deg,rgba(241,248,253,0.95),rgba(211,226,236,0.82))]">
-                          <div
-                            aria-hidden="true"
-                            className="absolute inset-0 bg-cover bg-center"
-                            style={{
-                              backgroundImage: toCssBackgroundImage(itemImageUrl),
-                            }}
-                          />
-                          <div
-                            aria-hidden="true"
-                            className="absolute inset-0 bg-[linear-gradient(165deg,rgba(255,255,255,0.3),rgba(15,23,42,0.12))]"
-                          />
-                          <div
-                            aria-hidden="true"
-                            className="absolute inset-0 opacity-50 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.38),transparent_52%)]"
-                          />
-                          <ItemIcon className="absolute bottom-1 right-1 size-3.5 text-slate-700/70" />
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div
-                            className="truncate text-[14px] font-semibold leading-tight text-slate-900"
-                            title={item.model_name}
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className={cn(
+                              "overflow-hidden text-ellipsis leading-[1.15] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]",
+                              "text-[15px] font-semibold text-slate-900"
+                            )}
                           >
                             {item.model_name}
-                          </div>
-                          <div className="mt-0.5 truncate text-[12px] text-slate-700/76">
-                            {formatCategory(item.category)}
-                            {typeof item.rcl_clo === "number" && (
-                              <span className="ml-1.5 font-medium opacity-80">
-                                · {item.rcl_clo.toFixed(2)} clo
-                              </span>
-                            )}
+                          </p>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-0.5 rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
+                                "border-slate-400/50 bg-slate-200/60 text-slate-800"
+                              )}
+                            >
+                              {categoryLabel}
+                            </span>
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-0.5 rounded-md border px-2 py-0.5 text-[11px] font-medium",
+                                "border-slate-400/50 bg-slate-200/60 text-slate-800"
+                              )}
+                            >
+                              {brand}
+                            </span>
                           </div>
                         </div>
 
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <div
-                            className="relative flex h-8 w-16 items-center justify-center overflow-hidden rounded-lg border border-slate-300/35 bg-white/72 px-1 shadow-[0_1px_4px_rgba(15,23,42,0.12)]"
-                            title={brand}
-                            aria-label={`${brand} logo`}
-                          >
-                            <span className="pointer-events-none text-[8px] font-semibold uppercase tracking-[0.14em] text-slate-700/72">
-                              {getBrandInitials(brand)}
-                            </span>
+                        <div className="ml-1 flex shrink-0 items-center gap-1.5">
+                          {clo !== undefined ? (
                             <div
-                              aria-hidden="true"
-                              className="absolute inset-0 bg-contain bg-center bg-no-repeat p-1"
-                              style={{
-                                backgroundImage: toCssBackgroundImage(brandLogoUrl),
-                              }}
-                            />
-                          </div>
+                              className={cn(
+                                "flex h-8 w-16 flex-col items-center justify-center rounded-lg border px-1",
+                                "border-blue-400/60 bg-blue-100/70"
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "font-mono text-[13px] font-bold leading-none",
+                                  "text-blue-800"
+                                )}
+                              >
+                                {clo.toFixed(2)}
+                              </div>
+                              <div
+                                className={cn(
+                                  "mt-0.5 text-[9px] font-medium uppercase tracking-wider",
+                                  "text-blue-700/75"
+                                )}
+                              >
+                                clo
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              className={cn(
+                                "flex h-8 w-16 items-center justify-center rounded-lg border px-1",
+                                "border-slate-400/50 bg-slate-200/60"
+                              )}
+                            >
+                              <div className="text-center text-[9px] font-medium text-slate-600/72">
+                                Pending
+                              </div>
+                            </div>
+                          )}
 
                           <div className="size-8 flex items-center justify-center">
                             {wasJustAdded ? (
@@ -200,7 +224,7 @@ export function BodyPartPickerDrawer({
                                 }}
                               />
                             ) : (
-                              <Plus className="size-4 text-muted-foreground/70" />
+                              <Plus className="size-4 text-slate-600/70" />
                             )}
                           </div>
                         </div>

@@ -15,6 +15,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { Trash2 } from "lucide-react";
 import { WardrobeItem } from "@/types/wardrobe";
 import { ItemDetailContent } from "./item-detail/ItemDetailContent";
 import { getItemHeaderContext } from "./item-detail/detail-formatters";
@@ -23,9 +24,10 @@ interface ItemDetailCardProps {
   item: WardrobeItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onRemove?: (wardrobeId: string) => void;
 }
 
-export function ItemDetailCard({ item, open, onOpenChange }: ItemDetailCardProps) {
+export function ItemDetailCard({ item, open, onOpenChange, onRemove }: ItemDetailCardProps) {
   const isMobile = useIsMobile();
 
   if (!item) return null;
@@ -44,6 +46,16 @@ export function ItemDetailCard({ item, open, onOpenChange }: ItemDetailCardProps
             </DrawerHeader>
             <div className="px-5">
               <ItemDetailContent item={item} />
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={() => { onRemove(item.id); onOpenChange(false); }}
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 hover:border-red-300"
+                >
+                  <Trash2 className="size-3.5" />
+                  Remove from wardrobe
+                </button>
+              )}
             </div>
           </div>
         </DrawerContent>
@@ -59,6 +71,16 @@ export function ItemDetailCard({ item, open, onOpenChange }: ItemDetailCardProps
           <DialogDescription className="text-muted-foreground/90">{description}</DialogDescription>
         </DialogHeader>
         <ItemDetailContent item={item} />
+        {onRemove && (
+          <button
+            type="button"
+            onClick={() => { onRemove(item.id); onOpenChange(false); }}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 hover:border-red-300"
+          >
+            <Trash2 className="size-3.5" />
+            Remove from wardrobe
+          </button>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -1,4 +1,4 @@
-import { Shirt, Hand, HardHat, Layers, Flame, Shield, Wind, CloudRain, LucideProps } from "lucide-react";
+import { Shirt, Hand, HardHat, Layers, Flame, Shield, Wind, CloudRain, Sparkles, LucideProps } from "lucide-react";
 import type { WardrobeItem, AvailableItem } from "@/types/wardrobe";
 import type { EstimationMethod } from "@/types/garments";
 
@@ -42,6 +42,9 @@ export function bodyPartToFilterKey(
 export function inferAvailableBodyPart(
   item: AvailableItem
 ): "torso" | "legs" | "hands" | "headNeck" {
+  if (item.type === "custom") {
+    return item.body_part || "torso";
+  }
   if (item.type === "handwear") return "hands";
   if (item.type === "headwear") return "headNeck";
 
@@ -57,6 +60,7 @@ export const typeIcons = {
   garment: Shirt,
   handwear: Hand,
   headwear: HardHat,
+  custom: Sparkles,
 };
 
 const categoryIcons: Record<string, React.ComponentType<LucideProps>> = {
@@ -75,11 +79,15 @@ export const typeLabels = {
   garment: "Clothing",
   handwear: "Handwear",
   headwear: "Headwear",
+  custom: "Custom",
 };
 
 export const BODY_PART_ORDER = ["torso", "legs", "hands", "head & neck"];
 
 export function getItemIcon(itemType: string, garmentType?: string, category?: string) {
+  if (itemType === "custom") {
+    return Sparkles;
+  }
   if (itemType === "garment" && garmentType && LEGS_GARMENT_TYPES.includes(garmentType)) {
     return PantsIcon;
   }
@@ -118,6 +126,9 @@ export function formatValue(value: number | undefined | null, decimals: number =
 }
 
 export function getClo(item: WardrobeItem): number | undefined {
+  if (item.item_type === "custom") {
+    return item.details.rcl_clo;
+  }
   if (item.details.rcl_clo !== undefined) return item.details.rcl_clo;
   const tp = item.details.garment_thermal_properties;
   const props = Array.isArray(tp) ? tp[0] : tp;
@@ -125,6 +136,10 @@ export function getClo(item: WardrobeItem): number | undefined {
 }
 
 export function getBodyPart(item: WardrobeItem): string {
+  if (item.item_type === "custom") {
+    const bp = item.details.body_part;
+    return bp === "headNeck" ? "head & neck" : bp || "torso";
+  }
   if (item.item_type === "handwear") return "hands";
   if (item.item_type === "headwear") return "head & neck";
   if (item.details.garment_type && LEGS_GARMENT_TYPES.includes(item.details.garment_type)) return "legs";

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 import { getAuthUserId } from "@/lib/auth";
 
-type ItemType = "garment" | "handwear" | "headwear";
+type ItemType = "garment" | "handwear" | "headwear" | "custom";
 
 /**
  * GET /api/wardrobe/gear
@@ -62,6 +62,24 @@ export async function GET(request: NextRequest) {
             .eq("id", entry.item_id)
             .single();
           itemDetails = data;
+        } else if (entry.item_type === "custom") {
+          const { data } = await supabase
+            .from("user_custom_items")
+            .select("*")
+            .eq("id", entry.item_id)
+            .single();
+
+          itemDetails = data
+            ? {
+                brand: "Custom",
+                model_name: data.custom_name,
+                rcl_clo: data.rcl_clo,
+                body_part: data.body_part,
+                layer_type: data.layer_type,
+                generic_option: data.generic_option,
+                custom_name: data.custom_name,
+              }
+            : null;
         }
 
         return {
