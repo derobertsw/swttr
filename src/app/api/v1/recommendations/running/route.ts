@@ -164,6 +164,11 @@ export async function POST(request: NextRequest) {
   });
 }
 
+/**
+ * Build a garment ensemble for running, prioritizing breathability.
+ * Selects base layers, mid-layers, and shells for torso and legs
+ * while respecting IREQ targets and preventing duplicate garments.
+ */
 export function buildRunningEnsemble(
   categorized: CategorizedGarments,
   ireq: { ireqMin: number; ireqNeutral: number },
@@ -184,8 +189,9 @@ export function buildRunningEnsemble(
   const sortedLegsBases = sortByBreathability(legsBaseLayers);
   if (sortedLegsBases.length > 0) {
     const suitableBase = findBreathableGarment(sortedLegsBases, minEvapPotential);
-    if (!ensemble.some((g) => g.id === suitableBase?.id)) {
-      ensemble.push(suitableBase ?? sortedLegsBases[0]);
+    const legsBase = suitableBase ?? sortedLegsBases[0];
+    if (!ensemble.some((g) => g.id === legsBase.id)) {
+      ensemble.push(legsBase);
     }
   }
 
