@@ -16,6 +16,7 @@ export interface PickerItem {
   name: string;
   brand: string;
   rcl: number;
+  nativeLayerType: LayerType;
   isInUse: boolean;
   isOwned: boolean;
 }
@@ -142,6 +143,7 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
           name: item.nickname || item.details.model_name,
           brand: item.details.brand,
           rcl: getRegionalClo(item, bodyPart),
+          nativeLayerType: wardrobeLayerType(item) ?? layerType,
           isInUse: inUseItemIds.has(item.item_id),
           isOwned: true,
         }))
@@ -163,6 +165,7 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
             name: item.model_name,
             brand: item.brand,
             rcl: regionalRcl ?? item.rcl_clo ?? 0,
+            nativeLayerType: inferAvailableLayer(item),
             isInUse: inUseItemIds.has(item.id),
             isOwned: false,
           };
