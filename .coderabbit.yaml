@@ -3,4 +3,4 @@ reviews:
     enabled: true
   auto_approve:
     enabled: true
-  request_changes_workflow: false
+  request_changes_workflow: true
