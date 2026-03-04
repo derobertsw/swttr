@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
             .from("user_custom_items")
             .select("*")
             .eq("id", entry.item_id)
+            .eq("user_id", userId)
             .single();
 
           itemDetails = data
@@ -156,6 +157,14 @@ export async function POST(request: NextRequest) {
         .from("headwear")
         .select("id")
         .eq("id", item_id)
+        .single();
+      itemExists = !!data;
+    } else if (item_type === "custom") {
+      const { data } = await supabase
+        .from("user_custom_items")
+        .select("id")
+        .eq("id", item_id)
+        .eq("user_id", userId)
         .single();
       itemExists = !!data;
     }

@@ -185,9 +185,12 @@ export function useWardrobe() {
       garment: [],
       handwear: [],
       headwear: [],
+      custom: [],
     };
     visibleSearchItems.forEach((item) => {
-      groups[item.type].push(item);
+      if (groups[item.type]) {
+        groups[item.type].push(item);
+      }
     });
     return groups;
   }, [visibleSearchItems]);
@@ -378,6 +381,7 @@ export function useWardrobe() {
     adding,
     justAdded,
     wardrobeItems,
+    availableItems,
     totalAvailableCount: availableItems.length,
     filteredItems,
     visibleSearchItems,

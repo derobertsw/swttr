@@ -76,9 +76,12 @@ export function BodyPartPickerDrawer({
       garment: [],
       handwear: [],
       headwear: [],
+      custom: [],
     };
     sortedItems.forEach((item) => {
-      groups[item.type].push(item);
+      if (groups[item.type]) {
+        groups[item.type].push(item);
+      }
     });
     return groups;
   }, [sortedItems]);

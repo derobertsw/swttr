@@ -31,7 +31,7 @@ export function WardrobeItemCard({
     item.details.headwear_type ||
     "";
   const categoryLabel = isCustom
-    ? `${item.details.generic_option} ${item.details.layer_type}`
+    ? `${item.details.generic_option ?? ""} ${item.details.layer_type ?? ""}`.trim() || "Custom"
     : category
     ? formatCategory(category)
     : "Uncategorized";

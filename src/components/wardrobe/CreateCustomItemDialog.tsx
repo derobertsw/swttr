@@ -77,11 +77,14 @@ export function CreateCustomItemDialog({
 
   // Initialize first option when dialog opens
   const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen && options.length > 0 && !genericOption) {
-      setGenericOption(options[0]);
-    }
     if (newOpen && initialBodyPart) {
       setBodyPart(initialBodyPart);
+      const newOptions = getGenericOptions(initialBodyPart, layerType);
+      if (newOptions.length > 0) {
+        setGenericOption(newOptions[0]);
+      }
+    } else if (newOpen && options.length > 0 && !genericOption) {
+      setGenericOption(options[0]);
     }
     if (!newOpen) {
       // Reset form

@@ -197,6 +197,7 @@ export function WardrobeSearch({
               key={option.value}
               role="button"
               tabIndex={0}
+              aria-pressed={searchBodyPartFilter === option.value}
               onClick={() => onSearchBodyPartFilterChange(option.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -219,6 +220,8 @@ export function WardrobeSearch({
         <div
           role="button"
           tabIndex={0}
+          aria-expanded={filtersExpanded}
+          aria-controls="wardrobe-filter-panel"
           onClick={() => setFiltersExpanded((current) => !current)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -429,6 +432,8 @@ export function WardrobeSearch({
                         <div
                           role="button"
                           tabIndex={0}
+                          aria-expanded={isPopoverOpen}
+                          aria-haspopup="dialog"
                           onClick={() => setPopoverId(isPopoverOpen ? null : item.id)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {

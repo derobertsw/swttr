@@ -40,6 +40,7 @@ export default function Wardrobe() {
     adding,
     justAdded,
     wardrobeItems,
+    availableItems,
     totalAvailableCount,
     filteredItems,
     totalMatches,
@@ -74,6 +75,7 @@ export default function Wardrobe() {
   const [pickerBodyPart, setPickerBodyPart] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [showCustomDialog, setShowCustomDialog] = useState(false);
+  const [customDialogBodyPart, setCustomDialogBodyPart] = useState<string | undefined>(undefined);
 
 
 
@@ -121,7 +123,10 @@ export default function Wardrobe() {
               </button>
 
               <button
-                onClick={() => setShowCustomDialog(true)}
+                onClick={() => {
+                  setCustomDialogBodyPart(undefined);
+                  setShowCustomDialog(true);
+                }}
                 className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-emerald-300/60 bg-emerald-50/90 px-4 py-6 transition-all hover:bg-emerald-100/90 hover:border-emerald-400/70 active:scale-[0.98]"
               >
                 <Sparkles className="size-8 text-emerald-600" />
@@ -273,12 +278,13 @@ export default function Wardrobe() {
             if (!open) setPickerBodyPart(null);
           }}
           bodyPart={pickerBodyPart}
-          availableItems={filteredItems}
+          availableItems={availableItems}
           wardrobeItemIds={wardrobeItemIds}
           adding={adding}
           justAdded={justAdded}
           onAddItem={addItem}
           onCreateCustom={() => {
+            setCustomDialogBodyPart(pickerBodyPart ? bodyPartToFilterKey(pickerBodyPart) : undefined);
             setPickerBodyPart(null);
             setShowCustomDialog(true);
           }}
@@ -288,7 +294,7 @@ export default function Wardrobe() {
       <CreateCustomItemDialog
         open={showCustomDialog}
         onOpenChange={setShowCustomDialog}
-        bodyPart={pickerBodyPart ? bodyPartToFilterKey(pickerBodyPart) : undefined}
+        bodyPart={customDialogBodyPart as BodyPart | undefined}
         onItemCreated={async () => {
           setShowCustomDialog(false);
           // Refresh wardrobe by reloading data

@@ -157,15 +157,14 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (error) {
+      if (error.code === "PGRST116") {
+        return NextResponse.json({ error: "Item not found" }, { status: 404 });
+      }
       logError("PATCH /api/wardrobe/custom", error);
       return NextResponse.json(
         { error: "Failed to update custom item" },
         { status: 500 }
       );
-    }
-
-    if (!data) {
-      return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
     return NextResponse.json({ item: data });
@@ -202,12 +201,20 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete from user_wardrobe first
-    await supabase
+    const { error: wardrobeDeleteError } = await supabase
       .from("user_wardrobe")
       .delete()
       .eq("item_type", "custom")
       .eq("item_id", id)
       .eq("user_id", userId);
+
+    if (wardrobeDeleteError) {
+      logError("DELETE /api/wardrobe/custom - wardrobe delete", wardrobeDeleteError);
+      return NextResponse.json(
+        { error: "Failed to remove item from wardrobe" },
+        { status: 500 }
+      );
+    }
 
     // Delete from user_custom_items
     const { error } = await supabase
