@@ -1,4 +1,6 @@
 reviews:
   auto_review:
     enabled: true
+  auto_approve:
+    enabled: true
   request_changes_workflow: false
