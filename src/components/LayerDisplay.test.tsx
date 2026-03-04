@@ -8,6 +8,21 @@ vi.mock("@clerk/nextjs", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+// Mock sonner toast
+vi.mock("sonner", () => ({
+  toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }),
+}));
+
+// Mock useLayerPicker — no wardrobe items available in tests
+vi.mock("@/hooks/useLayerPicker", () => ({
+  useLayerPicker: () => ({ loading: false, getItems: () => [] }),
+}));
+
+// Mock LayerPickerDrawer — renders nothing in tests
+vi.mock("@/components/layers/LayerPickerDrawer", () => ({
+  LayerPickerDrawer: () => null,
+}));
+
 const mockRecommendation = {
   torso: {
     base: [{ name: "Wool base layer" }],
@@ -499,6 +514,20 @@ describe("LayerDisplay", () => {
       // 0.25 × 0.961 ≈ 0.2
       expect(screen.getByText("Target 1.3 clo")).toBeInTheDocument();
       expect(screen.getByText("Actual 0.2 clo")).toBeInTheDocument();
+    });
+
+    it("should render ThermalGauge with target range pill", () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      // ThermalGauge renders full range: "Target min-max clo"
+      expect(screen.getByText("Target 1.5-2.0 clo")).toBeInTheDocument();
     });
 
     it("should show body-part clo values from biophysics data", () => {
