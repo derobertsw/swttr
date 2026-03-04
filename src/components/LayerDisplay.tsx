@@ -494,7 +494,8 @@ const LayerDisplay = ({
 
   const handlePickerSelect = useCallback((item: PickerItem) => {
     if (!pickerTarget) return;
-    const { bodyPart: bp, layerType: lt, replaceIndex, phase } = pickerTarget;
+    const { bodyPart: bp, replaceIndex, phase } = pickerTarget;
+    const lt = item.nativeLayerType;
     const newItem = {
       name: item.name,
       rcl: item.rcl,
