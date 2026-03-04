@@ -27,9 +27,21 @@ export function makeItemMappingKey(
   return `${bodyPart}:${layerType}:${standardOption}`;
 }
 
+export interface UserCustomItem {
+  id: string;
+  user_id: string;
+  body_part: BodyPart;
+  layer_type: LayerType;
+  generic_option: string;
+  custom_name: string;
+  rcl_clo: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AvailableItem {
   id: string;
-  type: "garment" | "handwear" | "headwear";
+  type: "garment" | "handwear" | "headwear" | "custom";
   brand: string;
   model_name: string;
   brand_logo_url?: string;
@@ -40,11 +52,15 @@ export interface AvailableItem {
   rcl_torso?: number;
   rcl_legs?: number;
   dexterity_score?: number;
+  // For custom items
+  body_part?: BodyPart;
+  layer_type?: LayerType;
+  generic_option?: string;
 }
 
 export interface WardrobeItem {
   id: string;
-  item_type: "garment" | "handwear" | "headwear";
+  item_type: "garment" | "handwear" | "headwear" | "custom";
   item_id: string;
   nickname?: string;
   disabled?: boolean;
@@ -68,5 +84,10 @@ export interface WardrobeItem {
     covers_neck?: boolean;
     covers_face?: boolean;
     garment_thermal_properties?: GarmentThermalProperties | GarmentThermalProperties[];
+    // For custom items
+    body_part?: BodyPart;
+    layer_type?: LayerType;
+    generic_option?: string;
+    custom_name?: string;
   };
 }
