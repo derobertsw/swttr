@@ -16,6 +16,7 @@ interface BodyPartSectionProps {
   onItemClick?: (item: WardrobeItem) => void;
   showSwipeHintOnFirstItem?: boolean;
   onDismissSwipeHint?: () => void;
+  onHeadingClick?: () => void;
 }
 
 export function BodyPartSection({
@@ -30,6 +31,7 @@ export function BodyPartSection({
   onItemClick,
   showSwipeHintOnFirstItem = false,
   onDismissSwipeHint,
+  onHeadingClick,
 }: BodyPartSectionProps) {
   const EmptyIcon = getEmptyStateIcon(part);
   const sectionCount = items.length + disabledItems.length;
@@ -37,12 +39,25 @@ export function BodyPartSection({
   return (
     <section className="flex flex-col gap-1.5 scroll-mt-20">
       <div className={cn("sticky top-0 z-10", !isFirst && "pt-1")}>
-        <h4 className="flex items-center justify-between rounded-md border border-white/12 bg-slate-900/20 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/84 backdrop-blur-md">
-          <span>{part}</span>
-          <span className="rounded-full border border-white/20 bg-white/10 px-1.5 py-[1px] text-[10px] text-white/65">
-            {sectionCount}
-          </span>
-        </h4>
+        <button
+          type="button"
+          onClick={onHeadingClick}
+          className="group w-full text-left transition-colors hover:bg-white/5 active:bg-white/8 rounded-md disabled:cursor-default disabled:hover:bg-transparent"
+          aria-label={`Add ${part} items from database`}
+          disabled={!onHeadingClick}
+        >
+          <h4 className="flex items-center justify-between rounded-md border border-white/12 bg-slate-900/20 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/84 backdrop-blur-md">
+            <span className="flex items-center gap-1.5">
+              <span>{part}</span>
+              {onHeadingClick && (
+                <Plus className="size-3.5 text-white/50 group-hover:text-white/70 transition-colors" />
+              )}
+            </span>
+            <span className="rounded-full border border-white/20 bg-white/10 px-1.5 py-[1px] text-[10px] text-white/65">
+              {sectionCount}
+            </span>
+          </h4>
+        </button>
       </div>
       {items.length === 0 && disabledItems.length === 0 ? (
         <div className="flex items-center gap-3 rounded-lg border border-dashed border-white/20 bg-white/5 px-3 py-3.5">

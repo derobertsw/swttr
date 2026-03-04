@@ -71,3 +71,11 @@ export function getGenericLayerClo(
 ): number {
   return GENERIC_LAYER_CLO[bodyPart][layerType]?.[optionName] ?? 0;
 }
+
+export function getGenericOptions(
+  bodyPart: BodyPart,
+  layerType: LayerType
+): string[] {
+  const options = GENERIC_LAYER_CLO[bodyPart]?.[layerType];
+  return options ? Object.keys(options) : [];
+}

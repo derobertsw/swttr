@@ -4,21 +4,19 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useUserId } from "@/hooks/useUserId";
 import { logWarn } from "@/lib/logger";
 import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
-import { normalizeSearch, getBodyPart, BODY_PART_ORDER } from "@/components/wardrobe/wardrobe-utils";
+import {
+  normalizeSearch,
+  getBodyPart,
+  BODY_PART_ORDER,
+  inferAvailableBodyPart,
+  getClo,
+} from "@/components/wardrobe/wardrobe-utils";
 import { CATEGORY_TO_LAYER_TYPE } from "@/lib/layers";
 
 const SEARCH_RESULTS_LIMIT = 30;
 type SearchBodyPartFilter = "all" | "torso" | "legs" | "hands" | "headNeck";
 type SearchLayerFilter = "all" | "base" | "mid" | "outer";
 type SearchSort = "bestMatch" | "alpha" | "clo";
-const LEGS_GARMENT_TYPES = new Set(["pants", "shorts", "bib"]);
-
-function inferAvailableBodyPart(item: AvailableItem): Exclude<SearchBodyPartFilter, "all"> {
-  if (item.type === "handwear") return "hands";
-  if (item.type === "headwear") return "headNeck";
-  if (item.garment_type && LEGS_GARMENT_TYPES.has(item.garment_type.toLowerCase())) return "legs";
-  return "torso";
-}
 
 function inferAvailableLayer(item: AvailableItem): Exclude<SearchLayerFilter, "all"> {
   const category = (item.category ?? "").toLowerCase();
@@ -90,8 +88,6 @@ export function useWardrobe() {
 
   const baseFilteredItems = useMemo(() => {
     return availableItems.filter((item) => {
-      const inWardrobe = wardrobeItemIds.has(item.id);
-      if (inWardrobe) return false;
       if (brandFilter && item.brand !== brandFilter) return false;
       if (searchBodyPartFilter !== "all" && inferAvailableBodyPart(item) !== searchBodyPartFilter) return false;
       if (searchLayerFilter !== "all" && inferAvailableLayer(item) !== searchLayerFilter) return false;
@@ -163,7 +159,10 @@ export function useWardrobe() {
   }, [filteredItems, search, searchSort]);
 
   const visibleSearchItems = useMemo(() => {
-    if (!search.trim() || !normalizeSearch(search).trim()) return [];
+    // Show all items when not searching, limited items when searching
+    if (!search.trim() || !normalizeSearch(search).trim()) {
+      return rankedFilteredItems;
+    }
     return rankedFilteredItems.slice(0, SEARCH_RESULTS_LIMIT);
   }, [rankedFilteredItems, search]);
 
@@ -186,9 +185,12 @@ export function useWardrobe() {
       garment: [],
       handwear: [],
       headwear: [],
+      custom: [],
     };
     visibleSearchItems.forEach((item) => {
-      groups[item.type].push(item);
+      if (groups[item.type]) {
+        groups[item.type].push(item);
+      }
     });
     return groups;
   }, [visibleSearchItems]);
@@ -203,6 +205,14 @@ export function useWardrobe() {
       const part = getBodyPart(item);
       groups[part].push(item);
     });
+    // Sort each group by clo value (lowest to highest)
+    for (const part of BODY_PART_ORDER) {
+      groups[part].sort((a, b) => {
+        const cloA = getClo(a) ?? 0;
+        const cloB = getClo(b) ?? 0;
+        return cloA - cloB;
+      });
+    }
     return groups;
   }, [wardrobeItems]);
 
@@ -216,6 +226,14 @@ export function useWardrobe() {
       const part = getBodyPart(item);
       groups[part].push(item);
     });
+    // Sort each group by clo value (lowest to highest)
+    for (const part of BODY_PART_ORDER) {
+      groups[part].sort((a, b) => {
+        const cloA = getClo(a) ?? 0;
+        const cloB = getClo(b) ?? 0;
+        return cloA - cloB;
+      });
+    }
     return groups;
   }, [wardrobeItems]);
 
@@ -238,15 +256,15 @@ export function useWardrobe() {
       if (res.ok) {
         setJustAdded(item.id);
         setAdding(null);
+        // Refresh wardrobe list silently so wardrobeItemIds updates
+        fetch("/api/wardrobe/gear")
+          .then(r => r.json())
+          .then(data => {
+            setWardrobeItems(data.items || []);
+          })
+          .catch(err => logWarn("useWardrobe.addItem.refresh", err));
         addTimerRef.current = setTimeout(() => {
           setJustAdded(null);
-          fetch("/api/wardrobe/gear")
-            .then(r => r.json())
-            .then(data => {
-              setWardrobeItems(data.items || []);
-            })
-            .catch(err => logWarn("useWardrobe.addItem.refresh", err));
-          setSearch("");
         }, 600);
       } else {
         setAdding(null);
@@ -342,6 +360,13 @@ export function useWardrobe() {
     setDisabledCollapsed(prev => ({ ...prev, [part]: !prev[part] }));
   };
 
+  const removeItemByItemId = async (itemId: string) => {
+    const entry = wardrobeItems.find((w) => w.item_id === itemId);
+    if (entry) {
+      await removeItem(entry.id);
+    }
+  };
+
   const clearSearchFilters = () => {
     setBrandFilter(null);
     setSearchBodyPartFilter("all");
@@ -356,10 +381,13 @@ export function useWardrobe() {
     adding,
     justAdded,
     wardrobeItems,
+    availableItems,
+    totalAvailableCount: availableItems.length,
     filteredItems,
     visibleSearchItems,
-    totalMatches: search.trim() ? filteredItems.length : 0,
-    shownMatches: search.trim() ? visibleSearchItems.length : 0,
+    wardrobeItemIds,
+    totalMatches: filteredItems.length,
+    shownMatches: visibleSearchItems.length,
     groupedItems,
     groupedWardrobeItems,
     disabledItemsByPart,
@@ -379,6 +407,7 @@ export function useWardrobe() {
     clearSearchFilters,
     addItem,
     removeItem,
+    removeItemByItemId,
     restoreItem,
     clearRecentlyRemoved,
     toggleDisabled,

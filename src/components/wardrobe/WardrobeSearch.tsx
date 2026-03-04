@@ -1,17 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Search, Plus, Check, X, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, Plus, X, Minus, SlidersHorizontal, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { FROSTED_INPUT, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
 import type { AvailableItem } from "@/types/wardrobe";
-import { typeIcons, typeLabels, getItemIcon, formatCategory } from "./wardrobe-utils";
-import {
-  getAvailableMediaRef,
-  getBrandInitials,
-  resolveBrandLogoUrl,
-  resolveItemImageUrl,
-  toCssBackgroundImage,
-} from "./media";
+import { typeIcons, typeLabels, formatCategory } from "./wardrobe-utils";
 
 interface WardrobeSearchProps {
   search: string;
@@ -23,6 +14,8 @@ interface WardrobeSearchProps {
   adding: string | null;
   justAdded: string | null;
   onAddItem: (item: AvailableItem) => void;
+  onRemoveItem: (itemId: string) => void;
+  wardrobeItemIds: Set<string>;
   brandFilter: string | null;
   onBrandFilterChange: (brand: string | null) => void;
   searchBodyPartFilter: "all" | "torso" | "legs" | "hands" | "headNeck";
@@ -35,13 +28,13 @@ interface WardrobeSearchProps {
   availableBrands: string[];
 }
 
-const BODY_AREA_LABELS: Record<WardrobeSearchProps["searchBodyPartFilter"], string> = {
-  all: "All areas",
-  torso: "Torso",
-  legs: "Legs",
-  hands: "Hands",
-  headNeck: "Head/Neck",
-};
+const BODY_AREA_OPTIONS: { value: WardrobeSearchProps["searchBodyPartFilter"]; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "torso", label: "Torso" },
+  { value: "legs", label: "Legs" },
+  { value: "hands", label: "Hands" },
+  { value: "headNeck", label: "Head/Neck" },
+];
 
 const LAYER_LABELS: Record<WardrobeSearchProps["searchLayerFilter"], string> = {
   all: "All layers",
@@ -56,73 +49,6 @@ const SORT_LABELS: Record<WardrobeSearchProps["searchSort"], string> = {
   clo: "Highest clo",
 };
 
-function LongPressName({ name }: { name: string }) {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const preventClickRef = useRef(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  const handleTouchStart = useCallback(() => {
-    timerRef.current = setTimeout(() => {
-      preventClickRef.current = true;
-      if (ref.current) {
-        const rect = ref.current.getBoundingClientRect();
-        setTooltip({ x: rect.left + rect.width / 2, y: rect.top });
-      }
-    }, 500);
-  }, []);
-
-  const clearTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  const handleTouchEnd = useCallback(() => {
-    clearTimer();
-    setTooltip(null);
-  }, [clearTimer]);
-
-  const handleClickCapture = useCallback((e: React.MouseEvent) => {
-    if (preventClickRef.current) {
-      e.preventDefault();
-      e.stopPropagation();
-      preventClickRef.current = false;
-    }
-  }, []);
-
-  return (
-    <>
-      <div
-        ref={ref}
-        className="truncate text-[14px] font-semibold leading-tight text-slate-900"
-        title={name}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onTouchMove={clearTimer}
-        onTouchCancel={handleTouchEnd}
-        onClickCapture={handleClickCapture}
-      >
-        {name}
-      </div>
-      {tooltip &&
-        createPortal(
-          <div
-            className="fixed z-[100] max-w-[80vw] rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white shadow-lg"
-            style={{
-              left: tooltip.x,
-              top: tooltip.y,
-              transform: "translate(-50%, calc(-100% - 8px))",
-            }}
-          >
-            {name}
-          </div>,
-          document.body
-        )}
-    </>
-  );
-}
 
 export function WardrobeSearch({
   search,
@@ -134,6 +60,8 @@ export function WardrobeSearch({
   adding,
   justAdded,
   onAddItem,
+  onRemoveItem,
+  wardrobeItemIds,
   brandFilter,
   onBrandFilterChange,
   searchBodyPartFilter,
@@ -147,9 +75,48 @@ export function WardrobeSearch({
 }: WardrobeSearchProps) {
   const hasSearch = search.trim().length > 0;
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [popoverId, setPopoverId] = useState<string | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // ResizeObserver for Safari-safe scroll
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [resultsMaxHeight, setResultsMaxHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    const container = containerRef.current;
+    if (!controls || !container) return;
+
+    const update = () => {
+      const containerHeight = container.clientHeight;
+      const controlsHeight = controls.offsetHeight;
+      setResultsMaxHeight(Math.max(0, containerHeight - controlsHeight - 12));
+    };
+
+    const observer = new ResizeObserver(update);
+    observer.observe(controls);
+    observer.observe(container);
+    update();
+
+    return () => observer.disconnect();
+  }, []);
+
+
+  // Close popover on click outside
+  useEffect(() => {
+    if (!popoverId) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setPopoverId(null);
+      }
+    };
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, [popoverId]);
+
   const hasActiveFilters =
     brandFilter !== null ||
-    searchBodyPartFilter !== "all" ||
     searchLayerFilter !== "all" ||
     searchSort !== "bestMatch";
   const activeFilters = useMemo(
@@ -159,13 +126,6 @@ export function WardrobeSearch({
             key: `brand-${brandFilter}`,
             label: `Brand: ${brandFilter}`,
             onClear: () => onBrandFilterChange(null),
-          }
-        : null,
-      searchBodyPartFilter !== "all"
-        ? {
-            key: `area-${searchBodyPartFilter}`,
-            label: BODY_AREA_LABELS[searchBodyPartFilter],
-            onClear: () => onSearchBodyPartFilterChange("all"),
           }
         : null,
       searchLayerFilter !== "all"
@@ -185,11 +145,9 @@ export function WardrobeSearch({
     ].filter((filter): filter is { key: string; label: string; onClear: () => void } => Boolean(filter)),
     [
       brandFilter,
-      searchBodyPartFilter,
       searchLayerFilter,
       searchSort,
       onBrandFilterChange,
-      onSearchBodyPartFilterChange,
       onSearchLayerFilterChange,
       onSearchSortChange,
     ]
@@ -202,171 +160,258 @@ export function WardrobeSearch({
 
       const summaryParts: string[] = [];
       if (brandFilter) summaryParts.push(brandFilter);
-      if (searchBodyPartFilter !== "all") summaryParts.push(BODY_AREA_LABELS[searchBodyPartFilter]);
       if (searchLayerFilter !== "all") summaryParts.push(LAYER_LABELS[searchLayerFilter]);
       if (searchSort !== "bestMatch") summaryParts.push(SORT_LABELS[searchSort]);
       return summaryParts.join(" · ");
     },
-    [hasActiveFilters, brandFilter, searchBodyPartFilter, searchLayerFilter, searchSort]
+    [hasActiveFilters, brandFilter, searchLayerFilter, searchSort]
   );
 
   return (
-    <div className="relative">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/62" />
-        <Input
-          placeholder="Search by brand, model, or category..."
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className={`h-10 border-white/45 bg-white/18 pl-10 pr-10 text-white/90 placeholder:text-white/68 ${FROSTED_INPUT}`}
-        />
-        {hasSearch && (
-          <button
-            type="button"
-            onClick={() => onSearchChange("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-white/75 hover:bg-white/15 hover:text-white transition-colors"
-            aria-label="Clear search"
+    <div ref={containerRef} className="h-full overflow-hidden">
+      <div ref={controlsRef}>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+          <Input
+            placeholder="Search by brand, model, or category..."
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="h-10 border-slate-300 bg-white pl-10 pr-10 text-slate-900 placeholder:text-slate-400"
+          />
+          {hasSearch && (
+            <button
+              type="button"
+              onClick={() => onSearchChange("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+              aria-label="Clear search"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Body Part Pills */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {BODY_AREA_OPTIONS.map((option) => (
+            <div
+              key={option.value}
+              role="button"
+              tabIndex={0}
+              aria-pressed={searchBodyPartFilter === option.value}
+              onClick={() => onSearchBodyPartFilterChange(option.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSearchBodyPartFilterChange(option.value);
+                }
+              }}
+              className={`select-none rounded-full px-3 py-1.5 text-xs font-medium cursor-pointer ${
+                searchBodyPartFilter === option.value
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              {option.label}
+            </div>
+          ))}
+        </div>
+
+        {/* Filter toggle bar */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-expanded={filtersExpanded}
+          aria-controls="wardrobe-filter-panel"
+          onClick={() => setFiltersExpanded((current) => !current)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setFiltersExpanded((current) => !current);
+            }
+          }}
+          className="mt-3 flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left cursor-pointer select-none hover:border-slate-300 hover:bg-slate-100"
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            <SlidersHorizontal className="size-4 text-slate-500" />
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Filters</p>
+              <p className="truncate text-xs text-slate-700">{filterSummary}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {activeFilters.length > 0 && (
+              <span className="rounded-full border border-blue-300 bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                {activeFilters.length}
+              </span>
+            )}
+            {filtersExpanded ? (
+              <ChevronUp className="size-4 text-slate-500" />
+            ) : (
+              <ChevronDown className="size-4 text-slate-500" />
+            )}
+          </div>
+        </div>
+
+        {activeFilters.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {activeFilters.map((filter) => (
+              <div
+                key={filter.key}
+                role="button"
+                tabIndex={0}
+                onClick={filter.onClear}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); filter.onClear(); }
+                }}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] text-slate-700 cursor-pointer select-none hover:bg-slate-200"
+              >
+                {filter.label}
+                <X className="size-3" />
+              </div>
+            ))}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={onClearFilters}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClearFilters(); }
+              }}
+              className="text-[11px] font-medium text-slate-600 cursor-pointer select-none hover:text-slate-900"
+            >
+              Clear all
+            </div>
+          </div>
+        )}
+
+        {filtersExpanded && (
+          <div
+            id="wardrobe-filter-panel"
+            className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3"
           >
-            <X className="size-4" />
-          </button>
+            {/* Layer */}
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-medium mb-1.5">Layer</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(["all", "base", "mid", "outer"] as const).map((v) => (
+                  <div
+                    key={v}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { onSearchLayerFilterChange(v); setFiltersExpanded(false); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSearchLayerFilterChange(v); setFiltersExpanded(false); }
+                    }}
+                    className={`select-none rounded-full px-2.5 py-1 text-[11px] font-medium cursor-pointer ${
+                      searchLayerFilter === v
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    {LAYER_LABELS[v]}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Sort */}
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-medium mb-1.5">Sort</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(["bestMatch", "alpha", "clo"] as const).map((v) => (
+                  <div
+                    key={v}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { onSearchSortChange(v); setFiltersExpanded(false); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSearchSortChange(v); setFiltersExpanded(false); }
+                    }}
+                    className={`select-none rounded-full px-2.5 py-1 text-[11px] font-medium cursor-pointer ${
+                      searchSort === v
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    {SORT_LABELS[v]}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Brand */}
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-medium mb-1.5">Brand</p>
+              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { onBrandFilterChange(null); setFiltersExpanded(false); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onBrandFilterChange(null); setFiltersExpanded(false); }
+                  }}
+                  className={`select-none rounded-full px-2.5 py-1 text-[11px] font-medium cursor-pointer ${
+                    brandFilter === null
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  All brands
+                </div>
+                {availableBrands.map((brand) => (
+                  <div
+                    key={brand}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { onBrandFilterChange(brand); setFiltersExpanded(false); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onBrandFilterChange(brand); setFiltersExpanded(false); }
+                    }}
+                    className={`select-none rounded-full px-2.5 py-1 text-[11px] font-medium cursor-pointer ${
+                      brandFilter === brand
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    {brand}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => setFiltersExpanded((current) => !current)}
-        className="mt-1 flex w-full items-center justify-between rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-left transition-colors hover:border-white/30 hover:bg-white/12 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/35"
-        aria-expanded={filtersExpanded}
-        aria-controls="wardrobe-filter-panel"
+      {/* Results List */}
+      <div
+        className="mt-3 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-sm"
+        style={resultsMaxHeight !== null ? { maxHeight: resultsMaxHeight } : undefined}
       >
-        <div className="flex min-w-0 items-center gap-2">
-          <SlidersHorizontal className="size-4 text-white/65" />
-          <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wide text-white/60">Filters</p>
-            <p className="truncate text-xs text-white/78">{filterSummary}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {activeFilters.length > 0 && (
-            <span className="rounded-full border border-white/25 bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white/85">
-              {activeFilters.length}
-            </span>
-          )}
-          {filtersExpanded ? (
-            <ChevronUp className="size-4 text-white/70" />
-          ) : (
-            <ChevronDown className="size-4 text-white/70" />
-          )}
-        </div>
-      </button>
-
-      {activeFilters.length > 0 && (
-        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          {activeFilters.map((filter) => (
-            <button
-              key={filter.key}
-              type="button"
-              onClick={filter.onClear}
-              className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/12 px-2.5 py-1 text-[11px] text-white/85 hover:bg-white/20"
-            >
-              {filter.label}
-              <X className="size-3" />
-            </button>
-          ))}
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={onClearFilters}
-              className="text-[11px] font-medium text-white/75 hover:text-white"
-            >
-              Clear all
-            </button>
-          )}
-        </div>
-      )}
-
-      {filtersExpanded && (
-        <div
-          id="wardrobe-filter-panel"
-          className="mt-1 rounded-lg border border-white/20 bg-white/10 p-1.5"
-        >
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-white/60">Brand</span>
-              <select
-                value={brandFilter ?? "all"}
-                onChange={(event) => onBrandFilterChange(event.target.value === "all" ? null : event.target.value)}
-                className="h-8 rounded-md border border-white/25 bg-white/15 px-2 text-xs text-white outline-none focus:border-white/45"
-              >
-                <option value="all" className="text-slate-900">All brands</option>
-                {availableBrands.map((brand) => (
-                  <option key={brand} value={brand} className="text-slate-900">
-                    {brand}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-white/60">Body area</span>
-              <select
-                value={searchBodyPartFilter}
-                onChange={(event) => onSearchBodyPartFilterChange(event.target.value as "all" | "torso" | "legs" | "hands" | "headNeck")}
-                className="h-8 rounded-md border border-white/25 bg-white/15 px-2 text-xs text-white outline-none focus:border-white/45"
-              >
-                <option value="all" className="text-slate-900">All areas</option>
-                <option value="torso" className="text-slate-900">Torso</option>
-                <option value="legs" className="text-slate-900">Legs</option>
-                <option value="hands" className="text-slate-900">Hands</option>
-                <option value="headNeck" className="text-slate-900">Head/Neck</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-white/60">Layer</span>
-              <select
-                value={searchLayerFilter}
-                onChange={(event) => onSearchLayerFilterChange(event.target.value as "all" | "base" | "mid" | "outer")}
-                className="h-8 rounded-md border border-white/25 bg-white/15 px-2 text-xs text-white outline-none focus:border-white/45"
-              >
-                <option value="all" className="text-slate-900">All layers</option>
-                <option value="base" className="text-slate-900">Base</option>
-                <option value="mid" className="text-slate-900">Mid</option>
-                <option value="outer" className="text-slate-900">Outer</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-white/60">Sort</span>
-              <select
-                value={searchSort}
-                onChange={(event) => onSearchSortChange(event.target.value as "bestMatch" | "alpha" | "clo")}
-                className="h-8 rounded-md border border-white/25 bg-white/15 px-2 text-xs text-white outline-none focus:border-white/45"
-              >
-                <option value="bestMatch" className="text-slate-900">Best match</option>
-                <option value="alpha" className="text-slate-900">A-Z</option>
-                <option value="clo" className="text-slate-900">Highest clo</option>
-              </select>
-            </label>
-          </div>
-        </div>
-      )}
-
-      {hasSearch && (
-        <div className={`absolute z-20 w-full mt-1.5 ${SUGGESTIONS_DROPDOWN} max-h-[55vh] overflow-y-auto`}>
-          <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur-md">
+        {filteredItems.length > 0 && (
+          <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur-sm px-3 py-2.5">
             <p className="text-xs font-medium text-slate-700">
-              {shownMatches}
-              {totalMatches > shownMatches ? ` of ${totalMatches}` : ""} results
+              {hasSearch ? (
+                <>{shownMatches}{totalMatches > shownMatches ? ` of ${totalMatches}` : ""} results</>
+              ) : (
+                <>All available items ({shownMatches})</>
+              )}
             </p>
-            <p className="text-[11px] text-slate-500">Tap + to add an item to your wardrobe</p>
+            <p className="text-[11px] text-slate-500">Tap an item for options</p>
           </div>
-          {filteredItems.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground text-center">
-              No matching items found
-            </div>
-          ) : (
-            Object.entries(groupedItems).map(([type, items]) => {
+        )}
+        {filteredItems.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-sm font-medium text-slate-700">
+              {hasSearch ? "No items found" : "No items available"}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {hasSearch
+                ? "Try adjusting your filters or search query"
+                : "Select a body part filter to browse by category"
+              }
+            </p>
+          </div>
+        ) : (
+          Object.entries(groupedItems).map(([type, items]) => {
               if (items.length === 0) return null;
               const Icon = typeIcons[type as keyof typeof typeIcons];
               return (
@@ -376,90 +421,106 @@ export function WardrobeSearch({
                     {typeLabels[type as keyof typeof typeLabels]}
                   </div>
                   {items.map((item) => {
-                    const ItemIcon = getItemIcon(item.type, item.garment_type, item.category);
                     const isAdding = adding === item.id;
                     const wasJustAdded = justAdded === item.id;
-                    const disableAdd = isAdding || wasJustAdded;
-                    const media = getAvailableMediaRef(item);
-                    const itemImageUrl = resolveItemImageUrl(media);
-                    const brandLogoUrl = resolveBrandLogoUrl(media);
-                    const brand = item.brand || "Unknown brand";
+                    const isInWardrobe = wardrobeItemIds.has(item.id);
+                    const isPopoverOpen = popoverId === item.id;
+                    const buyUrl = `https://www.google.com/search?q=${encodeURIComponent(`buy ${item.brand} ${item.model_name}`)}`;
 
                     return (
-                      <button
-                        key={item.id}
-                        onClick={() => onAddItem(item)}
-                        disabled={disableAdd}
-                        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 disabled:opacity-70"
-                      >
-                        <div className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-slate-300/40 bg-[linear-gradient(145deg,rgba(241,248,253,0.95),rgba(211,226,236,0.82))]">
-                          <div
-                            aria-hidden="true"
-                            className="absolute inset-0 bg-cover bg-center"
-                            style={{ backgroundImage: toCssBackgroundImage(itemImageUrl) }}
-                          />
-                          <div
-                            aria-hidden="true"
-                            className="absolute inset-0 bg-[linear-gradient(165deg,rgba(255,255,255,0.3),rgba(15,23,42,0.12))]"
-                          />
-                          <div
-                            aria-hidden="true"
-                            className="absolute inset-0 opacity-50 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.38),transparent_52%)]"
-                          />
-                          <ItemIcon className="absolute bottom-1 right-1 size-3.5 text-slate-700/70" />
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <LongPressName name={item.model_name} />
-                          <div className="mt-0.5 truncate text-[12px] text-slate-700/76">
-                            {formatCategory(item.category)}
-                            {typeof item.rcl_clo === "number" && (
-                              <span className="ml-1.5 font-medium opacity-80">· {item.rcl_clo.toFixed(2)} clo</span>
-                            )}
+                      <div key={item.id} className="relative">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={isPopoverOpen}
+                          aria-haspopup="dialog"
+                          onClick={() => setPopoverId(isPopoverOpen ? null : item.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setPopoverId(isPopoverOpen ? null : item.id);
+                            }
+                          }}
+                          className={`flex w-full items-center gap-2.5 py-2.5 text-left cursor-pointer hover:bg-slate-50/80 ${isPopoverOpen ? "bg-blue-50 border-l-[3px] border-l-blue-500 pl-[9px] pr-3" : "px-3"}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="truncate text-[14px] font-semibold leading-tight text-slate-900">
+                              {item.model_name}
+                            </div>
+                            <div className="mt-0.5 truncate text-[12px] text-slate-700/76">
+                              {item.brand}
+                              {item.category && (
+                                <span className="ml-1.5">· {formatCategory(item.category)}</span>
+                              )}
+                              {typeof item.rcl_clo === "number" && (
+                                <span className="ml-1.5 font-medium opacity-80">· {item.rcl_clo.toFixed(2)} clo</span>
+                              )}
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <div
-                            className="relative flex h-8 w-16 items-center justify-center overflow-hidden rounded-lg border border-slate-300/35 bg-white/72 px-1 shadow-[0_1px_4px_rgba(15,23,42,0.12)]"
-                            title={brand}
-                            aria-label={`${brand} logo`}
-                          >
-                            <span className="pointer-events-none text-[8px] font-semibold uppercase tracking-[0.14em] text-slate-700/72">
-                              {getBrandInitials(brand)}
+                          {(isInWardrobe || wasJustAdded) && (
+                            <span className="shrink-0 rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                              Added
                             </span>
-                            <div
-                              aria-hidden="true"
-                              className="absolute inset-0 bg-contain bg-center bg-no-repeat p-1"
-                              style={{ backgroundImage: toCssBackgroundImage(brandLogoUrl) }}
-                            />
-                          </div>
-
-                          <div className="size-8 flex items-center justify-center">
-                            {wasJustAdded ? (
-                              <Check
-                                className="size-5 text-emerald-500"
-                                style={{ animation: "checkmark-pop 0.3s ease-out forwards" }}
-                              />
-                            ) : (
-                              <Plus className="size-4 text-muted-foreground/70 hover:text-muted-foreground transition-colors" />
-                            )}
-                          </div>
+                          )}
                         </div>
-                      </button>
+
+                        {/* Popover */}
+                        {isPopoverOpen && (
+                          <div
+                            ref={popoverRef}
+                            className="absolute right-3 z-20 mt-[-4px] flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 shadow-lg"
+                          >
+                            {isAdding ? (
+                              <span className="text-xs text-slate-500 px-1">Adding...</span>
+                            ) : isInWardrobe || wasJustAdded ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRemoveItem(item.id);
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-red-50 hover:border-red-300 hover:text-red-600"
+                              >
+                                <Minus className="size-3.5" />
+                                Remove from wardrobe
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onAddItem(item);
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                              >
+                                <Plus className="size-3.5" />
+                                Add to wardrobe
+                              </button>
+                            )}
+                            <a
+                              href={buyUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/60 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100/80"
+                            >
+                              <ExternalLink className="size-3.5" />
+                              Buy it
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
               );
-            })
-          )}
-          {totalMatches > shownMatches && (
-            <div className="border-t border-slate-200 px-3 py-2 text-[11px] text-slate-500">
-              Showing the top {shownMatches} matches. Keep typing to narrow results.
-            </div>
-          )}
-        </div>
-      )}
+          })
+        )}
+        {hasSearch && totalMatches > shownMatches && (
+          <div className="border-t border-slate-200 px-3 py-2.5 text-[11px] text-slate-500 bg-slate-50">
+            Showing the top {shownMatches} matches. Keep typing to narrow results.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

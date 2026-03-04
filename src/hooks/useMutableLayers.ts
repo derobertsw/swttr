@@ -105,21 +105,17 @@ export function useMutableLayers(
     };
   });
 
-  // Track recommendation data references to detect when biophysics changes
-  const prevGarmentsRef = useRef(biophysicsData?.recommendation?.garments);
-  const prevHandwearRef = useRef(handwear);
-  const prevHeadwearRef = useRef(headwear);
+  // Track recommendation data using deep comparison to detect actual changes
+  // This prevents resets when references change but data is identical (e.g., XC skiing headwear)
+  const prevDataRef = useRef<string>("");
 
   useEffect(() => {
     const garments = biophysicsData?.recommendation?.garments;
-    if (
-      garments !== prevGarmentsRef.current ||
-      handwear !== prevHandwearRef.current ||
-      headwear !== prevHeadwearRef.current
-    ) {
-      prevGarmentsRef.current = garments;
-      prevHandwearRef.current = handwear;
-      prevHeadwearRef.current = headwear;
+    // Use JSON.stringify for deep comparison to avoid resets on reference-only changes
+    const currentData = JSON.stringify({ garments, handwear, headwear });
+
+    if (currentData !== prevDataRef.current) {
+      prevDataRef.current = currentData;
       const layers = buildLayersFromData(garments, handwear, headwear);
       setMutableLayers(layers);
       setOriginalCloByBodyPart({

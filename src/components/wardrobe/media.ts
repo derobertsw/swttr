@@ -1,6 +1,6 @@
 import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
 
-type ItemType = "garment" | "handwear" | "headwear";
+type ItemType = "garment" | "handwear" | "headwear" | "custom";
 
 type ItemDetailsWithLegacyMedia = WardrobeItem["details"] & {
   brand_logo?: string;
