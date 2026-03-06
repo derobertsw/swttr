@@ -8,7 +8,7 @@
 -- Helmet-compatible StormHood, FC0 DWR. 2025 update: relaxed fit, two chest pockets.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Arc''teryx', 'Gamma Hoody', 'soft_shell', 'jacket', true, true, false, false, 'helmet_compatible', 460, 300);
+VALUES (gen_random_uuid(), 'Arc''teryx', 'Gamma Hoody', 'soft_shell', 'jacket', true, true, false, true, 'helmet_compatible', 460, 300);
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.95, 0.80, 0, 0.65, 22.0, 20.0, 0, 15.5, 0.25, 'derived_from_similar', 0.70
@@ -34,7 +34,7 @@ FROM garments WHERE brand = 'Arc''teryx' AND model_name = 'Gamma Hoody';
 -- Helmet-compatible StormHood, RECCO reflector.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Arc''teryx', 'Rush Jacket', 'hard_shell', 'jacket', true, true, false, false, 'helmet_compatible', 590, 700);
+VALUES (gen_random_uuid(), 'Arc''teryx', 'Rush Jacket', 'hard_shell', 'jacket', true, true, false, true, 'helmet_compatible', 590, 700);
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.22, 0.18, 0, 0.15, 28.0, 26.0, 0, 20.0, 0.18, 'derived_from_similar', 0.75
