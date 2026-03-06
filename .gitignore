@@ -46,3 +46,6 @@ ios/App/App.xcworkspace/xcuserdata/
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# Claude
+CLAUDE.md
