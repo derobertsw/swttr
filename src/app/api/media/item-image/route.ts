@@ -10,6 +10,7 @@ const TABLE_BY_ITEM_TYPE: Record<ItemType, "garments" | "handwear" | "headwear">
 };
 
 const DIRECT_ITEM_IMAGE_BY_KEY: Record<string, string> = {
+  // Existing entries
   "32 degrees|heat midweight crew": "https://www.rei.com/media/e95a1679-4f82-4d6b-b67c-0502c6af70f9.jpg?size=784x588",
   "helly hansen|swift ht gloves": "https://www.rei.com/media/7ea4c6a0-efc4-43fc-835f-2ce81e0172b1.jpg?size=784x588",
   "lululemon|pace breaker jacket": "https://cdn11.bigcommerce.com/s-21x65e8kfn/images/stencil/original/products/78952/421710/PAT1503_1000_1__78149.1746624036.jpg",
@@ -31,6 +32,46 @@ const DIRECT_ITEM_IMAGE_BY_KEY: Record<string, string> = {
   "patagonia|snowdrifter jacket": "https://assets.trailspace.com/assets/7/1/1/15251217/patagonia-snowdrifter-jacket-men-s-.jpg",
   "patagonia|snowfarer cap": "https://www.patagoniabend.com/cdn/shop/files/snowfarer-cap-33556-efsu-earlylines-flow-sunken-blue-4521190.jpg?v=1756845115&width=1800",
   "smartwool|thermal merino reversible neck gaiter": "https://www.rei.com/media/ac0bc34a-7e30-4939-97f7-f06dd4996f8e.jpg?size=784x588",
+  // Arc'teryx
+  "arcteryx|gamma mx hoody": "https://images.arcteryx.com/F25/1350x1710/Gamma-MX-Hoody-Black.jpg",
+  "arcteryx|beta ar jacket": "https://assets.trailspace.com/assets/d/9/4/15424916/S26-X000009906-Beta-AR-Jacket-Black-Front-View.jpg",
+  "arcteryx|fission sv gloves": "https://images.arcteryx.com/F25/1350x1710/Fission-SV-Glove-Black.jpg",
+  "arcteryx|venta glove": "https://images.arcteryx.com/F25/1350x1710/Venta-Glove-Black.jpg",
+  "arcteryx|rho ltw beanie": "https://images.arcteryx.com/F25/1350x1710/Rho-Synthetic-Toque-Black.jpg",
+  // Icebreaker
+  "icebreaker|merino 260 tech long sleeve crewe": "https://na.icebreaker.com/cdn/shop/files/IB104371001-1.jpg",
+  "icebreaker|merino 260 tech long sleeve half zip": "https://na.icebreaker.com/cdn/shop/files/IB104372001-1.jpg",
+  "icebreaker|merino 260 tech leggings": "https://na.icebreaker.com/cdn/shop/files/IB104373001-1.jpg",
+  "icebreaker|merino 200 oasis long sleeve crewe": "https://na.icebreaker.com/cdn/shop/files/IB104365001-1.jpg",
+  "icebreaker|merino 200 zoneknit long sleeve half zip": "https://na.icebreaker.com/cdn/shop/files/IB0A57CH001-1.jpg",
+  "icebreaker|merino 175 everyday long sleeve crewe": "https://na.icebreaker.com/cdn/shop/files/IB104483001-1.jpg",
+  // Mountain Hardwear
+  "mountain hardwear|ghost whisperer 2 jacket": "https://media.mountainhardwear.com/i/mountainhardwear/2104461_010_f_om?w=768&h=806&fmt=auto",
+  // Black Diamond
+  "black diamond|guide glove": "https://assets.trailspace.com/assets/c/1/e/15379486/7784.jpg",
+  "black diamond|guide finger": "https://assets.trailspace.com/assets/2/7/a/15377018/7883.jpg",
+  "black diamond|mercury mitt": "https://assets.trailspace.com/assets/a/1/4/15415828/7793.jpg",
+  // Outdoor Research
+  "outdoor research|helium rain jacket": "https://assets.trailspace.com/assets/a/f/7/15416055/8441.jpg",
+  "outdoor research|ferrosi hoodie": "https://assets.trailspace.com/assets/4/a/f/15107247/l1852701.png",
+  "outdoor research|ferrosi joggers": "https://www.outdoorresearch.com/cdn/shop/files/3002572853E1.png?v=1768339463",
+  "outdoor research|snowcrew jacket": "https://www.outdoorresearch.com/cdn/shop/files/2831902983A1_grande.png?v=1755706979",
+  "outdoor research|carbide jacket": "https://www.outdoorresearch.com/cdn/shop/files/2775632936A1_grande.png?v=1755708837",
+  "outdoor research|carbide bibs": "https://www.outdoorresearch.com/cdn/shop/files/2775642288D1.png?v=1720563482",
+  // Helmets
+  "smith|vantage mips": "https://assets.trailspace.com/assets/d/e/a/13188586/clone.jpg",
+  "giro|range mips": "https://assets.trailspace.com/assets/f/0/3/15253251/1659.jpg",
+  // OGL recommended items
+  "arcteryx|gamma hoody": "https://images.arcteryx.com/F25/1350x1710/Gamma-Hoody-Black.jpg",
+  "arcteryx|rush jacket": "https://images.arcteryx.com/F25/1350x1710/Rush-Jacket-Vitality-Black-Sapphire.jpg",
+  "arcteryx|sabre pant": "https://images.arcteryx.com/F25/1350x1710/Sabre-Pant-Vitality.jpg",
+  "rab|nebitron pro insulated": "https://rab.equipment/media/catalog/product/n/e/nebula_pro_jacket_anthracite_qip_23_ant_1.jpg",
+  "rab|borealis": "https://rab.equipment/media/catalog/product/b/o/borealis_hoody_beluga_qws_76_bel_2.jpg",
+  "rab|neutrino pro": "https://www.cleverhiker.com/wp-content/uploads/2024/01/neutrino-pro.png",
+  "the north face|summit breithorn hoodie": "https://www.cleverhiker.com/wp-content/uploads/2025/08/north-face-breithorn.png",
+  "obermeyer|raze jacket": "https://obermeyer.com/cdn/shop/files/2111325188_S01_MODFRT.png?v=1756480959",
+  "smith|method pro mips": "https://www.smithoptics.com/cdn/shop/files/method-pro-helmet_matteBlack_3Q_grande.png?v=1757523179",
+  "giro|ratio mips": "https://vault.widen.net/content/cwfxvozxni/webp?w=1500&h=1500",
 };
 
 function isItemType(value: string | null): value is ItemType {
