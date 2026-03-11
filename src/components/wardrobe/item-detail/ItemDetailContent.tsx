@@ -4,7 +4,6 @@ import { GarmentDetails } from "./GarmentDetails";
 import { HandwearDetails } from "./HandwearDetails";
 import { HeadwearDetails } from "./HeadwearDetails";
 import { getWardrobeMediaRef, resolveItemImageUrl, resolveBrandLogoUrl, toCssBackgroundImage, getBrandInitials } from "../media";
-import { getItemIcon } from "../wardrobe-utils";
 
 export function ItemDetailContent({ item }: { item: WardrobeItem }) {
   const category =
@@ -16,7 +15,6 @@ export function ItemDetailContent({ item }: { item: WardrobeItem }) {
   const itemImageUrl = resolveItemImageUrl(media);
   const brandLogoUrl = resolveBrandLogoUrl(media);
   const brand = item.details.brand || "Unknown brand";
-  const Icon = getItemIcon(item.item_type, item.details.garment_type, item.details.category);
 
   return (
     <div className="flex flex-col gap-3 pb-2">
@@ -27,15 +25,6 @@ export function ItemDetailContent({ item }: { item: WardrobeItem }) {
           style={{ backgroundImage: toCssBackgroundImage(itemImageUrl) }}
         />
         <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-[linear-gradient(165deg,rgba(255,255,255,0.28),rgba(15,23,42,0.12))]"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 opacity-50 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.38),transparent_52%)]"
-        />
-        <Icon className="absolute bottom-3 right-3 size-8 text-slate-700/60" />
-        <div
           className="absolute top-3 left-3 flex h-10 w-24 items-center justify-center overflow-hidden rounded-lg border border-slate-300/50 bg-white/85 px-2 shadow-md backdrop-blur-sm"
           title={brand}
           aria-label={`${brand} logo`}
@@ -45,7 +34,7 @@ export function ItemDetailContent({ item }: { item: WardrobeItem }) {
           </span>
           <div
             aria-hidden="true"
-            className="absolute inset-0 bg-contain bg-center bg-no-repeat p-1.5"
+            className="absolute inset-0 bg-white bg-contain bg-center bg-no-repeat p-1.5"
             style={{ backgroundImage: toCssBackgroundImage(brandLogoUrl) }}
           />
         </div>
