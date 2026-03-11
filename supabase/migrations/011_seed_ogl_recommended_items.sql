@@ -8,7 +8,8 @@
 -- Helmet-compatible StormHood, FC0 DWR. 2025 update: relaxed fit, two chest pockets.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Arc''teryx', 'Gamma Hoody', 'soft_shell', 'jacket', true, true, false, true, 'helmet_compatible', 460, 300);
+VALUES (gen_random_uuid(), 'Arc''teryx', 'Gamma Hoody', 'soft_shell', 'jacket', true, true, false, true, 'helmet_compatible', 460, 300)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.95, 0.80, 0, 0.65, 22.0, 20.0, 0, 15.5, 0.25, 'derived_from_similar', 0.70
@@ -34,7 +35,8 @@ FROM garments WHERE brand = 'Arc''teryx' AND model_name = 'Gamma Hoody';
 -- Helmet-compatible StormHood, RECCO reflector.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Arc''teryx', 'Rush Jacket', 'hard_shell', 'jacket', true, true, false, true, 'helmet_compatible', 590, 700);
+VALUES (gen_random_uuid(), 'Arc''teryx', 'Rush Jacket', 'hard_shell', 'jacket', true, true, false, true, 'helmet_compatible', 590, 700)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.22, 0.18, 0, 0.15, 28.0, 26.0, 0, 20.0, 0.18, 'derived_from_similar', 0.75
@@ -60,7 +62,8 @@ FROM garments WHERE brand = 'Arc''teryx' AND model_name = 'Rush Jacket';
 -- Thigh vents, RECCO reflector, articulated fit.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Arc''teryx', 'Sabre Pant', 'hard_shell', 'pants', false, false, true, false, 'none', 624, 600);
+VALUES (gen_random_uuid(), 'Arc''teryx', 'Sabre Pant', 'hard_shell', 'pants', false, false, true, false, 'none', 624, 600)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0, 0, 0.25, 0.06, 0, 0, 26.0, 6.5, 0.20, 'derived_from_similar', 0.70
@@ -86,7 +89,8 @@ FROM garments WHERE brand = 'Arc''teryx' AND model_name = 'Sabre Pant';
 -- 30D Pertex Quantum Pro shell. Helmet-compatible hood.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Rab', 'Nebitron Pro Insulated', 'insulation_synthetic', 'jacket', true, true, false, true, 'helmet_compatible', 568, 350);
+VALUES (gen_random_uuid(), 'Rab', 'Nebitron Pro Insulated', 'insulation_synthetic', 'jacket', true, true, false, true, 'helmet_compatible', 568, 350)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 2.40, 1.90, 0, 1.60, 40.0, 36.0, 0, 28.0, 0.16, 'derived_from_similar', 0.65
@@ -108,7 +112,8 @@ FROM garments WHERE brand = 'Rab' AND model_name = 'Nebitron Pro Insulated';
 -- FC-free DWR. 2025 update: recycled materials, hand pockets.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Rab', 'Borealis', 'soft_shell', 'jacket', true, true, false, true, 'attached', 295, 120);
+VALUES (gen_random_uuid(), 'Rab', 'Borealis', 'soft_shell', 'jacket', true, true, false, true, 'attached', 295, 120)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.70, 0.55, 0, 0.47, 16.0, 14.0, 0, 11.0, 0.30, 'derived_from_similar', 0.65
@@ -130,7 +135,8 @@ FROM garments WHERE brand = 'Rab' AND model_name = 'Borealis';
 -- 100% recycled poly ripstop shell with mechanical stretch. 8.8 oz.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Patagonia', 'Nano-Air Ultralight Full-Zip Hoody', 'insulation_synthetic', 'jacket', true, true, false, true, 'attached', 249, 250);
+VALUES (gen_random_uuid(), 'Patagonia', 'Nano-Air Ultralight Full-Zip Hoody', 'insulation_synthetic', 'jacket', true, true, false, true, 'attached', 249, 250)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.80, 0.60, 0, 0.52, 12.0, 10.0, 0, 8.0, 0.35, 'derived_from_similar', 0.65
@@ -152,7 +158,8 @@ FROM garments WHERE brand = 'Patagonia' AND model_name = 'Nano-Air Ultralight Fu
 -- 10D Pertex Quantum Pro shell with PU dry coating. Self-stuffing.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Patagonia', 'DAS Light Hoody', 'insulation_synthetic', 'jacket', true, true, false, true, 'helmet_compatible', 320, 349);
+VALUES (gen_random_uuid(), 'Patagonia', 'DAS Light Hoody', 'insulation_synthetic', 'jacket', true, true, false, true, 'helmet_compatible', 320, 349)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 2.00, 1.60, 0, 1.35, 38.0, 34.0, 0, 27.0, 0.15, 'derived_from_similar', 0.65
@@ -174,7 +181,8 @@ FROM garments WHERE brand = 'Patagonia' AND model_name = 'DAS Light Hoody';
 -- 15D recycled nylon ripstop. Helmet-compatible hood.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'The North Face', 'Summit Breithorn Hoodie', 'insulation_down', 'jacket', true, true, false, true, 'helmet_compatible', 451, 430);
+VALUES (gen_random_uuid(), 'The North Face', 'Summit Breithorn Hoodie', 'insulation_down', 'jacket', true, true, false, true, 'helmet_compatible', 451, 430)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 2.60, 2.10, 0, 1.75, 42.0, 38.0, 0, 30.0, 0.14, 'derived_from_similar', 0.70
@@ -196,7 +204,8 @@ FROM garments WHERE brand = 'The North Face' AND model_name = 'Summit Breithorn 
 -- Pertex Quantum Pro shell. Helmet-compatible hood.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Rab', 'Neutrino Pro', 'insulation_down', 'jacket', true, true, false, true, 'helmet_compatible', 585, 425);
+VALUES (gen_random_uuid(), 'Rab', 'Neutrino Pro', 'insulation_down', 'jacket', true, true, false, true, 'helmet_compatible', 585, 425)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 3.20, 2.60, 0, 2.15, 48.0, 42.0, 0, 34.0, 0.12, 'derived_from_similar', 0.70
@@ -218,7 +227,8 @@ FROM garments WHERE brand = 'Rab' AND model_name = 'Neutrino Pro';
 -- Quarter-zip for versatile venting.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Smartwool', 'Classic Thermal Merino 1/4 Zip', 'base_layer', 'top_long_sleeve', true, true, false, false, 'none', 250, 110);
+VALUES (gen_random_uuid(), 'Smartwool', 'Classic Thermal Merino 1/4 Zip', 'base_layer', 'top_long_sleeve', true, true, false, false, 'none', 250, 110)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.55, 0.45, 0, 0.37, 16.0, 14.0, 0, 11.0, 0.30, 'derived_from_similar', 0.70
@@ -240,7 +250,8 @@ FROM garments WHERE brand = 'Smartwool' AND model_name = 'Classic Thermal Merino
 -- Waterproof shell with underarm vents. Detachable helmet-compatible hood.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Helly Hansen', 'Alpha LifaLoft Jacket', 'outer_insulated', 'jacket', true, true, false, true, 'helmet_compatible', 850, 570);
+VALUES (gen_random_uuid(), 'Helly Hansen', 'Alpha LifaLoft Jacket', 'outer_insulated', 'jacket', true, true, false, true, 'helmet_compatible', 850, 570)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 1.80, 1.40, 0, 1.20, 40.0, 35.0, 0, 28.0, 0.16, 'derived_from_similar', 0.65
@@ -266,7 +277,8 @@ FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Alpha LifaLoft Jack
 -- HydroBlock Pro 15k/15k. 2-way stretch fabric.
 
 INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Obermeyer', 'Raze Jacket', 'outer_insulated', 'jacket', true, true, false, true, 'helmet_compatible', 800, 350);
+VALUES (gen_random_uuid(), 'Obermeyer', 'Raze Jacket', 'outer_insulated', 'jacket', true, true, false, true, 'helmet_compatible', 800, 350)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 1.40, 1.00, 0, 0.90, 36.0, 30.0, 0, 24.0, 0.18, 'derived_from_similar', 0.60
@@ -292,7 +304,8 @@ FROM garments WHERE brand = 'Obermeyer' AND model_name = 'Raze Jacket';
 -- AirEvac ventilation, micro-adjustable dial fit. 400g.
 
 INSERT INTO headwear (brand, model_name, headwear_type, weight_grams, covers_ears, covers_neck, covers_face, helmet_compatible, rcl_clo, windproof, min_temp_active, min_temp_static)
-VALUES ('Smith', 'Method Pro MIPS', 'ski_helmet', 400, true, false, false, false, 0.75, true, -18, -8);
+VALUES ('Smith', 'Method Pro MIPS', 'ski_helmet', 400, true, false, false, false, 0.75, true, -18, -8)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 
 -- ============================================
@@ -302,7 +315,8 @@ VALUES ('Smith', 'Method Pro MIPS', 'ski_helmet', 400, true, false, false, false
 -- MIPS + RECCO. 360° Pure Sound system. 98% recycled polycarbonate.
 
 INSERT INTO headwear (brand, model_name, headwear_type, weight_grams, covers_ears, covers_neck, covers_face, helmet_compatible, rcl_clo, windproof, min_temp_active, min_temp_static)
-VALUES ('Scott', 'Flow Pro MIPS', 'ski_helmet', 500, true, false, false, false, 0.80, true, -20, -10);
+VALUES ('Scott', 'Flow Pro MIPS', 'ski_helmet', 500, true, false, false, false, 0.80, true, -20, -10)
+ON CONFLICT (brand, model_name) DO NOTHING;
 
 
 -- ============================================
@@ -312,4 +326,5 @@ VALUES ('Scott', 'Flow Pro MIPS', 'ski_helmet', 500, true, false, false, false, 
 -- Thermostat Control adjustable venting (6 vents). In Form fit system.
 
 INSERT INTO headwear (brand, model_name, headwear_type, weight_grams, covers_ears, covers_neck, covers_face, helmet_compatible, rcl_clo, windproof, min_temp_active, min_temp_static)
-VALUES ('Giro', 'Ratio MIPS', 'ski_helmet', 610, true, false, false, false, 0.80, true, -20, -10);
+VALUES ('Giro', 'Ratio MIPS', 'ski_helmet', 610, true, false, false, false, 0.80, true, -20, -10)
+ON CONFLICT (brand, model_name) DO NOTHING;

@@ -286,6 +286,7 @@ function buildSvg(itemType: ItemType, data: ItemData): string {
 </svg>`;
 }
 
+/** Resolves a product image: redirects to a direct photo, a category silhouette, or returns a generated SVG placeholder. */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const itemTypeParam = searchParams.get("item_type");

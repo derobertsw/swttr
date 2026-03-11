@@ -102,6 +102,7 @@ function buildTextFallback(brand: string): string {
 </svg>`;
 }
 
+/** Resolves a brand logo: redirects to a local file if mapped, otherwise returns a generated SVG text fallback. */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const itemTypeParam = searchParams.get("item_type");
