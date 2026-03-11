@@ -1,16 +1,10 @@
 import { WardrobeItem } from "@/types/wardrobe";
-import { CategoryBadge } from "./CategoryBadge";
 import { GarmentDetails } from "./GarmentDetails";
 import { HandwearDetails } from "./HandwearDetails";
 import { HeadwearDetails } from "./HeadwearDetails";
 import { getWardrobeMediaRef, resolveItemImageUrl, resolveBrandLogoUrl, toCssBackgroundImage, getBrandInitials } from "../media";
 
 export function ItemDetailContent({ item }: { item: WardrobeItem }) {
-  const category =
-    item.details.category ||
-    item.details.handwear_type ||
-    item.details.headwear_type ||
-    "";
   const media = getWardrobeMediaRef(item);
   const itemImageUrl = resolveItemImageUrl(media);
   const brandLogoUrl = resolveBrandLogoUrl(media);
@@ -39,8 +33,6 @@ export function ItemDetailContent({ item }: { item: WardrobeItem }) {
           />
         </div>
       </div>
-
-      {category && <CategoryBadge category={category} />}
 
       {item.item_type === "garment" && <GarmentDetails details={item.details} />}
       {item.item_type === "handwear" && <HandwearDetails details={item.details} />}
