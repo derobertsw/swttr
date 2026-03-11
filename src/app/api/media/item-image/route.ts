@@ -28,16 +28,15 @@ const DIRECT_ITEM_IMAGE_BY_KEY: Record<string, string> = {
   "patagonia|merino air balaclava": "/images/items/patagonia-merino-air-balaclava.jpg",
   "patagonia|micro puff hoody": "/images/items/patagonia-micro-puff-hoody.jpg",
   "patagonia|nano air hoody": "https://www.rei.com/media/7c9e4ec6-2f43-4846-ab6d-df8f1c49f4ff.jpg?size=2000",
-  "patagonia|r1 pullover": "https://www.rei.com/media/e1300ef6-a98f-4853-800f-f6f5d594f7f1.jpg?size=2000",
   "patagonia|snowdrifter jacket": "/images/items/patagonia-snowdrifter-jacket.jpg",
   "patagonia|snowfarer cap": "/images/items/patagonia-snowfarer-cap.jpg",
   "smartwool|thermal merino reversible neck gaiter": "https://www.rei.com/media/ac0bc34a-7e30-4939-97f7-f06dd4996f8e.jpg?size=784x588",
   // Arc'teryx
-  "arcteryx|gamma mx hoody": "/images/items/arcteryx-gamma-mx-hoody.jpg",
-  "arcteryx|beta ar jacket": "/images/items/arcteryx-beta-ar-jacket.jpg",
-  "arcteryx|fission sv gloves": "/images/items/arcteryx-fission-sv-gloves.jpg",
-  "arcteryx|venta glove": "/images/items/arcteryx-venta-glove.jpg",
-  "arcteryx|rho ltw beanie": "/images/items/arcteryx-rho-ltw-beanie.jpg",
+  "arc teryx|gamma mx hoody": "/images/items/arcteryx-gamma-mx-hoody.jpg",
+  "arc teryx|beta ar jacket": "/images/items/arcteryx-beta-ar-jacket.jpg",
+  "arc teryx|fission sv gloves": "/images/items/arcteryx-fission-sv-gloves.jpg",
+  "arc teryx|venta glove": "/images/items/arcteryx-venta-glove.jpg",
+  "arc teryx|rho ltw beanie": "/images/items/arcteryx-rho-ltw-beanie.jpg",
   // Icebreaker
   "icebreaker|merino 260 tech long sleeve crewe": "/images/items/icebreaker-merino-260-tech-long-sleeve-crewe.jpg",
   "icebreaker|merino 260 tech long sleeve half zip": "/images/items/icebreaker-merino-260-tech-long-sleeve-half-zip.jpg",
@@ -62,9 +61,9 @@ const DIRECT_ITEM_IMAGE_BY_KEY: Record<string, string> = {
   "smith|vantage mips": "/images/items/smith-vantage-mips.jpg",
   "giro|range mips": "/images/items/giro-range-mips.jpg",
   // OGL recommended items
-  "arcteryx|gamma hoody": "/images/items/arcteryx-gamma-hoody.jpg",
-  "arcteryx|rush jacket": "/images/items/arcteryx-rush-jacket.jpg",
-  "arcteryx|sabre pant": "/images/items/arcteryx-sabre-pant.jpg",
+  "arc teryx|gamma hoody": "/images/items/arcteryx-gamma-hoody.jpg",
+  "arc teryx|rush jacket": "/images/items/arcteryx-rush-jacket.jpg",
+  "arc teryx|sabre pant": "/images/items/arcteryx-sabre-pant.jpg",
   "rab|nebitron pro insulated": "/images/items/rab-nebitron-pro-insulated.jpg",
   "rab|borealis": "/images/items/rab-borealis.jpg",
   "rab|neutrino pro": "/images/items/rab-neutrino-pro.png",
@@ -72,6 +71,10 @@ const DIRECT_ITEM_IMAGE_BY_KEY: Record<string, string> = {
   "obermeyer|raze jacket": "/images/items/obermeyer-raze-jacket.png",
   "smith|method pro mips": "/images/items/smith-method-pro-mips.png",
   "giro|ratio mips": "/images/items/giro-ratio-mips.webp",
+  "patagonia|r1 air full zip hoody": "/images/items/patagonia-r1-air-full-zip-hoody.png",
+  "patagonia|r1 techface jacket": "/images/items/patagonia-r1-techface-jacket.png",
+  "hestra|ergo grip active": "/images/items/hestra-ergo-grip-active.png",
+  "patagonia|wind shield pants": "/images/items/patagonia-wind-shield-pants.png",
 };
 
 function isItemType(value: string | null): value is ItemType {

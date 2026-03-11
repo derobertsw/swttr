@@ -10,16 +10,38 @@ const TABLE_BY_ITEM_TYPE: Record<ItemType, "garments" | "handwear" | "headwear">
 };
 
 const BRAND_LOGO_BY_KEY: Record<string, string> = {
-  "32 degrees": "https://wjm.s3.amazonaws.com/stylecareers/uploads/Shorta.jpg",
+  "32 degrees": "/media/brands/32degrees.png",
   "arc teryx": "/media/brands/arcteryx.svg",
   "black diamond": "/media/brands/black-diamond.png",
+  blackstrap: "/media/brands/blackstrap.png",
+  columbia: "/media/brands/columbia.png",
+  giro: "/media/brands/giro.png",
+  head: "/media/brands/head.png",
   "helly hansen": "/media/brands/helly-hansen.png",
-  hestra: "/media/brands/hestra.svg",
-  lululemon: "/media/brands/lululemon.svg",
-  norrona: "/media/brands/norrona.svg",
-  "outdoor research": "/media/brands/outdoor-research.png",
+  hestra: "/media/brands/hestra.png",
+  icebreaker: "/media/brands/icebreaker.png",
+  "mountain hardwear": "/media/brands/mountainhardwear.png",
+  norrona: "/media/brands/norrona.png",
+  obermeyer: "/media/brands/obermeyer.png",
+  lululemon: "/media/brands/lululemon.png",
+  "outdoor research": "/media/brands/outdoorresearch.png",
   patagonia: "/media/brands/patagonia-real.svg",
+  rab: "/media/brands/rab.png",
+  scott: "/media/brands/scott.png",
   smartwool: "/media/brands/smartwool.svg",
+  smith: "/media/brands/smith.png",
+  "the north face": "/media/brands/thenorthface.png",
+  "turtle fur": "/media/brands/turtlefur.png",
+  "under armour": "/media/brands/underarmour.png",
+  spyder: "/media/brands/spyder.png",
+  fjallraven: "/media/brands/fjallraven.png",
+  atomic: "/media/brands/atomic.png",
+  buff: "/media/brands/buff.png",
+  oakley: "/media/brands/oakley.png",
+  poc: "/media/brands/poc.png",
+  salomon: "/media/brands/salomon.png",
+  seirus: "/media/brands/seirus.png",
+  "sweet protection": "/media/brands/sweetprotection.png",
 };
 
 function isItemType(value: string | null): value is ItemType {
@@ -71,10 +93,12 @@ async function getBrandFromItem(itemType: ItemType, itemId: string): Promise<str
 
 function buildTextFallback(brand: string): string {
   const safeBrand = escapeXml(brand.trim() || "Brand");
+  const len = safeBrand.length;
+  const fontSize = len <= 4 ? 52 : len <= 8 ? 40 : len <= 12 ? 32 : 24;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="320" height="100" viewBox="0 0 320 100" role="img" aria-label="${safeBrand}">
   <rect width="320" height="100" fill="white"/>
-  <text x="160" y="56" text-anchor="middle" fill="#334155" font-size="20" font-family="ui-sans-serif, system-ui" font-weight="600">${safeBrand}</text>
+  <text x="160" y="${50 + Math.round(fontSize * 0.35)}" text-anchor="middle" fill="#334155" font-size="${fontSize}" font-family="ui-sans-serif, system-ui" font-weight="600">${safeBrand}</text>
 </svg>`;
 }
 
