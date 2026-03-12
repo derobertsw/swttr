@@ -52,6 +52,18 @@ describe("evaluateThermalComfort", () => {
     expect(result?.riskType).toBe("overheat");
     expect(result?.delta).toBeCloseTo(0.4, 5);
   });
+
+  it("flags overheating immediately above the configured overheat buffer", () => {
+    const result = evaluateThermalComfort({
+      totalClo: 2.21,
+      targetRange: [1.5, 1.9],
+      maxRegionalDeficit: 0.02,
+      maxExtremityDeficit: 0.06,
+    });
+
+    expect(result?.riskType).toBe("overheat");
+    expect(result?.delta).toBeCloseTo(0.31, 5);
+  });
 });
 
 describe("calculateThermalComfortScore", () => {

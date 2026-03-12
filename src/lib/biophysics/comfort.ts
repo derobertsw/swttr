@@ -153,7 +153,7 @@ export function evaluateThermalComfort(input: ThermalComfortInput): ThermalComfo
     };
   }
 
-  if (wholeBodyExcess > overheatBufferClo + THERMAL_DISPLAY_CLO_EPSILON) {
+  if (wholeBodyExcess > overheatBufferClo) {
     return {
       riskType: "overheat",
       severity: getSeverity(wholeBodyExcess, targetRange),
