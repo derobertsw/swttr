@@ -38,8 +38,8 @@ export function SwipeableItem({
   const currentXRef = useRef(0);
 
   const hasToggle = !!onToggleDisabled;
-  // When disabled, only show Enable button (single width)
-  // When not disabled, show both Disable and Remove buttons (double width)
+  // Paused items only need a single re-include action.
+  // Active items expose both pause and remove actions.
   const totalActionWidth = hasToggle && isDisabled ? ACTION_WIDTH : hasToggle ? ACTION_WIDTH * 2 : ACTION_WIDTH;
 
   const handleTouchStart = useCallback(
@@ -107,7 +107,7 @@ export function SwipeableItem({
   }, [translateX]);
 
   return (
-    <div ref={containerRef} className="relative overflow-hidden rounded-lg">
+    <div ref={containerRef} className="relative overflow-hidden rounded-2xl">
       {/* Actions behind */}
       <div
         className="absolute inset-y-0 right-0 flex items-stretch transition-opacity"
@@ -121,7 +121,7 @@ export function SwipeableItem({
           <button
             onClick={handleToggleDisabled}
             className={`flex flex-col items-center justify-center text-white ${
-              isDisabled ? "bg-emerald-600/90 rounded-r-lg" : "bg-amber-500/90"
+              isDisabled ? "rounded-r-2xl bg-emerald-600/90" : "bg-amber-500/90"
             }`}
             style={{ width: ACTION_WIDTH }}
           >
@@ -131,7 +131,7 @@ export function SwipeableItem({
               <Ban className="size-5" />
             )}
             <span className="text-[10px] mt-1">
-              {isDisabled ? "Enable" : "Disable"}
+              {isDisabled ? "Include" : "Pause"}
             </span>
           </button>
         )}
@@ -140,7 +140,7 @@ export function SwipeableItem({
         {!isDisabled && (
           <button
             onClick={handleDelete}
-            className="flex flex-col items-center justify-center bg-red-500/90 text-white rounded-r-lg"
+            className="flex flex-col items-center justify-center rounded-r-2xl bg-red-500/90 text-white"
             style={{ width: ACTION_WIDTH }}
           >
             <Trash2 className="size-5" />
@@ -152,7 +152,7 @@ export function SwipeableItem({
       {/* Main content */}
       <div
         className={cn(
-          "relative rounded-xl border border-white/35 bg-[linear-gradient(120deg,rgba(246,251,255,0.82),rgba(231,240,248,0.76))] shadow-[0_3px_10px_rgba(11,20,35,0.1)] backdrop-blur-[1px] touch-pan-y",
+          "relative rounded-2xl border border-white/35 bg-[linear-gradient(145deg,rgba(249,252,255,0.94),rgba(226,236,243,0.84))] shadow-[0_8px_24px_rgba(8,18,36,0.14)] backdrop-blur-[6px] touch-pan-y",
           onClick ? "cursor-pointer" : "cursor-default"
         )}
         style={{

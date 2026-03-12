@@ -1,21 +1,20 @@
 import { Plus, ChevronDown, ChevronRight } from "lucide-react";
 import type { WardrobeItem } from "@/types/wardrobe";
 import { cn } from "@/lib/utils";
-import { getEmptyStateIcon } from "./wardrobe-utils";
+import { formatBodyPartLabel, getEmptyStateIcon } from "./wardrobe-utils";
 import { WardrobeItemCard } from "./WardrobeItemCard";
 
 interface BodyPartSectionProps {
   part: string;
   items: WardrobeItem[];
   disabledItems: WardrobeItem[];
+  sectionId?: string;
   isFirst: boolean;
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
   onRemoveItem: (id: string) => void;
   onToggleDisabled: (id: string, currentDisabled: boolean) => void;
   onItemClick?: (item: WardrobeItem) => void;
-  showSwipeHintOnFirstItem?: boolean;
-  onDismissSwipeHint?: () => void;
   onHeadingClick?: () => void;
 }
 
@@ -23,54 +22,81 @@ export function BodyPartSection({
   part,
   items,
   disabledItems,
+  sectionId,
   isFirst,
   isCollapsed,
   onToggleCollapsed,
   onRemoveItem,
   onToggleDisabled,
   onItemClick,
-  showSwipeHintOnFirstItem = false,
-  onDismissSwipeHint,
   onHeadingClick,
 }: BodyPartSectionProps) {
   const EmptyIcon = getEmptyStateIcon(part);
+  const label = formatBodyPartLabel(part);
   const sectionCount = items.length + disabledItems.length;
 
   return (
-    <section className="flex flex-col gap-1.5 scroll-mt-20">
-      <div className={cn("sticky top-0 z-10", !isFirst && "pt-1")}>
-        <button
-          type="button"
-          onClick={onHeadingClick}
-          className="group w-full text-left transition-colors hover:bg-white/5 active:bg-white/8 rounded-md disabled:cursor-default disabled:hover:bg-transparent"
-          aria-label={`Add ${part} items from database`}
-          disabled={!onHeadingClick}
-        >
-          <h4 className="flex items-center justify-between rounded-md border border-white/12 bg-slate-900/20 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/84 backdrop-blur-md">
-            <span className="flex items-center gap-1.5">
-              <span>{part}</span>
-              {onHeadingClick && (
-                <Plus className="size-3.5 text-white/50 group-hover:text-white/70 transition-colors" />
-              )}
-            </span>
-            <span className="rounded-full border border-white/20 bg-white/10 px-1.5 py-[1px] text-[10px] text-white/65">
+    <section id={sectionId} className="flex scroll-mt-24 flex-col gap-2">
+      <div className={cn("sticky top-0 z-10", !isFirst && "pt-1.5")}>
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/12 bg-slate-950/26 px-3 py-2.5 backdrop-blur-xl">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/8">
+              <EmptyIcon className="size-4 text-white/74" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="truncate text-[12px] font-semibold uppercase tracking-[0.16em] text-white/88">
+                {label}
+              </h4>
+              <p className="truncate text-[11px] text-white/56">
+                {items.length > 0 ? `${items.length} active` : "No active gear"}
+                {disabledItems.length > 0 ? ` · ${disabledItems.length} paused` : ""}
+                {sectionCount === 0 ? " yet" : ""}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="rounded-full border border-white/15 bg-white/8 px-2 py-0.5 text-[10px] font-medium text-white/65">
               {sectionCount}
             </span>
-          </h4>
-        </button>
+            {onHeadingClick && (
+              <button
+                type="button"
+                onClick={onHeadingClick}
+                className="inline-flex items-center gap-1.5 rounded-full border border-cyan-200/30 bg-cyan-200/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-50 transition-colors hover:bg-cyan-200/16 active:bg-cyan-200/20"
+                aria-label={`Add ${label} gear`}
+              >
+                <Plus className="size-3.5" />
+                Add gear
+              </button>
+            )}
+          </div>
+        </div>
       </div>
       {items.length === 0 && disabledItems.length === 0 ? (
-        <div className="flex items-center gap-3 rounded-lg border border-dashed border-white/20 bg-white/5 px-3 py-3.5">
-          <EmptyIcon className="size-5 text-white/30 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm text-white/55">No {part} gear yet</div>
-            <div className="text-xs text-white/42">Add from search to improve recommendations</div>
+        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-white/18 bg-white/[0.06] px-4 py-4">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/6">
+            <EmptyIcon className="size-5 text-white/35" />
           </div>
-          <Plus className="size-4 text-white/30 flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-white/74">No {label.toLowerCase()} gear yet</div>
+            <div className="mt-1 text-xs leading-5 text-white/48">
+              Add a piece here so recommendations can account for this zone.
+            </div>
+          </div>
+          {onHeadingClick && (
+            <button
+              type="button"
+              onClick={onHeadingClick}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/16 bg-white/8 px-3 py-1.5 text-[11px] font-medium text-white/76 transition-colors hover:bg-white/12"
+            >
+              <Plus className="size-3.5" />
+              Browse
+            </button>
+          )}
         </div>
       ) : (
         <>
-          {items.map((item, index) => (
+          {items.map((item) => (
             <WardrobeItemCard
               key={item.id}
               item={item}
@@ -78,28 +104,32 @@ export function BodyPartSection({
               onDelete={() => onRemoveItem(item.id)}
               onToggleDisabled={() => onToggleDisabled(item.id, false)}
               onClick={onItemClick ? () => onItemClick(item) : undefined}
-              showSwipeHint={showSwipeHintOnFirstItem && index === 0}
-              onDismissSwipeHint={onDismissSwipeHint}
             />
           ))}
 
           {disabledItems.length > 0 && (
-            <div className="flex flex-col gap-2 mt-2">
+            <div className="mt-2 rounded-2xl border border-white/10 bg-black/10 p-2">
               <button
+                type="button"
                 onClick={onToggleCollapsed}
-                className="flex items-center gap-1.5 px-2 py-1.5 text-white/50 hover:text-white/70 transition-colors"
+                className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-white/56 transition-colors hover:bg-white/6 hover:text-white/76"
               >
-                {isCollapsed ? (
-                  <ChevronRight className="size-3" />
-                ) : (
-                  <ChevronDown className="size-3" />
-                )}
-                <span className="text-[10px] font-medium uppercase tracking-wider">
-                  Not on this trip ({disabledItems.length})
+                <span className="flex items-center gap-1.5">
+                  {isCollapsed ? (
+                    <ChevronRight className="size-3.5" />
+                  ) : (
+                    <ChevronDown className="size-3.5" />
+                  )}
+                  <span className="text-[10px] font-medium uppercase tracking-[0.14em]">
+                    Paused For This Trip
+                  </span>
+                </span>
+                <span className="rounded-full border border-white/12 bg-white/6 px-2 py-0.5 text-[10px]">
+                  {disabledItems.length}
                 </span>
               </button>
               {!isCollapsed && (
-                <div className="flex flex-col gap-2 pl-2 border-l border-dashed border-white/15">
+                <div className="mt-2 flex flex-col gap-2 border-l border-dashed border-white/12 pl-2">
                   {disabledItems.map((item) => (
                     <WardrobeItemCard
                       key={item.id}
