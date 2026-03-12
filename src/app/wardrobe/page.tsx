@@ -108,57 +108,34 @@ export default function Wardrobe() {
                 Wardrobe
               </p>
               <h1 className="mt-1 text-[2.25rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
-                My gear
+                My Gear
               </h1>
               <p className="mt-1 text-sm text-white/62">
+                {overview.headline}
+                <span className="text-white/42"> · </span>
                 {overview.activeItems} {overview.activeItems === 1 ? "item is" : "items are"} shaping recommendations
                 {overview.totalDisabledItems > 0 ? ` · ${overview.totalDisabledItems} paused for this trip` : ""}
               </p>
             </header>
 
-            <section className="relative overflow-hidden rounded-[28px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(110,224,255,0.18),transparent_34%),linear-gradient(160deg,rgba(9,28,51,0.9),rgba(10,88,91,0.72))] p-4 shadow-[0_22px_60px_rgba(3,10,24,0.28)] sm:p-5">
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.04),transparent_44%)]" />
-              <div className="relative flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="inline-flex w-fit rounded-full border border-white/12 bg-white/8 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-50/78">
-                      Coverage
-                    </div>
-                    <h2 className="mt-2 text-[clamp(1.35rem,4.2vw,1.85rem)] font-semibold leading-[1.08] tracking-[-0.035em] text-white">
-                      {overview.headline}
-                    </h2>
-                    <p className="mt-2 max-w-xl text-sm leading-5 text-cyan-50/72">
-                      {overview.message}
-                    </p>
-                  </div>
-                  <div className="shrink-0 rounded-2xl border border-white/12 bg-white/[0.08] px-3 py-2 text-right backdrop-blur-sm">
-                    <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-white/46">Ready</p>
-                    <p className="mt-1 text-base font-semibold leading-none text-white">
-                      {overview.coveredBodyParts}/{BODY_PART_ORDER.length}
-                    </p>
-                  </div>
+            <section className="grid grid-cols-3 gap-2">
+              {[
+                { label: "Items", value: overview.totalItems },
+                { label: "Active", value: overview.activeItems },
+                { label: "Paused", value: overview.totalDisabledItems },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-white/10 bg-slate-950/18 px-3 py-2.5 backdrop-blur-sm"
+                >
+                  <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/44">
+                    {stat.label}
+                  </p>
+                  <p className="mt-1 text-xl font-semibold leading-none text-white">
+                    {stat.value}
+                  </p>
                 </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: "Items", value: overview.totalItems },
-                    { label: "Active", value: overview.activeItems },
-                    { label: "Paused", value: overview.totalDisabledItems },
-                  ].map((stat) => (
-                    <div
-                      key={stat.label}
-                      className="rounded-2xl border border-white/10 bg-slate-950/18 px-3 py-2.5"
-                    >
-                      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/44">
-                        {stat.label}
-                      </p>
-                      <p className="mt-1 text-xl font-semibold leading-none text-white">
-                        {stat.value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ))}
             </section>
 
             <div className="grid grid-cols-2 gap-2">
