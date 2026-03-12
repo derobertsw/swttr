@@ -7,13 +7,15 @@
 -- OGL's #1 softshell. 200gsm Wee Burly shell (56% nylon, 34% poly, 10% elastane).
 -- Helmet-compatible StormHood, FC0 DWR. 2025 update: relaxed fit, two chest pockets.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Arc''teryx', 'Gamma Hoody', 'soft_shell', 'jacket', true, true, false, true, 'helmet_compatible', 460, 300)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'Arc''teryx', 'Gamma Hoody', 'soft_shell', 'jacket', true, true, false, true, 'helmet_compatible', 460, 300)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.95, 0.80, 0, 0.65, 22.0, 20.0, 0, 15.5, 0.25, 'derived_from_similar', 0.70
-FROM garments WHERE brand = 'Arc''teryx' AND model_name = 'Gamma Hoody';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating)
 SELECT id, 'wind_resistant', 'DWR_only'
@@ -34,13 +36,15 @@ FROM garments WHERE brand = 'Arc''teryx' AND model_name = 'Gamma Hoody';
 -- OGL top ski jacket for backcountry. Gore-Tex Pro ePE 3L, no insulation.
 -- Helmet-compatible StormHood, RECCO reflector.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Arc''teryx', 'Rush Jacket', 'hard_shell', 'jacket', true, true, false, true, 'helmet_compatible', 590, 700)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'Arc''teryx', 'Rush Jacket', 'hard_shell', 'jacket', true, true, false, true, 'helmet_compatible', 590, 700)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.22, 0.18, 0, 0.15, 28.0, 26.0, 0, 20.0, 0.18, 'derived_from_similar', 0.75
-FROM garments WHERE brand = 'Arc''teryx' AND model_name = 'Rush Jacket';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating, waterproof_mm, membrane_type, seam_construction)
 SELECT id, 'windproof', 'waterproof', 28000, 'Gore-Tex Pro ePE', 'taped'
@@ -61,13 +65,15 @@ FROM garments WHERE brand = 'Arc''teryx' AND model_name = 'Rush Jacket';
 -- OGL's #1 ski pant. 80D 3L ePE Gore-Tex, uninsulated with warm backer.
 -- Thigh vents, RECCO reflector, articulated fit.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Arc''teryx', 'Sabre Pant', 'hard_shell', 'pants', false, false, true, false, 'none', 624, 600)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'Arc''teryx', 'Sabre Pant', 'hard_shell', 'pants', false, false, true, false, 'none', 624, 600)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0, 0, 0.25, 0.06, 0, 0, 26.0, 6.5, 0.20, 'derived_from_similar', 0.70
-FROM garments WHERE brand = 'Arc''teryx' AND model_name = 'Sabre Pant';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating, membrane_type, seam_construction)
 SELECT id, 'windproof', 'waterproof', 'Gore-Tex ePE 3L', 'taped'
@@ -88,13 +94,15 @@ FROM garments WHERE brand = 'Arc''teryx' AND model_name = 'Sabre Pant';
 -- OGL's #1 insulated jacket. PrimaLoft Silver RISE 279g fill.
 -- 30D Pertex Quantum Pro shell. Helmet-compatible hood.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Rab', 'Nebitron Pro Insulated', 'insulation_synthetic', 'jacket', true, true, false, true, 'helmet_compatible', 568, 350)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'Rab', 'Nebitron Pro Insulated', 'insulation_synthetic', 'jacket', true, true, false, true, 'helmet_compatible', 568, 350)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 2.40, 1.90, 0, 1.60, 40.0, 36.0, 0, 28.0, 0.16, 'derived_from_similar', 0.65
-FROM garments WHERE brand = 'Rab' AND model_name = 'Nebitron Pro Insulated';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating)
 SELECT id, 'wind_resistant', 'DWR_only'
@@ -111,13 +119,15 @@ FROM garments WHERE brand = 'Rab' AND model_name = 'Nebitron Pro Insulated';
 -- OGL's best value softshell. 130gsm Matrix fabric (88% recycled nylon, 12% elastane).
 -- FC-free DWR. 2025 update: recycled materials, hand pockets.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Rab', 'Borealis', 'soft_shell', 'jacket', true, true, false, true, 'attached', 295, 120)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'Rab', 'Borealis', 'soft_shell', 'jacket', true, true, false, true, 'attached', 295, 120)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.70, 0.55, 0, 0.47, 16.0, 14.0, 0, 11.0, 0.30, 'derived_from_similar', 0.65
-FROM garments WHERE brand = 'Rab' AND model_name = 'Borealis';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating)
 SELECT id, 'wind_resistant', 'DWR_only'
@@ -134,13 +144,15 @@ FROM garments WHERE brand = 'Rab' AND model_name = 'Borealis';
 -- OGL's most breathable insulated jacket. 20g FullRange insulation.
 -- 100% recycled poly ripstop shell with mechanical stretch. 8.8 oz.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Patagonia', 'Nano-Air Ultralight Full-Zip Hoody', 'insulation_synthetic', 'jacket', true, true, false, true, 'attached', 249, 250)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'Patagonia', 'Nano-Air Ultralight Full-Zip Hoody', 'insulation_synthetic', 'jacket', true, true, false, true, 'attached', 249, 250)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.80, 0.60, 0, 0.52, 12.0, 10.0, 0, 8.0, 0.35, 'derived_from_similar', 0.65
-FROM garments WHERE brand = 'Patagonia' AND model_name = 'Nano-Air Ultralight Full-Zip Hoody';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating)
 SELECT id, 'wind_resistant', 'DWR_only'
@@ -157,13 +169,15 @@ FROM garments WHERE brand = 'Patagonia' AND model_name = 'Nano-Air Ultralight Fu
 -- OGL's most weather-resistant insulated jacket. 65g PlumaFill synthetic.
 -- 10D Pertex Quantum Pro shell with PU dry coating. Self-stuffing.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Patagonia', 'DAS Light Hoody', 'insulation_synthetic', 'jacket', true, true, false, true, 'helmet_compatible', 320, 349)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'Patagonia', 'DAS Light Hoody', 'insulation_synthetic', 'jacket', true, true, false, true, 'helmet_compatible', 320, 349)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 2.00, 1.60, 0, 1.35, 38.0, 34.0, 0, 27.0, 0.15, 'derived_from_similar', 0.65
-FROM garments WHERE brand = 'Patagonia' AND model_name = 'DAS Light Hoody';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating)
 SELECT id, 'windproof', 'DWR_only'
@@ -180,13 +194,15 @@ FROM garments WHERE brand = 'Patagonia' AND model_name = 'DAS Light Hoody';
 -- OGL's #1 down jacket. 800-fill ProDown with hydrophobic treatment.
 -- 15D recycled nylon ripstop. Helmet-compatible hood.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'The North Face', 'Summit Breithorn Hoodie', 'insulation_down', 'jacket', true, true, false, true, 'helmet_compatible', 451, 430)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'The North Face', 'Summit Breithorn Hoodie', 'insulation_down', 'jacket', true, true, false, true, 'helmet_compatible', 451, 430)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 2.60, 2.10, 0, 1.75, 42.0, 38.0, 0, 30.0, 0.14, 'derived_from_similar', 0.70
-FROM garments WHERE brand = 'The North Face' AND model_name = 'Summit Breithorn Hoodie';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating)
 SELECT id, 'wind_resistant', 'DWR_only'
@@ -203,13 +219,15 @@ FROM garments WHERE brand = 'The North Face' AND model_name = 'Summit Breithorn 
 -- OGL's best down jacket for extreme cold. 800FP European goose down.
 -- Pertex Quantum Pro shell. Helmet-compatible hood.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Rab', 'Neutrino Pro', 'insulation_down', 'jacket', true, true, false, true, 'helmet_compatible', 585, 425)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'Rab', 'Neutrino Pro', 'insulation_down', 'jacket', true, true, false, true, 'helmet_compatible', 585, 425)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 3.20, 2.60, 0, 2.15, 48.0, 42.0, 0, 34.0, 0.12, 'derived_from_similar', 0.70
-FROM garments WHERE brand = 'Rab' AND model_name = 'Neutrino Pro';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating)
 SELECT id, 'wind_resistant', 'DWR_only'
@@ -226,13 +244,15 @@ FROM garments WHERE brand = 'Rab' AND model_name = 'Neutrino Pro';
 -- OGL's #1 base layer. 100% Merino wool, 250gsm weight.
 -- Quarter-zip for versatile venting.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Smartwool', 'Classic Thermal Merino 1/4 Zip', 'base_layer', 'top_long_sleeve', true, true, false, false, 'none', 250, 110)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'Smartwool', 'Classic Thermal Merino 1/4 Zip', 'base_layer', 'top_long_sleeve', true, true, false, false, 'none', 250, 110)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 0.55, 0.45, 0, 0.37, 16.0, 14.0, 0, 11.0, 0.30, 'derived_from_similar', 0.70
-FROM garments WHERE brand = 'Smartwool' AND model_name = 'Classic Thermal Merino 1/4 Zip';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating)
 SELECT id, 'none', 'none'
@@ -249,13 +269,15 @@ FROM garments WHERE brand = 'Smartwool' AND model_name = 'Classic Thermal Merino
 -- OGL's #1 ski jacket (several years running). LifaLoft 100g insulation.
 -- Waterproof shell with underarm vents. Detachable helmet-compatible hood.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Helly Hansen', 'Alpha LifaLoft Jacket', 'outer_insulated', 'jacket', true, true, false, true, 'helmet_compatible', 850, 570)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'Helly Hansen', 'Alpha LifaLoft Jacket', 'outer_insulated', 'jacket', true, true, false, true, 'helmet_compatible', 850, 570)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 1.80, 1.40, 0, 1.20, 40.0, 35.0, 0, 28.0, 0.16, 'derived_from_similar', 0.65
-FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Alpha LifaLoft Jacket';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating, seam_construction)
 SELECT id, 'windproof', 'waterproof', 'taped'
@@ -276,13 +298,15 @@ FROM garments WHERE brand = 'Helly Hansen' AND model_name = 'Alpha LifaLoft Jack
 -- OGL top ski jacket for fit/comfort. 60g body / 40g sleeves synthetic insulation.
 -- HydroBlock Pro 15k/15k. 2-way stretch fabric.
 
-INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
-VALUES (gen_random_uuid(), 'Obermeyer', 'Raze Jacket', 'outer_insulated', 'jacket', true, true, false, true, 'helmet_compatible', 800, 350)
-ON CONFLICT (brand, model_name) DO NOTHING;
-
+WITH inserted AS (
+  INSERT INTO garments (id, brand, model_name, category, garment_type, covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams, msrp_usd)
+  VALUES (gen_random_uuid(), 'Obermeyer', 'Raze Jacket', 'outer_insulated', 'jacket', true, true, false, true, 'helmet_compatible', 800, 350)
+  ON CONFLICT (brand, model_name) DO NOTHING
+  RETURNING id
+)
 INSERT INTO garment_thermal_properties (garment_id, rcl_torso, rcl_arms, rcl_legs, rcl_whole_body, recl_torso, recl_arms, recl_legs, recl_whole_body, evap_potential, estimation_method, confidence_score)
 SELECT id, 1.40, 1.00, 0, 0.90, 36.0, 30.0, 0, 24.0, 0.18, 'derived_from_similar', 0.60
-FROM garments WHERE brand = 'Obermeyer' AND model_name = 'Raze Jacket';
+FROM inserted;
 
 INSERT INTO garment_protection (garment_id, windproof_rating, waterproof_rating, waterproof_mm, seam_construction)
 SELECT id, 'windproof', 'waterproof', 15000, 'taped'

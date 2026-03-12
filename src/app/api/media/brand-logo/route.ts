@@ -92,8 +92,9 @@ async function getBrandFromItem(itemType: ItemType, itemId: string): Promise<str
 }
 
 function buildTextFallback(brand: string): string {
-  const safeBrand = escapeXml(brand.trim() || "Brand");
-  const len = safeBrand.length;
+  const label = brand.trim() || "Brand";
+  const safeBrand = escapeXml(label);
+  const len = label.length;
   const fontSize = len <= 4 ? 52 : len <= 8 ? 40 : len <= 12 ? 32 : 24;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="320" height="100" viewBox="0 0 320 100" role="img" aria-label="${safeBrand}">

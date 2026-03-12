@@ -205,6 +205,7 @@ async function getItemData(itemType: ItemType, itemId: string): Promise<ItemData
 
 function getSilhouetteImage(itemType: ItemType, data: ItemData): string | undefined {
   if (itemType === "headwear") {
+    if (!data.headwearType) return undefined;
     return data.headwearType === "ski_helmet"
       ? "/images/silhouettes/ski-helmet.png"
       : "/images/silhouettes/beanie.png";
@@ -214,6 +215,7 @@ function getSilhouetteImage(itemType: ItemType, data: ItemData): string | undefi
     const light = ["liner_glove", "light_glove"];
     const mittens = ["mitten", "lobster_mitten", "shell_overmitten"];
     const hwt = data.handwearType ?? "";
+    if (!hwt) return undefined;
     if (light.includes(hwt)) return "/images/silhouettes/gloves-lightweight.png";
     if (mittens.includes(hwt)) return "/images/silhouettes/mittens.png";
     return "/images/silhouettes/gloves-heavy.png";
