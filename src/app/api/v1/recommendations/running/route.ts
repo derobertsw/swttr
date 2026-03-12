@@ -84,13 +84,13 @@ export async function POST(request: NextRequest) {
       recommendations: {
         target_clo_range: [targetMinClo, maxClo],
         min_evap_potential: minEvapPotential,
-        guidance: getRunningGuidance(tempC, ireq),
+        guidance: getRunningGuidance(tempC, ireq, weather.precipitation ?? false),
       },
     });
   }
 
   const { categorized, userHandwear, userHeadwear } = prepared;
-  const ensemble = buildRunningEnsemble(categorized, ireq, maxClo, minEvapPotential);
+  const ensemble = buildRunningEnsemble(categorized, ireq, maxClo, minEvapPotential, weather.precipitation ?? false);
   const regionalIreq = scaleIreqShapeToTargetRange(calculateRegionalIreq(ireq, 'running'), {
     ireqMin: ireq.ireqMin,
     ireqNeutral: ireq.ireqNeutral,
@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
       temperature: `${weather.temperature}°F`,
       wind_speed: `${weather.wind_speed} mph`,
       exertion,
+      precipitation: weather.precipitation ?? false,
     },
     ireq: {
       min: ireq.ireqMin,
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
     },
     recommendation: response.recommendation,
     warnings: response.warnings,
-    guidance: getRunningGuidance(tempC, ireq),
+    guidance: getRunningGuidance(tempC, ireq, weather.precipitation ?? false),
   });
 }
 
@@ -173,7 +174,8 @@ export function buildRunningEnsemble(
   categorized: CategorizedGarments,
   ireq: { ireqMin: number; ireqNeutral: number },
   maxClo: number,
-  minEvapPotential: number
+  minEvapPotential: number,
+  precipitation = false
 ): GarmentRow[] {
   const ensemble: GarmentRow[] = [];
 
@@ -220,7 +222,7 @@ export function buildRunningEnsemble(
     }
   }
 
-  if (categorized.shells.length > 0 && (currentClo < ireq.ireqMin || ireq.ireqMin > 1.0)) {
+  if (categorized.shells.length > 0 && (currentClo < ireq.ireqMin || ireq.ireqMin > 1.0 || precipitation)) {
     const torsoShells = sortByBreathability(categorized.shells.filter((s) => s.covers_torso));
     for (const shell of torsoShells) {
       const shellClo = shell.garment_thermal_properties?.rcl_whole_body ?? 0;
@@ -245,7 +247,7 @@ export function buildRunningEnsemble(
   return ensemble;
 }
 
-function getRunningGuidance(tempC: number, ireq: { ireqMin: number; ireqNeutral: number }): string[] {
+function getRunningGuidance(tempC: number, ireq: { ireqMin: number; ireqNeutral: number }, precipitation = false): string[] {
   const guidance: string[] = [];
 
   if (tempC > 0) {
@@ -258,6 +260,10 @@ function getRunningGuidance(tempC: number, ireq: { ireqMin: number; ireqNeutral:
 
   if (ireq.ireqNeutral < 1.0) {
     guidance.push('Avoid over-layering to prevent overheating');
+  }
+
+  if (precipitation) {
+    guidance.push('Wet conditions - wear a water-resistant outer layer');
   }
 
   return guidance;

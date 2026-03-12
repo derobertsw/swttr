@@ -1,11 +1,14 @@
 import { ChevronRight, Pencil } from "lucide-react";
 import ScoreDisplay from "@/components/ScoreDisplay";
 import { cn } from "@/lib/utils";
+import type { PrecipitationType } from "@/types/weather";
 
 interface WeatherHeaderProps {
   temperature: number;
   windspeed: number;
   feelsLike?: number;
+  precipitation?: boolean;
+  precipitationType?: PrecipitationType;
   score?: number;
   totalClo?: number;
   targetRange?: [number, number];
@@ -41,6 +44,8 @@ export function WeatherHeader({
   temperature,
   windspeed,
   feelsLike,
+  precipitation,
+  precipitationType,
   score,
   totalClo,
   targetRange,
@@ -76,6 +81,12 @@ export function WeatherHeader({
               </>
             )}
             <span>Wind {windspeed} mph</span>
+            {precipitation && (
+              <>
+                <span className="opacity-50">·</span>
+                <span className="capitalize">{precipitationType ?? 'Precipitation'}</span>
+              </>
+            )}
           </div>
 
           {temperature < 32 && (

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { PrecipitationType } from "@/types/weather";
 
 function isValidDateString(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -14,6 +15,22 @@ function addDaysToDateString(dateString: string, daysToAdd: number): string {
   const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(date.getUTCDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function decodePrecipitation(weatherCode: number): { precipitation: boolean; precipitationType?: PrecipitationType } {
+  // Rain: drizzle (51-55), freezing drizzle (56-57), rain (61-65), rain showers (80-82), thunderstorms (95-99)
+  if ((weatherCode >= 51 && weatherCode <= 55) || (weatherCode >= 61 && weatherCode <= 65) || (weatherCode >= 80 && weatherCode <= 82) || weatherCode >= 95) {
+    return { precipitation: true, precipitationType: 'rain' };
+  }
+  // Mixed: freezing rain/drizzle (56-57, 66-67)
+  if (weatherCode === 56 || weatherCode === 57 || weatherCode === 66 || weatherCode === 67) {
+    return { precipitation: true, precipitationType: 'mixed' };
+  }
+  // Snow: snow fall (71-77), snow showers (85-86)
+  if ((weatherCode >= 71 && weatherCode <= 77) || weatherCode === 85 || weatherCode === 86) {
+    return { precipitation: true, precipitationType: 'snow' };
+  }
+  return { precipitation: false };
 }
 
 export async function GET(request: NextRequest) {
@@ -131,10 +148,13 @@ export async function GET(request: NextRequest) {
 
       const data = await response.json();
 
+      const precipInfo = decodePrecipitation(data.current.weather_code);
       return NextResponse.json({
         temperature: Math.round(data.current.temperature_2m),
         windSpeed: Math.round(data.current.wind_speed_10m),
         weatherCode: data.current.weather_code,
+        precipitation: precipInfo.precipitation,
+        precipitationType: precipInfo.precipitationType,
         isForecast: false,
       });
     }

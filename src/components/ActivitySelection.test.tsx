@@ -27,7 +27,7 @@ describe("ActivitySelection", () => {
   describe("rendering", () => {
     it("should render the carousel", () => {
       renderSelection();
-      expect(screen.getByRole("region", { name: "" })).toHaveAttribute(
+      expect(screen.getByRole("region", { name: /activity carousel/i })).toHaveAttribute(
         "aria-roledescription",
         "carousel"
       );
@@ -41,12 +41,18 @@ describe("ActivitySelection", () => {
 
     it("should show activity names", () => {
       renderSelection();
-      expect(screen.getByText("Running")).toBeInTheDocument();
-      expect(screen.getByText("Biking")).toBeInTheDocument();
-      expect(screen.getByText("Hiking / Snowshoeing")).toBeInTheDocument();
-      expect(screen.getByText("Backcountry Skiing")).toBeInTheDocument();
-      expect(screen.getByText("Alpine Skiing")).toBeInTheDocument();
-      expect(screen.getByText("XC Skiing")).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /running/i })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /biking/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: /hiking \/ snowshoeing/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: /backcountry skiing/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: /alpine skiing/i })
+      ).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /xc skiing/i })).toBeInTheDocument();
     });
 
     it("should render pagination dots", () => {
@@ -58,7 +64,7 @@ describe("ActivitySelection", () => {
 
     it("should render exertion selector", () => {
       renderSelection();
-      expect(screen.getByRole("radiogroup", { name: /exertion level/i })).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: /effort level/i })).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: /easy/i })).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: /moderate/i })).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: /hard/i })).toBeInTheDocument();
@@ -84,9 +90,9 @@ describe("ActivitySelection", () => {
 
       const slides = screen.getAllByRole("group");
       const bikingSlide = slides[1];
-      const card = within(bikingSlide).getByText("Biking").closest("button");
+      const card = within(bikingSlide).getByRole("radio", { name: /biking/i });
 
-      await user.click(card!);
+      await user.click(card);
 
       expect(mockOnChange).toHaveBeenCalledWith("biking");
     });
@@ -108,7 +114,7 @@ describe("ActivitySelection", () => {
 
       const slides = screen.getAllByRole("group");
       const alpineSlide = slides[4];
-      const card = within(alpineSlide).getByText("Alpine Skiing").closest("button");
+      const card = within(alpineSlide).getByRole("radio", { name: /alpine skiing/i });
 
       expect(card).toHaveClass("scale-110");
     });
@@ -118,7 +124,7 @@ describe("ActivitySelection", () => {
 
       const slides = screen.getAllByRole("group");
       const runningSlide = slides[0];
-      const card = within(runningSlide).getByText("Running").closest("button");
+      const card = within(runningSlide).getByRole("radio", { name: /running/i });
 
       expect(card).toHaveClass("scale-110");
     });

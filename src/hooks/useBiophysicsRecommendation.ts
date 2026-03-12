@@ -11,8 +11,11 @@ import {
   exertionToXcIntensity,
 } from "@/lib/biophysics/exertion";
 import type { UserBodyMetrics } from "@/types/preferences";
+import type { WeatherData } from "@/types/weather";
 import { useAuth } from "@clerk/nextjs";
 import { logWarn } from "@/lib/logger";
+
+type BiophysicsWeather = WeatherData & { humidity?: number };
 
 export interface UseBiophysicsResult {
   data: BiophysicsRecommendation | null;
@@ -20,7 +23,7 @@ export interface UseBiophysicsResult {
   error: Error | null;
   fetch: (
     activity: string,
-    weather: { temperature: number; windSpeed: number; humidity?: number },
+    weather: BiophysicsWeather,
     exertion: ExertionLevel,
     bodyMetrics: UserBodyMetrics
   ) => Promise<BiophysicsRecommendation | null>;
@@ -43,7 +46,7 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
   const fetchBiophysics = useCallback(
     async (
       activity: string,
-      weather: { temperature: number; windSpeed: number; humidity?: number },
+      weather: BiophysicsWeather,
       exertion: ExertionLevel,
       bodyMetrics: UserBodyMetrics
     ): Promise<BiophysicsRecommendation | null> => {
@@ -68,6 +71,8 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
               temperature: weather.temperature,
               wind_speed: weather.windSpeed,
               humidity: weather.humidity ?? 50,
+              precipitation: weather.precipitation,
+              precipitation_type: weather.precipitationType,
             },
             exertion,
             // Backward-compatible alias for routes that still inspect "intensity".
