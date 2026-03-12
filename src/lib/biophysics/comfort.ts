@@ -1,6 +1,7 @@
 export const REGIONAL_DEFICIT_CLO_THRESHOLD = 0.12;
 export const EXTREMITY_DEFICIT_CLO_THRESHOLD = 0.1;
 export const OVERHEAT_BUFFER_CLO = 0.3;
+export const THERMAL_DISPLAY_CLO_EPSILON = 0.05;
 
 export type ThermalRiskType = "comfortable" | "cold" | "overheat";
 export type ThermalRiskSeverity = "moderate" | "high";
@@ -22,8 +23,26 @@ export interface ThermalComfortDecision {
   delta: number;
 }
 
+interface ThermalComfortInput {
+  totalClo: number | undefined;
+  targetRange: [number, number] | undefined;
+  maxRegionalDeficit?: number;
+  maxExtremityDeficit?: number;
+  regionalDeficitThreshold?: number;
+  extremityDeficitThreshold?: number;
+  overheatBufferClo?: number;
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function getRangeWidth(targetRange: [number, number]): number {
+  return Math.max(0.2, targetRange[1] - targetRange[0]);
+}
+
+function getSeverity(delta: number, targetRange: [number, number]): ThermalRiskSeverity {
+  return delta <= getRangeWidth(targetRange) ? "moderate" : "high";
 }
 
 export function getMaxRegionalDeficit(
@@ -53,15 +72,7 @@ export function getMaxExtremityDeficit(
   );
 }
 
-export function evaluateThermalComfort(input: {
-  totalClo: number | undefined;
-  targetRange: [number, number] | undefined;
-  maxRegionalDeficit?: number;
-  maxExtremityDeficit?: number;
-  regionalDeficitThreshold?: number;
-  extremityDeficitThreshold?: number;
-  overheatBufferClo?: number;
-}): ThermalComfortDecision | null {
+function evaluateThermalComfortScoreState(input: ThermalComfortInput): ThermalComfortDecision | null {
   const {
     totalClo,
     targetRange,
@@ -75,7 +86,6 @@ export function evaluateThermalComfort(input: {
   if (totalClo === undefined || !targetRange) return null;
 
   const [targetMin, targetMax] = targetRange;
-  const rangeWidth = Math.max(0.2, targetMax - targetMin);
 
   const localDeficit = Math.max(maxRegionalDeficit, maxExtremityDeficit);
   const localThreshold = maxRegionalDeficit >= maxExtremityDeficit
@@ -84,7 +94,7 @@ export function evaluateThermalComfort(input: {
   if (localDeficit > localThreshold) {
     return {
       riskType: "cold",
-      severity: localDeficit <= rangeWidth ? "moderate" : "high",
+      severity: getSeverity(localDeficit, targetRange),
       delta: localDeficit,
     };
   }
@@ -93,7 +103,7 @@ export function evaluateThermalComfort(input: {
     const deficit = targetMin - totalClo;
     return {
       riskType: "cold",
-      severity: deficit <= rangeWidth ? "moderate" : "high",
+      severity: getSeverity(deficit, targetRange),
       delta: deficit,
     };
   }
@@ -102,7 +112,7 @@ export function evaluateThermalComfort(input: {
     const excess = totalClo - targetMax;
     return {
       riskType: "overheat",
-      severity: excess <= rangeWidth ? "moderate" : "high",
+      severity: getSeverity(excess, targetRange),
       delta: excess,
     };
   }
@@ -114,15 +124,59 @@ export function evaluateThermalComfort(input: {
   };
 }
 
-export function calculateThermalComfortScore(input: {
-  totalClo: number | undefined;
-  targetRange: [number, number] | undefined;
-  maxRegionalDeficit?: number;
-  maxExtremityDeficit?: number;
-  regionalDeficitThreshold?: number;
-  extremityDeficitThreshold?: number;
-  overheatBufferClo?: number;
-}): number | null {
+export function evaluateThermalComfort(input: ThermalComfortInput): ThermalComfortDecision | null {
+  const {
+    totalClo,
+    targetRange,
+    maxRegionalDeficit = 0,
+    maxExtremityDeficit = 0,
+    overheatBufferClo = OVERHEAT_BUFFER_CLO,
+  } = input;
+
+  if (totalClo === undefined || !targetRange) return null;
+
+  const [targetMin, targetMax] = targetRange;
+  const localDeficit = Math.max(maxRegionalDeficit, maxExtremityDeficit);
+  const wholeBodyDeficit = targetMin - totalClo;
+  const wholeBodyExcess = totalClo - targetMax;
+
+  if (wholeBodyDeficit > THERMAL_DISPLAY_CLO_EPSILON) {
+    const delta = Math.max(
+      wholeBodyDeficit,
+      localDeficit > THERMAL_DISPLAY_CLO_EPSILON ? localDeficit : 0
+    );
+
+    return {
+      riskType: "cold",
+      severity: getSeverity(delta, targetRange),
+      delta,
+    };
+  }
+
+  if (wholeBodyExcess > overheatBufferClo + THERMAL_DISPLAY_CLO_EPSILON) {
+    return {
+      riskType: "overheat",
+      severity: getSeverity(wholeBodyExcess, targetRange),
+      delta: wholeBodyExcess,
+    };
+  }
+
+  if (localDeficit > THERMAL_DISPLAY_CLO_EPSILON) {
+    return {
+      riskType: "cold",
+      severity: getSeverity(localDeficit, targetRange),
+      delta: localDeficit,
+    };
+  }
+
+  return {
+    riskType: "comfortable",
+    severity: "moderate",
+    delta: 0,
+  };
+}
+
+export function calculateThermalComfortScore(input: ThermalComfortInput): number | null {
   const {
     totalClo,
     targetRange,
@@ -135,7 +189,7 @@ export function calculateThermalComfortScore(input: {
 
   if (totalClo === undefined || !targetRange) return null;
 
-  const decision = evaluateThermalComfort({
+  const decision = evaluateThermalComfortScoreState({
     totalClo,
     targetRange,
     maxRegionalDeficit,
