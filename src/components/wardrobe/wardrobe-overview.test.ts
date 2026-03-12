@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { WardrobeItem } from "@/types/wardrobe";
 import { buildWardrobeOverview } from "./wardrobe-overview";
+import { formatBodyPartLabel } from "./wardrobe-utils";
 
 function createWardrobeItem(id: string): WardrobeItem {
   return {
@@ -18,6 +19,10 @@ function createWardrobeItem(id: string): WardrobeItem {
 }
 
 describe("buildWardrobeOverview", () => {
+  it("formats canonical body-part keys for display", () => {
+    expect(formatBodyPartLabel("headNeck")).toBe("Head + Neck");
+  });
+
   it("returns starter guidance for an empty wardrobe", () => {
     const overview = buildWardrobeOverview({
       wardrobeItems: [],

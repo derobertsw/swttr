@@ -87,6 +87,7 @@ export const BODY_PART_LABELS: Record<string, string> = {
   torso: "Torso",
   legs: "Legs",
   hands: "Hands",
+  headNeck: "Head + Neck",
   "head & neck": "Head + Neck",
 };
 

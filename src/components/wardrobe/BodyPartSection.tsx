@@ -34,6 +34,7 @@ export function BodyPartSection({
   const EmptyIcon = getEmptyStateIcon(part);
   const label = formatBodyPartLabel(part);
   const sectionCount = items.length + disabledItems.length;
+  const pausedPanelId = `${sectionId ?? `paused-items-${part.replace(/[^a-z0-9]+/gi, "-")}`}-panel`;
 
   return (
     <section id={sectionId} className="flex scroll-mt-24 flex-col gap-2">
@@ -112,6 +113,8 @@ export function BodyPartSection({
               <button
                 type="button"
                 onClick={onToggleCollapsed}
+                aria-expanded={!isCollapsed}
+                aria-controls={pausedPanelId}
                 className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-white/56 transition-colors hover:bg-white/6 hover:text-white/76"
               >
                 <span className="flex items-center gap-1.5">
@@ -128,9 +131,13 @@ export function BodyPartSection({
                   {disabledItems.length}
                 </span>
               </button>
-              {!isCollapsed && (
-                <div className="mt-2 flex flex-col gap-2 border-l border-dashed border-white/12 pl-2">
-                  {disabledItems.map((item) => (
+              <div
+                id={pausedPanelId}
+                hidden={isCollapsed}
+                className="mt-2 flex flex-col gap-2 border-l border-dashed border-white/12 pl-2"
+              >
+                {!isCollapsed &&
+                  disabledItems.map((item) => (
                     <WardrobeItemCard
                       key={item.id}
                       item={item}
@@ -140,8 +147,7 @@ export function BodyPartSection({
                       onClick={onItemClick ? () => onItemClick(item) : undefined}
                     />
                   ))}
-                </div>
-              )}
+              </div>
             </div>
           )}
         </>

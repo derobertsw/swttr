@@ -180,7 +180,7 @@ export default function Wardrobe() {
                       Start with the pieces you use most often. Even a few key layers make recommendations far more useful.
                     </p>
                     <p className="mt-3 text-xs uppercase tracking-[0.16em] text-white/42">
-                      Tip: tap a zone above to jump straight into that part of the catalog.
+                      Tip: use Browse catalog or Custom item above to add your first piece.
                     </p>
                   </div>
                 ) : (
