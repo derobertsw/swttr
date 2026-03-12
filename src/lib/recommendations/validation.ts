@@ -5,13 +5,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
 import { fahrenheitToCelsius, mphToMs } from '@/lib/biophysics/ireq';
 import { getAuthUserId } from '@/lib/auth';
+import type { PrecipitationType } from '@/types/weather';
 
 export interface WeatherInput {
   temperature: number;
   wind_speed: number;
   humidity?: number;
   precipitation?: boolean;
-  precipitation_type?: 'rain' | 'snow' | 'mixed';
+  precipitation_type?: PrecipitationType;
 }
 
 export interface ValidatedRequest {

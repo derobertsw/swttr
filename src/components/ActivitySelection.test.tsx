@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import * as React from "react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import ActivitySelection from "./ActivitySelection";
+import type { ExertionLevel } from "@/lib/biophysics/exertion";
 
 // Mock next/navigation for components that use PageLayout -> AppNavigation
 vi.mock("next/navigation", () => ({
@@ -11,6 +13,36 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("ActivitySelection", () => {
+  const ControlledSelection = ({
+    value = "running",
+    exertion = "moderate",
+    onChange = vi.fn(),
+    onExertionChange = vi.fn(),
+  }: {
+    value?: string;
+    exertion?: ExertionLevel;
+    onChange?: (value: string) => void;
+    onExertionChange?: (value: ExertionLevel) => void;
+  }) => {
+    const [selectedValue, setSelectedValue] = React.useState(value);
+    const [selectedExertion, setSelectedExertion] = React.useState(exertion);
+
+    return (
+      <ActivitySelection
+        value={selectedValue}
+        onChange={(nextValue) => {
+          setSelectedValue(nextValue);
+          onChange(nextValue);
+        }}
+        exertion={selectedExertion}
+        onExertionChange={(nextExertion) => {
+          setSelectedExertion(nextExertion);
+          onExertionChange(nextExertion);
+        }}
+      />
+    );
+  };
+
   const renderSelection = (
     overrides?: Partial<ComponentProps<typeof ActivitySelection>>
   ) =>
@@ -27,7 +59,7 @@ describe("ActivitySelection", () => {
   describe("rendering", () => {
     it("should render the carousel", () => {
       renderSelection();
-      expect(screen.getByRole("region", { name: "" })).toHaveAttribute(
+      expect(screen.getByRole("region", { name: /activity carousel/i })).toHaveAttribute(
         "aria-roledescription",
         "carousel"
       );
@@ -41,24 +73,32 @@ describe("ActivitySelection", () => {
 
     it("should show activity names", () => {
       renderSelection();
-      expect(screen.getByText("Running")).toBeInTheDocument();
-      expect(screen.getByText("Biking")).toBeInTheDocument();
-      expect(screen.getByText("Hiking / Snowshoeing")).toBeInTheDocument();
-      expect(screen.getByText("Backcountry Skiing")).toBeInTheDocument();
-      expect(screen.getByText("Alpine Skiing")).toBeInTheDocument();
-      expect(screen.getByText("XC Skiing")).toBeInTheDocument();
+      const activityGroup = screen.getByRole("radiogroup", { name: /^activity$/i });
+      expect(within(activityGroup).getByRole("radio", { name: /running/i })).toBeInTheDocument();
+      expect(within(activityGroup).getByRole("radio", { name: /biking/i })).toBeInTheDocument();
+      expect(
+        within(activityGroup).getByRole("radio", { name: /hiking \/ snowshoeing/i })
+      ).toBeInTheDocument();
+      expect(
+        within(activityGroup).getByRole("radio", { name: /backcountry skiing/i })
+      ).toBeInTheDocument();
+      expect(
+        within(activityGroup).getByRole("radio", { name: /alpine skiing/i })
+      ).toBeInTheDocument();
+      expect(within(activityGroup).getByRole("radio", { name: /xc skiing/i })).toBeInTheDocument();
     });
 
     it("should render pagination dots", () => {
       renderSelection();
-      expect(screen.getByRole("button", { name: /select running/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /select biking/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /select alpine skiing/i })).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: /activity shortcuts/i })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /select running/i })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /select biking/i })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /select alpine skiing/i })).toBeInTheDocument();
     });
 
     it("should render exertion selector", () => {
       renderSelection();
-      expect(screen.getByRole("radiogroup", { name: /exertion level/i })).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: /effort level/i })).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: /easy/i })).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: /moderate/i })).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: /hard/i })).toBeInTheDocument();
@@ -67,14 +107,22 @@ describe("ActivitySelection", () => {
   });
 
   describe("interaction", () => {
+    it("should not call onChange on initial render", () => {
+      const mockOnChange = vi.fn();
+      renderSelection({ onChange: mockOnChange });
+
+      expect(mockOnChange).not.toHaveBeenCalled();
+    });
+
     it("should call onChange when a pagination dot is clicked", async () => {
       const mockOnChange = vi.fn();
       const user = userEvent.setup();
       renderSelection({ onChange: mockOnChange });
 
-      await user.click(screen.getByRole("button", { name: /select biking/i }));
+      await user.click(screen.getByRole("radio", { name: /select biking/i }));
 
       expect(mockOnChange).toHaveBeenCalledWith("biking");
+      expect(mockOnChange).toHaveBeenCalledTimes(1);
     });
 
     it("should call onChange when clicking on an activity card", async () => {
@@ -84,11 +132,12 @@ describe("ActivitySelection", () => {
 
       const slides = screen.getAllByRole("group");
       const bikingSlide = slides[1];
-      const card = within(bikingSlide).getByText("Biking").closest("button");
+      const card = within(bikingSlide).getByRole("radio", { name: /biking/i });
 
-      await user.click(card!);
+      await user.click(card);
 
       expect(mockOnChange).toHaveBeenCalledWith("biking");
+      expect(mockOnChange).toHaveBeenCalledTimes(1);
     });
 
     it("should call onExertionChange when exertion option is clicked", async () => {
@@ -100,6 +149,80 @@ describe("ActivitySelection", () => {
 
       expect(mockOnExertionChange).toHaveBeenCalledWith("hard");
     });
+
+    it("should sync to an updated value prop without echoing onChange", async () => {
+      const mockOnChange = vi.fn();
+      const { rerender } = renderSelection({ onChange: mockOnChange });
+
+      rerender(
+        <ActivitySelection
+          value="biking"
+          onChange={mockOnChange}
+          exertion="moderate"
+          onExertionChange={vi.fn()}
+        />
+      );
+
+      await waitFor(() => {
+        const activityGroup = screen.getByRole("radiogroup", { name: /^activity$/i });
+        expect(
+          within(activityGroup).getByRole("radio", { name: /biking/i })
+        ).toHaveAttribute("aria-checked", "true");
+      });
+      expect(mockOnChange).not.toHaveBeenCalled();
+    });
+
+    it("should move focus to the newly selected activity when using arrow keys", async () => {
+      const user = userEvent.setup();
+      renderSelection();
+
+      const activityGroup = screen.getByRole("radiogroup", { name: /^activity$/i });
+      const runningCard = within(activityGroup).getByRole("radio", { name: /running/i });
+
+      await user.tab();
+      expect(runningCard).toHaveFocus();
+
+      await user.keyboard("{ArrowRight}");
+
+      const bikingCard = within(activityGroup).getByRole("radio", { name: /biking/i });
+      expect(bikingCard).toHaveAttribute("aria-checked", "true");
+      expect(bikingCard).toHaveFocus();
+    });
+
+    it("should move focus to the newly selected shortcut when using arrow keys", async () => {
+      const user = userEvent.setup();
+      renderSelection();
+
+      const runningShortcut = screen.getByRole("radio", { name: /select running/i });
+      runningShortcut.focus();
+      expect(runningShortcut).toHaveFocus();
+
+      await user.keyboard("{ArrowRight}");
+
+      const bikingShortcut = screen.getByRole("radio", { name: /select biking/i });
+      expect(bikingShortcut).toHaveAttribute("aria-checked", "true");
+      expect(bikingShortcut).toHaveFocus();
+    });
+
+    it("should move focus through exertion options with arrow keys", async () => {
+      const user = userEvent.setup();
+      const mockOnExertionChange = vi.fn();
+
+      render(
+        <ControlledSelection onExertionChange={mockOnExertionChange} />
+      );
+
+      const moderateButton = screen.getByRole("radio", { name: /moderate/i });
+      moderateButton.focus();
+      expect(moderateButton).toHaveFocus();
+
+      await user.keyboard("{ArrowRight}");
+
+      const hardButton = screen.getByRole("radio", { name: /hard/i });
+      expect(hardButton).toHaveAttribute("aria-checked", "true");
+      expect(hardButton).toHaveFocus();
+      expect(mockOnExertionChange).toHaveBeenCalledWith("hard");
+    });
   });
 
   describe("initial value", () => {
@@ -108,9 +231,9 @@ describe("ActivitySelection", () => {
 
       const slides = screen.getAllByRole("group");
       const alpineSlide = slides[4];
-      const card = within(alpineSlide).getByText("Alpine Skiing").closest("button");
+      const card = within(alpineSlide).getByRole("radio", { name: /alpine skiing/i });
 
-      expect(card).toHaveClass("scale-110");
+      expect(card).toHaveAttribute("aria-checked", "true");
     });
 
     it("should highlight first activity when value is running", () => {
@@ -118,9 +241,9 @@ describe("ActivitySelection", () => {
 
       const slides = screen.getAllByRole("group");
       const runningSlide = slides[0];
-      const card = within(runningSlide).getByText("Running").closest("button");
+      const card = within(runningSlide).getByRole("radio", { name: /running/i });
 
-      expect(card).toHaveClass("scale-110");
+      expect(card).toHaveAttribute("aria-checked", "true");
     });
   });
 });

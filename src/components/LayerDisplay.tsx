@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, Backpack, Check, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { Recommendation } from "@/types/recommendations";
+import type { PrecipitationType } from "@/types/weather";
 import {
   BiophysicsRecommendation,
   RecommendedHandwear,
@@ -57,6 +58,8 @@ interface LayerDisplayProps {
   recommendation: Recommendation | null;
   temperature: number;
   windspeed: number;
+  precipitation?: boolean;
+  precipitationType?: PrecipitationType;
   itemMappings?: Map<string, string>;
   biophysicsData?: BiophysicsRecommendation | null;
   onReset?: () => void;
@@ -328,6 +331,8 @@ const LayerDisplay = ({
   recommendation,
   temperature,
   windspeed,
+  precipitation,
+  precipitationType,
   itemMappings,
   biophysicsData,
   onReset,
@@ -944,6 +949,8 @@ const LayerDisplay = ({
           <WeatherHeader
             temperature={temperature}
             windspeed={windspeed}
+            precipitation={precipitation}
+            precipitationType={precipitationType}
             score={showDualComfortGauges ? undefined : thermalComfortScore}
             totalClo={effectiveTotalClo}
             targetRange={biophysicsData?.ireq?.target_range}
@@ -965,6 +972,8 @@ const LayerDisplay = ({
         <WeatherHeader
           temperature={temperature}
           windspeed={windspeed}
+          precipitation={precipitation}
+          precipitationType={precipitationType}
           score={showDualComfortGauges ? undefined : thermalComfortScore}
           totalClo={effectiveTotalClo}
           targetRange={biophysicsData?.ireq?.target_range}

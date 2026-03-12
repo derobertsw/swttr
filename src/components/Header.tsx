@@ -18,12 +18,14 @@ import {
   SheetClose,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface HeaderProps {
   onLogoClick?: () => void;
+  variant?: "default" | "compact";
 }
 
-const Header = ({ onLogoClick }: HeaderProps) => {
+const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const {
@@ -64,11 +66,16 @@ const Header = ({ onLogoClick }: HeaderProps) => {
   };
 
   return (
-    <header className="flex w-full items-center justify-between gap-4">
+    <header className={cn(
+      "flex w-full items-center justify-between",
+      variant === "compact" ? "gap-3" : "gap-4"
+    )}>
       <div className="flex items-center gap-2">
         {/* Mobile: show logo */}
         <Link href="/" onClick={onLogoClick} className="md:hidden">
-          <h1 className="site-header">SWTTR</h1>
+          <h1 className={cn("site-header", variant === "compact" && "site-header--compact")}>
+            SWTTR
+          </h1>
         </Link>
       </div>
 
@@ -96,9 +103,12 @@ const Header = ({ onLogoClick }: HeaderProps) => {
             <Button
               variant="ghost"
               size="icon"
-              className="h-11 w-11 rounded-full text-white/95 hover:bg-white/10"
+              className={cn(
+                "rounded-full text-white/95 hover:bg-white/10",
+                variant === "compact" ? "h-10 w-10" : "h-11 w-11"
+              )}
             >
-              <Menu className="size-5 text-white/95" />
+              <Menu className={cn("text-white/95", variant === "compact" ? "size-[18px]" : "size-5")} />
               <span className="sr-only">Open menu</span>
             </Button>
           </SheetTrigger>

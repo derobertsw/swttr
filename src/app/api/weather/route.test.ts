@@ -74,6 +74,8 @@ describe("Weather API Route", () => {
       expect(data.temperature).toBe(33); // Rounded
       expect(data.windSpeed).toBe(10); // Rounded
       expect(data.weatherCode).toBe(1);
+      expect(data.precipitation).toBe(false);
+      expect(data.precipitationType).toBeUndefined();
       expect(data.isForecast).toBe(false);
     });
 
@@ -106,6 +108,9 @@ describe("Weather API Route", () => {
         expect.stringContaining("current=")
       );
       expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("weather_code")
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("temperature_unit=fahrenheit")
       );
       expect(global.fetch).toHaveBeenCalledWith(
@@ -128,6 +133,7 @@ describe("Weather API Route", () => {
               ],
               temperature_2m: [28, 30, 32],
               wind_speed_10m: [5, 7, 10],
+              weather_code: [0, 61, 71],
             },
           }),
       });
@@ -142,6 +148,9 @@ describe("Weather API Route", () => {
       expect(response.status).toBe(200);
       expect(data.temperature).toBe(32);
       expect(data.windSpeed).toBe(10);
+      expect(data.weatherCode).toBe(71);
+      expect(data.precipitation).toBe(true);
+      expect(data.precipitationType).toBe("snow");
       expect(data.isForecast).toBe(true);
     });
 
@@ -154,6 +163,7 @@ describe("Weather API Route", () => {
               time: ["2024-01-15T14:00"],
               temperature_2m: [32],
               wind_speed_10m: [10],
+              weather_code: [61],
             },
           }),
       });
@@ -168,6 +178,9 @@ describe("Weather API Route", () => {
         expect.stringContaining("hourly=")
       );
       expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("weather_code")
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("start_date=2024-01-15")
       );
       expect(global.fetch).toHaveBeenCalledWith(
@@ -175,31 +188,42 @@ describe("Weather API Route", () => {
       );
     });
 
-    it("should fall back to noon when requested hour not found", async () => {
+    it("should fall back to the default forecast slot when requested hour not found", async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: () =>
           Promise.resolve({
-            hourly: {
-              time: Array.from({ length: 24 }, (_, i) =>
-                `2024-01-15T${String(i).padStart(2, "0")}:00`
-              ),
-              temperature_2m: Array.from({ length: 24 }, (_, i) => 20 + i),
-              wind_speed_10m: Array.from({ length: 24 }, (_, i) => i),
-            },
+            hourly: (() => {
+              const hours = Array.from({ length: 24 }, (_, i) => ({
+                time: `2024-01-15T${String(i).padStart(2, "0")}:00`,
+                temperature: 20 + (i < 11 ? i : i - 1),
+                windSpeed: i < 11 ? i : i - 1,
+                weatherCode: i === 13 ? 61 : 0,
+              })).filter(({ time }) => time !== "2024-01-15T11:00");
+
+              return {
+                time: hours.map(({ time }) => time),
+                temperature_2m: hours.map(({ temperature }) => temperature),
+                wind_speed_10m: hours.map(({ windSpeed }) => windSpeed),
+                weather_code: hours.map(({ weatherCode }) => weatherCode),
+              };
+            })(),
           }),
       });
 
       const request = new NextRequest(
-        "http://localhost:3000/api/weather?lat=40.7128&lon=-74.006&datetime=2024-01-15T25:00"
+        "http://localhost:3000/api/weather?lat=40.7128&lon=-74.006&datetime=2024-01-15T11:00"
       );
 
       const response = await GET(request);
       const data = await response.json();
 
-      // Should use index 12 (noon) as fallback
+      // Should use fallback index 12
       expect(data.temperature).toBe(32); // 20 + 12
       expect(data.windSpeed).toBe(12);
+      expect(data.weatherCode).toBe(61);
+      expect(data.precipitation).toBe(true);
+      expect(data.precipitationType).toBe("rain");
       expect(data.isForecast).toBe(true);
     });
   });

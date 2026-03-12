@@ -4,6 +4,15 @@ import type { WeatherData, WeatherResult } from "@/types/weather";
 
 export type { WeatherData, WeatherResult };
 
+function parseWeatherResponse(data: Record<string, unknown>): WeatherData {
+  return {
+    temperature: data.temperature as number,
+    windSpeed: data.windSpeed as number,
+    precipitation: data.precipitation as boolean | undefined,
+    precipitationType: data.precipitationType as WeatherData["precipitationType"],
+  };
+}
+
 export function fetchCurrentWeather(): Promise<WeatherResult> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
@@ -25,10 +34,7 @@ export function fetchCurrentWeather(): Promise<WeatherResult> {
           }
 
           const data = await response.json();
-          resolve({
-            data: { temperature: data.temperature, windSpeed: data.windSpeed },
-            locationDenied: false,
-          });
+          resolve({ data: parseWeatherResponse(data), locationDenied: false });
         } catch {
           resolve({ data: null, locationDenied: false });
         }
@@ -55,7 +61,7 @@ export async function fetchWeatherByCoords(
     }
 
     const data = await response.json();
-    return { temperature: data.temperature, windSpeed: data.windSpeed };
+    return parseWeatherResponse(data);
   } catch {
     return null;
   }

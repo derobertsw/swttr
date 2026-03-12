@@ -12,6 +12,7 @@ import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useBiophysicsRecommendation } from "@/hooks/useBiophysicsRecommendation";
 import { fetchCurrentWeather, fetchWeatherByCoords } from "@/hooks/useCurrentWeather";
+import type { WeatherData, PrecipitationType } from "@/types/weather";
 import { BiophysicsRecommendation } from "@/types/biophysics";
 import { MultiDayLayerPlan } from "@/types/plan";
 import { logWarn } from "@/lib/logger";
@@ -32,6 +33,8 @@ type InputMode = "manual" | "planAhead";
 interface GearUpState {
   temperature: number;
   windspeed: number;
+  precipitation: boolean;
+  precipitationType?: PrecipitationType;
   inputMode: InputMode;
   date: Date | undefined;
   time: string;
@@ -55,7 +58,7 @@ type GearUpAction =
   | { type: "SET_DURATION_DAYS"; durationDays: number }
   | { type: "LOCATION_DENIED" }
   | { type: "SUBMIT_START" }
-  | { type: "SUBMIT_SUCCESS"; recommendation: Recommendation | null; biophysicsData: BiophysicsRecommendation | null; temperature: number; windspeed: number }
+  | { type: "SUBMIT_SUCCESS"; recommendation: Recommendation | null; biophysicsData: BiophysicsRecommendation | null; temperature: number; windspeed: number; precipitation?: boolean; precipitationType?: 'rain' | 'snow' | 'mixed' }
   | { type: "SUBMIT_PLAN_SUCCESS"; plan: MultiDayLayerPlan; recommendation: Recommendation | null; temperature: number; windspeed: number }
   | { type: "SUBMIT_ERROR" }
   | { type: "RESET"; defaultActivity?: string };
@@ -64,6 +67,8 @@ function createInitialState(inputMode: InputMode): GearUpState {
   return {
     temperature: 50,
     windspeed: 10,
+    precipitation: false,
+    precipitationType: undefined,
     inputMode,
     date: undefined,
     time: "12:00",
@@ -104,6 +109,8 @@ function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpState {
         loading: false,
         temperature: action.temperature,
         windspeed: action.windspeed,
+        precipitation: action.precipitation ?? false,
+        precipitationType: action.precipitationType,
         recommendation: action.recommendation,
         biophysicsData: action.biophysicsData,
         multiDayPlan: null,
@@ -176,6 +183,8 @@ interface SubmitResult {
   biophysicsData: BiophysicsRecommendation | null;
   temperature: number;
   windspeed: number;
+  precipitation?: boolean;
+  precipitationType?: PrecipitationType;
 }
 
 interface PlanSubmitResult {
@@ -248,18 +257,15 @@ async function submitLocationDenied(
 
   if (weather) {
     const layers = getRecommendation(weather.temperature, activity, sensitivity);
-    const bioData = await biophysics.fetch(
-      activity,
-      { temperature: weather.temperature, windSpeed: weather.windSpeed },
-      exertion,
-      bodyMetrics
-    );
+    const bioData = await biophysics.fetch(activity, weather, exertion, bodyMetrics);
 
     return {
       recommendation: layers,
       biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
       temperature: weather.temperature,
       windspeed: weather.windSpeed,
+      precipitation: weather.precipitation,
+      precipitationType: weather.precipitationType,
     };
   }
   return null;
@@ -275,20 +281,18 @@ async function submitCurrentLocation(
   const result = await fetchCurrentWeather();
 
   if (result.data) {
-    const layers = getRecommendation(result.data.temperature, activity, sensitivity);
-    const bioData = await biophysics.fetch(
-      activity,
-      { temperature: result.data.temperature, windSpeed: result.data.windSpeed },
-      exertion,
-      bodyMetrics
-    );
+    const weather = result.data;
+    const layers = getRecommendation(weather.temperature, activity, sensitivity);
+    const bioData = await biophysics.fetch(activity, weather, exertion, bodyMetrics);
 
     return {
       result: {
         recommendation: layers,
         biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
-        temperature: result.data.temperature,
-        windspeed: result.data.windSpeed,
+        temperature: weather.temperature,
+        windspeed: weather.windSpeed,
+        precipitation: weather.precipitation,
+        precipitationType: weather.precipitationType,
       },
     };
   } else if (result.locationDenied) {
@@ -496,16 +500,15 @@ export function useGearUp() {
           const weather = await fetchWeatherByCoords(coords.latitude, coords.longitude);
           if (weather) {
             const layers = getRecommendation(weather.temperature, activity, sensitivity);
-            const bioData = await biophysics.fetch(activity, {
-              temperature: weather.temperature,
-              windSpeed: weather.windSpeed,
-            }, exertion, bodyMetrics);
+            const bioData = await biophysics.fetch(activity, weather, exertion, bodyMetrics);
             dispatch({
               type: "SUBMIT_SUCCESS",
               recommendation: layers,
               biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
               temperature: weather.temperature,
               windspeed: weather.windSpeed,
+              precipitation: weather.precipitation,
+              precipitationType: weather.precipitationType,
             });
           } else {
             dispatch({ type: "LOCATION_DENIED" });
@@ -554,15 +557,10 @@ export function useGearUp() {
         : `/api/weather?lat=${latitude}&lon=${longitude}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch weather");
-      const weather = await response.json() as { temperature: number; windSpeed: number };
+      const weather = await response.json() as WeatherData;
 
       const layers = getRecommendation(weather.temperature, activity, sensitivity);
-      const bioData = await biophysics.fetch(
-        activity,
-        { temperature: weather.temperature, windSpeed: weather.windSpeed },
-        exertion,
-        bodyMetrics
-      );
+      const bioData = await biophysics.fetch(activity, weather, exertion, bodyMetrics);
 
       dispatch({
         type: "SUBMIT_SUCCESS",
@@ -570,6 +568,8 @@ export function useGearUp() {
         biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
         temperature: weather.temperature,
         windspeed: weather.windSpeed,
+        precipitation: weather.precipitation,
+        precipitationType: weather.precipitationType,
       });
     } catch (error) {
       toast.error("Failed to update weather");
@@ -583,12 +583,13 @@ export function useGearUp() {
     dispatch({ type: "SUBMIT_START" });
     try {
       const layers = getRecommendation(state.temperature, newActivity, sensitivity);
-      const bioData = await biophysics.fetch(
-        newActivity,
-        { temperature: state.temperature, windSpeed: state.windspeed },
-        exertion,
-        bodyMetrics
-      );
+      const currentWeather: WeatherData = {
+        temperature: state.temperature,
+        windSpeed: state.windspeed,
+        precipitation: state.precipitation,
+        precipitationType: state.precipitationType,
+      };
+      const bioData = await biophysics.fetch(newActivity, currentWeather, exertion, bodyMetrics);
 
       dispatch({
         type: "SUBMIT_SUCCESS",
@@ -596,13 +597,15 @@ export function useGearUp() {
         biophysicsData: normalizeBiophysicsForActivity(newActivity, bioData),
         temperature: state.temperature,
         windspeed: state.windspeed,
+        precipitation: state.precipitation,
+        precipitationType: state.precipitationType,
       });
     } catch (error) {
       toast.error("Failed to update activity");
       logWarn("useGearUp.handleActivityChange", error);
       dispatch({ type: "SUBMIT_ERROR" });
     }
-  }, [setActivity, state.temperature, state.windspeed, sensitivity, biophysics, exertion, bodyMetrics]);
+  }, [setActivity, state.temperature, state.windspeed, state.precipitation, state.precipitationType, sensitivity, biophysics, exertion, bodyMetrics]);
 
   const handleGoNow = useCallback(async () => {
     if (!activity) {
@@ -648,6 +651,8 @@ export function useGearUp() {
     setTemperature,
     windspeed: state.windspeed,
     setWindspeed,
+    precipitation: state.precipitation,
+    precipitationType: state.precipitationType,
     recommendation: state.recommendation,
     showResults: state.showResults,
     showSliders: state.showSliders,

@@ -21,6 +21,8 @@ const HomeContent = () => {
     setExertion,
     temperature,
     windspeed,
+    precipitation,
+    precipitationType,
     recommendation,
     showResults,
     inputMode,
@@ -44,19 +46,21 @@ const HomeContent = () => {
   const { itemMappings } = useItemMappings();
 
   return (
-    <PageLayout onLogoClick={resetToInitialState}>
+    <PageLayout onLogoClick={resetToInitialState} chromeVariant="compact">
       <div
         key={showResults ? "results" : "form"}
         className="flex w-full flex-col items-center gap-6 animate-in fade-in duration-300 sm:gap-7"
       >
         {!showResults ? (
           <>
-            <p className="mb-1 text-center text-[12px] font-semibold uppercase tracking-[0.2em] text-white/70">
-              1. Activity
-            </p>
-            <p className="mb-3 text-center text-[1.95rem] font-semibold leading-tight text-white/95 tracking-[-0.01em]">
-              Choose your trip activity
-            </p>
+            <div className="mb-1 flex max-w-md flex-col items-center gap-2 text-center">
+              <p className="text-[1.75rem] font-semibold leading-tight tracking-[-0.01em] text-white/95 sm:text-[1.95rem]">
+                Pick your activity
+              </p>
+              <p className="max-w-[24rem] text-[0.95rem] leading-relaxed text-white/64">
+                This sets your layering baseline.
+              </p>
+            </div>
             {activityInitializing ? (
               <div className="mx-auto w-full max-w-md">
                 <div className="mb-2 flex items-center justify-between px-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
@@ -115,12 +119,6 @@ const HomeContent = () => {
                 onDismiss={locationSearch.dismiss}
               />
             ) : null}
-            <p className="mt-4 text-center text-base text-white/80 sm:text-lg">
-              Recommendations update from your activity, exertion, and start time.
-            </p>
-            <p className="mb-4 text-center text-sm text-white/55">
-              Built on thermal science
-            </p>
           </>
         ) : inputMode === "planAhead" && multiDayPlan ? (
           <MultiDayPlanDisplay
@@ -134,6 +132,8 @@ const HomeContent = () => {
             recommendation={recommendation}
             temperature={temperature}
             windspeed={windspeed}
+            precipitation={precipitation}
+            precipitationType={precipitationType}
             itemMappings={itemMappings}
             biophysicsData={biophysicsData}
             onReset={resetToInitialState}
@@ -148,7 +148,7 @@ const HomeContent = () => {
 };
 
 const HomeLoading = () => (
-  <PageLayout>
+  <PageLayout chromeVariant="compact">
     <div className="mx-auto w-full max-w-md">
       <div className="flex justify-center gap-4 py-6">
         <Skeleton className="h-24 w-24 rounded-xl" />
