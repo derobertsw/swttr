@@ -50,7 +50,7 @@ const ActivitySelection = ({
       const index = api.selectedScrollSnap();
       setCurrent(index);
 
-      if (pendingInitialSelectRef.current && index === (initialIndex >= 0 ? initialIndex : 0)) {
+      if (pendingInitialSelectRef.current && initialIndex >= 0 && index === initialIndex) {
         pendingInitialSelectRef.current = false;
         return;
       }
@@ -65,21 +65,10 @@ const ActivitySelection = ({
       api.scrollTo(initialIndex, true);
     }
 
-    setCurrent(api.selectedScrollSnap());
-
     return () => {
       api.off("select", onSelect);
     };
   }, [api, initialIndex]);
-
-  React.useEffect(() => {
-    if (!api) return;
-    const onFocus = () => {
-      api.scrollTo(current);
-    };
-    window.addEventListener("focusActivityCarousel", onFocus);
-    return () => window.removeEventListener("focusActivityCarousel", onFocus);
-  }, [api, current]);
 
   return (
     <div className="mx-auto w-full max-w-[420px]">
@@ -163,14 +152,30 @@ const ActivitySelection = ({
           </CarouselContent>
         </Carousel>
       </div>
-      <div className="mt-1.5 flex justify-center gap-2">
+      <div
+        className="mt-1.5 flex justify-center gap-2"
+        role="radiogroup"
+        aria-label="Activity shortcuts"
+      >
         {ACTIVITIES.map((activity, index) => (
           <button
             key={activity.value}
             type="button"
+            role="radio"
+            aria-checked={index === current}
+            tabIndex={index === current ? 0 : -1}
             onClick={() => api?.scrollTo(index)}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowRight") {
+                event.preventDefault();
+                api?.scrollNext();
+              }
+              if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                api?.scrollPrev();
+              }
+            }}
             aria-label={`Select ${activity.name}`}
-            aria-pressed={index === current}
             className={cn(
               "h-2 rounded-full transition-all duration-300",
               index === current

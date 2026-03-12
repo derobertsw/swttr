@@ -108,6 +108,9 @@ describe("Weather API Route", () => {
         expect.stringContaining("current=")
       );
       expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("weather_code")
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("temperature_unit=fahrenheit")
       );
       expect(global.fetch).toHaveBeenCalledWith(
@@ -193,7 +196,7 @@ describe("Weather API Route", () => {
             hourly: {
               time: Array.from({ length: 24 }, (_, i) =>
                 `2024-01-15T${String(i).padStart(2, "0")}:00`
-              ),
+              ).filter((time) => time !== "2024-01-15T11:00"),
               temperature_2m: Array.from({ length: 24 }, (_, i) => 20 + i),
               wind_speed_10m: Array.from({ length: 24 }, (_, i) => i),
               weather_code: Array.from({ length: 24 }, (_, i) => i === 12 ? 61 : 0),
@@ -202,7 +205,7 @@ describe("Weather API Route", () => {
       });
 
       const request = new NextRequest(
-        "http://localhost:3000/api/weather?lat=40.7128&lon=-74.006&datetime=2024-01-15T25:00"
+        "http://localhost:3000/api/weather?lat=40.7128&lon=-74.006&datetime=2024-01-15T11:00"
       );
 
       const response = await GET(request);
