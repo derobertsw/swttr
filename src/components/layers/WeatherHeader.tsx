@@ -152,9 +152,7 @@ export function WeatherHeader({
     isInteractive &&
       (precipitationAlert
         ? "hover:border-white/40 active:border-white/50"
-        : "hover:bg-white/[0.09] active:bg-white/[0.12]"),
-    isInteractive &&
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/65 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800"
+        : "hover:bg-white/[0.09] active:bg-white/[0.12]")
   );
 
   const content = (
