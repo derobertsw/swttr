@@ -188,19 +188,26 @@ describe("Weather API Route", () => {
       );
     });
 
-    it("should fall back to noon when requested hour not found", async () => {
+    it("should fall back to the default forecast slot when requested hour not found", async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: () =>
           Promise.resolve({
-            hourly: {
-              time: Array.from({ length: 24 }, (_, i) =>
-                `2024-01-15T${String(i).padStart(2, "0")}:00`
-              ).filter((time) => time !== "2024-01-15T11:00"),
-              temperature_2m: Array.from({ length: 24 }, (_, i) => 20 + i),
-              wind_speed_10m: Array.from({ length: 24 }, (_, i) => i),
-              weather_code: Array.from({ length: 24 }, (_, i) => i === 12 ? 61 : 0),
-            },
+            hourly: (() => {
+              const hours = Array.from({ length: 24 }, (_, i) => ({
+                time: `2024-01-15T${String(i).padStart(2, "0")}:00`,
+                temperature: 20 + (i < 11 ? i : i - 1),
+                windSpeed: i < 11 ? i : i - 1,
+                weatherCode: i === 13 ? 61 : 0,
+              })).filter(({ time }) => time !== "2024-01-15T11:00");
+
+              return {
+                time: hours.map(({ time }) => time),
+                temperature_2m: hours.map(({ temperature }) => temperature),
+                wind_speed_10m: hours.map(({ windSpeed }) => windSpeed),
+                weather_code: hours.map(({ weatherCode }) => weatherCode),
+              };
+            })(),
           }),
       });
 
@@ -211,7 +218,7 @@ describe("Weather API Route", () => {
       const response = await GET(request);
       const data = await response.json();
 
-      // Should use index 12 (noon) as fallback
+      // Should use fallback index 12
       expect(data.temperature).toBe(32); // 20 + 12
       expect(data.windSpeed).toBe(12);
       expect(data.weatherCode).toBe(61);

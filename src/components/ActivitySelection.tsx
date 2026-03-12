@@ -23,6 +23,17 @@ interface ActivitySelectionProps {
   onExertionChange: (value: ExertionLevel) => void;
 }
 
+type ActivityFocusGroup = "activity" | "shortcut";
+
+function getActivityIndex(value: string) {
+  const index = ACTIVITIES.findIndex((activity) => activity.value === value);
+  return index >= 0 ? index : 0;
+}
+
+function getWrappedIndex(index: number, delta: number, length: number) {
+  return (index + delta + length) % length;
+}
+
 const ActivitySelection = ({
   value,
   onChange,
@@ -30,45 +41,155 @@ const ActivitySelection = ({
   onExertionChange,
 }: ActivitySelectionProps) => {
   const [api, setApi] = React.useState<CarouselApi>();
-  const [initialIndex] = React.useState(() =>
-    ACTIVITIES.findIndex((a) => a.value === value)
-  );
-  const [current, setCurrent] = React.useState(() =>
-    initialIndex >= 0 ? initialIndex : 0
-  );
+  const selectedIndex = getActivityIndex(value);
+  const [current, setCurrent] = React.useState(selectedIndex);
   const onChangeRef = React.useRef(onChange);
-  const pendingInitialSelectRef = React.useRef(true);
+  const valueRef = React.useRef(value);
+  const activityButtonRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
+  const shortcutButtonRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
+  const exertionButtonRefs = React.useRef<Record<ExertionLevel, HTMLButtonElement | null>>({
+    easy: null,
+    moderate: null,
+    hard: null,
+  });
+  const pendingActivityFocusRef = React.useRef<{ group: ActivityFocusGroup; index: number } | null>(null);
+  const pendingExertionFocusRef = React.useRef<ExertionLevel | null>(null);
 
   React.useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
 
   React.useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  React.useEffect(() => {
     if (!api) return;
 
     const onSelect = () => {
       const index = api.selectedScrollSnap();
+      const nextActivity = ACTIVITIES[index];
+      if (!nextActivity) return;
+
       setCurrent(index);
 
-      if (pendingInitialSelectRef.current && initialIndex >= 0 && index === initialIndex) {
-        pendingInitialSelectRef.current = false;
-        return;
+      const pendingActivityFocus = pendingActivityFocusRef.current;
+      if (pendingActivityFocus?.index === index) {
+        const target =
+          pendingActivityFocus.group === "activity"
+            ? activityButtonRefs.current[index]
+            : shortcutButtonRefs.current[index];
+        target?.focus();
+        pendingActivityFocusRef.current = null;
       }
 
-      pendingInitialSelectRef.current = false;
-      onChangeRef.current(ACTIVITIES[index].value);
+      if (nextActivity.value !== valueRef.current) {
+        onChangeRef.current(nextActivity.value);
+      }
     };
 
     api.on("select", onSelect);
 
-    if (initialIndex >= 0) {
-      api.scrollTo(initialIndex, true);
-    }
-
     return () => {
       api.off("select", onSelect);
     };
-  }, [api, initialIndex]);
+  }, [api]);
+
+  React.useEffect(() => {
+    setCurrent(selectedIndex);
+
+    if (!api) return;
+    if (api.selectedScrollSnap() === selectedIndex) return;
+
+    api.scrollTo(selectedIndex, true);
+  }, [api, selectedIndex]);
+
+  React.useEffect(() => {
+    const pendingExertionFocus = pendingExertionFocusRef.current;
+    if (!pendingExertionFocus || pendingExertionFocus !== exertion) return;
+
+    exertionButtonRefs.current[exertion]?.focus();
+    pendingExertionFocusRef.current = null;
+  }, [exertion]);
+
+  const focusActivityControl = (group: ActivityFocusGroup, index: number) => {
+    const target =
+      group === "activity"
+        ? activityButtonRefs.current[index]
+        : shortcutButtonRefs.current[index];
+    target?.focus();
+  };
+
+  const selectActivity = (index: number, focusGroup?: ActivityFocusGroup) => {
+    const nextActivity = ACTIVITIES[index];
+    if (!nextActivity) return;
+
+    if (focusGroup) {
+      pendingActivityFocusRef.current = { group: focusGroup, index };
+    }
+
+    if (!api) {
+      setCurrent(index);
+      if (focusGroup) {
+        focusActivityControl(focusGroup, index);
+        pendingActivityFocusRef.current = null;
+      }
+      if (nextActivity.value !== valueRef.current) {
+        onChangeRef.current(nextActivity.value);
+      }
+      return;
+    }
+
+    if (api.selectedScrollSnap() === index) {
+      setCurrent(index);
+      if (focusGroup) {
+        focusActivityControl(focusGroup, index);
+        pendingActivityFocusRef.current = null;
+      }
+      return;
+    }
+
+    api.scrollTo(index);
+  };
+
+  const handleActivityKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+    group: ActivityFocusGroup
+  ) => {
+    let delta = 0;
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      delta = 1;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      delta = -1;
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+    selectActivity(getWrappedIndex(index, delta, ACTIVITIES.length), group);
+  };
+
+  const handleExertionKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number
+  ) => {
+    let delta = 0;
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      delta = 1;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      delta = -1;
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+    const nextLevel = EXERTION_LEVELS[getWrappedIndex(index, delta, EXERTION_LEVELS.length)];
+    pendingExertionFocusRef.current = nextLevel;
+    onExertionChange(nextLevel);
+  };
 
   return (
     <div className="mx-auto w-full max-w-[420px]">
@@ -81,7 +202,7 @@ const ActivitySelection = ({
         <Carousel
           className="w-full"
           aria-label="Activity carousel"
-          opts={{ loop: true, startIndex: initialIndex >= 0 ? initialIndex : 0 }}
+          opts={{ loop: true, startIndex: selectedIndex }}
           setApi={setApi}
         >
           <CarouselContent className="py-3">
@@ -95,6 +216,9 @@ const ActivitySelection = ({
                     aria-checked={isSelected}
                     aria-label={activity.name}
                     tabIndex={isSelected ? 0 : -1}
+                    ref={(element) => {
+                      activityButtonRefs.current[index] = element;
+                    }}
                     className={cn(
                       "w-full cursor-pointer rounded-[1.35rem] border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/85 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800",
                       isSelected
@@ -103,18 +227,9 @@ const ActivitySelection = ({
                     )}
                     onClick={() => {
                       if (isSelected) return;
-                      api?.scrollTo(index);
+                      selectActivity(index);
                     }}
-                    onKeyDown={(event) => {
-                      if (event.key === "ArrowRight") {
-                        event.preventDefault();
-                        api?.scrollNext();
-                      }
-                      if (event.key === "ArrowLeft") {
-                        event.preventDefault();
-                        api?.scrollPrev();
-                      }
-                    }}
+                    onKeyDown={(event) => handleActivityKeyDown(event, index, "activity")}
                   >
                     <div
                       className={cn(
@@ -164,17 +279,11 @@ const ActivitySelection = ({
             role="radio"
             aria-checked={index === current}
             tabIndex={index === current ? 0 : -1}
-            onClick={() => api?.scrollTo(index)}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowRight") {
-                event.preventDefault();
-                api?.scrollNext();
-              }
-              if (event.key === "ArrowLeft") {
-                event.preventDefault();
-                api?.scrollPrev();
-              }
+            ref={(element) => {
+              shortcutButtonRefs.current[index] = element;
             }}
+            onClick={() => selectActivity(index)}
+            onKeyDown={(event) => handleActivityKeyDown(event, index, "shortcut")}
             aria-label={`Select ${activity.name}`}
             className={cn(
               "h-2 rounded-full transition-all duration-300",
@@ -201,7 +310,7 @@ const ActivitySelection = ({
             role="radiogroup"
             aria-label="Effort level"
           >
-            {EXERTION_LEVELS.map((level) => {
+            {EXERTION_LEVELS.map((level, index) => {
               const isSelected = level === exertion;
               return (
                 <button
@@ -210,6 +319,11 @@ const ActivitySelection = ({
                   onClick={() => onExertionChange(level)}
                   role="radio"
                   aria-checked={isSelected}
+                  tabIndex={isSelected ? 0 : -1}
+                  ref={(element) => {
+                    exertionButtonRefs.current[level] = element;
+                  }}
+                  onKeyDown={(event) => handleExertionKeyDown(event, index)}
                   className={cn(
                     "rounded-xl border px-2 py-3 text-base font-semibold transition-all",
                     isSelected

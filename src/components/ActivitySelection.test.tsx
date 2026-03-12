@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import * as React from "react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import ActivitySelection from "./ActivitySelection";
+import type { ExertionLevel } from "@/lib/biophysics/exertion";
 
 // Mock next/navigation for components that use PageLayout -> AppNavigation
 vi.mock("next/navigation", () => ({
@@ -11,6 +13,36 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("ActivitySelection", () => {
+  const ControlledSelection = ({
+    value = "running",
+    exertion = "moderate",
+    onChange = vi.fn(),
+    onExertionChange = vi.fn(),
+  }: {
+    value?: string;
+    exertion?: ExertionLevel;
+    onChange?: (value: string) => void;
+    onExertionChange?: (value: ExertionLevel) => void;
+  }) => {
+    const [selectedValue, setSelectedValue] = React.useState(value);
+    const [selectedExertion, setSelectedExertion] = React.useState(exertion);
+
+    return (
+      <ActivitySelection
+        value={selectedValue}
+        onChange={(nextValue) => {
+          setSelectedValue(nextValue);
+          onChange(nextValue);
+        }}
+        exertion={selectedExertion}
+        onExertionChange={(nextExertion) => {
+          setSelectedExertion(nextExertion);
+          onExertionChange(nextExertion);
+        }}
+      />
+    );
+  };
+
   const renderSelection = (
     overrides?: Partial<ComponentProps<typeof ActivitySelection>>
   ) =>
@@ -115,6 +147,80 @@ describe("ActivitySelection", () => {
 
       await user.click(screen.getByRole("radio", { name: /hard/i }));
 
+      expect(mockOnExertionChange).toHaveBeenCalledWith("hard");
+    });
+
+    it("should sync to an updated value prop without echoing onChange", async () => {
+      const mockOnChange = vi.fn();
+      const { rerender } = renderSelection({ onChange: mockOnChange });
+
+      rerender(
+        <ActivitySelection
+          value="biking"
+          onChange={mockOnChange}
+          exertion="moderate"
+          onExertionChange={vi.fn()}
+        />
+      );
+
+      await waitFor(() => {
+        const activityGroup = screen.getByRole("radiogroup", { name: /^activity$/i });
+        expect(
+          within(activityGroup).getByRole("radio", { name: /biking/i })
+        ).toHaveAttribute("aria-checked", "true");
+      });
+      expect(mockOnChange).not.toHaveBeenCalled();
+    });
+
+    it("should move focus to the newly selected activity when using arrow keys", async () => {
+      const user = userEvent.setup();
+      renderSelection();
+
+      const activityGroup = screen.getByRole("radiogroup", { name: /^activity$/i });
+      const runningCard = within(activityGroup).getByRole("radio", { name: /running/i });
+
+      await user.tab();
+      expect(runningCard).toHaveFocus();
+
+      await user.keyboard("{ArrowRight}");
+
+      const bikingCard = within(activityGroup).getByRole("radio", { name: /biking/i });
+      expect(bikingCard).toHaveAttribute("aria-checked", "true");
+      expect(bikingCard).toHaveFocus();
+    });
+
+    it("should move focus to the newly selected shortcut when using arrow keys", async () => {
+      const user = userEvent.setup();
+      renderSelection();
+
+      const runningShortcut = screen.getByRole("radio", { name: /select running/i });
+      runningShortcut.focus();
+      expect(runningShortcut).toHaveFocus();
+
+      await user.keyboard("{ArrowRight}");
+
+      const bikingShortcut = screen.getByRole("radio", { name: /select biking/i });
+      expect(bikingShortcut).toHaveAttribute("aria-checked", "true");
+      expect(bikingShortcut).toHaveFocus();
+    });
+
+    it("should move focus through exertion options with arrow keys", async () => {
+      const user = userEvent.setup();
+      const mockOnExertionChange = vi.fn();
+
+      render(
+        <ControlledSelection onExertionChange={mockOnExertionChange} />
+      );
+
+      const moderateButton = screen.getByRole("radio", { name: /moderate/i });
+      moderateButton.focus();
+      expect(moderateButton).toHaveFocus();
+
+      await user.keyboard("{ArrowRight}");
+
+      const hardButton = screen.getByRole("radio", { name: /hard/i });
+      expect(hardButton).toHaveAttribute("aria-checked", "true");
+      expect(hardButton).toHaveFocus();
       expect(mockOnExertionChange).toHaveBeenCalledWith("hard");
     });
   });
