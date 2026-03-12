@@ -97,4 +97,30 @@ describe("WeatherHeader", () => {
 
     expect(onEditWeather).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the score trigger interactive without nesting buttons inside the weather card", async () => {
+    const onEditWeather = vi.fn();
+    const user = userEvent.setup();
+    const { container } = render(
+      <WeatherHeader
+        temperature={48}
+        windspeed={6}
+        score={91}
+        totalClo={1.1}
+        targetRange={[1, 1.2]}
+        interactive
+        onEditWeather={onEditWeather}
+      />
+    );
+
+    const cardButton = screen.getByRole("button", { name: /change weather location, date, or time/i });
+    const scoreButton = screen.getByRole("button", { name: /optimal/i });
+
+    expect(container.querySelectorAll("button")).toHaveLength(2);
+    expect(cardButton).not.toContainElement(scoreButton);
+
+    await user.click(scoreButton);
+
+    expect(onEditWeather).not.toHaveBeenCalled();
+  });
 });
