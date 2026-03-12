@@ -20,7 +20,7 @@ export const ACTIVITIES: Activity[] = [
     name: "Hiking / Snowshoeing",
     value: "hiking_snowshoeing",
     icon: HikeIcon,
-    cardLines: ["Hike /", "Snowshoe"],
+    cardLines: ["Hike", "Snowshoe"],
   },
   {
     name: "Backcountry Skiing",

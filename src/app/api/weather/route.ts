@@ -18,11 +18,11 @@ function addDaysToDateString(dateString: string, daysToAdd: number): string {
 }
 
 function decodePrecipitation(weatherCode: number): { precipitation: boolean; precipitationType?: PrecipitationType } {
-  // Rain: drizzle (51-55), freezing drizzle (56-57), rain (61-65), rain showers (80-82), thunderstorms (95-99)
+  // Rain: drizzle (51-55), rain (61-65), rain showers (80-82), thunderstorms (95-99)
   if ((weatherCode >= 51 && weatherCode <= 55) || (weatherCode >= 61 && weatherCode <= 65) || (weatherCode >= 80 && weatherCode <= 82) || weatherCode >= 95) {
     return { precipitation: true, precipitationType: 'rain' };
   }
-  // Mixed: freezing rain/drizzle (56-57, 66-67)
+  // Mixed: freezing drizzle/rain (56-57, 66-67)
   if (weatherCode === 56 || weatherCode === 57 || weatherCode === 66 || weatherCode === 67) {
     return { precipitation: true, precipitationType: 'mixed' };
   }
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
     // If datetime is provided, fetch hourly forecast; otherwise fetch current weather
     if (dateTime) {
       const date = dateTime.split("T")[0];
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m&start_date=${date}&end_date=${date}&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,weather_code&start_date=${date}&end_date=${date}&temperature_unit=fahrenheit&wind_speed_unit=mph`;
 
       const response = await fetch(url);
 
@@ -116,6 +116,7 @@ export async function GET(request: NextRequest) {
       }
 
       const data = await response.json();
+      const hourlyWeatherCodes: number[] = Array.isArray(data?.hourly?.weather_code) ? data.hourly.weather_code : [];
 
       // Find the index for the requested hour
       const targetHour = dateTime.substring(0, 13) + ":00"; // e.g., "2024-01-15T14:00"
@@ -124,16 +125,30 @@ export async function GET(request: NextRequest) {
       if (hourIndex === -1) {
         // Fall back to closest available hour
         const fallbackIndex = Math.min(12, Math.max(0, data.hourly.temperature_2m.length - 1));
+        const fallbackWeatherCode = Number(hourlyWeatherCodes[fallbackIndex]);
+        const precipInfo = Number.isFinite(fallbackWeatherCode)
+          ? decodePrecipitation(fallbackWeatherCode)
+          : { precipitation: false };
         return NextResponse.json({
           temperature: Math.round(data.hourly.temperature_2m[fallbackIndex]), // noon as fallback
           windSpeed: Math.round(data.hourly.wind_speed_10m[fallbackIndex]),
+          weatherCode: Number.isFinite(fallbackWeatherCode) ? fallbackWeatherCode : undefined,
+          precipitation: precipInfo.precipitation,
+          precipitationType: precipInfo.precipitationType,
           isForecast: true,
         });
       }
 
+      const weatherCode = Number(hourlyWeatherCodes[hourIndex]);
+      const precipInfo = Number.isFinite(weatherCode)
+        ? decodePrecipitation(weatherCode)
+        : { precipitation: false };
       return NextResponse.json({
         temperature: Math.round(data.hourly.temperature_2m[hourIndex]),
         windSpeed: Math.round(data.hourly.wind_speed_10m[hourIndex]),
+        weatherCode: Number.isFinite(weatherCode) ? weatherCode : undefined,
+        precipitation: precipInfo.precipitation,
+        precipitationType: precipInfo.precipitationType,
         isForecast: true,
       });
     } else {

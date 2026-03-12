@@ -101,7 +101,6 @@ const ActivitySelection = ({
                     onClick={() => {
                       if (isSelected) return;
                       setCurrent(index);
-                      onChange(ACTIVITIES[index].value);
                       api?.scrollTo(index);
                     }}
                     onKeyDown={(event) => {

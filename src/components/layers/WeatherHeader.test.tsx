@@ -27,4 +27,36 @@ describe("WeatherHeader", () => {
     expect(screen.queryByText("Wet conditions: shell protection matters.")).not.toBeInTheDocument();
     expect(container.firstElementChild).toHaveAttribute("data-precipitation-state", "dry");
   });
+
+  it("renders a snow alert when it is snowing", () => {
+    const { container } = render(
+      <WeatherHeader
+        temperature={28}
+        windspeed={8}
+        precipitation
+        precipitationType="snow"
+      />
+    );
+
+    expect(screen.getByText("Snow falling")).toBeInTheDocument();
+    expect(screen.getByText("Active precipitation on route.")).toBeInTheDocument();
+    expect(screen.getByText("Snowing")).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveAttribute("data-precipitation-state", "snow");
+  });
+
+  it("renders a mixed precipitation alert for wintry conditions", () => {
+    const { container } = render(
+      <WeatherHeader
+        temperature={34}
+        windspeed={10}
+        precipitation
+        precipitationType="mixed"
+      />
+    );
+
+    expect(screen.getByText("Wintry mix")).toBeInTheDocument();
+    expect(screen.getByText("Cold and wet: keep waterproof layers on.")).toBeInTheDocument();
+    expect(screen.getByText("Shell on")).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveAttribute("data-precipitation-state", "mixed");
+  });
 });

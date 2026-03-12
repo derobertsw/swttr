@@ -256,6 +256,12 @@ export function WeatherHeader({
       </span>
     </div>
   ) : null;
+  const precipitationOverlay = precipitationAlert ? (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18)_0%,transparent_42%),linear-gradient(118deg,rgba(255,255,255,0.10)_0%,transparent_32%)]"
+    />
+  ) : null;
 
   if (!isInteractive) {
     return (
@@ -263,12 +269,7 @@ export function WeatherHeader({
         className={shellClassName}
         data-precipitation-state={precipitationAlert?.state ?? "dry"}
       >
-        {precipitationAlert && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18)_0%,transparent_42%),linear-gradient(118deg,rgba(255,255,255,0.10)_0%,transparent_32%)]"
-          />
-        )}
+        {precipitationOverlay}
         {content}
       </div>
     );
@@ -282,12 +283,7 @@ export function WeatherHeader({
       className={shellClassName}
       data-precipitation-state={precipitationAlert?.state ?? "dry"}
     >
-      {precipitationAlert && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18)_0%,transparent_42%),linear-gradient(118deg,rgba(255,255,255,0.10)_0%,transparent_32%)]"
-        />
-      )}
+      {precipitationOverlay}
       {content}
       {footer}
     </button>

@@ -128,6 +128,7 @@ describe("Weather API Route", () => {
               ],
               temperature_2m: [28, 30, 32],
               wind_speed_10m: [5, 7, 10],
+              weather_code: [0, 61, 71],
             },
           }),
       });
@@ -142,6 +143,9 @@ describe("Weather API Route", () => {
       expect(response.status).toBe(200);
       expect(data.temperature).toBe(32);
       expect(data.windSpeed).toBe(10);
+      expect(data.weatherCode).toBe(71);
+      expect(data.precipitation).toBe(true);
+      expect(data.precipitationType).toBe("snow");
       expect(data.isForecast).toBe(true);
     });
 
@@ -154,6 +158,7 @@ describe("Weather API Route", () => {
               time: ["2024-01-15T14:00"],
               temperature_2m: [32],
               wind_speed_10m: [10],
+              weather_code: [61],
             },
           }),
       });
@@ -166,6 +171,9 @@ describe("Weather API Route", () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("hourly=")
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("weather_code")
       );
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("start_date=2024-01-15")
@@ -186,6 +194,7 @@ describe("Weather API Route", () => {
               ),
               temperature_2m: Array.from({ length: 24 }, (_, i) => 20 + i),
               wind_speed_10m: Array.from({ length: 24 }, (_, i) => i),
+              weather_code: Array.from({ length: 24 }, (_, i) => i === 12 ? 61 : 0),
             },
           }),
       });
@@ -200,6 +209,9 @@ describe("Weather API Route", () => {
       // Should use index 12 (noon) as fallback
       expect(data.temperature).toBe(32); // 20 + 12
       expect(data.windSpeed).toBe(12);
+      expect(data.weatherCode).toBe(61);
+      expect(data.precipitation).toBe(true);
+      expect(data.precipitationType).toBe("rain");
       expect(data.isForecast).toBe(true);
     });
   });

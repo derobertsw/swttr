@@ -95,6 +95,7 @@ describe("ActivitySelection", () => {
       await user.click(card);
 
       expect(mockOnChange).toHaveBeenCalledWith("biking");
+      expect(mockOnChange).toHaveBeenCalledTimes(1);
     });
 
     it("should call onExertionChange when exertion option is clicked", async () => {
