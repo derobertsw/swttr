@@ -27,10 +27,9 @@ import {
   LayerItem,
 } from "@/lib/layers";
 import {
-  EXTREMITY_DEFICIT_CLO_THRESHOLD,
-  REGIONAL_DEFICIT_CLO_THRESHOLD,
   calculateThermalComfortScore,
   evaluateThermalComfort,
+  THERMAL_DISPLAY_CLO_EPSILON,
 } from "@/lib/biophysics/comfort";
 import { ENSEMBLE_REGRESSION, REGIONAL_WEIGHTS } from "@/lib/biophysics/constants";
 import { ACTIVITIES } from "@/data/activities";
@@ -102,75 +101,6 @@ function getImmediateAction(state: ThermalDecisionState | null): string {
   return state.severity === "high"
     ? "Remove a warm layer and open vents immediately."
     : "Drop one layer or increase venting to avoid overheating.";
-}
-
-type CloStatusKind = "need" | "over" | "inRange";
-interface CloStatus {
-  kind: CloStatusKind;
-  delta: number;
-  label: string;
-  phrase: string;
-  className: string;
-}
-
-function getCloStatus(
-  totalClo: number | undefined,
-  targetRange: [number, number] | undefined
-): CloStatus | null {
-  if (totalClo === undefined || !targetRange) return null;
-
-  const [targetMin, targetMax] = targetRange;
-  const CLO_EPSILON = 0.05;
-  const deficitRaw = targetMin - totalClo;
-  const surplusRaw = totalClo - targetMax;
-  const deficit = deficitRaw > CLO_EPSILON ? deficitRaw : 0;
-  const surplus = surplusRaw > CLO_EPSILON ? surplusRaw : 0;
-
-  if (deficit > 0) {
-    return {
-      kind: "need",
-      delta: deficit,
-      label: `Need +${deficit.toFixed(1)} clo`,
-      phrase: "cold",
-      className: "border-sky-200 bg-sky-50/95 text-sky-800",
-    };
-  }
-
-  if (surplus > 0) {
-    return {
-      kind: "over",
-      delta: surplus,
-      label: `Over +${surplus.toFixed(1)} clo`,
-      phrase: "warm",
-      className: "border-amber-200 bg-amber-50/95 text-amber-800",
-    };
-  }
-
-  return {
-    kind: "inRange",
-    delta: 0,
-    label: "In target range",
-    phrase: "in range",
-    className: "border-emerald-200 bg-emerald-50/95 text-emerald-800",
-  };
-}
-
-function getDecisionFromCloStatus(status: CloStatus | null): ThermalDecisionState | null {
-  if (!status) return null;
-
-  if (status.kind === "inRange") {
-    return {
-      riskType: "comfortable",
-      severity: "moderate",
-      delta: 0,
-    };
-  }
-
-  return {
-    riskType: status.kind === "need" ? "cold" : "overheat",
-    severity: status.delta >= 0.35 ? "high" : "moderate",
-    delta: status.delta,
-  };
 }
 
 /**
@@ -630,8 +560,8 @@ const LayerDisplay = ({
 
   const maxRegionalDeficit = Math.max(torsoDeficit, armsDeficit, legsDeficit);
   const maxExtremityDeficit = Math.max(handsDeficit, headDeficit);
-  const hasRegionalGap = maxRegionalDeficit > REGIONAL_DEFICIT_CLO_THRESHOLD;
-  const hasExtremityGap = maxExtremityDeficit > EXTREMITY_DEFICIT_CLO_THRESHOLD;
+  const hasRegionalGap = maxRegionalDeficit > THERMAL_DISPLAY_CLO_EPSILON;
+  const hasExtremityGap = maxExtremityDeficit > THERMAL_DISPLAY_CLO_EPSILON;
 
   // Calculate effectiveTotalClo using the same method as the breakdown
   // This ensures the "Actual" badge matches the breakdown "Total"
@@ -662,8 +592,7 @@ const LayerDisplay = ({
     ?? biophysicsData?.recommendation?.score;
 
   // Calculate climb/descent decisions for dual-gauge view
-  const climbStatus = showDualComfortGauges ? getCloStatus(effectiveTotalClo, uphillTargetRange) : null;
-  const climbDecision = showDualComfortGauges ? getDecisionFromCloStatus(climbStatus) : null;
+  const climbDecision = showDualComfortGauges ? thermalDecision : null;
 
   // Determine which decision to use for risk card
   const decisionForRiskCard = showDualComfortGauges ? climbDecision : thermalDecision;
@@ -727,9 +656,32 @@ const LayerDisplay = ({
     estimatedDescentClo = torso * wt.torso + arms * wt.arm + legs * wt.leg;
   }
 
-  // Now compute descent status using the refined estimatedDescentClo
-  const descentStatus = showDualComfortGauges ? getCloStatus(estimatedDescentClo, downhillTargetRange) : null;
-  const descentDecision = showDualComfortGauges ? getDecisionFromCloStatus(descentStatus) : null;
+  const descentTorsoSection = descentBodyPartSections.find((s) => s.part === "torso");
+  const descentLegsSection = descentBodyPartSections.find((s) => s.part === "legs");
+  const descentHandsSection = descentBodyPartSections.find((s) => s.part === "hands");
+  const descentHeadNeckSection = descentBodyPartSections.find((s) => s.part === "headNeck");
+  const descentArmsDeficit = getRegionalDeficit(
+    descentBreakdown?.regional_ireq?.neutral?.arms ?? regionalIreq?.neutral?.arms,
+    descentBreakdown?.regional_clo?.arms ?? regionalClo?.arms
+  );
+  const descentMaxRegionalDeficit = Math.max(
+    getRegionalDeficit(descentTorsoSection?.targetClo, descentTorsoSection?.currentClo),
+    descentArmsDeficit,
+    getRegionalDeficit(descentLegsSection?.targetClo, descentLegsSection?.currentClo)
+  );
+  const descentMaxExtremityDeficit = Math.max(
+    getRegionalDeficit(descentHandsSection?.targetClo, descentHandsSection?.currentClo),
+    getRegionalDeficit(descentHeadNeckSection?.targetClo, descentHeadNeckSection?.currentClo)
+  );
+
+  const descentDecision = showDualComfortGauges
+    ? evaluateThermalComfort({
+        totalClo: estimatedDescentClo,
+        targetRange: downhillTargetRange,
+        maxRegionalDeficit: descentMaxRegionalDeficit,
+        maxExtremityDeficit: descentMaxExtremityDeficit,
+      })
+    : null;
   const descentRiskTitle = descentDecision
     ? descentDecision.riskType === "comfortable"
       ? "Descent In Target Range"
