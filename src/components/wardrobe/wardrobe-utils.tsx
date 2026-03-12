@@ -83,6 +83,17 @@ export const typeLabels = {
 };
 
 export const BODY_PART_ORDER = ["torso", "legs", "hands", "head & neck"];
+export const BODY_PART_LABELS: Record<string, string> = {
+  torso: "Torso",
+  legs: "Legs",
+  hands: "Hands",
+  headNeck: "Head + Neck",
+  "head & neck": "Head + Neck",
+};
+
+export function formatBodyPartLabel(part: string): string {
+  return BODY_PART_LABELS[part] ?? formatCategory(part);
+}
 
 export function getItemIcon(itemType: string, garmentType?: string, category?: string) {
   if (itemType === "custom") {

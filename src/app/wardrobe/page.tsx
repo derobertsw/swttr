@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { RotateCcw, X, Search, Sparkles } from "lucide-react";
@@ -26,10 +26,9 @@ import { BodyPartSection } from "@/components/wardrobe/BodyPartSection";
 import { ItemDetailCard } from "@/components/wardrobe";
 import { BodyPartPickerDrawer } from "@/components/wardrobe/BodyPartPickerDrawer";
 import { CreateCustomItemDialog } from "@/components/wardrobe/CreateCustomItemDialog";
+import { buildWardrobeOverview } from "@/components/wardrobe/wardrobe-overview";
 import { BODY_PART_ORDER, getItemIcon, formatCategory, bodyPartToFilterKey, getClo } from "@/components/wardrobe/wardrobe-utils";
 import type { BodyPart } from "@/types/wardrobe";
-
-const SWIPE_HINT_STORAGE_KEY = "swttr-wardrobe-swipe-hint-dismissed-v1";
 
 export default function Wardrobe() {
   const isMobile = useIsMobile();
@@ -71,123 +70,137 @@ export default function Wardrobe() {
     toggleDisabled,
     toggleDisabledCollapsed,
   } = useWardrobe();
-  const [showSwipeHint, setShowSwipeHint] = useState(false);
   const [pickerBodyPart, setPickerBodyPart] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [showCustomDialog, setShowCustomDialog] = useState(false);
   const [customDialogBodyPart, setCustomDialogBodyPart] = useState<string | undefined>(undefined);
-
-
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (wardrobeItems.length === 0) {
-      setShowSwipeHint(false);
-      return;
-    }
-
-    const dismissed = window.localStorage.getItem(SWIPE_HINT_STORAGE_KEY) === "1";
-    setShowSwipeHint(!dismissed);
-  }, [wardrobeItems.length]);
-
-  const dismissSwipeHint = useCallback(() => {
-    setShowSwipeHint(false);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(SWIPE_HINT_STORAGE_KEY, "1");
-    }
-  }, []);
+  const overview = useMemo(
+    () =>
+      buildWardrobeOverview({
+        wardrobeItems,
+        groupedWardrobeItems,
+        disabledItemsByPart,
+      }),
+    [wardrobeItems, groupedWardrobeItems, disabledItemsByPart]
+  );
+  const wardrobeSectionIds = useMemo(
+    () =>
+      Object.fromEntries(
+        BODY_PART_ORDER.map((part) => [part, `wardrobe-section-${part.replace(/[^a-z0-9]+/gi, "-")}`])
+      ) as Record<string, string>,
+    []
+  );
 
   return (
-    <PageLayout>
-      <div className="flex w-full max-w-2xl flex-col gap-4">
+    <PageLayout chromeVariant="compact">
+      <div className="flex w-full max-w-3xl flex-col gap-4">
         {loading ? (
           <div className="flex flex-col gap-4 py-2">
-            <Skeleton className="h-12 w-full rounded-xl bg-white/25" />
-            <Skeleton className="h-24 w-full rounded-xl bg-white/20" />
-            <Skeleton className="h-24 w-full rounded-xl bg-white/20" />
-            <Skeleton className="h-24 w-full rounded-xl bg-white/20" />
+            <Skeleton className="h-72 w-full rounded-[28px] bg-white/18" />
+            <Skeleton className="h-14 w-full rounded-2xl bg-white/15" />
+            <Skeleton className="h-28 w-full rounded-2xl bg-white/15" />
+            <Skeleton className="h-28 w-full rounded-2xl bg-white/15" />
           </div>
         ) : (
           <>
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3">
+            <header>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/42">
+                Wardrobe
+              </p>
+              <h1 className="mt-1 text-[2.25rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
+                My Gear
+              </h1>
+              <p className="mt-1 text-sm text-white/62">
+                {overview.headline}
+                <span className="text-white/42"> · </span>
+                {overview.activeItems} {overview.activeItems === 1 ? "item is" : "items are"} shaping recommendations
+                {overview.totalDisabledItems > 0 ? ` · ${overview.totalDisabledItems} paused for this trip` : ""}
+              </p>
+            </header>
+
+            <section className="grid grid-cols-3 gap-2">
+              {[
+                { label: "Items", value: overview.totalItems },
+                { label: "Active", value: overview.activeItems },
+                { label: "Paused", value: overview.totalDisabledItems },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-white/10 bg-slate-950/18 px-3 py-2.5 backdrop-blur-sm"
+                >
+                  <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/44">
+                    {stat.label}
+                  </p>
+                  <p className="mt-1 text-xl font-semibold leading-none text-white">
+                    {stat.value}
+                  </p>
+                </div>
+              ))}
+            </section>
+
+            <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={() => setShowSearch(true)}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-blue-300/60 bg-blue-50/90 px-4 py-6 transition-all hover:bg-blue-100/90 hover:border-blue-400/70 active:scale-[0.98]"
+                className="flex items-center gap-3 rounded-2xl border border-white/14 bg-white/[0.08] px-3.5 py-3 text-left transition-colors hover:bg-white/[0.12]"
               >
-                <Search className="size-8 text-blue-600" />
-                <div className="text-center">
-                  <p className="text-base font-semibold text-blue-900">Browse Catalog</p>
-                  <p className="text-xs text-blue-700/80">{totalAvailableCount} items available</p>
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-cyan-200/12">
+                  <Search className="size-[18px] text-cyan-50" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-white">Browse catalog</p>
+                  <p className="truncate text-xs text-white/58">{totalAvailableCount} items available</p>
                 </div>
               </button>
 
               <button
+                type="button"
                 onClick={() => {
                   setCustomDialogBodyPart(undefined);
                   setShowCustomDialog(true);
                 }}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-emerald-300/60 bg-emerald-50/90 px-4 py-6 transition-all hover:bg-emerald-100/90 hover:border-emerald-400/70 active:scale-[0.98]"
+                className="flex items-center gap-3 rounded-2xl border border-white/14 bg-white/[0.08] px-3.5 py-3 text-left transition-colors hover:bg-white/[0.12]"
               >
-                <Sparkles className="size-8 text-emerald-600" />
-                <div className="text-center">
-                  <p className="text-base font-semibold text-emerald-900">Add Custom Item</p>
-                  <p className="text-xs text-emerald-700/80">Add generic gear</p>
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-emerald-200/12">
+                  <Sparkles className="size-[18px] text-emerald-50" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-white">Custom item</p>
+                  <p className="text-xs text-white/58">Create a stand-in piece</p>
                 </div>
               </button>
             </div>
 
-            <header>
-              <h2 className="text-2xl font-semibold leading-tight tracking-wide text-white/90">My Gear</h2>
-              <p className="mt-1 text-[13px] text-white/55">
-                Used in your thermal recommendations.
-              </p>
-              <p className="mt-1.5 text-sm font-semibold text-white/80">
-                {wardrobeItems.length} items
-              </p>
-            </header>
-
             <div className="pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
-              <div className="mt-0.5 flex flex-col gap-3.5">
-
+              <div className="mt-0.5 flex flex-col gap-4">
                 {wardrobeItems.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-white/40 bg-white/10 px-4 py-5">
-                    <p className="text-sm font-semibold text-white/90">No gear added yet</p>
-                    <p className="mt-1 text-sm text-white/70">
-                      Search above to add your first item and unlock gear-aware recommendations.
+                  <div className="rounded-[26px] border border-dashed border-white/22 bg-white/[0.08] px-5 py-5 backdrop-blur-sm">
+                    <p className="text-base font-semibold text-white/92">No gear added yet</p>
+                    <p className="mt-2 text-sm leading-6 text-white/66">
+                      Start with the pieces you use most often. Even a few key layers make recommendations far more useful.
+                    </p>
+                    <p className="mt-3 text-xs uppercase tracking-[0.16em] text-white/42">
+                      Tip: use Browse catalog or Custom item above to add your first piece.
                     </p>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-6">
-                    {(() => {
-                      let swipeHintAssigned = false;
-                      return BODY_PART_ORDER.map((part, index) => {
-                        const activeItems = groupedWardrobeItems[part];
-                        const shouldShowSwipeHint =
-                          showSwipeHint && !swipeHintAssigned && activeItems.length > 0;
-                        if (shouldShowSwipeHint) {
-                          swipeHintAssigned = true;
-                        }
-
-                        return (
-                          <BodyPartSection
-                            key={part}
-                            part={part}
-                            items={activeItems}
-                            disabledItems={disabledItemsByPart[part]}
-                            isFirst={index === 0}
-                            isCollapsed={disabledCollapsed[part] ?? true}
-                            onToggleCollapsed={() => toggleDisabledCollapsed(part)}
-                            onRemoveItem={removeItem}
-                            onToggleDisabled={toggleDisabled}
-                            onItemClick={setSelectedItem}
-                            showSwipeHintOnFirstItem={shouldShowSwipeHint}
-                            onDismissSwipeHint={dismissSwipeHint}
-                            onHeadingClick={() => setPickerBodyPart(part)}
-                          />
-                        );
-                      });
-                    })()}
+                    {BODY_PART_ORDER.map((part, index) => (
+                      <BodyPartSection
+                        key={part}
+                        part={part}
+                        sectionId={wardrobeSectionIds[part]}
+                        items={groupedWardrobeItems[part]}
+                        disabledItems={disabledItemsByPart[part]}
+                        isFirst={index === 0}
+                        isCollapsed={disabledCollapsed[part] ?? true}
+                        onToggleCollapsed={() => toggleDisabledCollapsed(part)}
+                        onRemoveItem={removeItem}
+                        onToggleDisabled={toggleDisabled}
+                        onItemClick={setSelectedItem}
+                        onHeadingClick={() => setPickerBodyPart(part)}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
