@@ -74,6 +74,8 @@ describe("Weather API Route", () => {
       expect(data.temperature).toBe(33); // Rounded
       expect(data.windSpeed).toBe(10); // Rounded
       expect(data.weatherCode).toBe(1);
+      expect(data.precipitation).toBe(false);
+      expect(data.precipitationType).toBeUndefined();
       expect(data.isForecast).toBe(false);
     });
 

@@ -73,6 +73,13 @@ describe("ActivitySelection", () => {
   });
 
   describe("interaction", () => {
+    it("should not call onChange on initial render", () => {
+      const mockOnChange = vi.fn();
+      renderSelection({ onChange: mockOnChange });
+
+      expect(mockOnChange).not.toHaveBeenCalled();
+    });
+
     it("should call onChange when a pagination dot is clicked", async () => {
       const mockOnChange = vi.fn();
       const user = userEvent.setup();
@@ -81,6 +88,7 @@ describe("ActivitySelection", () => {
       await user.click(screen.getByRole("button", { name: /select biking/i }));
 
       expect(mockOnChange).toHaveBeenCalledWith("biking");
+      expect(mockOnChange).toHaveBeenCalledTimes(1);
     });
 
     it("should call onChange when clicking on an activity card", async () => {

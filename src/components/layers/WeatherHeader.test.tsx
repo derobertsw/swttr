@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { WeatherHeader } from "./WeatherHeader";
 
 describe("WeatherHeader", () => {
@@ -58,5 +59,42 @@ describe("WeatherHeader", () => {
     expect(screen.getByText("Cold and wet: keep waterproof layers on.")).toBeInTheDocument();
     expect(screen.getByText("Shell on")).toBeInTheDocument();
     expect(container.firstElementChild).toHaveAttribute("data-precipitation-state", "mixed");
+  });
+
+  it("falls back to the default precipitation state when type is missing", () => {
+    const { container } = render(
+      <WeatherHeader
+        temperature={39}
+        windspeed={12}
+        precipitation
+      />
+    );
+
+    expect(screen.getByText("Precipitation")).toBeInTheDocument();
+    expect(screen.getByText("Wet conditions in the current weather.")).toBeInTheDocument();
+    expect(screen.getByText("Wet out")).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveAttribute("data-precipitation-state", "precipitation");
+  });
+
+  it("renders the interactive footer and wires the edit action when precipitation is active", async () => {
+    const onEditWeather = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <WeatherHeader
+        temperature={34}
+        windspeed={10}
+        precipitation
+        precipitationType="mixed"
+        interactive
+        onEditWeather={onEditWeather}
+      />
+    );
+
+    expect(screen.getByText("Change location or time")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /change weather location, date, or time/i }));
+
+    expect(onEditWeather).toHaveBeenCalledTimes(1);
   });
 });

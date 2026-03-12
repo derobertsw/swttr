@@ -36,9 +36,30 @@ const ActivitySelection = ({
   const [current, setCurrent] = React.useState(() =>
     initialIndex >= 0 ? initialIndex : 0
   );
+  const onChangeRef = React.useRef(onChange);
+  const pendingInitialSelectRef = React.useRef(true);
+
+  React.useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   React.useEffect(() => {
     if (!api) return;
+
+    const onSelect = () => {
+      const index = api.selectedScrollSnap();
+      setCurrent(index);
+
+      if (pendingInitialSelectRef.current && index === (initialIndex >= 0 ? initialIndex : 0)) {
+        pendingInitialSelectRef.current = false;
+        return;
+      }
+
+      pendingInitialSelectRef.current = false;
+      onChangeRef.current(ACTIVITIES[index].value);
+    };
+
+    api.on("select", onSelect);
 
     if (initialIndex >= 0) {
       api.scrollTo(initialIndex, true);
@@ -46,17 +67,10 @@ const ActivitySelection = ({
 
     setCurrent(api.selectedScrollSnap());
 
-    const onSelect = () => {
-      const index = api.selectedScrollSnap();
-      setCurrent(index);
-      onChange(ACTIVITIES[index].value);
-    };
-
-    api.on("select", onSelect);
     return () => {
       api.off("select", onSelect);
     };
-  }, [api, initialIndex, onChange]);
+  }, [api, initialIndex]);
 
   React.useEffect(() => {
     if (!api) return;
@@ -100,7 +114,6 @@ const ActivitySelection = ({
                     )}
                     onClick={() => {
                       if (isSelected) return;
-                      setCurrent(index);
                       api?.scrollTo(index);
                     }}
                     onKeyDown={(event) => {

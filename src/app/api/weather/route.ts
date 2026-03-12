@@ -163,11 +163,14 @@ export async function GET(request: NextRequest) {
 
       const data = await response.json();
 
-      const precipInfo = decodePrecipitation(data.current.weather_code);
+      const currentWeatherCode = Number(data.current.weather_code);
+      const precipInfo = Number.isFinite(currentWeatherCode)
+        ? decodePrecipitation(currentWeatherCode)
+        : { precipitation: false };
       return NextResponse.json({
         temperature: Math.round(data.current.temperature_2m),
         windSpeed: Math.round(data.current.wind_speed_10m),
-        weatherCode: data.current.weather_code,
+        weatherCode: Number.isFinite(currentWeatherCode) ? currentWeatherCode : undefined,
         precipitation: precipInfo.precipitation,
         precipitationType: precipInfo.precipitationType,
         isForecast: false,
