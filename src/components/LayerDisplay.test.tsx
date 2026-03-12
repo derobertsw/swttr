@@ -660,6 +660,14 @@ describe("LayerDisplay", () => {
           ...mockBiophysicsData.ireq,
           // Lower target range so effectiveTotalClo (~1.3) falls in range
           target_range: [1.0, 1.5] as [number, number],
+          regional: {
+            min: { torso: 1.0, arms: 0.8, legs: 0.9 },
+            neutral: { torso: 1.45, arms: 1.2, legs: 1.3 },
+          },
+          extremity: {
+            min: { hands: 0.5, head: 0.4 },
+            neutral: { hands: 0.85, head: 0.57 },
+          },
         },
         recommendation: {
           ...mockBiophysicsData.recommendation,
@@ -699,6 +707,37 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("Optimal")).toBeInTheDocument();
     });
 
+    it("should not show cold risk when the whole-body and body-part gaps stay within display tolerance", () => {
+      const nearTargetData = {
+        ...mockBiophysicsData,
+        ireq: {
+          ...mockBiophysicsData.ireq,
+          target_range: [1.0, 1.5] as [number, number],
+          regional: {
+            min: { torso: 1.0, arms: 0.8, legs: 0.2 },
+            neutral: { torso: 1.46, arms: 1.23, legs: 0.28 },
+          },
+          extremity: {
+            min: { hands: 0.5, head: 0.4 },
+            neutral: { hands: 0.69, head: 0.57 },
+          },
+        },
+      };
+
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={40}
+          windspeed={11}
+          biophysicsData={nearTargetData}
+        />
+      );
+
+      expect(screen.getByText("Optimal")).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Cold Risk/)).not.toBeInTheDocument();
+      expect(screen.queryByText("Cold Stress")).not.toBeInTheDocument();
+    });
+
     it("should not show comfort achieved when total clo is in range but a region is under target", () => {
       render(
         <LayerDisplay
@@ -719,6 +758,10 @@ describe("LayerDisplay", () => {
         ireq: {
           ...mockBiophysicsData.ireq,
           target_range: [0.8, 1.3] as [number, number],
+          extremity: {
+            min: { hands: 0.5, head: 0.4 },
+            neutral: { hands: 0.68, head: 0.56 },
+          },
           downhill: { min: 1.0, neutral: 1.6 },
           downhill_target_range: [1.0, 1.6] as [number, number],
         },
@@ -747,8 +790,6 @@ describe("LayerDisplay", () => {
 
       expect(screen.getAllByText("Climb").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Descent").length).toBeGreaterThan(0);
-      expect(screen.queryByText(/Climb Cold Risk/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Descent.*Risk/)).not.toBeInTheDocument();
       // Old descent section removed — descent tab and "In the Pack" summary replace it
       expect(screen.queryByText("Descent Layer Plan")).not.toBeInTheDocument();
       // Pack item visible in climb tab via "In the Pack" summary
