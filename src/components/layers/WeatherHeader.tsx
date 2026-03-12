@@ -152,13 +152,11 @@ export function WeatherHeader({
     isInteractive &&
       (precipitationAlert
         ? "hover:border-white/40 active:border-white/50"
-        : "hover:bg-white/[0.09] active:bg-white/[0.12]"),
-    isInteractive &&
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/65 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800"
+        : "hover:bg-white/[0.09] active:bg-white/[0.12]")
   );
 
   const content = (
-    <div className="relative z-10">
+    <div className={cn("relative z-20", isInteractive && "pointer-events-none")}>
       <div className="pb-6 border-b border-white/20">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col">
@@ -173,16 +171,18 @@ export function WeatherHeader({
           </div>
 
           {score !== undefined && (
-            <ScoreDisplay
-              score={score}
-              size="md"
-              totalClo={totalClo}
-              targetRange={targetRange}
-              regionalDeficit={regionalDeficit}
-              hasRegionalGap={hasRegionalGap}
-              extremityDeficit={extremityDeficit}
-              hasExtremityGap={hasExtremityGap}
-            />
+            <div className={cn(isInteractive && "pointer-events-auto relative z-30")}>
+              <ScoreDisplay
+                score={score}
+                size="md"
+                totalClo={totalClo}
+                targetRange={targetRange}
+                regionalDeficit={regionalDeficit}
+                hasRegionalGap={hasRegionalGap}
+                extremityDeficit={extremityDeficit}
+                hasExtremityGap={hasExtremityGap}
+              />
+            </div>
           )}
         </div>
 
@@ -243,7 +243,7 @@ export function WeatherHeader({
   );
 
   const footer = isInteractive ? (
-    <div className="relative z-10 pt-3">
+    <div className="pointer-events-none relative z-20 pt-3">
       <span className="inline-flex w-full items-center justify-between rounded-xl border border-white/30 bg-white/10 px-3 py-2 text-white/85 transition-colors group-hover:bg-white/15">
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
           <Pencil className="size-3.5" />
@@ -276,16 +276,19 @@ export function WeatherHeader({
   }
 
   return (
-    <button
-      type="button"
-      onClick={onEditWeather}
-      aria-label="Change weather location, date, or time"
+    <div
       className={shellClassName}
       data-precipitation-state={precipitationAlert?.state ?? "dry"}
     >
+      <button
+        type="button"
+        onClick={onEditWeather}
+        aria-label="Change weather location, date, or time"
+        className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/65 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800"
+      />
       {precipitationOverlay}
       {content}
       {footer}
-    </button>
+    </div>
   );
 }
