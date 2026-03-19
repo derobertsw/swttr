@@ -81,15 +81,6 @@ function isItemType(value: string | null): value is ItemType {
   return value === "garment" || value === "handwear" || value === "headwear";
 }
 
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function normalizeMediaKey(value: string): string {
   return value
     .trim()
@@ -109,29 +100,9 @@ function getDirectItemImageUrl(brand: string, modelName: string): string | undef
   return DIRECT_ITEM_IMAGE_BY_KEY[key];
 }
 
-function compactLabel(value: string, fallback: string, limit: number): string {
-  const normalized = value.trim().replace(/\s+/g, " ");
-  if (!normalized) return fallback;
-  if (normalized.length <= limit) return normalized;
-  return `${normalized.slice(0, limit - 3)}...`;
-}
-
 function formatTypeLabel(value: string | undefined, fallback: string): string {
   if (!value) return fallback;
   return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function getSilhouette(itemType: ItemType, garmentType?: string): string {
-  if (itemType === "garment") {
-    if (garmentType === "pants" || garmentType === "shorts" || garmentType === "bib") {
-      return "M76 44h44l10 22-10 78h-18l-4-38-4 38H76L66 66z";
-    }
-    return "M74 44h48l16 24-14 11v56h-18V95h-16v40H72V79L58 68z";
-  }
-  if (itemType === "handwear") {
-    return "M98 46h18v18h12c8 0 14 6 14 14v16c0 6-3 10-8 13l-7 4v18H82V66c0-12 7-20 16-20z";
-  }
-  return "M58 86c0-26 21-48 48-48s48 22 48 48H58z M72 86h68v18H72z";
 }
 
 interface ItemData {
@@ -203,9 +174,8 @@ async function getItemData(itemType: ItemType, itemId: string): Promise<ItemData
   };
 }
 
-function getSilhouetteImage(itemType: ItemType, data: ItemData): string | undefined {
+function getSilhouetteImage(itemType: ItemType, data: ItemData): string {
   if (itemType === "headwear") {
-    if (!data.headwearType) return undefined;
     return data.headwearType === "ski_helmet"
       ? "/images/silhouettes/ski-helmet.png"
       : "/images/silhouettes/beanie.png";
@@ -215,7 +185,6 @@ function getSilhouetteImage(itemType: ItemType, data: ItemData): string | undefi
     const light = ["liner_glove", "light_glove"];
     const mittens = ["mitten", "lobster_mitten", "shell_overmitten"];
     const hwt = data.handwearType ?? "";
-    if (!hwt) return undefined;
     if (light.includes(hwt)) return "/images/silhouettes/gloves-lightweight.png";
     if (mittens.includes(hwt)) return "/images/silhouettes/mittens.png";
     return "/images/silhouettes/gloves-heavy.png";
@@ -252,43 +221,11 @@ function getSilhouetteImage(itemType: ItemType, data: ItemData): string | undefi
       : "/images/silhouettes/pullover-no-hood.png";
   }
 
-  return undefined;
+  // Default: hooded jacket silhouette
+  return "/images/silhouettes/hooded-jacket.png";
 }
 
-function getPalette(itemType: ItemType): { start: string; end: string; accent: string } {
-  if (itemType === "handwear") {
-    return { start: "#0b3a36", end: "#115e59", accent: "#99f6e4" };
-  }
-  if (itemType === "headwear") {
-    return { start: "#1f3354", end: "#334e78", accent: "#bfdbfe" };
-  }
-  return { start: "#3f2a16", end: "#5b3a1a", accent: "#fde68a" };
-}
-
-function buildSvg(itemType: ItemType, data: ItemData): string {
-  const palette = getPalette(itemType);
-  const title = escapeXml(compactLabel(data.modelName, "Gear Item", 22));
-  const subtitle = escapeXml(compactLabel(data.typeLabel, "Layer", 22));
-  const silhouette = getSilhouette(itemType, data.garmentType);
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" role="img" aria-label="${title}">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="${palette.start}"/>
-      <stop offset="100%" stop-color="${palette.end}"/>
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="240" height="240" rx="24" fill="url(#bg)"/>
-  <rect x="14" y="14" width="212" height="212" rx="18" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.24)"/>
-  <path d="${silhouette}" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.55)" stroke-width="4" stroke-linejoin="round"/>
-  <path d="M26 182L214 182" stroke="${palette.accent}" stroke-opacity="0.75" stroke-width="3" stroke-linecap="round"/>
-  <text x="24" y="206" fill="white" font-size="18" font-family="ui-sans-serif, system-ui" font-weight="700">${title}</text>
-  <text x="24" y="224" fill="rgba(255,255,255,0.85)" font-size="12" font-family="ui-sans-serif, system-ui" letter-spacing="0.06em">${subtitle}</text>
-</svg>`;
-}
-
-/** Resolves a product image: redirects to a direct photo, a category silhouette, or returns a generated SVG placeholder. */
+/** Resolves a product image: redirects to a direct product photo or a category silhouette. */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const itemTypeParam = searchParams.get("item_type");
@@ -321,17 +258,8 @@ export async function GET(request: NextRequest) {
   }
 
   const silhouettePath = getSilhouetteImage(itemType, data);
-  if (silhouettePath) {
-    const silhouetteUrl = new URL(silhouettePath, request.nextUrl.origin);
-    const response = NextResponse.redirect(silhouetteUrl, 307);
-    response.headers.set("Cache-Control", "public, max-age=604800, s-maxage=604800");
-    return response;
-  }
-
-  return new NextResponse(buildSvg(itemType, data), {
-    headers: {
-      "Content-Type": "image/svg+xml; charset=utf-8",
-      "Cache-Control": "public, max-age=604800, s-maxage=604800",
-    },
-  });
+  const silhouetteUrl = new URL(silhouettePath, request.nextUrl.origin);
+  const response = NextResponse.redirect(silhouetteUrl, 307);
+  response.headers.set("Cache-Control", "public, max-age=604800, s-maxage=604800");
+  return response;
 }
