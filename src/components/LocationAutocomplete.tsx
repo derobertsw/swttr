@@ -45,6 +45,7 @@ export function LocationAutocomplete({
 }: LocationAutocompleteProps) {
   const isFrosted = variant === "frosted";
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [flipUp, setFlipUp] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
 
   const open = showSuggestions && suggestions.length > 0;
@@ -55,6 +56,15 @@ export function LocationAutocomplete({
   useEffect(() => {
     setActiveIndex(-1);
   }, [suggestions]);
+
+  // Flip dropdown upward if there isn't enough space below (e.g. mobile nav bar)
+  useEffect(() => {
+    if (!open || !suggestionRef.current) return;
+    const rect = suggestionRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    // 240px = max-h-60, 80px buffer for mobile nav bar
+    setFlipUp(spaceBelow < 240 + 80);
+  }, [open, suggestionRef]);
 
   // Scroll active option into view
   useEffect(() => {
@@ -140,7 +150,7 @@ export function LocationAutocomplete({
             id={listboxId}
             role="listbox"
             ref={listRef}
-            className={`absolute top-full left-0 right-0 mt-1.5 ${isFrosted ? SUGGESTIONS_DROPDOWN : "bg-popover text-popover-foreground border rounded-xl shadow-lg"} z-50 max-h-60 overflow-auto`}
+            className={`absolute left-0 right-0 ${flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${isFrosted ? SUGGESTIONS_DROPDOWN : "bg-popover text-popover-foreground border rounded-xl shadow-lg"} z-50 max-h-60 overflow-auto`}
           >
             {suggestions.map((suggestion, i) => (
               <li
