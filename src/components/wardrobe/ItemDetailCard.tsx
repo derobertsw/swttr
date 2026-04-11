@@ -42,7 +42,7 @@ export function ItemDetailCard({ item, open, onOpenChange, onRemove }: ItemDetai
           <div className="mx-auto w-full max-w-sm max-h-[84vh] overflow-y-auto pb-8">
             <DrawerHeader className="px-5 pb-2 pt-2">
               <DrawerTitle className="text-2xl leading-tight">{title}</DrawerTitle>
-              <DrawerDescription className="text-muted-foreground/90">{description}</DrawerDescription>
+              <DrawerDescription className="sr-only">{description}</DrawerDescription>
             </DrawerHeader>
             <div className="px-5">
               <ItemDetailContent item={item} />
@@ -68,7 +68,7 @@ export function ItemDetailCard({ item, open, onOpenChange, onRemove }: ItemDetai
       <DialogContent className="max-h-[86vh] overflow-y-auto border-border/60 bg-background/95">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className="text-muted-foreground/90">{description}</DialogDescription>
+          <DialogDescription className="sr-only">{description}</DialogDescription>
         </DialogHeader>
         <ItemDetailContent item={item} />
         {onRemove && (
