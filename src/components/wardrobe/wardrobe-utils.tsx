@@ -3,7 +3,7 @@ import type { WardrobeItem, AvailableItem } from "@/types/wardrobe";
 import type { EstimationMethod } from "@/types/garments";
 
 // Custom pants icon (ski pants style) since lucide-react doesn't have one
-export function PantsIcon(props: LucideProps) {
+function PantsIcon(props: LucideProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

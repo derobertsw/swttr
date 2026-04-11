@@ -6,7 +6,7 @@ import AlpineSkiIcon from "@/components/icons/AlpineSkiIcon";
 import BikeIcon from "@/components/icons/BikeIcon";
 import HikeIcon from "@/components/icons/HikeIcon";
 
-export interface Activity {
+interface Activity {
   name: string;
   value: string;
   icon: LucideIcon;

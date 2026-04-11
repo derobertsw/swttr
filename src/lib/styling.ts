@@ -21,6 +21,3 @@ export const LAYER_CARD = "rounded-xl bg-white/35 backdrop-blur-sm p-5";
 
 // Label styling
 export const FORM_LABEL = "text-sm font-medium text-white/82";
-
-// Icon positioning in inputs
-export const INPUT_ICON_LEFT = "absolute left-3 top-1/2 -translate-y-1/2";

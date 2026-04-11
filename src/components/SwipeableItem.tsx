@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Trash2, Ban, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export interface SwipeAction {
+interface SwipeAction {
   icon: React.ReactNode;
   label: string;
   color: string;
