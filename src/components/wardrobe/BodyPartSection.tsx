@@ -1,4 +1,4 @@
-import { Plus, ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { WardrobeItem } from "@/types/wardrobe";
 import { cn } from "@/lib/utils";
 import { formatBodyPartLabel, getEmptyStateIcon } from "./wardrobe-utils";
@@ -15,7 +15,8 @@ interface BodyPartSectionProps {
   onRemoveItem: (id: string) => void;
   onToggleDisabled: (id: string, currentDisabled: boolean) => void;
   onItemClick?: (item: WardrobeItem) => void;
-  onHeadingClick?: () => void;
+  showSwipeHintOnFirstItem?: boolean;
+  onDismissSwipeHint?: () => void;
 }
 
 export function BodyPartSection({
@@ -29,7 +30,8 @@ export function BodyPartSection({
   onRemoveItem,
   onToggleDisabled,
   onItemClick,
-  onHeadingClick,
+  showSwipeHintOnFirstItem = false,
+  onDismissSwipeHint,
 }: BodyPartSectionProps) {
   const EmptyIcon = getEmptyStateIcon(part);
   const label = formatBodyPartLabel(part);
@@ -55,22 +57,9 @@ export function BodyPartSection({
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="rounded-full border border-white/15 bg-white/8 px-2 py-0.5 text-[10px] font-medium text-white/65">
-              {sectionCount}
-            </span>
-            {onHeadingClick && (
-              <button
-                type="button"
-                onClick={onHeadingClick}
-                className="inline-flex items-center gap-1.5 rounded-full border border-cyan-200/30 bg-cyan-200/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-50 transition-colors hover:bg-cyan-200/16 active:bg-cyan-200/20"
-                aria-label={`Add ${label} gear`}
-              >
-                <Plus className="size-3.5" />
-                Add gear
-              </button>
-            )}
-          </div>
+          <span className="rounded-full border border-white/15 bg-white/8 px-2 py-0.5 text-[10px] font-medium text-white/65">
+            {sectionCount}
+          </span>
         </div>
       </div>
       {items.length === 0 && disabledItems.length === 0 ? (
@@ -84,16 +73,6 @@ export function BodyPartSection({
               Add a piece here so recommendations can account for this zone.
             </div>
           </div>
-          {onHeadingClick && (
-            <button
-              type="button"
-              onClick={onHeadingClick}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/16 bg-white/8 px-3 py-1.5 text-[11px] font-medium text-white/76 transition-colors hover:bg-white/12"
-            >
-              <Plus className="size-3.5" />
-              Browse
-            </button>
-          )}
         </div>
       ) : (
         <>

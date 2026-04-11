@@ -27,10 +27,11 @@ interface MediaRef {
   itemImageUrl?: string;
 }
 
-const MEDIA_URL_REVISION = "2026-02-13-logos-v5";
+const MEDIA_URL_REVISION = "2026-03-09-brand-logos-v3";
 
 function isLegacyBrandWrapper(url?: string): boolean {
-  return typeof url === "string" && url.startsWith("/media/brands/");
+  if (typeof url !== "string") return false;
+  return url.startsWith("/media/brands/") || url.startsWith("/api/media/brand-logo");
 }
 
 function isLegacyItemWrapper(url?: string): boolean {

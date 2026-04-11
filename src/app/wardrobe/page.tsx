@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { RotateCcw, X, Search, Sparkles } from "lucide-react";
@@ -24,10 +24,9 @@ import { useWardrobe } from "@/hooks/useWardrobe";
 import { WardrobeSearch } from "@/components/wardrobe/WardrobeSearch";
 import { BodyPartSection } from "@/components/wardrobe/BodyPartSection";
 import { ItemDetailCard } from "@/components/wardrobe";
-import { BodyPartPickerDrawer } from "@/components/wardrobe/BodyPartPickerDrawer";
 import { CreateCustomItemDialog } from "@/components/wardrobe/CreateCustomItemDialog";
 import { buildWardrobeOverview } from "@/components/wardrobe/wardrobe-overview";
-import { BODY_PART_ORDER, getItemIcon, formatCategory, bodyPartToFilterKey, getClo } from "@/components/wardrobe/wardrobe-utils";
+import { BODY_PART_ORDER, getItemIcon, formatCategory, getClo } from "@/components/wardrobe/wardrobe-utils";
 import type { BodyPart } from "@/types/wardrobe";
 
 export default function Wardrobe() {
@@ -39,7 +38,6 @@ export default function Wardrobe() {
     adding,
     justAdded,
     wardrobeItems,
-    availableItems,
     totalAvailableCount,
     filteredItems,
     totalMatches,
@@ -70,7 +68,8 @@ export default function Wardrobe() {
     toggleDisabled,
     toggleDisabledCollapsed,
   } = useWardrobe();
-  const [pickerBodyPart, setPickerBodyPart] = useState<string | null>(null);
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const dismissSwipeHint = useCallback(() => setShowSwipeHint(false), []);
   const [showSearch, setShowSearch] = useState(false);
   const [showCustomDialog, setShowCustomDialog] = useState(false);
   const [customDialogBodyPart, setCustomDialogBodyPart] = useState<string | undefined>(undefined);
@@ -185,22 +184,35 @@ export default function Wardrobe() {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-6">
-                    {BODY_PART_ORDER.map((part, index) => (
-                      <BodyPartSection
-                        key={part}
-                        part={part}
-                        sectionId={wardrobeSectionIds[part]}
-                        items={groupedWardrobeItems[part]}
-                        disabledItems={disabledItemsByPart[part]}
-                        isFirst={index === 0}
-                        isCollapsed={disabledCollapsed[part] ?? true}
-                        onToggleCollapsed={() => toggleDisabledCollapsed(part)}
-                        onRemoveItem={removeItem}
-                        onToggleDisabled={toggleDisabled}
-                        onItemClick={setSelectedItem}
-                        onHeadingClick={() => setPickerBodyPart(part)}
-                      />
-                    ))}
+                    {(() => {
+                      let swipeHintAssigned = false;
+                      return BODY_PART_ORDER.map((part, index) => {
+                        const activeItems = groupedWardrobeItems[part];
+                        const shouldShowSwipeHint =
+                          showSwipeHint && !swipeHintAssigned && activeItems.length > 0;
+                        if (shouldShowSwipeHint) {
+                          swipeHintAssigned = true;
+                        }
+
+                        return (
+                          <BodyPartSection
+                            key={part}
+                            part={part}
+                            sectionId={wardrobeSectionIds[part]}
+                            items={activeItems}
+                            disabledItems={disabledItemsByPart[part]}
+                            isFirst={index === 0}
+                            isCollapsed={disabledCollapsed[part] ?? true}
+                            onToggleCollapsed={() => toggleDisabledCollapsed(part)}
+                            onRemoveItem={removeItem}
+                            onToggleDisabled={toggleDisabled}
+                            onItemClick={setSelectedItem}
+                            showSwipeHintOnFirstItem={shouldShowSwipeHint}
+                            onDismissSwipeHint={dismissSwipeHint}
+                          />
+                        );
+                      });
+                    })()}
                   </div>
                 )}
               </div>
@@ -283,26 +295,6 @@ export default function Wardrobe() {
           setSelectedItem(null);
         }}
       />
-
-      {pickerBodyPart && (
-        <BodyPartPickerDrawer
-          open={true}
-          onOpenChange={(open) => {
-            if (!open) setPickerBodyPart(null);
-          }}
-          bodyPart={pickerBodyPart}
-          availableItems={availableItems}
-          wardrobeItemIds={wardrobeItemIds}
-          adding={adding}
-          justAdded={justAdded}
-          onAddItem={addItem}
-          onCreateCustom={() => {
-            setCustomDialogBodyPart(pickerBodyPart ? bodyPartToFilterKey(pickerBodyPart) : undefined);
-            setPickerBodyPart(null);
-            setShowCustomDialog(true);
-          }}
-        />
-      )}
 
       <CreateCustomItemDialog
         open={showCustomDialog}
