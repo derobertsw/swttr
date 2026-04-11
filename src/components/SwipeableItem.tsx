@@ -4,13 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Trash2, Ban, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface SwipeAction {
-  icon: React.ReactNode;
-  label: string;
-  color: string;
-  onClick: () => void;
-}
-
 interface SwipeableItemProps {
   children: React.ReactNode;
   onDelete: () => void;
