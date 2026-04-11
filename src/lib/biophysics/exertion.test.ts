@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_EXERTION_LEVEL,
-  exertionToSliderValue,
   exertionToXcIntensity,
   getMetabolicRateForActivity,
   parseExertionLevel,
-  sliderValueToExertion,
 } from "./exertion";
 
 describe("exertion utilities", () => {
@@ -33,12 +31,4 @@ describe("exertion utilities", () => {
     expect(hard).toBeGreaterThan(easy);
   });
 
-  it("converts slider values to exertion levels", () => {
-    expect(exertionToSliderValue("easy")).toBe(1);
-    expect(exertionToSliderValue("moderate")).toBe(2);
-    expect(exertionToSliderValue("hard")).toBe(3);
-    expect(sliderValueToExertion(0)).toBe("easy");
-    expect(sliderValueToExertion(2)).toBe("moderate");
-    expect(sliderValueToExertion(4)).toBe("hard");
-  });
 });

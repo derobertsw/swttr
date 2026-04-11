@@ -61,12 +61,6 @@ const METABOLIC_RATE_BY_ACTIVITY: Record<
   },
 };
 
-const EXERTION_INDEX: Record<ExertionLevel, number> = {
-  easy: 0,
-  moderate: 1,
-  hard: 2,
-};
-
 const XC_INTENSITY_TO_EXERTION: Record<string, ExertionLevel> = {
   easy: "easy",
   moderate: "moderate",
@@ -105,11 +99,3 @@ export function exertionToXcIntensity(
   return exertion;
 }
 
-export function exertionToSliderValue(exertion: ExertionLevel): number {
-  return EXERTION_INDEX[exertion] + 1;
-}
-
-export function sliderValueToExertion(value: number): ExertionLevel {
-  const clampedValue = Math.max(1, Math.min(3, Math.round(value)));
-  return EXERTION_LEVELS[clampedValue - 1];
-}

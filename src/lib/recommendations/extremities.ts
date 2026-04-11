@@ -71,32 +71,6 @@ export function selectHandwear(
 }
 
 /**
- * Select best headwear based on temperature (legacy - single item)
- */
-export function selectHeadwear(
-  headwear: HeadwearRow[],
-  tempC: number,
-  isActive: boolean
-): HeadwearRow | null {
-  if (headwear.length === 0) return null;
-
-  // Filter by temperature suitability
-  const suitable = headwear.filter((h) => {
-    const minTemp = isActive ? h.min_temp_active : h.min_temp_static;
-    return minTemp === undefined || minTemp === null || tempC >= minTemp;
-  });
-
-  // Sort by clo (warmest first for cold, lightest first for warm)
-  const sorted = [...(suitable.length > 0 ? suitable : headwear)].sort((a, b) => {
-    if (tempC < -10) return b.rcl_clo - a.rcl_clo; // Cold: prefer warmer
-    if (tempC > 0) return a.rcl_clo - b.rcl_clo;   // Warm: prefer lighter
-    return b.rcl_clo - a.rcl_clo; // Default: prefer warmer
-  });
-
-  return sorted[0] || null;
-}
-
-/**
  * Select headwear by category - returns helmet, head warmth, and neck warmth separately
  */
 export function selectHeadwearByCategory(

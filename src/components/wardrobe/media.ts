@@ -1,17 +1,8 @@
-import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
+import type { WardrobeItem } from "@/types/wardrobe";
 
 type ItemType = "garment" | "handwear" | "headwear" | "custom";
 
 type ItemDetailsWithLegacyMedia = WardrobeItem["details"] & {
-  brand_logo?: string;
-  logo_url?: string;
-  image_url?: string;
-  photo_url?: string;
-  thumbnail_url?: string;
-  item_photo_url?: string;
-};
-
-type AvailableItemWithLegacyMedia = AvailableItem & {
   brand_logo?: string;
   logo_url?: string;
   image_url?: string;
@@ -98,17 +89,3 @@ export function getWardrobeMediaRef(item: WardrobeItem): MediaRef {
   };
 }
 
-export function getAvailableMediaRef(item: AvailableItem): MediaRef {
-  const available = item as AvailableItemWithLegacyMedia;
-  return {
-    itemType: item.type,
-    itemId: item.id,
-    brandLogoUrl: available.brand_logo_url || available.logo_url || available.brand_logo,
-    itemImageUrl:
-      available.item_image_url ||
-      available.image_url ||
-      available.photo_url ||
-      available.thumbnail_url ||
-      available.item_photo_url,
-  };
-}
