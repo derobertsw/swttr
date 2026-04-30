@@ -48,11 +48,7 @@ const HomeContent = () => {
   const { itemMappings } = useItemMappings();
 
   const ActivityIcon = ACTIVITIES.find((item) => item.value === activity)?.icon ?? Zap;
-  const showGearUpButton =
-    !showResults &&
-    !activityInitializing &&
-    inputMode !== "planAhead" &&
-    !(inputMode === "manual" && locationDenied);
+  const showGearUpButton = !showResults && inputMode !== "planAhead";
 
   return (
     <PageLayout onLogoClick={resetToInitialState} chromeVariant="compact">
