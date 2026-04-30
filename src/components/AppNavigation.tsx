@@ -194,28 +194,24 @@ export function MobileTabBar() {
         isLandingScreen ? "text-white/60" : "text-white/80"
       )}
     >
-      <div className="relative h-[74px] border-t border-white/20 bg-[rgba(17,45,62,0.74)] backdrop-blur-2xl">
-        <div className="flex h-full items-center justify-around px-3 pb-1 pt-1.5">
+      <div className="h-[74px] border-t border-white/20 bg-[rgba(17,45,62,0.74)] backdrop-blur-2xl">
+        <div className="flex h-full items-center justify-around gap-3 px-3 pb-1 pt-1.5">
           {renderTab(TAB_ITEMS[0])}
-          <div className="w-16" />
+          <button
+            type="button"
+            aria-label="Gear Up"
+            onClick={onGearUpClick}
+            disabled={isGearUpLoading}
+            className={cn(
+              "inline-flex h-12 min-w-[140px] flex-shrink items-center justify-center gap-2 rounded-xl border border-white/10 bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] px-5 text-sm font-semibold text-white shadow-[0_14px_26px_rgba(0,0,0,0.44)] transition-transform duration-200 hover:bg-[#030712]",
+              isFabPulse && "scale-[1.03]"
+            )}
+          >
+            {isGearUpLoading ? <Loader2 className="size-5 animate-spin" /> : <ActivityGlyph className="size-5" />}
+            <span className="tracking-wide">Gear Up</span>
+          </button>
           {renderTab(TAB_ITEMS[1])}
         </div>
-
-        <button
-          type="button"
-          className={cn(
-            "absolute left-1/2 top-0 flex h-[60px] w-[60px] -translate-x-1/2 -translate-y-[56%] items-center justify-center rounded-full border border-white/25 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.16)_0%,rgba(255,255,255,0.04)_28%,rgba(5,10,20,0.92)_100%)] text-white shadow-[0_16px_28px_rgba(0,0,0,0.42)] transition-transform duration-200",
-            isFabPulse && "scale-110"
-          )}
-          aria-label="Gear Up"
-          onClick={onGearUpClick}
-          disabled={isGearUpLoading}
-        >
-          {isGearUpLoading ? <Loader2 className="size-6 animate-spin" /> : <ActivityGlyph className="size-6" />}
-        </button>
-        <span className="pointer-events-none absolute left-1/2 top-8 -translate-x-1/2 text-[11px] font-semibold tracking-[0.01em] text-white">
-          Gear Up
-        </span>
       </div>
     </nav>
   );
