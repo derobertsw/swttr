@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import { Loader2, Zap } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import ActivitySelection from "@/components/ActivitySelection";
 import LayerDisplay from "@/components/LayerDisplay";
@@ -38,12 +39,16 @@ const HomeContent = () => {
     multiDayPlan,
     locationSearch,
     handleGoNow,
+    handleSubmit,
     handleWeatherChange,
     handleActivityChange,
     resetToInitialState,
   } = useGearUp();
 
   const { itemMappings } = useItemMappings();
+
+  const ActivityIcon = ACTIVITIES.find((item) => item.value === activity)?.icon ?? Zap;
+  const showGearUpButton = !showResults && inputMode !== "planAhead";
 
   return (
     <PageLayout onLogoClick={resetToInitialState} chromeVariant="compact">
@@ -119,6 +124,18 @@ const HomeContent = () => {
                 onDismiss={locationSearch.dismiss}
               />
             ) : null}
+            {showGearUpButton && (
+              <button
+                type="button"
+                aria-label="Gear Up"
+                onClick={() => void handleSubmit()}
+                disabled={loading}
+                className="inline-flex h-12 w-full max-w-[420px] items-center justify-center gap-2 rounded-xl border border-white/10 bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] px-6 text-sm font-semibold text-white shadow-[0_14px_26px_rgba(0,0,0,0.44)] transition-transform duration-200 hover:bg-[#030712] disabled:opacity-70"
+              >
+                {loading ? <Loader2 className="size-5 animate-spin" /> : <ActivityIcon className="size-5" />}
+                <span className="tracking-wide">Gear Up</span>
+              </button>
+            )}
           </>
         ) : inputMode === "planAhead" && multiDayPlan ? (
           <MultiDayPlanDisplay
