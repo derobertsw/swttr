@@ -36,6 +36,10 @@ export const TRIP_ACTIVITY_TO_RECOMMENDATION_KEY = {
 
 export function tripActivityToRecommendationKey(activity: string | null): string | null {
   if (!activity) return null;
-  if (!(activity in TRIP_ACTIVITY_TO_RECOMMENDATION_KEY)) return null;
+  // hasOwnProperty (not `in`) — `in` would match inherited Object.prototype
+  // keys like "toString" and return the wrong recommendation key.
+  if (!Object.prototype.hasOwnProperty.call(TRIP_ACTIVITY_TO_RECOMMENDATION_KEY, activity)) {
+    return null;
+  }
   return TRIP_ACTIVITY_TO_RECOMMENDATION_KEY[activity as TripActivity];
 }

@@ -36,14 +36,21 @@ export async function fetchUserWardrobeItems(
           .from("garments")
           .select("*, garment_thermal_properties(*)")
           .in("id", idsByType.garment)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
     idsByType.handwear.length > 0
       ? supabase.from("handwear").select("*").in("id", idsByType.handwear)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
     idsByType.headwear.length > 0
       ? supabase.from("headwear").select("*").in("id", idsByType.headwear)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
   ]);
+
+  // Bail out entirely on any detail-fetch error rather than producing a
+  // wardrobe with missing details — that would surface false "gap" rows in
+  // the packing list and look like the user doesn't own the gear they do.
+  if (garmentsRes.error || handwearRes.error || headwearRes.error) {
+    return [];
+  }
 
   const indexById = <T extends { id: string }>(rows: T[] | null) =>
     new Map<string, T>((rows ?? []).map((row) => [row.id, row]));
