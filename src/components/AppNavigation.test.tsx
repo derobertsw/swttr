@@ -57,14 +57,26 @@ describe("AppNavigation", () => {
       mockPathname = "/trips";
       renderBothNavs();
       const trips = screen.getAllByRole("link", { name: /trips/i });
-      // Both mobile and desktop variants render — at least one should be marked active
       expect(trips.length).toBeGreaterThan(0);
+      expect(trips.some((el) => el.getAttribute("aria-current") === "page")).toBe(true);
+      const wardrobe = screen.getAllByRole("link", { name: /wardrobe/i });
+      expect(wardrobe.every((el) => el.getAttribute("aria-current") !== "page")).toBe(true);
     });
 
     it("marks Trips active on nested trip routes", () => {
       mockPathname = "/trips/abc-123";
       renderBothNavs();
-      expect(screen.getAllByText("Trips").length).toBeGreaterThan(0);
+      const trips = screen.getAllByRole("link", { name: /trips/i });
+      expect(trips.some((el) => el.getAttribute("aria-current") === "page")).toBe(true);
+    });
+
+    it("marks Wardrobe active on /wardrobe", () => {
+      mockPathname = "/wardrobe";
+      renderBothNavs();
+      const wardrobe = screen.getAllByRole("link", { name: /wardrobe/i });
+      expect(wardrobe.some((el) => el.getAttribute("aria-current") === "page")).toBe(true);
+      const trips = screen.getAllByRole("link", { name: /trips/i });
+      expect(trips.every((el) => el.getAttribute("aria-current") !== "page")).toBe(true);
     });
   });
 });

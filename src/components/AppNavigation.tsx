@@ -38,6 +38,7 @@ export function MobileTabBar() {
       <Link
         key={item.href}
         href={item.href}
+        aria-current={isActive ? "page" : undefined}
         className={cn(
           "flex flex-col items-center gap-1 text-[11px] font-medium leading-none tracking-[0.01em] transition-colors",
           isActive ? "text-white" : "text-white/70",
@@ -93,6 +94,7 @@ export function DesktopActionDock() {
       <Link
         key={item.href}
         href={item.href}
+        aria-current={isActive ? "page" : undefined}
         className={cn(
           "inline-flex h-10 min-w-[102px] items-center justify-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition-colors",
           isActive

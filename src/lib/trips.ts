@@ -43,6 +43,7 @@ export async function assertCanAccessTrip(
     .select("id")
     .eq("trip_id", tripId)
     .eq("user_id", userId)
+    .neq("status", "left")
     .maybeSingle();
   return membership ? (trip as Trip) : null;
 }
@@ -59,7 +60,8 @@ export async function listTripsForUser(
   const { data: memberships } = await supabase
     .from("trip_members")
     .select("trip_id")
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .neq("status", "left");
 
   const memberTripIds = (memberships ?? []).map((m) => m.trip_id);
   const ownedIds = new Set((owned ?? []).map((t) => t.id));

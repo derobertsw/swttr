@@ -83,15 +83,23 @@ export async function POST(_request: NextRequest, ctx: RouteContext) {
     return NextResponse.json({ trip_id: member.trip_id, already_joined: true });
   }
 
-  const { error } = await supabase
+  // Atomic claim: only update if the invite_token is still attached. If another
+  // request raced ahead and cleared the token, no row is returned and we report
+  // the conflict instead of silently overwriting their claim.
+  const { data: accepted, error } = await supabase
     .from("trip_members")
     .update({
       user_id: userId,
       status: "joined",
       invite_token: null,
     })
-    .eq("id", member.id);
+    .eq("id", member.id)
+    .eq("invite_token", token)
+    .select("trip_id")
+    .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!accepted)
+    return NextResponse.json({ error: "Invite already used" }, { status: 409 });
 
-  return NextResponse.json({ trip_id: member.trip_id, already_joined: false });
+  return NextResponse.json({ trip_id: accepted.trip_id, already_joined: false });
 }

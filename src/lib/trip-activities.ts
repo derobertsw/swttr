@@ -19,7 +19,10 @@ export type TripActivity = (typeof TRIP_ACTIVITY_OPTIONS)[number];
 // recommendation engine (src/data/activities.ts / layerRecommendations.json).
 // Null entries are sports the engine doesn't support yet — we surface those as
 // gaps in the auto-generated packing list rather than guessing.
-export const TRIP_ACTIVITY_TO_RECOMMENDATION_KEY: Record<string, string | null> = {
+//
+// `satisfies` makes this object a compile error if a TripActivity key is
+// missing or misspelled, while still narrowing each value to string | null.
+export const TRIP_ACTIVITY_TO_RECOMMENDATION_KEY = {
   Alpine: "alpine_skiing",
   Backcountry: "backcountry_skiing",
   XC: "xc_skiing",
@@ -29,9 +32,10 @@ export const TRIP_ACTIVITY_TO_RECOMMENDATION_KEY: Record<string, string | null> 
   Climb: "hiking_snowshoeing", // closest available — load-bearing, slow uphill
   Surf: null,
   Rest: null,
-};
+} satisfies Record<TripActivity, string | null>;
 
 export function tripActivityToRecommendationKey(activity: string | null): string | null {
   if (!activity) return null;
-  return TRIP_ACTIVITY_TO_RECOMMENDATION_KEY[activity] ?? null;
+  if (!(activity in TRIP_ACTIVITY_TO_RECOMMENDATION_KEY)) return null;
+  return TRIP_ACTIVITY_TO_RECOMMENDATION_KEY[activity as TripActivity];
 }
