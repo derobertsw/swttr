@@ -2,55 +2,34 @@
 
 import { useCallback } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, Shirt } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Map, Shirt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNativeTabShell } from "@/hooks/useNativeTabShell";
 
 const TAB_ITEMS = [
-  { href: "/?mode=planAhead", label: "Plan", icon: CalendarDays },
+  { href: "/trips", label: "Trips", icon: Map },
   { href: "/wardrobe", label: "Wardrobe", icon: Shirt },
 ];
 
 type TabItem = (typeof TAB_ITEMS)[number];
 
-interface RouterLike {
-  push: (href: string) => void;
-}
-
-function useNavigationState(pathname: string, router: RouterLike) {
+function useNavigationState(pathname: string) {
   const isLandingScreen = pathname === "/";
 
   const isTabActive = useCallback(
-    (href: string) => (href.startsWith("/?") ? pathname === "/" : pathname === href),
+    (href: string) =>
+      href === "/trips" ? pathname.startsWith("/trips") : pathname === href,
     [pathname]
   );
 
-  const onTabClick = useCallback(
-    (item: TabItem, e: React.MouseEvent) => {
-      if (item.href === "/?mode=planAhead") {
-        e.preventDefault();
-        window.dispatchEvent(new CustomEvent("navigatePlanAhead"));
-        if (pathname !== "/") {
-          router.push(item.href);
-        }
-      }
-    },
-    [pathname, router]
-  );
-
-  return {
-    isLandingScreen,
-    isTabActive,
-    onTabClick,
-  };
+  return { isLandingScreen, isTabActive };
 }
 
 export function MobileTabBar() {
   const isNativeTabShell = useNativeTabShell();
   const pathname = usePathname();
-  const router = useRouter();
-  const { isLandingScreen, isTabActive, onTabClick } = useNavigationState(pathname, router);
+  const { isLandingScreen, isTabActive } = useNavigationState(pathname);
 
   const renderTab = (item: TabItem) => {
     const isActive = isTabActive(item.href);
@@ -59,7 +38,6 @@ export function MobileTabBar() {
       <Link
         key={item.href}
         href={item.href}
-        onClick={(e) => onTabClick(item, e)}
         className={cn(
           "flex flex-col items-center gap-1 text-[11px] font-medium leading-none tracking-[0.01em] transition-colors",
           isActive ? "text-white" : "text-white/70",
@@ -96,8 +74,7 @@ export function MobileTabBar() {
     >
       <div className="h-[64px] border-t border-white/20 bg-[rgba(17,45,62,0.74)] backdrop-blur-2xl">
         <div className="flex h-full items-center justify-around px-6 pb-1 pt-1.5">
-          {renderTab(TAB_ITEMS[0])}
-          {renderTab(TAB_ITEMS[1])}
+          {TAB_ITEMS.map(renderTab)}
         </div>
       </div>
     </nav>
@@ -107,8 +84,7 @@ export function MobileTabBar() {
 export function DesktopActionDock() {
   const isNativeTabShell = useNativeTabShell();
   const pathname = usePathname();
-  const router = useRouter();
-  const { isLandingScreen, isTabActive, onTabClick } = useNavigationState(pathname, router);
+  const { isLandingScreen, isTabActive } = useNavigationState(pathname);
 
   const renderDesktopTab = (item: TabItem) => {
     const isActive = isTabActive(item.href);
@@ -117,7 +93,6 @@ export function DesktopActionDock() {
       <Link
         key={item.href}
         href={item.href}
-        onClick={(e) => onTabClick(item, e)}
         className={cn(
           "inline-flex h-10 min-w-[102px] items-center justify-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition-colors",
           isActive
@@ -145,8 +120,7 @@ export function DesktopActionDock() {
       )}
     >
       <div className="pointer-events-auto inline-flex max-w-[min(640px,calc(100vw-var(--sidebar-width)-2.25rem))] items-center gap-2 rounded-2xl border border-white/25 bg-[linear-gradient(135deg,rgba(54,86,116,0.8)_0%,rgba(38,86,108,0.78)_100%)] p-2 shadow-[0_18px_34px_rgba(0,0,0,0.3)] backdrop-blur-xl">
-        {renderDesktopTab(TAB_ITEMS[0])}
-        {renderDesktopTab(TAB_ITEMS[1])}
+        {TAB_ITEMS.map(renderDesktopTab)}
       </div>
     </nav>
   );

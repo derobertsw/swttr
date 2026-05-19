@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Shirt, Settings, HelpCircle, MessageSquare } from "lucide-react";
+import { Map, Shirt, Settings, HelpCircle, MessageSquare } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -20,7 +20,7 @@ import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
 
 const NAV_ITEMS = [
-  { href: "/?mode=planAhead", label: "Plan", icon: CalendarDays },
+  { href: "/trips", label: "Trips", icon: Map },
   { href: "/wardrobe", label: "Wardrobe", icon: Shirt },
 ];
 
@@ -79,7 +79,11 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
-                    isActive={item.href.startsWith("/?") ? pathname === "/" : pathname === item.href}
+                    isActive={
+                      item.href === "/trips"
+                        ? pathname.startsWith("/trips")
+                        : pathname === item.href
+                    }
                     tooltip={item.label}
                     className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
                   >
