@@ -369,18 +369,6 @@ export function useGearUp() {
     }
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Listen for planAhead navigation events (resets form even if already on plan mode)
-  useEffect(() => {
-    const onPlanAhead = () => {
-      dispatch({ type: "RESET" });
-      locationSearch.reset();
-      biophysics.reset();
-      dispatch({ type: "SET_INPUT_MODE", mode: "planAhead" });
-    };
-    window.addEventListener("navigatePlanAhead", onPlanAhead);
-    return () => window.removeEventListener("navigatePlanAhead", onPlanAhead);
-  }, [locationSearch, biophysics]);
-
   const handleSubmit = useCallback(async () => {
     if (!activity) {
       toast.error("Please select an activity");

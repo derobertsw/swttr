@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MobileTabBar, DesktopActionDock } from "./AppNavigation";
 
 let mockPathname = "/";
-const mockPush = vi.fn();
 
 vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname,
-  useRouter: () => ({ push: mockPush, replace: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
 const localStorageMock = {
@@ -36,10 +34,15 @@ describe("AppNavigation", () => {
   });
 
   describe("rendering", () => {
-    it("renders Plan and Wardrobe tabs in both navs", () => {
+    it("renders Trips and Wardrobe tabs in both navs", () => {
       renderBothNavs();
-      expect(screen.getAllByText("Plan")).toHaveLength(2);
+      expect(screen.getAllByText("Trips")).toHaveLength(2);
       expect(screen.getAllByText("Wardrobe")).toHaveLength(2);
+    });
+
+    it("does not render a Plan tab", () => {
+      renderBothNavs();
+      expect(screen.queryAllByText("Plan")).toHaveLength(0);
     });
 
     it("does not render a Gear Up button in either nav", () => {
@@ -49,40 +52,31 @@ describe("AppNavigation", () => {
     });
   });
 
-  describe("Plan tab parity", () => {
-    it("both Plan tabs dispatch navigatePlanAhead on home page", async () => {
-      const spy = vi.fn();
-      window.addEventListener("navigatePlanAhead", spy);
-
-      const user = userEvent.setup();
+  describe("Trips tab active state", () => {
+    it("marks Trips active on /trips", () => {
+      mockPathname = "/trips";
       renderBothNavs();
-
-      const planLinks = screen.getAllByText("Plan");
-      await user.click(planLinks[0]);
-      await user.click(planLinks[1]);
-
-      expect(spy).toHaveBeenCalledTimes(2);
-      // Already on home — should NOT router.push
-      expect(mockPush).not.toHaveBeenCalled();
-
-      window.removeEventListener("navigatePlanAhead", spy);
+      const trips = screen.getAllByRole("link", { name: /trips/i });
+      expect(trips.length).toBeGreaterThan(0);
+      expect(trips.some((el) => el.getAttribute("aria-current") === "page")).toBe(true);
+      const wardrobe = screen.getAllByRole("link", { name: /wardrobe/i });
+      expect(wardrobe.every((el) => el.getAttribute("aria-current") !== "page")).toBe(true);
     });
 
-    it("Plan tab navigates when not on home page", async () => {
-      mockPathname = "/wardrobe";
-      const spy = vi.fn();
-      window.addEventListener("navigatePlanAhead", spy);
-
-      const user = userEvent.setup();
+    it("marks Trips active on nested trip routes", () => {
+      mockPathname = "/trips/abc-123";
       renderBothNavs();
+      const trips = screen.getAllByRole("link", { name: /trips/i });
+      expect(trips.some((el) => el.getAttribute("aria-current") === "page")).toBe(true);
+    });
 
-      const planLinks = screen.getAllByText("Plan");
-      await user.click(planLinks[0]);
-
-      expect(spy).toHaveBeenCalledTimes(1);
-      expect(mockPush).toHaveBeenCalledWith("/?mode=planAhead");
-
-      window.removeEventListener("navigatePlanAhead", spy);
+    it("marks Wardrobe active on /wardrobe", () => {
+      mockPathname = "/wardrobe";
+      renderBothNavs();
+      const wardrobe = screen.getAllByRole("link", { name: /wardrobe/i });
+      expect(wardrobe.some((el) => el.getAttribute("aria-current") === "page")).toBe(true);
+      const trips = screen.getAllByRole("link", { name: /trips/i });
+      expect(trips.every((el) => el.getAttribute("aria-current") !== "page")).toBe(true);
     });
   });
 });
