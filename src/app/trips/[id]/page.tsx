@@ -15,6 +15,7 @@ import {
   formatDateRange,
 } from "@/components/trips/trip-primitives";
 import { useTrip } from "@/hooks/useTrip";
+import { useTripNudges } from "@/hooks/useTripNudges";
 import type { TripDay, TripStop } from "@/types/trips";
 
 const STOP_COLOR_CYCLE = ["cyan", "emerald", "amber"] as const;
@@ -22,6 +23,7 @@ const STOP_COLOR_CYCLE = ["cyan", "emerald", "amber"] as const;
 export default function TripOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data, loading, error } = useTrip(id);
+  useTripNudges(id, data?.trip.name);
 
   return (
     <PageLayout chromeVariant="compact">

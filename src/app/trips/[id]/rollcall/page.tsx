@@ -2,7 +2,8 @@
 
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, BellRing } from "lucide-react";
+import { ArrowLeft, BellRing, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import PageLayout from "@/components/PageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -19,7 +20,33 @@ const REQUIRED_SLOTS = ["shirt", "midlayer", "shell", "pants", "gloves"];
 export default function RollCallPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data, loading, error } = useTrip(id);
-  const [poked, setPoked] = useState<Set<string>>(new Set());
+  const [nudged, setNudged] = useState<Set<string>>(new Set());
+  const [sending, setSending] = useState<string | null>(null);
+
+  const sendNudge = async (memberId: string, memberName: string) => {
+    setSending(memberId);
+    try {
+      const res = await fetch(`/api/v1/trips/${id}/nudges`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient_member_id: memberId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? `Failed (${res.status})`);
+      }
+      setNudged((prev) => {
+        const next = new Set(prev);
+        next.add(memberId);
+        return next;
+      });
+      toast.success(`Nudged ${memberName}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to nudge");
+    } finally {
+      setSending(null);
+    }
+  };
 
   // Use the first day's kits as roll-call snapshot (the "trailhead" moment).
   const rollCall = useMemo(() => {
@@ -103,18 +130,16 @@ export default function RollCallPage({ params }: { params: Promise<{ id: string 
               {!row.ready && row.member.role !== "organizer" && (
                 <button
                   type="button"
-                  onClick={() =>
-                    setPoked((s) => {
-                      const next = new Set(s);
-                      next.add(row.member.id);
-                      return next;
-                    })
-                  }
-                  disabled={poked.has(row.member.id)}
+                  onClick={() => sendNudge(row.member.id, row.member.display_name)}
+                  disabled={nudged.has(row.member.id) || sending === row.member.id}
                   className="inline-flex items-center gap-1 rounded-full border border-cyan-300/50 bg-cyan-300/22 px-2.5 py-0.5 text-xs text-white disabled:opacity-60"
                 >
-                  <BellRing className="size-3" />
-                  {poked.has(row.member.id) ? "poked" : "poke"}
+                  {sending === row.member.id ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <BellRing className="size-3" />
+                  )}
+                  {nudged.has(row.member.id) ? "nudged" : "nudge"}
                 </button>
               )}
             </div>

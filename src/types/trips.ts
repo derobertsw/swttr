@@ -65,6 +65,20 @@ export interface TripGroupGear {
   created_at: string;
 }
 
+export interface TripNudge {
+  id: string;
+  trip_id: string;
+  sender_member_id: string;
+  recipient_member_id: string;
+  message: string | null;
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface TripNudgeWithSender extends TripNudge {
+  sender_display_name: string | null;
+}
+
 export interface TripSummary extends Trip {
   member_count: number;
   stop_count: number;
