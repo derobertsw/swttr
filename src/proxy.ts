@@ -9,6 +9,8 @@ const isPublicRoute = createRouteMatcher([
   "/api/geocode(.*)",
   "/api/weather(.*)",
   "/api/v1(.*)",
+  // Paid agent API — gated by MPP (HTTP 402), not Clerk auth.
+  "/api/agent(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
