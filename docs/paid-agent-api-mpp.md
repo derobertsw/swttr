@@ -45,6 +45,12 @@ Request flow:
 `307`-redirect unauthenticated agents to sign-in, so `/api/agent(.*)` is listed as a
 public route in `src/proxy.ts` — payment (402), not Clerk, is the gate.
 
+`/api/v1/recommendations/*` itself requires a Clerk session (`src/proxy.ts` returns
+a JSON 401 otherwise), so anonymous callers can't fetch the same response for free.
+The signed-out frontend falls back to static recommendations. The agent routes are
+unaffected — they invoke the v1 handler functions in-process, so the middleware
+gate never runs for paid calls.
+
 > Next 16 renamed `middleware.ts` → `proxy.ts`; the Clerk middleware lives there.
 
 ## Configuration (`.env.local`)
@@ -94,9 +100,36 @@ npx mppx --network testnet -X POST \
   -d '{"weather":{"temperature":45,"wind_speed":5}}'
 ```
 
-Request body matches the v1 routes: `weather.temperature` (°F) and `weather.wind_speed`
-(mph) are required (`src/lib/recommendations/validation.ts`). A successful call returns
-the recommendation JSON and deducts the charge from the caller's testnet balance.
+A successful call returns the recommendation JSON and deducts the charge from the
+caller's testnet balance.
+
+## Request body
+
+Matches the v1 routes (`src/lib/recommendations/validation.ts`), but the agent wrapper
+(`paidRecommendationRoute` in `src/lib/payments/mpp.ts`) validates the body **before**
+issuing the 402 challenge, so a bad request costs nothing.
+
+Required:
+
+- `weather.temperature` (°F)
+- `weather.wind_speed` (mph)
+
+Optional:
+
+- `weather.humidity` (%, default 50), `weather.precipitation` (bool),
+  `weather.precipitation_type`
+- `exertion` (or `intensity`): `easy` | `moderate` | `hard`
+- `height_inches`, `weight_lbs` — body metrics for metabolic adjustment
+  (clamped; defaults 69 in / 170 lbs)
+- `prioritize_light_pack` (bool, ski-touring only)
+
+Rejected with 400: `use_wardrobe_only: true` — wardrobes require a signed-in user,
+which the stateless agent API never has.
+
+Because agent calls are anonymous, garment ensembles and extremity picks
+(handwear/headwear) are selected from the full public catalog rather than a
+user wardrobe; garment candidates are filtered by per-activity suitability
+scores where the schema has them (alpine, xc, ski-touring).
 
 ## Adding a paid route for a new sport
 
