@@ -329,10 +329,7 @@ describe('Ski Touring Recommendations API Route', () => {
         expect(response.status).not.toBe(400);
       });
 
-      // Note: The current validation uses falsy check for temperature,
-      // which means temperature of 0 is incorrectly rejected.
-      // This test documents the current behavior.
-      it('should reject temperature of 0 due to falsy check (known limitation)', async () => {
+      it('should accept temperature of 0', async () => {
         const mockSupabase = createMockSupabase();
         mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
 
@@ -341,12 +338,9 @@ describe('Ski Touring Recommendations API Route', () => {
         });
 
         const response = await POST(request);
-        const data = await response.json();
 
-        // Current behavior: 0 is treated as falsy/missing
-        // This could be considered a bug - temperature 0°F is valid
-        expect(response.status).toBe(400);
-        expect(data.error).toBe('weather.temperature and weather.wind_speed are required');
+        // 0°F is a valid winter temperature, not a missing value
+        expect(response.status).not.toBe(400);
       });
 
       it('should handle negative temperatures', async () => {
@@ -599,10 +593,10 @@ describe('Ski Touring Recommendations API Route', () => {
         expect(Array.isArray(packItems.garments)).toBe(true);
       });
 
-      it('should keep descent pack plan wardrobe-only when user wardrobe is empty', () => {
+      it('should build the descent pack from the catalog when user wardrobe is empty', () => {
         const packItems = responseData.pack_items as Record<string, unknown>;
         const garments = packItems.garments as Array<Record<string, unknown>>;
-        expect(garments).toHaveLength(0);
+        expect(garments.length).toBeGreaterThan(0);
       });
 
       it('should include total_weight_g', () => {

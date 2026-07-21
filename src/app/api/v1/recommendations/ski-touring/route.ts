@@ -267,12 +267,11 @@ export async function POST(request: NextRequest) {
   const uphillThermalProperties = predictEnsembleThermal(uphillThermalGarments);
   const uphillTotalClo = uphillThermalProperties.rcl.wholeBody;
 
-  // Pack Items
-  const packInsulationCandidates = hasUserWardrobe ? categorizedGarments.insulation : [];
+  // Pack Items — catalog callers get candidates too (suitableGarments is
+  // already score-filtered for them above)
+  const packInsulationCandidates = categorizedGarments.insulation;
   const uphillIds = new Set(uphillEnsemble.map((g) => g.id));
-  const packShellCandidates = hasUserWardrobe
-    ? categorizedGarments.shells.filter((s) => !uphillIds.has(s.id))
-    : [];
+  const packShellCandidates = categorizedGarments.shells.filter((s) => !uphillIds.has(s.id));
   const additionalCloNeeded = Math.max(0, ireqDownhill.ireqNeutral - uphillTotalClo);
   const packInsulationLayer = selectPackableInsulation(
     packInsulationCandidates, additionalCloNeeded, shouldPrioritizeLightPack

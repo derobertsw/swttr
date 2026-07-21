@@ -39,7 +39,7 @@ export async function validateRecommendationRequest(
   const userId = await getAuthUserId();
   const body = await request.json();
 
-  if (!body.weather?.temperature || body.weather?.wind_speed === undefined) {
+  if (body.weather?.temperature === undefined || body.weather?.wind_speed === undefined) {
     return NextResponse.json(
       { error: 'weather.temperature and weather.wind_speed are required' },
       { status: 400 }
