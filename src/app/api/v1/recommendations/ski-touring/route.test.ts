@@ -280,7 +280,7 @@ describe('Ski Touring Recommendations API Route', () => {
         const data = await response.json();
 
         expect(response.status).toBe(400);
-        expect(data.error).toBe('weather.temperature and weather.wind_speed are required');
+        expect(data.error).toBe('weather.temperature and weather.wind_speed must be finite numbers');
       });
 
       it('should return 400 when temperature is missing', async () => {
@@ -295,7 +295,7 @@ describe('Ski Touring Recommendations API Route', () => {
         const data = await response.json();
 
         expect(response.status).toBe(400);
-        expect(data.error).toBe('weather.temperature and weather.wind_speed are required');
+        expect(data.error).toBe('weather.temperature and weather.wind_speed must be finite numbers');
       });
 
       it('should return 400 when wind_speed is missing', async () => {
@@ -310,7 +310,7 @@ describe('Ski Touring Recommendations API Route', () => {
         const data = await response.json();
 
         expect(response.status).toBe(400);
-        expect(data.error).toBe('weather.temperature and weather.wind_speed are required');
+        expect(data.error).toBe('weather.temperature and weather.wind_speed must be finite numbers');
       });
     });
 
@@ -341,6 +341,33 @@ describe('Ski Touring Recommendations API Route', () => {
 
         // 0°F is a valid winter temperature, not a missing value
         expect(response.status).not.toBe(400);
+      });
+
+      it('should return 400 for null temperature', async () => {
+        const mockSupabase = createMockSupabase();
+        mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
+
+        const request = createRequest({
+          weather: { temperature: null, wind_speed: 10 },
+        });
+
+        const response = await POST(request);
+
+        // null would coerce to a bogus 0°F recommendation — reject it
+        expect(response.status).toBe(400);
+      });
+
+      it('should return 400 for non-numeric temperature', async () => {
+        const mockSupabase = createMockSupabase();
+        mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
+
+        const request = createRequest({
+          weather: { temperature: 'cold', wind_speed: 10 },
+        });
+
+        const response = await POST(request);
+
+        expect(response.status).toBe(400);
       });
 
       it('should handle negative temperatures', async () => {
@@ -961,6 +988,56 @@ describe('Ski Touring Recommendations API Route', () => {
         g => g.toLowerCase().includes('breathability') || g.toLowerCase().includes('evap')
       );
       expect(hasBreathabilityGuidance).toBe(true);
+    });
+  });
+
+  describe('Descent pack suitability (catalog callers)', () => {
+    // Insulation that only clears the uphill threshold — qualifies for the
+    // touring catalog (uphill OR downhill >= 6) but is unfit for the descent pack.
+    const uphillOnlyInsulation = {
+      ...createMockInsulation(),
+      id: 'garment-ins-uphill-only',
+      garment_activity_ratings: {
+        ski_touring_uphill_score: 8,
+        ski_touring_downhill_score: 4,
+      },
+    };
+
+    it('should exclude uphill-only insulation from the descent pack', async () => {
+      const mockSupabase = createMockSupabase({
+        garments: [createMockGarment(), createMockLegsBaseLayer(), uphillOnlyInsulation],
+      });
+      mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
+
+      const request = createRequest({
+        weather: { temperature: 10, wind_speed: 10 },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      const packItems = data.pack_items as Record<string, unknown>;
+      const garments = packItems.garments as Array<Record<string, unknown>>;
+      expect(garments.some((g) => g.id === 'garment-ins-uphill-only')).toBe(false);
+    });
+
+    it('should include downhill-suitable insulation in the descent pack', async () => {
+      // createMockInsulation has ski_touring_downhill_score: 9
+      const mockSupabase = createMockSupabase({
+        garments: [createMockGarment(), createMockLegsBaseLayer(), createMockInsulation()],
+      });
+      mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
+
+      const request = createRequest({
+        weather: { temperature: 10, wind_speed: 10 },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      const packItems = data.pack_items as Record<string, unknown>;
+      const garments = packItems.garments as Array<Record<string, unknown>>;
+      expect(garments.length).toBeGreaterThan(0);
     });
   });
 });

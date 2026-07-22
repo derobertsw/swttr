@@ -64,9 +64,16 @@ export function paidRecommendationRoute(
     const weather = body?.weather as
       | { temperature?: unknown; wind_speed?: unknown }
       | undefined;
-    if (!body || weather?.temperature === undefined || weather?.wind_speed === undefined) {
+    // Mirror validateRecommendationRequest: both fields must be finite numbers
+    // (0 allowed). Rejecting here avoids charging for a request the v1 handler
+    // would 400 anyway.
+    if (
+      !body ||
+      !Number.isFinite(weather?.temperature) ||
+      !Number.isFinite(weather?.wind_speed)
+    ) {
       return NextResponse.json(
-        { error: 'weather.temperature and weather.wind_speed are required' },
+        { error: 'weather.temperature and weather.wind_speed must be finite numbers' },
         { status: 400 },
       );
     }

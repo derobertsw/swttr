@@ -39,9 +39,15 @@ export async function validateRecommendationRequest(
   const userId = await getAuthUserId();
   const body = await request.json();
 
-  if (body.weather?.temperature === undefined || body.weather?.wind_speed === undefined) {
+  // Require finite numbers (0°F/0mph are valid), rejecting undefined, null,
+  // booleans, and non-numeric strings that would otherwise coerce to a bogus
+  // temperature in fahrenheitToCelsius.
+  if (
+    !Number.isFinite(body.weather?.temperature) ||
+    !Number.isFinite(body.weather?.wind_speed)
+  ) {
     return NextResponse.json(
-      { error: 'weather.temperature and weather.wind_speed are required' },
+      { error: 'weather.temperature and weather.wind_speed must be finite numbers' },
       { status: 400 }
     );
   }
