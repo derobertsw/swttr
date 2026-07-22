@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server';
 import { Mppx, tempo } from 'mppx/nextjs';
 
 /**
@@ -34,3 +35,59 @@ export const mppx = Mppx.create({
     }),
   ],
 });
+
+/**
+ * Wrap a paid recommendation route with pre-charge validation.
+ *
+ * Bodies that would fail (or come back guaranteed-empty) in the v1 handler are
+ * rejected with a 400 before the 402 challenge is ever issued, so agents don't
+ * pay for a response they can't use:
+ * - missing `weather.temperature` / `weather.wind_speed` (required by
+ *   `validateRecommendationRequest`)
+ * - `use_wardrobe_only: true` — wardrobes require a signed-in user, which the
+ *   stateless agent API never has
+ */
+export function paidRecommendationRoute(
+  amount: string,
+  handler: (request: Request) => Promise<Response>,
+): (request: Request) => Promise<Response> {
+  const charged = mppx.charge({ amount })(handler);
+
+  return async (request: Request) => {
+    let body: Record<string, unknown> | null = null;
+    try {
+      body = await request.clone().json();
+    } catch {
+      body = null;
+    }
+
+    const weather = body?.weather as
+      | { temperature?: unknown; wind_speed?: unknown }
+      | undefined;
+    // Mirror validateRecommendationRequest: both fields must be finite numbers
+    // (0 allowed). Rejecting here avoids charging for a request the v1 handler
+    // would 400 anyway.
+    if (
+      !body ||
+      !Number.isFinite(weather?.temperature) ||
+      !Number.isFinite(weather?.wind_speed)
+    ) {
+      return NextResponse.json(
+        { error: 'weather.temperature and weather.wind_speed must be finite numbers' },
+        { status: 400 },
+      );
+    }
+
+    if (body.use_wardrobe_only === true) {
+      return NextResponse.json(
+        {
+          error:
+            'use_wardrobe_only is not supported on the agent API — wardrobes require a signed-in user. Omit the flag to get catalog recommendations.',
+        },
+        { status: 400 },
+      );
+    }
+
+    return charged(request);
+  };
+}

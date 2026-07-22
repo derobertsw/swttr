@@ -267,12 +267,17 @@ export async function POST(request: NextRequest) {
   const uphillThermalProperties = predictEnsembleThermal(uphillThermalGarments);
   const uphillTotalClo = uphillThermalProperties.rcl.wholeBody;
 
-  // Pack Items
-  const packInsulationCandidates = hasUserWardrobe ? categorizedGarments.insulation : [];
+  // Pack items are descent gear. Catalog callers draw from suitableGarments
+  // (uphill OR downhill >= 6), so restrict the descent pack to insulation that
+  // actually clears the downhill threshold. Wardrobe garments stay unfiltered —
+  // they're the user's own kit and may lack activity ratings.
+  const packInsulationCandidates = hasUserWardrobe
+    ? categorizedGarments.insulation
+    : categorizedGarments.insulation.filter(
+        (g) => (g.garment_activity_ratings?.ski_touring_downhill_score ?? 0) >= 6
+      );
   const uphillIds = new Set(uphillEnsemble.map((g) => g.id));
-  const packShellCandidates = hasUserWardrobe
-    ? categorizedGarments.shells.filter((s) => !uphillIds.has(s.id))
-    : [];
+  const packShellCandidates = categorizedGarments.shells.filter((s) => !uphillIds.has(s.id));
   const additionalCloNeeded = Math.max(0, ireqDownhill.ireqNeutral - uphillTotalClo);
   const packInsulationLayer = selectPackableInsulation(
     packInsulationCandidates, additionalCloNeeded, shouldPrioritizeLightPack
