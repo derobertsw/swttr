@@ -37,13 +37,18 @@ export async function fetchGarmentsWithDetails(
     };
   }
 ): Promise<{ data: GarmentRow[] | null; error: Error | null }> {
+  const useActivityFilter =
+    !(options?.wardrobeIds && options.wardrobeIds.length > 0) && Boolean(options?.activityFilter);
+
+  // `!inner` is required for the .gte() below to drop garments under the score
+  // threshold — without it PostgREST only nulls the embed and returns every row.
   let query = supabase
     .from('garments')
     .select(`
       *,
       garment_thermal_properties (*),
       garment_protection (*),
-      garment_activity_ratings (*)
+      ${useActivityFilter ? 'garment_activity_ratings!inner (*)' : 'garment_activity_ratings (*)'}
     `);
 
   if (options?.wardrobeIds && options.wardrobeIds.length > 0) {
@@ -91,6 +96,12 @@ export async function fetchUserHandwear(
   supabase: NonNullable<ReturnType<typeof getSupabase>>,
   userId: string | null
 ): Promise<HandwearRow[]> {
+  // Anonymous callers (agent API) have no wardrobe — select from the full catalog.
+  if (!userId) {
+    const { data } = await supabase.from('handwear').select('*');
+    return (data as HandwearRow[]) || [];
+  }
+
   const ids = await getUserWardrobeItemIds(supabase, userId, 'handwear');
   if (!ids || ids.length === 0) return [];
 
@@ -109,6 +120,12 @@ export async function fetchUserHeadwear(
   supabase: NonNullable<ReturnType<typeof getSupabase>>,
   userId: string | null
 ): Promise<HeadwearRow[]> {
+  // Anonymous callers (agent API) have no wardrobe — select from the full catalog.
+  if (!userId) {
+    const { data } = await supabase.from('headwear').select('*');
+    return (data as HeadwearRow[]) || [];
+  }
+
   const ids = await getUserWardrobeItemIds(supabase, userId, 'headwear');
   if (!ids || ids.length === 0) return [];
 
