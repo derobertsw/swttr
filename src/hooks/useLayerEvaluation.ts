@@ -26,7 +26,8 @@ export function useLayerEvaluation(phases: PhaseEvaluationInput[] | null) {
       signal: controller.signal,
     })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Evaluate failed (${res.status})`))))
-      .then((data: { phases: PhaseEvaluation[] }) => {
+      .then((data: { phases?: PhaseEvaluation[] }) => {
+        if (!Array.isArray(data?.phases)) throw new Error("Malformed evaluation response");
         if (!controller.signal.aborted) setResult({ body, phases: data.phases });
       })
       .catch((err) => {
