@@ -18,7 +18,7 @@ describe("garmentsToLayerSet", () => {
     const torsoLayers = garmentsToLayerSet(garments, "torso");
 
     expect(torsoLayers.mid).toHaveLength(1);
-    expect(torsoLayers.mid[0].name).toBe("Insulated Jacket");
+    expect(torsoLayers.mid?.[0]?.name).toBe("Insulated Jacket");
     expect(torsoLayers.outer).toHaveLength(0);
   });
 });

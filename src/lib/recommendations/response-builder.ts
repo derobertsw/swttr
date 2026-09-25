@@ -15,7 +15,7 @@ import {
 import type { GarmentRow, HandwearRow, HeadwearRecommendations } from './types';
 import { formatGarmentResponse, formatHandwearResponse, formatHeadwearResponse, ensembleToThermalGarments } from './formatting';
 
-export interface EnsembleScoringInput {
+interface EnsembleScoringInput {
   ensemble: GarmentRow[];
   weather: WeatherConditions;
   activity: ActivityProfile;
@@ -27,7 +27,7 @@ export interface EnsembleScoringInput {
   };
 }
 
-export interface ResponseComponents {
+interface ResponseComponents {
   conditions: Record<string, unknown>;
   recommendation: {
     garments: ReturnType<typeof formatGarmentResponse>[];

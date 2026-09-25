@@ -86,20 +86,26 @@ export function useWardrobe() {
 
   const wardrobeItemIds = useMemo(() => new Set(wardrobeItems.map((w) => w.item_id)), [wardrobeItems]);
 
-  const baseFilteredItems = useMemo(() => {
+  const itemsMatchingNonBrandFilters = useMemo(() => {
     return availableItems.filter((item) => {
-      if (brandFilter && item.brand !== brandFilter) return false;
       if (searchBodyPartFilter !== "all" && inferAvailableBodyPart(item) !== searchBodyPartFilter) return false;
       if (searchLayerFilter !== "all" && inferAvailableLayer(item) !== searchLayerFilter) return false;
       return true;
     });
-  }, [
-    availableItems,
-    wardrobeItemIds,
-    brandFilter,
-    searchBodyPartFilter,
-    searchLayerFilter,
-  ]);
+  }, [availableItems, searchBodyPartFilter, searchLayerFilter]);
+
+  // Drop the brand filter once the other filters leave nothing from that brand.
+  if (brandFilter && !itemsMatchingNonBrandFilters.some((item) => item.brand === brandFilter)) {
+    setBrandFilter(null);
+  }
+
+  const baseFilteredItems = useMemo(
+    () =>
+      brandFilter
+        ? itemsMatchingNonBrandFilters.filter((item) => item.brand === brandFilter)
+        : itemsMatchingNonBrandFilters,
+    [itemsMatchingNonBrandFilters, brandFilter]
+  );
 
   const filteredItems = useMemo(() => {
     const searchNormalized = normalizeSearch(search);
@@ -173,12 +179,6 @@ export function useWardrobe() {
     }
     return Array.from(brands).sort();
   }, [baseFilteredItems]);
-
-  useEffect(() => {
-    if (brandFilter && !availableBrands.includes(brandFilter)) {
-      setBrandFilter(null);
-    }
-  }, [availableBrands, brandFilter]);
 
   const groupedItems = useMemo(() => {
     const groups: Record<string, AvailableItem[]> = {

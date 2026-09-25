@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
 import { ArrowDownToLine, GripVertical, Plus, Trash2 } from "lucide-react";
 import {
   LayerSet,
@@ -196,7 +196,6 @@ function LayerGroup({
   elRef,
   label,
   items,
-  layerType,
   readOnly,
   otherPhaseItems,
   syncLabel,
@@ -211,7 +210,6 @@ function LayerGroup({
   elRef?: (el: HTMLLIElement | null) => void;
   label: string;
   items: LayerItem[];
-  layerType: LayerType;
   readOnly?: boolean;
   otherPhaseItems?: LayerItem[];
   syncLabel?: string;
@@ -317,9 +315,12 @@ export function LayerItems({
   // --- Drag between layer types ---
   const [drag, setDrag] = useState<DragInfo | null>(null);
   const dragRef = useRef<DragInfo | null>(null);
-  dragRef.current = drag;
   const onMoveItemRef = useRef(onMoveItem);
-  onMoveItemRef.current = onMoveItem;
+  // Window listeners read the latest drag state and callback through refs.
+  useLayoutEffect(() => {
+    dragRef.current = drag;
+    onMoveItemRef.current = onMoveItem;
+  });
   const layerGroupRefs = useRef(new Map<LayerType, HTMLLIElement>());
 
   const getOverLayerType = useCallback((clientY: number): LayerType | null => {
@@ -414,7 +415,6 @@ export function LayerItems({
             elRef={(el) => { if (el) layerGroupRefs.current.set(layerType, el); }}
             label={LAYER_LABELS[layerType]}
             items={items}
-            layerType={layerType}
             readOnly={readOnly}
             otherPhaseItems={otherPhaseItemsForType}
             syncLabel={syncLabel}

@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarRange, CloudRain, Thermometer, Wind } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { DailyLayerPlan, MultiDayLayerPlan } from "@/types/plan";
+import type { MultiDayLayerPlan } from "@/types/plan";
 import { BODY_PART_LABELS, LAYER_LABELS } from "@/lib/layers";
-import type { PackingListData, MatchConfidence } from "@/lib/packingList";
+import type { PackingListData } from "@/lib/packingList";
 import { BODY_PART_ORDER, LAYER_TYPE_ORDER } from "@/lib/packingList";
 
 type BodyPartKey = "torso" | "legs" | "hands" | "headNeck";
-type LayerType = "base" | "mid" | "outer";
 type PackingView = "packOnce" | "perDay";
 type PackingFilter = "all" | "gaps" | BodyPartKey;
 
@@ -53,57 +52,46 @@ export default function MultiDayPlanDisplay({
   itemMappings,
   onReset,
 }: MultiDayPlanDisplayProps) {
-  const [packingList, setPackingList] = useState<PackingListData>(EMPTY_PACKING_LIST);
-  const [packingLoading, setPackingLoading] = useState(true);
+  const [packingResult, setPackingResult] = useState<{
+    days: MultiDayLayerPlan["days"];
+    itemMappings: Map<string, string> | undefined;
+    list: PackingListData;
+  } | null>(null);
   const [packingView, setPackingView] = useState<PackingView>("packOnce");
   const [activeFilter, setActiveFilter] = useState<PackingFilter>("all");
-  const [quickFixAssignments, setQuickFixAssignments] = useState<Map<string, string>>(new Map());
-
-  const resolvedItemMappings = useMemo(() => {
-    const merged = new Map(itemMappings ?? new Map<string, string>());
-    quickFixAssignments.forEach((item, key) => merged.set(key, item));
-    return merged;
-  }, [itemMappings, quickFixAssignments]);
 
   useEffect(() => {
     let isCancelled = false;
-    setPackingLoading(true);
 
     const fetchPackingList = async () => {
+      let list = EMPTY_PACKING_LIST;
       try {
         const response = await fetch("/api/packing-list", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             days: plan.days,
-            itemMappings: Object.fromEntries(resolvedItemMappings),
+            itemMappings: Object.fromEntries(itemMappings ?? new Map<string, string>()),
           }),
         });
-
-        if (!response.ok) {
-          if (!isCancelled) {
-            setPackingList(EMPTY_PACKING_LIST);
-            setPackingLoading(false);
-          }
-          return;
-        }
-
-        const data = await response.json() as { packingList: PackingListData };
-        if (!isCancelled) {
-          setPackingList(data.packingList);
-          setPackingLoading(false);
+        if (response.ok) {
+          const data = await response.json() as { packingList: PackingListData };
+          list = data.packingList;
         }
       } catch {
-        if (!isCancelled) {
-          setPackingList(EMPTY_PACKING_LIST);
-          setPackingLoading(false);
-        }
+        // Fall back to an empty packing list.
       }
+      if (!isCancelled) setPackingResult({ days: plan.days, itemMappings, list });
     };
 
     void fetchPackingList();
     return () => { isCancelled = true; };
-  }, [plan.days, resolvedItemMappings]);
+  }, [plan.days, itemMappings]);
+
+  // Loading until the stored result matches the current inputs; the previous
+  // list stays on screen while a refetch is in flight.
+  const packingLoading = packingResult?.days !== plan.days || packingResult?.itemMappings !== itemMappings;
+  const packingList = packingResult?.list ?? EMPTY_PACKING_LIST;
 
   const rangeLabel = formatPlanRange(plan.startDate, plan.endDate);
 
@@ -112,14 +100,6 @@ export default function MultiDayPlanDisplay({
     setActiveFilter("gaps");
     const gapsPanel = document.getElementById("packing-gaps");
     gapsPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const applyLikelyMatch = (mappingKey: string, suggestion: string) => {
-    setQuickFixAssignments((prev) => {
-      const next = new Map(prev);
-      next.set(mappingKey, suggestion);
-      return next;
-    });
   };
 
   return (

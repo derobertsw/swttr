@@ -182,7 +182,6 @@ export const ACTIVITY_WEIGHTS = {
 } as const;
 
 export type ActivityType = keyof typeof ACTIVITY_WEIGHTS;
-export type MetabolicRateKey = keyof typeof METABOLIC_RATES;
 export type RegionalIreqActivity = keyof typeof REGIONAL_IREQ_MULTIPLIERS;
 export type ExtremityIreqActivity = keyof typeof EXTREMITY_IREQ_MULTIPLIERS;
 

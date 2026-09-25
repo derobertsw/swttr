@@ -25,7 +25,7 @@ if (!secretKey) {
 const currency =
   process.env.MPP_CURRENCY ?? '0x20c0000000000000000000000000000000000000';
 
-export const mppx = Mppx.create({
+const mppx = Mppx.create({
   secretKey,
   methods: [
     tempo({

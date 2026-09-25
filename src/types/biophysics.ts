@@ -64,12 +64,13 @@ export interface IreqRange {
   validation_source?: string;
 }
 
+/** Per-dimension ensemble scores (0-10), as returned by scoreEnsemble. */
 export interface ComponentScores {
-  thermal: number;
-  moisture: number;
-  protection: number;
+  coldProtection: number;
+  overheatPrevention: number;
+  breathability: number;
+  weatherProtection: number;
   weight: number;
-  mobility: number;
 }
 
 export interface RegionalClo {

@@ -8,7 +8,7 @@ export function formatDetailValue(
   return value.toFixed(decimals);
 }
 
-export function getGarmentCoverageAreas(details: WardrobeItem["details"]): string[] {
+function getGarmentCoverageAreas(details: WardrobeItem["details"]): string[] {
   const coverage: string[] = [];
   if (details.covers_torso) coverage.push("Torso");
   if (details.covers_arms) coverage.push("Arms");
@@ -17,7 +17,7 @@ export function getGarmentCoverageAreas(details: WardrobeItem["details"]): strin
   return coverage;
 }
 
-export function getHeadCoverageAreas(details: WardrobeItem["details"]): string[] {
+function getHeadCoverageAreas(details: WardrobeItem["details"]): string[] {
   const coverage: string[] = [];
   if (details.covers_ears) coverage.push("Ears");
   if (details.covers_neck) coverage.push("Neck");

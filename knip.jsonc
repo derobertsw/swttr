@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "tags": ["-lintignore"],
+  "ignoreDependencies": [
+    // Linked natively by ios/App/CapApp-SPM/Package.swift; never imported from JS.
+    "@capacitor/splash-screen",
+    // Loaded through postcss.config.mjs by Next's bundled PostCSS.
+    "postcss"
+  ],
+  "ignoreIssues": {
+    // Vendored shadcn/ui components keep their full upstream export surface.
+    "src/components/ui/**": ["exports", "types"]
+  }
+}

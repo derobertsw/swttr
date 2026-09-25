@@ -7,32 +7,48 @@ function makeMinimalBiophysics(
   garments: BiophysicsRecommendation["recommendation"]["garments"] = []
 ): BiophysicsRecommendation {
   return {
-    recommendation: { garments },
-    biophysics: {} as BiophysicsRecommendation["biophysics"],
-  } as BiophysicsRecommendation;
+    conditions: { temperature: "30°F", wind_speed: "5 mph", precipitation: false },
+    ireq: { target_range: [1, 2] },
+    recommendation: {
+      garments,
+      ensemble_properties: { total_clo: 0, evap_potential: 0, permeability_index: 0 },
+      score: 0,
+      component_scores: {
+        coldProtection: 0,
+        overheatPrevention: 0,
+        breathability: 0,
+        weatherProtection: 0,
+        weight: 0,
+      },
+    },
+    warnings: [],
+    guidance: [],
+  };
 }
 
 const HANDWEAR_A: RecommendedHandwear = {
   id: "glove-a",
+  type: "insulated",
   name: "Glove A",
   rcl: 0.5,
 };
 
 const HANDWEAR_B: RecommendedHandwear = {
   id: "glove-b",
+  type: "insulated",
   name: "Glove B",
   rcl: 0.8,
 };
 
 const HEADWEAR_A: RecommendedHeadwear = {
-  head_warmth: { id: "beanie-a", name: "Beanie A", rcl: 0.2 },
+  head_warmth: { id: "beanie-a", name: "Beanie A", type: "beanie", rcl: 0.2 },
   neck_warmth: null,
   helmet: null,
 };
 
 const HEADWEAR_B: RecommendedHeadwear = {
-  head_warmth: { id: "beanie-b", name: "Beanie B", rcl: 0.4 },
-  neck_warmth: { id: "gaiter-b", name: "Gaiter B", rcl: 0.15 },
+  head_warmth: { id: "beanie-b", name: "Beanie B", type: "beanie", rcl: 0.4 },
+  neck_warmth: { id: "gaiter-b", name: "Gaiter B", type: "neck_gaiter", rcl: 0.15 },
   helmet: null,
 };
 

@@ -8,12 +8,12 @@ import type { GarmentRow, CategorizedGarments, HandwearRow, HeadwearRow } from '
 import { getUserWardrobeGarmentIds, fetchGarmentsWithDetails, fetchUserHandwear, fetchUserHeadwear } from './database';
 import { categorizeGarments } from './categorization';
 
-export interface ActivityRouteConfig {
+interface ActivityRouteConfig {
   activityFilter?: { field: string; minScore: number };
   forceWardrobeOnly?: boolean;
 }
 
-export interface PreparedRouteData {
+interface PreparedRouteData {
   wardrobeIds: string[] | null;
   useWardrobe: boolean;
   allGarments: GarmentRow[];

@@ -3,7 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { BodyPart, LayerType, UserItemMapping } from "@/types/wardrobe";
 import { getAuthUserId } from "@/lib/auth";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const supabase = getSupabase();
   const userId = await getAuthUserId();
 

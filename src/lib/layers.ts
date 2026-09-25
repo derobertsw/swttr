@@ -81,11 +81,6 @@ export function createEmptyLayerSet(): LayerSet {
  * @param rcl - Optional thermal resistance (clo) value
  * @returns Formatted string with clo value appended if available
  */
-export function formatGarmentWithClo(name: string, rcl?: number): string {
-  const cloStr = rcl !== undefined ? ` (${rcl.toFixed(2)} clo)` : "";
-  return `${name}${cloStr}`;
-}
-
 /**
  * Transforms biophysics garments into a LayerSet format for display.
  * Filters garments by body part coverage (torso or legs) and organizes

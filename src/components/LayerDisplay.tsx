@@ -16,12 +16,10 @@ import BiophysicsDetails from "@/components/BiophysicsDetails";
 import {
   BodyPart,
   BODY_PARTS,
-  BODY_PART_LABELS,
   BODY_PART_TO_REGION,
   BODY_PART_TO_EXTREMITY,
   createEmptyLayerSet,
   garmentsToLayerSet,
-  LAYER_LABELS,
   LayerType,
   LayerSet,
   LayerItem,
@@ -33,7 +31,6 @@ import {
 } from "@/lib/biophysics/comfort";
 import { ENSEMBLE_REGRESSION, REGIONAL_WEIGHTS } from "@/lib/biophysics/constants";
 import { ACTIVITIES } from "@/data/activities";
-import { useAuth } from "@clerk/nextjs";
 import {
   Popover,
   PopoverContent,
@@ -146,47 +143,6 @@ function getCloValues(
   return { currentClo: undefined, targetClo: undefined };
 }
 
-/**
- * Calculate whole-body clo from regional values and mutable layers.
- * Uses the same weighted average method as the backend for consistency.
- */
-function calculateWholeBodyClo(
-  regionalClo: RegionalClo | undefined,
-  mutableLayers: MutableLayers,
-  biophysicsActive: boolean
-): number | undefined {
-  if (!regionalClo) return undefined;
-
-  // Calculate torso clo from mutable layers if biophysics is active
-  let torsoClo = regionalClo.torso;
-  if (biophysicsActive) {
-    const rawSum = (["base", "mid", "outer"] as LayerType[]).reduce((sum, lt) => {
-      const items = mutableLayers.torso[lt];
-      return sum + (items ? items.reduce((s, item) => s + (item.rcl ?? 0), 0) : 0);
-    }, 0);
-    const coef = ENSEMBLE_REGRESSION.thermal.torso.coef;
-    torsoClo = rawSum * coef;
-  }
-
-  // Calculate legs clo from mutable layers if biophysics is active
-  let legsClo = regionalClo.legs;
-  if (biophysicsActive) {
-    const rawSum = (["base", "mid", "outer"] as LayerType[]).reduce((sum, lt) => {
-      const items = mutableLayers.legs[lt];
-      return sum + (items ? items.reduce((s, item) => s + (item.rcl ?? 0), 0) : 0);
-    }, 0);
-    const coef = ENSEMBLE_REGRESSION.thermal.leg.coef;
-    legsClo = rawSum * coef;
-  }
-
-  // Arms aren't independently editable, use API value
-  const armsClo = regionalClo.arms;
-
-  // Apply regional weights
-  const wt = REGIONAL_WEIGHTS;
-  return torsoClo * wt.torso + armsClo * wt.arm + legsClo * wt.leg;
-}
-
 type MutableLayers = Record<BodyPart, LayerSet>;
 const LAYER_TYPES: LayerType[] = ["base", "mid", "outer"];
 
@@ -256,7 +212,12 @@ function collectInUseIds(layers: MutableLayers): Set<string> {
  * Displays layered clothing recommendations organized by body part.
  * Supports both static recommendations and biophysics-based recommendations.
  */
-const LayerDisplay = ({
+const LayerDisplay = (props: LayerDisplayProps) => {
+  if (!props.recommendation && !props.biophysicsData) return null;
+  return <LayerDisplayContent {...props} />;
+};
+
+const LayerDisplayContent = ({
   activity,
   recommendation,
   temperature,
@@ -270,7 +231,6 @@ const LayerDisplay = ({
   onActivityChange,
   weatherLoading,
 }: LayerDisplayProps) => {
-  const { userId } = useAuth();
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
   const [activityPopoverOpen, setActivityPopoverOpen] = useState(false);
   const [activePhase, setActivePhase] = useState<"climb" | "descent">("climb");
@@ -288,9 +248,7 @@ const LayerDisplay = ({
   const {
     mutableLayers,
     layerEditDelta,
-    totalLayerEditDelta,
     inUseItemIds,
-    hasSwttrRecommendsInUse,
     addItem: addMutableItem,
     removeItem: removeMutableItem,
     replaceItem: replaceMutableItem,
@@ -440,9 +398,11 @@ const LayerDisplay = ({
     };
     const isDescent = phase === "descent";
     if (replaceIndex !== null) {
-      isDescent ? replaceDescentItem(bp, lt, replaceIndex, newItem) : replaceMutableItem(bp, lt, replaceIndex, newItem);
+      if (isDescent) replaceDescentItem(bp, lt, replaceIndex, newItem);
+      else replaceMutableItem(bp, lt, replaceIndex, newItem);
     } else {
-      isDescent ? addDescentItem(bp, lt, newItem) : addMutableItem(bp, lt, newItem);
+      if (isDescent) addDescentItem(bp, lt, newItem);
+      else addMutableItem(bp, lt, newItem);
     }
     if (!item.isOwned) {
       toast.info("This item isn't in your wardrobe yet. Add it for better future recommendations.", {
@@ -463,7 +423,8 @@ const LayerDisplay = ({
   const handlePickerRemove = useCallback(() => {
     if (!pickerTarget || pickerTarget.replaceIndex === null) return;
     const { bodyPart: bp, layerType: lt, replaceIndex, phase } = pickerTarget;
-    phase === "descent" ? removeDescentItem(bp, lt, replaceIndex) : removeMutableItem(bp, lt, replaceIndex);
+    if (phase === "descent") removeDescentItem(bp, lt, replaceIndex);
+    else removeMutableItem(bp, lt, replaceIndex);
     setPickerTarget(null);
   }, [pickerTarget, removeMutableItem, removeDescentItem]);
 
@@ -477,12 +438,8 @@ const LayerDisplay = ({
   const descentPackClo = descentPackItems.reduce((sum, item) => {
     return sum + (typeof item.rcl_clo === "number" ? item.rcl_clo : 0);
   }, 0);
-  const downhillTargetMinClo = biophysicsData?.ireq?.downhill_target_range?.[0]
-    ?? biophysicsData?.ireq?.downhill?.min;
   // Preliminary descent clo from API data (used for early guards); refined after bodyPartSections and descentBodyPartSections
   let estimatedDescentClo: number | undefined = totalClo !== undefined ? totalClo + descentPackClo + descentHelmetClo : undefined;
-
-  if (!recommendation && !biophysicsData) return null;
 
   const uphillTargetRange = biophysicsData?.ireq?.target_range;
   const downhillTargetRange = biophysicsData?.ireq?.downhill_target_range
@@ -694,7 +651,7 @@ const LayerDisplay = ({
   const descentStatusSummary = getThermalSummary(descentDecision);
   const descentImmediateAction = getImmediateAction(descentDecision);
 
-  const pickerCloContext = useMemo(() => {
+  const pickerCloContext = (() => {
     if (!pickerTarget || !biophysicsActive) return undefined;
     const sections = pickerTarget.phase === "descent" ? descentBodyPartSections : bodyPartSections;
     const section = sections.find((s) => s.part === pickerTarget.bodyPart);
@@ -704,7 +661,7 @@ const LayerDisplay = ({
       currentClo: section.currentClo,
       delta: section.targetClo - section.currentClo,
     };
-  }, [pickerTarget, biophysicsActive, bodyPartSections, descentBodyPartSections]);
+  })();
 
   const recommendedItems = useMemo(() => {
     const items: { name: string; brand: string; sourceId: string; bodyPart: BodyPart }[] = [];

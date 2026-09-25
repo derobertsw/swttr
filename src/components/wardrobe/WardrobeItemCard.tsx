@@ -2,7 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { SwipeableItem } from "@/components/SwipeableItem";
 import type { WardrobeItem } from "@/types/wardrobe";
 import { cn } from "@/lib/utils";
-import { formatCategory, getClo, getItemIcon } from "./wardrobe-utils";
+import { formatCategory, getClo, ItemIcon } from "./wardrobe-utils";
 
 interface WardrobeItemCardProps {
   item: WardrobeItem;
@@ -20,7 +20,6 @@ export function WardrobeItemCard({
   onClick,
 }: WardrobeItemCardProps) {
   const isCustom = item.item_type === "custom";
-  const Icon = getItemIcon(item.item_type, item.details.garment_type, item.details.category);
 
   const category =
     item.details.category ||
@@ -53,7 +52,12 @@ export function WardrobeItemCard({
               : "border-slate-300/80 bg-white/75 text-slate-700"
           )}
         >
-          <Icon className="size-[18px]" />
+          <ItemIcon
+            itemType={item.item_type}
+            garmentType={item.details.garment_type}
+            category={item.details.category}
+            className="size-[18px]"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <p

@@ -37,6 +37,19 @@ const SKIP_REASON_LABEL: Record<string, string> = {
   activity_unsupported: "activity not yet supported by the engine",
 };
 
+async function fetchPackList(tripId: string): Promise<TripPackResponse> {
+  const res = await fetch(`/api/v1/trips/${tripId}/pack`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error ?? `Failed (${res.status})`);
+  }
+  return (await res.json()) as TripPackResponse;
+}
+
+function toErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "Failed to load pack list";
+}
+
 export default function PackListPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [data, setData] = useState<TripPackResponse | null>(null);
@@ -44,28 +57,36 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = async () => {
+  useEffect(() => {
+    let cancelled = false;
+    fetchPackList(id)
+      .then((body) => {
+        if (cancelled) return;
+        setData(body);
+        setError(null);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(toErrorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const refresh = async () => {
+    setRefreshing(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v1/trips/${id}/pack`);
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error ?? `Failed (${res.status})`);
-      }
-      const body = (await res.json()) as TripPackResponse;
-      setData(body);
+      setData(await fetchPackList(id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load pack list");
+      setError(toErrorMessage(err));
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   };
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
 
   const sections = useMemo(() => {
     if (!data) return [];
@@ -120,8 +141,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
           <button
             type="button"
             onClick={() => {
-              setRefreshing(true);
-              load();
+              void refresh();
             }}
             disabled={refreshing}
             className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-white/14 bg-white/[0.06] px-3 text-xs font-medium text-white/85 hover:bg-white/[0.10] disabled:opacity-50"

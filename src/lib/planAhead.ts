@@ -32,10 +32,10 @@ interface BuildMultiDayLayerPlanArgs {
   getRecommendation: (effectiveTemperature: number) => Recommendation | null;
 }
 
-export const RELEVANT_DAY_START_HOUR = 6;
-export const RELEVANT_DAY_END_HOUR = 21;
+const RELEVANT_DAY_START_HOUR = 6;
+const RELEVANT_DAY_END_HOUR = 21;
 
-export const DAYPARTS: DaypartDefinition[] = [
+const DAYPARTS: DaypartDefinition[] = [
   { id: "morning", label: "Morning", startHour: 6, endHour: 10, timeRangeLabel: "6am-10am" },
   { id: "midday", label: "Midday", startHour: 11, endHour: 15, timeRangeLabel: "11am-3pm" },
   { id: "evening", label: "Evening", startHour: 16, endHour: 21, timeRangeLabel: "4pm-9pm" },

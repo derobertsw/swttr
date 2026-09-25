@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { useLayerPicker } from "./useLayerPicker";
 import type { WardrobeItem, AvailableItem } from "@/types/wardrobe";
 
@@ -54,7 +54,15 @@ const JACKET_WARDROBE: WardrobeItem = makeWardrobeItem({
     model_name: "Mid Layer",
     category: "mid_layer_heavy",
     garment_type: "jacket",
-    garment_thermal_properties: { rcl_whole_body: 0.8, rcl_torso: 0.85, rcl_legs: 0 },
+    garment_thermal_properties: {
+      garment_id: "jacket-1",
+      rcl_whole_body: 0.8,
+      rcl_torso: 0.85,
+      rcl_legs: 0,
+      estimation_method: "lab_tested",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+    },
   },
 });
 

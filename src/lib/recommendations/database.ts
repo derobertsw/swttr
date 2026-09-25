@@ -71,7 +71,7 @@ export async function fetchGarmentsWithDetails(
 /**
  * Get user's wardrobe item IDs by type
  */
-export async function getUserWardrobeItemIds(
+async function getUserWardrobeItemIds(
   supabase: ReturnType<typeof getSupabase>,
   userId: string | null,
   itemType: 'garment' | 'handwear' | 'headwear'

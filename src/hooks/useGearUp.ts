@@ -346,20 +346,12 @@ export function useGearUp() {
   }, []);
 
   // Set initial activity once from stored/server preferences.
-  useEffect(() => {
-    if (hasSetInitialActivity || !defaultActivity) return;
-
-    if (hasStoredDefaultActivity) {
-      setActivityState(defaultActivity);
-      setHasSetInitialActivity(true);
-      return;
-    }
-
-    if (preferencesLoading) return;
-
-    setActivityState(defaultActivity);
+  const initialActivityReady =
+    Boolean(defaultActivity) && (hasStoredDefaultActivity || !preferencesLoading);
+  if (!hasSetInitialActivity && initialActivityReady) {
     setHasSetInitialActivity(true);
-  }, [defaultActivity, hasSetInitialActivity, hasStoredDefaultActivity, preferencesLoading]);
+    setActivityState(defaultActivity);
+  }
 
   // Update input mode when URL param changes
   useEffect(() => {

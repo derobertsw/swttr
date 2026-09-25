@@ -1,6 +1,6 @@
 import type { ActivityType } from './constants';
 
-export interface ActivityTargetRangeInput {
+interface ActivityTargetRangeInput {
   activity: ActivityType;
   ireqMin: number;
   ireqNeutral: number;
@@ -9,7 +9,7 @@ export interface ActivityTargetRangeInput {
   windSpeedMs: number;
 }
 
-export interface ActivityTargetRangeResult {
+interface ActivityTargetRangeResult {
   min: number;
   max: number;
 }

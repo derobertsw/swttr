@@ -7,7 +7,7 @@ export const COWEDA_VALIDATION_SOURCE = "potter_2020_coweda_validation";
  * Potter et al. (2020), Informatics in Medicine Unlocked 18:100301.
  * "Validation of new method for predicting human skin temperatures during cold exposure: CoWEDA"
  */
-export const COWEDA_VALIDATION_METRICS = {
+const COWEDA_VALIDATION_METRICS = {
   allSkin: { maeC: 1.85, rmseC: 2.28 },
   finger: { maeC: 2.68, rmseC: 2.68 },
   meanSkin: { maeC: 1.06, rmseC: 1.25 },
@@ -15,7 +15,7 @@ export const COWEDA_VALIDATION_METRICS = {
   exerciseR2: 0.8,
 } as const;
 
-export interface CowedaValidationBuffer {
+interface CowedaValidationBuffer {
   wholeBody: number;
   coldRisk: number;
   extremity: number;
@@ -32,7 +32,7 @@ interface ExtremityTargetShape {
   neutral: { hands: number; head: number };
 }
 
-export interface CowedaBufferInput {
+interface CowedaBufferInput {
   airTempC: number;
   relativeHumidity: number;
   metabolicRate: number;

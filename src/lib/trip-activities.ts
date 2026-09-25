@@ -13,7 +13,7 @@ export const TRIP_ACTIVITY_OPTIONS = [
   "Rest",
 ] as const;
 
-export type TripActivity = (typeof TRIP_ACTIVITY_OPTIONS)[number];
+type TripActivity = (typeof TRIP_ACTIVITY_OPTIONS)[number];
 
 // Map the trip chip label to the activity key used by the biophysics
 // recommendation engine (src/data/activities.ts / layerRecommendations.json).
@@ -22,7 +22,7 @@ export type TripActivity = (typeof TRIP_ACTIVITY_OPTIONS)[number];
 //
 // `satisfies` makes this object a compile error if a TripActivity key is
 // missing or misspelled, while still narrowing each value to string | null.
-export const TRIP_ACTIVITY_TO_RECOMMENDATION_KEY = {
+const TRIP_ACTIVITY_TO_RECOMMENDATION_KEY = {
   Alpine: "alpine_skiing",
   Backcountry: "backcountry_skiing",
   XC: "xc_skiing",

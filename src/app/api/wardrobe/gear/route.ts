@@ -8,7 +8,7 @@ type ItemType = "garment" | "handwear" | "headwear" | "custom";
  * GET /api/wardrobe/gear
  * Get user's wardrobe items with full details
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   const supabase = getSupabase();
   const userId = await getAuthUserId();
 

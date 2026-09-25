@@ -38,7 +38,7 @@ function buildMediaUrl(path: string, itemType: ItemType, itemId: string): string
   return `${path}?${params.toString()}`;
 }
 
-export function normalizeBrandKey(brand: string): string {
+function normalizeBrandKey(brand: string): string {
   return brand
     .toLowerCase()
     .normalize("NFD")

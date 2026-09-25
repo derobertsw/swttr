@@ -5,7 +5,7 @@ interface PartGroups {
   [part: string]: WardrobeItem[];
 }
 
-export interface WardrobeBodyPartSummary {
+interface WardrobeBodyPartSummary {
   part: string;
   label: string;
   activeCount: number;
@@ -14,7 +14,7 @@ export interface WardrobeBodyPartSummary {
   isEmpty: boolean;
 }
 
-export interface WardrobeOverview {
+interface WardrobeOverview {
   totalItems: number;
   activeItems: number;
   totalDisabledItems: number;

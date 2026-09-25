@@ -3,8 +3,8 @@ export const EXTREMITY_DEFICIT_CLO_THRESHOLD = 0.1;
 export const OVERHEAT_BUFFER_CLO = 0.3;
 export const THERMAL_DISPLAY_CLO_EPSILON = 0.05;
 
-export type ThermalRiskType = "comfortable" | "cold" | "overheat";
-export type ThermalRiskSeverity = "moderate" | "high";
+type ThermalRiskType = "comfortable" | "cold" | "overheat";
+type ThermalRiskSeverity = "moderate" | "high";
 
 export interface RegionalCloValues {
   torso: number;
@@ -17,7 +17,7 @@ export interface ExtremityCloValues {
   head: number;
 }
 
-export interface ThermalComfortDecision {
+interface ThermalComfortDecision {
   riskType: ThermalRiskType;
   severity: ThermalRiskSeverity;
   delta: number;

@@ -43,6 +43,12 @@ const ActivitySelection = ({
   const [api, setApi] = React.useState<CarouselApi>();
   const selectedIndex = getActivityIndex(value);
   const [current, setCurrent] = React.useState(selectedIndex);
+  // Follow the controlled value when it changes from outside the carousel.
+  const [prevSelectedIndex, setPrevSelectedIndex] = React.useState(selectedIndex);
+  if (selectedIndex !== prevSelectedIndex) {
+    setPrevSelectedIndex(selectedIndex);
+    setCurrent(selectedIndex);
+  }
   const onChangeRef = React.useRef(onChange);
   const valueRef = React.useRef(value);
   const activityButtonRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
@@ -96,8 +102,6 @@ const ActivitySelection = ({
   }, [api]);
 
   React.useEffect(() => {
-    setCurrent(selectedIndex);
-
     if (!api) return;
     if (api.selectedScrollSnap() === selectedIndex) return;
 
