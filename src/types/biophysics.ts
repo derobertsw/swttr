@@ -178,6 +178,57 @@ export interface BiophysicsRecommendation {
   transition_protocol?: TransitionProtocol;
 }
 
+// ============================================
+// Layer evaluation: POST /api/v1/ensembles/evaluate
+// ============================================
+
+export type EvaluatedBodyPart = "torso" | "legs" | "hands" | "headNeck";
+
+export interface ThermalDecision {
+  riskType: "comfortable" | "cold" | "overheat";
+  severity: "moderate" | "high";
+  /** How far outside the target the clo is. */
+  delta: number;
+}
+
+export interface PhaseEvaluationInput {
+  /** Clo of each item worn on each body part. */
+  itemClo: Record<EvaluatedBodyPart, number[]>;
+  /** Neutral clo target per body part, when the recommendation has one. */
+  targets: Partial<Record<EvaluatedBodyPart, number>>;
+  /**
+   * Arms aren't edited directly, so their clo comes from the recommendation.
+   * `deficitClo` overrides `clo` for the arm deficit (the descent reports its
+   * own arm clo); the whole-body total always uses `clo`.
+   */
+  arms?: { clo: number; target?: number; deficitClo?: number };
+  targetRange?: [number, number];
+}
+
+export interface BodyPartEvaluation {
+  clo: number;
+  target?: number;
+  /** target - clo: positive when more insulation is needed. */
+  delta?: number;
+  status?: "under" | "over" | "in_range";
+}
+
+export interface PhaseEvaluation {
+  bodyParts: Record<EvaluatedBodyPart, BodyPartEvaluation>;
+  /** Regional clo weighted by each region's share of the body. */
+  breakdown?: {
+    regions: { region: "torso" | "arms" | "legs"; clo: number; weight: number; contribution: number }[];
+    total: number;
+  };
+  totalClo?: number;
+  maxRegionalDeficit: number;
+  maxExtremityDeficit: number;
+  hasRegionalGap: boolean;
+  hasExtremityGap: boolean;
+  decision: ThermalDecision | null;
+  comfortScore: number | null;
+}
+
 /**
  * Activity ID to API endpoint mapping
  */

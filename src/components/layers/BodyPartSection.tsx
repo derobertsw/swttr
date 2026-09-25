@@ -5,6 +5,7 @@ import { Shirt, Footprints, Hand, HardHat, ChevronRight } from "lucide-react";
 import { BodyPart, LayerType, LayerSet, BODY_PART_LABELS, hasAnyLayers } from "@/lib/layers";
 import { cn } from "@/lib/utils";
 import { LayerItems } from "./LayerItems";
+import type { BodyPartEvaluation } from "@/types/biophysics";
 
 interface BodyPartSectionProps {
   bodyPart: BodyPart;
@@ -12,6 +13,8 @@ interface BodyPartSectionProps {
   biophysicsActive: boolean;
   currentClo: number | undefined;
   targetClo: number | undefined;
+  /** Actual vs target, from the layer evaluation. */
+  status?: BodyPartEvaluation["status"];
   itemMappings?: Map<string, string>;
   defaultCollapsed?: boolean;
   colorScheme?: "climb" | "descent";
@@ -63,6 +66,7 @@ export function BodyPartSection({
   biophysicsActive,
   currentClo,
   targetClo,
+  status,
   itemMappings,
   defaultCollapsed = false,
   colorScheme,
@@ -77,24 +81,15 @@ export function BodyPartSection({
 }: BodyPartSectionProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
-  const effectiveCurrentClo = currentClo;
   const hasContent = hasAnyLayers(layers);
-  const deficitClo =
-    targetClo !== undefined
-      ? Math.max(0, targetClo - (effectiveCurrentClo ?? 0))
-      : 0;
-  const surplusClo =
-    targetClo !== undefined && effectiveCurrentClo !== undefined
-      ? Math.max(0, effectiveCurrentClo - targetClo)
-      : 0;
   const actualPillClass =
-    targetClo === undefined
-      ? "border-slate-300/70 bg-slate-100/70 text-slate-600"
-      : deficitClo > 0.15
-        ? "border-sky-500 bg-sky-200 text-sky-950 font-bold"
-        : surplusClo > 0.35
-          ? "border-amber-500 bg-amber-200 text-amber-950 font-bold"
-          : "border-emerald-500 bg-emerald-200 text-emerald-950 font-bold";
+    status === "under"
+      ? "border-sky-500 bg-sky-200 text-sky-950 font-bold"
+      : status === "over"
+        ? "border-amber-500 bg-amber-200 text-amber-950 font-bold"
+        : status === "in_range"
+          ? "border-emerald-500 bg-emerald-200 text-emerald-950 font-bold"
+          : "border-slate-300/70 bg-slate-100/70 text-slate-600";
 
   return (
     <div
@@ -118,13 +113,13 @@ export function BodyPartSection({
           {BODY_PART_LABELS[bodyPart]}
         </h3>
         <div className="flex items-center gap-2">
-          {targetClo !== undefined && effectiveCurrentClo !== undefined && (
+          {targetClo !== undefined && currentClo !== undefined && (
             <div className="flex items-center gap-1.5">
               <span className="rounded-full border border-slate-300/70 bg-slate-100/70 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-slate-600">
                 Target {targetClo.toFixed(1)} clo
               </span>
               <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums", actualPillClass)}>
-                Actual {effectiveCurrentClo.toFixed(1)} clo
+                Actual {currentClo.toFixed(1)} clo
               </span>
             </div>
           )}

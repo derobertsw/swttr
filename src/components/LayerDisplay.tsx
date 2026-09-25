@@ -1,53 +1,41 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, Backpack, Check, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
-import { Recommendation } from "@/types/recommendations";
+import { useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { toast } from "sonner";
+import type { Recommendation } from "@/types/recommendations";
 import type { PrecipitationType } from "@/types/weather";
-import {
+import type {
   BiophysicsRecommendation,
-  RecommendedHandwear,
-  RecommendedHeadwear,
-  RegionalClo,
-  RegionalIreqRange,
   ExtremityIreqRange,
+  PackItemGarment,
+  PhaseEvaluationInput,
+  RegionalIreqRange,
 } from "@/types/biophysics";
 import BiophysicsDetails from "@/components/BiophysicsDetails";
 import {
-  BodyPart,
   BODY_PARTS,
-  BODY_PART_TO_REGION,
-  BODY_PART_TO_EXTREMITY,
+  buildDescentLayers,
+  buildRecommendedLayers,
+  collectInUseIds,
   createEmptyLayerSet,
-  garmentsToLayerSet,
-  LayerType,
-  LayerSet,
-  LayerItem,
+  itemCloByBodyPart,
+  itemNamesMissingFrom,
+  type BodyPart,
+  type BodyPartLayers,
+  type LayerItem,
+  type LayerType,
 } from "@/lib/layers";
-import {
-  calculateThermalComfortScore,
-  evaluateThermalComfort,
-  THERMAL_DISPLAY_CLO_EPSILON,
-} from "@/lib/biophysics/comfort";
-import { ENSEMBLE_REGRESSION, REGIONAL_WEIGHTS } from "@/lib/biophysics/constants";
-import { ACTIVITIES } from "@/data/activities";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  WeatherHeader,
-  ThermalGauge,
-  BodyPartSection,
-  WeatherEditDrawer,
-} from "@/components/layers";
-import type { CloBreakdown } from "@/components/layers/ThermalGauge";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { useMutableLayers } from "@/hooks/useMutableLayers";
-import { useLayerPicker, PickerItem } from "@/hooks/useLayerPicker";
+import { WeatherHeader, BodyPartSection, WeatherEditDrawer } from "@/components/layers";
 import { LayerPickerDrawer } from "@/components/layers/LayerPickerDrawer";
+import { ActivityHeader } from "@/components/layers/ActivityHeader";
+import { ComfortOverview } from "@/components/layers/ComfortOverview";
+import { PackItemsCard } from "@/components/layers/PackItemsCard";
+import { RecommendedItemsCard, type RecommendedItem } from "@/components/layers/RecommendedItemsCard";
+import { useEditableLayers } from "@/hooks/useEditableLayers";
+import { useLayerEvaluation } from "@/hooks/useLayerEvaluation";
+import { useLayerPicker, type PickerItem } from "@/hooks/useLayerPicker";
 
 interface LayerDisplayProps {
   activity?: string;
@@ -64,148 +52,45 @@ interface LayerDisplayProps {
   weatherLoading?: boolean;
 }
 
-interface CloValues {
-  currentClo: number | undefined;
-  targetClo: number | undefined;
+type Phase = "climb" | "descent";
+
+interface PickerTarget {
+  bodyPart: BodyPart;
+  layerType: LayerType;
+  replaceIndex: number | null;
+  phase: Phase;
 }
 
-const ACTIVITY_HEADER_LABELS: Record<string, string> = {
-  running: "Running",
-  biking: "Biking",
-  hiking_snowshoeing: "Hiking",
-  backcountry_skiing: "Backcountry",
-  alpine_skiing: "Alpine",
-  xc_skiing: "XC",
-};
+const NO_PACK_ITEMS: PackItemGarment[] = [];
 
-type ThermalDecisionState = NonNullable<ReturnType<typeof evaluateThermalComfort>>;
-
-function getThermalSummary(state: ThermalDecisionState | null): string {
-  if (!state) return "Layer guidance generated for current conditions.";
-  if (state.riskType === "comfortable") return "Insulation is within your comfort target.";
-  if (state.riskType === "cold") return `${state.severity === "high" ? "Significantly" : "Slightly"} under-insulated (+${state.delta.toFixed(1)} clo needed).`;
-  return `${state.severity === "high" ? "Significantly" : "Slightly"} over-insulated (-${state.delta.toFixed(1)} clo advised).`;
+/** Each body part's neutral clo target from a recommendation's IREQ ranges. */
+function bodyPartTargets(
+  regional: RegionalIreqRange | undefined,
+  extremity: ExtremityIreqRange | undefined
+): PhaseEvaluationInput["targets"] {
+  return {
+    torso: regional?.neutral?.torso,
+    legs: regional?.neutral?.legs,
+    hands: extremity?.neutral?.hands,
+    headNeck: extremity?.neutral?.head,
+  };
 }
 
-function getImmediateAction(state: ThermalDecisionState | null): string {
-  if (!state) return "Review body-part recommendations below.";
-  if (state.riskType === "comfortable") return "Current setup is in range; keep vents and exertion in mind.";
-  if (state.riskType === "cold") {
-    return state.severity === "high"
-      ? "Add a warmer base and an insulating mid-layer now."
-      : "Add a light-to-mid insulation layer now.";
-  }
-  return state.severity === "high"
-    ? "Remove a warm layer and open vents immediately."
-    : "Drop one layer or increase venting to avoid overheating.";
-}
-
-/**
- * Calculates current and target clo values for a body part based on biophysics data.
- */
-function getCloValues(
-  bodyPart: BodyPart,
-  regionalClo: RegionalClo | undefined,
-  regionalIreq: RegionalIreqRange | undefined,
-  extremityIreq: ExtremityIreqRange | undefined,
-  handwear: RecommendedHandwear | null | undefined,
-  headwear: RecommendedHeadwear | null | undefined,
-  includeHelmetClo = true
-): CloValues {
-  const region = BODY_PART_TO_REGION[bodyPart];
-  const extremity = BODY_PART_TO_EXTREMITY[bodyPart];
-
-  if (region) {
-    return {
-      currentClo: regionalClo?.[region],
-      targetClo: regionalIreq?.neutral?.[region],
-    };
-  }
-
-  if (extremity) {
-    let currentClo: number | undefined;
-
-    if (extremity === "hands" && handwear) {
-      currentClo = handwear.rcl;
-    } else if (extremity === "head" && headwear) {
-      currentClo =
-        (includeHelmetClo ? (headwear.helmet?.rcl ?? 0) : 0) +
-        (headwear.head_warmth?.rcl ?? 0) +
-        (headwear.neck_warmth?.rcl ?? 0);
-    }
-
-    return {
-      currentClo,
-      targetClo: extremityIreq?.neutral?.[extremity],
-    };
-  }
-
-  return { currentClo: undefined, targetClo: undefined };
-}
-
-type MutableLayers = Record<BodyPart, LayerSet>;
-const LAYER_TYPES: LayerType[] = ["base", "mid", "outer"];
-
-function buildDescentLayers(
-  garments: BiophysicsRecommendation["recommendation"]["garments"] | undefined,
-  climbHandwear: RecommendedHandwear | null | undefined,
-  climbHeadwear: RecommendedHeadwear | null | undefined,
-  packItems: { id: string; name: string; rcl_clo?: number }[],
-  dHandwear: RecommendedHandwear | null | undefined,
-  dHeadwear: RecommendedHeadwear | null | undefined,
-): MutableLayers {
-  const torso = garments ? garmentsToLayerSet(garments, "torso") : createEmptyLayerSet();
-  const legs = garments ? garmentsToLayerSet(garments, "legs") : createEmptyLayerSet();
-
-  // Append pack items to torso outer
-  const packLayerItems: LayerItem[] = packItems.map((item) => ({
-    name: item.name,
-    rcl: typeof item.rcl_clo === "number" ? item.rcl_clo : undefined,
-    sourceId: item.id,
-  }));
-  torso.outer = [...torso.outer, ...packLayerItems];
-
-  // Hands — use descent handwear if different, else climb handwear
-  const hands = createEmptyLayerSet();
-  const effectiveHandwear = dHandwear && dHandwear.name !== climbHandwear?.name
-    ? dHandwear : climbHandwear;
-  if (effectiveHandwear) {
-    hands.outer = [{ name: effectiveHandwear.name, rcl: effectiveHandwear.rcl, sourceId: effectiveHandwear.id }];
-  }
-
-  // HeadNeck — use descent headwear if available, else climb headwear
-  const headNeck = createEmptyLayerSet();
-  const effectiveHeadwear = dHeadwear ?? climbHeadwear;
-  if (effectiveHeadwear) {
-    const baseItems: LayerItem[] = [];
-    if (effectiveHeadwear.head_warmth) {
-      baseItems.push({ name: effectiveHeadwear.head_warmth.name, rcl: effectiveHeadwear.head_warmth.rcl, sourceId: effectiveHeadwear.head_warmth.id });
-    }
-    if (effectiveHeadwear.neck_warmth) {
-      baseItems.push({ name: effectiveHeadwear.neck_warmth.name, rcl: effectiveHeadwear.neck_warmth.rcl, sourceId: effectiveHeadwear.neck_warmth.id });
-    }
-    if (baseItems.length > 0) headNeck.base = baseItems;
-    if (effectiveHeadwear.helmet) {
-      headNeck.outer = [{ name: effectiveHeadwear.helmet.name, rcl: effectiveHeadwear.helmet.rcl, sourceId: effectiveHeadwear.helmet.id }];
-    }
-  }
-
-  return { torso, legs, hands, headNeck };
-}
-
-function collectInUseIds(layers: MutableLayers): Set<string> {
-  const ids = new Set<string>();
-  for (const part of BODY_PARTS) {
-    for (const lt of LAYER_TYPES) {
-      const items = layers[part][lt];
-      if (items) {
-        for (const item of items) {
-          if (item.sourceId) ids.add(item.sourceId);
+/** Catalog items in the layers that the user picked from recommendations, once each. */
+function recommendedCatalogItems(layers: BodyPartLayers): RecommendedItem[] {
+  const items: RecommendedItem[] = [];
+  const seen = new Set<string>();
+  for (const bodyPart of BODY_PARTS) {
+    for (const layerType of ["base", "mid", "outer"] as const) {
+      for (const item of layers[bodyPart][layerType] ?? []) {
+        if (item.isRecommended && item.sourceId && !seen.has(item.sourceId)) {
+          seen.add(item.sourceId);
+          items.push({ name: item.name, brand: item.brand ?? "", sourceId: item.sourceId, bodyPart });
         }
       }
     }
   }
-  return ids;
+  return items;
 }
 
 /**
@@ -232,177 +117,120 @@ const LayerDisplayContent = ({
   weatherLoading,
 }: LayerDisplayProps) => {
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
-  const [activityPopoverOpen, setActivityPopoverOpen] = useState(false);
-  const [activePhase, setActivePhase] = useState<"climb" | "descent">("climb");
-  const isBackcountrySkiing = activity === "backcountry_skiing";
+  const [activePhase, setActivePhase] = useState<Phase>("climb");
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
+
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
-  const shouldIgnoreHelmetForClo = activity === "xc_skiing";
+  const ireq = biophysicsData?.ireq;
+  const regionalClo = biophysicsData?.recommendation?.ensemble_properties?.regional_clo;
+  const totalClo = biophysicsData?.recommendation?.ensemble_properties?.total_clo;
+  const garments = biophysicsData?.recommendation?.garments;
   const handwear = biophysicsData?.recommendation?.handwear;
   const rawHeadwear = biophysicsData?.recommendation?.headwear;
+  const packItems = biophysicsData?.pack_items?.garments ?? NO_PACK_ITEMS;
+  const descentHandwear = biophysicsData?.descent_handwear;
+  const descentHeadwear = biophysicsData?.descent_headwear;
+  const descentBreakdown = biophysicsData?.descent_breakdown;
+
+  // Helmet insulation doesn't count toward head clo for XC skiing.
   const headwear = useMemo(
-    () => shouldIgnoreHelmetForClo && rawHeadwear
-      ? { ...rawHeadwear, helmet: null }
-      : rawHeadwear,
-    [shouldIgnoreHelmetForClo, rawHeadwear]
-  );
-  const {
-    mutableLayers,
-    layerEditDelta,
-    inUseItemIds,
-    addItem: addMutableItem,
-    removeItem: removeMutableItem,
-    replaceItem: replaceMutableItem,
-    setLayerItems: setMutableLayerItems,
-  } = useMutableLayers(biophysicsData ?? null, handwear, headwear);
-  // --- Descent mutable layers (independent from climb) ---
-  const [descentMutableLayers, setDescentMutableLayers] = useState<MutableLayers>(() =>
-    buildDescentLayers(
-      biophysicsData?.recommendation?.garments,
-      handwear, headwear,
-      biophysicsData?.pack_items?.garments ?? [],
-      biophysicsData?.descent_handwear,
-      biophysicsData?.descent_headwear,
-    )
-  );
-  const prevDescentGarmentsRef = useRef(biophysicsData?.recommendation?.garments);
-  useEffect(() => {
-    const garments = biophysicsData?.recommendation?.garments;
-    if (garments !== prevDescentGarmentsRef.current) {
-      prevDescentGarmentsRef.current = garments;
-      setDescentMutableLayers(
-        buildDescentLayers(
-          garments, handwear, headwear,
-          biophysicsData?.pack_items?.garments ?? [],
-          biophysicsData?.descent_handwear,
-          biophysicsData?.descent_headwear,
-        )
-      );
-    }
-  }, [biophysicsData?.recommendation?.garments, biophysicsData?.pack_items?.garments, biophysicsData?.descent_handwear, biophysicsData?.descent_headwear, handwear, headwear]);
-
-  const addDescentItem = useCallback((bodyPart: BodyPart, layerType: LayerType, item: LayerItem) => {
-    setDescentMutableLayers((prev) => ({
-      ...prev,
-      [bodyPart]: {
-        ...prev[bodyPart],
-        [layerType]: [...(prev[bodyPart][layerType] ?? []), item],
-      },
-    }));
-  }, []);
-
-  const removeDescentItem = useCallback((bodyPart: BodyPart, layerType: LayerType, index: number) => {
-    setDescentMutableLayers((prev) => {
-      const existing = prev[bodyPart][layerType] ?? [];
-      if (index < 0 || index >= existing.length) return prev;
-      return {
-        ...prev,
-        [bodyPart]: {
-          ...prev[bodyPart],
-          [layerType]: existing.filter((_, i) => i !== index),
-        },
-      };
-    });
-  }, []);
-
-  const replaceDescentItem = useCallback(
-    (bodyPart: BodyPart, layerType: LayerType, index: number, newItem: LayerItem) => {
-      setDescentMutableLayers((prev) => {
-        const existing = prev[bodyPart][layerType] ?? [];
-        if (index < 0 || index >= existing.length) return prev;
-        const updated = [...existing];
-        updated[index] = newItem;
-        return {
-          ...prev,
-          [bodyPart]: {
-            ...prev[bodyPart],
-            [layerType]: updated,
-          },
-        };
-      });
-    },
-    []
+    () => (activity === "xc_skiing" && rawHeadwear ? { ...rawHeadwear, helmet: null } : rawHeadwear),
+    [activity, rawHeadwear]
   );
 
-  const syncDescentFromClimb = useCallback((bodyPart: BodyPart, layerType: LayerType) => {
-    setDescentMutableLayers((prev) => ({
-      ...prev,
-      [bodyPart]: {
-        ...prev[bodyPart],
-        [layerType]: [...(mutableLayers[bodyPart][layerType] ?? [])],
-      },
-    }));
-  }, [mutableLayers]);
-
-  const syncClimbFromDescent = useCallback((bodyPart: BodyPart, layerType: LayerType) => {
-    setMutableLayerItems(bodyPart, layerType, descentMutableLayers[bodyPart][layerType] ?? []);
-  }, [descentMutableLayers, setMutableLayerItems]);
-
-  const moveDescentItem = useCallback(
-    (bodyPart: BodyPart, fromLayerType: LayerType, fromIndex: number, toLayerType: LayerType) => {
-      setDescentMutableLayers((prev) => {
-        const existing = prev[bodyPart][fromLayerType] ?? [];
-        const item = existing[fromIndex];
-        if (!item || fromIndex < 0 || fromIndex >= existing.length) return prev;
-        return {
-          ...prev,
-          [bodyPart]: {
-            ...prev[bodyPart],
-            [fromLayerType]: existing.filter((_, i) => i !== fromIndex),
-            [toLayerType]: [...(prev[bodyPart][toLayerType] ?? []), item],
-          },
-        };
-      });
-    },
-    []
+  const recommendedLayers = useMemo(
+    () => buildRecommendedLayers(garments, handwear, headwear),
+    [garments, handwear, headwear]
   );
+  const initialDescentLayers = useMemo(
+    () => buildDescentLayers(garments, handwear, headwear, packItems, descentHandwear, descentHeadwear),
+    [garments, handwear, headwear, packItems, descentHandwear, descentHeadwear]
+  );
+  const climb = useEditableLayers(recommendedLayers);
+  const descent = useEditableLayers(initialDescentLayers);
+  const phaseLayers = (phase: Phase) => (phase === "descent" ? descent : climb);
 
-  const descentInUseItemIds = useMemo(() => collectInUseIds(descentMutableLayers), [descentMutableLayers]);
-  const combinedInUseItemIds = useMemo(() => {
-    const combined = new Set(inUseItemIds);
-    for (const id of descentInUseItemIds) combined.add(id);
-    return combined;
-  }, [inUseItemIds, descentInUseItemIds]);
+  const downhillTargetRange: [number, number] | undefined = ireq?.downhill_target_range
+    ?? (ireq?.downhill ? [ireq.downhill.min, ireq.downhill.neutral] : undefined);
+  const showDescent = activity === "backcountry_skiing"
+    && biophysicsActive
+    && totalClo !== undefined
+    && downhillTargetRange !== undefined;
 
-  const { getItems: getPickerItems } = useLayerPicker(combinedInUseItemIds);
-  const [pickerTarget, setPickerTarget] = useState<{
-    bodyPart: BodyPart;
-    layerType: LayerType;
-    replaceIndex: number | null;
-    phase?: "climb" | "descent";
-  } | null>(null);
+  // Thermal evaluation of the worn layers (including edits) runs on the server.
+  const climbInput: PhaseEvaluationInput = {
+    itemClo: itemCloByBodyPart(climb.layers),
+    targets: bodyPartTargets(ireq?.regional, ireq?.extremity),
+    arms: regionalClo ? { clo: regionalClo.arms, target: ireq?.regional?.neutral?.arms } : undefined,
+    targetRange: ireq?.target_range,
+  };
+  const descentInput: PhaseEvaluationInput = {
+    itemClo: itemCloByBodyPart(descent.layers),
+    targets: descentBreakdown
+      ? bodyPartTargets(descentBreakdown.regional_ireq, descentBreakdown.extremity_ireq)
+      : climbInput.targets,
+    arms: regionalClo
+      ? {
+          clo: regionalClo.arms,
+          target: descentBreakdown?.regional_ireq?.neutral?.arms ?? ireq?.regional?.neutral?.arms,
+          deficitClo: descentBreakdown?.regional_clo?.arms ?? regionalClo.arms,
+        }
+      : undefined,
+    targetRange: downhillTargetRange,
+  };
+  const { evaluation } = useLayerEvaluation(
+    biophysicsActive ? (showDescent ? [climbInput, descentInput] : [climbInput]) : null
+  );
+  const climbEvaluation = evaluation?.[0];
+  const descentEvaluation = showDescent ? evaluation?.[1] : undefined;
+  const phaseEvaluation = (phase: Phase) => (phase === "descent" ? descentEvaluation : climbEvaluation);
+
+  const comfortScore = climbEvaluation
+    ? (climbEvaluation.comfortScore
+      ?? biophysicsData?.recommendation?.thermal_comfort_score
+      ?? biophysicsData?.recommendation?.score)
+    : undefined;
+
+  // --- Layer picker ---
+  const inUseItemIds = useMemo(() => {
+    const ids = collectInUseIds(climb.layers);
+    for (const id of collectInUseIds(descent.layers)) ids.add(id);
+    return ids;
+  }, [climb.layers, descent.layers]);
+  const { getItems: getPickerItems } = useLayerPicker(inUseItemIds);
 
   const pickerItems = useMemo(() => {
     if (!pickerTarget) return { wardrobeItems: [], recommendedItems: [] };
-    const { targetClo } = getCloValues(
-      pickerTarget.bodyPart,
-      biophysicsData?.recommendation?.ensemble_properties?.regional_clo,
-      biophysicsData?.ireq?.regional,
-      biophysicsData?.ireq?.extremity,
-      handwear, headwear, !shouldIgnoreHelmetForClo
-    );
+    const targetClo = bodyPartTargets(ireq?.regional, ireq?.extremity)[pickerTarget.bodyPart];
     return getPickerItems(pickerTarget.bodyPart, pickerTarget.layerType, targetClo);
-  }, [pickerTarget, getPickerItems, biophysicsData, handwear, headwear, shouldIgnoreHelmetForClo]);
+  }, [pickerTarget, getPickerItems, ireq?.regional, ireq?.extremity]);
 
-  // pickerCloContext computed after bodyPartSections/descentBodyPartSections (below)
+  const pickerCurrentItem = pickerTarget && pickerTarget.replaceIndex !== null
+    ? phaseLayers(pickerTarget.phase).layers[pickerTarget.bodyPart][pickerTarget.layerType]?.[pickerTarget.replaceIndex]
+    : undefined;
 
-  const handlePickerSelect = useCallback((item: PickerItem) => {
+  const pickerBodyPart = pickerTarget && biophysicsActive
+    ? phaseEvaluation(pickerTarget.phase)?.bodyParts[pickerTarget.bodyPart]
+    : undefined;
+  const pickerCloContext = pickerBodyPart?.target !== undefined && pickerBodyPart.delta !== undefined
+    ? { targetClo: pickerBodyPart.target, currentClo: pickerBodyPart.clo, delta: pickerBodyPart.delta }
+    : undefined;
+
+  const handlePickerSelect = (item: PickerItem) => {
     if (!pickerTarget) return;
-    const { bodyPart: bp, replaceIndex, phase } = pickerTarget;
-    const lt = item.nativeLayerType;
-    const newItem = {
+    const { bodyPart, replaceIndex, phase } = pickerTarget;
+    const layers = phaseLayers(phase);
+    const newItem: LayerItem = {
       name: item.name,
       rcl: item.rcl,
       sourceId: item.id,
       isRecommended: !item.isOwned,
       brand: item.brand,
     };
-    const isDescent = phase === "descent";
     if (replaceIndex !== null) {
-      if (isDescent) replaceDescentItem(bp, lt, replaceIndex, newItem);
-      else replaceMutableItem(bp, lt, replaceIndex, newItem);
+      layers.replaceItem(bodyPart, item.nativeLayerType, replaceIndex, newItem);
     } else {
-      if (isDescent) addDescentItem(bp, lt, newItem);
-      else addMutableItem(bp, lt, newItem);
+      layers.addItem(bodyPart, item.nativeLayerType, newItem);
     }
     if (!item.isOwned) {
       toast.info("This item isn't in your wardrobe yet. Add it for better future recommendations.", {
@@ -410,817 +238,159 @@ const LayerDisplayContent = ({
       });
     }
     setPickerTarget(null);
-  }, [pickerTarget, replaceMutableItem, addMutableItem, replaceDescentItem, addDescentItem]);
-
-  const pickerCurrentItem = useMemo(() => {
-    if (!pickerTarget || pickerTarget.replaceIndex === null) return undefined;
-    const layers = pickerTarget.phase === "descent" ? descentMutableLayers : mutableLayers;
-    const item = layers[pickerTarget.bodyPart][pickerTarget.layerType]?.[pickerTarget.replaceIndex];
-    if (!item) return undefined;
-    return { name: item.name, rcl: item.rcl };
-  }, [pickerTarget, mutableLayers, descentMutableLayers]);
-
-  const handlePickerRemove = useCallback(() => {
-    if (!pickerTarget || pickerTarget.replaceIndex === null) return;
-    const { bodyPart: bp, layerType: lt, replaceIndex, phase } = pickerTarget;
-    if (phase === "descent") removeDescentItem(bp, lt, replaceIndex);
-    else removeMutableItem(bp, lt, replaceIndex);
-    setPickerTarget(null);
-  }, [pickerTarget, removeMutableItem, removeDescentItem]);
-
-  const regionalClo = biophysicsData?.recommendation?.ensemble_properties?.regional_clo;
-  const totalClo = biophysicsData?.recommendation?.ensemble_properties?.total_clo;
-  const regionalIreq = biophysicsData?.ireq?.regional;
-  const extremityIreq = biophysicsData?.ireq?.extremity;
-  const descentPackItems = biophysicsData?.pack_items?.garments ?? [];
-  const descentHeadwear = biophysicsData?.descent_headwear;
-  const descentHelmetClo = descentHeadwear?.helmet?.rcl ?? 0;
-  const descentPackClo = descentPackItems.reduce((sum, item) => {
-    return sum + (typeof item.rcl_clo === "number" ? item.rcl_clo : 0);
-  }, 0);
-  // Preliminary descent clo from API data (used for early guards); refined after bodyPartSections and descentBodyPartSections
-  let estimatedDescentClo: number | undefined = totalClo !== undefined ? totalClo + descentPackClo + descentHelmetClo : undefined;
-
-  const uphillTargetRange = biophysicsData?.ireq?.target_range;
-  const downhillTargetRange = biophysicsData?.ireq?.downhill_target_range
-    ?? (biophysicsData?.ireq?.downhill
-      ? [biophysicsData.ireq.downhill.min, biophysicsData.ireq.downhill.neutral] as [number, number]
-      : undefined);
-  const showDualComfortGauges = isBackcountrySkiing
-    && biophysicsActive
-    && estimatedDescentClo !== undefined
-    && downhillTargetRange !== undefined;
-  const bodyPartSections = BODY_PARTS.map((part) => {
-    // Use mutable layers for torso/legs when biophysics is active
-    const layers = biophysicsActive
-      ? mutableLayers[part]
-      : recommendation?.[part] ?? createEmptyLayerSet();
-
-    const { currentClo, targetClo } = getCloValues(
-      part,
-      regionalClo,
-      regionalIreq,
-      extremityIreq,
-      handwear,
-      headwear,
-      !shouldIgnoreHelmetForClo
-    );
-
-    // When mutable layers are active, compute actual insulation from the
-    // items' regional clo values. For torso/legs, apply the ensemble
-    // regression coefficient — layering compresses air gaps so the
-    // effective insulation is less than the raw sum.
-    let adjustedCurrent: number;
-    if (biophysicsActive) {
-      const rawSum = ["base", "mid", "outer"].reduce((sum, lt) => {
-        const items = mutableLayers[part][lt as LayerType];
-        return sum + (items ? items.reduce((s, item) => s + (item.rcl ?? 0), 0) : 0);
-      }, 0);
-      const coef = part === "torso" ? ENSEMBLE_REGRESSION.thermal.torso.coef
-        : part === "legs" ? ENSEMBLE_REGRESSION.thermal.leg.coef
-        : undefined;
-      adjustedCurrent = coef ? rawSum * coef : rawSum;
-    } else {
-      adjustedCurrent = (currentClo ?? 0) + layerEditDelta[part];
-    }
-
-    const urgencyDelta =
-      targetClo !== undefined
-        ? Math.max(Math.abs(adjustedCurrent - targetClo), 0)
-        : 0;
-
-    return {
-      part,
-      layers,
-      currentClo: adjustedCurrent,
-      targetClo,
-      urgencyDelta,
-    };
-  });
-
-  // Calculate regional and extremity deficits from bodyPartSections
-  // This ensures deficits use the same properly-calculated values as the breakdown
-  const getRegionalDeficit = (target?: number, current?: number): number => {
-    if (target === undefined) return 0;
-    return Math.max(0, target - (current ?? 0));
   };
-  const torsoSection = bodyPartSections.find((s) => s.part === "torso");
-  const legsSection = bodyPartSections.find((s) => s.part === "legs");
-  const handsSection = bodyPartSections.find((s) => s.part === "hands");
-  const headNeckSection = bodyPartSections.find((s) => s.part === "headNeck");
 
-  const torsoDeficit = getRegionalDeficit(torsoSection?.targetClo, torsoSection?.currentClo);
-  const armsDeficit = getRegionalDeficit(regionalIreq?.neutral?.arms, regionalClo?.arms);
-  const legsDeficit = getRegionalDeficit(legsSection?.targetClo, legsSection?.currentClo);
-  const handsDeficit = getRegionalDeficit(handsSection?.targetClo, handsSection?.currentClo);
-  const headDeficit = getRegionalDeficit(headNeckSection?.targetClo, headNeckSection?.currentClo);
+  const handlePickerRemove = () => {
+    if (!pickerTarget || pickerTarget.replaceIndex === null) return;
+    const { bodyPart, layerType, replaceIndex, phase } = pickerTarget;
+    phaseLayers(phase).removeItem(bodyPart, layerType, replaceIndex);
+    setPickerTarget(null);
+  };
 
-  const maxRegionalDeficit = Math.max(torsoDeficit, armsDeficit, legsDeficit);
-  const maxExtremityDeficit = Math.max(handsDeficit, headDeficit);
-  const hasRegionalGap = maxRegionalDeficit > THERMAL_DISPLAY_CLO_EPSILON;
-  const hasExtremityGap = maxExtremityDeficit > THERMAL_DISPLAY_CLO_EPSILON;
+  // --- Body part sections ---
+  const renderSection = (bodyPart: BodyPart, phase: Phase) => {
+    const layers = biophysicsActive
+      ? phaseLayers(phase).layers[bodyPart]
+      : recommendation?.[bodyPart] ?? createEmptyLayerSet();
+    const bodyPartEvaluation = phaseEvaluation(phase)?.bodyParts[bodyPart];
+    const otherPhase: Phase = phase === "descent" ? "climb" : "descent";
 
-  // Calculate effectiveTotalClo using the same method as the breakdown
-  // This ensures the "Actual" badge matches the breakdown "Total"
-  const effectiveTotalClo = biophysicsActive && regionalClo
-    ? (() => {
-        const torso = torsoSection?.currentClo ?? regionalClo.torso;
-        const arms = regionalClo.arms;
-        const legs = legsSection?.currentClo ?? regionalClo.legs;
-        const wt = REGIONAL_WEIGHTS;
-        return torso * wt.torso + arms * wt.arm + legs * wt.leg;
-      })()
-    : totalClo;
+    return (
+      <BodyPartSection
+        key={bodyPart}
+        bodyPart={bodyPart}
+        layers={layers}
+        biophysicsActive={biophysicsActive}
+        currentClo={bodyPartEvaluation?.clo}
+        targetClo={bodyPartEvaluation?.target}
+        status={bodyPartEvaluation?.status}
+        itemMappings={itemMappings}
+        {...(showDescent && {
+          colorScheme: phase,
+          otherPhaseLayers: phaseLayers(otherPhase).layers[bodyPart],
+          syncLabel: phase === "descent" ? "Use climb" : "Use descent",
+          onSyncFromOtherPhase: (layerType: LayerType) =>
+            phaseLayers(phase).setLayerItems(
+              bodyPart,
+              layerType,
+              phaseLayers(otherPhase).layers[bodyPart][layerType] ?? []
+            ),
+        })}
+        onItemTap={(layerType, index) => setPickerTarget({ bodyPart, layerType, replaceIndex: index, phase })}
+        onItemRemove={(layerType, index) => phaseLayers(phase).removeItem(bodyPart, layerType, index)}
+        onAddLayer={(layerType) => setPickerTarget({ bodyPart, layerType, replaceIndex: null, phase })}
+        onMoveItem={biophysicsActive
+          ? (fromLayerType, fromIndex, toLayerType) =>
+              phaseLayers(phase).moveItem(bodyPart, fromLayerType, fromIndex, toLayerType)
+          : undefined}
+      />
+    );
+  };
 
-  const thermalDecision = evaluateThermalComfort({
-    totalClo: effectiveTotalClo,
-    targetRange: biophysicsData?.ireq?.target_range,
-    maxRegionalDeficit,
-    maxExtremityDeficit,
-  });
-
-  const thermalComfortScore = calculateThermalComfortScore({
-    totalClo: effectiveTotalClo,
-    targetRange: biophysicsData?.ireq?.target_range,
-    maxRegionalDeficit,
-    maxExtremityDeficit,
-  })
-    ?? biophysicsData?.recommendation?.thermal_comfort_score
-    ?? biophysicsData?.recommendation?.score;
-
-  // Calculate climb/descent decisions for dual-gauge view
-  const climbDecision = showDualComfortGauges ? thermalDecision : null;
-
-  // Determine which decision to use for risk card
-  const decisionForRiskCard = showDualComfortGauges ? climbDecision : thermalDecision;
-  const decisionTitle = thermalDecision
-    ? thermalDecision.riskType === "comfortable"
-      ? "In Target Range"
-      : thermalDecision.riskType === "cold"
-        ? `Cold Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
-        : `Overheating Risk — ${thermalDecision.severity === "high" ? "High" : "Moderate"}`
-    : "Layer Guidance";
-  const climbRiskTitle = decisionForRiskCard
-    ? decisionForRiskCard.riskType === "comfortable"
-      ? "Climb In Target Range"
-      : decisionForRiskCard.riskType === "cold"
-        ? `Climb Cold Risk — ${decisionForRiskCard.severity === "high" ? "High" : "Moderate"}`
-        : `Climb Overheating Risk — ${decisionForRiskCard.severity === "high" ? "High" : "Moderate"}`
-    : "Climb Guidance";
-  const riskCardTitle = showDualComfortGauges ? climbRiskTitle : decisionTitle;
-  const showRiskCard = biophysicsActive
-    ? Boolean(decisionForRiskCard && decisionForRiskCard.riskType !== "comfortable")
-    : true;
-  const statusSummary = getThermalSummary(decisionForRiskCard);
-  const immediateAction = getImmediateAction(decisionForRiskCard);
-
-  const descentBreakdown = biophysicsData?.descent_breakdown;
-  const descentBodyPartSections = showDualComfortGauges
-    ? BODY_PARTS.map((part) => {
-        const layers = descentMutableLayers[part];
-
-        // Use descent breakdown for target if available
-        const descentCloValues = descentBreakdown
-          ? getCloValues(part, descentBreakdown.regional_clo, descentBreakdown.regional_ireq, descentBreakdown.extremity_ireq,
-              biophysicsData?.descent_handwear, descentHeadwear, true)
-          : getCloValues(part, regionalClo, regionalIreq, extremityIreq, handwear, headwear, !shouldIgnoreHelmetForClo);
-
-        // Compute actual clo from descent layer items
-        const rawSum = (["base", "mid", "outer"] as LayerType[]).reduce((sum, lt) => {
-          const items = layers[lt];
-          return sum + (items ? items.reduce((s, item) => s + (item.rcl ?? 0), 0) : 0);
-        }, 0);
-        const coef = part === "torso" ? ENSEMBLE_REGRESSION.thermal.torso.coef
-          : part === "legs" ? ENSEMBLE_REGRESSION.thermal.leg.coef
-          : undefined;
-        const currentClo = coef ? rawSum * coef : rawSum;
-
-        return {
-          part,
-          layers,
-          currentClo: currentClo,
-          targetClo: descentCloValues.targetClo,
-        };
-      })
+  const shownPhase: Phase = showDescent ? activePhase : "climb";
+  // "In the pack": carried during this phase, worn during the other.
+  const packedItems = showDescent
+    ? itemNamesMissingFrom(phaseLayers(shownPhase === "climb" ? "descent" : "climb").layers, phaseLayers(shownPhase).layers)
     : [];
-
-  // Refine descent full-body clo using the same regional-weight method as climb
-  if (showDualComfortGauges && regionalClo) {
-    const torso = descentBodyPartSections.find((s) => s.part === "torso")?.currentClo ?? regionalClo.torso;
-    const arms = regionalClo.arms; // arms aren't independently editable
-    const legs = descentBodyPartSections.find((s) => s.part === "legs")?.currentClo ?? regionalClo.legs;
-    const wt = REGIONAL_WEIGHTS;
-    estimatedDescentClo = torso * wt.torso + arms * wt.arm + legs * wt.leg;
-  }
-
-  const descentTorsoSection = descentBodyPartSections.find((s) => s.part === "torso");
-  const descentLegsSection = descentBodyPartSections.find((s) => s.part === "legs");
-  const descentHandsSection = descentBodyPartSections.find((s) => s.part === "hands");
-  const descentHeadNeckSection = descentBodyPartSections.find((s) => s.part === "headNeck");
-  const descentArmsDeficit = getRegionalDeficit(
-    descentBreakdown?.regional_ireq?.neutral?.arms ?? regionalIreq?.neutral?.arms,
-    descentBreakdown?.regional_clo?.arms ?? regionalClo?.arms
-  );
-  const descentMaxRegionalDeficit = Math.max(
-    getRegionalDeficit(descentTorsoSection?.targetClo, descentTorsoSection?.currentClo),
-    descentArmsDeficit,
-    getRegionalDeficit(descentLegsSection?.targetClo, descentLegsSection?.currentClo)
-  );
-  const descentMaxExtremityDeficit = Math.max(
-    getRegionalDeficit(descentHandsSection?.targetClo, descentHandsSection?.currentClo),
-    getRegionalDeficit(descentHeadNeckSection?.targetClo, descentHeadNeckSection?.currentClo)
-  );
-
-  const descentDecision = showDualComfortGauges
-    ? evaluateThermalComfort({
-        totalClo: estimatedDescentClo,
-        targetRange: downhillTargetRange,
-        maxRegionalDeficit: descentMaxRegionalDeficit,
-        maxExtremityDeficit: descentMaxExtremityDeficit,
-      })
-    : null;
-  const descentRiskTitle = descentDecision
-    ? descentDecision.riskType === "comfortable"
-      ? "Descent In Target Range"
-      : descentDecision.riskType === "cold"
-        ? `Descent Cold Risk — ${descentDecision.severity === "high" ? "High" : "Moderate"}`
-        : `Descent Overheating Risk — ${descentDecision.severity === "high" ? "High" : "Moderate"}`
-    : "Descent Guidance";
-  const showDescentRiskCard = showDualComfortGauges
-    && Boolean(descentDecision && descentDecision.riskType !== "comfortable");
-  const descentStatusSummary = getThermalSummary(descentDecision);
-  const descentImmediateAction = getImmediateAction(descentDecision);
-
-  const pickerCloContext = (() => {
-    if (!pickerTarget || !biophysicsActive) return undefined;
-    const sections = pickerTarget.phase === "descent" ? descentBodyPartSections : bodyPartSections;
-    const section = sections.find((s) => s.part === pickerTarget.bodyPart);
-    if (!section || section.targetClo === undefined || section.currentClo === undefined) return undefined;
-    return {
-      targetClo: section.targetClo,
-      currentClo: section.currentClo,
-      delta: section.targetClo - section.currentClo,
-    };
-  })();
-
-  const recommendedItems = useMemo(() => {
-    const items: { name: string; brand: string; sourceId: string; bodyPart: BodyPart }[] = [];
-    const seen = new Set<string>();
-    for (const part of BODY_PARTS) {
-      for (const lt of (["base", "mid", "outer"] as const)) {
-        for (const item of mutableLayers[part][lt] ?? []) {
-          if (item.isRecommended && item.sourceId && !seen.has(item.sourceId)) {
-            seen.add(item.sourceId);
-            items.push({ name: item.name, brand: item.brand ?? "", sourceId: item.sourceId, bodyPart: part });
-          }
-        }
-      }
-    }
-    return items;
-  }, [mutableLayers]);
-
-  const [addedToWardrobe, setAddedToWardrobe] = useState<Set<string>>(new Set());
-
-  const handleAddToWardrobe = useCallback(async (sourceId: string, name: string, bodyPart: BodyPart) => {
-    const itemType = bodyPart === "hands" ? "handwear" : bodyPart === "headNeck" ? "headwear" : "garment";
-    try {
-      const res = await fetch("/api/wardrobe/gear", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ item_type: itemType, item_id: sourceId }),
-      });
-      if (res.ok) {
-        setAddedToWardrobe((prev) => new Set(prev).add(sourceId));
-        toast.success(`${name} added to your wardrobe`);
-      } else if (res.status === 409) {
-        setAddedToWardrobe((prev) => new Set(prev).add(sourceId));
-        toast.info(`${name} is already in your wardrobe`);
-      } else {
-        toast.error("Failed to add item to wardrobe");
-      }
-    } catch {
-      toast.error("Failed to add item to wardrobe");
-    }
-  }, []);
-
-  // "In the pack" — diff climb vs descent mutable layers to find items
-  // carried but not worn in each phase.
-  const { climbPackItems, descentPackItems: descentPackItemsList } = useMemo(() => {
-    if (!showDualComfortGauges) {
-      return { climbPackItems: [] as string[], descentPackItems: [] as string[] };
-    }
-
-    function collectItemKeys(layers: MutableLayers): Set<string> {
-      const keys = new Set<string>();
-      for (const part of BODY_PARTS) {
-        for (const lt of LAYER_TYPES) {
-          for (const item of layers[part][lt] ?? []) {
-            keys.add(item.sourceId || item.name);
-          }
-        }
-      }
-      return keys;
-    }
-
-    function collectUniqueNames(layers: MutableLayers, excludeKeys: Set<string>): string[] {
-      const names: string[] = [];
-      const seen = new Set<string>();
-      for (const part of BODY_PARTS) {
-        for (const lt of LAYER_TYPES) {
-          for (const item of layers[part][lt] ?? []) {
-            const key = item.sourceId || item.name;
-            if (!excludeKeys.has(key) && !seen.has(key)) {
-              seen.add(key);
-              names.push(item.name);
-            }
-          }
-        }
-      }
-      return names;
-    }
-
-    const climbKeys = collectItemKeys(mutableLayers);
-    const descentKeys = collectItemKeys(descentMutableLayers);
-
-    return {
-      climbPackItems: collectUniqueNames(descentMutableLayers, climbKeys),
-      descentPackItems: collectUniqueNames(mutableLayers, descentKeys),
-    };
-  }, [showDualComfortGauges, mutableLayers, descentMutableLayers]);
-
-  const orderedBodyPartSections = bodyPartSections;
-  const climbCloBreakdown: CloBreakdown | undefined = biophysicsActive && regionalClo
-    ? (() => {
-        const torso = bodyPartSections.find((s) => s.part === "torso")?.currentClo ?? regionalClo.torso;
-        const arms = regionalClo.arms;
-        const legs = bodyPartSections.find((s) => s.part === "legs")?.currentClo ?? regionalClo.legs;
-        const wt = REGIONAL_WEIGHTS;
-        return {
-          lines: [
-            { label: "Torso", detail: `${torso.toFixed(2)} x ${(wt.torso * 100).toFixed(0)}% = ${(torso * wt.torso).toFixed(2)}` },
-            { label: "Arms", detail: `${arms.toFixed(2)} x ${(wt.arm * 100).toFixed(0)}% = ${(arms * wt.arm).toFixed(2)}` },
-            { label: "Legs", detail: `${legs.toFixed(2)} x ${(wt.leg * 100).toFixed(0)}% = ${(legs * wt.leg).toFixed(2)}` },
-          ],
-          total: torso * wt.torso + arms * wt.arm + legs * wt.leg,
-        };
-      })()
-    : undefined;
-  const descentCloBreakdown: CloBreakdown | undefined =
-    showDualComfortGauges && regionalClo && estimatedDescentClo !== undefined
-      ? (() => {
-          const torso = descentBodyPartSections.find((s) => s.part === "torso")?.currentClo ?? regionalClo.torso;
-          const arms = regionalClo.arms;
-          const legs = descentBodyPartSections.find((s) => s.part === "legs")?.currentClo ?? regionalClo.legs;
-          const wt = REGIONAL_WEIGHTS;
-          return {
-            lines: [
-              { label: "Torso", detail: `${torso.toFixed(2)} x ${(wt.torso * 100).toFixed(0)}% = ${(torso * wt.torso).toFixed(2)}` },
-              { label: "Arms", detail: `${arms.toFixed(2)} x ${(wt.arm * 100).toFixed(0)}% = ${(arms * wt.arm).toFixed(2)}` },
-              { label: "Legs", detail: `${legs.toFixed(2)} x ${(wt.leg * 100).toFixed(0)}% = ${(legs * wt.leg).toFixed(2)}` },
-            ],
-            total: estimatedDescentClo,
-          };
-        })()
-      : undefined;
-  const selectedActivity = activity
-    ? ACTIVITIES.find((candidate) => candidate.value === activity)
-    : null;
-  const selectedActivityLabel = selectedActivity
-    ? (ACTIVITY_HEADER_LABELS[selectedActivity.value] ?? selectedActivity.name)
-    : null;
+  const recommendedItems = recommendedCatalogItems(climb.layers);
 
   return (
     <div className="flex flex-col gap-8 pb-24">
-      {(onReset || selectedActivity) && (
-        <div className="-mt-2 -mb-2 flex items-center justify-between gap-2">
-          {onReset ? (
-            <button
-              type="button"
-              onClick={onReset}
-              className="flex items-center gap-1.5 text-sm font-medium text-white/75 transition-colors hover:text-white"
-            >
-              <ArrowLeft className="size-4" />
-              Back
-            </button>
-          ) : <span />}
-          {selectedActivity && selectedActivityLabel && (
-            onActivityChange ? (
-              <Popover open={activityPopoverOpen} onOpenChange={(open) => { if (!weatherLoading) setActivityPopoverOpen(open); }}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    disabled={weatherLoading}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/[0.08] px-2.5 py-1 text-[11px] font-semibold text-white/75 transition-colors hover:bg-white/[0.14]"
-                  >
-                    {weatherLoading ? <Loader2 className="size-3.5 animate-spin" /> : <selectedActivity.icon className="size-3.5" />}
-                    <span className="max-w-[7.25rem] truncate sm:max-w-none">{selectedActivityLabel}</span>
-                    <ChevronDown className="size-3 opacity-60" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-52 p-1" align="end">
-                  {ACTIVITIES.map((act) => (
-                    <button
-                      key={act.value}
-                      type="button"
-                      className={cn(
-                        "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors hover:bg-slate-100",
-                        act.value === activity && "bg-slate-50 font-semibold"
-                      )}
-                      onClick={() => {
-                        setActivityPopoverOpen(false);
-                        if (act.value !== activity) {
-                          void onActivityChange(act.value);
-                        }
-                      }}
-                    >
-                      <act.icon className="size-4 shrink-0 text-slate-500" />
-                      <span className="flex-1 text-left">{act.name}</span>
-                      {act.value === activity && (
-                        <Check className="size-3.5 text-slate-500" />
-                      )}
-                    </button>
-                  ))}
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/[0.08] px-2.5 py-1 text-[11px] font-semibold text-white/75">
-                <selectedActivity.icon className="size-3.5" />
-                <span className="max-w-[7.25rem] truncate sm:max-w-none">{selectedActivityLabel}</span>
-              </span>
-            )
-          )}
-        </div>
-      )}
+      <ActivityHeader
+        activity={activity}
+        onReset={onReset}
+        onActivityChange={onActivityChange}
+        loading={weatherLoading}
+      />
 
       <div className={cn("flex flex-col gap-8 transition-opacity duration-200", weatherLoading && "opacity-50 pointer-events-none")}>
-      {onWeatherChange ? (
-        <>
-          <WeatherHeader
-            temperature={temperature}
-            windspeed={windspeed}
-            precipitation={precipitation}
-            precipitationType={precipitationType}
-            score={showDualComfortGauges ? undefined : thermalComfortScore}
-            totalClo={effectiveTotalClo}
-            targetRange={biophysicsData?.ireq?.target_range}
-            regionalDeficit={maxRegionalDeficit}
-            hasRegionalGap={hasRegionalGap}
-            extremityDeficit={maxExtremityDeficit}
-            hasExtremityGap={hasExtremityGap}
-            interactive
-            onEditWeather={() => setWeatherDrawerOpen(true)}
-          />
+        <WeatherHeader
+          temperature={temperature}
+          windspeed={windspeed}
+          precipitation={precipitation}
+          precipitationType={precipitationType}
+          score={showDescent ? undefined : comfortScore}
+          totalClo={climbEvaluation?.totalClo}
+          targetRange={ireq?.target_range}
+          decision={climbEvaluation?.decision}
+          interactive={Boolean(onWeatherChange)}
+          onEditWeather={onWeatherChange ? () => setWeatherDrawerOpen(true) : undefined}
+        />
+        {onWeatherChange && (
           <WeatherEditDrawer
             open={weatherDrawerOpen}
             onOpenChange={setWeatherDrawerOpen}
             onSubmit={onWeatherChange}
             loading={weatherLoading}
           />
-        </>
-      ) : (
-        <WeatherHeader
-          temperature={temperature}
-          windspeed={windspeed}
-          precipitation={precipitation}
-          precipitationType={precipitationType}
-          score={showDualComfortGauges ? undefined : thermalComfortScore}
-          totalClo={effectiveTotalClo}
-          targetRange={biophysicsData?.ireq?.target_range}
-          regionalDeficit={maxRegionalDeficit}
-          hasRegionalGap={hasRegionalGap}
-          extremityDeficit={maxExtremityDeficit}
-          hasExtremityGap={hasExtremityGap}
-        />
-      )}
-
-      {showDualComfortGauges ? (
-        <section className="rounded-xl border border-white/20 bg-white/[0.06] px-3 py-3 sm:px-4">
-          <div className="space-y-4">
-            <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">
-                Climb
-              </p>
-              <ThermalGauge
-                totalClo={effectiveTotalClo}
-                targetRange={uphillTargetRange}
-                markerLabel=""
-                showStatusPill={false}
-                hideMarkerLabel
-                cloBreakdown={climbCloBreakdown}
-              />
-            </div>
-            {showRiskCard && decisionForRiskCard && decisionForRiskCard.riskType !== "comfortable" && (
-              <details
-                className={cn(
-                  "group rounded-lg border px-3 py-2",
-                  decisionForRiskCard.riskType === "cold"
-                    ? "border-sky-400/40 bg-sky-500/15"
-                    : "border-amber-400/40 bg-amber-500/15"
-                )}
-              >
-                <summary
-                  className={cn(
-                    "flex cursor-pointer list-none items-center gap-2 text-xs font-semibold [&::-webkit-details-marker]:hidden",
-                    decisionForRiskCard.riskType === "cold" ? "text-sky-200" : "text-amber-200"
-                  )}
-                  aria-label={climbRiskTitle}
-                >
-                  <AlertTriangle className="size-3.5 shrink-0" />
-                  <span className="flex-1">{climbRiskTitle}</span>
-                  <ChevronRight className="size-3.5 shrink-0 transition-transform group-open:rotate-90" />
-                </summary>
-                <div className="mt-2 space-y-1.5 pb-1 text-xs text-white/80">
-                  <p>{statusSummary}</p>
-                  <p>{immediateAction}</p>
-                </div>
-              </details>
-            )}
-            <div className="border-t border-white/15 pt-4">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">
-                Descent
-              </p>
-              <ThermalGauge
-                totalClo={estimatedDescentClo}
-                targetRange={downhillTargetRange}
-                markerLabel=""
-                showStatusPill={false}
-                hideMarkerLabel
-                cloBreakdown={descentCloBreakdown}
-              />
-            </div>
-            {showDescentRiskCard && descentDecision && descentDecision.riskType !== "comfortable" && (
-              <details
-                className={cn(
-                  "group rounded-lg border px-3 py-2",
-                  descentDecision.riskType === "cold"
-                    ? "border-sky-400/40 bg-sky-500/15"
-                    : "border-amber-400/40 bg-amber-500/15"
-                )}
-              >
-                <summary
-                  className={cn(
-                    "flex cursor-pointer list-none items-center gap-2 text-xs font-semibold [&::-webkit-details-marker]:hidden",
-                    descentDecision.riskType === "cold" ? "text-sky-200" : "text-amber-200"
-                  )}
-                  aria-label={descentRiskTitle}
-                >
-                  <AlertTriangle className="size-3.5 shrink-0" />
-                  <span className="flex-1">{descentRiskTitle}</span>
-                  <ChevronRight className="size-3.5 shrink-0 transition-transform group-open:rotate-90" />
-                </summary>
-                <div className="mt-2 space-y-1.5 pb-1 text-xs text-white/80">
-                  <p>{descentStatusSummary}</p>
-                  <p>{descentImmediateAction}</p>
-                </div>
-              </details>
-            )}
-          </div>
-        </section>
-      ) : (
-        <>
-          <ThermalGauge
-            totalClo={effectiveTotalClo}
-            targetRange={uphillTargetRange}
-            showStatusPill={false}
-            hideMarkerLabel
-            cloBreakdown={climbCloBreakdown}
-          />
-          {showRiskCard && decisionForRiskCard && decisionForRiskCard.riskType !== "comfortable" && (
-            <details
-              className={cn(
-                "group rounded-lg border px-3 py-2",
-                decisionForRiskCard.riskType === "cold"
-                  ? "border-sky-400/40 bg-sky-500/15"
-                  : "border-amber-400/40 bg-amber-500/15"
-              )}
-            >
-              <summary
-                className={cn(
-                  "flex cursor-pointer list-none items-center gap-2 text-xs font-semibold [&::-webkit-details-marker]:hidden",
-                  decisionForRiskCard.riskType === "cold" ? "text-sky-200" : "text-amber-200"
-                )}
-                aria-label={riskCardTitle}
-              >
-                <AlertTriangle className="size-3.5 shrink-0" />
-                <span className="flex-1">{riskCardTitle}</span>
-                <ChevronRight className="size-3.5 shrink-0 transition-transform group-open:rotate-90" />
-              </summary>
-              <div className="mt-2 space-y-1.5 pb-1 text-xs text-white/80">
-                <p>{statusSummary}</p>
-                <p>{immediateAction}</p>
-              </div>
-            </details>
-          )}
-        </>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">
-          Detailed Layer Breakdown
-        </h3>
-        {showDualComfortGauges && (
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => setActivePhase("climb")}
-              className={cn(
-                "rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors",
-                activePhase === "climb"
-                  ? "border border-violet-400/60 bg-violet-500/25 text-violet-200"
-                  : "border border-white/20 bg-white/[0.06] text-white/50 hover:text-white/70"
-              )}
-            >
-              Climb
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePhase("descent")}
-              className={cn(
-                "rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors",
-                activePhase === "descent"
-                  ? "border border-teal-400/60 bg-teal-500/25 text-teal-200"
-                  : "border border-white/20 bg-white/[0.06] text-white/50 hover:text-white/70"
-              )}
-            >
-              Descent
-            </button>
-          </div>
         )}
-      </div>
-      <p className="-mt-4 text-xs text-white/60">
-        Tap a body area to collapse or expand details.
-      </p>
-      {showDualComfortGauges ? (
+
+        <ComfortOverview
+          climb={{ evaluation: climbEvaluation, targetRange: ireq?.target_range }}
+          descent={showDescent ? { evaluation: descentEvaluation, targetRange: downhillTargetRange } : undefined}
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">
+            Detailed Layer Breakdown
+          </h3>
+          {showDescent && (
+            <div className="flex gap-1.5">
+              {(["climb", "descent"] as const).map((phase) => (
+                <button
+                  key={phase}
+                  type="button"
+                  onClick={() => setActivePhase(phase)}
+                  className={cn(
+                    "rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors",
+                    activePhase === phase
+                      ? phase === "climb"
+                        ? "border border-violet-400/60 bg-violet-500/25 text-violet-200"
+                        : "border border-teal-400/60 bg-teal-500/25 text-teal-200"
+                      : "border border-white/20 bg-white/[0.06] text-white/50 hover:text-white/70"
+                  )}
+                >
+                  {phase === "climb" ? "Climb" : "Descent"}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <p className="-mt-4 text-xs text-white/60">
+          Tap a body area to collapse or expand details.
+        </p>
         <div className="flex flex-col gap-6">
-          {(activePhase === "climb" ? orderedBodyPartSections : descentBodyPartSections).map(({ part, layers, currentClo, targetClo }) => (
-            <BodyPartSection
-              key={part}
-              bodyPart={part}
-              layers={layers}
-              biophysicsActive={biophysicsActive}
-              currentClo={currentClo}
-              targetClo={targetClo}
-              itemMappings={itemMappings}
-              colorScheme={activePhase}
-              otherPhaseLayers={activePhase === "descent" ? mutableLayers[part] : descentMutableLayers[part]}
-              syncLabel={activePhase === "descent" ? "Use climb" : "Use descent"}
-              onItemTap={(layerType, index) =>
-                setPickerTarget({ bodyPart: part, layerType, replaceIndex: index, phase: activePhase })
-              }
-              onItemRemove={(layerType, index) =>
-                activePhase === "descent"
-                  ? removeDescentItem(part, layerType, index)
-                  : removeMutableItem(part, layerType, index)
-              }
-              onAddLayer={(layerType) =>
-                setPickerTarget({ bodyPart: part, layerType, replaceIndex: null, phase: activePhase })
-              }
-              onSyncFromOtherPhase={activePhase === "descent"
-                ? (layerType) => syncDescentFromClimb(part, layerType)
-                : (layerType) => syncClimbFromDescent(part, layerType)
-              }
-              onMoveItem={biophysicsActive
-                ? (fromLt, fromIdx, toLt) => {
-                    if (activePhase === "descent") {
-                      moveDescentItem(part, fromLt, fromIdx, toLt);
-                    } else {
-                      const item = mutableLayers[part][fromLt]?.[fromIdx];
-                      if (!item) return;
-                      removeMutableItem(part, fromLt, fromIdx);
-                      addMutableItem(part, toLt, item);
-                    }
-                  }
-                : undefined
-              }
-            />
-          ))}
-          {(() => {
-            const items = activePhase === "climb" ? climbPackItems : descentPackItemsList;
-            return (
-              <div className="rounded-lg border border-white/20 bg-white/[0.06] px-3.5 py-3">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/60">
-                  <Backpack className="size-3.5" />
-                  In the Pack
-                </div>
-                {items.length > 0 ? (
-                  <ul className="mt-2 space-y-1.5">
-                    {items.map((name) => (
-                      <li key={name} className="text-sm text-white/80">
-                        {name}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-1.5 text-xs text-white/40">Nothing extra in the pack.</p>
-                )}
-              </div>
-            );
-          })()}
+          {BODY_PARTS.map((bodyPart) => renderSection(bodyPart, shownPhase))}
+          {showDescent && <PackItemsCard items={packedItems} />}
         </div>
-      ) : (
-        <div className="flex flex-col gap-6">
-          {orderedBodyPartSections.map(({ part, layers, currentClo, targetClo }) => (
-            <BodyPartSection
-              key={part}
-              bodyPart={part}
-              layers={layers}
-              biophysicsActive={biophysicsActive}
-              currentClo={currentClo}
-              targetClo={targetClo}
-              itemMappings={itemMappings}
-              onItemTap={(layerType, index) =>
-                setPickerTarget({ bodyPart: part, layerType, replaceIndex: index })
-              }
-              onItemRemove={(layerType, index) => removeMutableItem(part, layerType, index)}
-              onAddLayer={(layerType) =>
-                setPickerTarget({ bodyPart: part, layerType, replaceIndex: null })
-              }
-              onMoveItem={biophysicsActive
-                ? (fromLt, fromIdx, toLt) => {
-                    const item = mutableLayers[part][fromLt]?.[fromIdx];
-                    if (!item) return;
-                    removeMutableItem(part, fromLt, fromIdx);
-                    addMutableItem(part, toLt, item);
-                  }
-                : undefined
-              }
-            />
-          ))}
-        </div>
-      )}
 
-      <LayerPickerDrawer
-        open={pickerTarget !== null}
-        onOpenChange={(open) => { if (!open) setPickerTarget(null); }}
-        bodyPart={pickerTarget?.bodyPart ?? "torso"}
-        layerType={pickerTarget?.layerType ?? "base"}
-        wardrobeItems={pickerItems.wardrobeItems}
-        recommendedItems={pickerItems.recommendedItems}
-        currentItemName={pickerCurrentItem?.name}
-        currentItemClo={pickerCurrentItem?.rcl}
-        cloContext={pickerCloContext}
-        onSelect={handlePickerSelect}
-        onRemove={pickerTarget?.replaceIndex !== null ? handlePickerRemove : undefined}
-      />
+        <LayerPickerDrawer
+          open={pickerTarget !== null}
+          onOpenChange={(open) => { if (!open) setPickerTarget(null); }}
+          bodyPart={pickerTarget?.bodyPart ?? "torso"}
+          layerType={pickerTarget?.layerType ?? "base"}
+          wardrobeItems={pickerItems.wardrobeItems}
+          recommendedItems={pickerItems.recommendedItems}
+          currentItemName={pickerCurrentItem?.name}
+          currentItemClo={pickerCurrentItem?.rcl}
+          cloContext={pickerCloContext}
+          onSelect={handlePickerSelect}
+          onRemove={pickerTarget?.replaceIndex !== null ? handlePickerRemove : undefined}
+        />
 
-      {biophysicsData?.recommendation && (
-        <details className="group rounded-xl border border-white/25 bg-white/10 p-4">
-          <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold tracking-wide text-white/85 transition-colors hover:text-white [&::-webkit-details-marker]:hidden">
-            <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
-            <span>Advanced Biophysics Details</span>
-          </summary>
-          <div className="mt-4">
-            <BiophysicsDetails data={biophysicsData} />
-          </div>
-        </details>
-      )}
+        {biophysicsData?.recommendation && (
+          <details className="group rounded-xl border border-white/25 bg-white/10 p-4">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold tracking-wide text-white/85 transition-colors hover:text-white [&::-webkit-details-marker]:hidden">
+              <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
+              <span>Advanced Biophysics Details</span>
+            </summary>
+            <div className="mt-4">
+              <BiophysicsDetails data={biophysicsData} />
+            </div>
+          </details>
+        )}
 
-      {recommendedItems.length > 0 && (
-        <div className="rounded-lg border border-amber-300/60 bg-amber-50/90 px-4 py-3">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">SWTTR Recommended Items</p>
-          <div className="space-y-2">
-            {recommendedItems.map((item) => {
-              const wasAdded = addedToWardrobe.has(item.sourceId);
-              return (
-                <div key={item.sourceId} className="flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-amber-950">{item.name}</p>
-                    <p className="text-[11px] text-amber-800/70">{item.brand}</p>
-                  </div>
-                  <a
-                    href={`https://www.google.com/search?q=${encodeURIComponent(`buy ${item.brand} ${item.name}`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0 rounded-md border border-amber-400/60 bg-white/70 px-2.5 py-1 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100/80"
-                  >
-                    Buy it
-                  </a>
-                  <button
-                    type="button"
-                    disabled={wasAdded}
-                    onClick={() => handleAddToWardrobe(item.sourceId, item.name, item.bodyPart)}
-                    className={cn(
-                      "shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors",
-                      wasAdded
-                        ? "border-emerald-400/60 bg-emerald-50 text-emerald-700 cursor-default"
-                        : "border-amber-400/60 bg-amber-100/70 text-amber-900 hover:bg-amber-200/80"
-                    )}
-                  >
-                    {wasAdded ? (
-                      <span className="flex items-center gap-1">
-                        <Check className="size-3" />
-                        Added
-                      </span>
-                    ) : (
-                      "Add to wardrobe"
-                    )}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        <RecommendedItemsCard items={recommendedItems} />
       </div>
     </div>
   );
