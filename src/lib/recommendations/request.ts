@@ -1,10 +1,13 @@
 /**
- * Request validation for recommendation API routes
+ * Request parsing for recommendation API routes
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
 import { fahrenheitToCelsius, mphToMs } from '@/lib/biophysics/ireq';
+import { parseExertionLevel, type ExertionLevel } from '@/lib/biophysics/exertion';
+import { parseBodyMetricsFromRequestBody } from '@/lib/biophysics/bodyMetrics';
 import { getAuthUserId } from '@/lib/auth';
+import type { UserBodyMetrics } from '@/types/preferences';
 import type { PrecipitationType } from '@/types/weather';
 
 export interface WeatherInput {
@@ -15,22 +18,29 @@ export interface WeatherInput {
   precipitation_type?: PrecipitationType;
 }
 
-export interface ValidatedRequest {
+export interface RecommendationRequest {
   supabase: NonNullable<ReturnType<typeof getSupabase>>;
   userId: string | null;
+  /** Weather as sent (°F, mph), echoed back in `conditions`. */
   weather: WeatherInput;
   tempC: number;
   windMs: number;
-  body: Record<string, unknown>;
+  /** Relative humidity in percent (defaults to 50). */
+  humidity: number;
+  precipitation: boolean;
+  exertion: ExertionLevel;
+  bodyMetrics: UserBodyMetrics;
+  useWardrobeOnly: boolean;
+  prioritizeLightPack: boolean;
 }
 
 /**
- * Validate common request fields for recommendation endpoints
- * Returns ValidatedRequest on success, NextResponse on error
+ * Validate and parse a recommendation request body.
+ * Returns the parsed request, or a NextResponse describing the error.
  */
-export async function validateRecommendationRequest(
+export async function parseRecommendationRequest(
   request: NextRequest
-): Promise<ValidatedRequest | NextResponse> {
+): Promise<RecommendationRequest | NextResponse> {
   const supabase = getSupabase();
   if (!supabase) {
     return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
@@ -52,12 +62,18 @@ export async function validateRecommendationRequest(
     );
   }
 
+  const weather: WeatherInput = body.weather;
   return {
     supabase,
     userId,
-    weather: body.weather,
-    tempC: fahrenheitToCelsius(body.weather.temperature),
-    windMs: mphToMs(body.weather.wind_speed),
-    body,
+    weather,
+    tempC: fahrenheitToCelsius(weather.temperature),
+    windMs: mphToMs(weather.wind_speed),
+    humidity: weather.humidity ?? 50,
+    precipitation: weather.precipitation ?? false,
+    exertion: parseExertionLevel(body.exertion ?? body.intensity),
+    bodyMetrics: parseBodyMetricsFromRequestBody(body),
+    useWardrobeOnly: body.use_wardrobe_only === true,
+    prioritizeLightPack: Boolean(body.prioritize_light_pack),
   };
 }

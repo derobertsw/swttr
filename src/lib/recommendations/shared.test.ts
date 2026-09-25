@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
+import { categorizeGarments } from './categorization';
 import {
-  categorizeGarments,
   sortByBreathability,
   sortByInsulation,
   sortByWaterproofness,
   getEnsembleClo,
   findBreathableGarment,
-  formatGarmentResponse,
-  type GarmentRow,
-} from './shared';
+} from './sorting';
+import { formatGarmentResponse } from './formatting';
+import type { GarmentRow } from './types';
 
 // Test fixtures
 const createMockGarment = (overrides: Partial<GarmentRow>): GarmentRow => ({

@@ -1,9 +1,9 @@
 /**
- * Shared response builder for recommendation API routes.
- * Builds the standard JSON response shape from ensemble data.
+ * Scores an ensemble and builds the standard `recommendation` block used by
+ * every sport except ski touring, which scores climb and descent separately.
  */
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
-import { scoreEnsemble, type WeatherConditions, type ActivityProfile, type GarmentWithProtection } from '@/lib/biophysics/scorer';
+import { scoreEnsemble, type WeatherConditions, type ActivityProfile } from '@/lib/biophysics/scorer';
 import { HOOD_CLO_VALUES, type ActivityType, type HoodType } from '@/lib/biophysics/constants';
 import {
   calculateThermalComfortScore,
@@ -13,7 +13,7 @@ import {
   type ExtremityCloValues,
 } from '@/lib/biophysics/comfort';
 import type { GarmentRow, HandwearRow, HeadwearRecommendations } from './types';
-import { formatGarmentResponse, formatHandwearResponse, formatHeadwearResponse, ensembleToThermalGarments } from './formatting';
+import { formatGarmentResponse, formatHandwearResponse, formatHeadwearSet, ensembleToThermalGarments } from './formatting';
 
 interface EnsembleScoringInput {
   ensemble: GarmentRow[];
@@ -27,16 +27,11 @@ interface EnsembleScoringInput {
   };
 }
 
-interface ResponseComponents {
-  conditions: Record<string, unknown>;
+interface ScoredRecommendation {
   recommendation: {
     garments: ReturnType<typeof formatGarmentResponse>[];
     handwear: ReturnType<typeof formatHandwearResponse> | null;
-    headwear: {
-      helmet: ReturnType<typeof formatHeadwearResponse> | null;
-      head_warmth: ReturnType<typeof formatHeadwearResponse> | null;
-      neck_warmth: ReturnType<typeof formatHeadwearResponse> | null;
-    };
+    headwear: ReturnType<typeof formatHeadwearSet>;
     ensemble_properties: {
       total_clo: number;
       regional_clo: {
@@ -52,17 +47,16 @@ interface ResponseComponents {
     component_scores: Record<string, number>;
   };
   warnings: string[];
-  thermalGarments: GarmentWithProtection[];
 }
 
 /**
- * Score an ensemble and format the common response components.
+ * Score an ensemble and format the `recommendation` block and warnings.
  */
-export function buildResponseComponents(
+export function buildScoredRecommendation(
   input: EnsembleScoringInput,
   handwear: HandwearRow | null,
   headwear: HeadwearRecommendations
-): ResponseComponents {
+): ScoredRecommendation {
   const thermalGarments = ensembleToThermalGarments(input.ensemble);
   const ensembleProps = predictEnsembleThermal(thermalGarments);
 
@@ -116,15 +110,10 @@ export function buildResponseComponents(
   ) / 10;
 
   return {
-    conditions: {},
     recommendation: {
       garments: input.ensemble.map(formatGarmentResponse),
       handwear: handwear ? formatHandwearResponse(handwear) : null,
-      headwear: {
-        helmet: headwear.helmet ? formatHeadwearResponse(headwear.helmet) : null,
-        head_warmth: headwear.headWarmth ? formatHeadwearResponse(headwear.headWarmth) : null,
-        neck_warmth: headwear.neckWarmth ? formatHeadwearResponse(headwear.neckWarmth) : null,
-      },
+      headwear: formatHeadwearSet(headwear),
       ensemble_properties: {
         total_clo: ensembleProps.rcl.wholeBody,
         regional_clo: {
@@ -140,6 +129,5 @@ export function buildResponseComponents(
       component_scores: score.componentScores,
     },
     warnings: score.warnings,
-    thermalGarments,
   };
 }

@@ -25,11 +25,18 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 
 ## How Layer Recommendations Work
 
-The biophysics-supported activities share a common recommendation pipeline built on the IREQ standard (ISO 11079). The diagrams below describe the architecture for contributors. All calculations live server-side under `src/lib/biophysics/` and sport-specific route handlers under `src/app/api/v1/recommendations/`.
+The biophysics-supported activities share a common recommendation pipeline built on the IREQ standard (ISO 11079). The diagrams below describe the architecture for contributors. All calculations live server-side:
+
+- `src/lib/biophysics/` — the thermal models (IREQ, target ranges, CoWEDA buffer, ensemble prediction, scoring)
+- `src/lib/recommendations/` — the shared pipeline: request parsing, `thermal-targets.ts`, gear-pool loading, and the route factory in `handler.ts`
+- `src/lib/recommendations/sports/` — one module per sport with its ensemble builder, extremity rules, and response shape
+- `src/app/api/v1/recommendations/<sport>/route.ts` — one-line routes that pair the factory with a sport module (the paid `/api/agent/recommendations/*` routes reuse them)
+
+Golden tests in `src/app/api/v1/recommendations/golden.test.ts` pin every sport's full response against a snapshot of the real gear catalog; an intended output change shows up as a snapshot diff to review and update with `npx vitest run -u`.
 
 ### 1. Recommendation Pipeline
 
-Every biophysics recommendation passes through the same eight-step pipeline, from metabolic rate lookup through final comfort classification.
+Every biophysics recommendation passes through the same pipeline, from metabolic rate lookup through final comfort classification. Multi-phase sports run the target steps once per phase: alpine blends a skiing and a chairlift phase, and ski touring computes uphill, downhill, and transition phases.
 
 ```mermaid
 graph TD
@@ -38,11 +45,13 @@ graph TD
     C --> D[Activity Target Range]
     D --> E[CoWEDA Validation Buffer]
     E --> F[Regional & Extremity IREQ]
-    F --> G[Ensemble Building]
+    F --> P[Load Gear Pool:<br/>wardrobe, or catalog filtered by activity score]
+    P -->|No usable garments| T[Targets-only response]
+    P --> G[Ensemble Building]
     G --> H[Ensemble Scoring]
     H --> I[Comfort Evaluation]
 
-    subgraph "Shared Biophysics Core"
+    subgraph "Shared Biophysics Core — thermal-targets.ts"
         B
         C
         D
@@ -50,11 +59,16 @@ graph TD
         F
     end
 
-    subgraph "Sport-Specific"
+    subgraph "Shared Pipeline — handler.ts, gear-pool.ts"
+        P
+        T
+    end
+
+    subgraph "Sport-Specific — sports/*.ts"
         G
     end
 
-    subgraph "Shared Evaluation"
+    subgraph "Shared Evaluation — response-builder.ts (ski touring scores each phase itself)"
         H
         I
     end
@@ -148,13 +162,13 @@ graph TD
     SPORT --> XC[XC Skiing]
     SPORT --> TOUR[Ski Touring]
 
-    subgraph "Running"
+    subgraph "Running — shared breathable builder"
         RUN --> R1[Breathability-sorted at every layer]
         R1 --> R2[Shells conditional:<br/>clo deficit or precipitation]
         R2 --> R3[Whole-body clo budget]
     end
 
-    subgraph "Biking"
+    subgraph "Biking — shared breathable builder"
         BIKE --> B1[Breathability-sorted]
         B1 --> B2[Shells always processed]
         B2 --> B3[Whole-body clo budget]
@@ -241,8 +255,8 @@ graph TD
 
     subgraph "Handwear — Active vs Static Thresholds"
         HAND --> HMODE{Activity context?}
-        HMODE -->|Running, Biking,<br/>XC, Touring uphill| ACTIVE[Use active temp thresholds]
-        HMODE -->|Alpine,<br/>Touring descent| STATIC[Use static temp thresholds]
+        HMODE -->|Running, Biking, XC| ACTIVE[Use active temp thresholds]
+        HMODE -->|Alpine, Ski touring<br/>climb and descent| STATIC[Use static temp thresholds]
         ACTIVE --> HTARGET{IREQ target available?}
         STATIC --> HTARGET
         HTARGET -->|Yes| HSCORE[Score by proximity to target]

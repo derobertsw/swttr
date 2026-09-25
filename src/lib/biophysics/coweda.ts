@@ -15,7 +15,7 @@ const COWEDA_VALIDATION_METRICS = {
   exerciseR2: 0.8,
 } as const;
 
-interface CowedaValidationBuffer {
+export interface CowedaValidationBuffer {
   wholeBody: number;
   coldRisk: number;
   extremity: number;
