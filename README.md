@@ -9,8 +9,10 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - **Manual or forecast mode** for quick input or location/time-based planning
 - **Wardrobe management** with calibrated gear data (clo, breathability, wind/water protection)
 - **Body-part guidance** (torso, legs, hands, head/neck) with target clo insights
-- **Backpack planning** for activity + temperature range
-- **Mobile-first UX** with a Gear Up FAB and bottom navigation
+- **Plan ahead** with multi-day forecasts and a packing list
+- **Trips** for crews: stops, per-day kits, shared group gear, and an auto-generated pack list
+- **Paid agent API** for machine callers, metered per request over HTTP 402 ([docs](docs/paid-agent-api-mpp.md))
+- **Mobile-first UX**, also shipped as an iOS app via Capacitor
 
 ## Activities
 
@@ -21,7 +23,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - Running
 - Biking
 
-**Biophysics support:** Alpine Skiing, Backcountry Skiing, and XC Skiing. Other activities use static recommendations from `src/data/layerRecommendations.json`.
+**Biophysics support (signed in):** Alpine Skiing, Backcountry Skiing (ski touring), XC Skiing, Running, and Biking. Hiking / Snowshoeing and signed-out users get static recommendations from `src/data/layerRecommendations.json`, which covers Alpine, XC, and Hiking.
 
 ## How Layer Recommendations Work
 
@@ -274,8 +276,8 @@ graph TD
 
 ### Prerequisites
 
-- Node.js 18+
-- npm, yarn, pnpm, or bun
+- Node.js 22 (CI's version; Next.js 16 needs 20.9 or newer)
+- npm
 
 ### Install
 
@@ -318,10 +320,15 @@ Open `http://localhost:3000` in your browser.
 npm run build
 ```
 
-### Lint
+### Checks
+
+CI runs these on every pull request (production builds come from Vercel):
 
 ```bash
-npm run lint
+npm run lint        # ESLint, zero warnings allowed
+npm run typecheck   # next typegen + tsc
+npm run knip        # unused files, exports, and dependencies
+npm test -- --run   # Vitest
 ```
 
 ## Testing
@@ -339,45 +346,48 @@ npm run test:ui
 npm run test:coverage
 ```
 
+Route tests use `src/test/fakeSupabase.ts`, an in-memory stand-in for the Supabase query builder. The recommendation golden tests run against `src/test/fixtures/gear-catalog.json`, a snapshot of the real gear catalog.
+
 ## Project Structure
 
 ```
 src/
-  app/                          # Next.js App Router pages
-    api/                        # API routes (weather, wardrobe, recommendations)
-    backpack/                   # Backpack management page
-    faq/                        # FAQ page
-    wardrobe/                   # My Gear page
-    page.tsx                    # Home page
+  app/
+    api/
+      agent/recommendations/  # Paid (MPP) mirrors of the v1 recommendation routes
+      v1/recommendations/     # One route per sport, built from lib/recommendations
+      v1/ensembles/evaluate/  # Evaluates edited layers against the targets
+      v1/trips/               # Trips, stops, crew, days, kits, group gear, pack list
+      wardrobe/               # Wardrobe items, catalog, custom items
+      preferences/            # User preferences
+      weather/, geocode/      # Open-Meteo forecast and location search
+      plan-ahead/             # Multi-day forecast plan
+      packing-list/           # Packing list for a plan
+      media/                  # Brand logos and item images
+    trips/                    # Trips pages
+    wardrobe/                 # My Gear page
+    faq/                      # FAQ page
+    page.tsx                  # Home: pick an activity and Gear Up
   components/
-    icons/                      # Custom SVG icons
-    wardrobe/                   # Wardrobe components
-    ui/                         # Shared UI components (shadcn/ui)
-    ActivitySelection.tsx       # Activity carousel
-    BackpackEditor.tsx          # Pack list editor
-    BiophysicsDetails.tsx       # Thermal comfort details
-    LayerDisplay.tsx            # Recommendation display
-    PreferencesDrawer.tsx       # User preferences
-    WeatherSelection.tsx        # Temperature/wind sliders
+    layers/                   # Recommendation view: weather header, gauges, body-part sections, layer picker
+    trips/                    # Trip UI primitives
+    wardrobe/                 # Wardrobe components
+    ui/                       # shadcn/ui components (vendored)
+    LayerDisplay.tsx          # Recommendation view
   data/
-    activities.ts               # Activity definitions
-    layerRecommendations.json   # Default layer recommendations
-    layerOptions.ts             # Available layer options
-  hooks/
-    useBackpack.ts              # Backpack state management
-    useBiophysicsRecommendation.ts  # IREQ-based recommendations
-    useCurrentWeather.ts        # Weather data hook
-    useItemMappings.ts          # Gear mappings hook
-    useLocationSearch.ts        # Location search hook
-    usePreferences.ts           # User preferences hook
+    activities.ts             # Activity definitions
+    layerRecommendations.json # Static layers for signed-out users
+  hooks/                      # Client hooks: useGearUp, usePreferences, useWardrobe, useTrip, ...
   lib/
-    biophysics/                 # IREQ thermal comfort calculations
-    recommendations/            # Shared recommendation logic
-    supabase.ts                 # Supabase client
-  types/
-    biophysics.ts               # Thermal property types
-    garments.ts                 # Garment database types
-    wardrobe.ts                 # Wardrobe types
+    api.ts                    # Route helpers: requireUser, readJson, jsonError
+    biophysics/               # Thermal models: IREQ, targets, CoWEDA buffer, ensembles, scoring
+    recommendations/          # Recommendation pipeline, sport modules, layer evaluation
+    payments/mpp.ts           # Paid agent API (MPP)
+    supabase.ts               # Server-only service-role client
+    trips.ts                  # Trip data access and requireTripAccess
+  test/                       # Supabase fake and test fixtures
+  types/                      # API contracts shared by server and client, and domain types
+  proxy.ts                    # Clerk middleware (Next 16's name for middleware.ts)
 ```
 
 ## Database (Supabase)
