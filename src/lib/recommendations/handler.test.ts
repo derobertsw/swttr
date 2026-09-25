@@ -23,7 +23,9 @@ const sport: SportRecommender<{ target: number }> = {
   catalog: {},
   computeTargets: () => ({ target: 1 }),
   emptyResponse: (_request, targets) => ({ targets }),
-  recommend: () => ({ recommendation: {} }),
+  recommend: () => {
+    throw new Error("not reached: these tests have no usable gear");
+  },
 };
 
 const POST = createRecommendationRoute(sport);

@@ -7,7 +7,7 @@ function makeMinimalBiophysics(
   garments: BiophysicsRecommendation["recommendation"]["garments"] = []
 ): BiophysicsRecommendation {
   return {
-    conditions: { temperature: "30°F", wind_speed: "5 mph", precipitation: false },
+    conditions: { temperature: "30°F", wind_speed: "5 mph", exertion: "moderate", precipitation: false },
     ireq: { target_range: [1, 2] },
     recommendation: {
       garments,

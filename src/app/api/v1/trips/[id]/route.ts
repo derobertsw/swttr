@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
-import { getAuthUserId } from "@/lib/auth";
+import { readJson } from "@/lib/api";
 import {
-  assertCanAccessTrip,
+  requireTripAccess,
   classifyTripStatus,
   enumerateDates,
   loadTripFull,
@@ -11,14 +10,10 @@ import {
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, ctx: RouteContext) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase || !userId)
-    return NextResponse.json({ error: "Auth required" }, { status: 401 });
-
   const { id } = await ctx.params;
-  const access = await assertCanAccessTrip(supabase, id, userId);
-  if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const auth = await requireTripAccess(id);
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
   const full = await loadTripFull(supabase, id);
   if (!full) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -26,25 +21,19 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
 }
 
 export async function PATCH(request: NextRequest, ctx: RouteContext) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase || !userId)
-    return NextResponse.json({ error: "Auth required" }, { status: 401 });
-
   const { id } = await ctx.params;
-  const access = await assertCanAccessTrip(supabase, id, userId);
-  if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (access.owner_user_id !== userId)
-    return NextResponse.json({ error: "Organizer only" }, { status: 403 });
+  const auth = await requireTripAccess(id, { organizerOnly: true });
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, trip } = auth;
 
-  const body = await request.json().catch(() => null);
+  const body = await readJson(request);
   const update: Record<string, unknown> = {};
   if (typeof body?.name === "string") update.name = body.name;
   if (typeof body?.start_date === "string") update.start_date = body.start_date;
   if (typeof body?.end_date === "string") update.end_date = body.end_date;
 
-  const nextStart = (update.start_date as string | undefined) ?? access.start_date;
-  const nextEnd = (update.end_date as string | undefined) ?? access.end_date;
+  const nextStart = (update.start_date as string | undefined) ?? trip.start_date;
+  const nextEnd = (update.end_date as string | undefined) ?? trip.end_date;
   if (nextStart > nextEnd) {
     return NextResponse.json(
       { error: "start_date must be on or before end_date" },
@@ -84,16 +73,10 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
 }
 
 export async function DELETE(_request: NextRequest, ctx: RouteContext) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase || !userId)
-    return NextResponse.json({ error: "Auth required" }, { status: 401 });
-
   const { id } = await ctx.params;
-  const access = await assertCanAccessTrip(supabase, id, userId);
-  if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (access.owner_user_id !== userId)
-    return NextResponse.json({ error: "Organizer only" }, { status: 403 });
+  const auth = await requireTripAccess(id, { organizerOnly: true });
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
   const { error } = await supabase.from("trips").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

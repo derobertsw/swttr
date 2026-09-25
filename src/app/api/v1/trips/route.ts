@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
-import { getAuthUserId } from "@/lib/auth";
+import { readJson, requireUser } from "@/lib/api";
 import {
   classifyTripStatus,
   enumerateDates,
@@ -8,23 +7,20 @@ import {
 } from "@/lib/trips";
 
 export async function GET() {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase) return NextResponse.json({ trips: [] });
-  if (!userId) return NextResponse.json({ error: "Auth required" }, { status: 401 });
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, userId } = auth;
 
   const trips = await listTripsForUser(supabase, userId);
   return NextResponse.json({ trips });
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase)
-    return NextResponse.json({ error: "Database not configured" }, { status: 503 });
-  if (!userId) return NextResponse.json({ error: "Auth required" }, { status: 401 });
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, userId } = auth;
 
-  const body = await request.json().catch(() => null);
+  const body = await readJson(request);
   const { name, start_date, end_date } = (body ?? {}) as {
     name?: string;
     start_date?: string;

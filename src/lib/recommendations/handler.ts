@@ -7,6 +7,7 @@
  * alone. The sport-specific steps live in a SportRecommender.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import type { BiophysicsRecommendation } from '@/types/biophysics';
 import { parseRecommendationRequest, type RecommendationRequest } from './request';
 import { loadGearPool, type CatalogFilter, type GearPool } from './gear-pool';
 
@@ -16,7 +17,7 @@ export interface SportRecommender<Targets> {
   computeTargets(request: RecommendationRequest): Targets;
   /** Response body (besides the message) when there is no usable gear. */
   emptyResponse(request: RecommendationRequest, targets: Targets): object;
-  recommend(request: RecommendationRequest, targets: Targets, pool: GearPool): object;
+  recommend(request: RecommendationRequest, targets: Targets, pool: GearPool): BiophysicsRecommendation;
 }
 
 const NO_GARMENTS_MESSAGE = 'No suitable garments found in database';

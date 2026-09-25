@@ -1,6 +1,7 @@
 /**
  * In-memory stand-in for the subset of the Supabase query builder used by the
- * API routes: from().select().eq().in().gte(), awaited directly.
+ * API routes: from().select().eq().neq().in().gte().order().limit(), awaited
+ * directly or via maybeSingle().
  *
  * Embedded one-to-one relations (e.g. garment_thermal_properties) are stored on
  * each row, matching PostgREST's response shape. A gte() filter on an embedded
@@ -12,6 +13,8 @@ type Filter = (row: Row) => boolean;
 
 class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
   private readonly filters: Filter[] = [];
+  private readonly sorts: Array<(a: Row, b: Row) => number> = [];
+  private maxRows = Infinity;
 
   constructor(private readonly rows: Row[]) {}
 
@@ -21,6 +24,11 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
 
   eq(column: string, value: unknown) {
     this.filters.push((row) => row[column] === value);
+    return this;
+  }
+
+  neq(column: string, value: unknown) {
+    this.filters.push((row) => row[column] !== value);
     return this;
   }
 
@@ -37,12 +45,37 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
     return this;
   }
 
+  order(column: string, options: { ascending?: boolean } = {}) {
+    const direction = options.ascending === false ? -1 : 1;
+    this.sorts.push((a, b) => {
+      const x = a[column] as string | number;
+      const y = b[column] as string | number;
+      return x < y ? -direction : x > y ? direction : 0;
+    });
+    return this;
+  }
+
+  limit(count: number) {
+    this.maxRows = count;
+    return this;
+  }
+
+  /** Resolves to the first matching row, or null. */
+  maybeSingle() {
+    return Promise.resolve({ data: this.matches()[0] ?? null, error: null });
+  }
+
+  private matches(): Row[] {
+    const rows = this.rows.filter((row) => this.filters.every((f) => f(row)));
+    for (const compare of [...this.sorts].reverse()) rows.sort(compare);
+    return structuredClone(rows.slice(0, this.maxRows));
+  }
+
   then<TResult1 = { data: Row[]; error: null }, TResult2 = never>(
     onfulfilled?: ((value: { data: Row[]; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): PromiseLike<TResult1 | TResult2> {
-    const data = structuredClone(this.rows.filter((row) => this.filters.every((f) => f(row))));
-    return Promise.resolve({ data, error: null as null }).then(onfulfilled, onrejected);
+    return Promise.resolve({ data: this.matches(), error: null as null }).then(onfulfilled, onrejected);
   }
 }
 

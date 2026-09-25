@@ -300,6 +300,7 @@ describe("LayerDisplay", () => {
       conditions: {
         temperature: "15",
         wind_speed: "10",
+        exertion: "moderate" as const,
         precipitation: false,
       },
       ireq: {

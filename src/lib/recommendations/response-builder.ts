@@ -12,6 +12,7 @@ import {
   type RegionalCloValues,
   type ExtremityCloValues,
 } from '@/lib/biophysics/comfort';
+import type { BiophysicsRecommendation } from '@/types/biophysics';
 import type { GarmentRow, HandwearRow, HeadwearRecommendations } from './types';
 import { formatGarmentResponse, formatHandwearResponse, formatHeadwearSet, ensembleToThermalGarments } from './formatting';
 
@@ -27,27 +28,7 @@ interface EnsembleScoringInput {
   };
 }
 
-interface ScoredRecommendation {
-  recommendation: {
-    garments: ReturnType<typeof formatGarmentResponse>[];
-    handwear: ReturnType<typeof formatHandwearResponse> | null;
-    headwear: ReturnType<typeof formatHeadwearSet>;
-    ensemble_properties: {
-      total_clo: number;
-      regional_clo: {
-        torso: number;
-        arms: number;
-        legs: number;
-      };
-      evap_potential: number;
-      permeability_index: number;
-    };
-    score: number;
-    thermal_comfort_score: number;
-    component_scores: Record<string, number>;
-  };
-  warnings: string[];
-}
+type ScoredRecommendation = Pick<BiophysicsRecommendation, 'recommendation' | 'warnings'>;
 
 /**
  * Score an ensemble and format the `recommendation` block and warnings.

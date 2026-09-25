@@ -1,5 +1,7 @@
+import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
+import { jsonError, requireUser, type AuthedContext } from "@/lib/api";
 import type {
   Trip,
   TripDay,
@@ -25,6 +27,11 @@ export function enumerateDates(startISO: string, endISO: string): string[] {
   return out;
 }
 
+/**
+ * The trip if `userId` owns it or is a current member, otherwise null.
+ * @public For routes that already hold a client and user id; most routes
+ * should use requireTripAccess.
+ */
 export async function assertCanAccessTrip(
   supabase: SupabaseClient,
   tripId: string,
@@ -46,6 +53,27 @@ export async function assertCanAccessTrip(
     .neq("status", "left")
     .maybeSingle();
   return membership ? (trip as Trip) : null;
+}
+
+/**
+ * The signed-in user, a database client, and the trip, or the error response
+ * to return: 401/503 from requireUser, 404 when the trip does not exist or the
+ * user is not on it, 403 when `organizerOnly` and the user is not the owner.
+ */
+export async function requireTripAccess(
+  tripId: string,
+  options: { organizerOnly?: boolean } = {}
+): Promise<(AuthedContext & { trip: Trip }) | NextResponse> {
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+
+  const trip = await assertCanAccessTrip(auth.supabase, tripId, auth.userId);
+  if (!trip) return jsonError("Not found", 404);
+  if (options.organizerOnly && trip.owner_user_id !== auth.userId) {
+    return jsonError("Organizer only", 403);
+  }
+
+  return { ...auth, trip };
 }
 
 export async function listTripsForUser(

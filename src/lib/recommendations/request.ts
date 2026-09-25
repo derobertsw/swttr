@@ -7,6 +7,7 @@ import { fahrenheitToCelsius, mphToMs } from '@/lib/biophysics/ireq';
 import { parseExertionLevel, type ExertionLevel } from '@/lib/biophysics/exertion';
 import { parseBodyMetricsFromRequestBody } from '@/lib/biophysics/bodyMetrics';
 import { getAuthUserId } from '@/lib/auth';
+import { readJson } from '@/lib/api';
 import type { UserBodyMetrics } from '@/types/preferences';
 import type { PrecipitationType } from '@/types/weather';
 
@@ -17,6 +18,18 @@ export interface WeatherInput {
   precipitation?: boolean;
   precipitation_type?: PrecipitationType;
 }
+
+/** Request body as sent by clients; only `weather` is required. */
+type RecommendationBody = {
+  weather?: Partial<WeatherInput>;
+  exertion?: unknown;
+  /** Legacy alias for `exertion`. */
+  intensity?: unknown;
+  use_wardrobe_only?: unknown;
+  prioritize_light_pack?: unknown;
+  height_inches?: unknown;
+  weight_lbs?: unknown;
+};
 
 export interface RecommendationRequest {
   supabase: NonNullable<ReturnType<typeof getSupabase>>;
@@ -47,7 +60,8 @@ export async function parseRecommendationRequest(
   }
 
   const userId = await getAuthUserId();
-  const body = await request.json();
+  // A malformed body fails the weather check below with a 400.
+  const body = (await readJson<RecommendationBody>(request)) ?? {};
 
   // Require finite numbers (0°F/0mph are valid), rejecting undefined, null,
   // booleans, and non-numeric strings that would otherwise coerce to a bogus
@@ -62,7 +76,7 @@ export async function parseRecommendationRequest(
     );
   }
 
-  const weather: WeatherInput = body.weather;
+  const weather = body.weather as WeatherInput;
   return {
     supabase,
     userId,

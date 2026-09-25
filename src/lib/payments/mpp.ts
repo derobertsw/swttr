@@ -14,27 +14,35 @@ import { Mppx, tempo } from 'mppx/nextjs';
  * `MPP_RECIPIENT_ADDRESS` (the Tempo wallet that receives funds).
  */
 
-const secretKey = process.env.MPP_SECRET_KEY;
-if (!secretKey) {
-  throw new Error(
-    'MPP_SECRET_KEY is not set — generate one with `openssl rand -base64 32`',
-  );
+// pathUSD (TIP-20) on Tempo. Override with MPP_CURRENCY if needed.
+const DEFAULT_CURRENCY = '0x20c0000000000000000000000000000000000000';
+
+function createMppx(secretKey: string) {
+  return Mppx.create({
+    secretKey,
+    methods: [
+      tempo({
+        currency: process.env.MPP_CURRENCY ?? DEFAULT_CURRENCY,
+        recipient: process.env.MPP_RECIPIENT_ADDRESS as `0x${string}` | undefined,
+        testnet: process.env.MPP_TESTNET !== 'false',
+      }),
+    ],
+  });
 }
 
-// pathUSD (TIP-20) on Tempo. Override with MPP_CURRENCY if needed.
-const currency =
-  process.env.MPP_CURRENCY ?? '0x20c0000000000000000000000000000000000000';
+let mppx: ReturnType<typeof createMppx> | null = null;
 
-const mppx = Mppx.create({
-  secretKey,
-  methods: [
-    tempo({
-      currency,
-      recipient: process.env.MPP_RECIPIENT_ADDRESS as `0x${string}` | undefined,
-      testnet: process.env.MPP_TESTNET !== 'false',
-    }),
-  ],
-});
+/**
+ * The shared MPP instance, created on first use so that a missing
+ * MPP_SECRET_KEY only disables the paid routes instead of failing every
+ * import of this module (including `next build`). Null when not configured.
+ */
+function getMppx() {
+  if (!mppx && process.env.MPP_SECRET_KEY) {
+    mppx = createMppx(process.env.MPP_SECRET_KEY);
+  }
+  return mppx;
+}
 
 /**
  * Wrap a paid recommendation route with pre-charge validation.
@@ -43,7 +51,7 @@ const mppx = Mppx.create({
  * rejected with a 400 before the 402 challenge is ever issued, so agents don't
  * pay for a response they can't use:
  * - missing `weather.temperature` / `weather.wind_speed` (required by
- *   `validateRecommendationRequest`)
+ *   `parseRecommendationRequest`)
  * - `use_wardrobe_only: true` — wardrobes require a signed-in user, which the
  *   stateless agent API never has
  */
@@ -51,7 +59,9 @@ export function paidRecommendationRoute(
   amount: string,
   handler: (request: Request) => Promise<Response>,
 ): (request: Request) => Promise<Response> {
-  const charged = mppx.charge({ amount })(handler);
+  const chargeWith = (instance: NonNullable<ReturnType<typeof getMppx>>) =>
+    instance.charge({ amount })(handler);
+  let charged: ReturnType<typeof chargeWith> | null = null;
 
   return async (request: Request) => {
     let body: Record<string, unknown> | null = null;
@@ -64,7 +74,7 @@ export function paidRecommendationRoute(
     const weather = body?.weather as
       | { temperature?: unknown; wind_speed?: unknown }
       | undefined;
-    // Mirror validateRecommendationRequest: both fields must be finite numbers
+    // Mirror parseRecommendationRequest: both fields must be finite numbers
     // (0 allowed). Rejecting here avoids charging for a request the v1 handler
     // would 400 anyway.
     if (
@@ -88,6 +98,14 @@ export function paidRecommendationRoute(
       );
     }
 
-    return charged(request);
+    const instance = getMppx();
+    if (!instance) {
+      return NextResponse.json(
+        { error: 'The paid agent API is not configured on this deployment' },
+        { status: 503 },
+      );
+    }
+    const chargedHandler = (charged ??= chargeWith(instance));
+    return chargedHandler(request);
   };
 }

@@ -5,29 +5,6 @@
 // ENUM TYPES
 // ============================================
 
-export type GarmentCategory =
-  | 'base_layer'
-  | 'mid_layer_light'
-  | 'mid_layer_heavy'
-  | 'insulation_synthetic'
-  | 'insulation_down'
-  | 'soft_shell'
-  | 'hard_shell'
-  | 'outer_insulated';
-
-export type GarmentType =
-  | 'top_sleeveless'
-  | 'top_short_sleeve'
-  | 'top_long_sleeve'
-  | 'jacket'
-  | 'vest'
-  | 'pants'
-  | 'shorts'
-  | 'bib'
-  | 'one_piece';
-
-export type HoodType = 'none' | 'attached' | 'removable' | 'helmet_compatible';
-
 export type EstimationMethod =
   | 'lab_tested'
   | 'derived_from_similar'

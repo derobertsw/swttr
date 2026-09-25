@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
-import { getAuthUserId } from "@/lib/auth";
-import { assertCanAccessTrip, loadTripFull } from "@/lib/trips";
+import { requireTripAccess, loadTripFull } from "@/lib/trips";
 import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 import { buildPackingListFromDays } from "@/lib/packingList";
 import { fetchUserWardrobeItems } from "@/lib/userWardrobe";
@@ -72,14 +70,10 @@ function chooseActivity(day: TripDay, stop: TripStop | undefined): string | null
 }
 
 export async function GET(_request: NextRequest, ctx: RouteContext) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase || !userId)
-    return NextResponse.json({ error: "Auth required" }, { status: 401 });
-
   const { id } = await ctx.params;
-  const access = await assertCanAccessTrip(supabase, id, userId);
-  if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const auth = await requireTripAccess(id);
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, userId } = auth;
 
   const full = await loadTripFull(supabase, id);
   if (!full) return NextResponse.json({ error: "Not found" }, { status: 404 });

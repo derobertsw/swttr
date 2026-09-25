@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
-import { getAuthUserId } from "@/lib/auth";
-import { assertCanAccessTrip } from "@/lib/trips";
+import { readJson } from "@/lib/api";
+import { requireTripAccess } from "@/lib/trips";
 
 type RouteContext = { params: Promise<{ id: string; stopId: string }> };
 
 export async function PATCH(request: NextRequest, ctx: RouteContext) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase || !userId)
-    return NextResponse.json({ error: "Auth required" }, { status: 401 });
-
   const { id, stopId } = await ctx.params;
-  const access = await assertCanAccessTrip(supabase, id, userId);
-  if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const auth = await requireTripAccess(id);
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
-  const body = await request.json().catch(() => null);
+  const body = await readJson(request);
   const update: Record<string, unknown> = {};
   if (typeof body?.name === "string") update.name = body.name;
   if (body?.latitude !== undefined) update.latitude = body.latitude;
@@ -47,14 +42,10 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
 }
 
 export async function DELETE(_request: NextRequest, ctx: RouteContext) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase || !userId)
-    return NextResponse.json({ error: "Auth required" }, { status: 401 });
-
   const { id, stopId } = await ctx.params;
-  const access = await assertCanAccessTrip(supabase, id, userId);
-  if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const auth = await requireTripAccess(id);
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
   const { error } = await supabase
     .from("trip_stops")

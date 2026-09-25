@@ -1,6 +1,9 @@
 /**
- * Types for biophysics API responses
+ * Response contract of the /api/v1/recommendations/* routes. The sport
+ * recommenders are typed against these, so the client and server agree.
  */
+import type { ExertionLevel } from "@/lib/biophysics/exertion";
+import type { EnsembleScore } from "@/types/garments";
 
 export interface IreqData {
   min: number;
@@ -30,11 +33,15 @@ export interface ExtremityIreqRange {
   neutral: ExtremityIreqData;
 }
 
+/**
+ * Single-phase sports report `min`/`neutral` at the top level; alpine reports
+ * `skiing`/`chairlift` and ski touring `uphill`/`downhill` phases instead.
+ */
 export interface IreqRange {
+  min?: number;
+  neutral?: number;
   skiing?: IreqData;
   chairlift?: IreqData;
-  active?: IreqData;
-  rest?: IreqData;
   uphill?: IreqData;
   downhill?: IreqData;
   downhill_target_range?: [number, number];
@@ -64,14 +71,8 @@ export interface IreqRange {
   validation_source?: string;
 }
 
-/** Per-dimension ensemble scores (0-10), as returned by scoreEnsemble. */
-export interface ComponentScores {
-  coldProtection: number;
-  overheatPrevention: number;
-  breathability: number;
-  weatherProtection: number;
-  weight: number;
-}
+/** Per-dimension ensemble scores, as returned by scoreEnsemble. */
+export type ComponentScores = EnsembleScore["componentScores"];
 
 export interface RegionalClo {
   torso: number;
@@ -111,10 +112,12 @@ export interface RecommendedGarment {
   category: string;
   rcl?: number;
   rcl_torso?: number;
+  rcl_arms?: number;
   rcl_legs?: number;
   recl?: number;
   evap_potential?: number;
   covers_torso?: boolean;
+  covers_arms?: boolean;
   covers_legs?: boolean;
 }
 
@@ -142,10 +145,14 @@ export interface RecommendedHeadwear {
 }
 
 export interface BiophysicsRecommendation {
+  /** The request's conditions, echoed as sent (°F, mph). */
   conditions: {
     temperature: string;
     wind_speed: string;
-    precipitation: boolean;
+    exertion: ExertionLevel;
+    precipitation?: boolean;
+    /** XC skiing only: exertion expressed as XC intensity. */
+    intensity?: "easy" | "moderate" | "racing";
   };
   ireq: IreqRange;
   recommendation: {
