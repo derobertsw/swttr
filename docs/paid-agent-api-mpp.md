@@ -69,7 +69,8 @@ MPP_RECIPIENT_ADDRESS=0x...
 ```
 
 `MPP_SECRET_KEY` is generated locally, not obtained from Stripe. A Stripe/Tempo account
-is only needed for **mainnet** payout.
+is only needed for **mainnet** payout. Without it the agent routes still validate
+requests but answer `503` instead of issuing a payment challenge.
 
 ## Networks
 

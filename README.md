@@ -285,15 +285,24 @@ npm install
 
 ### Environment Variables
 
-Create a `.env.local` file with the following optional variables:
+Create a `.env.local` file:
 
 ```bash
-# Supabase (optional - enables persistent wardrobe and calibrated gear data)
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Clerk authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
+CLERK_SECRET_KEY=sk_...
+
+# Supabase: persistent wardrobe, preferences, trips, and calibrated gear data.
+# The service-role key is server-only (never prefix it with NEXT_PUBLIC_).
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_or_secret_key
+
+# Paid agent API (optional; /api/agent/* returns 503 without it).
+# See docs/paid-agent-api-mpp.md.
+MPP_SECRET_KEY=...
 ```
 
-Without Supabase configured, the app uses static layer recommendations from `src/data/layerRecommendations.json`.
+Without Supabase configured, database-backed API routes return 503 and the home page falls back to static layer recommendations from `src/data/layerRecommendations.json`.
 
 ### Development
 
@@ -381,6 +390,12 @@ The app uses a biophysics-based garment database with calibrated thermal propert
 - `garment_activity_ratings` - Activity-specific suitability scores
 - `handwear` / `headwear` - Extremity items with thermal properties
 - `user_wardrobe` - Links users to their owned gear
+- `user_custom_items`, `user_item_mappings`, `user_preferences` - Per-user data
+- `trips`, `trip_stops`, `trip_members`, `trip_days`, `trip_member_day_kits`, `trip_group_gear` - Trips/crew planning
+
+**Access model:** the browser never talks to Supabase. API routes use the service-role key (`src/lib/supabase.ts`, guarded by `server-only`) and enforce per-user access in code, for example with `requireUser()` in `src/lib/api.ts` and `requireTripAccess()` in `src/lib/trips.ts`. Migration `014_restrict_to_service_role.sql` revokes all table access from the public `anon`/`authenticated` roles, so the anon key grants nothing.
+
+**Applying migrations:** production's migration history doesn't match the numbered files here (some migrations were applied by hand), so don't `supabase db push` the whole folder. Apply new migrations individually, for example in the SQL editor or with the Supabase MCP `apply_migration`.
 
 ## Deployment
 
