@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import type { Recommendation } from "@/types/recommendations";
@@ -116,6 +117,7 @@ const LayerDisplayContent = ({
   onActivityChange,
   weatherLoading,
 }: LayerDisplayProps) => {
+  const router = useRouter();
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
   const [activePhase, setActivePhase] = useState<Phase>("climb");
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
@@ -234,7 +236,7 @@ const LayerDisplayContent = ({
     }
     if (!item.isOwned) {
       toast.info("This item isn't in your wardrobe yet. Add it for better future recommendations.", {
-        action: { label: "Go to Wardrobe", onClick: () => window.location.assign("/wardrobe") },
+        action: { label: "Go to Wardrobe", onClick: () => router.push("/wardrobe") },
       });
     }
     setPickerTarget(null);
