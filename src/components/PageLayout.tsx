@@ -5,7 +5,7 @@ import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import Header from "@/components/Header";
 import { AppSidebar } from "@/components/AppSidebar";
-import { DesktopActionDock, MobileTabBar } from "@/components/AppNavigation";
+import { MobileTabBar } from "@/components/AppNavigation";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { useMigrateUser } from "@/hooks/useMigrateUser";
 import { useNativeTabShell } from "@/hooks/useNativeTabShell";
@@ -59,7 +59,8 @@ const PageLayout = ({
               isNativeTabShell
                 ? "pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]"
                 : "pb-[calc(5.5rem_+_env(safe-area-inset-bottom))]",
-              "md:gap-8 md:rounded-3xl md:border md:border-white/25 md:bg-white/[0.04] md:p-10 md:pb-40 md:backdrop-blur-[6px] lg:p-12 lg:pb-44"
+              // Keep the bottom inset: on wide native screens (iPad, landscape) the native tab bar still covers the bottom.
+              "md:gap-8 md:rounded-3xl md:border md:border-white/25 md:bg-white/[0.04] md:p-10 md:pb-[calc(2.5rem_+_env(safe-area-inset-bottom))] md:backdrop-blur-[6px] lg:p-12 lg:pb-[calc(3rem_+_env(safe-area-inset-bottom))]"
             )}
           >
             <Header onLogoClick={onLogoClick} variant={chromeVariant} />
@@ -73,7 +74,6 @@ const PageLayout = ({
             </main>
           </div>
         </SidebarInset>
-        <DesktopActionDock />
       </SidebarProvider>
       <MobileTabBar />
     </>
