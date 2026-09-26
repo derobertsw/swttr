@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { NextRequest } from "next/server";
+import { toast } from "sonner";
 import { POST as evaluateLayers } from "@/app/api/v1/ensembles/evaluate/route";
+import type { PickerItem } from "@/hooks/useLayerPicker";
 import LayerDisplay from "./LayerDisplay";
 
 // Layer evaluation runs on the server; serve it from the real route handler.
@@ -27,9 +29,14 @@ vi.mock("@clerk/nextjs", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush, replace: vi.fn(), prefetch: vi.fn() }),
+}));
+
 // Mock sonner toast
 vi.mock("sonner", () => ({
-  toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }),
+  toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn(), info: vi.fn() }),
 }));
 
 // Mock useLayerPicker — no wardrobe items available in tests
@@ -37,9 +44,19 @@ vi.mock("@/hooks/useLayerPicker", () => ({
   useLayerPicker: () => ({ loading: false, getItems: () => [] }),
 }));
 
-// Mock LayerPickerDrawer — renders nothing in tests
+// Mock LayerPickerDrawer — while open, offers one item that isn't in the wardrobe
+const catalogFleece: PickerItem = {
+  id: "catalog-fleece",
+  name: "Catalog fleece",
+  brand: "Test Brand",
+  rcl: 0.3,
+  nativeLayerType: "mid",
+  isInUse: false,
+  isOwned: false,
+};
 vi.mock("@/components/layers/LayerPickerDrawer", () => ({
-  LayerPickerDrawer: () => null,
+  LayerPickerDrawer: ({ open, onSelect }: { open: boolean; onSelect: (item: PickerItem) => void }) =>
+    open ? <button onClick={() => onSelect(catalogFleece)}>Pick catalog fleece</button> : null,
 }));
 
 const mockRecommendation = {
@@ -897,5 +914,26 @@ describe("LayerDisplay", () => {
       expect(await screen.findByLabelText(/Descent Cold Risk/)).toBeInTheDocument();
     });
 
+  });
+
+  describe("layer picker", () => {
+    it("offers a client-side route to the wardrobe after picking an item not in it", () => {
+      const noMidRecommendation = {
+        torso: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
+        legs: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
+        hands: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
+        headNeck: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
+      };
+
+      render(<LayerDisplay recommendation={noMidRecommendation} temperature={25} windspeed={10} />);
+      fireEvent.click(screen.getAllByText("Add mid")[0]);
+      fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+      expect(screen.getByText("Catalog fleece")).toBeInTheDocument();
+      const action = vi.mocked(toast.info).mock.lastCall?.[1]?.action as { label: string; onClick: () => void };
+      expect(action.label).toBe("Go to Wardrobe");
+      action.onClick();
+      expect(mockPush).toHaveBeenCalledWith("/wardrobe");
+    });
   });
 });
