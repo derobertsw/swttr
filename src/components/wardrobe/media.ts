@@ -57,7 +57,11 @@ export function getBrandInitials(brand: string): string {
 
 export function toCssBackgroundImage(url?: string): string | undefined {
   if (!url) return undefined;
-  return `url("${url.replace(/"/g, '\\"')}")`;
+  // Backslashes and newlines could otherwise end the quoted CSS string early.
+  const escaped = url
+    .replace(/["\\]/g, "\\$&")
+    .replace(/[\n\r\f]/g, (char) => `\\${char.charCodeAt(0).toString(16)} `);
+  return `url("${escaped}")`;
 }
 
 export function resolveBrandLogoUrl(media: MediaRef): string {
