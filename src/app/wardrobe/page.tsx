@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { RotateCcw, X, Search, Sparkles } from "lucide-react";
@@ -26,7 +26,7 @@ import { BodyPartSection } from "@/components/wardrobe/BodyPartSection";
 import { ItemDetailCard } from "@/components/wardrobe";
 import { CreateCustomItemDialog } from "@/components/wardrobe/CreateCustomItemDialog";
 import { buildWardrobeOverview } from "@/components/wardrobe/wardrobe-overview";
-import { BODY_PART_ORDER, getItemIcon, formatCategory, getClo } from "@/components/wardrobe/wardrobe-utils";
+import { BODY_PART_ORDER, ItemIcon, formatCategory, getClo } from "@/components/wardrobe/wardrobe-utils";
 import type { BodyPart } from "@/types/wardrobe";
 
 export default function Wardrobe() {
@@ -68,8 +68,6 @@ export default function Wardrobe() {
     toggleDisabled,
     toggleDisabledCollapsed,
   } = useWardrobe();
-  const [showSwipeHint, setShowSwipeHint] = useState(false);
-  const dismissSwipeHint = useCallback(() => setShowSwipeHint(false), []);
   const [showSearch, setShowSearch] = useState(false);
   const [showCustomDialog, setShowCustomDialog] = useState(false);
   const [customDialogBodyPart, setCustomDialogBodyPart] = useState<string | undefined>(undefined);
@@ -184,35 +182,21 @@ export default function Wardrobe() {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-6">
-                    {(() => {
-                      let swipeHintAssigned = false;
-                      return BODY_PART_ORDER.map((part, index) => {
-                        const activeItems = groupedWardrobeItems[part];
-                        const shouldShowSwipeHint =
-                          showSwipeHint && !swipeHintAssigned && activeItems.length > 0;
-                        if (shouldShowSwipeHint) {
-                          swipeHintAssigned = true;
-                        }
-
-                        return (
-                          <BodyPartSection
-                            key={part}
-                            part={part}
-                            sectionId={wardrobeSectionIds[part]}
-                            items={activeItems}
-                            disabledItems={disabledItemsByPart[part]}
-                            isFirst={index === 0}
-                            isCollapsed={disabledCollapsed[part] ?? true}
-                            onToggleCollapsed={() => toggleDisabledCollapsed(part)}
-                            onRemoveItem={removeItem}
-                            onToggleDisabled={toggleDisabled}
-                            onItemClick={setSelectedItem}
-                            showSwipeHintOnFirstItem={shouldShowSwipeHint}
-                            onDismissSwipeHint={dismissSwipeHint}
-                          />
-                        );
-                      });
-                    })()}
+                    {BODY_PART_ORDER.map((part, index) => (
+                      <BodyPartSection
+                        key={part}
+                        part={part}
+                        sectionId={wardrobeSectionIds[part]}
+                        items={groupedWardrobeItems[part]}
+                        disabledItems={disabledItemsByPart[part]}
+                        isFirst={index === 0}
+                        isCollapsed={disabledCollapsed[part] ?? true}
+                        onToggleCollapsed={() => toggleDisabledCollapsed(part)}
+                        onRemoveItem={removeItem}
+                        onToggleDisabled={toggleDisabled}
+                        onItemClick={setSelectedItem}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
@@ -238,7 +222,6 @@ export default function Wardrobe() {
 
                   <div className="flex flex-col gap-1">
                     {recentlyRemoved.map((item) => {
-                      const Icon = getItemIcon(item.item_type, item.details.garment_type, item.details.category);
                       const category =
                         item.details.category ||
                         item.details.handwear_type ||
@@ -251,7 +234,7 @@ export default function Wardrobe() {
                           key={item.item_id}
                           className="flex items-center gap-3 rounded-lg border border-white/30 bg-white/5 p-3"
                         >
-                          <Icon className="size-5 flex-shrink-0 text-white/65" />
+                          <ItemIcon itemType={item.item_type} garmentType={item.details.garment_type} category={item.details.category} className="size-5 flex-shrink-0 text-white/65" />
                           <div className="min-w-0 flex-1">
                             <div className="truncate font-medium text-white/85">
                               {item.details.brand} {item.details.model_name}

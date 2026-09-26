@@ -2,8 +2,6 @@
 
 import type { WeatherData, WeatherResult } from "@/types/weather";
 
-export type { WeatherData, WeatherResult };
-
 function parseWeatherResponse(data: Record<string, unknown>): WeatherData {
   return {
     temperature: data.temperature as number,

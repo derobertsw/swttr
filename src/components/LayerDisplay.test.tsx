@@ -1,6 +1,25 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { NextRequest } from "next/server";
+import { POST as evaluateLayers } from "@/app/api/v1/ensembles/evaluate/route";
 import LayerDisplay from "./LayerDisplay";
+
+// Layer evaluation runs on the server; serve it from the real route handler.
+beforeEach(() => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) !== "/api/v1/ensembles/evaluate") throw new Error(`Unexpected fetch: ${String(input)}`);
+      return evaluateLayers(
+        new NextRequest("http://localhost/api/v1/ensembles/evaluate", { method: "POST", body: init?.body as string })
+      );
+    })
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 // Mock Clerk — default to signed-in user
 const mockUseAuth = vi.fn(() => ({ userId: "test-user", isLoaded: true, isSignedIn: true }));
@@ -300,6 +319,7 @@ describe("LayerDisplay", () => {
       conditions: {
         temperature: "15",
         wind_speed: "10",
+        exertion: "moderate" as const,
         precipitation: false,
       },
       ireq: {
@@ -382,11 +402,11 @@ describe("LayerDisplay", () => {
         },
         score: 85,
         component_scores: {
-          thermal: 90,
-          moisture: 80,
-          protection: 85,
-          weight: 75,
-          mobility: 70,
+          coldProtection: 9,
+          overheatPrevention: 8,
+          breathability: 8.5,
+          weatherProtection: 7.5,
+          weight: 7,
         },
       },
       warnings: [],
@@ -493,7 +513,7 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("Buff Neck Gaiter")).toBeInTheDocument();
     });
 
-    it("should display regional clo progress bars", () => {
+    it("should display regional clo progress bars", async () => {
       render(
         <LayerDisplay
           recommendation={null}
@@ -506,7 +526,7 @@ describe("LayerDisplay", () => {
       // Torso clo display: target and actual pills
       // Actual = rawSum × ensemble regression coef (0.836 for torso)
       // (0.35 + 1.2 + 0.15) × 0.836 ≈ 1.4
-      expect(screen.getByText("Target 1.5 clo")).toBeInTheDocument();
+      expect(await screen.findByText("Target 1.5 clo")).toBeInTheDocument();
       expect(screen.getByText("Actual 1.4 clo")).toBeInTheDocument();
 
       // Legs clo display: target and actual pills
@@ -516,7 +536,7 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("Actual 0.2 clo")).toBeInTheDocument();
     });
 
-    it("should render ThermalGauge with target range pill", () => {
+    it("should render ThermalGauge with target range pill", async () => {
       render(
         <LayerDisplay
           recommendation={null}
@@ -527,10 +547,10 @@ describe("LayerDisplay", () => {
       );
 
       // ThermalGauge renders full range: "Target min-max clo"
-      expect(screen.getByText("Target 1.5-2.0 clo")).toBeInTheDocument();
+      expect(await screen.findByText("Target 1.5-2.0 clo")).toBeInTheDocument();
     });
 
-    it("should show body-part clo values from biophysics data", () => {
+    it("should show body-part clo values from biophysics data", async () => {
       render(
         <LayerDisplay
           recommendation={null}
@@ -541,10 +561,10 @@ describe("LayerDisplay", () => {
       );
 
       // 0.25 × 0.961 ≈ 0.2 (ensemble regression for legs)
-      expect(screen.getByText("Actual 0.2 clo")).toBeInTheDocument();
+      expect(await screen.findByText("Actual 0.2 clo")).toBeInTheDocument();
     });
 
-    it("should show global total clo and risk alert icon from biophysics data", () => {
+    it("should show global total clo and risk alert icon from biophysics data", async () => {
       render(
         <LayerDisplay
           recommendation={null}
@@ -557,7 +577,7 @@ describe("LayerDisplay", () => {
       // effectiveTotalClo is now computed from mutable layers with ensemble regression:
       // torso raw 1.7 × 0.836 = 1.42, legs raw 0.25 × 0.961 = 0.24, arms 1.2
       // weighted: 1.42×0.5 + 1.2×0.25 + 0.24×0.25 ≈ 1.1
-      expect(screen.getByText("Actual 1.1 clo")).toBeInTheDocument();
+      expect(await screen.findByText("Actual 1.1 clo")).toBeInTheDocument();
       // Risk details are now behind a popover icon, check the icon is present
       expect(screen.getByLabelText(/Cold Risk/)).toBeInTheDocument();
     });
@@ -618,7 +638,7 @@ describe("LayerDisplay", () => {
       expect(screen.queryByRole("button", { name: "Use Generic Outer" })).not.toBeInTheDocument();
     });
 
-    it("should exclude helmet insulation from head/neck clo for xc skiing", () => {
+    it("should exclude helmet insulation from head/neck clo for xc skiing", async () => {
       render(
         <LayerDisplay
           activity="xc_skiing"
@@ -630,7 +650,7 @@ describe("LayerDisplay", () => {
       );
 
       expect(screen.queryByText("Helmet")).not.toBeInTheDocument();
-      expect(screen.getByText("Actual 0.4 clo")).toBeInTheDocument();
+      expect(await screen.findByText("Actual 0.4 clo")).toBeInTheDocument();
     });
 
     it("should display layer labels for biophysics garments", () => {
@@ -653,7 +673,7 @@ describe("LayerDisplay", () => {
       expect(outerLabels.length).toBeGreaterThan(0);
     });
 
-    it("should display biophysics score", () => {
+    it("should display biophysics score", async () => {
       const inRangeData = {
         ...mockBiophysicsData,
         ireq: {
@@ -704,10 +724,10 @@ describe("LayerDisplay", () => {
 
       // With adjusted garments and target range, effectiveTotalClo is in range
       // and no significant regional deficits → score ≥ 85 → "Optimal"
-      expect(screen.getByText("Optimal")).toBeInTheDocument();
+      expect(await screen.findByText("Optimal")).toBeInTheDocument();
     });
 
-    it("should not show cold risk when the whole-body and body-part gaps stay within display tolerance", () => {
+    it("should not show cold risk when the whole-body and body-part gaps stay within display tolerance", async () => {
       const nearTargetData = {
         ...mockBiophysicsData,
         ireq: {
@@ -733,12 +753,12 @@ describe("LayerDisplay", () => {
         />
       );
 
-      expect(screen.getByText("Optimal")).toBeInTheDocument();
+      expect(await screen.findByText("Optimal")).toBeInTheDocument();
       expect(screen.queryByLabelText(/Cold Risk/)).not.toBeInTheDocument();
       expect(screen.queryByText("Cold Stress")).not.toBeInTheDocument();
     });
 
-    it("should not show comfort achieved when total clo is in range but a region is under target", () => {
+    it("should not show comfort achieved when total clo is in range but a region is under target", async () => {
       render(
         <LayerDisplay
           recommendation={null}
@@ -748,8 +768,8 @@ describe("LayerDisplay", () => {
         />
       );
 
+      expect((await screen.findAllByText(/Cold Risk/i)).length).toBeGreaterThan(0);
       expect(screen.queryByText("Comfort Range Achieved")).not.toBeInTheDocument();
-      expect(screen.getAllByText(/Cold Risk/i).length).toBeGreaterThan(0);
     });
 
     it("should show uphill copy and descent add-on layers for backcountry skiing", () => {
@@ -804,7 +824,7 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("Nothing extra in the pack.")).toBeInTheDocument();
     });
 
-    it("should show descent overheating risk card when descent clo exceeds target", () => {
+    it("should show descent overheating risk card when descent clo exceeds target", async () => {
       const overheatedDescentData = {
         ...mockBiophysicsData,
         ireq: {
@@ -838,10 +858,10 @@ describe("LayerDisplay", () => {
 
       // Descent: torso raw (1.7+0.7)*0.836=2.01, arms 1.2, legs 0.25*0.961=0.24
       // Full body = 2.01*0.50 + 1.2*0.25 + 0.24*0.25 ≈ 1.37 vs 0.9 max → over by ~0.47
-      expect(screen.getByLabelText(/Descent Overheating Risk/)).toBeInTheDocument();
+      expect(await screen.findByLabelText(/Descent Overheating Risk/)).toBeInTheDocument();
     });
 
-    it("should show descent cold risk card when descent clo is below target", () => {
+    it("should show descent cold risk card when descent clo is below target", async () => {
       const coldDescentData = {
         ...mockBiophysicsData,
         ireq: {
@@ -874,7 +894,7 @@ describe("LayerDisplay", () => {
 
       // Descent: torso raw (1.7+0.2)*0.836=1.59, arms 1.2, legs 0.25*0.961=0.24
       // Full body = 1.59*0.50 + 1.2*0.25 + 0.24*0.25 ≈ 1.16 vs 3.0 min → short by ~1.84
-      expect(screen.getByLabelText(/Descent Cold Risk/)).toBeInTheDocument();
+      expect(await screen.findByLabelText(/Descent Cold Risk/)).toBeInTheDocument();
     });
 
   });

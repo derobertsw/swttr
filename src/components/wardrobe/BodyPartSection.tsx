@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { WardrobeItem } from "@/types/wardrobe";
 import { cn } from "@/lib/utils";
-import { formatBodyPartLabel, getEmptyStateIcon } from "./wardrobe-utils";
+import { BodyPartIcon, formatBodyPartLabel } from "./wardrobe-utils";
 import { WardrobeItemCard } from "./WardrobeItemCard";
 
 interface BodyPartSectionProps {
@@ -15,8 +15,6 @@ interface BodyPartSectionProps {
   onRemoveItem: (id: string) => void;
   onToggleDisabled: (id: string, currentDisabled: boolean) => void;
   onItemClick?: (item: WardrobeItem) => void;
-  showSwipeHintOnFirstItem?: boolean;
-  onDismissSwipeHint?: () => void;
 }
 
 export function BodyPartSection({
@@ -30,10 +28,7 @@ export function BodyPartSection({
   onRemoveItem,
   onToggleDisabled,
   onItemClick,
-  showSwipeHintOnFirstItem = false,
-  onDismissSwipeHint,
 }: BodyPartSectionProps) {
-  const EmptyIcon = getEmptyStateIcon(part);
   const label = formatBodyPartLabel(part);
   const sectionCount = items.length + disabledItems.length;
   const pausedPanelId = `${sectionId ?? `paused-items-${part.replace(/[^a-z0-9]+/gi, "-")}`}-panel`;
@@ -44,7 +39,7 @@ export function BodyPartSection({
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/12 bg-slate-950/26 px-3 py-2.5 backdrop-blur-xl">
           <div className="flex min-w-0 items-center gap-2.5">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/8">
-              <EmptyIcon className="size-4 text-white/74" />
+              <BodyPartIcon part={part} className="size-4 text-white/74" />
             </div>
             <div className="min-w-0">
               <h4 className="truncate text-[12px] font-semibold uppercase tracking-[0.16em] text-white/88">
@@ -65,7 +60,7 @@ export function BodyPartSection({
       {items.length === 0 && disabledItems.length === 0 ? (
         <div className="flex items-center gap-3 rounded-2xl border border-dashed border-white/18 bg-white/[0.06] px-4 py-4">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/6">
-            <EmptyIcon className="size-5 text-white/35" />
+            <BodyPartIcon part={part} className="size-5 text-white/35" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-white/74">No {label.toLowerCase()} gear yet</div>

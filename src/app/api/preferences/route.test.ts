@@ -29,9 +29,7 @@ describe("Preferences API Route", () => {
       it("should return empty object so client keeps localStorage values", async () => {
         mockGetSupabase.mockReturnValue(null);
 
-        const request = new NextRequest("http://localhost:3000/api/preferences");
-
-        const response = await GET(request);
+        const response = await GET();
         const data = await response.json();
 
         expect(response.status).toBe(200);
@@ -45,9 +43,7 @@ describe("Preferences API Route", () => {
         mockGetSupabase.mockReturnValue(null);
         mockGetAuthUserId.mockResolvedValue(null);
 
-        const request = new NextRequest("http://localhost:3000/api/preferences");
-
-        const response = await GET(request);
+        const response = await GET();
         const data = await response.json();
 
         expect(response.status).toBe(200);
@@ -74,9 +70,7 @@ describe("Preferences API Route", () => {
         };
         mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
 
-        const request = new NextRequest("http://localhost:3000/api/preferences");
-
-        const response = await GET(request);
+        const response = await GET();
         const data = await response.json();
 
         expect(response.status).toBe(200);
@@ -98,9 +92,7 @@ describe("Preferences API Route", () => {
         };
         mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
 
-        const request = new NextRequest("http://localhost:3000/api/preferences");
-
-        const response = await GET(request);
+        const response = await GET();
         const data = await response.json();
 
         expect(response.status).toBe(200);
@@ -122,9 +114,7 @@ describe("Preferences API Route", () => {
         };
         mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
 
-        const request = new NextRequest("http://localhost:3000/api/preferences");
-
-        const response = await GET(request);
+        const response = await GET();
         const data = await response.json();
 
         expect(response.status).toBe(200);
@@ -143,9 +133,7 @@ describe("Preferences API Route", () => {
         };
         mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
 
-        const request = new NextRequest("http://localhost:3000/api/preferences");
-
-        const response = await GET(request);
+        const response = await GET();
         const data = await response.json();
 
         expect(response.status).toBe(200);

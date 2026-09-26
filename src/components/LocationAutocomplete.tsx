@@ -53,9 +53,11 @@ export function LocationAutocomplete({
   const optionId = (i: number) => `${id}-option-${i}`;
 
   // Reset activeIndex when suggestions change
-  useEffect(() => {
+  const [prevSuggestions, setPrevSuggestions] = useState(suggestions);
+  if (suggestions !== prevSuggestions) {
+    setPrevSuggestions(suggestions);
     setActiveIndex(-1);
-  }, [suggestions]);
+  }
 
   // Flip dropdown upward if there isn't enough space below (e.g. mobile nav bar)
   useEffect(() => {

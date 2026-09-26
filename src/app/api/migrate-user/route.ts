@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
-import { getAuthUserId } from "@/lib/auth";
+import { jsonError, readJson, requireUser } from "@/lib/api";
+
+/**
+ * Legacy IDs were generated client-side as `user-${crypto.randomUUID()}`.
+ * Only that shape is accepted: Clerk IDs (`user_...`) are visible to other
+ * users (e.g. trip members), so allowing them would let anyone claim another
+ * account's data.
+ */
+const LEGACY_USER_ID = /^user-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * POST /api/migrate-user
@@ -8,27 +15,21 @@ import { getAuthUserId } from "@/lib/auth";
  * Accepts { legacyUserId: string } in the request body.
  */
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
-  const clerkUserId = await getAuthUserId();
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, userId: clerkUserId } = auth;
 
-  if (!clerkUserId) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-
-  if (!supabase) {
-    return NextResponse.json({ error: "Database not configured" }, { status: 503 });
-  }
-
-  let body: { legacyUserId?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = await readJson<{ legacyUserId?: unknown }>(request);
+  if (!body) {
+    return jsonError("Invalid JSON", 400);
   }
 
   const { legacyUserId } = body;
   if (!legacyUserId || typeof legacyUserId !== "string") {
-    return NextResponse.json({ error: "legacyUserId is required" }, { status: 400 });
+    return jsonError("legacyUserId is required", 400);
+  }
+  if (!LEGACY_USER_ID.test(legacyUserId)) {
+    return jsonError("legacyUserId is not a legacy user ID", 400);
   }
 
   // Don't migrate if legacy ID is the same as Clerk ID (already migrated)
@@ -80,6 +81,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "migrated" });
   } catch (err) {
     console.error("Migration error:", err);
-    return NextResponse.json({ error: "Migration failed" }, { status: 500 });
+    return jsonError("Migration failed", 500);
   }
 }

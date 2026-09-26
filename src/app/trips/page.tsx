@@ -8,7 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
   Chip,
-  MemberAvatar,
   SectionLabel,
   formatDateRange,
   daysBetween,

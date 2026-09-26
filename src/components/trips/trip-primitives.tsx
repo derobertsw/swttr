@@ -174,7 +174,7 @@ export function daysBetween(startISO: string, endISO: string): number {
   return Math.round((end - start) / 86400000) + 1;
 }
 
-export function buildInviteUrl(token: string): string {
+function buildInviteUrl(token: string): string {
   if (typeof window === "undefined") return `/trips/invite/${token}`;
   return `${window.location.origin}/trips/invite/${token}`;
 }

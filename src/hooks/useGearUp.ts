@@ -1,311 +1,29 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useReducer } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { format } from "date-fns";
 import { toast } from "sonner";
-import layerRecommendations from "@/data/layerRecommendations.json";
-import { Recommendation } from "@/types/recommendations";
-import { getAdjustedTempRange } from "@/lib/getTempRange";
-import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useBiophysicsRecommendation } from "@/hooks/useBiophysicsRecommendation";
+import { useActivitySelection } from "@/hooks/useActivitySelection";
 import { fetchCurrentWeather, fetchWeatherByCoords } from "@/hooks/useCurrentWeather";
-import type { WeatherData, PrecipitationType } from "@/types/weather";
-import { BiophysicsRecommendation } from "@/types/biophysics";
-import { MultiDayLayerPlan } from "@/types/plan";
-import { logWarn } from "@/lib/logger";
-import { ACTIVITIES, DEFAULT_ACTIVITY } from "@/data/activities";
-import { STORAGE_KEYS } from "@/lib/storage";
-import { TemperatureSensitivity, UserBodyMetrics } from "@/types/preferences";
 import {
-  type ExertionLevel,
-  DEFAULT_EXERTION_LEVEL,
-} from "@/lib/biophysics/exertion";
+  buildGearUpResult,
+  createInitialState,
+  fetchPlanAhead,
+  gearUpReducer,
+  type GearUpResult,
+  type InputMode,
+} from "@/lib/gearUp";
+import { logWarn } from "@/lib/logger";
+import type { WeatherData } from "@/types/weather";
 
-// ---------------------------------------------------------------------------
-// State & Actions
-// ---------------------------------------------------------------------------
-
-type InputMode = "manual" | "planAhead";
-
-interface GearUpState {
-  temperature: number;
-  windspeed: number;
-  precipitation: boolean;
-  precipitationType?: PrecipitationType;
-  inputMode: InputMode;
-  date: Date | undefined;
-  time: string;
-  durationDays: number;
-  showSliders: boolean;
-  showResults: boolean;
-  locationDenied: boolean;
-  loading: boolean;
-  recommendation: Recommendation | null;
-  biophysicsData: BiophysicsRecommendation | null;
-  multiDayPlan: MultiDayLayerPlan | null;
-}
-
-type GearUpAction =
-  | { type: "SET_WEATHER"; temperature: number; windspeed: number }
-  | { type: "SET_TEMPERATURE"; temperature: number }
-  | { type: "SET_WINDSPEED"; windspeed: number }
-  | { type: "SET_INPUT_MODE"; mode: InputMode }
-  | { type: "SET_DATE"; date: Date | undefined }
-  | { type: "SET_TIME"; time: string }
-  | { type: "SET_DURATION_DAYS"; durationDays: number }
-  | { type: "LOCATION_DENIED" }
-  | { type: "SUBMIT_START" }
-  | { type: "SUBMIT_SUCCESS"; recommendation: Recommendation | null; biophysicsData: BiophysicsRecommendation | null; temperature: number; windspeed: number; precipitation?: boolean; precipitationType?: 'rain' | 'snow' | 'mixed' }
-  | { type: "SUBMIT_PLAN_SUCCESS"; plan: MultiDayLayerPlan; recommendation: Recommendation | null; temperature: number; windspeed: number }
-  | { type: "SUBMIT_ERROR" }
-  | { type: "RESET"; defaultActivity?: string };
-
-function createInitialState(inputMode: InputMode): GearUpState {
-  return {
-    temperature: 50,
-    windspeed: 10,
-    precipitation: false,
-    precipitationType: undefined,
-    inputMode,
-    date: undefined,
-    time: "12:00",
-    durationDays: 3,
-    showSliders: false,
-    showResults: false,
-    locationDenied: false,
-    loading: false,
-    recommendation: null,
-    biophysicsData: null,
-    multiDayPlan: null,
-  };
-}
-
-function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpState {
-  switch (action.type) {
-    case "SET_WEATHER":
-      return { ...state, temperature: action.temperature, windspeed: action.windspeed };
-    case "SET_TEMPERATURE":
-      return { ...state, temperature: action.temperature };
-    case "SET_WINDSPEED":
-      return { ...state, windspeed: action.windspeed };
-    case "SET_INPUT_MODE":
-      return { ...state, inputMode: action.mode };
-    case "SET_DATE":
-      return { ...state, date: action.date };
-    case "SET_TIME":
-      return { ...state, time: action.time };
-    case "SET_DURATION_DAYS":
-      return { ...state, durationDays: action.durationDays };
-    case "LOCATION_DENIED":
-      return { ...state, locationDenied: true, showSliders: false };
-    case "SUBMIT_START":
-      return { ...state, loading: true };
-    case "SUBMIT_SUCCESS":
-      return {
-        ...state,
-        loading: false,
-        temperature: action.temperature,
-        windspeed: action.windspeed,
-        precipitation: action.precipitation ?? false,
-        precipitationType: action.precipitationType,
-        recommendation: action.recommendation,
-        biophysicsData: action.biophysicsData,
-        multiDayPlan: null,
-        showResults: true,
-      };
-    case "SUBMIT_PLAN_SUCCESS":
-      return {
-        ...state,
-        loading: false,
-        temperature: action.temperature,
-        windspeed: action.windspeed,
-        recommendation: action.recommendation,
-        biophysicsData: null,
-        multiDayPlan: action.plan,
-        showResults: true,
-      };
-    case "SUBMIT_ERROR":
-      return { ...state, loading: false };
-    case "RESET":
-      return createInitialState("manual");
-    default:
-      return state;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Submit helpers (plain async functions, not hooks)
-// ---------------------------------------------------------------------------
-
-function normalizeBiophysicsForActivity(
-  activityValue: string,
-  data: BiophysicsRecommendation | null
-): BiophysicsRecommendation | null {
-  if (!data) return null;
-  if (activityValue !== "xc_skiing") return data;
-  if (!data.recommendation?.headwear?.helmet) return data;
-
-  return {
-    ...data,
-    recommendation: {
-      ...data.recommendation,
-      headwear: {
-        ...data.recommendation.headwear,
-        helmet: null,
-      },
-    },
-  };
-}
-
-function getRecommendation(
-  temp: number,
-  activity: string,
-  sensitivity: TemperatureSensitivity
-): Recommendation | null {
-  const tempRange = getAdjustedTempRange(temp, sensitivity);
-  const activityData =
-    layerRecommendations[activity as keyof typeof layerRecommendations];
-
-  if (activityData) {
-    const legacyRec = activityData[tempRange as keyof typeof activityData];
-    if (legacyRec) {
-      return convertLegacyRecommendation(legacyRec as LegacyRecommendation);
-    }
-  }
-  return null;
-}
-
-interface SubmitResult {
-  recommendation: Recommendation | null;
-  biophysicsData: BiophysicsRecommendation | null;
-  temperature: number;
-  windspeed: number;
-  precipitation?: boolean;
-  precipitationType?: PrecipitationType;
-}
-
-interface PlanSubmitResult {
-  plan: MultiDayLayerPlan;
-  recommendation: Recommendation | null;
-  temperature: number;
-  windspeed: number;
-}
-
-async function submitPlanAhead(
-  state: GearUpState,
-  activity: string,
-  sensitivity: TemperatureSensitivity,
-  locationSearch: ReturnType<typeof useLocationSearch>,
-): Promise<PlanSubmitResult> {
-  const dateStr = format(state.date!, "yyyy-MM-dd");
-  const { selectedLocation } = locationSearch;
-  const parsedStartHour = Number.parseInt(state.time.split(":")[0] ?? "", 10);
-
-  const response = await fetch("/api/plan-ahead", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      activity,
-      sensitivity,
-      lat: selectedLocation!.latitude,
-      lon: selectedLocation!.longitude,
-      startDate: dateStr,
-      durationDays: state.durationDays,
-      startHour: Number.isFinite(parsedStartHour) ? parsedStartHour : undefined,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({})) as { error?: string };
-    throw new Error(errorData.error ?? "Failed to build plan");
-  }
-
-  const data = await response.json() as {
-    plan: MultiDayLayerPlan;
-    baseline: {
-      recommendation: Recommendation | null;
-      effectiveTemperature: number;
-      maxWindSpeed: number;
-    };
-  };
-
-  return {
-    plan: data.plan,
-    recommendation: data.baseline.recommendation,
-    temperature: data.baseline.effectiveTemperature,
-    windspeed: data.baseline.maxWindSpeed,
-  };
-}
-
-async function submitLocationDenied(
-  state: GearUpState,
-  activity: string,
-  exertion: ExertionLevel,
-  bodyMetrics: UserBodyMetrics,
-  sensitivity: TemperatureSensitivity,
-  locationSearch: ReturnType<typeof useLocationSearch>,
-  biophysics: ReturnType<typeof useBiophysicsRecommendation>,
-): Promise<SubmitResult | null> {
-  const { selectedLocation } = locationSearch;
-  const weather = await fetchWeatherByCoords(
-    selectedLocation!.latitude,
-    selectedLocation!.longitude
-  );
-
-  if (weather) {
-    const layers = getRecommendation(weather.temperature, activity, sensitivity);
-    const bioData = await biophysics.fetch(activity, weather, exertion, bodyMetrics);
-
-    return {
-      recommendation: layers,
-      biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
-      temperature: weather.temperature,
-      windspeed: weather.windSpeed,
-      precipitation: weather.precipitation,
-      precipitationType: weather.precipitationType,
-    };
-  }
-  return null;
-}
-
-async function submitCurrentLocation(
-  activity: string,
-  exertion: ExertionLevel,
-  bodyMetrics: UserBodyMetrics,
-  sensitivity: TemperatureSensitivity,
-  biophysics: ReturnType<typeof useBiophysicsRecommendation>,
-): Promise<{ result: SubmitResult | null; locationDenied?: boolean; showSliders?: boolean }> {
-  const result = await fetchCurrentWeather();
-
-  if (result.data) {
-    const weather = result.data;
-    const layers = getRecommendation(weather.temperature, activity, sensitivity);
-    const bioData = await biophysics.fetch(activity, weather, exertion, bodyMetrics);
-
-    return {
-      result: {
-        recommendation: layers,
-        biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
-        temperature: weather.temperature,
-        windspeed: weather.windSpeed,
-        precipitation: weather.precipitation,
-        precipitationType: weather.precipitationType,
-      },
-    };
-  } else if (result.locationDenied) {
-    return { result: null, locationDenied: true };
-  } else {
-    return { result: null, showSliders: true };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
-
+/**
+ * State and actions for the home page's Gear Up flow: pick an activity, get
+ * weather (current location, a searched location, or a multi-day forecast),
+ * and fetch layer recommendations for it.
+ */
 export function useGearUp() {
   const searchParams = useSearchParams();
   const {
@@ -315,51 +33,21 @@ export function useGearUp() {
     bodyMetrics,
     loading: preferencesLoading,
   } = usePreferences();
-
-  // Activity stays as useState — drives effects and is passed to sub-hooks
-  const [activity, setActivityState] = useState<string>(defaultActivity || DEFAULT_ACTIVITY);
-  const [exertion, setExertion] = useState<ExertionLevel>(DEFAULT_EXERTION_LEVEL);
-  const [hasSetInitialActivity, setHasSetInitialActivity] = useState<boolean>(false);
+  const { activity, setActivity, exertion, setExertion, initializing, resetActivity } =
+    useActivitySelection(defaultActivity, hasStoredDefaultActivity || !preferencesLoading);
 
   const initialMode: InputMode = searchParams.get("mode") === "planAhead" ? "planAhead" : "manual";
   const [state, dispatch] = useReducer(gearUpReducer, initialMode, createInitialState);
 
   const locationSearch = useLocationSearch();
   const biophysics = useBiophysicsRecommendation();
-  const didAutoGearUp = useRef(false);
-  const isActivityInitializing = !hasSetInitialActivity;
 
-  const setActivity = useCallback((nextActivity: string) => {
-    setHasSetInitialActivity(true);
-    setActivityState(nextActivity);
-  }, []);
-
-  // Setter wrappers for consumers
-  const setTemperature = useCallback((t: number) => dispatch({ type: "SET_TEMPERATURE", temperature: t }), []);
-  const setWindspeed = useCallback((w: number) => dispatch({ type: "SET_WINDSPEED", windspeed: w }), []);
-  const setInputMode = useCallback((m: InputMode) => dispatch({ type: "SET_INPUT_MODE", mode: m }), []);
   const setDate = useCallback((d: Date | undefined) => dispatch({ type: "SET_DATE", date: d }), []);
   const setTime = useCallback((t: string) => dispatch({ type: "SET_TIME", time: t }), []);
   const setDurationDays = useCallback((days: number) => {
     const clampedDays = Math.min(7, Math.max(1, Math.round(days)));
     dispatch({ type: "SET_DURATION_DAYS", durationDays: clampedDays });
   }, []);
-
-  // Set initial activity once from stored/server preferences.
-  useEffect(() => {
-    if (hasSetInitialActivity || !defaultActivity) return;
-
-    if (hasStoredDefaultActivity) {
-      setActivityState(defaultActivity);
-      setHasSetInitialActivity(true);
-      return;
-    }
-
-    if (preferencesLoading) return;
-
-    setActivityState(defaultActivity);
-    setHasSetInitialActivity(true);
-  }, [defaultActivity, hasSetInitialActivity, hasStoredDefaultActivity, preferencesLoading]);
 
   // Update input mode when URL param changes
   useEffect(() => {
@@ -368,6 +56,29 @@ export function useGearUp() {
       dispatch({ type: "SET_INPUT_MODE", mode: "planAhead" });
     }
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Recommendations for the given weather and activity. */
+  const recommendFor = useCallback(
+    (weather: WeatherData, forActivity: string = activity) =>
+      buildGearUpResult(weather, forActivity, sensitivity, (act, w) =>
+        biophysics.fetch(act, w, exertion, bodyMetrics)
+      ),
+    [activity, sensitivity, biophysics, exertion, bodyMetrics]
+  );
+
+  /** Recommendations for the location picked in the search box, or null without weather. */
+  const recommendForSelectedLocation = useCallback(async (): Promise<GearUpResult | null> => {
+    const { selectedLocation } = locationSearch;
+    const weather = await fetchWeatherByCoords(selectedLocation!.latitude, selectedLocation!.longitude);
+    return weather ? recommendFor(weather) : null;
+  }, [locationSearch, recommendFor]);
+
+  /** Recommendations for the device's current location. */
+  const recommendForCurrentLocation = useCallback(async () => {
+    const current = await fetchCurrentWeather();
+    if (current.data) return { result: await recommendFor(current.data) };
+    return { result: null, locationDenied: Boolean(current.locationDenied) };
+  }, [recommendFor]);
 
   const handleSubmit = useCallback(async () => {
     if (!activity) {
@@ -389,15 +100,7 @@ export function useGearUp() {
       try {
         if (state.durationDays === 1) {
           // Single-day plan-ahead: use regular layer display with biophysics
-          const result = await submitLocationDenied(
-            state,
-            activity,
-            exertion,
-            bodyMetrics,
-            sensitivity,
-            locationSearch,
-            biophysics
-          );
+          const result = await recommendForSelectedLocation();
           if (result) {
             dispatch({ type: "SUBMIT_SUCCESS", ...result });
           } else {
@@ -405,12 +108,14 @@ export function useGearUp() {
             dispatch({ type: "SUBMIT_ERROR" });
           }
         } else {
-          const result = await submitPlanAhead(
-            state,
+          const result = await fetchPlanAhead({
             activity,
             sensitivity,
-            locationSearch,
-          );
+            location: locationSearch.selectedLocation,
+            date: state.date,
+            time: state.time,
+            durationDays: state.durationDays,
+          });
           dispatch({ type: "SUBMIT_PLAN_SUCCESS", ...result });
         }
       } catch (error) {
@@ -420,15 +125,7 @@ export function useGearUp() {
       }
     } else if (state.locationDenied && locationSearch.selectedLocation) {
       dispatch({ type: "SUBMIT_START" });
-      const result = await submitLocationDenied(
-        state,
-        activity,
-        exertion,
-        bodyMetrics,
-        sensitivity,
-        locationSearch,
-        biophysics
-      );
+      const result = await recommendForSelectedLocation();
       if (result) {
         dispatch({ type: "SUBMIT_SUCCESS", ...result });
       } else {
@@ -437,29 +134,24 @@ export function useGearUp() {
       }
     } else {
       dispatch({ type: "SUBMIT_START" });
-      const { result, locationDenied, showSliders } = await submitCurrentLocation(
-        activity,
-        exertion,
-        bodyMetrics,
-        sensitivity,
-        biophysics
-      );
+      const { result, locationDenied } = await recommendForCurrentLocation();
 
       if (result) {
         dispatch({ type: "SUBMIT_SUCCESS", ...result });
-      } else if (locationDenied) {
-        toast.error("Location access denied. Please enter your location manually.");
-        dispatch({ type: "LOCATION_DENIED" });
-        dispatch({ type: "SUBMIT_ERROR" });
-      } else if (showSliders) {
-        toast.error("Could not get current weather. Please enter your location manually.");
+      } else {
+        toast.error(
+          locationDenied
+            ? "Location access denied. Please enter your location manually."
+            : "Could not get current weather. Please enter your location manually."
+        );
         dispatch({ type: "LOCATION_DENIED" });
         dispatch({ type: "SUBMIT_ERROR" });
       }
     }
-  }, [activity, biophysics, bodyMetrics, exertion, state, locationSearch, sensitivity]);
+  }, [activity, state, locationSearch, sensitivity, recommendForSelectedLocation, recommendForCurrentLocation]);
 
-  // Listen for gearUp events from navigation
+  // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches "gearUp"
+  // from its native Gear Up tab while this page is open...
   useEffect(() => {
     const onGearUp = () => {
       void handleSubmit();
@@ -468,70 +160,13 @@ export function useGearUp() {
     return () => window.removeEventListener("gearUp", onGearUp);
   }, [handleSubmit]);
 
-  // Auto gear-up from session storage coords
+  // ...and otherwise opens /?gearUp=1, which starts in manual location entry.
+  const handledGearUpParam = useRef(false);
   useEffect(() => {
-    const shouldGearUp = searchParams.get("gearUp");
-    if (!shouldGearUp || didAutoGearUp.current) return;
-    didAutoGearUp.current = true;
-
-    const stored = typeof window !== "undefined"
-      ? sessionStorage.getItem("swttr-gearup-coords")
-      : null;
-    const geoDenied = searchParams.get("geoDenied");
-
-    if (stored) {
-      sessionStorage.removeItem("swttr-gearup-coords");
-      try {
-        const coords = JSON.parse(stored) as { latitude: number; longitude: number };
-        dispatch({ type: "SUBMIT_START" });
-        void (async () => {
-          const weather = await fetchWeatherByCoords(coords.latitude, coords.longitude);
-          if (weather) {
-            const layers = getRecommendation(weather.temperature, activity, sensitivity);
-            const bioData = await biophysics.fetch(activity, weather, exertion, bodyMetrics);
-            dispatch({
-              type: "SUBMIT_SUCCESS",
-              recommendation: layers,
-              biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
-              temperature: weather.temperature,
-              windspeed: weather.windSpeed,
-              precipitation: weather.precipitation,
-              precipitationType: weather.precipitationType,
-            });
-          } else {
-            dispatch({ type: "LOCATION_DENIED" });
-            dispatch({ type: "SUBMIT_ERROR" });
-          }
-        })();
-        return;
-      } catch {
-        // fall through to manual
-      }
-    }
-
-    if (geoDenied) {
-      dispatch({ type: "LOCATION_DENIED" });
-      return;
-    }
+    if (!searchParams.get("gearUp") || handledGearUpParam.current) return;
+    handledGearUpParam.current = true;
     dispatch({ type: "LOCATION_DENIED" });
-  }, [searchParams, activity, biophysics, bodyMetrics, exertion, sensitivity]);
-
-  // Dispatch activity change events and persist to localStorage
-  useEffect(() => {
-    const activityName =
-      ACTIVITIES.find((item) => item.value === activity)?.name ?? "";
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, activity);
-    }
-    window.dispatchEvent(
-      new CustomEvent("activityChange", { detail: { name: activityName, value: activity } })
-    );
-  }, [activity]);
-
-  // Dispatch loading events
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent("gearUpLoading", { detail: state.loading }));
-  }, [state.loading]);
+  }, [searchParams]);
 
   const handleWeatherChange = useCallback(async (
     latitude: number,
@@ -546,54 +181,31 @@ export function useGearUp() {
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch weather");
       const weather = await response.json() as WeatherData;
-
-      const layers = getRecommendation(weather.temperature, activity, sensitivity);
-      const bioData = await biophysics.fetch(activity, weather, exertion, bodyMetrics);
-
-      dispatch({
-        type: "SUBMIT_SUCCESS",
-        recommendation: layers,
-        biophysicsData: normalizeBiophysicsForActivity(activity, bioData),
-        temperature: weather.temperature,
-        windspeed: weather.windSpeed,
-        precipitation: weather.precipitation,
-        precipitationType: weather.precipitationType,
-      });
+      dispatch({ type: "SUBMIT_SUCCESS", ...(await recommendFor(weather)) });
     } catch (error) {
       toast.error("Failed to update weather");
       logWarn("useGearUp.handleWeatherChange", error);
       dispatch({ type: "SUBMIT_ERROR" });
     }
-  }, [activity, biophysics, bodyMetrics, exertion, sensitivity]);
+  }, [recommendFor]);
 
   const handleActivityChange = useCallback(async (newActivity: string) => {
     setActivity(newActivity);
     dispatch({ type: "SUBMIT_START" });
     try {
-      const layers = getRecommendation(state.temperature, newActivity, sensitivity);
       const currentWeather: WeatherData = {
         temperature: state.temperature,
         windSpeed: state.windspeed,
         precipitation: state.precipitation,
         precipitationType: state.precipitationType,
       };
-      const bioData = await biophysics.fetch(newActivity, currentWeather, exertion, bodyMetrics);
-
-      dispatch({
-        type: "SUBMIT_SUCCESS",
-        recommendation: layers,
-        biophysicsData: normalizeBiophysicsForActivity(newActivity, bioData),
-        temperature: state.temperature,
-        windspeed: state.windspeed,
-        precipitation: state.precipitation,
-        precipitationType: state.precipitationType,
-      });
+      dispatch({ type: "SUBMIT_SUCCESS", ...(await recommendFor(currentWeather, newActivity)) });
     } catch (error) {
       toast.error("Failed to update activity");
       logWarn("useGearUp.handleActivityChange", error);
       dispatch({ type: "SUBMIT_ERROR" });
     }
-  }, [setActivity, state.temperature, state.windspeed, state.precipitation, state.precipitationType, sensitivity, biophysics, exertion, bodyMetrics]);
+  }, [setActivity, state.temperature, state.windspeed, state.precipitation, state.precipitationType, recommendFor]);
 
   const handleGoNow = useCallback(async () => {
     if (!activity) {
@@ -601,51 +213,39 @@ export function useGearUp() {
       return;
     }
     dispatch({ type: "SUBMIT_START" });
-    const { result, locationDenied: denied } = await submitCurrentLocation(
-      activity,
-      exertion,
-      bodyMetrics,
-      sensitivity,
-      biophysics
-    );
+    const { result, locationDenied } = await recommendForCurrentLocation();
     if (result) {
       dispatch({ type: "SUBMIT_SUCCESS", ...result });
-    } else if (denied) {
-      toast.error("Location access denied. Please enter a location or use Plan Ahead.");
-      dispatch({ type: "SUBMIT_ERROR" });
     } else {
-      toast.error("Could not get current weather.");
+      toast.error(
+        locationDenied
+          ? "Location access denied. Please enter a location or use Plan Ahead."
+          : "Could not get current weather."
+      );
       dispatch({ type: "SUBMIT_ERROR" });
     }
-  }, [activity, biophysics, bodyMetrics, exertion, sensitivity]);
+  }, [activity, recommendForCurrentLocation]);
 
   const resetToInitialState = useCallback(() => {
-    setActivityState(defaultActivity || DEFAULT_ACTIVITY);
-    setHasSetInitialActivity(true);
-    setExertion(DEFAULT_EXERTION_LEVEL);
+    resetActivity();
     dispatch({ type: "RESET" });
     locationSearch.reset();
     biophysics.reset();
-  }, [locationSearch, defaultActivity, biophysics]);
+  }, [resetActivity, locationSearch, biophysics]);
 
   return {
-    // State
     activity,
     setActivity,
-    activityInitializing: isActivityInitializing,
+    activityInitializing: initializing,
     exertion,
     setExertion,
     temperature: state.temperature,
-    setTemperature,
     windspeed: state.windspeed,
-    setWindspeed,
     precipitation: state.precipitation,
     precipitationType: state.precipitationType,
     recommendation: state.recommendation,
     showResults: state.showResults,
-    showSliders: state.showSliders,
     inputMode: state.inputMode,
-    setInputMode,
     date: state.date,
     setDate,
     time: state.time,
@@ -656,12 +256,7 @@ export function useGearUp() {
     locationDenied: state.locationDenied,
     biophysicsData: state.biophysicsData,
     multiDayPlan: state.multiDayPlan,
-    sensitivity,
-
-    // Location search (pass-through)
     locationSearch,
-
-    // Actions
     handleSubmit,
     handleGoNow,
     handleWeatherChange,

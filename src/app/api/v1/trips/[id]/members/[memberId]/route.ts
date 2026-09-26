@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
-import { getAuthUserId } from "@/lib/auth";
-import { assertCanAccessTrip } from "@/lib/trips";
+import { readJson } from "@/lib/api";
+import { requireTripAccess } from "@/lib/trips";
 
 type RouteContext = { params: Promise<{ id: string; memberId: string }> };
 
 export async function PATCH(request: NextRequest, ctx: RouteContext) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase || !userId)
-    return NextResponse.json({ error: "Auth required" }, { status: 401 });
-
   const { id, memberId } = await ctx.params;
-  const access = await assertCanAccessTrip(supabase, id, userId);
-  if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const auth = await requireTripAccess(id);
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
-  const body = await request.json().catch(() => null);
+  const body = await readJson(request);
   const update: Record<string, unknown> = {};
   if (typeof body?.display_name === "string") update.display_name = body.display_name;
   if (typeof body?.role === "string") update.role = body.role;
@@ -33,16 +28,10 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
 }
 
 export async function DELETE(_request: NextRequest, ctx: RouteContext) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase || !userId)
-    return NextResponse.json({ error: "Auth required" }, { status: 401 });
-
   const { id, memberId } = await ctx.params;
-  const access = await assertCanAccessTrip(supabase, id, userId);
-  if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (access.owner_user_id !== userId)
-    return NextResponse.json({ error: "Organizer only" }, { status: 403 });
+  const auth = await requireTripAccess(id, { organizerOnly: true });
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
   const { data: target } = await supabase
     .from("trip_members")

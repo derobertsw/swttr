@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import ScoreDisplay from "@/components/ScoreDisplay";
 import { cn } from "@/lib/utils";
 import type { PrecipitationType } from "@/types/weather";
+import type { ThermalDecision } from "@/types/biophysics";
 
 interface WeatherHeaderProps {
   temperature: number;
@@ -13,10 +14,7 @@ interface WeatherHeaderProps {
   score?: number;
   totalClo?: number;
   targetRange?: [number, number];
-  regionalDeficit?: number;
-  hasRegionalGap?: boolean;
-  extremityDeficit?: number;
-  hasExtremityGap?: boolean;
+  decision?: ThermalDecision | null;
   interactive?: boolean;
   onEditWeather?: () => void;
 }
@@ -133,10 +131,7 @@ export function WeatherHeader({
   score,
   totalClo,
   targetRange,
-  regionalDeficit,
-  hasRegionalGap,
-  extremityDeficit,
-  hasExtremityGap,
+  decision,
   interactive,
   onEditWeather,
 }: WeatherHeaderProps) {
@@ -177,10 +172,7 @@ export function WeatherHeader({
                 size="md"
                 totalClo={totalClo}
                 targetRange={targetRange}
-                regionalDeficit={regionalDeficit}
-                hasRegionalGap={hasRegionalGap}
-                extremityDeficit={extremityDeficit}
-                hasExtremityGap={hasExtremityGap}
+                decision={decision}
               />
             </div>
           )}

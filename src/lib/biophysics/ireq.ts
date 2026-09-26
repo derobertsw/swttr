@@ -16,7 +16,7 @@ import type { IreqResult } from '@/types/garments';
 
 export const DLE_ESTIMATION_METHOD = 'heuristic_exposure_estimate_v1';
 
-export interface IreqInput {
+interface IreqInput {
   airTemp: number;           // °C
   meanRadiantTemp?: number;  // °C (defaults to airTemp outdoors)
   windSpeed: number;         // m/s
@@ -208,13 +208,13 @@ export function calculateIreq(input: IreqInput): IreqResult {
   };
 }
 
-export interface RegionalIreq {
+interface RegionalIreq {
   torso: number;
   arms: number;
   legs: number;
 }
 
-export interface RegionalIreqResult {
+interface RegionalIreqResult {
   min: RegionalIreq;
   neutral: RegionalIreq;
 }
@@ -245,12 +245,12 @@ export function calculateRegionalIreq(
   };
 }
 
-export interface ExtremityIreq {
+interface ExtremityIreq {
   hands: number;
   head: number;
 }
 
-export interface ExtremityIreqResult {
+interface ExtremityIreqResult {
   min: ExtremityIreq;
   neutral: ExtremityIreq;
 }

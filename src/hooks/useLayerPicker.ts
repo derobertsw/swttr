@@ -86,42 +86,49 @@ function getRegionalClo(item: WardrobeItem, bodyPart: BodyPart): number {
   return getClo(item) ?? 0;
 }
 
+const EMPTY_WARDROBE_ITEMS: WardrobeItem[] = [];
+const EMPTY_AVAILABLE_ITEMS: AvailableItem[] = [];
+
 export function useLayerPicker(inUseItemIds: Set<string>) {
   const userId = useUserId();
-  const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([]);
-  const [availableItems, setAvailableItems] = useState<AvailableItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Items are stored with the user they were loaded for, so loading and
+  // signed-out states are derived instead of synced from an effect.
+  const [data, setData] = useState<{
+    userId: string;
+    wardrobeItems: WardrobeItem[];
+    availableItems: AvailableItem[];
+  } | null>(null);
 
   useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
+    if (!userId) return;
 
     let cancelled = false;
     const fetchData = async () => {
-      setLoading(true);
+      let wardrobeItems: WardrobeItem[] = [];
+      let availableItems: AvailableItem[] = [];
       try {
         const [gearRes, availableRes] = await Promise.all([
           fetch("/api/wardrobe/gear"),
           fetch("/api/wardrobe/available"),
         ]);
-        if (cancelled) return;
         const gearData = await gearRes.json();
         const availableData = await availableRes.json();
-        if (cancelled) return;
-        setWardrobeItems(gearData.items || []);
-        setAvailableItems(availableData.items || []);
+        wardrobeItems = gearData.items || [];
+        availableItems = availableData.items || [];
       } catch (err) {
         logWarn("useLayerPicker.fetchData", err);
-      } finally {
-        if (!cancelled) setLoading(false);
       }
+      if (!cancelled) setData({ userId, wardrobeItems, availableItems });
     };
 
     fetchData();
     return () => { cancelled = true; };
   }, [userId]);
+
+  const isCurrent = data !== null && data.userId === userId;
+  const loading = userId !== null && !isCurrent;
+  const wardrobeItems = isCurrent ? data.wardrobeItems : EMPTY_WARDROBE_ITEMS;
+  const availableItems = isCurrent ? data.availableItems : EMPTY_AVAILABLE_ITEMS;
 
   const wardrobeItemIds = useMemo(
     () => new Set(wardrobeItems.map((w) => w.item_id)),

@@ -2,8 +2,13 @@
  * Response formatting helpers for recommendation API routes
  */
 import { garmentToThermalProps } from '@/lib/biophysics/ensemble';
+import { COWEDA_VALIDATION_SOURCE, type CowedaValidationBuffer } from '@/lib/biophysics/coweda';
+import { DLE_ESTIMATION_METHOD } from '@/lib/biophysics/ireq';
 import type { GarmentWithProtection } from '@/lib/biophysics/scorer';
-import type { GarmentRow, HandwearRow, HeadwearRow } from './types';
+import type { IreqResult } from '@/types/garments';
+import type { GarmentRow, HandwearRow, HeadwearRow, HeadwearRecommendations } from './types';
+import type { WeatherInput } from './request';
+import type { PhaseTargets } from './thermal-targets';
 
 /**
  * Format garment for API response
@@ -71,7 +76,7 @@ export function formatHandwearResponse(handwear: HandwearRow) {
 /**
  * Format headwear for API response
  */
-export function formatHeadwearResponse(headwear: HeadwearRow) {
+function formatHeadwearResponse(headwear: HeadwearRow) {
   return {
     id: headwear.id,
     name: `${headwear.brand} ${headwear.model_name}`,
@@ -79,5 +84,62 @@ export function formatHeadwearResponse(headwear: HeadwearRow) {
     rcl: headwear.rcl_clo,
     covers_ears: headwear.covers_ears,
     covers_neck: headwear.covers_neck,
+  };
+}
+
+/**
+ * Format the helmet / head warmth / neck warmth selection for API response
+ */
+export function formatHeadwearSet(headwear: HeadwearRecommendations) {
+  return {
+    helmet: headwear.helmet ? formatHeadwearResponse(headwear.helmet) : null,
+    head_warmth: headwear.headWarmth ? formatHeadwearResponse(headwear.headWarmth) : null,
+    neck_warmth: headwear.neckWarmth ? formatHeadwearResponse(headwear.neckWarmth) : null,
+  };
+}
+
+/**
+ * Echo the request's weather in the units it was sent
+ */
+export function formatConditions(weather: WeatherInput) {
+  return {
+    temperature: `${weather.temperature}°F`,
+    wind_speed: `${weather.wind_speed} mph`,
+  };
+}
+
+/**
+ * Format one phase's IREQ (clo) and duration-limited exposure
+ */
+export function formatIreqPhase(ireq: IreqResult) {
+  return { min: ireq.ireqMin, neutral: ireq.ireqNeutral, dle_hours: ireq.dleHours };
+}
+
+/**
+ * Format the CoWEDA validation buffer added to a phase's targets
+ */
+export function formatValidationBuffer(buffer: CowedaValidationBuffer) {
+  return {
+    whole_body: buffer.wholeBody,
+    cold_risk: buffer.coldRisk,
+    extremity: buffer.extremity,
+    context: buffer.context,
+  };
+}
+
+/**
+ * The `ireq` block shared by single-phase sports
+ */
+export function formatSinglePhaseIreq(ireq: IreqResult, targets: PhaseTargets) {
+  return {
+    min: ireq.ireqMin,
+    neutral: ireq.ireqNeutral,
+    dle_hours: ireq.dleHours,
+    dle_method: DLE_ESTIMATION_METHOD,
+    target_range: targets.targetRange,
+    regional: targets.regional,
+    extremity: targets.extremity,
+    validation_buffer_clo: formatValidationBuffer(targets.validationBuffer),
+    validation_source: COWEDA_VALIDATION_SOURCE,
   };
 }

@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
 import { BodyPart, LayerType, UserItemMapping } from "@/types/wardrobe";
-import { getAuthUserId } from "@/lib/auth";
+import { readJson, requireUser } from "@/lib/api";
 
-export async function GET(request: NextRequest) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-
-  if (!supabase) {
-    return NextResponse.json({ mappings: [] });
-  }
-
-  if (!userId) {
-    return NextResponse.json({ error: "User ID required" }, { status: 401 });
-  }
+export async function GET() {
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, userId } = auth;
 
   try {
     const { data, error } = await supabase
@@ -37,22 +29,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-
-  if (!supabase) {
-    return NextResponse.json(
-      { error: "Database not configured" },
-      { status: 503 }
-    );
-  }
-
-  if (!userId) {
-    return NextResponse.json({ error: "User ID required" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, userId } = auth;
 
   try {
-    const body = await request.json();
+    const body = (await readJson(request)) ?? {};
     const { bodyPart, layerType, standardOption, customName } = body as {
       bodyPart: BodyPart;
       layerType: LayerType;
@@ -103,19 +85,9 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-
-  if (!supabase) {
-    return NextResponse.json(
-      { error: "Database not configured" },
-      { status: 503 }
-    );
-  }
-
-  if (!userId) {
-    return NextResponse.json({ error: "User ID required" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, userId } = auth;
 
   try {
     const { searchParams } = new URL(request.url);

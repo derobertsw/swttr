@@ -32,9 +32,10 @@ export default function DayDetailPage({
   const { data, loading, error, refresh } = useTrip(id);
   // tempF/wind in imperial units (matches /api/weather), precip is a 0–1 fraction
   // representing the day's peak precipitation probability.
-  const [weather, setWeather] = useState<{ tempF: number; precip: number; wind: number } | null>(
-    null
-  );
+  const [weatherResult, setWeatherResult] = useState<{
+    key: string;
+    weather: { tempF: number; precip: number; wind: number };
+  } | null>(null);
 
   const day = data?.days.find((d) => d.date === date);
   const assignedStop = day?.stop_id ? data?.stops.find((s) => s.id === day.stop_id) : undefined;
@@ -44,12 +45,16 @@ export default function DayDetailPage({
   const baseStop = data?.stops[0];
   const effectiveStop = assignedStop ?? baseStop;
   const usingBaseFallback = !assignedStop && !!baseStop;
+  // Forecasts are stored with the stop/date they were fetched for, so one never
+  // shows against a different stop.
+  const weatherKey =
+    effectiveStop?.latitude && effectiveStop?.longitude
+      ? `${effectiveStop.latitude},${effectiveStop.longitude},${date}`
+      : null;
+  const weather = weatherKey && weatherResult?.key === weatherKey ? weatherResult.weather : null;
 
   useEffect(() => {
-    if (!effectiveStop?.latitude || !effectiveStop?.longitude) {
-      setWeather(null);
-      return;
-    }
+    if (!weatherKey || !effectiveStop?.latitude || !effectiveStop?.longitude) return;
     let cancelled = false;
     fetch(
       `/api/weather?lat=${effectiveStop.latitude}&lon=${effectiveStop.longitude}&startDate=${date}&days=1`
@@ -74,17 +79,20 @@ export default function DayDetailPage({
           (acc, h) => Math.max(acc, h.precipitationProbability ?? 0),
           0
         );
-        setWeather({
-          tempF: avgTemp,
-          wind: peakWind,
-          precip: peakPrecip / 100, // /api/weather returns 0–100, normalize for inferWeatherKind
+        setWeatherResult({
+          key: weatherKey,
+          weather: {
+            tempF: avgTemp,
+            wind: peakWind,
+            precip: peakPrecip / 100, // /api/weather returns 0–100, normalize for inferWeatherKind
+          },
         });
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [effectiveStop?.latitude, effectiveStop?.longitude, date]);
+  }, [weatherKey, effectiveStop?.latitude, effectiveStop?.longitude, date]);
 
   const dateObj = new Date(`${date}T00:00:00`);
   const dateLabel = dateObj.toLocaleDateString(undefined, {
@@ -361,10 +369,12 @@ function ActivityPicker({
 }) {
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState<string | null>(current);
-
-  useEffect(() => {
+  // Re-sync the optimistic selection whenever the saved activity changes.
+  const [prevCurrent, setPrevCurrent] = useState(current);
+  if (current !== prevCurrent) {
+    setPrevCurrent(current);
     setValue(current);
-  }, [current]);
+  }
 
   const merged = useMemo(() => {
     const set = new Set<string>(TRIP_ACTIVITY_OPTIONS);
@@ -442,12 +452,14 @@ function MemberKitRow({
   const [items, setItems] = useState<string[]>(kit?.items ?? []);
   const [state, setState] = useState<TripKitState>(kit?.state ?? "ok");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
+  // Re-sync the optimistic edits whenever the saved kit changes.
+  const [prevKit, setPrevKit] = useState(kit);
+  if (kit !== prevKit) {
+    setPrevKit(kit);
     setEffort(kit?.effort ?? "steady");
     setItems(kit?.items ?? []);
     setState(kit?.state ?? "ok");
-  }, [kit?.id, kit?.effort, kit?.items, kit?.state]);
+  }
 
   const persist = async (next: {
     effort?: TripEffort;

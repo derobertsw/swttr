@@ -4,7 +4,7 @@ import { TemperatureSensitivity } from "@/types/preferences";
 import { sanitizeOptionalBodyMetrics } from "@/lib/biophysics/bodyMetrics";
 import { getAuthUserId } from "@/lib/auth";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const supabase = getSupabase();
   const userId = await getAuthUserId();
 

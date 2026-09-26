@@ -4,11 +4,11 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import {
   EXTREMITY_DEFICIT_CLO_THRESHOLD,
-  evaluateThermalComfort,
   OVERHEAT_BUFFER_CLO,
   REGIONAL_DEFICIT_CLO_THRESHOLD,
   THERMAL_DISPLAY_CLO_EPSILON,
 } from "@/lib/biophysics/comfort";
+import type { ThermalDecision } from "@/types/biophysics";
 import {
   Popover,
   PopoverContent,
@@ -24,10 +24,8 @@ interface ScoreDisplayProps {
   className?: string;
   totalClo?: number;
   targetRange?: [number, number];
-  regionalDeficit?: number;
-  hasRegionalGap?: boolean;
-  extremityDeficit?: number;
-  hasExtremityGap?: boolean;
+  /** Comfort decision from the layer evaluation, when available. */
+  decision?: ThermalDecision | null;
 }
 
 type ThermalStatus = "optimal" | "comfortable" | "cold_stress" | "overheating";
@@ -76,26 +74,11 @@ const ScoreDisplay = ({
   className,
   totalClo,
   targetRange,
-  regionalDeficit,
-  hasRegionalGap = false,
-  extremityDeficit,
-  hasExtremityGap = false,
+  decision,
 }: ScoreDisplayProps) => {
   const roundedScore = Math.round(score);
 
   const getStatus = (): ThermalStatus => {
-    const inferredRegionalDeficit = regionalDeficit ?? (
-      hasRegionalGap ? THERMAL_DISPLAY_CLO_EPSILON + 0.01 : 0
-    );
-    const inferredExtremityDeficit = extremityDeficit ?? (
-      hasExtremityGap ? THERMAL_DISPLAY_CLO_EPSILON + 0.01 : 0
-    );
-    const decision = evaluateThermalComfort({
-      totalClo,
-      targetRange,
-      maxRegionalDeficit: inferredRegionalDeficit,
-      maxExtremityDeficit: inferredExtremityDeficit,
-    });
 
     if (decision?.riskType === "cold") return "cold_stress";
     if (decision?.riskType === "overheat") return "overheating";

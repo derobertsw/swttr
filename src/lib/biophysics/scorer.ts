@@ -1,7 +1,7 @@
 // Ensemble Scoring Function
 // Scores ensembles for given weather conditions and activities
 
-import { calculateIreq, fahrenheitToCelsius, mphToMs } from './ireq';
+import { calculateIreq } from './ireq';
 import { predictEnsembleThermal } from './ensemble';
 import { ACTIVITY_WEIGHTS, type ActivityType } from './constants';
 import type { EnsembleScore } from '@/types/garments';
@@ -242,23 +242,4 @@ function calculateWeatherScore(
   }
 
   return Math.max(0, score);
-}
-
-/**
- * Helper to convert weather from imperial to metric
- */
-export function convertWeatherToMetric(imperial: {
-  temperatureF: number;
-  windSpeedMph: number;
-  humidity: number;
-  precipitation: boolean;
-  precipitationType?: 'rain' | 'snow' | 'mixed';
-}): WeatherConditions {
-  return {
-    temperature: fahrenheitToCelsius(imperial.temperatureF),
-    windSpeed: mphToMs(imperial.windSpeedMph),
-    humidity: imperial.humidity,
-    precipitation: imperial.precipitation,
-    precipitationType: imperial.precipitationType,
-  };
 }

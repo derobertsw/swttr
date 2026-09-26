@@ -1,4 +1,9 @@
-import { RecommendedGarment } from "@/types/biophysics";
+import type {
+  PackItemGarment,
+  RecommendedGarment,
+  RecommendedHandwear,
+  RecommendedHeadwear,
+} from "@/types/biophysics";
 import { LayerSet, LayerItem } from "@/types/recommendations";
 import { BodyPart, LayerType, BODY_PARTS as _BODY_PARTS } from "@/types/wardrobe";
 
@@ -42,26 +47,6 @@ export const LAYER_LABELS: Record<LayerType, string> = {
 };
 
 /**
- * Maps UI body parts to biophysics body regions (for clo calculations)
- */
-export const BODY_PART_TO_REGION: Record<BodyPart, "torso" | "arms" | "legs" | null> = {
-  torso: "torso",
-  legs: "legs",
-  hands: null,
-  headNeck: null,
-};
-
-/**
- * Maps UI body parts to extremity regions (for hands/head clo calculations)
- */
-export const BODY_PART_TO_EXTREMITY: Record<BodyPart, "hands" | "head" | null> = {
-  torso: null,
-  legs: null,
-  hands: "hands",
-  headNeck: "head",
-};
-
-/**
  * All body parts in display order
  */
 export const BODY_PARTS = _BODY_PARTS;
@@ -71,19 +56,6 @@ export const BODY_PARTS = _BODY_PARTS;
  */
 export function createEmptyLayerSet(): LayerSet {
   return { base: [], mid: [], outer: [] };
-}
-
-/**
- * Formats a garment name with optional clo value for display.
- * Example output: "Patagonia R1 (0.85 clo)"
- *
- * @param name - The garment name/brand model
- * @param rcl - Optional thermal resistance (clo) value
- * @returns Formatted string with clo value appended if available
- */
-export function formatGarmentWithClo(name: string, rcl?: number): string {
-  const cloStr = rcl !== undefined ? ` (${rcl.toFixed(2)} clo)` : "";
-  return `${name}${cloStr}`;
 }
 
 /**
@@ -123,6 +95,130 @@ export function garmentsToLayerSet(
   }
 
   return layers;
+}
+
+/** Layers worn on every body part. */
+export type BodyPartLayers = Record<BodyPart, LayerSet>;
+
+const LAYER_TYPES: LayerType[] = ["base", "mid", "outer"];
+
+function handwearLayers(handwear: RecommendedHandwear | null | undefined): LayerSet {
+  const layers = createEmptyLayerSet();
+  if (handwear) {
+    layers.outer = [{ name: handwear.name, rcl: handwear.rcl, sourceId: handwear.id }];
+  }
+  return layers;
+}
+
+/** Warmth items (hat, neck gaiter) as base layers and the helmet as the outer layer. */
+function headwearLayers(headwear: RecommendedHeadwear | null | undefined): LayerSet {
+  const layers = createEmptyLayerSet();
+  if (!headwear) return layers;
+
+  const baseItems: LayerItem[] = [];
+  if (headwear.head_warmth) {
+    baseItems.push({ name: headwear.head_warmth.name, rcl: headwear.head_warmth.rcl, sourceId: headwear.head_warmth.id });
+  }
+  if (headwear.neck_warmth) {
+    baseItems.push({ name: headwear.neck_warmth.name, rcl: headwear.neck_warmth.rcl, sourceId: headwear.neck_warmth.id });
+  }
+  if (baseItems.length > 0) layers.base = baseItems;
+  if (headwear.helmet) {
+    layers.outer = [{ name: headwear.helmet.name, rcl: headwear.helmet.rcl, sourceId: headwear.helmet.id }];
+  }
+  return layers;
+}
+
+/** The layers of a biophysics recommendation, per body part. */
+export function buildRecommendedLayers(
+  garments: RecommendedGarment[] | undefined,
+  handwear: RecommendedHandwear | null | undefined,
+  headwear: RecommendedHeadwear | null | undefined
+): BodyPartLayers {
+  return {
+    torso: garments ? garmentsToLayerSet(garments, "torso") : createEmptyLayerSet(),
+    legs: garments ? garmentsToLayerSet(garments, "legs") : createEmptyLayerSet(),
+    hands: handwearLayers(handwear),
+    headNeck: headwearLayers(headwear),
+  };
+}
+
+/**
+ * Ski-touring descent layers: the climb garments plus pack items (added as
+ * torso outer layers), with the descent gloves and headwear when provided.
+ */
+export function buildDescentLayers(
+  garments: RecommendedGarment[] | undefined,
+  climbHandwear: RecommendedHandwear | null | undefined,
+  climbHeadwear: RecommendedHeadwear | null | undefined,
+  packItems: PackItemGarment[],
+  descentHandwear: RecommendedHandwear | null | undefined,
+  descentHeadwear: RecommendedHeadwear | null | undefined
+): BodyPartLayers {
+  const torso = garments ? garmentsToLayerSet(garments, "torso") : createEmptyLayerSet();
+  const legs = garments ? garmentsToLayerSet(garments, "legs") : createEmptyLayerSet();
+
+  const packLayerItems: LayerItem[] = packItems.map((item) => ({
+    name: item.name,
+    rcl: typeof item.rcl_clo === "number" ? item.rcl_clo : undefined,
+    sourceId: item.id,
+  }));
+  torso.outer = [...torso.outer, ...packLayerItems];
+
+  const handwear = descentHandwear && descentHandwear.name !== climbHandwear?.name
+    ? descentHandwear
+    : climbHandwear;
+
+  return {
+    torso,
+    legs,
+    hands: handwearLayers(handwear),
+    headNeck: headwearLayers(descentHeadwear ?? climbHeadwear),
+  };
+}
+
+function forEachItem(layers: BodyPartLayers, visit: (item: LayerItem, bodyPart: BodyPart) => void) {
+  for (const part of BODY_PARTS) {
+    for (const layerType of LAYER_TYPES) {
+      for (const item of layers[part][layerType] ?? []) visit(item, part);
+    }
+  }
+}
+
+/** Catalog ids of every item worn. */
+export function collectInUseIds(layers: BodyPartLayers): Set<string> {
+  const ids = new Set<string>();
+  forEachItem(layers, (item) => {
+    if (item.sourceId) ids.add(item.sourceId);
+  });
+  return ids;
+}
+
+/**
+ * Names of items worn in `layers` but not in `other` (matched by catalog id,
+ * or name for custom items), in body-part and layer order without repeats.
+ */
+export function itemNamesMissingFrom(layers: BodyPartLayers, other: BodyPartLayers): string[] {
+  const keyOf = (item: LayerItem) => item.sourceId || item.name;
+  const otherKeys = new Set<string>();
+  forEachItem(other, (item) => otherKeys.add(keyOf(item)));
+
+  const names: string[] = [];
+  const seen = new Set<string>();
+  forEachItem(layers, (item) => {
+    const key = keyOf(item);
+    if (otherKeys.has(key) || seen.has(key)) return;
+    seen.add(key);
+    names.push(item.name);
+  });
+  return names;
+}
+
+/** Clo of every item worn, per body part (items without a clo value count as 0). */
+export function itemCloByBodyPart(layers: BodyPartLayers): Record<BodyPart, number[]> {
+  const clo: Record<BodyPart, number[]> = { torso: [], legs: [], hands: [], headNeck: [] };
+  forEachItem(layers, (item, part) => clo[part].push(item.rcl ?? 0));
+  return clo;
 }
 
 /**

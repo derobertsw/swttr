@@ -5,7 +5,7 @@ export const TEMP_BRACKETS = [
   "15-20", "20-25", "25-30", "30-35", "35-40", "40+"
 ] as const;
 
-export type TempBracket = typeof TEMP_BRACKETS[number];
+type TempBracket = typeof TEMP_BRACKETS[number];
 
 export function getTempRange(temp: number): TempBracket {
   if (temp < -15) return "-20--15";

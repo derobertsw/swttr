@@ -12,7 +12,7 @@ import {
 import { CalendarIcon, CalendarDays, Locate, Loader2, Route, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LocationSuggestion } from "@/types/recommendations";
-import { RefObject, useEffect, useState } from "react";
+import { RefObject, useSyncExternalStore } from "react";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { FROSTED_INPUT, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
 import { Capacitor } from "@capacitor/core";
@@ -37,6 +37,15 @@ interface PlanAheadFormProps {
   onLocationFocus: () => void;
   onSelectLocation: (suggestion: LocationSuggestion) => void;
   onDismiss?: () => void;
+}
+
+// Platform detection never changes during a session, so there is nothing to subscribe to.
+const subscribeToNothing = () => () => {};
+
+function shouldUseNativeIOSDatePicker(): boolean {
+  const isNativeIOS = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+  const isIOSBrowser = /iPad|iPhone|iPod/.test(window.navigator.userAgent);
+  return isNativeIOS || isIOSBrowser;
 }
 
 function formatStartTimeLabel(time: string): string {
@@ -85,18 +94,15 @@ export function PlanAheadForm({
   onSelectLocation,
   onDismiss,
 }: PlanAheadFormProps) {
-  const [useNativeIOSDatePicker, setUseNativeIOSDatePicker] = useState(false);
+  const useNativeIOSDatePicker = useSyncExternalStore(
+    subscribeToNothing,
+    shouldUseNativeIOSDatePicker,
+    () => false
+  );
   const timeLabel = formatStartTimeLabel(time);
   const isMultiDay = durationDays > 1;
   const durationLabel = durationDays === 1 ? "1 day" : `${durationDays} days`;
   const dateValue = date ? format(date, "yyyy-MM-dd") : "";
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const isNativeIOS = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
-    const isIOSBrowser = /iPad|iPhone|iPod/.test(window.navigator.userAgent);
-    setUseNativeIOSDatePicker(isNativeIOS || isIOSBrowser);
-  }, []);
 
   return (
     <div className="flex w-full max-w-[420px] flex-col gap-5 pb-28">

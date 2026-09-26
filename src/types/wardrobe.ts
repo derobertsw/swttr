@@ -16,29 +16,6 @@ export interface UserItemMapping {
   custom_name: string;
 }
 
-// Key for item mapping lookup
-export type ItemMappingKey = `${BodyPart}:${LayerType}:${string}`;
-
-export function makeItemMappingKey(
-  bodyPart: BodyPart,
-  layerType: LayerType,
-  standardOption: string
-): ItemMappingKey {
-  return `${bodyPart}:${layerType}:${standardOption}`;
-}
-
-export interface UserCustomItem {
-  id: string;
-  user_id: string;
-  body_part: BodyPart;
-  layer_type: LayerType;
-  generic_option: string;
-  custom_name: string;
-  rcl_clo: number;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface AvailableItem {
   id: string;
   type: "garment" | "handwear" | "headwear" | "custom";

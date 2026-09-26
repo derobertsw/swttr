@@ -22,19 +22,12 @@ function PantsIcon(props: LucideProps) {
   );
 }
 
-export const LEGS_GARMENT_TYPES = ["pants", "shorts", "bib"];
+const LEGS_GARMENT_TYPES = ["pants", "shorts", "bib"];
 
 /**
  * Convert display body part name to filter key
  * Maps "head & neck" to "headNeck" for consistency with search filters
  */
-export function bodyPartToFilterKey(
-  displayName: string
-): "torso" | "legs" | "hands" | "headNeck" {
-  if (displayName === "head & neck") return "headNeck";
-  return displayName as "torso" | "legs" | "hands";
-}
-
 /**
  * Infer the body part category for an available item
  * Used for filtering items by body part
@@ -63,7 +56,12 @@ export const typeIcons = {
   custom: Sparkles,
 };
 
-const categoryIcons: Record<string, React.ComponentType<LucideProps>> = {
+// Keyed by item type, "legs", and garment category. Kept at module level so
+// icon components index into a static map instead of creating components
+// during render.
+const ITEM_ICONS: Record<string, React.ComponentType<LucideProps>> = {
+  ...typeIcons,
+  legs: PantsIcon,
   base_layer: Layers,
   mid_layer_light: Shirt,
   mid_layer_heavy: Shirt,
@@ -83,7 +81,7 @@ export const typeLabels = {
 };
 
 export const BODY_PART_ORDER = ["torso", "legs", "hands", "head & neck"];
-export const BODY_PART_LABELS: Record<string, string> = {
+const BODY_PART_LABELS: Record<string, string> = {
   torso: "Torso",
   legs: "Legs",
   hands: "Hands",
@@ -95,17 +93,23 @@ export function formatBodyPartLabel(part: string): string {
   return BODY_PART_LABELS[part] ?? formatCategory(part);
 }
 
-export function getItemIcon(itemType: string, garmentType?: string, category?: string) {
-  if (itemType === "custom") {
-    return Sparkles;
-  }
-  if (itemType === "garment" && garmentType && LEGS_GARMENT_TYPES.includes(garmentType)) {
-    return PantsIcon;
-  }
-  if (itemType === "garment" && category && categoryIcons[category]) {
-    return categoryIcons[category];
-  }
-  return typeIcons[itemType as keyof typeof typeIcons] || Shirt;
+function getItemIconKey(itemType: string, garmentType?: string, category?: string): string {
+  if (itemType === "custom") return "custom";
+  if (itemType === "garment" && garmentType && LEGS_GARMENT_TYPES.includes(garmentType)) return "legs";
+  if (itemType === "garment" && category && ITEM_ICONS[category]) return category;
+  return ITEM_ICONS[itemType] ? itemType : "garment";
+}
+
+interface ItemIconProps extends LucideProps {
+  itemType: string;
+  garmentType?: string;
+  category?: string;
+}
+
+/** Icon for a wardrobe item, picked by item type, garment type, and category. */
+export function ItemIcon({ itemType, garmentType, category, ...props }: ItemIconProps) {
+  const Icon = ITEM_ICONS[getItemIconKey(itemType, garmentType, category)];
+  return <Icon {...props} />;
 }
 
 export function formatCategory(category: string): string {
@@ -131,11 +135,6 @@ export function formatConfidence(score: number | undefined): string {
   return "Low";
 }
 
-export function formatValue(value: number | undefined | null, decimals: number = 3): string {
-  if (value === undefined || value === null) return "—";
-  return value.toFixed(decimals);
-}
-
 export function getClo(item: WardrobeItem): number | undefined {
   if (item.item_type === "custom") {
     return item.details.rcl_clo;
@@ -157,14 +156,17 @@ export function getBodyPart(item: WardrobeItem): string {
   return "torso";
 }
 
-export function getEmptyStateIcon(part: string) {
-  switch (part) {
-    case "torso": return Shirt;
-    case "legs": return PantsIcon;
-    case "hands": return Hand;
-    case "head & neck": return HardHat;
-    default: return Shirt;
-  }
+const BODY_PART_ICONS: Record<string, React.ComponentType<LucideProps>> = {
+  torso: Shirt,
+  legs: PantsIcon,
+  hands: Hand,
+  "head & neck": HardHat,
+};
+
+/** Icon for a wardrobe body-part section. */
+export function BodyPartIcon({ part, ...props }: LucideProps & { part: string }) {
+  const Icon = BODY_PART_ICONS[part] ?? Shirt;
+  return <Icon {...props} />;
 }
 
 export function normalizeSearch(text: string) {

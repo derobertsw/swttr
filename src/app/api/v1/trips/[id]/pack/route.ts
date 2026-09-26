@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
-import { getAuthUserId } from "@/lib/auth";
-import { assertCanAccessTrip, loadTripFull } from "@/lib/trips";
+import { requireTripAccess, loadTripFull } from "@/lib/trips";
 import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 import { buildPackingListFromDays } from "@/lib/packingList";
 import { fetchUserWardrobeItems } from "@/lib/userWardrobe";
@@ -72,14 +70,10 @@ function chooseActivity(day: TripDay, stop: TripStop | undefined): string | null
 }
 
 export async function GET(_request: NextRequest, ctx: RouteContext) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase || !userId)
-    return NextResponse.json({ error: "Auth required" }, { status: 401 });
-
   const { id } = await ctx.params;
-  const access = await assertCanAccessTrip(supabase, id, userId);
-  if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const auth = await requireTripAccess(id);
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, userId } = auth;
 
   const full = await loadTripFull(supabase, id);
   if (!full) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -89,14 +83,14 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   try {
     const { data: prefs } = await supabase
       .from("user_preferences")
-      .select("sensitivity")
+      .select("temperature_sensitivity")
       .eq("user_id", userId)
       .maybeSingle();
-    if (prefs?.sensitivity === "hot" || prefs?.sensitivity === "cold") {
-      sensitivity = prefs.sensitivity;
+    if (prefs?.temperature_sensitivity === "hot" || prefs?.temperature_sensitivity === "cold") {
+      sensitivity = prefs.temperature_sensitivity;
     }
   } catch {
-    // Table may not exist in this project — fall back to neutral.
+    // Fall back to neutral if preferences can't be read.
   }
 
   // Group days by (stopId, activityKey) so we can issue one weather fetch per

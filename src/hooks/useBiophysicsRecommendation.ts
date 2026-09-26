@@ -17,7 +17,7 @@ import { logWarn } from "@/lib/logger";
 
 type BiophysicsWeather = WeatherData & { humidity?: number };
 
-export interface UseBiophysicsResult {
+interface UseBiophysicsResult {
   data: BiophysicsRecommendation | null;
   loading: boolean;
   error: Error | null;

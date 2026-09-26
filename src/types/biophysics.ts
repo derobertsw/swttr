@@ -1,6 +1,9 @@
 /**
- * Types for biophysics API responses
+ * Response contract of the /api/v1/recommendations/* routes. The sport
+ * recommenders are typed against these, so the client and server agree.
  */
+import type { ExertionLevel } from "@/lib/biophysics/exertion";
+import type { EnsembleScore } from "@/types/garments";
 
 export interface IreqData {
   min: number;
@@ -30,11 +33,15 @@ export interface ExtremityIreqRange {
   neutral: ExtremityIreqData;
 }
 
+/**
+ * Single-phase sports report `min`/`neutral` at the top level; alpine reports
+ * `skiing`/`chairlift` and ski touring `uphill`/`downhill` phases instead.
+ */
 export interface IreqRange {
+  min?: number;
+  neutral?: number;
   skiing?: IreqData;
   chairlift?: IreqData;
-  active?: IreqData;
-  rest?: IreqData;
   uphill?: IreqData;
   downhill?: IreqData;
   downhill_target_range?: [number, number];
@@ -64,13 +71,8 @@ export interface IreqRange {
   validation_source?: string;
 }
 
-export interface ComponentScores {
-  thermal: number;
-  moisture: number;
-  protection: number;
-  weight: number;
-  mobility: number;
-}
+/** Per-dimension ensemble scores, as returned by scoreEnsemble. */
+export type ComponentScores = EnsembleScore["componentScores"];
 
 export interface RegionalClo {
   torso: number;
@@ -110,10 +112,12 @@ export interface RecommendedGarment {
   category: string;
   rcl?: number;
   rcl_torso?: number;
+  rcl_arms?: number;
   rcl_legs?: number;
   recl?: number;
   evap_potential?: number;
   covers_torso?: boolean;
+  covers_arms?: boolean;
   covers_legs?: boolean;
 }
 
@@ -141,10 +145,14 @@ export interface RecommendedHeadwear {
 }
 
 export interface BiophysicsRecommendation {
+  /** The request's conditions, echoed as sent (°F, mph). */
   conditions: {
     temperature: string;
     wind_speed: string;
-    precipitation: boolean;
+    exertion: ExertionLevel;
+    precipitation?: boolean;
+    /** XC skiing only: exertion expressed as XC intensity. */
+    intensity?: "easy" | "moderate" | "racing";
   };
   ireq: IreqRange;
   recommendation: {
@@ -168,6 +176,57 @@ export interface BiophysicsRecommendation {
   };
   pack_items?: PackItems;
   transition_protocol?: TransitionProtocol;
+}
+
+// ============================================
+// Layer evaluation: POST /api/v1/ensembles/evaluate
+// ============================================
+
+export type EvaluatedBodyPart = "torso" | "legs" | "hands" | "headNeck";
+
+export interface ThermalDecision {
+  riskType: "comfortable" | "cold" | "overheat";
+  severity: "moderate" | "high";
+  /** How far outside the target the clo is. */
+  delta: number;
+}
+
+export interface PhaseEvaluationInput {
+  /** Clo of each item worn on each body part. */
+  itemClo: Record<EvaluatedBodyPart, number[]>;
+  /** Neutral clo target per body part, when the recommendation has one. */
+  targets: Partial<Record<EvaluatedBodyPart, number>>;
+  /**
+   * Arms aren't edited directly, so their clo comes from the recommendation.
+   * `deficitClo` overrides `clo` for the arm deficit (the descent reports its
+   * own arm clo); the whole-body total always uses `clo`.
+   */
+  arms?: { clo: number; target?: number; deficitClo?: number };
+  targetRange?: [number, number];
+}
+
+export interface BodyPartEvaluation {
+  clo: number;
+  target?: number;
+  /** target - clo: positive when more insulation is needed. */
+  delta?: number;
+  status?: "under" | "over" | "in_range";
+}
+
+export interface PhaseEvaluation {
+  bodyParts: Record<EvaluatedBodyPart, BodyPartEvaluation>;
+  /** Regional clo weighted by each region's share of the body. */
+  breakdown?: {
+    regions: { region: "torso" | "arms" | "legs"; clo: number; weight: number; contribution: number }[];
+    total: number;
+  };
+  totalClo?: number;
+  maxRegionalDeficit: number;
+  maxExtremityDeficit: number;
+  hasRegionalGap: boolean;
+  hasExtremityGap: boolean;
+  decision: ThermalDecision | null;
+  comfortScore: number | null;
 }
 
 /**

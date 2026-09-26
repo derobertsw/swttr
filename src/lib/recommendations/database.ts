@@ -2,7 +2,7 @@
  * Database helpers for recommendation API routes
  */
 import { getSupabase } from '@/lib/supabase';
-import type { GarmentRow, HandwearRow, HeadwearRow } from './types';
+import type { GarmentActivityRatingProps, GarmentRow, HandwearRow, HeadwearRow } from './types';
 
 /**
  * Get user's wardrobe garment IDs from the database
@@ -32,7 +32,7 @@ export async function fetchGarmentsWithDetails(
   options?: {
     wardrobeIds?: string[] | null;
     activityFilter?: {
-      field: string;
+      field: keyof GarmentActivityRatingProps;
       minScore: number;
     };
   }
@@ -71,7 +71,7 @@ export async function fetchGarmentsWithDetails(
 /**
  * Get user's wardrobe item IDs by type
  */
-export async function getUserWardrobeItemIds(
+async function getUserWardrobeItemIds(
   supabase: ReturnType<typeof getSupabase>,
   userId: string | null,
   itemType: 'garment' | 'handwear' | 'headwear'

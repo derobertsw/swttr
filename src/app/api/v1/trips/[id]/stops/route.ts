@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
-import { getAuthUserId } from "@/lib/auth";
-import { assertCanAccessTrip } from "@/lib/trips";
+import { readJson } from "@/lib/api";
+import { requireTripAccess } from "@/lib/trips";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, ctx: RouteContext) {
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase || !userId)
-    return NextResponse.json({ error: "Auth required" }, { status: 401 });
-
   const { id } = await ctx.params;
-  const access = await assertCanAccessTrip(supabase, id, userId);
-  if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const auth = await requireTripAccess(id);
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
-  const body = await request.json().catch(() => null);
+  const body = await readJson(request);
   const { name, latitude, longitude, activities } = (body ?? {}) as {
     name?: string;
     latitude?: number | null;
@@ -50,16 +45,12 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
 
 export async function PUT(request: NextRequest, ctx: RouteContext) {
   // Reorder: body is { order: [stopId, stopId, ...] }
-  const supabase = getSupabase();
-  const userId = await getAuthUserId();
-  if (!supabase || !userId)
-    return NextResponse.json({ error: "Auth required" }, { status: 401 });
-
   const { id } = await ctx.params;
-  const access = await assertCanAccessTrip(supabase, id, userId);
-  if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const auth = await requireTripAccess(id);
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
 
-  const body = await request.json().catch(() => null);
+  const body = await readJson(request);
   const order = (body?.order ?? []) as string[];
   if (!Array.isArray(order))
     return NextResponse.json({ error: "order array required" }, { status: 400 });

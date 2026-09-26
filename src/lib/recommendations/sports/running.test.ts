@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildRunningEnsemble } from "./route";
-import type { CategorizedGarments, GarmentRow } from "@/lib/recommendations/shared";
+import { buildRunningEnsemble } from "./running";
+import type { CategorizedGarments, GarmentRow } from "../types";
 
 function createGarment(overrides: Partial<GarmentRow>): GarmentRow {
   return {

@@ -101,7 +101,7 @@ export function selectHeadwearByCategory(
 /**
  * Select best item from a category based on temperature
  */
-export function selectBestFromCategory(
+function selectBestFromCategory(
   items: HeadwearRow[],
   tempC: number,
   isActive: boolean

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
-import { getAuthUserId } from "@/lib/auth";
+import { readJson, requireUser } from "@/lib/api";
 import type { BodyPart, LayerType } from "@/types/wardrobe";
 import { getGenericLayerClo } from "@/data/genericLayerClo";
 import { logError } from "@/lib/logger";
@@ -10,18 +9,12 @@ import { logError } from "@/lib/logger";
  * Create a new custom item and add it to the wardrobe
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, userId } = auth;
+
   try {
-    const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
-    }
-    const userId = await getAuthUserId();
-
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await request.json();
+    const body = (await readJson(request)) ?? {};
     const { body_part, layer_type, generic_option, custom_name } = body as {
       body_part: BodyPart;
       layer_type: LayerType;
@@ -119,18 +112,12 @@ export async function POST(request: NextRequest) {
  * Update a custom item's name
  */
 export async function PATCH(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, userId } = auth;
+
   try {
-    const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
-    }
-    const userId = await getAuthUserId();
-
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await request.json();
+    const body = (await readJson(request)) ?? {};
     const { id, custom_name } = body as { id: string; custom_name: string };
 
     if (!id || !custom_name) {
@@ -182,17 +169,11 @@ export async function PATCH(request: NextRequest) {
  * Delete a custom item and remove from wardrobe
  */
 export async function DELETE(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+  const { supabase, userId } = auth;
+
   try {
-    const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
-    }
-    const userId = await getAuthUserId();
-
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 

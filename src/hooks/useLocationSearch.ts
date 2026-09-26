@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { LocationSuggestion } from "@/types/recommendations";
 import { logWarn } from "@/lib/logger";
 
+const MIN_QUERY_LENGTH = 2;
+
 export function useLocationSearch() {
   const [location, setLocation] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
@@ -14,29 +16,28 @@ export function useLocationSearch() {
   const suggestionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (locationQuery.length < 2) {
-      setSuggestions([]);
-      setIsSearching(false);
-      return;
-    }
+    if (locationQuery.length < MIN_QUERY_LENGTH) return;
 
-    setIsSearching(true);
-
+    let cancelled = false;
     const fetchSuggestions = async () => {
       try {
         const response = await fetch(`/api/geocode?q=${encodeURIComponent(locationQuery)}`);
         const data = await response.json();
+        if (cancelled) return;
         setSuggestions(data.results || []);
         setShowSuggestions(true);
       } catch (error) {
         logWarn("useLocationSearch", error);
       } finally {
-        setIsSearching(false);
+        if (!cancelled) setIsSearching(false);
       }
     };
 
     const debounce = setTimeout(fetchSuggestions, 300);
-    return () => clearTimeout(debounce);
+    return () => {
+      cancelled = true;
+      clearTimeout(debounce);
+    };
   }, [locationQuery]);
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export function useLocationSearch() {
     setLocationQuery("");
     setSuggestions([]);
     setShowSuggestions(false);
+    setIsSearching(false);
   };
 
   const handleLocationInputChange = (value: string) => {
@@ -68,6 +70,12 @@ export function useLocationSearch() {
       setLocation("");
     }
     setLocationQuery(value);
+    if (value.length < MIN_QUERY_LENGTH) {
+      setSuggestions([]);
+      setIsSearching(false);
+    } else {
+      setIsSearching(true);
+    }
   };
 
   const dismiss = () => setShowSuggestions(false);
@@ -78,6 +86,7 @@ export function useLocationSearch() {
     setSuggestions([]);
     setShowSuggestions(false);
     setSelectedLocation(null);
+    setIsSearching(false);
   };
 
   return {

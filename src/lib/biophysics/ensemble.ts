@@ -131,7 +131,7 @@ function calculatePermeabilityIndex(rclClo: number, recl: number): number {
   return Math.min(1.0, im); // Cap at 1.0
 }
 
-export interface GarmentThermalData extends ThermalGarment {
+interface GarmentThermalData extends ThermalGarment {
   garmentId: string;
   name: string;
   category: string;
