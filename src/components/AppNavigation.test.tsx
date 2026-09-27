@@ -1,12 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { MobileTabBar } from "./AppNavigation";
+import { AppSidebar } from "./AppSidebar";
 
 let mockPathname = "/";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+}));
+
+vi.mock("@/hooks/usePreferences", () => ({
+  usePreferences: () => ({
+    sensitivity: "neutral",
+    defaultActivity: "running",
+    bodyMetricsSelection: {},
+    updateSensitivity: vi.fn(),
+    updateDefaultActivity: vi.fn(),
+    updateBodyMetrics: vi.fn(),
+  }),
 }));
 
 const localStorageMock = {
@@ -75,6 +88,19 @@ describe("AppNavigation", () => {
       render(<MobileTabBar />);
       expect(screen.getByRole("link", { name: "Wardrobe" })).toHaveAttribute("aria-current", "page");
       expect(screen.getByRole("link", { name: "Trips" })).not.toHaveAttribute("aria-current");
+    });
+  });
+
+  // Desktop has no bottom dock, so the sidebar is its only route to these pages.
+  describe("desktop sidebar", () => {
+    it("links to Trips and Wardrobe", () => {
+      render(
+        <SidebarProvider>
+          <AppSidebar />
+        </SidebarProvider>
+      );
+      expect(screen.getByRole("link", { name: "Trips" })).toHaveAttribute("href", "/trips");
+      expect(screen.getByRole("link", { name: "Wardrobe" })).toHaveAttribute("href", "/wardrobe");
     });
   });
 });
