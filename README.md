@@ -403,9 +403,9 @@ The app uses a biophysics-based garment database with calibrated thermal propert
 - `user_custom_items`, `user_item_mappings`, `user_preferences` - Per-user data
 - `trips`, `trip_stops`, `trip_members`, `trip_days`, `trip_member_day_kits`, `trip_group_gear` - Trips/crew planning
 
-**Access model:** the browser never talks to Supabase. API routes use the service-role key (`src/lib/supabase.ts`, guarded by `server-only`) and enforce per-user access in code, for example with `requireUser()` in `src/lib/api.ts` and `requireTripAccess()` in `src/lib/trips.ts`. Migration `014_restrict_to_service_role.sql` revokes all table access from the public `anon`/`authenticated` roles, so the anon key grants nothing.
+**Access model:** the browser never talks to Supabase. API routes use the service-role key (`src/lib/supabase.ts`, guarded by `server-only`) and enforce per-user access in code, for example with `requireUser()` in `src/lib/api.ts` and `requireTripAccess()` in `src/lib/trips.ts`. Migration `20260926003534_restrict_to_service_role.sql` revokes all table access from the public `anon`/`authenticated` roles, so the anon key grants nothing.
 
-**Applying migrations:** production's migration history doesn't match the numbered files here (some migrations were applied by hand), so don't `supabase db push` the whole folder. Apply new migrations individually, for example in the SQL editor or with the Supabase MCP `apply_migration`.
+**Migrations:** each file in `supabase/migrations/` matches one entry in production's migration history, so the Supabase CLI can tell which ones are pending. Create new ones with `supabase migration new <name>`, which adds the timestamp prefix, and don't apply them by hand. The [Supabase Migrations workflow](.github/workflows/supabase-migrations.yml) lists pending migrations on pull requests and applies them to production when they merge to `main`. Vercel deploys the app at the same time, so keep each migration compatible with the code that's already live.
 
 ## Deployment
 

@@ -1,0 +1,55 @@
+name: Supabase Migrations
+
+# Applies new files in supabase/migrations/ to the production database when
+# they reach main, and lists what would be applied on pull requests.
+#
+# Needs the SUPABASE_DB_URL repository secret: the "Session pooler" connection
+# string (port 5432) from the Connect panel in the Supabase dashboard, with the
+# database password filled in and percent-encoded. GitHub's runners have no
+# IPv6, so the direct db.<project>.supabase.co host can't be reached from here.
+
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/migrations/**"]
+  pull_request:
+    paths: ["supabase/migrations/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Runs against the database one at a time, and never cancels one mid-push.
+concurrency:
+  group: supabase-migrations-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  migrations:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Check for the database secret
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Add the SUPABASE_DB_URL repository secret (see the top of this workflow)."
+            exit 1
+          fi
+
+      # The CLI refuses to push when the files and production's migration
+      # history disagree, including a new file dated before the latest applied
+      # migration, so this step also catches drift before it merges.
+      - name: List pending migrations
+        if: github.ref != 'refs/heads/main'
+        run: supabase db push --dry-run --db-url "$SUPABASE_DB_URL"
+
+      - name: Apply pending migrations
+        if: github.ref == 'refs/heads/main'
+        run: supabase db push --db-url "$SUPABASE_DB_URL"
