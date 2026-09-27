@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildGearUpResult, createInitialState, fetchPlanAhead, gearUpReducer } from "./gearUp";
 import type { BiophysicsOutcome, BiophysicsRecommendation } from "@/types/biophysics";
 import type { MultiDayLayerPlan } from "@/types/plan";
@@ -108,18 +108,30 @@ describe("buildGearUpResult", () => {
 });
 
 describe("fetchPlanAhead", () => {
+  const PLAN_REQUEST = {
+    activity: "running",
+    sensitivity: "neutral",
+    location: { id: 1, name: "Bend", country: "US", latitude: 44, longitude: -121 },
+    date: new Date("2026-10-01T00:00:00"),
+    time: "08:00",
+    durationDays: 3,
+  } as const;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("surfaces the API's error message", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "Forecast unavailable" }, { status: 502 })));
-    await expect(
-      fetchPlanAhead({
-        activity: "running",
-        sensitivity: "neutral",
-        location: { id: 1, name: "Bend", country: "US", latitude: 44, longitude: -121 },
-        date: new Date("2026-10-01T00:00:00"),
-        time: "08:00",
-        durationDays: 3,
-      })
-    ).rejects.toThrow("Forecast unavailable");
-    vi.unstubAllGlobals();
+    await expect(fetchPlanAhead(PLAN_REQUEST)).rejects.toThrow("Forecast unavailable");
+  });
+
+  it.each([
+    { page: "a sign-in page, after following a redirect", status: 200 },
+    { page: "an error page", status: 404 },
+  ])("fails with its own message, not a parse error, when it gets $page", async ({ status }) => {
+    const html = "<!DOCTYPE html><html><body>Sign in</body></html>";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(html, { status, headers: { "Content-Type": "text/html" } })));
+    await expect(fetchPlanAhead(PLAN_REQUEST)).rejects.toThrow(new Error("Failed to build plan"));
   });
 });

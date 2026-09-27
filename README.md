@@ -23,7 +23,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - Running
 - Biking
 
-**Biophysics support (signed in):** Alpine Skiing, Backcountry Skiing (ski touring), XC Skiing, Running, and Biking. Hiking / Snowshoeing and signed-out users get static recommendations from `src/data/layerRecommendations.json`, which covers Alpine, XC, and Hiking. The app labels those as general guidance. Where there are no static layers (signed-out Running, Biking, and Backcountry), it keeps the outing on screen with a sign-in prompt instead. Signed-in users get the same fallback, with Add gear or Try again in place of sign-in, when their wardrobe has no usable gear or the request fails.
+**Biophysics support (signed in):** Alpine Skiing, Backcountry Skiing (ski touring), XC Skiing, Running, and Biking. Hiking / Snowshoeing and signed-out users get static recommendations from `src/data/layerRecommendations.json`, which covers Alpine, XC, and Hiking. The app labels those as general guidance. Where there are no static layers (signed-out Running, Biking, and Backcountry), it keeps the outing on screen with a sign-in prompt instead. Signed-in users get the same fallback, with Add gear or Try again in place of sign-in, when their wardrobe has no usable gear or the request fails. Multi-day Plan Ahead uses the static table for everyone, so it works signed out too.
 
 ## How Layer Recommendations Work
 

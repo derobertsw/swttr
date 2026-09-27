@@ -676,6 +676,25 @@ describe("Home Page", () => {
       expect(getCurrentPosition).not.toHaveBeenCalled();
     });
 
+    it("builds a multi-day plan for a signed-out visitor", async () => {
+      // /api/plan-ahead is public (see src/proxy.test.ts), so a guest gets the same plan.
+      mockUseAuth.mockReturnValue({ userId: null, isLoaded: true, isSignedIn: false });
+      const { toast } = await import("sonner");
+      const { requests } = mockPlanAheadApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+
+      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      expect(requests.planAhead).toEqual([
+        expect.objectContaining({ lat: 44.47, lon: -72.69, startDate: START_DATE, durationDays: 3 }),
+      ]);
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
     it("shows inline errors, focuses the first field to fix, and keeps what was entered", async () => {
       const { requests } = mockPlanAheadApis();
       const user = userEvent.setup();

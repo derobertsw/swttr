@@ -9,6 +9,9 @@ const isPublicRoute = createRouteMatcher([
   "/trips/invite(.*)",
   "/api/geocode(.*)",
   "/api/weather(.*)",
+  // Multi-day Plan Ahead: the forecast plus the static layer table signed-out
+  // users already get. No user data, and nothing the paid /api/agent API sells.
+  "/api/plan-ahead",
   "/api/v1(.*)",
   // Paid agent API — gated by MPP (HTTP 402), not Clerk auth.
   "/api/agent(.*)",
