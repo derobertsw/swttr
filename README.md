@@ -123,14 +123,14 @@ graph TD
 
 ### 3. Ensemble Building Flow
 
-Most sports select base layers, then mid layers, then shells. Alpine compares complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. It allows at most one item in each slot per covered region, including items that span multiple regions. Regional budgets use the same thermal regression coefficients as ensemble scoring. When targets cannot be met, alpine returns the best available wearable combination and warns about regional insulation shortfalls.
+Most sports select base layers, then mid layers, then shells. Alpine compares complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. It allows at most one item in each slot per covered region, including items that span multiple regions. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. Weather-protection scoring counts insulated outerwear as the shell. When targets cannot be met, alpine returns the best available wearable combination and warns about regional insulation shortfalls.
 
 ```mermaid
 graph TD
     START[Target Clo Range from Pipeline] --> SPORT{Alpine?}
     SPORT -->|Yes| COMB[Compare base + optional mid/puffy + outer<br/>for torso, then legs]
-    COMB --> CAP[One item per slot per covered region<br/>Insulated outer replaces shell]
-    CAP --> REG[Preserve coverage and rain protection<br/>Fit regional budgets, then minimize layers]
+    COMB --> CAP[One item per slot per covered region<br/>Insulated outer replaces shell<br/>Bibs fill leg slots under a jacket]
+    CAP --> REG[Preserve coverage and rain protection<br/>Minimize combined shortfall and excess, then layers]
     REG --> WARN[Warn about remaining regional shortfalls]
     SPORT -->|No| SORT[Sort Pool by Sport Strategy]
     SORT --> BASE[Select Base Layer]
@@ -185,7 +185,7 @@ graph TD
         ALP --> A1[Compare complete regional outfits]
         A1 --> A2[One base + at most one mid/puffy<br/>+ one outer per region]
         A2 --> A3[Insulated outerwear occupies outer slot<br/>Puffies pair only with hard shells or no outer]
-        A3 --> A4[Budget all layers by regional clo<br/>Check arms and multi-region coverage]
+        A3 --> A4[Budget all layers by regional clo<br/>Balance shortfalls against excess warmth]
         A4 --> A5[Dual metabolic model:<br/>skiing + chairlift blend]
     end
 
@@ -227,7 +227,7 @@ graph TD
     AWET -->|Yes| AWP[Prefer waterproof outer coverage]
     AWET -->|No| ABUDGET[Fit regional insulation targets]
     AWP --> ABUDGET
-    ABUDGET --> ACAP[One outer per covered region<br/>No shell over insulated outerwear]
+    ABUDGET --> ACAP[One outer per covered region<br/>No shell over insulated outerwear<br/>Bibs sit under the jacket]
 
     XC --> XBREATH{Meets breathability<br/>threshold?}
     XBREATH -->|Yes| XPREF[Select breathable shell]

@@ -11,6 +11,15 @@ function covers(garment: GarmentRow, region: Region): boolean {
   return garment[`covers_${region}`];
 }
 
+/**
+ * Bibs cover the torso but sit under a jacket, so they fill only the legs
+ * slots. One-piece suits also cover the arms and fill every region's slots.
+ */
+function occupies(garment: GarmentRow, region: Region): boolean {
+  if (region === 'torso' && garment.covers_legs && !garment.covers_arms) return false;
+  return covers(garment, region);
+}
+
 function layer(garment: GarmentRow): Layer {
   if (garment.category === 'base_layer') return 'base';
   if (['hard_shell', 'soft_shell', 'windbreaker', 'outer_insulated'].includes(garment.category)) {
@@ -34,8 +43,8 @@ function isWearable(ensemble: GarmentRow[]): boolean {
   if (new Set(ensemble.map((g) => g.id)).size !== ensemble.length) return false;
 
   return REGIONS.every((region) => {
-    const garments = ensemble.filter((g) => covers(g, region));
-    // An item spanning regions occupies its slot in every region it covers.
+    const garments = ensemble.filter((g) => occupies(g, region));
+    // An item spanning regions occupies its slot in every region it fills.
     for (const slot of ['base', 'mid', 'outer'] as const) {
       if (garments.filter((g) => layer(g) === slot).length > 1) return false;
     }
@@ -82,7 +91,7 @@ export function buildAlpineEnsemble(
     const scoredRegions: Region[] = region === 'torso' ? ['torso', 'arms'] : ['legs'];
     const options = (slot: Layer): Array<GarmentRow | undefined> => [
       undefined,
-      ...pools[slot].filter((g) => covers(g, region) && isWearable([...ensemble, g])),
+      ...pools[slot].filter((g) => occupies(g, region) && isWearable([...ensemble, g])),
     ];
     const bases = options('base');
     const mids = options('mid');
@@ -98,19 +107,22 @@ export function buildAlpineEnsemble(
 
           const clo = Object.fromEntries(REGIONS.map((r) => [r, regionalClo(candidate, r)])) as Record<Region, number>;
           const missingCoverage = scoredRegions.reduce((missing, r) => missing +
-            Number(!candidate.some((g) => covers(g, r) && layer(g) === 'base')) +
-            Number(!candidate.some((g) => covers(g, r) && layer(g) === 'outer')), 0);
+            Number(!candidate.some((g) => occupies(g, r) && layer(g) === 'base')) +
+            Number(!candidate.some((g) => occupies(g, r) && layer(g) === 'outer')), 0);
           const wetExposure = precipitation ? scoredRegions.filter((r) =>
-            !candidate.some((g) => covers(g, r) && layer(g) === 'outer' && isWaterproof(g))
+            !candidate.some((g) => occupies(g, r) && layer(g) === 'outer' && isWaterproof(g))
           ).length : 0;
           const excess = REGIONS.reduce((sum, r) => sum + Math.max(0, clo[r] - targets.neutral[r]), 0);
           const deficit = scoredRegions.reduce((sum, r) => sum + Math.max(0, targets.min[r] - clo[r]), 0);
           const surplus = scoredRegions.reduce((sum, r) => sum + Math.max(0, clo[r] - targets.min[r]), 0);
           const breathability = candidate.reduce((sum, g) => sum + (g.garment_thermal_properties?.evap_potential ?? 0), 0);
-          // Keep base/outer coverage and rain protection, then fit regional
-          // targets. Among adequate outfits, prefer fewer, lighter layers.
-          // If even base + outer is too warm, choose the least excess.
-          const rank = [missingCoverage, wetExposure, excess, deficit, candidate.length, surplus, -breathability];
+          // Keep base/outer coverage and rain protection, then minimize the
+          // total distance outside each region's min–neutral band: a small
+          // torso excess must not outweigh an avoidable arms deficit, and a
+          // large torso excess must not buy a small arms gain. Among equally
+          // close outfits, prefer fewer, lighter layers.
+          const targetDistance = deficit + excess;
+          const rank = [missingCoverage, wetExposure, targetDistance, candidate.length, surplus, -breathability];
           if (isBetter(rank, bestRank)) {
             best = candidate;
             bestRank = rank;

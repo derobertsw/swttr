@@ -78,12 +78,21 @@ export function garmentsToLayerSet(
 ): LayerSet {
   const layers = createEmptyLayerSet();
 
-  for (const garment of garments) {
-    // Filter by body part coverage
-    if (bodyPart === "torso" && !garment.covers_torso) continue;
-    if (bodyPart === "legs" && !garment.covers_legs) continue;
+  // Filter by body part coverage
+  const covering = garments.filter((garment) =>
+    bodyPart === "torso" ? garment.covers_torso : garment.covers_legs
+  );
+  // Insulated outerwear is the outer layer unless a shell is worn over it.
+  // Bibs cover the torso but sit under a jacket, so they don't count here.
+  const hasShell = covering.some((garment) =>
+    CATEGORY_TO_LAYER_TYPE[garment.category] === "outer" &&
+    !(bodyPart === "torso" && garment.covers_legs && !garment.covers_arms)
+  );
 
-    const layerType = CATEGORY_TO_LAYER_TYPE[garment.category];
+  for (const garment of covering) {
+    const layerType = garment.category === "outer_insulated" && !hasShell
+      ? "outer"
+      : CATEGORY_TO_LAYER_TYPE[garment.category];
     if (layerType) {
       // Use regional clo for the specific body part so displayed values
       // match the regional deficit/surplus calculations

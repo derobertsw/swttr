@@ -116,7 +116,9 @@ function expectWearableAlpine(body: BiophysicsRecommendation) {
   expect(garments.length).toBeGreaterThan(0);
   expect(new Set(garments.map((g) => g.id)).size).toBe(garments.length);
   for (const region of ["torso", "arms", "legs"] as const) {
-    const layers = garments.filter((g) => g[`covers_${region}`]);
+    // Bibs sit under the jacket, so they only fill the legs slots.
+    const isBib = (g: (typeof garments)[number]) => g.covers_legs && !g.covers_arms;
+    const layers = garments.filter((g) => g[`covers_${region}`] && !(region === "torso" && isBib(g)));
     const bases = layers.filter((g) => g.category === "base_layer");
     const mids = layers.filter((g) => ["mid_layer_light", "mid_layer_heavy", "insulation_down", "insulation_synthetic"].includes(g.category));
     const outers = layers.filter((g) => ["outer_insulated", "hard_shell", "soft_shell", "windbreaker"].includes(g.category));

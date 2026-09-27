@@ -41,6 +41,53 @@ describe('buildAlpineEnsemble', () => {
     expect(ids(result)).toEqual(['base', 'warm-fleece', 'shell']);
   });
 
+  it.each([
+    { armsClo: 2, outcome: 'eliminates the arms shortfall' },
+    { armsClo: 1.5, outcome: 'reduces an unavoidable arms shortfall' },
+  ])('accepts a small torso excess when a warmer mid $outcome', ({ armsClo }) => {
+    const lightMid = garment('light-mid', 'mid_layer_heavy', 'torso', 1.8);
+    lightMid.garment_thermal_properties = { rcl_torso: 1.8, rcl_arms: 0.7 };
+    const warmMid = garment('warm-mid', 'mid_layer_heavy', 'torso', 2.31);
+    warmMid.garment_thermal_properties = { rcl_torso: 2.31, rcl_arms: armsClo };
+    // With base + shell, the light mid gives 1.13 clo at the arms. The
+    // warmer mid puts the torso only 0.016 clo above its 2.5 clo maximum.
+    const result = recommend([
+      garment('base', 'base_layer', 'torso', 0.5),
+      lightMid,
+      warmMid,
+      garment('shell', 'hard_shell', 'torso', 0.2),
+    ]);
+    expect(ids(result)).toEqual(['base', 'warm-mid', 'shell']);
+  });
+
+  it('prefers less excess insulation once both outfits meet regional minimums', () => {
+    const result = recommend([
+      garment('base', 'base_layer', 'torso', 0.5),
+      garment('overly-warm-mid', 'mid_layer_heavy', 'torso', 2.5),
+      garment('adequate-mid', 'mid_layer_heavy', 'torso', 1.8),
+      garment('shell', 'hard_shell', 'torso', 0.2),
+    ]);
+    expect(ids(result)).toEqual(['base', 'adequate-mid', 'shell']);
+  });
+
+  it('does not overheat the torso to chase an arms target it cannot reach', () => {
+    const layer = (id: string, category: string, torso: number, arms: number) => {
+      const g = garment(id, category, 'torso', torso);
+      g.garment_thermal_properties = { rcl_torso: torso, rcl_arms: arms };
+      return g;
+    };
+    // The parka narrows the arms shortfall by 0.13 clo but pushes the torso
+    // 0.72 clo past its maximum; the fleece outfit keeps the torso in range.
+    const result = recommend([
+      layer('base', 'base_layer', 0.9, 0.75),
+      layer('fleece', 'mid_layer_heavy', 1.45, 1.2),
+      layer('parka', 'insulation_synthetic', 4.7, 2.94),
+      layer('insulated-jacket', 'outer_insulated', 2.2, 1.8),
+      layer('shell', 'hard_shell', 0.28, 0.22),
+    ], 3.7);
+    expect(ids(result)).toEqual(['base', 'fleece', 'insulated-jacket']);
+  });
+
   it('uses one insulated pant as the outer layer instead of stacking pants and a shell', () => {
     const result = recommend([
       garment('leggings', 'base_layer', 'legs', 0.5),
@@ -103,6 +150,21 @@ describe('buildAlpineEnsemble', () => {
       garment('pants', 'outer_insulated', 'legs', 1.5),
     ], 2, 2);
     expect(ids(result)).toEqual(['union-suit', 'ski-suit']);
+  });
+
+  it.each(['hard_shell', 'outer_insulated'])('wears %s bibs under the jacket as the leg outer layer', (category) => {
+    // Bibs cover the torso but not the arms, and sit under the jacket.
+    const bibs = garment('bibs', category, 'both', 1);
+    bibs.covers_arms = false;
+    bibs.garment_thermal_properties = { rcl_torso: 0.3, rcl_legs: 1 };
+    const result = recommend([
+      garment('base-top', 'base_layer', 'torso', 0.5),
+      garment('leggings', 'base_layer', 'legs', 0.5),
+      garment('puffy', 'insulation_synthetic', 'torso', 1.5),
+      garment('jacket', 'hard_shell', 'torso', 0.2),
+      bibs,
+    ]);
+    expect(ids(result)).toEqual(['base-top', 'leggings', 'puffy', 'jacket', 'bibs']);
   });
 
   it('checks every covered region before choosing a multi-region item', () => {
