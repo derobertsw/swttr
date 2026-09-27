@@ -119,6 +119,7 @@ const HomeContent = () => {
                 onDateChange={setDate}
                 onTimeChange={setTime}
                 onDurationDaysChange={setDurationDays}
+                onSubmit={() => void handleSubmit()}
                 onGoNow={handleGoNow}
                 onLocationInputChange={locationSearch.handleLocationInputChange}
                 onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}

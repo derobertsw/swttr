@@ -9,11 +9,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, CalendarDays, Locate, Loader2, Route, ChevronDown } from "lucide-react";
+import { CalendarIcon, CalendarDays, Layers, Locate, Loader2, Route, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LocationSuggestion } from "@/types/recommendations";
-import { RefObject, useSyncExternalStore } from "react";
+import { FormEvent, RefObject, useRef, useState, useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { FieldError } from "@/components/FieldError";
 import { FROSTED_INPUT, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
 import { Capacitor } from "@capacitor/core";
 
@@ -32,6 +34,8 @@ interface PlanAheadFormProps {
   onDateChange: (date: Date | undefined) => void;
   onTimeChange: (time: string) => void;
   onDurationDaysChange: (days: number) => void;
+  /** Requests layers for the chosen place, date and duration. Called only when those are filled in. */
+  onSubmit: () => void;
   onGoNow?: () => void;
   onLocationInputChange: (value: string) => void;
   onLocationFocus: () => void;
@@ -88,6 +92,7 @@ export function PlanAheadForm({
   onDateChange,
   onTimeChange,
   onDurationDaysChange,
+  onSubmit,
   onGoNow,
   onLocationInputChange,
   onLocationFocus,
@@ -104,8 +109,63 @@ export function PlanAheadForm({
   const durationLabel = durationDays === 1 ? "1 day" : `${durationDays} days`;
   const dateValue = date ? format(date, "yyyy-MM-dd") : "";
 
+  const locationInputRef = useRef<HTMLInputElement>(null);
+  const dateButtonRef = useRef<HTMLButtonElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const timeInputRef = useRef<HTMLInputElement>(null);
+
+  // Field errors appear after the first submit attempt, and each clears once its field is filled in.
+  const [showErrors, setShowErrors] = useState(false);
+  const locationError = selectedLocation ? undefined : "Search for a place, then choose it from the list.";
+  const dateError = date ? undefined : "Choose a start date.";
+  const timeError = time ? undefined : "Enter a start time.";
+  const showDateError = showErrors && Boolean(dateError);
+  const showTimeError = showErrors && Boolean(timeError);
+
+  // Both buttons share the page's loading flag, so remember which one started the request.
+  const [pendingAction, setPendingAction] = useState<"goNow" | "plan" | null>(null);
+  if (!loading && pendingAction) setPendingAction(null);
+  const goNowPending = loading && pendingAction === "goNow";
+  // Any other request here is for this plan: the iOS shell's Gear Up action submits it too.
+  const planPending = loading && !goNowPending;
+  const submitLabel = isMultiDay
+    ? planPending ? "Building layer plan…" : "Build layer plan"
+    : planPending ? "Getting your layers…" : "See my layers";
+
+  const handleGoNow = () => {
+    setPendingAction("goNow");
+    onGoNow?.();
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (loading) return;
+
+    // In page order, so focus lands on the first field to fix.
+    const firstInvalidField = [
+      { error: locationError, element: locationInputRef.current },
+      { error: dateError, element: dateInputRef.current ?? dateButtonRef.current },
+      { error: timeError, element: timeInputRef.current },
+    ].find((field) => field.error);
+
+    if (firstInvalidField) {
+      // Render the error first, so the field is announced as invalid when it takes focus.
+      flushSync(() => setShowErrors(true));
+      firstInvalidField.element?.focus();
+      return;
+    }
+
+    setPendingAction("plan");
+    onSubmit();
+  };
+
   return (
-    <div className="flex w-full max-w-[420px] flex-col gap-5 pb-28">
+    <form
+      noValidate
+      aria-label="Plan ahead"
+      onSubmit={handleSubmit}
+      className="flex w-full max-w-[420px] flex-col gap-5 pb-28"
+    >
       <section className="rounded-[1.6rem] border border-white/28 bg-white/[0.1] p-3.5 shadow-[0_12px_30px_rgba(8,16,34,0.16)] backdrop-blur-xl">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">Trip Mode</p>
         <div className="mt-2.5 rounded-2xl border border-white/30 bg-white/[0.07] p-1.5">
@@ -145,10 +205,10 @@ export function PlanAheadForm({
           <button
             type="button"
             disabled={loading}
-            onClick={onGoNow}
+            onClick={handleGoNow}
             className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/[0.14] px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(8,16,34,0.12)] backdrop-blur-xl transition hover:bg-white/[0.22] disabled:opacity-50"
           >
-            {loading ? (
+            {goNowPending ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
               <Locate className="size-4" />
@@ -171,6 +231,8 @@ export function PlanAheadForm({
         showSuggestions={showSuggestions}
         selectedLocation={selectedLocation}
         isSearching={isSearching}
+        error={showErrors ? locationError : undefined}
+        inputRef={locationInputRef}
         suggestionRef={suggestionRef}
         onLocationInputChange={onLocationInputChange}
         onLocationFocus={onLocationFocus}
@@ -185,18 +247,24 @@ export function PlanAheadForm({
             <div className="relative flex-1">
               <CalendarIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/75" />
               <Input
+                ref={dateInputRef}
                 type="date"
                 value={dateValue}
                 onChange={(event) => onDateChange(parseDateInputValue(event.target.value))}
                 className={`h-12 pl-10 ${FROSTED_INPUT}`}
                 aria-label="Start date"
+                aria-invalid={showDateError || undefined}
+                aria-describedby={showDateError ? "plan-start-date-error" : undefined}
               />
             </div>
           ) : (
             <Popover>
               <PopoverTrigger asChild>
                 <Button
+                  ref={dateButtonRef}
                   variant="outline"
+                  aria-invalid={showDateError || undefined}
+                  aria-describedby={showDateError ? "plan-start-date-error" : undefined}
                   className={cn(
                     `h-12 flex-1 justify-start text-left font-normal ${FROSTED_INPUT} hover:bg-white/25 hover:text-white`,
                     !date && "text-white/50"
@@ -218,14 +286,19 @@ export function PlanAheadForm({
           )}
           <div className="w-40 sm:w-44">
             <Input
+              ref={timeInputRef}
               type="time"
               value={time}
               onChange={(e) => onTimeChange(e.target.value)}
               className={`h-12 tabular-nums ${FROSTED_INPUT}`}
               aria-label="Start time"
+              aria-invalid={showTimeError || undefined}
+              aria-describedby={showTimeError ? "plan-start-time-error" : undefined}
             />
           </div>
         </div>
+        {showDateError && <FieldError id="plan-start-date-error">{dateError}</FieldError>}
+        {showTimeError && <FieldError id="plan-start-time-error">{timeError}</FieldError>}
         <p className="text-xs text-white/70">Start time: {timeLabel} (local)</p>
         <p className="text-xs text-white/65">
           Plan builder uses daytime forecast windows (6am-9pm) to avoid overnight bias.
@@ -301,6 +374,15 @@ export function PlanAheadForm({
           </details>
         </>
       )}
-    </div>
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] px-6 text-sm font-semibold text-white shadow-[0_14px_26px_rgba(0,0,0,0.44)] transition-transform duration-200 hover:bg-[#030712] disabled:opacity-70"
+      >
+        {planPending ? <Loader2 className="size-5 animate-spin" /> : <Layers className="size-5" />}
+        <span className="tracking-wide">{submitLabel}</span>
+      </button>
+    </form>
   );
 }

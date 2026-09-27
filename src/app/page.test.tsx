@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { format } from "date-fns";
 import Home from "./page";
 
 // Mock sonner toast
@@ -42,6 +43,13 @@ const localStorageMock = {
   clear: vi.fn(),
 };
 Object.defineProperty(window, "localStorage", { value: localStorageMock });
+
+type MockResponse = { ok: boolean; status: number; json: () => Promise<unknown> };
+const respond = (status: number, body: unknown): MockResponse => ({
+  ok: status >= 200 && status < 300,
+  status,
+  json: () => Promise.resolve(body),
+});
 
 describe("Home Page", () => {
   let originalGeolocation: Geolocation;
@@ -293,13 +301,6 @@ describe("Home Page", () => {
   });
 
   describe("results without personalized layers", () => {
-    type MockResponse = { ok: boolean; status: number; json: () => Promise<unknown> };
-    const respond = (status: number, body: unknown): MockResponse => ({
-      ok: status >= 200 && status < 300,
-      status,
-      json: () => Promise.resolve(body),
-    });
-
     const RUNNING_RECOMMENDATION = {
       ireq: { target_range: [0.4, 0.8] },
       recommendation: {
@@ -418,6 +419,223 @@ describe("Home Page", () => {
       render(<Home />);
 
       expect(screen.getByDisplayValue("12:00")).toBeInTheDocument();
+    });
+  });
+
+  describe("submitting a plan", () => {
+    const STOWE = {
+      id: 1,
+      name: "Stowe",
+      region: "Vermont",
+      country: "United States",
+      latitude: 44.47,
+      longitude: -72.69,
+    };
+    const PLAN = {
+      startDate: "2026-10-15",
+      endDate: "2026-10-17",
+      durationDays: 3,
+      dayStartHour: 6,
+      dayEndHour: 21,
+      days: [],
+    };
+
+    /** The 15th of next month, which chooseStartDate picks. */
+    function expectedStartDate() {
+      const today = new Date();
+      return format(new Date(today.getFullYear(), today.getMonth() + 1, 15), "yyyy-MM-dd");
+    }
+
+    /**
+     * Plan-ahead requests succeed (weather: 28°F, wind 12 mph) unless `weather`
+     * says otherwise. Returns the requests made, and a geolocation spy that only Go Now uses.
+     */
+    function mockPlanAheadApis({ weather }: { weather?: () => Promise<MockResponse> } = {}) {
+      const requests = { weather: [] as string[], planAhead: [] as unknown[] };
+      const getCurrentPosition = vi.fn();
+      Object.defineProperty(navigator, "geolocation", {
+        value: { getCurrentPosition },
+        writable: true,
+      });
+      mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+        if (url.includes("/api/geocode")) {
+          return Promise.resolve(respond(200, { results: [STOWE] }));
+        }
+        if (url.includes("/api/weather")) {
+          requests.weather.push(url);
+          return weather?.() ?? Promise.resolve(respond(200, { temperature: 28, windSpeed: 12 }));
+        }
+        if (url.includes("/api/plan-ahead")) {
+          requests.planAhead.push(JSON.parse(String(init?.body)));
+          return Promise.resolve(respond(200, {
+            plan: PLAN,
+            baseline: { recommendation: null, effectiveTemperature: 28, maxWindSpeed: 12 },
+          }));
+        }
+        if (url.includes("/api/wardrobe/items")) {
+          return Promise.resolve(respond(200, { mappings: [] }));
+        }
+        if (url.includes("/api/preferences")) {
+          return Promise.resolve(respond(200, { temperatureSensitivity: "neutral" }));
+        }
+        return Promise.resolve(respond(200, {}));
+      });
+      return { requests, getCurrentPosition };
+    }
+
+    async function chooseStowe(user: ReturnType<typeof userEvent.setup>) {
+      await user.type(screen.getByRole("combobox", { name: /location/i }), "Stowe");
+      await user.click(await screen.findByRole("option", { name: /Stowe/ }));
+    }
+
+    async function chooseStartDate(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole("button", { name: /pick start date/i }));
+      await user.click(screen.getByRole("button", { name: /next month/i }));
+      await user.click(screen.getByRole("button", { name: /15th/ }));
+    }
+
+    beforeEach(() => {
+      mockSearchParams.set("mode", "planAhead");
+    });
+
+    it("gets layers for a one-day plan with See my layers, without using Go Now", async () => {
+      const { requests, getCurrentPosition } = mockPlanAheadApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(screen.getByRole("button", { name: /single day/i }));
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await user.click(screen.getByRole("button", { name: "See my layers" }));
+
+      expect(await screen.findByText(/wind 12 mph/i)).toBeInTheDocument();
+      expect(requests.weather).toEqual([expect.stringContaining("lat=44.47&lon=-72.69")]);
+      expect(requests.planAhead).toEqual([]);
+      expect(getCurrentPosition).not.toHaveBeenCalled();
+    });
+
+    it("builds a multi-day plan with Build layer plan", async () => {
+      const { requests, getCurrentPosition } = mockPlanAheadApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+
+      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      expect(requests.planAhead).toEqual([
+        expect.objectContaining({
+          lat: 44.47,
+          lon: -72.69,
+          startDate: expectedStartDate(),
+          durationDays: 3,
+          startHour: 12,
+        }),
+      ]);
+      expect(requests.weather).toEqual([]);
+      expect(getCurrentPosition).not.toHaveBeenCalled();
+    });
+
+    it("shows inline errors, focuses the first field to fix, and keeps what was entered", async () => {
+      const { requests } = mockPlanAheadApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+
+      const location = screen.getByRole("combobox", { name: /location/i });
+      expect(location).toHaveFocus();
+      expect(location).toBeInvalid();
+      expect(location).toHaveAccessibleDescription("Search for a place, then choose it from the list.");
+      expect(screen.getByText("Choose a start date.")).toBeInTheDocument();
+
+      await chooseStowe(user);
+      expect(location).toBeValid();
+      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+
+      const dateButton = screen.getByRole("button", { name: /pick start date/i });
+      expect(dateButton).toHaveFocus();
+      expect(dateButton).toHaveAccessibleDescription("Choose a start date.");
+
+      await chooseStartDate(user);
+      const time = screen.getByLabelText("Start time");
+      await user.clear(time);
+      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+
+      expect(time).toHaveFocus();
+      expect(time).toHaveAccessibleDescription("Enter a start time.");
+      expect(screen.queryByText("Choose a start date.")).not.toBeInTheDocument();
+      expect(location).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: /multi day/i })).toBeInTheDocument();
+      expect(screen.getByText("3 days")).toBeInTheDocument();
+      expect(requests.planAhead).toEqual([]);
+    });
+
+    it("names the request while it loads and ignores repeat submissions", async () => {
+      let finishWeather = () => {};
+      const { requests } = mockPlanAheadApis({
+        weather: () =>
+          new Promise((resolve) => {
+            finishWeather = () => resolve(respond(200, { temperature: 28, windSpeed: 12 }));
+          }),
+      });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(screen.getByRole("button", { name: /single day/i }));
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await user.click(screen.getByRole("button", { name: "See my layers" }));
+
+      const pending = await screen.findByRole("button", { name: "Getting your layers…" });
+      expect(pending).toBeDisabled();
+      expect(screen.getByRole("button", { name: /go now/i })).toBeDisabled();
+
+      await user.click(pending);
+      // The iOS shell's Gear Up action submits the same plan.
+      act(() => {
+        window.dispatchEvent(new CustomEvent("gearUp"));
+      });
+      expect(requests.weather).toHaveLength(1);
+
+      finishWeather();
+      expect(await screen.findByText(/wind 12 mph/i)).toBeInTheDocument();
+      expect(requests.weather).toHaveLength(1);
+    });
+
+    it("doesn't label a Go Now request as building the plan", async () => {
+      // Geolocation never answers, so Go Now stays in flight.
+      const { getCurrentPosition } = mockPlanAheadApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(screen.getByRole("button", { name: /go now/i }));
+
+      expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("button", { name: "Build layer plan" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Building layer plan…" })).not.toBeInTheDocument();
+    });
+
+    it("keeps the submit action in the iOS shell, which hides the web tab bar", async () => {
+      const userAgent = vi
+        .spyOn(window.navigator, "userAgent", "get")
+        .mockReturnValue("Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 SWTTRNativeTabs");
+      try {
+        const { requests } = mockPlanAheadApis();
+        const user = userEvent.setup();
+        render(<Home />);
+
+        await user.click(screen.getByRole("button", { name: /single day/i }));
+        await chooseStowe(user);
+        fireEvent.change(screen.getByLabelText("Start date"), { target: { value: expectedStartDate() } });
+        await user.click(screen.getByRole("button", { name: "See my layers" }));
+
+        expect(await screen.findByText(/wind 12 mph/i)).toBeInTheDocument();
+        expect(requests.weather).toHaveLength(1);
+      } finally {
+        userAgent.mockRestore();
+      }
     });
   });
 });
