@@ -17,9 +17,10 @@ const isPublicRoute = createRouteMatcher([
 // Clerk-gated even though /api/v1 is otherwise public: anonymous callers would
 // get the same response the paid /api/agent mirror charges for. The agent
 // routes invoke the v1 handlers in-process, so this gate never runs for them.
-// The signed-out frontend degrades gracefully to static recommendations
-// (useBiophysicsRecommendation swallows non-OK responses). Ensemble
-// evaluation only serves those signed-in recommendation screens.
+// The signed-out frontend reads the 401 as "sign in required" and shows
+// static layers as general guidance, or a sign-in prompt for activities
+// without them (see useBiophysicsRecommendation). Ensemble evaluation only
+// serves those signed-in recommendation screens.
 const isGatedRecommendationRoute = createRouteMatcher([
   "/api/v1/recommendations(.*)",
   "/api/v1/ensembles(.*)",

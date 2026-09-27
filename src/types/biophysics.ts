@@ -246,3 +246,16 @@ export const BIOPHYSICS_ENDPOINTS: Record<string, string> = {
 export function isBiophysicsSupported(activity: string): boolean {
   return activity in BIOPHYSICS_ENDPOINTS;
 }
+
+/**
+ * Whether a biophysics recommendation came back, and if not, why:
+ * - `unsupported`: the activity has no biophysics model
+ * - `auth_required`: the API needs a signed-in user
+ * - `no_gear`: the API returned targets only, with no usable gear to recommend
+ * - `unavailable`: the request failed or the response was unusable
+ */
+export type BiophysicsStatus = "ok" | "unsupported" | "auth_required" | "no_gear" | "unavailable";
+
+export type BiophysicsOutcome =
+  | { status: "ok"; data: BiophysicsRecommendation }
+  | { status: Exclude<BiophysicsStatus, "ok">; data: null };

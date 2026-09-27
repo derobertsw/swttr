@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Home from "./page";
 
@@ -19,13 +19,15 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
-// Mock Clerk components
+// Mock Clerk components — default to a signed-in user
+const SIGNED_IN = { userId: "test-user-id" as string | null, isLoaded: true, isSignedIn: true };
+const mockUseAuth = vi.fn(() => SIGNED_IN);
 vi.mock("@clerk/nextjs", () => ({
   SignedIn: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SignedOut: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   UserButton: () => <div data-testid="user-button">UserButton</div>,
   ClerkProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useAuth: () => ({ userId: "test-user-id", isLoaded: true, isSignedIn: true }),
+  useAuth: () => mockUseAuth(),
 }));
 
 // Mock fetch globally
@@ -46,6 +48,7 @@ describe("Home Page", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAuth.mockReturnValue(SIGNED_IN);
     originalGeolocation = navigator.geolocation;
     localStorageMock.getItem.mockReturnValue(null);
     // Reset search params
@@ -286,6 +289,112 @@ describe("Home Page", () => {
           "Could not get current weather. Please enter your location manually."
         );
       });
+    });
+  });
+
+  describe("results without personalized layers", () => {
+    type MockResponse = { ok: boolean; status: number; json: () => Promise<unknown> };
+    const respond = (status: number, body: unknown): MockResponse => ({
+      ok: status >= 200 && status < 300,
+      status,
+      json: () => Promise.resolve(body),
+    });
+
+    const RUNNING_RECOMMENDATION = {
+      ireq: { target_range: [0.4, 0.8] },
+      recommendation: {
+        garments: [
+          { id: "tights", name: "Running tights", category: "base_layer", rcl: 0.3, covers_torso: false, covers_legs: true },
+        ],
+        ensemble_properties: {
+          total_clo: 0.3,
+          regional_clo: { torso: 0, arms: 0, legs: 0.3 },
+          evap_potential: 0.5,
+          permeability_index: 0.4,
+        },
+        score: 80,
+        component_scores: {},
+      },
+      warnings: [],
+      guidance: [],
+    };
+
+    /** Located at 32°F with 15 mph wind; recommendation requests get the given response. */
+    function mockOuting(recommendationResponse: (url: string) => MockResponse) {
+      Object.defineProperty(navigator, "geolocation", {
+        value: {
+          getCurrentPosition: vi.fn((success) => {
+            success({ coords: { latitude: 44.47, longitude: -72.69 } });
+          }),
+        },
+        writable: true,
+      });
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes("/api/weather")) {
+          return Promise.resolve(respond(200, { temperature: 32, windSpeed: 15 }));
+        }
+        if (url.includes("/api/v1/recommendations/")) {
+          return Promise.resolve(recommendationResponse(url));
+        }
+        if (url.includes("/api/wardrobe/items")) {
+          return Promise.resolve(respond(200, { mappings: [] }));
+        }
+        if (url.includes("/api/preferences")) {
+          return Promise.resolve(respond(200, { temperatureSensitivity: "neutral" }));
+        }
+        return Promise.resolve(respond(200, {}));
+      });
+    }
+
+    async function switchActivity(user: ReturnType<typeof userEvent.setup>, from: string, to: string) {
+      await user.click(screen.getByRole("button", { name: from }));
+      await user.click(await screen.findByRole("button", { name: to }));
+    }
+
+    it("keeps a guest's outing and asks them to sign in after switching Alpine to Running", async () => {
+      mockUseAuth.mockReturnValue({ userId: null, isLoaded: true, isSignedIn: false });
+      mockOuting(() => respond(401, { error: "Authentication required" }));
+
+      const user = userEvent.setup();
+      render(<Home />);
+      await user.click(screen.getByRole("button", { name: /gear up/i }));
+
+      // Alpine has static layers, shown as general guidance.
+      expect(await screen.findByRole("heading", { name: "General guidance" })).toBeInTheDocument();
+
+      await switchActivity(user, "Alpine", "Running");
+
+      const notice = await screen.findByRole("region", { name: "Sign in for Running layers" });
+      expect(within(notice).getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
+      expect(screen.getByText(/wind 15 mph/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Running" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Change weather location, date, or time" })).toBeInTheDocument();
+    });
+
+    it("retries a failed request for the same outing", async () => {
+      let runningRequests = 0;
+      mockOuting((url) => {
+        if (!url.endsWith("/running")) return respond(500, { error: "Unavailable" });
+        runningRequests += 1;
+        return runningRequests === 1
+          ? respond(500, { error: "Unavailable" })
+          : respond(200, RUNNING_RECOMMENDATION);
+      });
+
+      const user = userEvent.setup();
+      render(<Home />);
+      await user.click(screen.getByRole("button", { name: /gear up/i }));
+      expect(await screen.findByText(/personalized layers couldn't load/i)).toBeInTheDocument();
+
+      await switchActivity(user, "Alpine", "Running");
+      const notice = await screen.findByRole("region", { name: "Couldn't load Running layers" });
+
+      await user.click(within(notice).getByRole("button", { name: "Try again" }));
+
+      expect((await screen.findAllByText("Running tights")).length).toBeGreaterThan(0);
+      expect(screen.queryByRole("region", { name: "Couldn't load Running layers" })).not.toBeInTheDocument();
+      expect(screen.getByText(/wind 15 mph/i)).toBeInTheDocument();
+      expect(runningRequests).toBe(2);
     });
   });
 

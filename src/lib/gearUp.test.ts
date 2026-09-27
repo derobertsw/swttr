@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildGearUpResult, createInitialState, fetchPlanAhead, gearUpReducer } from "./gearUp";
-import type { BiophysicsRecommendation } from "@/types/biophysics";
+import type { BiophysicsOutcome, BiophysicsRecommendation } from "@/types/biophysics";
 
 const WEATHER = { temperature: 20, windSpeed: 12, precipitation: true, precipitationType: "snow" as const };
+const SIGN_IN_REQUIRED: BiophysicsOutcome = { status: "auth_required", data: null };
 
 describe("gearUpReducer", () => {
   it("stores a successful result and shows it", () => {
@@ -11,10 +12,17 @@ describe("gearUpReducer", () => {
       type: "SUBMIT_SUCCESS",
       recommendation: null,
       biophysicsData: null,
+      biophysicsStatus: "auth_required",
       temperature: 20,
       windspeed: 12,
     });
-    expect(state).toMatchObject({ loading: false, showResults: true, temperature: 20, precipitation: false });
+    expect(state).toMatchObject({
+      loading: false,
+      showResults: true,
+      temperature: 20,
+      precipitation: false,
+      biophysicsStatus: "auth_required",
+    });
   });
 
   it("stops loading on error and resets to manual mode", () => {
@@ -26,17 +34,25 @@ describe("gearUpReducer", () => {
 
 describe("buildGearUpResult", () => {
   it("combines static layers with biophysics data for the weather", async () => {
-    const fetchBiophysics = vi.fn(async () => null);
+    const fetchBiophysics = vi.fn(async () => SIGN_IN_REQUIRED);
     const result = await buildGearUpResult(WEATHER, "alpine_skiing", "neutral", fetchBiophysics);
 
     expect(fetchBiophysics).toHaveBeenCalledWith("alpine_skiing", WEATHER);
-    expect(result).toMatchObject({ temperature: 20, windspeed: 12, precipitation: true, precipitationType: "snow" });
+    expect(result).toMatchObject({
+      temperature: 20,
+      windspeed: 12,
+      precipitation: true,
+      precipitationType: "snow",
+      biophysicsData: null,
+      biophysicsStatus: "auth_required",
+    });
     expect(result.recommendation?.torso.base.length).toBeGreaterThan(0);
   });
 
   it("has no static layers for activities outside the static table", async () => {
-    const result = await buildGearUpResult(WEATHER, "running", "neutral", async () => null);
+    const result = await buildGearUpResult(WEATHER, "running", "neutral", async () => SIGN_IN_REQUIRED);
     expect(result.recommendation).toBeNull();
+    expect(result.biophysicsStatus).toBe("auth_required");
   });
 
   it("drops a helmet from XC skiing recommendations", async () => {
@@ -45,8 +61,12 @@ describe("buildGearUpResult", () => {
         headwear: { helmet: { id: "h", name: "Helmet", type: "ski_helmet", rcl: 0.3 }, head_warmth: null, neck_warmth: null },
       },
     } as unknown as BiophysicsRecommendation;
-    const result = await buildGearUpResult(WEATHER, "xc_skiing", "neutral", async () => withHelmet);
+    const result = await buildGearUpResult(WEATHER, "xc_skiing", "neutral", async () => ({
+      status: "ok",
+      data: withHelmet,
+    }));
     expect(result.biophysicsData?.recommendation.headwear?.helmet).toBeNull();
+    expect(result.biophysicsStatus).toBe("ok");
   });
 });
 
