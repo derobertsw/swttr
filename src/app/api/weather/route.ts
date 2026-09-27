@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { formatZonedIsoTime, isLocalDateTime, zonedTimeToInstant } from "@/lib/timeZones";
 import type { PrecipitationType } from "@/types/weather";
+
+/** Days of hourly forecast Open-Meteo has, today included. */
+const FORECAST_DAYS = 16;
+const HOUR_SECONDS = 3600;
 
 function isValidDateString(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -33,11 +38,77 @@ function decodePrecipitation(weatherCode: number): { precipitation: boolean; pre
   return { precipitation: false };
 }
 
+/** A forecast day, e.g. "Oct 12", on the place's calendar. */
+function formatForecastDay(hourStart: number, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone, month: "short", day: "numeric" }).format(hourStart * 1000);
+}
+
+/**
+ * The forecast for the hour a local date-time falls in at the coordinates.
+ * The time is read on the place's clock, whatever time zone the caller is in.
+ */
+async function getHourlyForecast(lat: string, lon: string, localDateTime: string) {
+  // Exact timestamps, because Open-Meteo labels its local times with today's
+  // UTC offset, which is an hour out after a daylight saving change.
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,weather_code&forecast_days=${FORECAST_DAYS}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch weather data");
+  }
+
+  const data = await response.json();
+  const timeZone: string = data.timezone;
+  const hourStarts: unknown[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
+  // Hours with a temperature and wind speed, each starting at a Unix time in seconds.
+  const hours = hourStarts.flatMap((start, index) => {
+    const temperature: unknown = data.hourly.temperature_2m?.[index];
+    const windSpeed: unknown = data.hourly.wind_speed_10m?.[index];
+    const weatherCode: unknown = data.hourly.weather_code?.[index];
+    return typeof start === "number" && typeof temperature === "number" && typeof windSpeed === "number"
+      ? [{ start, temperature, windSpeed, weatherCode: typeof weatherCode === "number" ? weatherCode : undefined }]
+      : [];
+  });
+
+  if (hours.length === 0) {
+    throw new Error("Forecast has no hourly data");
+  }
+
+  const requested = zonedTimeToInstant(localDateTime, timeZone) / 1000;
+  const hour = hours.findLast(({ start }) => start <= requested);
+
+  if (!hour || requested >= hour.start + HOUR_SECONDS) {
+    const firstDay = formatForecastDay(hours[0].start, timeZone);
+    const lastDay = formatForecastDay(hours[hours.length - 1].start, timeZone);
+    return NextResponse.json(
+      { error: `The forecast for this place covers ${firstDay} to ${lastDay}. Pick a date in that range.` },
+      { status: 422 }
+    );
+  }
+
+  const { weatherCode } = hour;
+  const precipInfo = weatherCode === undefined
+    ? { precipitation: false }
+    : decodePrecipitation(weatherCode);
+  return NextResponse.json({
+    temperature: Math.round(hour.temperature),
+    windSpeed: Math.round(hour.windSpeed),
+    weatherCode,
+    precipitation: precipInfo.precipitation,
+    precipitationType: precipInfo.precipitationType,
+    isForecast: true,
+    // When the forecast hour starts, with the place's UTC offset at that time.
+    forecastTime: formatZonedIsoTime(hour.start * 1000, timeZone),
+    timeZone,
+  });
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const lat = searchParams.get("lat");
   const lon = searchParams.get("lon");
-  const dateTime = searchParams.get("datetime"); // ISO format: 2024-01-15T14:00
+  // Local date and time at the coordinates, e.g. 2026-10-15T14:00
+  const dateTime = searchParams.get("datetime");
   const startDate = searchParams.get("startDate");
   const daysParam = searchParams.get("days");
 
@@ -106,51 +177,13 @@ export async function GET(request: NextRequest) {
 
     // If datetime is provided, fetch hourly forecast; otherwise fetch current weather
     if (dateTime) {
-      const date = dateTime.split("T")[0];
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,weather_code&start_date=${date}&end_date=${date}&temperature_unit=fahrenheit&wind_speed_unit=mph`;
-
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch weather data");
+      if (!isLocalDateTime(dateTime)) {
+        return NextResponse.json(
+          { error: "Invalid datetime. Use YYYY-MM-DDTHH:mm." },
+          { status: 400 }
+        );
       }
-
-      const data = await response.json();
-      const hourlyWeatherCodes: number[] = Array.isArray(data?.hourly?.weather_code) ? data.hourly.weather_code : [];
-
-      // Find the index for the requested hour
-      const targetHour = dateTime.substring(0, 13) + ":00"; // e.g., "2024-01-15T14:00"
-      const hourIndex = data.hourly.time.findIndex((t: string) => t === targetHour);
-
-      if (hourIndex === -1) {
-        // Fall back to closest available hour
-        const fallbackIndex = Math.min(12, Math.max(0, data.hourly.temperature_2m.length - 1));
-        const fallbackWeatherCode = Number(hourlyWeatherCodes[fallbackIndex]);
-        const precipInfo = Number.isFinite(fallbackWeatherCode)
-          ? decodePrecipitation(fallbackWeatherCode)
-          : { precipitation: false };
-        return NextResponse.json({
-          temperature: Math.round(data.hourly.temperature_2m[fallbackIndex]), // noon as fallback
-          windSpeed: Math.round(data.hourly.wind_speed_10m[fallbackIndex]),
-          weatherCode: Number.isFinite(fallbackWeatherCode) ? fallbackWeatherCode : undefined,
-          precipitation: precipInfo.precipitation,
-          precipitationType: precipInfo.precipitationType,
-          isForecast: true,
-        });
-      }
-
-      const weatherCode = Number(hourlyWeatherCodes[hourIndex]);
-      const precipInfo = Number.isFinite(weatherCode)
-        ? decodePrecipitation(weatherCode)
-        : { precipitation: false };
-      return NextResponse.json({
-        temperature: Math.round(data.hourly.temperature_2m[hourIndex]),
-        windSpeed: Math.round(data.hourly.wind_speed_10m[hourIndex]),
-        weatherCode: Number.isFinite(weatherCode) ? weatherCode : undefined,
-        precipitation: precipInfo.precipitation,
-        precipitationType: precipInfo.precipitationType,
-        isForecast: true,
-      });
+      return await getHourlyForecast(lat, lon, dateTime);
     } else {
       // Current weather
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph`;

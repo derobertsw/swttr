@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { WeatherHeader } from "./WeatherHeader";
@@ -74,6 +74,56 @@ describe("WeatherHeader", () => {
     expect(screen.getByText("Wet conditions in the current weather.")).toBeInTheDocument();
     expect(screen.getByText("Wet out")).toBeInTheDocument();
     expect(container.firstElementChild).toHaveAttribute("data-precipitation-state", "precipitation");
+  });
+
+  describe("where and when", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("shows a forecast's hour on the place's clock, wherever the device is", () => {
+      vi.stubEnv("TZ", "Asia/Tokyo");
+      render(
+        <WeatherHeader
+          temperature={41}
+          windspeed={9}
+          context={{
+            source: "forecast",
+            place: "Stowe, Vermont, United States",
+            forecastTime: "2026-10-08T14:00-04:00",
+            timeZone: "America/New_York",
+          }}
+        />
+      );
+
+      expect(screen.getByText("Forecast · Thu, Oct 8, 2:00 PM EDT")).toBeInTheDocument();
+      expect(screen.getByText("Stowe, Vermont, United States")).toBeInTheDocument();
+      expect(screen.getByText("°F")).toBeInTheDocument();
+      expect(screen.getByText("Wind 9 mph")).toBeInTheDocument();
+    });
+
+    it("says forecast precipitation is expected, not happening now", () => {
+      render(
+        <WeatherHeader
+          temperature={40}
+          windspeed={11}
+          precipitation
+          precipitationType="rain"
+          context={{ source: "forecast", forecastTime: "2026-10-08T14:00-04:00", timeZone: "America/New_York" }}
+        />
+      );
+
+      expect(screen.getByText("Rain expected")).toBeInTheDocument();
+      expect(screen.queryByText("Rain right now")).not.toBeInTheDocument();
+      expect(screen.queryByText("Current weather")).not.toBeInTheDocument();
+    });
+
+    it("labels current conditions at the device's location", () => {
+      render(<WeatherHeader temperature={40} windspeed={11} context={{ source: "current" }} />);
+
+      expect(screen.getByText("Current conditions")).toBeInTheDocument();
+      expect(screen.getByText("Your location")).toBeInTheDocument();
+    });
   });
 
   it("renders the interactive footer and wires the edit action when precipitation is active", async () => {

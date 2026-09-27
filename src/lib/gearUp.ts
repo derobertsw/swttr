@@ -6,7 +6,7 @@ import layerRecommendations from "@/data/layerRecommendations.json";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
 import type { Recommendation, LocationSuggestion } from "@/types/recommendations";
-import type { WeatherData, PrecipitationType } from "@/types/weather";
+import type { WeatherContext, WeatherData, PrecipitationType } from "@/types/weather";
 import type { BiophysicsOutcome, BiophysicsRecommendation, BiophysicsStatus } from "@/types/biophysics";
 import type { MultiDayLayerPlan } from "@/types/plan";
 import type { TemperatureSensitivity } from "@/types/preferences";
@@ -22,6 +22,8 @@ interface GearUpState {
   windspeed: number;
   precipitation: boolean;
   precipitationType?: PrecipitationType;
+  /** Where and when the shown weather applies. */
+  weatherContext: WeatherContext | null;
   inputMode: InputMode;
   date: Date | undefined;
   time: string;
@@ -36,7 +38,7 @@ interface GearUpState {
 }
 
 /** Recommendations for one weather reading. */
-export interface GearUpResult {
+interface GearUpResult {
   recommendation: Recommendation | null;
   biophysicsData: BiophysicsRecommendation | null;
   /** Why biophysicsData is missing, when it is. */
@@ -45,6 +47,7 @@ export interface GearUpResult {
   windspeed: number;
   precipitation?: boolean;
   precipitationType?: PrecipitationType;
+  weatherContext?: WeatherContext;
 }
 
 interface PlanAheadResult {
@@ -72,6 +75,7 @@ export function createInitialState(inputMode: InputMode): GearUpState {
     windspeed: 10,
     precipitation: false,
     precipitationType: undefined,
+    weatherContext: null,
     inputMode,
     date: undefined,
     time: "12:00",
@@ -108,6 +112,7 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
         windspeed: action.windspeed,
         precipitation: action.precipitation ?? false,
         precipitationType: action.precipitationType,
+        weatherContext: action.weatherContext ?? null,
         recommendation: action.recommendation,
         biophysicsData: action.biophysicsData,
         biophysicsStatus: action.biophysicsStatus,
@@ -120,6 +125,7 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
         loading: false,
         temperature: action.temperature,
         windspeed: action.windspeed,
+        weatherContext: null,
         recommendation: action.recommendation,
         biophysicsData: null,
         biophysicsStatus: null,
@@ -183,6 +189,7 @@ export async function buildGearUpResult(
     windspeed: weather.windSpeed,
     precipitation: weather.precipitation,
     precipitationType: weather.precipitationType,
+    weatherContext: weather.context,
   };
 }
 

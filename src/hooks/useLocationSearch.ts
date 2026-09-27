@@ -6,6 +6,13 @@ import { logWarn } from "@/lib/logger";
 
 const MIN_QUERY_LENGTH = 2;
 
+/** A place as shown once it's picked, e.g. "Stowe, Vermont, United States". */
+export function formatLocationName(suggestion: LocationSuggestion): string {
+  return suggestion.region
+    ? `${suggestion.name}, ${suggestion.region}, ${suggestion.country}`
+    : `${suggestion.name}, ${suggestion.country}`;
+}
+
 export function useLocationSearch() {
   const [location, setLocation] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
@@ -53,11 +60,7 @@ export function useLocationSearch() {
 
   const handleSelectLocation = (suggestion: LocationSuggestion) => {
     setSelectedLocation(suggestion);
-    setLocation(
-      suggestion.region
-        ? `${suggestion.name}, ${suggestion.region}, ${suggestion.country}`
-        : `${suggestion.name}, ${suggestion.country}`
-    );
+    setLocation(formatLocationName(suggestion));
     setLocationQuery("");
     setSuggestions([]);
     setShowSuggestions(false);

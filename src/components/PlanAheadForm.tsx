@@ -299,9 +299,11 @@ export function PlanAheadForm({
         </div>
         {showDateError && <FieldError id="plan-start-date-error">{dateError}</FieldError>}
         {showTimeError && <FieldError id="plan-start-time-error">{timeError}</FieldError>}
-        <p className="text-xs text-white/70">Start time: {timeLabel} (local)</p>
+        <p className="text-xs text-white/70">Start time: {timeLabel}, local time at the location</p>
         <p className="text-xs text-white/65">
-          Plan builder uses daytime forecast windows (6am-9pm) to avoid overnight bias.
+          {isMultiDay
+            ? "Plan builder uses daytime forecast windows (6am-9pm) to avoid overnight bias."
+            : "Layers use the forecast for the hour you start."}
         </p>
       </section>
 

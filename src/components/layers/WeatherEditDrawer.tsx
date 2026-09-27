@@ -20,13 +20,15 @@ import {
   DrawerFooter,
 } from "@/components/ui/drawer";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
-import { useLocationSearch } from "@/hooks/useLocationSearch";
+import { formatLocationName, useLocationSearch } from "@/hooks/useLocationSearch";
 import { cn } from "@/lib/utils";
+import type { LocationSuggestion } from "@/types/recommendations";
 
 interface WeatherEditDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (lat: number, lon: number, datetime?: string) => Promise<void>;
+  /** Resolves true once the weather is updated; the drawer stays open otherwise. */
+  onSubmit: (location: LocationSuggestion, localDateTime?: string) => Promise<boolean>;
   loading?: boolean;
 }
 
@@ -34,15 +36,6 @@ function getDefaultTime(): string {
   const now = new Date();
   const hours = now.getHours().toString().padStart(2, "0");
   return `${hours}:00`;
-}
-
-function formatSelectedLocationName(
-  location: { name: string; region?: string | null; country: string } | null
-): string {
-  if (!location) return "No location selected yet";
-  return location.region
-    ? `${location.name}, ${location.region}, ${location.country}`
-    : `${location.name}, ${location.country}`;
 }
 
 export function WeatherEditDrawer({
@@ -55,7 +48,9 @@ export function WeatherEditDrawer({
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState(getDefaultTime);
   const [useScheduledTime, setUseScheduledTime] = useState(false);
-  const selectedLocationLabel = formatSelectedLocationName(locationSearch.selectedLocation);
+  const selectedLocationLabel = locationSearch.selectedLocation
+    ? formatLocationName(locationSearch.selectedLocation)
+    : "No location selected yet";
   const selectedTimeLabel = useMemo(() => {
     if (!useScheduledTime) return "Using current conditions (now)";
     if (!date) return "Choose a date and time";
@@ -68,16 +63,16 @@ export function WeatherEditDrawer({
   const handleSubmit = async () => {
     if (!locationSearch.selectedLocation) return;
 
-    const { latitude, longitude } = locationSearch.selectedLocation;
-
-    let datetime: string | undefined;
+    // Local time at the location, wherever the device is.
+    let localDateTime: string | undefined;
     if (useScheduledTime && date) {
       const dateStr = format(date, "yyyy-MM-dd");
-      datetime = `${dateStr}T${time}`;
+      localDateTime = `${dateStr}T${time}`;
     }
 
-    await onSubmit(latitude, longitude, datetime);
-    onOpenChange(false);
+    if (await onSubmit(locationSearch.selectedLocation, localDateTime)) {
+      onOpenChange(false);
+    }
   };
 
   const resetToNow = () => {
@@ -180,6 +175,7 @@ export function WeatherEditDrawer({
                 <label className="text-sm font-medium text-muted-foreground">
                   Date & Time
                 </label>
+                <p className="text-xs text-slate-500">Local time at the location.</p>
                 <div className="flex gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
