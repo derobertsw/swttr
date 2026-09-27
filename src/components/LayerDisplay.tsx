@@ -8,6 +8,7 @@ import type { Recommendation } from "@/types/recommendations";
 import type { PrecipitationType } from "@/types/weather";
 import type {
   BiophysicsRecommendation,
+  BiophysicsStatus,
   ExtremityIreqRange,
   PackItemGarment,
   PhaseEvaluationInput,
@@ -33,6 +34,7 @@ import { LayerPickerDrawer } from "@/components/layers/LayerPickerDrawer";
 import { ActivityHeader } from "@/components/layers/ActivityHeader";
 import { ComfortOverview } from "@/components/layers/ComfortOverview";
 import { PackItemsCard } from "@/components/layers/PackItemsCard";
+import { RecommendationNotice } from "@/components/layers/RecommendationNotice";
 import { RecommendedItemsCard, type RecommendedItem } from "@/components/layers/RecommendedItemsCard";
 import { useEditableLayers } from "@/hooks/useEditableLayers";
 import { useLayerEvaluation } from "@/hooks/useLayerEvaluation";
@@ -47,7 +49,11 @@ interface LayerDisplayProps {
   precipitationType?: PrecipitationType;
   itemMappings?: Map<string, string>;
   biophysicsData?: BiophysicsRecommendation | null;
+  /** Why biophysicsData is missing, when it is. */
+  biophysicsStatus?: BiophysicsStatus | null;
   onReset?: () => void;
+  /** Requests the same recommendation again after a failure. */
+  onRetry?: () => void;
   onWeatherChange?: (lat: number, lon: number, datetime?: string) => Promise<void>;
   onActivityChange?: (activity: string) => Promise<void>;
   weatherLoading?: boolean;
@@ -97,13 +103,10 @@ function recommendedCatalogItems(layers: BodyPartLayers): RecommendedItem[] {
 /**
  * Displays layered clothing recommendations organized by body part.
  * Supports both static recommendations and biophysics-based recommendations.
+ * Without either, keeps the outing on screen and explains why there are no
+ * layers instead.
  */
-const LayerDisplay = (props: LayerDisplayProps) => {
-  if (!props.recommendation && !props.biophysicsData) return null;
-  return <LayerDisplayContent {...props} />;
-};
-
-const LayerDisplayContent = ({
+const LayerDisplay = ({
   activity,
   recommendation,
   temperature,
@@ -112,7 +115,9 @@ const LayerDisplayContent = ({
   precipitationType,
   itemMappings,
   biophysicsData,
+  biophysicsStatus,
   onReset,
+  onRetry,
   onWeatherChange,
   onActivityChange,
   weatherLoading,
@@ -123,6 +128,7 @@ const LayerDisplayContent = ({
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
 
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
+  const hasLayers = biophysicsActive || recommendation !== null;
   const ireq = biophysicsData?.ireq;
   const regionalClo = biophysicsData?.recommendation?.ensemble_properties?.regional_clo;
   const totalClo = biophysicsData?.recommendation?.ensemble_properties?.total_clo;
@@ -327,72 +333,86 @@ const LayerDisplayContent = ({
           />
         )}
 
-        <ComfortOverview
-          climb={{ evaluation: climbEvaluation, targetRange: ireq?.target_range }}
-          descent={showDescent ? { evaluation: descentEvaluation, targetRange: downhillTargetRange } : undefined}
-        />
-
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">
-            Detailed Layer Breakdown
-          </h3>
-          {showDescent && (
-            <div className="flex gap-1.5">
-              {(["climb", "descent"] as const).map((phase) => (
-                <button
-                  key={phase}
-                  type="button"
-                  onClick={() => setActivePhase(phase)}
-                  className={cn(
-                    "rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors",
-                    activePhase === phase
-                      ? phase === "climb"
-                        ? "border border-violet-400/60 bg-violet-500/25 text-violet-200"
-                        : "border border-teal-400/60 bg-teal-500/25 text-teal-200"
-                      : "border border-white/20 bg-white/[0.06] text-white/50 hover:text-white/70"
-                  )}
-                >
-                  {phase === "climb" ? "Climb" : "Descent"}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <p className="-mt-4 text-xs text-white/60">
-          Tap a body area to collapse or expand details.
-        </p>
-        <div className="flex flex-col gap-6">
-          {BODY_PARTS.map((bodyPart) => renderSection(bodyPart, shownPhase))}
-          {showDescent && <PackItemsCard items={packedItems} />}
-        </div>
-
-        <LayerPickerDrawer
-          open={pickerTarget !== null}
-          onOpenChange={(open) => { if (!open) setPickerTarget(null); }}
-          bodyPart={pickerTarget?.bodyPart ?? "torso"}
-          layerType={pickerTarget?.layerType ?? "base"}
-          wardrobeItems={pickerItems.wardrobeItems}
-          recommendedItems={pickerItems.recommendedItems}
-          currentItemName={pickerCurrentItem?.name}
-          currentItemClo={pickerCurrentItem?.rcl}
-          cloContext={pickerCloContext}
-          onSelect={handlePickerSelect}
-          onRemove={pickerTarget?.replaceIndex !== null ? handlePickerRemove : undefined}
-        />
-
-        {biophysicsData?.recommendation && (
-          <details className="group rounded-xl border border-white/25 bg-white/10 p-4">
-            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold tracking-wide text-white/85 transition-colors hover:text-white [&::-webkit-details-marker]:hidden">
-              <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
-              <span>Advanced Biophysics Details</span>
-            </summary>
-            <div className="mt-4">
-              <BiophysicsDetails data={biophysicsData} />
-            </div>
-          </details>
+        {!biophysicsActive && (
+          <RecommendationNotice
+            activity={activity}
+            status={biophysicsStatus}
+            hasGeneralLayers={hasLayers}
+            onRetry={onRetry}
+            retrying={weatherLoading}
+          />
         )}
 
-        <RecommendedItemsCard items={recommendedItems} />
+        {hasLayers && (
+          <>
+            <ComfortOverview
+              climb={{ evaluation: climbEvaluation, targetRange: ireq?.target_range }}
+              descent={showDescent ? { evaluation: descentEvaluation, targetRange: downhillTargetRange } : undefined}
+            />
+
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">
+                Detailed Layer Breakdown
+              </h3>
+              {showDescent && (
+                <div className="flex gap-1.5">
+                  {(["climb", "descent"] as const).map((phase) => (
+                    <button
+                      key={phase}
+                      type="button"
+                      onClick={() => setActivePhase(phase)}
+                      className={cn(
+                        "rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors",
+                        activePhase === phase
+                          ? phase === "climb"
+                            ? "border border-violet-400/60 bg-violet-500/25 text-violet-200"
+                            : "border border-teal-400/60 bg-teal-500/25 text-teal-200"
+                          : "border border-white/20 bg-white/[0.06] text-white/50 hover:text-white/70"
+                      )}
+                    >
+                      {phase === "climb" ? "Climb" : "Descent"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <p className="-mt-4 text-xs text-white/60">
+              Tap a body area to collapse or expand details.
+            </p>
+            <div className="flex flex-col gap-6">
+              {BODY_PARTS.map((bodyPart) => renderSection(bodyPart, shownPhase))}
+              {showDescent && <PackItemsCard items={packedItems} />}
+            </div>
+
+            <LayerPickerDrawer
+              open={pickerTarget !== null}
+              onOpenChange={(open) => { if (!open) setPickerTarget(null); }}
+              bodyPart={pickerTarget?.bodyPart ?? "torso"}
+              layerType={pickerTarget?.layerType ?? "base"}
+              wardrobeItems={pickerItems.wardrobeItems}
+              recommendedItems={pickerItems.recommendedItems}
+              currentItemName={pickerCurrentItem?.name}
+              currentItemClo={pickerCurrentItem?.rcl}
+              cloContext={pickerCloContext}
+              onSelect={handlePickerSelect}
+              onRemove={pickerTarget?.replaceIndex !== null ? handlePickerRemove : undefined}
+            />
+
+            {biophysicsData?.recommendation && (
+              <details className="group rounded-xl border border-white/25 bg-white/10 p-4">
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold tracking-wide text-white/85 transition-colors hover:text-white [&::-webkit-details-marker]:hidden">
+                  <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
+                  <span>Advanced Biophysics Details</span>
+                </summary>
+                <div className="mt-4">
+                  <BiophysicsDetails data={biophysicsData} />
+                </div>
+              </details>
+            )}
+
+            <RecommendedItemsCard items={recommendedItems} />
+          </>
+        )}
       </div>
     </div>
   );

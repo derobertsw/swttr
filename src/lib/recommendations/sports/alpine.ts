@@ -6,11 +6,11 @@ import { METABOLIC_RATES } from '@/lib/biophysics/constants';
 import { COWEDA_VALIDATION_SOURCE } from '@/lib/biophysics/coweda';
 import { DLE_ESTIMATION_METHOD } from '@/lib/biophysics/ireq';
 import { applyBodySizeMetabolicAdjustment } from '@/lib/biophysics/bodyMetrics';
+import { REGIONAL_DEFICIT_CLO_THRESHOLD } from '@/lib/biophysics/comfort';
 import type { IreqResult } from '@/types/garments';
 import type { SportRecommender } from '../handler';
-import type { CategorizedGarments, GarmentRow } from '../types';
 import { metabolicRateFor, phaseIreq, phaseTargets, type PhaseTargets } from '../thermal-targets';
-import { sortByBreathability, sortByInsulation, sortByWaterproofness } from '../sorting';
+import { buildAlpineEnsemble } from './alpine-ensemble';
 import { selectHandwear, selectHeadwearByCategory } from '../extremities';
 import { buildScoredRecommendation } from '../response-builder';
 import {
@@ -81,8 +81,7 @@ export const alpine: SportRecommender<AlpineTargets> = {
 
     const ensemble = buildAlpineEnsemble(
       pool.categorized,
-      targetCloMin,
-      targetCloMax,
+      targets.regional,
       request.precipitation
     );
     const handwear = selectHandwear(pool.handwear, tempC, false, targets.extremity.neutral.hands);
@@ -116,6 +115,18 @@ export const alpine: SportRecommender<AlpineTargets> = {
       headwear
     );
 
+    // Layer limits can leave a shortfall. The shared scorer uses the skiing
+    // phase, so also surface unmet regional targets for chairlift exposure.
+    const regionalClo = recommendation.ensemble_properties.regional_clo;
+    if (regionalClo) {
+      for (const region of ['torso', 'arms', 'legs'] as const) {
+        const minimum = targets.regional.min[region];
+        if (minimum - regionalClo[region] > REGIONAL_DEFICIT_CLO_THRESHOLD) {
+          warnings.push(`Insufficient ${region} insulation: ${regionalClo[region].toFixed(1)} clo vs ${minimum.toFixed(1)} clo required for alpine conditions`);
+        }
+      }
+    }
+
     return {
       conditions: {
         ...formatConditions(weather),
@@ -139,90 +150,6 @@ export const alpine: SportRecommender<AlpineTargets> = {
     };
   },
 };
-
-function buildAlpineEnsemble(
-  categorized: CategorizedGarments,
-  minClo: number,
-  maxClo: number,
-  precipitation: boolean
-): GarmentRow[] {
-  const ensemble: GarmentRow[] = [];
-  let currentClo = 0;
-
-  const torsoBaseLayers = categorized.baseLayers.filter((g) => g.covers_torso);
-  const legsBaseLayers = categorized.baseLayers.filter((g) => g.covers_legs);
-
-  const sortedTorsoBases = sortByInsulation(torsoBaseLayers);
-  if (sortedTorsoBases.length > 0) {
-    const suitableBase = sortedTorsoBases.find(
-      (b) => (b.garment_thermal_properties?.rcl_whole_body ?? 0) <= minClo * 0.3
-    );
-    const baseLayer = suitableBase ?? sortedTorsoBases[sortedTorsoBases.length - 1];
-    ensemble.push(baseLayer);
-    currentClo += baseLayer.garment_thermal_properties?.rcl_whole_body ?? 0;
-  }
-
-  const sortedLegsBases = sortByInsulation(legsBaseLayers);
-  if (sortedLegsBases.length > 0) {
-    const suitableBase = sortedLegsBases.find(
-      (b) => (b.garment_thermal_properties?.rcl_whole_body ?? 0) <= minClo * 0.3
-    );
-    const baseLayer = suitableBase ?? sortedLegsBases[sortedLegsBases.length - 1];
-    if (!ensemble.some((g) => g.id === baseLayer.id)) {
-      ensemble.push(baseLayer);
-      currentClo += baseLayer.garment_thermal_properties?.rcl_whole_body ?? 0;
-    }
-  }
-
-  const allMids = sortByInsulation([...categorized.midLayers, ...categorized.insulation], false);
-
-  const addMidIfFits = (mid: GarmentRow | undefined) => {
-    if (!mid) return;
-    if (ensemble.some((g) => g.id === mid.id)) return;
-    const midClo = mid.garment_thermal_properties?.rcl_whole_body ?? 0;
-    if (currentClo + midClo <= maxClo && currentClo < minClo) {
-      ensemble.push(mid);
-      currentClo += midClo;
-    }
-  };
-
-  addMidIfFits(allMids.find((m) => m.covers_torso));
-  addMidIfFits(allMids.find((m) => m.covers_legs));
-
-  for (const mid of allMids) {
-    if (currentClo >= minClo) break;
-    if (!mid.covers_torso && !mid.covers_legs) continue;
-    addMidIfFits(mid);
-  }
-
-  const hardShells = categorized.shells.filter(s => s.category === 'hard_shell');
-  const otherShells = categorized.shells.filter(s => s.category !== 'hard_shell');
-
-  const sortedHardShells = sortByWaterproofness(hardShells);
-  const sortedOtherShells = precipitation
-    ? sortByWaterproofness(otherShells)
-    : sortByBreathability(otherShells);
-
-  const sortedShells = [...sortedHardShells, ...sortedOtherShells];
-
-  if (sortedShells.length > 0) {
-    const torsoShell = sortedShells.find((s) => s.covers_torso) ?? sortedShells[0];
-    if (torsoShell) {
-      ensemble.push(torsoShell);
-      currentClo += torsoShell.garment_thermal_properties?.rcl_whole_body ?? 0;
-    }
-
-    const legsShell = sortedShells.find(
-      (s) => s.covers_legs && s.id !== torsoShell?.id
-    );
-    if (legsShell) {
-      ensemble.push(legsShell);
-      currentClo += legsShell.garment_thermal_properties?.rcl_whole_body ?? 0;
-    }
-  }
-
-  return ensemble;
-}
 
 function getAlpineGuidance(tempC: number, precipitation?: boolean): string[] {
   const guidance: string[] = [];

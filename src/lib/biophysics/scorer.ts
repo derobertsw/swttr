@@ -200,9 +200,10 @@ function calculateWeatherScore(
 ): number {
   let score = 100;
 
-  // Check for shell layer
+  // Check for shell layer. Insulated outerwear is the shell when worn alone
+  // (alpine uses it in place of a hard shell), so it counts too.
   const shells = garments.filter(
-    (g) => g.category === 'hard_shell' || g.category === 'soft_shell'
+    (g) => g.category === 'hard_shell' || g.category === 'soft_shell' || g.category === 'outer_insulated'
   );
 
   if (weather.precipitation) {

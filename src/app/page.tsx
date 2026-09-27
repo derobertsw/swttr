@@ -36,12 +36,14 @@ const HomeContent = () => {
     loading,
     locationDenied,
     biophysicsData,
+    biophysicsStatus,
     multiDayPlan,
     locationSearch,
     handleGoNow,
     handleSubmit,
     handleWeatherChange,
     handleActivityChange,
+    handleRetry,
     resetToInitialState,
   } = useGearUp();
 
@@ -153,7 +155,9 @@ const HomeContent = () => {
             precipitationType={precipitationType}
             itemMappings={itemMappings}
             biophysicsData={biophysicsData}
+            biophysicsStatus={biophysicsStatus}
             onReset={resetToInitialState}
+            onRetry={() => void handleRetry()}
             onWeatherChange={handleWeatherChange}
             onActivityChange={handleActivityChange}
             weatherLoading={loading}

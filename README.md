@@ -23,7 +23,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - Running
 - Biking
 
-**Biophysics support (signed in):** Alpine Skiing, Backcountry Skiing (ski touring), XC Skiing, Running, and Biking. Hiking / Snowshoeing and signed-out users get static recommendations from `src/data/layerRecommendations.json`, which covers Alpine, XC, and Hiking.
+**Biophysics support (signed in):** Alpine Skiing, Backcountry Skiing (ski touring), XC Skiing, Running, and Biking. Hiking / Snowshoeing and signed-out users get static recommendations from `src/data/layerRecommendations.json`, which covers Alpine, XC, and Hiking. The app labels those as general guidance. Where there are no static layers (signed-out Running, Biking, and Backcountry), it keeps the outing on screen with a sign-in prompt instead. Signed-in users get the same fallback, with Add gear or Try again in place of sign-in, when their wardrobe has no usable gear or the request fails.
 
 ## How Layer Recommendations Work
 
@@ -101,7 +101,7 @@ graph TD
     subgraph "Pool: Insulation"
         INS --> INS1[insulation_synthetic]
         INS --> INS2[insulation_down]
-        INS --> INS3[outer_insulated]
+        INS --> INS3[outer_insulated<br/>Alpine treats these as outer layers]
     end
 
     subgraph "Pool: Shells"
@@ -123,11 +123,16 @@ graph TD
 
 ### 3. Ensemble Building Flow
 
-Garments are selected in a fixed order: base layers first, then mid layers, then shells. A running clo budget prevents over-insulation, and duplicate prevention ensures no garment appears twice.
+Most sports select base layers, then mid layers, then shells. Alpine compares complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. It allows at most one item in each slot per covered region, including items that span multiple regions. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. Weather-protection scoring counts insulated outerwear as the shell. When targets cannot be met, alpine returns the best available wearable combination and warns about regional insulation shortfalls.
 
 ```mermaid
 graph TD
-    START[Target Clo Range from Pipeline] --> SORT[Sort Pool by Sport Strategy]
+    START[Target Clo Range from Pipeline] --> SPORT{Alpine?}
+    SPORT -->|Yes| COMB[Compare base + optional mid/puffy + outer<br/>for torso, then legs]
+    COMB --> CAP[One item per slot per covered region<br/>Insulated outer replaces shell<br/>Bibs fill leg slots under a jacket]
+    CAP --> REG[Preserve coverage and rain protection<br/>Minimize combined shortfall and excess, then layers]
+    REG --> WARN[Warn about remaining regional shortfalls]
+    SPORT -->|No| SORT[Sort Pool by Sport Strategy]
     SORT --> BASE[Select Base Layer]
     BASE --> MID[Select Mid Layer]
     MID --> SHELL[Select Shell]
@@ -177,10 +182,10 @@ graph TD
     end
 
     subgraph "Alpine Skiing"
-        ALP --> A1[Insulation-sorted]
-        A1 --> A2[Base layer capped at<br/>fraction of min clo]
-        A2 --> A3[Mid + Insulation pools merged]
-        A3 --> A4[Shells bypass clo budget]
+        ALP --> A1[Compare complete regional outfits]
+        A1 --> A2[One base + at most one mid/puffy<br/>+ one outer per region]
+        A2 --> A3[Insulated outerwear occupies outer slot<br/>Puffies pair only with hard shells or no outer]
+        A3 --> A4[Budget all layers by regional clo<br/>Balance shortfalls against excess warmth]
         A4 --> A5[Dual metabolic model:<br/>skiing + chairlift blend]
     end
 
@@ -217,11 +222,12 @@ graph TD
 
     BIKE --> BADD[Always consider shells<br/>— breathability-sorted]
 
-    ALP --> AHARD{Hard shell available?}
-    AHARD -->|Yes| AHSEL[Select hard shell for torso]
-    AHARD -->|No| ASOFT[Select soft shell for torso]
-    AHSEL --> ABUDGET[Shells bypass clo budget]
-    ASOFT --> ABUDGET
+    ALP --> AOUT[Compare shell or insulated outer<br/>as part of each regional outfit]
+    AOUT --> AWET{Precipitation?}
+    AWET -->|Yes| AWP[Prefer waterproof outer coverage]
+    AWET -->|No| ABUDGET[Fit regional insulation targets]
+    AWP --> ABUDGET
+    ABUDGET --> ACAP[One outer per covered region<br/>No shell over insulated outerwear<br/>Bibs sit under the jacket]
 
     XC --> XBREATH{Meets breathability<br/>threshold?}
     XBREATH -->|Yes| XPREF[Select breathable shell]
@@ -304,7 +310,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_or_secret_key
 MPP_SECRET_KEY=...
 ```
 
-Without Supabase configured, database-backed API routes return 503 and the home page falls back to static layer recommendations from `src/data/layerRecommendations.json`.
+Without Supabase configured, database-backed API routes return 503. The home page then falls back to static layer recommendations from `src/data/layerRecommendations.json`, or shows a Try again prompt for activities that have none.
 
 ### Development
 

@@ -10,23 +10,50 @@ import {
 import type { RecommendedGarment, RecommendedHandwear, RecommendedHeadwear } from "@/types/biophysics";
 
 describe("garmentsToLayerSet", () => {
-  it("maps outer_insulated garments to mid layer", () => {
+  const insulatedJacket: RecommendedGarment = {
+    id: "insulated-jacket",
+    name: "Insulated Jacket",
+    category: "outer_insulated",
+    rcl: 0.8,
+    covers_torso: true,
+    covers_arms: true,
+    covers_legs: false,
+  };
+
+  it("shows outer_insulated garments as the outer layer when no shell covers them", () => {
+    const torsoLayers = garmentsToLayerSet([insulatedJacket], "torso");
+
+    expect(torsoLayers.mid).toHaveLength(0);
+    expect(torsoLayers.outer?.map((item) => item.name)).toEqual(["Insulated Jacket"]);
+  });
+
+  it("shows outer_insulated garments as a mid layer under a shell", () => {
     const garments: RecommendedGarment[] = [
-      {
-        id: "insulated-jacket",
-        name: "Insulated Jacket",
-        category: "outer_insulated",
-        rcl: 0.8,
-        covers_torso: true,
-        covers_legs: false,
-      },
+      { id: "insulated-pants", name: "Insulated Pants", category: "outer_insulated", rcl: 0.3, covers_torso: false, covers_legs: true },
+      { id: "shell-pants", name: "Shell Pants", category: "soft_shell", rcl: 0.2, covers_torso: false, covers_legs: true },
     ];
 
-    const torsoLayers = garmentsToLayerSet(garments, "torso");
+    const legLayers = garmentsToLayerSet(garments, "legs");
 
-    expect(torsoLayers.mid).toHaveLength(1);
-    expect(torsoLayers.mid?.[0]?.name).toBe("Insulated Jacket");
-    expect(torsoLayers.outer).toHaveLength(0);
+    expect(legLayers.mid?.map((item) => item.name)).toEqual(["Insulated Pants"]);
+    expect(legLayers.outer?.map((item) => item.name)).toEqual(["Shell Pants"]);
+  });
+
+  it("keeps an insulated jacket as the outer layer over shell bibs", () => {
+    const bibs: RecommendedGarment = {
+      id: "bibs",
+      name: "Shell Bibs",
+      category: "hard_shell",
+      rcl: 0.14,
+      covers_torso: true,
+      covers_arms: false,
+      covers_legs: true,
+    };
+
+    const torsoLayers = garmentsToLayerSet([insulatedJacket, bibs], "torso");
+
+    expect(torsoLayers.mid).toHaveLength(0);
+    expect(torsoLayers.outer?.map((item) => item.name)).toEqual(["Insulated Jacket", "Shell Bibs"]);
   });
 });
 

@@ -7,7 +7,7 @@ import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
 import type { Recommendation, LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData, PrecipitationType } from "@/types/weather";
-import type { BiophysicsRecommendation } from "@/types/biophysics";
+import type { BiophysicsOutcome, BiophysicsRecommendation, BiophysicsStatus } from "@/types/biophysics";
 import type { MultiDayLayerPlan } from "@/types/plan";
 import type { TemperatureSensitivity } from "@/types/preferences";
 
@@ -31,6 +31,7 @@ interface GearUpState {
   loading: boolean;
   recommendation: Recommendation | null;
   biophysicsData: BiophysicsRecommendation | null;
+  biophysicsStatus: BiophysicsStatus | null;
   multiDayPlan: MultiDayLayerPlan | null;
 }
 
@@ -38,6 +39,8 @@ interface GearUpState {
 export interface GearUpResult {
   recommendation: Recommendation | null;
   biophysicsData: BiophysicsRecommendation | null;
+  /** Why biophysicsData is missing, when it is. */
+  biophysicsStatus: BiophysicsStatus;
   temperature: number;
   windspeed: number;
   precipitation?: boolean;
@@ -78,6 +81,7 @@ export function createInitialState(inputMode: InputMode): GearUpState {
     loading: false,
     recommendation: null,
     biophysicsData: null,
+    biophysicsStatus: null,
     multiDayPlan: null,
   };
 }
@@ -106,6 +110,7 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
         precipitationType: action.precipitationType,
         recommendation: action.recommendation,
         biophysicsData: action.biophysicsData,
+        biophysicsStatus: action.biophysicsStatus,
         multiDayPlan: null,
         showResults: true,
       };
@@ -117,6 +122,7 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
         windspeed: action.windspeed,
         recommendation: action.recommendation,
         biophysicsData: null,
+        biophysicsStatus: null,
         multiDayPlan: action.plan,
         showResults: true,
       };
@@ -165,13 +171,14 @@ export async function buildGearUpResult(
   weather: WeatherData,
   activity: string,
   sensitivity: TemperatureSensitivity,
-  fetchBiophysics: (activity: string, weather: WeatherData) => Promise<BiophysicsRecommendation | null>
+  fetchBiophysics: (activity: string, weather: WeatherData) => Promise<BiophysicsOutcome>
 ): Promise<GearUpResult> {
   const recommendation = getStaticRecommendation(weather.temperature, activity, sensitivity);
-  const biophysicsData = await fetchBiophysics(activity, weather);
+  const biophysics = await fetchBiophysics(activity, weather);
   return {
     recommendation,
-    biophysicsData: normalizeBiophysicsForActivity(activity, biophysicsData),
+    biophysicsData: normalizeBiophysicsForActivity(activity, biophysics.data),
+    biophysicsStatus: biophysics.status,
     temperature: weather.temperature,
     windspeed: weather.windSpeed,
     precipitation: weather.precipitation,
