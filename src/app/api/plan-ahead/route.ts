@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
-import { formatZonedTime } from "@/lib/timeZones";
+import { formatZonedTime, isTimeZone } from "@/lib/timeZones";
 import { Recommendation } from "@/types/recommendations";
 import { TemperatureSensitivity } from "@/types/preferences";
 import { ForecastHour } from "@/types/plan";
@@ -105,7 +105,14 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await weatherResponse.json();
-    const timeZone: string = typeof data?.timezone === "string" ? data.timezone : "UTC";
+    // Without the place's time zone, the hours can't be read on its clock.
+    const timeZone: unknown = data?.timezone;
+    if (!isTimeZone(timeZone)) {
+      return NextResponse.json(
+        { error: "Failed to fetch weather data" },
+        { status: 502 }
+      );
+    }
     const hourlyTime: number[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
     const hourlyTemps: number[] = Array.isArray(data?.hourly?.temperature_2m) ? data.hourly.temperature_2m : [];
     const hourlyWinds: number[] = Array.isArray(data?.hourly?.wind_speed_10m) ? data.hourly.wind_speed_10m : [];

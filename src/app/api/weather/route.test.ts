@@ -264,6 +264,17 @@ describe("Weather API Route", () => {
       expect((await response.json()).error).toContain("covers Sep 27 to Oct 11");
     });
 
+    it("fails rather than guess when the forecast has no usable time zone", async () => {
+      for (const timezone of [undefined, "Mars/Olympus"]) {
+        mockForecast({ ...stowe(), timezone: timezone as string });
+
+        const response = await getForecast("2026-10-08T14:00");
+
+        expect(response.status).toBe(500);
+        expect(await response.json()).toEqual({ error: "Failed to fetch weather data" });
+      }
+    });
+
     it("rejects a datetime that isn't a local date and time", async () => {
       global.fetch = vi.fn();
 

@@ -66,6 +66,16 @@ describe("POST /api/plan-ahead", () => {
     expect(plan.days[1].dayparts[0]).toMatchObject({ id: "morning", minTemp: 46 });
   });
 
+  it("fails rather than use UTC hours when the forecast has no time zone", async () => {
+    const withoutTimeZone = { ...forecastFixture("America/New_York", "2026-10-08T04:00Z", 48, () => -4), timezone: undefined };
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(withoutTimeZone) });
+
+    const response = await planAhead({ startDate: "2026-10-08", durationDays: 2 });
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "Failed to fetch weather data" });
+  });
+
   it("keeps daytime windows on the place's clock across a daylight saving change", async () => {
     // Sydney moves from UTC+10 to UTC+11 at 2:00 on October 4. Open-Meteo
     // starts at midnight UTC+10 on October 3 and labels every hour UTC+10.

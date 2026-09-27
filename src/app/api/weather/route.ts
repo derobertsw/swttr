@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { formatZonedIsoTime, isLocalDateTime, zonedTimeToInstant } from "@/lib/timeZones";
+import { formatZonedIsoTime, isLocalDateTime, isTimeZone, zonedTimeToInstant } from "@/lib/timeZones";
 import type { PrecipitationType } from "@/types/weather";
 
 /** Days of hourly forecast Open-Meteo has, today included. */
@@ -58,7 +58,11 @@ async function getHourlyForecast(lat: string, lon: string, localDateTime: string
   }
 
   const data = await response.json();
-  const timeZone: string = data.timezone;
+  // Without the place's time zone, the time can't be read on its clock.
+  const timeZone: unknown = data?.timezone;
+  if (!isTimeZone(timeZone)) {
+    throw new Error("Forecast has no valid time zone");
+  }
   const hourStarts: unknown[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
   // Hours with a temperature and wind speed, each starting at a Unix time in seconds.
   const hours = hourStarts.flatMap((start, index) => {

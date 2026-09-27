@@ -3,10 +3,24 @@ import {
   formatZonedIsoTime,
   formatZonedTime,
   isLocalDateTime,
+  isTimeZone,
   zonedTimeToInstant,
 } from "./timeZones";
 
 const at = (iso: string) => Date.parse(iso);
+
+describe("isTimeZone", () => {
+  it("accepts time zone names Intl knows", () => {
+    expect(isTimeZone("America/New_York")).toBe(true);
+    expect(isTimeZone("UTC")).toBe(true);
+  });
+
+  it("rejects anything else, including a missing zone Intl would read as the machine's", () => {
+    for (const value of [undefined, null, 42, "", "Mars/Olympus"]) {
+      expect(isTimeZone(value)).toBe(false);
+    }
+  });
+});
 
 describe("isLocalDateTime", () => {
   it("accepts a real date and time", () => {

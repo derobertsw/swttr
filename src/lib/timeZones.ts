@@ -37,6 +37,20 @@ function utcOffsetAt(instant: number, timeZone: string): number {
   return clockReadingAt(instant, timeZone) - Math.floor(instant / MINUTE_MS) * MINUTE_MS;
 }
 
+/**
+ * Whether a value names a time zone Intl knows, like "America/New_York".
+ * Intl reads a missing time zone as the machine's own, so check before using one.
+ */
+export function isTimeZone(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Whether a string is a real local date-time, like "2026-10-15T14:00". */
 export function isLocalDateTime(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return false;
