@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import type { Recommendation } from "@/types/recommendations";
-import type { PrecipitationType } from "@/types/weather";
+import type { LocationSuggestion, Recommendation } from "@/types/recommendations";
+import type { PrecipitationType, WeatherContext } from "@/types/weather";
 import type {
   BiophysicsRecommendation,
   BiophysicsStatus,
@@ -47,6 +47,8 @@ interface LayerDisplayProps {
   windspeed: number;
   precipitation?: boolean;
   precipitationType?: PrecipitationType;
+  /** Where and when the weather applies. */
+  weatherContext?: WeatherContext | null;
   itemMappings?: Map<string, string>;
   biophysicsData?: BiophysicsRecommendation | null;
   /** Why biophysicsData is missing, when it is. */
@@ -54,7 +56,8 @@ interface LayerDisplayProps {
   onReset?: () => void;
   /** Requests the same recommendation again after a failure. */
   onRetry?: () => void;
-  onWeatherChange?: (lat: number, lon: number, datetime?: string) => Promise<void>;
+  /** Gets weather for another place or local time there; resolves true once it's shown. */
+  onWeatherChange?: (location: LocationSuggestion, localDateTime?: string) => Promise<boolean>;
   onActivityChange?: (activity: string) => Promise<void>;
   weatherLoading?: boolean;
 }
@@ -113,6 +116,7 @@ const LayerDisplay = ({
   windspeed,
   precipitation,
   precipitationType,
+  weatherContext,
   itemMappings,
   biophysicsData,
   biophysicsStatus,
@@ -317,6 +321,7 @@ const LayerDisplay = ({
           windspeed={windspeed}
           precipitation={precipitation}
           precipitationType={precipitationType}
+          context={weatherContext}
           score={showDescent ? undefined : comfortScore}
           totalClo={climbEvaluation?.totalClo}
           targetRange={ireq?.target_range}

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { format } from "date-fns";
 import Home from "./page";
 
 // Mock sonner toast
@@ -50,6 +49,21 @@ const respond = (status: number, body: unknown): MockResponse => ({
   status,
   json: () => Promise.resolve(body),
 });
+
+const STOWE = {
+  id: 1,
+  name: "Stowe",
+  region: "Vermont",
+  country: "United States",
+  latitude: 44.47,
+  longitude: -72.69,
+};
+
+/** Searches for Stowe in the place field labeled `field`, and picks it. */
+async function chooseStowe(user: ReturnType<typeof userEvent.setup>, field: RegExp = /location/i) {
+  await user.type(screen.getByRole("combobox", { name: field }), "Stowe");
+  await user.click(await screen.findByRole("option", { name: /Stowe/ }));
+}
 
 describe("Home Page", () => {
   let originalGeolocation: Geolocation;
@@ -156,6 +170,9 @@ describe("Home Page", () => {
       await waitFor(() => {
         expect(screen.getByText(/wind 15 mph/i)).toBeInTheDocument();
       });
+      expect(screen.getByText("Current conditions")).toBeInTheDocument();
+      expect(screen.getByText("Your location")).toBeInTheDocument();
+      expect(mockFetch).toHaveBeenCalledWith("/api/weather?lat=40.7128&lon=-74.006");
     });
   });
 
@@ -298,6 +315,30 @@ describe("Home Page", () => {
         );
       });
     });
+
+    it("gets current conditions for a place picked by hand", async () => {
+      Object.defineProperty(navigator, "geolocation", { value: undefined, writable: true });
+      const weatherRequests: string[] = [];
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes("/api/geocode")) return Promise.resolve(respond(200, { results: [STOWE] }));
+        if (url.includes("/api/weather")) {
+          weatherRequests.push(url);
+          return Promise.resolve(respond(200, { temperature: 30, windSpeed: 7, isForecast: false }));
+        }
+        return Promise.resolve(respond(200, {}));
+      });
+
+      const user = userEvent.setup();
+      render(<Home />);
+      await user.click(screen.getByRole("button", { name: /gear up/i }));
+      await chooseStowe(user, /where are you/i);
+      await user.click(screen.getByRole("button", { name: /gear up/i }));
+
+      expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+      expect(screen.getByText("Stowe, Vermont, United States")).toBeInTheDocument();
+      expect(screen.getByText(/wind 7 mph/i)).toBeInTheDocument();
+      expect(weatherRequests).toEqual(["/api/weather?lat=44.47&lon=-72.69"]);
+    });
   });
 
   describe("results without personalized layers", () => {
@@ -368,6 +409,7 @@ describe("Home Page", () => {
       const notice = await screen.findByRole("region", { name: "Sign in for Running layers" });
       expect(within(notice).getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
       expect(screen.getByText(/wind 15 mph/i)).toBeInTheDocument();
+      expect(screen.getByText("Current conditions")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Running" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Change weather location, date, or time" })).toBeInTheDocument();
     });
@@ -423,31 +465,27 @@ describe("Home Page", () => {
   });
 
   describe("submitting a plan", () => {
-    const STOWE = {
-      id: 1,
-      name: "Stowe",
-      region: "Vermont",
-      country: "United States",
-      latitude: 44.47,
-      longitude: -72.69,
-    };
+    /** The start date chooseStartDate picks, a week after the pinned today. */
+    const START_DATE = "2026-10-08";
     const PLAN = {
-      startDate: "2026-10-15",
-      endDate: "2026-10-17",
+      startDate: START_DATE,
+      endDate: "2026-10-10",
       durationDays: 3,
       dayStartHour: 6,
       dayEndHour: 21,
       days: [],
     };
-
-    /** The 15th of next month, which chooseStartDate picks. */
-    function expectedStartDate() {
-      const today = new Date();
-      return format(new Date(today.getFullYear(), today.getMonth() + 1, 15), "yyyy-MM-dd");
-    }
+    /** /api/weather's forecast for noon in Stowe on the start date. */
+    const NOON_FORECAST = {
+      temperature: 28,
+      windSpeed: 12,
+      isForecast: true,
+      forecastTime: `${START_DATE}T12:00-04:00`,
+      timeZone: "America/New_York",
+    };
 
     /**
-     * Plan-ahead requests succeed (weather: 28°F, wind 12 mph) unless `weather`
+     * Plan-ahead requests succeed (the noon forecast: 28°F, wind 12 mph) unless `weather`
      * says otherwise. Returns the requests made, and a geolocation spy that only Go Now uses.
      */
     function mockPlanAheadApis({ weather }: { weather?: () => Promise<MockResponse> } = {}) {
@@ -463,7 +501,7 @@ describe("Home Page", () => {
         }
         if (url.includes("/api/weather")) {
           requests.weather.push(url);
-          return weather?.() ?? Promise.resolve(respond(200, { temperature: 28, windSpeed: 12 }));
+          return weather?.() ?? Promise.resolve(respond(200, NOON_FORECAST));
         }
         if (url.includes("/api/plan-ahead")) {
           requests.planAhead.push(JSON.parse(String(init?.body)));
@@ -483,22 +521,23 @@ describe("Home Page", () => {
       return { requests, getCurrentPosition };
     }
 
-    async function chooseStowe(user: ReturnType<typeof userEvent.setup>) {
-      await user.type(screen.getByRole("combobox", { name: /location/i }), "Stowe");
-      await user.click(await screen.findByRole("option", { name: /Stowe/ }));
-    }
-
     async function chooseStartDate(user: ReturnType<typeof userEvent.setup>) {
       await user.click(screen.getByRole("button", { name: /pick start date/i }));
-      await user.click(screen.getByRole("button", { name: /next month/i }));
-      await user.click(screen.getByRole("button", { name: /15th/ }));
+      await user.click(screen.getByRole("button", { name: /October 8th/ }));
     }
 
     beforeEach(() => {
       mockSearchParams.set("mode", "planAhead");
+      // Today is Thursday, October 1, 2026, in New York.
+      vi.setSystemTime(new Date("2026-10-01T16:00:00Z"));
     });
 
-    it("gets layers for a one-day plan with See my layers, without using Go Now", async () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    });
+
+    it("gets layers for a one-day plan from the forecast for its start time", async () => {
       const { requests, getCurrentPosition } = mockPlanAheadApis();
       const user = userEvent.setup();
       render(<Home />);
@@ -508,10 +547,110 @@ describe("Home Page", () => {
       await chooseStartDate(user);
       await user.click(screen.getByRole("button", { name: "See my layers" }));
 
-      expect(await screen.findByText(/wind 12 mph/i)).toBeInTheDocument();
-      expect(requests.weather).toEqual([expect.stringContaining("lat=44.47&lon=-72.69")]);
+      expect(await screen.findByText("Forecast · Thu, Oct 8, 12:00 PM EDT")).toBeInTheDocument();
+      expect(screen.getByText("Stowe, Vermont, United States")).toBeInTheDocument();
+      expect(screen.getByText(/wind 12 mph/i)).toBeInTheDocument();
+      expect(requests.weather).toEqual([`/api/weather?lat=44.47&lon=-72.69&datetime=${START_DATE}T12:00`]);
       expect(requests.planAhead).toEqual([]);
       expect(getCurrentPosition).not.toHaveBeenCalled();
+    });
+
+    it("reads the start time on the place's clock, wherever the device is", async () => {
+      // The device is in Tokyo, where it's already October 2.
+      vi.stubEnv("TZ", "Asia/Tokyo");
+      const { requests } = mockPlanAheadApis({
+        weather: () =>
+          Promise.resolve(respond(200, { ...NOON_FORECAST, forecastTime: `${START_DATE}T07:00-04:00` })),
+      });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(screen.getByRole("button", { name: /single day/i }));
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "07:30" } });
+      await user.click(screen.getByRole("button", { name: "See my layers" }));
+
+      expect(await screen.findByText("Forecast · Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+      expect(requests.weather).toEqual([`/api/weather?lat=44.47&lon=-72.69&datetime=${START_DATE}T07:30`]);
+    });
+
+    it.each([
+      {
+        failure: "a date the forecast doesn't cover",
+        response: respond(422, { error: "The forecast for this place covers Oct 1 to Oct 16. Pick a date in that range." }),
+        message: "The forecast for this place covers Oct 1 to Oct 16. Pick a date in that range.",
+      },
+      {
+        failure: "a forecast service failure",
+        response: respond(500, { error: "Failed to fetch weather data" }),
+        message: "Couldn't get the forecast for this place. Try again.",
+      },
+    ])("explains $failure and keeps the plan, without using current weather", async ({ response, message }) => {
+      const { toast } = await import("sonner");
+      const { requests, getCurrentPosition } = mockPlanAheadApis({ weather: () => Promise.resolve(response) });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(screen.getByRole("button", { name: /single day/i }));
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await user.click(screen.getByRole("button", { name: "See my layers" }));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+      expect(await screen.findByRole("button", { name: "See my layers" })).toBeEnabled();
+      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByLabelText("Start time")).toHaveValue("12:00");
+      expect(screen.queryByText(/wind/i)).not.toBeInTheDocument();
+      expect(requests.weather).toEqual([`/api/weather?lat=44.47&lon=-72.69&datetime=${START_DATE}T12:00`]);
+      expect(getCurrentPosition).not.toHaveBeenCalled();
+    });
+
+    it("changes the place and time from the results, keeping the drawer open when that fails", async () => {
+      const { toast } = await import("sonner");
+      const weatherResponses = [
+        respond(200, NOON_FORECAST),
+        respond(422, { error: "The forecast for this place covers Oct 1 to Oct 16. Pick a date in that range." }),
+        respond(200, { ...NOON_FORECAST, windSpeed: 20, forecastTime: "2026-10-02T09:00-04:00" }),
+      ];
+      const { requests } = mockPlanAheadApis({ weather: () => Promise.resolve(weatherResponses.shift()!) });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(screen.getByRole("button", { name: /single day/i }));
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await user.click(screen.getByRole("button", { name: "See my layers" }));
+      await user.click(await screen.findByRole("button", { name: "Change weather location, date, or time" }));
+
+      // The drawer's drag handling reads CSS transforms, which jsdom lacks, so
+      // it's driven with plain click events instead of pointer events.
+      const drawer = await screen.findByRole("dialog", { name: "Update Weather" });
+      fireEvent.change(within(drawer).getByRole("combobox", { name: "Location" }), { target: { value: "Stowe" } });
+      fireEvent.click(await within(drawer).findByRole("option", { name: /Stowe/ }));
+      fireEvent.click(within(drawer).getByRole("button", { name: "Pick date & time" }));
+      fireEvent.click(within(drawer).getByRole("button", { name: "Tomorrow" }));
+      fireEvent.change(within(drawer).getByLabelText("Time"), { target: { value: "09:15" } });
+      fireEvent.click(within(drawer).getByRole("button", { name: "Apply Weather" }));
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith("The forecast for this place covers Oct 1 to Oct 16. Pick a date in that range.")
+      );
+      expect(drawer).toHaveAttribute("data-state", "open");
+      expect(within(drawer).getByLabelText("Time")).toHaveValue("09:15");
+      expect(screen.getByText("Forecast · Thu, Oct 8, 12:00 PM EDT")).toBeInTheDocument();
+
+      fireEvent.click(within(drawer).getByRole("button", { name: "Apply Weather" }));
+
+      expect(await screen.findByText("Forecast · Fri, Oct 2, 9:00 AM EDT")).toBeInTheDocument();
+      expect(screen.getByText(/wind 20 mph/i)).toBeInTheDocument();
+      // jsdom never finishes the closing animation, so the closed drawer stays in the page.
+      await waitFor(() => expect(drawer).toHaveAttribute("data-state", "closed"));
+      expect(requests.weather.slice(1)).toEqual([
+        "/api/weather?lat=44.47&lon=-72.69&datetime=2026-10-02T09:15",
+        "/api/weather?lat=44.47&lon=-72.69&datetime=2026-10-02T09:15",
+      ]);
     });
 
     it("builds a multi-day plan with Build layer plan", async () => {
@@ -528,7 +667,7 @@ describe("Home Page", () => {
         expect.objectContaining({
           lat: 44.47,
           lon: -72.69,
-          startDate: expectedStartDate(),
+          startDate: START_DATE,
           durationDays: 3,
           startHour: 12,
         }),
@@ -577,7 +716,7 @@ describe("Home Page", () => {
       const { requests } = mockPlanAheadApis({
         weather: () =>
           new Promise((resolve) => {
-            finishWeather = () => resolve(respond(200, { temperature: 28, windSpeed: 12 }));
+            finishWeather = () => resolve(respond(200, NOON_FORECAST));
           }),
       });
       const user = userEvent.setup();
@@ -628,7 +767,7 @@ describe("Home Page", () => {
 
         await user.click(screen.getByRole("button", { name: /single day/i }));
         await chooseStowe(user);
-        fireEvent.change(screen.getByLabelText("Start date"), { target: { value: expectedStartDate() } });
+        fireEvent.change(screen.getByLabelText("Start date"), { target: { value: START_DATE } });
         await user.click(screen.getByRole("button", { name: "See my layers" }));
 
         expect(await screen.findByText(/wind 12 mph/i)).toBeInTheDocument();

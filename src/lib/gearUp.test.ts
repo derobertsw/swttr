@@ -1,8 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildGearUpResult, createInitialState, fetchPlanAhead, gearUpReducer } from "./gearUp";
 import type { BiophysicsOutcome, BiophysicsRecommendation } from "@/types/biophysics";
+import type { MultiDayLayerPlan } from "@/types/plan";
+import type { WeatherContext } from "@/types/weather";
 
-const WEATHER = { temperature: 20, windSpeed: 12, precipitation: true, precipitationType: "snow" as const };
+const FORECAST_CONTEXT: WeatherContext = {
+  source: "forecast",
+  place: "Stowe, Vermont, United States",
+  forecastTime: "2026-10-08T14:00-04:00",
+  timeZone: "America/New_York",
+};
+const WEATHER = {
+  temperature: 20,
+  windSpeed: 12,
+  precipitation: true,
+  precipitationType: "snow" as const,
+  context: FORECAST_CONTEXT,
+};
 const SIGN_IN_REQUIRED: BiophysicsOutcome = { status: "auth_required", data: null };
 
 describe("gearUpReducer", () => {
@@ -25,6 +39,28 @@ describe("gearUpReducer", () => {
     });
   });
 
+  it("keeps where and when the weather applies, until a multi-day plan replaces it", () => {
+    const shown = gearUpReducer(createInitialState("planAhead"), {
+      type: "SUBMIT_SUCCESS",
+      recommendation: null,
+      biophysicsData: null,
+      biophysicsStatus: "auth_required",
+      temperature: 20,
+      windspeed: 12,
+      weatherContext: FORECAST_CONTEXT,
+    });
+    expect(shown.weatherContext).toEqual(FORECAST_CONTEXT);
+
+    const planned = gearUpReducer(shown, {
+      type: "SUBMIT_PLAN_SUCCESS",
+      plan: { days: [] } as unknown as MultiDayLayerPlan,
+      recommendation: null,
+      temperature: 18,
+      windspeed: 10,
+    });
+    expect(planned.weatherContext).toBeNull();
+  });
+
   it("stops loading on error and resets to manual mode", () => {
     const planning = createInitialState("planAhead");
     expect(gearUpReducer({ ...planning, loading: true }, { type: "SUBMIT_ERROR" }).loading).toBe(false);
@@ -45,6 +81,7 @@ describe("buildGearUpResult", () => {
       precipitationType: "snow",
       biophysicsData: null,
       biophysicsStatus: "auth_required",
+      weatherContext: FORECAST_CONTEXT,
     });
     expect(result.recommendation?.torso.base.length).toBeGreaterThan(0);
   });

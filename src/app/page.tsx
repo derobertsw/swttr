@@ -24,6 +24,7 @@ const HomeContent = () => {
     windspeed,
     precipitation,
     precipitationType,
+    weatherContext,
     recommendation,
     showResults,
     inputMode,
@@ -154,6 +155,7 @@ const HomeContent = () => {
             windspeed={windspeed}
             precipitation={precipitation}
             precipitationType={precipitationType}
+            weatherContext={weatherContext}
             itemMappings={itemMappings}
             biophysicsData={biophysicsData}
             biophysicsStatus={biophysicsStatus}

@@ -2,21 +2,22 @@
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useBiophysicsRecommendation } from "@/hooks/useBiophysicsRecommendation";
 import { useActivitySelection } from "@/hooks/useActivitySelection";
-import { fetchCurrentWeather, fetchWeatherByCoords } from "@/hooks/useCurrentWeather";
+import { fetchCurrentWeather, fetchWeatherAt } from "@/hooks/useCurrentWeather";
 import {
   buildGearUpResult,
   createInitialState,
   fetchPlanAhead,
   gearUpReducer,
-  type GearUpResult,
   type InputMode,
 } from "@/lib/gearUp";
 import { logWarn } from "@/lib/logger";
+import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
 
 /**
@@ -66,12 +67,21 @@ export function useGearUp() {
     [activity, sensitivity, biophysics, exertion, bodyMetrics]
   );
 
-  /** Recommendations for the location picked in the search box, or null without weather. */
-  const recommendForSelectedLocation = useCallback(async (): Promise<GearUpResult | null> => {
-    const { selectedLocation } = locationSearch;
-    const weather = await fetchWeatherByCoords(selectedLocation!.latitude, selectedLocation!.longitude);
-    return weather ? recommendFor(weather) : null;
-  }, [locationSearch, recommendFor]);
+  /**
+   * Shows recommendations for a picked place's current weather, or for its
+   * forecast at a local date-time there. Resolves false, after saying why,
+   * when there's no weather; the inputs stay as they were.
+   */
+  const recommendAt = useCallback(async (location: LocationSuggestion, localDateTime?: string) => {
+    const { data, error } = await fetchWeatherAt(location, localDateTime);
+    if (!data) {
+      toast.error(error);
+      dispatch({ type: "SUBMIT_ERROR" });
+      return false;
+    }
+    dispatch({ type: "SUBMIT_SUCCESS", ...(await recommendFor(data)) });
+    return true;
+  }, [recommendFor]);
 
   /** Recommendations for the device's current location. */
   const recommendForCurrentLocation = useCallback(async () => {
@@ -99,17 +109,11 @@ export function useGearUp() {
       }
 
       dispatch({ type: "SUBMIT_START" });
-      try {
-        if (state.durationDays === 1) {
-          // Single-day plan-ahead: use regular layer display with biophysics
-          const result = await recommendForSelectedLocation();
-          if (result) {
-            dispatch({ type: "SUBMIT_SUCCESS", ...result });
-          } else {
-            toast.error("Could not get weather for this location.");
-            dispatch({ type: "SUBMIT_ERROR" });
-          }
-        } else {
+      if (state.durationDays === 1) {
+        // Single day: layers for the forecast hour the outing starts, read on the place's clock.
+        await recommendAt(locationSearch.selectedLocation, `${format(state.date, "yyyy-MM-dd")}T${state.time}`);
+      } else {
+        try {
           const result = await fetchPlanAhead({
             activity,
             sensitivity,
@@ -119,21 +123,15 @@ export function useGearUp() {
             durationDays: state.durationDays,
           });
           dispatch({ type: "SUBMIT_PLAN_SUCCESS", ...result });
+        } catch (error) {
+          toast.error("Failed to fetch weather forecast");
+          logWarn("useGearUp.handleSubmit", error);
+          dispatch({ type: "SUBMIT_ERROR" });
         }
-      } catch (error) {
-        toast.error("Failed to fetch weather forecast");
-        logWarn("useGearUp.handleSubmit", error);
-        dispatch({ type: "SUBMIT_ERROR" });
       }
     } else if (state.locationDenied && locationSearch.selectedLocation) {
       dispatch({ type: "SUBMIT_START" });
-      const result = await recommendForSelectedLocation();
-      if (result) {
-        dispatch({ type: "SUBMIT_SUCCESS", ...result });
-      } else {
-        toast.error("Could not get weather for this location.");
-        dispatch({ type: "SUBMIT_ERROR" });
-      }
+      await recommendAt(locationSearch.selectedLocation);
     } else {
       dispatch({ type: "SUBMIT_START" });
       const { result, locationDenied } = await recommendForCurrentLocation();
@@ -150,7 +148,7 @@ export function useGearUp() {
         dispatch({ type: "SUBMIT_ERROR" });
       }
     }
-  }, [activity, state, locationSearch, sensitivity, recommendForSelectedLocation, recommendForCurrentLocation]);
+  }, [activity, state, locationSearch, sensitivity, recommendAt, recommendForCurrentLocation]);
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches "gearUp"
   // from its native Gear Up tab while this page is open...
@@ -170,26 +168,10 @@ export function useGearUp() {
     dispatch({ type: "LOCATION_DENIED" });
   }, [searchParams]);
 
-  const handleWeatherChange = useCallback(async (
-    latitude: number,
-    longitude: number,
-    datetime?: string
-  ) => {
+  const handleWeatherChange = useCallback((location: LocationSuggestion, localDateTime?: string) => {
     dispatch({ type: "SUBMIT_START" });
-    try {
-      const url = datetime
-        ? `/api/weather?lat=${latitude}&lon=${longitude}&datetime=${datetime}`
-        : `/api/weather?lat=${latitude}&lon=${longitude}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Failed to fetch weather");
-      const weather = await response.json() as WeatherData;
-      dispatch({ type: "SUBMIT_SUCCESS", ...(await recommendFor(weather)) });
-    } catch (error) {
-      toast.error("Failed to update weather");
-      logWarn("useGearUp.handleWeatherChange", error);
-      dispatch({ type: "SUBMIT_ERROR" });
-    }
-  }, [recommendFor]);
+    return recommendAt(location, localDateTime);
+  }, [recommendAt]);
 
   /** Recommendations for the weather already shown, keeping the outing. */
   const recommendForShownWeather = useCallback(async (forActivity: string, failureMessage: string) => {
@@ -200,6 +182,7 @@ export function useGearUp() {
         windSpeed: state.windspeed,
         precipitation: state.precipitation,
         precipitationType: state.precipitationType,
+        context: state.weatherContext ?? undefined,
       };
       dispatch({ type: "SUBMIT_SUCCESS", ...(await recommendFor(shownWeather, forActivity)) });
     } catch (error) {
@@ -207,7 +190,7 @@ export function useGearUp() {
       logWarn("useGearUp.recommendForShownWeather", error);
       dispatch({ type: "SUBMIT_ERROR" });
     }
-  }, [state.temperature, state.windspeed, state.precipitation, state.precipitationType, recommendFor]);
+  }, [state.temperature, state.windspeed, state.precipitation, state.precipitationType, state.weatherContext, recommendFor]);
 
   const handleActivityChange = useCallback(async (newActivity: string) => {
     setActivity(newActivity);
@@ -255,6 +238,7 @@ export function useGearUp() {
     windspeed: state.windspeed,
     precipitation: state.precipitation,
     precipitationType: state.precipitationType,
+    weatherContext: state.weatherContext,
     recommendation: state.recommendation,
     showResults: state.showResults,
     inputMode: state.inputMode,

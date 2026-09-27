@@ -1,8 +1,8 @@
-import { ChevronRight, CloudRain, CloudSnow, Pencil } from "lucide-react";
+import { ChevronRight, CloudRain, CloudSnow, MapPin, Pencil } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import ScoreDisplay from "@/components/ScoreDisplay";
 import { cn } from "@/lib/utils";
-import type { PrecipitationType } from "@/types/weather";
+import type { PrecipitationType, WeatherContext } from "@/types/weather";
 import type { ThermalDecision } from "@/types/biophysics";
 
 interface WeatherHeaderProps {
@@ -11,6 +11,8 @@ interface WeatherHeaderProps {
   feelsLike?: number;
   precipitation?: boolean;
   precipitationType?: PrecipitationType;
+  /** Where and when the weather applies. */
+  context?: WeatherContext | null;
   score?: number;
   totalClo?: number;
   targetRange?: [number, number];
@@ -118,6 +120,35 @@ function getPrecipitationAlert(
   }
 }
 
+/** Forecasts describe conditions to expect, not what's happening now. */
+const FORECAST_ALERT_COPY: Record<PrecipitationAlert["state"], Pick<PrecipitationAlert, "eyebrow" | "label" | "detail">> = {
+  rain: { eyebrow: "Forecast", label: "Rain expected", detail: "Wet conditions: shell protection matters." },
+  mixed: { eyebrow: "Forecast", label: "Wintry mix expected", detail: "Cold and wet: keep waterproof layers on." },
+  snow: { eyebrow: "Forecast", label: "Snow expected", detail: "Precipitation expected on route." },
+  precipitation: { eyebrow: "Forecast", label: "Precipitation expected", detail: "Wet conditions in the forecast." },
+};
+
+/**
+ * The forecast hour on the place's clock, e.g. "Thu, Oct 15, 2:00 PM EDT",
+ * whatever time zone the device is in.
+ */
+function formatForecastTime(forecastTime: string, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(new Date(forecastTime));
+  } catch {
+    // A time zone this browser doesn't know: show the time with its UTC offset.
+    return forecastTime.replace("T", " ");
+  }
+}
+
 /**
  * Displays current weather conditions and optional thermal comfort score
  * Layout prioritizes temperature as the hero element with secondary details below
@@ -128,6 +159,7 @@ export function WeatherHeader({
   feelsLike,
   precipitation,
   precipitationType,
+  context,
   score,
   totalClo,
   targetRange,
@@ -137,7 +169,11 @@ export function WeatherHeader({
 }: WeatherHeaderProps) {
   const calculatedFeelsLike = feelsLike ?? calculateFeelsLike(temperature, windspeed);
   const showFeelsLike = calculatedFeelsLike !== temperature;
-  const precipitationAlert = getPrecipitationAlert(precipitation, precipitationType);
+  const isForecast = context?.source === "forecast";
+  const currentAlert = getPrecipitationAlert(precipitation, precipitationType);
+  const precipitationAlert = currentAlert && isForecast
+    ? { ...currentAlert, ...FORECAST_ALERT_COPY[currentAlert.state] }
+    : currentAlert;
   const isInteractive = interactive && typeof onEditWeather === "function";
   const shellClassName = cn(
     "group relative w-full overflow-hidden rounded-2xl border p-3 text-left transition-colors",
@@ -153,6 +189,19 @@ export function WeatherHeader({
   const content = (
     <div className={cn("relative z-20", isInteractive && "pointer-events-none")}>
       <div className="pb-6 border-b border-white/20">
+        {context && (
+          <div className="mb-3 flex flex-col gap-1 text-xs text-white/75">
+            <p className="font-semibold uppercase tracking-[0.16em] text-white/60">
+              {context.source === "forecast"
+                ? `Forecast · ${formatForecastTime(context.forecastTime, context.timeZone)}`
+                : "Current conditions"}
+            </p>
+            <p className="inline-flex items-center gap-1.5">
+              <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+              {context.place ?? "Your location"}
+            </p>
+          </div>
+        )}
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col">
             <div className="relative -m-3 p-3 bg-[radial-gradient(circle_at_30%_50%,rgba(0,0,0,0.12)_0%,transparent_70%)]">
