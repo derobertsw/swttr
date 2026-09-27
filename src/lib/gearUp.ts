@@ -218,19 +218,20 @@ export async function fetchPlanAhead(params: {
     }),
   });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({})) as { error?: string };
-    throw new Error(errorData.error ?? "Failed to build plan");
-  }
-
-  const data = await response.json() as {
-    plan: MultiDayLayerPlan;
-    baseline: {
+  // A response that isn't JSON, like an HTML error or sign-in page, fails like any other error.
+  const data = await response.json().catch(() => null) as {
+    plan?: MultiDayLayerPlan;
+    baseline?: {
       recommendation: Recommendation | null;
       effectiveTemperature: number;
       maxWindSpeed: number;
     };
-  };
+    error?: string;
+  } | null;
+
+  if (!response.ok || !data?.plan || !data.baseline) {
+    throw new Error(data?.error ?? "Failed to build plan");
+  }
 
   return {
     plan: data.plan,
