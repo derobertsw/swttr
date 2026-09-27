@@ -1,12 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MobileTabBar, DesktopActionDock } from "./AppNavigation";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { MobileTabBar } from "./AppNavigation";
+import { AppSidebar } from "./AppSidebar";
 
 let mockPathname = "/";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+}));
+
+vi.mock("@/hooks/usePreferences", () => ({
+  usePreferences: () => ({
+    sensitivity: "neutral",
+    defaultActivity: "running",
+    bodyMetricsSelection: {},
+    updateSensitivity: vi.fn(),
+    updateDefaultActivity: vi.fn(),
+    updateBodyMetrics: vi.fn(),
+  }),
 }));
 
 const localStorageMock = {
@@ -17,15 +30,6 @@ const localStorageMock = {
 };
 Object.defineProperty(window, "localStorage", { value: localStorageMock });
 
-function renderBothNavs() {
-  return render(
-    <>
-      <DesktopActionDock />
-      <MobileTabBar />
-    </>
-  );
-}
-
 describe("AppNavigation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -34,49 +38,69 @@ describe("AppNavigation", () => {
   });
 
   describe("rendering", () => {
-    it("renders Trips and Wardrobe tabs in both navs", () => {
-      renderBothNavs();
-      expect(screen.getAllByText("Trips")).toHaveLength(2);
-      expect(screen.getAllByText("Wardrobe")).toHaveLength(2);
+    it("renders Trips and Wardrobe tabs", () => {
+      render(<MobileTabBar />);
+      expect(screen.getByRole("link", { name: "Trips" })).toHaveAttribute("href", "/trips");
+      expect(screen.getByRole("link", { name: "Wardrobe" })).toHaveAttribute("href", "/wardrobe");
     });
 
     it("does not render a Plan tab", () => {
-      renderBothNavs();
+      render(<MobileTabBar />);
       expect(screen.queryAllByText("Plan")).toHaveLength(0);
     });
 
-    it("does not render a Gear Up button in either nav", () => {
-      renderBothNavs();
+    it("does not render a Gear Up button", () => {
+      render(<MobileTabBar />);
       expect(screen.queryByRole("button", { name: /gear up/i })).toBeNull();
       expect(screen.queryByRole("button", { name: /start recommendation/i })).toBeNull();
+    });
+
+    it("leaves navigation to the native tab bar inside the iOS shell", () => {
+      const userAgent = vi
+        .spyOn(window.navigator, "userAgent", "get")
+        .mockReturnValue("Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 SWTTRNativeTabs");
+      try {
+        render(<MobileTabBar />);
+        expect(screen.queryByRole("navigation")).toBeNull();
+        expect(screen.queryByRole("link", { name: "Trips" })).toBeNull();
+      } finally {
+        userAgent.mockRestore();
+      }
     });
   });
 
   describe("Trips tab active state", () => {
     it("marks Trips active on /trips", () => {
       mockPathname = "/trips";
-      renderBothNavs();
-      const trips = screen.getAllByRole("link", { name: /trips/i });
-      expect(trips.length).toBeGreaterThan(0);
-      expect(trips.some((el) => el.getAttribute("aria-current") === "page")).toBe(true);
-      const wardrobe = screen.getAllByRole("link", { name: /wardrobe/i });
-      expect(wardrobe.every((el) => el.getAttribute("aria-current") !== "page")).toBe(true);
+      render(<MobileTabBar />);
+      expect(screen.getByRole("link", { name: "Trips" })).toHaveAttribute("aria-current", "page");
+      expect(screen.getByRole("link", { name: "Wardrobe" })).not.toHaveAttribute("aria-current");
     });
 
     it("marks Trips active on nested trip routes", () => {
       mockPathname = "/trips/abc-123";
-      renderBothNavs();
-      const trips = screen.getAllByRole("link", { name: /trips/i });
-      expect(trips.some((el) => el.getAttribute("aria-current") === "page")).toBe(true);
+      render(<MobileTabBar />);
+      expect(screen.getByRole("link", { name: "Trips" })).toHaveAttribute("aria-current", "page");
     });
 
     it("marks Wardrobe active on /wardrobe", () => {
       mockPathname = "/wardrobe";
-      renderBothNavs();
-      const wardrobe = screen.getAllByRole("link", { name: /wardrobe/i });
-      expect(wardrobe.some((el) => el.getAttribute("aria-current") === "page")).toBe(true);
-      const trips = screen.getAllByRole("link", { name: /trips/i });
-      expect(trips.every((el) => el.getAttribute("aria-current") !== "page")).toBe(true);
+      render(<MobileTabBar />);
+      expect(screen.getByRole("link", { name: "Wardrobe" })).toHaveAttribute("aria-current", "page");
+      expect(screen.getByRole("link", { name: "Trips" })).not.toHaveAttribute("aria-current");
+    });
+  });
+
+  // Desktop has no bottom dock, so the sidebar is its only route to these pages.
+  describe("desktop sidebar", () => {
+    it("links to Trips and Wardrobe", () => {
+      render(
+        <SidebarProvider>
+          <AppSidebar />
+        </SidebarProvider>
+      );
+      expect(screen.getByRole("link", { name: "Trips" })).toHaveAttribute("href", "/trips");
+      expect(screen.getByRole("link", { name: "Wardrobe" })).toHaveAttribute("href", "/wardrobe");
     });
   });
 });
