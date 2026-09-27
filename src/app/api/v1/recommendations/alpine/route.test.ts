@@ -110,15 +110,16 @@ describe('Alpine Recommendations API Route', () => {
         category: 'base_layer',
         covers_torso: true,
         covers_legs: false,
-        garment_thermal_properties: { rcl_whole_body: 0.1, evap_potential: 0.3 },
+        garment_thermal_properties: { rcl_torso: 0.2, rcl_arms: 0.2, rcl_whole_body: 0.1, evap_potential: 0.3 },
       }),
       createMockGarment({
         id: 'base-legs',
         model_name: 'Legs Base',
         category: 'base_layer',
         covers_torso: false,
+        covers_arms: false,
         covers_legs: true,
-        garment_thermal_properties: { rcl_whole_body: 0.1, evap_potential: 0.3 },
+        garment_thermal_properties: { rcl_legs: 0.4, rcl_whole_body: 0.1, evap_potential: 0.3 },
       }),
       createMockGarment({
         id: 'mid-torso',
@@ -126,15 +127,16 @@ describe('Alpine Recommendations API Route', () => {
         category: 'mid_layer_light',
         covers_torso: true,
         covers_legs: false,
-        garment_thermal_properties: { rcl_whole_body: 0.2, evap_potential: 0.25 },
+        garment_thermal_properties: { rcl_torso: 0.3, rcl_arms: 0.3, rcl_whole_body: 0.2, evap_potential: 0.25 },
       }),
       createMockGarment({
         id: 'ins-legs',
         model_name: 'Legs Insulation',
         category: 'insulation_synthetic',
         covers_torso: false,
+        covers_arms: false,
         covers_legs: true,
-        garment_thermal_properties: { rcl_whole_body: 0.2, evap_potential: 0.2 },
+        garment_thermal_properties: { rcl_legs: 0.8, rcl_whole_body: 0.2, evap_potential: 0.2 },
       }),
       createMockGarment({
         id: 'shell-torso',
@@ -142,7 +144,7 @@ describe('Alpine Recommendations API Route', () => {
         category: 'hard_shell',
         covers_torso: true,
         covers_legs: false,
-        garment_thermal_properties: { rcl_whole_body: 0.1, evap_potential: 0.15 },
+        garment_thermal_properties: { rcl_torso: 0.2, rcl_arms: 0.2, rcl_whole_body: 0.1, evap_potential: 0.15 },
         garment_protection: { waterproof_mm: 20000 },
       }),
       createMockGarment({
@@ -150,8 +152,9 @@ describe('Alpine Recommendations API Route', () => {
         model_name: 'Legs Shell',
         category: 'hard_shell',
         covers_torso: false,
+        covers_arms: false,
         covers_legs: true,
-        garment_thermal_properties: { rcl_whole_body: 0.1, evap_potential: 0.15 },
+        garment_thermal_properties: { rcl_legs: 0.4, rcl_whole_body: 0.1, evap_potential: 0.15 },
         garment_protection: { waterproof_mm: 18000 },
       }),
     ];
@@ -171,6 +174,10 @@ describe('Alpine Recommendations API Route', () => {
 
     expect(names).toContain('TestBrand Torso Mid');
     expect(names).toContain('TestBrand Legs Insulation');
+    expect(data.warnings).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^Insufficient torso insulation:.*for alpine conditions$/),
+      expect.stringMatching(/^Insufficient legs insulation:.*for alpine conditions$/),
+    ]));
   });
 
   it('reduces skiing insulation requirement at higher exertion', async () => {
