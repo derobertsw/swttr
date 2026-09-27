@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { NextRequest } from "next/server";
 import { toast } from "sonner";
 import { POST as evaluateLayers } from "@/app/api/v1/ensembles/evaluate/route";
 import type { PickerItem } from "@/hooks/useLayerPicker";
+import { buildGearUpResult } from "@/lib/gearUp";
 import LayerDisplay from "./LayerDisplay";
 
 // Layer evaluation runs on the server; serve it from the real route handler.
@@ -87,9 +88,12 @@ const defaultProps = {
 
 describe("LayerDisplay", () => {
   describe("rendering", () => {
-    it("should render null when recommendation is null", () => {
-      const { container } = render(<LayerDisplay recommendation={null} temperature={25} windspeed={10} />);
-      expect(container.firstChild).toBeNull();
+    it("keeps the conditions on screen when there are no layers", () => {
+      render(<LayerDisplay recommendation={null} temperature={25} windspeed={10} />);
+
+      expect(screen.getByText("Wind 10 mph")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Layers aren't available yet" })).toBeInTheDocument();
+      expect(screen.queryByText("Detailed Layer Breakdown")).not.toBeInTheDocument();
     });
 
     it("should render all body part sections", () => {
@@ -449,30 +453,9 @@ describe("LayerDisplay", () => {
       // Should render weather info
       expect(screen.getByText("15")).toBeInTheDocument();
       expect(screen.getByText("Wind 10 mph")).toBeInTheDocument();
-    });
 
-    it("should return null when both recommendation AND biophysicsData are null", () => {
-      const { container } = render(
-        <LayerDisplay
-          recommendation={null}
-          temperature={25}
-          windspeed={10}
-          biophysicsData={null}
-        />
-      );
-      expect(container.firstChild).toBeNull();
-    });
-
-    it("should return null when both recommendation AND biophysicsData are undefined", () => {
-      const { container } = render(
-        <LayerDisplay
-          recommendation={null}
-          temperature={25}
-          windspeed={10}
-          biophysicsData={undefined}
-        />
-      );
-      expect(container.firstChild).toBeNull();
+      // Personalized layers aren't labeled as general guidance
+      expect(screen.queryByText("General guidance")).not.toBeInTheDocument();
     });
 
     it("should display biophysics garments with their thermal properties (clo values)", () => {
@@ -914,6 +897,109 @@ describe("LayerDisplay", () => {
       expect(await screen.findByLabelText(/Descent Cold Risk/)).toBeInTheDocument();
     });
 
+  });
+
+  describe("without a personalized recommendation", () => {
+    const scoreLabel = /optimal|comfortable|cold stress|overheating risk/i;
+
+    it("labels static layers as general guidance with no comfort score", () => {
+      render(<LayerDisplay {...defaultProps} activity="alpine_skiing" biophysicsStatus="auth_required" />);
+
+      expect(screen.getByRole("heading", { name: "General guidance" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
+      expect(screen.getByText("Wool base layer")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: scoreLabel })).not.toBeInTheDocument();
+    });
+
+    it("offers a retry when personalized layers failed to load", () => {
+      const onRetry = vi.fn();
+      render(<LayerDisplay {...defaultProps} biophysicsStatus="unavailable" onRetry={onRetry} />);
+
+      expect(screen.getByText(/personalized layers couldn't load/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(onRetry).toHaveBeenCalledTimes(1);
+    });
+
+    it("points to the wardrobe when there's no usable gear", () => {
+      render(<LayerDisplay {...defaultProps} biophysicsStatus="no_gear" />);
+      expect(screen.getByRole("link", { name: /add gear/i })).toHaveAttribute("href", "/wardrobe");
+    });
+
+    it("offers no action when the activity has no personalized model", () => {
+      render(<LayerDisplay {...defaultProps} activity="hiking_snowshoeing" biophysicsStatus="unsupported" />);
+
+      const notice = screen.getByRole("region", { name: "General guidance" });
+      expect(notice).toHaveTextContent(/aren't available for this activity yet/);
+      expect(within(notice).queryByRole("link")).not.toBeInTheDocument();
+      expect(within(notice).queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it.each(["running", "biking", "backcountry_skiing"])(
+      "gives a signed-out %s result the outing and a sign-in path",
+      async (activity) => {
+        const result = await buildGearUpResult({ temperature: 25, windSpeed: 10 }, activity, "neutral", async () => ({
+          status: "auth_required",
+          data: null,
+        }));
+        render(
+          <LayerDisplay
+            activity={activity}
+            recommendation={result.recommendation}
+            biophysicsStatus={result.biophysicsStatus}
+            temperature={result.temperature}
+            windspeed={result.windspeed}
+          />
+        );
+
+        expect(screen.getByText("Wind 10 mph")).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
+      }
+    );
+
+    describe("and no static layers", () => {
+      const noLayers = { activity: "running", recommendation: null, temperature: 25, windspeed: 10 };
+
+      it("asks a signed-out user to sign in, keeping the outing and its controls", () => {
+        render(
+          <LayerDisplay
+            {...noLayers}
+            biophysicsStatus="auth_required"
+            onReset={vi.fn()}
+            onActivityChange={vi.fn()}
+            onWeatherChange={vi.fn()}
+          />
+        );
+
+        expect(screen.getByRole("heading", { name: "Sign in for Running layers" })).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
+        expect(screen.getByText("Wind 10 mph")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Change weather location, date, or time" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Running" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+        expect(screen.queryByText("Detailed Layer Breakdown")).not.toBeInTheDocument();
+      });
+
+      it("offers a retry after a failed request and shows it's retrying", () => {
+        const onRetry = vi.fn();
+        const { rerender } = render(
+          <LayerDisplay {...noLayers} biophysicsStatus="unavailable" onRetry={onRetry} />
+        );
+
+        expect(screen.getByRole("heading", { name: "Couldn't load Running layers" })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+        expect(onRetry).toHaveBeenCalledTimes(1);
+
+        rerender(<LayerDisplay {...noLayers} biophysicsStatus="unavailable" onRetry={onRetry} weatherLoading />);
+        expect(screen.getByRole("button", { name: "Trying again…" })).toBeDisabled();
+      });
+
+      it("points a signed-in user without usable gear to the wardrobe", () => {
+        render(<LayerDisplay {...noLayers} biophysicsStatus="no_gear" />);
+
+        expect(screen.getByRole("heading", { name: "Add gear for Running layers" })).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: /add gear/i })).toHaveAttribute("href", "/wardrobe");
+      });
+    });
   });
 
   describe("layer picker", () => {

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import {
+  BiophysicsOutcome,
   BiophysicsRecommendation,
   BIOPHYSICS_ENDPOINTS,
   isBiophysicsSupported,
@@ -26,15 +27,17 @@ interface UseBiophysicsResult {
     weather: BiophysicsWeather,
     exertion: ExertionLevel,
     bodyMetrics: UserBodyMetrics
-  ) => Promise<BiophysicsRecommendation | null>;
+  ) => Promise<BiophysicsOutcome>;
   reset: () => void;
 }
 
 /**
  * Hook for fetching biophysics-based clothing recommendations
  *
- * Returns null for unsupported activities (graceful fallback).
- * Handles errors silently so existing static recommendations still work.
+ * Resolves to the recommendation, or to a status saying why there isn't one
+ * (unsupported activity, sign-in required, no usable gear, failed request),
+ * so callers can fall back to static layers and explain the fallback.
+ * Failures are logged rather than thrown.
  * If user has wardrobe items, uses only those for recommendations.
  */
 export function useBiophysicsRecommendation(): UseBiophysicsResult {
@@ -49,11 +52,10 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
       weather: BiophysicsWeather,
       exertion: ExertionLevel,
       bodyMetrics: UserBodyMetrics
-    ): Promise<BiophysicsRecommendation | null> => {
-      // Return null for unsupported activities
+    ): Promise<BiophysicsOutcome> => {
       if (!isBiophysicsSupported(activity)) {
         setData(null);
-        return null;
+        return { status: "unsupported", data: null };
       }
 
       const endpoint = BIOPHYSICS_ENDPOINTS[activity];
@@ -83,27 +85,32 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
           }),
         });
 
+        // Signed-out callers are turned away by src/proxy.ts.
+        if (response.status === 401) {
+          setData(null);
+          return { status: "auth_required", data: null };
+        }
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);
         }
 
         const result = await response.json();
-        // Validate that the response has the expected structure
         if (result?.recommendation?.score !== undefined) {
           setData(result);
-          return result;
-        } else {
-          // Response doesn't have expected structure, treat as null
-          setData(null);
-          return null;
+          return { status: "ok", data: result };
         }
+        // Targets without a recommendation: there was no usable gear.
+        if (result?.ireq) {
+          setData(null);
+          return { status: "no_gear", data: null };
+        }
+        throw new Error("API response has no recommendation");
       } catch (err) {
-        // Handle errors silently - existing recommendations still work
         const errorObj = err instanceof Error ? err : new Error("Unknown error");
         setError(errorObj);
         setData(null);
         logWarn("useBiophysicsRecommendation", errorObj);
-        return null;
+        return { status: "unavailable", data: null };
       } finally {
         setLoading(false);
       }

@@ -189,23 +189,33 @@ export function useGearUp() {
     }
   }, [recommendFor]);
 
-  const handleActivityChange = useCallback(async (newActivity: string) => {
-    setActivity(newActivity);
+  /** Recommendations for the weather already shown, keeping the outing. */
+  const recommendForShownWeather = useCallback(async (forActivity: string, failureMessage: string) => {
     dispatch({ type: "SUBMIT_START" });
     try {
-      const currentWeather: WeatherData = {
+      const shownWeather: WeatherData = {
         temperature: state.temperature,
         windSpeed: state.windspeed,
         precipitation: state.precipitation,
         precipitationType: state.precipitationType,
       };
-      dispatch({ type: "SUBMIT_SUCCESS", ...(await recommendFor(currentWeather, newActivity)) });
+      dispatch({ type: "SUBMIT_SUCCESS", ...(await recommendFor(shownWeather, forActivity)) });
     } catch (error) {
-      toast.error("Failed to update activity");
-      logWarn("useGearUp.handleActivityChange", error);
+      toast.error(failureMessage);
+      logWarn("useGearUp.recommendForShownWeather", error);
       dispatch({ type: "SUBMIT_ERROR" });
     }
-  }, [setActivity, state.temperature, state.windspeed, state.precipitation, state.precipitationType, recommendFor]);
+  }, [state.temperature, state.windspeed, state.precipitation, state.precipitationType, recommendFor]);
+
+  const handleActivityChange = useCallback(async (newActivity: string) => {
+    setActivity(newActivity);
+    await recommendForShownWeather(newActivity, "Failed to update activity");
+  }, [setActivity, recommendForShownWeather]);
+
+  const handleRetry = useCallback(
+    () => recommendForShownWeather(activity, "Failed to load layers"),
+    [activity, recommendForShownWeather]
+  );
 
   const handleGoNow = useCallback(async () => {
     if (!activity) {
@@ -255,12 +265,14 @@ export function useGearUp() {
     loading: state.loading,
     locationDenied: state.locationDenied,
     biophysicsData: state.biophysicsData,
+    biophysicsStatus: state.biophysicsStatus,
     multiDayPlan: state.multiDayPlan,
     locationSearch,
     handleSubmit,
     handleGoNow,
     handleWeatherChange,
     handleActivityChange,
+    handleRetry,
     resetToInitialState,
   };
 }

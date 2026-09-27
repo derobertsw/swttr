@@ -23,7 +23,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - Running
 - Biking
 
-**Biophysics support (signed in):** Alpine Skiing, Backcountry Skiing (ski touring), XC Skiing, Running, and Biking. Hiking / Snowshoeing and signed-out users get static recommendations from `src/data/layerRecommendations.json`, which covers Alpine, XC, and Hiking.
+**Biophysics support (signed in):** Alpine Skiing, Backcountry Skiing (ski touring), XC Skiing, Running, and Biking. Hiking / Snowshoeing and signed-out users get static recommendations from `src/data/layerRecommendations.json`, which covers Alpine, XC, and Hiking. The app labels those as general guidance. Where there are no static layers (signed-out Running, Biking, and Backcountry), it keeps the outing on screen with a sign-in prompt instead. Signed-in users get the same fallback, with Add gear or Try again in place of sign-in, when their wardrobe has no usable gear or the request fails.
 
 ## How Layer Recommendations Work
 
@@ -310,7 +310,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_or_secret_key
 MPP_SECRET_KEY=...
 ```
 
-Without Supabase configured, database-backed API routes return 503 and the home page falls back to static layer recommendations from `src/data/layerRecommendations.json`.
+Without Supabase configured, database-backed API routes return 503. The home page then falls back to static layer recommendations from `src/data/layerRecommendations.json`, or shows a Try again prompt for activities that have none.
 
 ### Development
 
