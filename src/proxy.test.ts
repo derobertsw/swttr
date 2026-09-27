@@ -25,8 +25,9 @@ describe("proxy, signed out", () => {
     auth.protect.mockClear();
   });
 
-  it("lets visitors build a multi-day plan", async () => {
+  it("lets visitors build a multi-day plan and its packing list", async () => {
     expect(await visit("/api/plan-ahead", "POST")).toBeUndefined();
+    expect(await visit("/api/packing-list", "POST")).toBeUndefined();
     expect(auth.protect).not.toHaveBeenCalled();
   });
 
