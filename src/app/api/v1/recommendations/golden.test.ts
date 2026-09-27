@@ -15,6 +15,7 @@ import { POST as biking } from "./biking/route";
 import { POST as running } from "./running/route";
 import { POST as skiTouring } from "./ski-touring/route";
 import { POST as xc } from "./xc/route";
+import type { BiophysicsRecommendation } from "@/types/biophysics";
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -110,7 +111,27 @@ function useDatabase(userId: string | null, wardrobe: Row[]) {
   });
 }
 
-describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST }) => {
+function expectWearableAlpine(body: BiophysicsRecommendation) {
+  const garments = body.recommendation?.garments ?? [];
+  expect(garments.length).toBeGreaterThan(0);
+  expect(new Set(garments.map((g) => g.id)).size).toBe(garments.length);
+  for (const region of ["torso", "arms", "legs"] as const) {
+    // Bibs sit under the jacket, so they only fill the legs slots.
+    const isBib = (g: (typeof garments)[number]) => g.covers_legs && !g.covers_arms;
+    const layers = garments.filter((g) => g[`covers_${region}`] && !(region === "torso" && isBib(g)));
+    const bases = layers.filter((g) => g.category === "base_layer");
+    const mids = layers.filter((g) => ["mid_layer_light", "mid_layer_heavy", "insulation_down", "insulation_synthetic"].includes(g.category));
+    const outers = layers.filter((g) => ["outer_insulated", "hard_shell", "soft_shell", "windbreaker"].includes(g.category));
+    expect(bases.length).toBeLessThanOrEqual(1);
+    expect(mids.length).toBeLessThanOrEqual(1);
+    expect(outers.length).toBeLessThanOrEqual(1);
+    if (mids.some((g) => ["insulation_down", "insulation_synthetic"].includes(g.category)) && outers.length) {
+      expect(outers[0].category).toBe("hard_shell");
+    }
+  }
+}
+
+describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST, sport }) => {
   beforeEach(() => {
     useDatabase(null, []);
   });
@@ -119,14 +140,18 @@ describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST })
     describe(mode.name, () => {
       it.each(CONDITIONS)("$name", async ({ body }) => {
         useDatabase(mode.userId, mode.wardrobe);
-        expect(await callRoute(POST, { ...body, ...mode.extraBody })).toMatchSnapshot();
+        const result = await callRoute(POST, { ...body, ...mode.extraBody });
+        if (sport === "alpine") expectWearableAlpine(result.body);
+        expect(result).toMatchSnapshot();
       });
     });
   }
 
   it("signed in with an empty wardrobe falls back to the catalog", async () => {
     useDatabase(USER_ID, []);
-    expect(await callRoute(POST, CONDITIONS[1].body)).toMatchSnapshot();
+    const result = await callRoute(POST, CONDITIONS[1].body);
+    if (sport === "alpine") expectWearableAlpine(result.body);
+    expect(result).toMatchSnapshot();
   });
 
   it("wardrobe-only with an empty wardrobe returns targets without garments", async () => {
