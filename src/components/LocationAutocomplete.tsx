@@ -3,8 +3,9 @@
 import { Input } from "@/components/ui/input";
 import { Loader2, MapPin } from "lucide-react";
 import { LocationSuggestion } from "@/types/recommendations";
-import { RefObject, useEffect, useRef, useState } from "react";
+import { Ref, RefObject, useEffect, useRef, useState } from "react";
 import { FROSTED_INPUT_FULL, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
+import { FieldError } from "@/components/FieldError";
 
 type LocationAutocompleteVariant = "frosted" | "default";
 
@@ -19,6 +20,9 @@ interface LocationAutocompleteProps {
   showSuggestions: boolean;
   selectedLocation: LocationSuggestion | null;
   isSearching?: boolean;
+  /** Validation message to show under the field; marks the input invalid. */
+  error?: string;
+  inputRef?: Ref<HTMLInputElement>;
   suggestionRef: RefObject<HTMLDivElement | null>;
   onLocationInputChange: (value: string) => void;
   onLocationFocus: () => void;
@@ -37,6 +41,8 @@ export function LocationAutocomplete({
   showSuggestions,
   selectedLocation,
   isSearching = false,
+  error,
+  inputRef,
   suggestionRef,
   onLocationInputChange,
   onLocationFocus,
@@ -50,6 +56,7 @@ export function LocationAutocomplete({
 
   const open = showSuggestions && suggestions.length > 0;
   const listboxId = `${id}-listbox`;
+  const errorId = `${id}-error`;
   const optionId = (i: number) => `${id}-option-${i}`;
 
   // Reset activeIndex when suggestions change
@@ -133,12 +140,15 @@ export function LocationAutocomplete({
           <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 ${isFrosted ? "text-white/75" : "text-muted-foreground"}`} />
         )}
         <Input
+          ref={inputRef}
           id={id}
           role="combobox"
           aria-expanded={open}
           aria-controls={listboxId}
           aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
           aria-autocomplete="list"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
           placeholder={placeholder}
           value={selectedLocation ? location : locationQuery}
           onChange={(e) => onLocationInputChange(e.target.value)}
@@ -175,6 +185,11 @@ export function LocationAutocomplete({
           </ul>
         )}
       </div>
+      {error && (
+        <FieldError id={errorId} variant={isFrosted ? "frosted" : "default"}>
+          {error}
+        </FieldError>
+      )}
     </div>
   );
 }

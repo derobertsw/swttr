@@ -81,6 +81,8 @@ export function useGearUp() {
   }, [recommendFor]);
 
   const handleSubmit = useCallback(async () => {
+    // The iOS shell's Gear Up action can fire again while a request is running.
+    if (state.loading) return;
     if (!activity) {
       toast.error("Please select an activity");
       return;
