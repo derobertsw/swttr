@@ -920,5 +920,92 @@ describe("Home Page", () => {
         userAgent.mockRestore();
       }
     });
+
+    /** Gets a one-day plan's layers for Stowe on the start date at 07:30. */
+    async function seeOneDayLayers(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole("button", { name: /single day/i }));
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "07:30" } });
+      await user.click(screen.getByRole("button", { name: "See my layers" }));
+      expect(await screen.findByText(/wind 12 mph/i)).toBeInTheDocument();
+    }
+
+    it("goes Back from a one-day plan's layers to the plan, keeping what was entered", async () => {
+      const { requests } = mockPlanAheadApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await seeOneDayLayers(user);
+      await user.click(screen.getByRole("button", { name: "Back" }));
+
+      expect(screen.queryByText(/wind 12 mph/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Gear Up" })).not.toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByLabelText("Start time")).toHaveValue("07:30");
+
+      await user.click(screen.getByRole("button", { name: "See my layers" }));
+
+      expect(await screen.findByText(/wind 12 mph/i)).toBeInTheDocument();
+      expect(requests.weather).toEqual([
+        `/api/weather?lat=44.47&lon=-72.69&datetime=${START_DATE}T07:30`,
+        `/api/weather?lat=44.47&lon=-72.69&datetime=${START_DATE}T07:30`,
+      ]);
+    });
+
+    it("plans another trip from a multi-day plan, starting from the last one", async () => {
+      mockPlanAheadApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await user.click(screen.getByRole("button", { name: "Increase duration" }));
+      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+      await user.click(await screen.findByRole("button", { name: "Plan Another Trip" }));
+
+      expect(screen.queryByRole("heading", { name: "Multi-Day Layer Plan" })).not.toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByText("4 days")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Build layer plan" })).toBeEnabled();
+    });
+
+    it("returns to the plan when the iOS shell's Plan tab is tapped again", async () => {
+      mockPlanAheadApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await seeOneDayLayers(user);
+      act(() => {
+        window.dispatchEvent(new CustomEvent("navigatePlanAhead"));
+      });
+
+      expect(screen.queryByText(/wind 12 mph/i)).not.toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByLabelText("Start time")).toHaveValue("07:30");
+    });
+
+    it("starts over in Now mode from the logo, until the iOS shell's Plan tab is tapped again", async () => {
+      mockPlanAheadApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await seeOneDayLayers(user);
+      await user.click(screen.getByRole("link", { name: "SWTTR" }));
+
+      expect(screen.getByRole("button", { name: "Gear Up" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: /where are you/i })).toHaveValue("");
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent("navigatePlanAhead"));
+      });
+
+      expect(screen.queryByRole("button", { name: "Gear Up" })).not.toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("");
+      expect(screen.getByRole("button", { name: /pick start date/i })).toBeInTheDocument();
+    });
   });
 });

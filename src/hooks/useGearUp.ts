@@ -214,6 +214,17 @@ export function useGearUp() {
     biophysics.reset();
   }, [resetActivity, cancelLocating, locationSearch, biophysics]);
 
+  /** Back to the plan form, keeping the activity, place, date, time and duration. */
+  const showPlanForm = useCallback(() => dispatch({ type: "SHOW_PLAN_FORM" }), []);
+
+  // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches
+  // "navigatePlanAhead" when its Plan tab is tapped again on this page, and
+  // otherwise opens /?mode=planAhead. Installed apps keep sending it.
+  useEffect(() => {
+    window.addEventListener("navigatePlanAhead", showPlanForm);
+    return () => window.removeEventListener("navigatePlanAhead", showPlanForm);
+  }, [showPlanForm]);
+
   return {
     activity,
     setActivity,
@@ -261,6 +272,7 @@ export function useGearUp() {
     handleWeatherChange,
     handleActivityChange,
     handleRetry,
+    showPlanForm,
     resetToInitialState,
   };
 }

@@ -68,6 +68,7 @@ type GearUpAction =
   | ({ type: "SUBMIT_SUCCESS" } & GearUpResult)
   | ({ type: "SUBMIT_PLAN_SUCCESS" } & PlanAheadResult)
   | { type: "SUBMIT_ERROR" }
+  | { type: "SHOW_PLAN_FORM" }
   | { type: "RESET" };
 
 export function createInitialState(inputMode: InputMode): GearUpState {
@@ -135,6 +136,11 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
       };
     case "SUBMIT_ERROR":
       return { ...state, loading: false };
+    case "SHOW_PLAN_FORM": {
+      // Drops any results, but keeps what was entered and a request still running.
+      const { date, time, durationDays, loading } = state;
+      return { ...createInitialState("planAhead"), date, time, durationDays, loading };
+    }
     case "RESET":
       return createInitialState("manual");
     default:
