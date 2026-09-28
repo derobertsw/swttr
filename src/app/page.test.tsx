@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { LOCATION_TIMEOUT_MS } from "@/hooks/useDeviceLocation";
 import Home from "./page";
 
 // Mock sonner toast
@@ -63,6 +64,25 @@ const STOWE = {
 async function chooseStowe(user: ReturnType<typeof userEvent.setup>, field: RegExp = /location/i) {
   await user.type(screen.getByRole("combobox", { name: field }), "Stowe");
   await user.click(await screen.findByRole("option", { name: /Stowe/ }));
+}
+
+/**
+ * Geolocation that answers only when the test says so, like a permission
+ * prompt nobody has answered yet. `answer` and `fail` reply to the latest request.
+ */
+function mockGeolocation() {
+  const requests: { success: PositionCallback; error: PositionErrorCallback }[] = [];
+  const getCurrentPosition = vi.fn((success: PositionCallback, error: PositionErrorCallback) => {
+    requests.push({ success, error });
+  });
+  Object.defineProperty(navigator, "geolocation", { value: { getCurrentPosition }, writable: true });
+  return {
+    getCurrentPosition,
+    answer: (latitude: number, longitude: number) =>
+      act(async () => requests.at(-1)?.success({ coords: { latitude, longitude } } as GeolocationPosition)),
+    /** Codes: 1 denied, 2 unavailable, 3 timed out. */
+    fail: (code: number) => act(async () => requests.at(-1)?.error({ code } as GeolocationPositionError)),
+  };
 }
 
 describe("Home Page", () => {
@@ -128,216 +148,247 @@ describe("Home Page", () => {
     });
   });
 
-  describe("Gear Up button - weather fetch success", () => {
-    it("should show results when weather fetch succeeds", async () => {
-      const mockGeolocation = {
-        getCurrentPosition: vi.fn((success) => {
-          success({ coords: { latitude: 40.7128, longitude: -74.006 } });
-        }),
-      };
-      Object.defineProperty(navigator, "geolocation", {
-        value: mockGeolocation,
-        writable: true,
-      });
+  describe("choosing where", () => {
+    const placeField = () => screen.getByRole("combobox", { name: /where are you/i });
+    const gearUpButton = () => screen.getByRole("button", { name: /gear up/i });
+    const useMyLocationButton = () => screen.getByRole("button", { name: "Use my location" });
 
-      mockFetch.mockImplementation((url: string) => {
-        if (url.includes("/api/wardrobe/items")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ mappings: [] }),
-          });
-        }
-        if (url.includes("/api/preferences")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ temperatureSensitivity: "neutral" }),
-          });
-        }
-        if (url.includes("/api/weather")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ temperature: 32, windSpeed: 15 }),
-          });
-        }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-      });
-
-      const user = userEvent.setup();
-      render(<Home />);
-
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText(/wind 15 mph/i)).toBeInTheDocument();
-      });
-      expect(screen.getByText("Current conditions")).toBeInTheDocument();
-      expect(screen.getByText("Your location")).toBeInTheDocument();
-      expect(mockFetch).toHaveBeenCalledWith("/api/weather?lat=40.7128&lon=-74.006");
-    });
-  });
-
-  describe("Gear Up button - weather fetch failure", () => {
-    it("should show location input when geolocation is not supported", async () => {
-      Object.defineProperty(navigator, "geolocation", {
-        value: undefined,
-        writable: true,
-      });
-
-      const user = userEvent.setup();
-      render(<Home />);
-
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
-      });
-    });
-
-    it("should show error toast when weather fetch fails", async () => {
-      const { toast } = await import("sonner");
-
-      Object.defineProperty(navigator, "geolocation", {
-        value: undefined,
-        writable: true,
-      });
-
-      const user = userEvent.setup();
-      render(<Home />);
-
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
-
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          "Could not get current weather. Please enter your location manually."
-        );
-      });
-    });
-
-    it("should show location input when geolocation permission denied", async () => {
-      const mockGeolocation = {
-        getCurrentPosition: vi.fn((_success, error) => {
-          error({ code: 1, PERMISSION_DENIED: 1 });
-        }),
-      };
-      Object.defineProperty(navigator, "geolocation", {
-        value: mockGeolocation,
-        writable: true,
-      });
-
-      const user = userEvent.setup();
-      render(<Home />);
-
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
-      });
-    });
-
-    it("should show location input when geoDenied query is set", async () => {
-      mockSearchParams.set("gearUp", "1");
-      mockSearchParams.set("geoDenied", "1");
-
-      render(<Home />);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
-      });
-      expect(screen.queryByText(/temperature:/i)).not.toBeInTheDocument();
-    });
-
-    it("should show location input when API returns error", async () => {
-      const mockGeolocation = {
-        getCurrentPosition: vi.fn((success) => {
-          success({ coords: { latitude: 40.7128, longitude: -74.006 } });
-        }),
-      };
-      Object.defineProperty(navigator, "geolocation", {
-        value: mockGeolocation,
-        writable: true,
-      });
-
-      mockFetch.mockImplementation((url: string) => {
-        if (url.includes("/api/wardrobe/items")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ mappings: [] }),
-          });
-        }
-        if (url.includes("/api/preferences")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ temperatureSensitivity: "neutral" }),
-          });
-        }
-        if (url.includes("/api/weather")) {
-          return Promise.resolve({ ok: false });
-        }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-      });
-
-      const user = userEvent.setup();
-      render(<Home />);
-
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("manual location mode", () => {
-    it("should retry current-location fetch when Gear Up is clicked again", async () => {
-      const { toast } = await import("sonner");
-
-      Object.defineProperty(navigator, "geolocation", {
-        value: undefined,
-        writable: true,
-      });
-
-      const user = userEvent.setup();
-      render(<Home />);
-
-      // First click shows location input fallback
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
-      });
-
-      // Second click without selecting location should prompt user
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
-
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          "Could not get current weather. Please enter your location manually."
-        );
-      });
-    });
-
-    it("gets current conditions for a place picked by hand", async () => {
-      Object.defineProperty(navigator, "geolocation", { value: undefined, writable: true });
+    /** Geocoding finds Stowe; weather requests get `weather`. Returns the weather requests made. */
+    function mockOutingApis(weather: () => MockResponse = () => respond(200, { temperature: 32, windSpeed: 15 })) {
       const weatherRequests: string[] = [];
       mockFetch.mockImplementation((url: string) => {
         if (url.includes("/api/geocode")) return Promise.resolve(respond(200, { results: [STOWE] }));
         if (url.includes("/api/weather")) {
           weatherRequests.push(url);
-          return Promise.resolve(respond(200, { temperature: 30, windSpeed: 7, isForecast: false }));
+          return Promise.resolve(weather());
+        }
+        if (url.includes("/api/wardrobe/items")) return Promise.resolve(respond(200, { mappings: [] }));
+        if (url.includes("/api/preferences")) {
+          return Promise.resolve(respond(200, { temperatureSensitivity: "neutral" }));
         }
         return Promise.resolve(respond(200, {}));
       });
+      return weatherRequests;
+    }
 
+    it("shows the place search from the start, and asks for a place instead of locating", async () => {
+      const geolocation = mockGeolocation();
+      const weatherRequests = mockOutingApis();
       const user = userEvent.setup();
       render(<Home />);
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
+
+      expect(placeField()).toBeEnabled();
+      await user.click(gearUpButton());
+
+      expect(placeField()).toHaveFocus();
+      expect(placeField()).toBeInvalid();
+      expect(placeField()).toHaveAccessibleDescription("Search for a place, or use your location.");
+      expect(geolocation.getCurrentPosition).not.toHaveBeenCalled();
+      expect(weatherRequests).toEqual([]);
+    });
+
+    it("gets current conditions at a place picked by hand", async () => {
+      const geolocation = mockGeolocation();
+      const weatherRequests = mockOutingApis(() => respond(200, { temperature: 30, windSpeed: 7, isForecast: false }));
+      const user = userEvent.setup();
+      render(<Home />);
+
       await chooseStowe(user, /where are you/i);
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
+      await user.click(gearUpButton());
 
       expect(await screen.findByText("Current conditions")).toBeInTheDocument();
       expect(screen.getByText("Stowe, Vermont, United States")).toBeInTheDocument();
       expect(screen.getByText(/wind 7 mph/i)).toBeInTheDocument();
       expect(weatherRequests).toEqual(["/api/weather?lat=44.47&lon=-72.69"]);
+      expect(geolocation.getCurrentPosition).not.toHaveBeenCalled();
+    });
+
+    it("gets current conditions at the device's location once Use my location finds it", async () => {
+      const geolocation = mockGeolocation();
+      const weatherRequests = mockOutingApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(useMyLocationButton());
+      expect(screen.getByText("Finding your location…")).toBeInTheDocument();
+      expect(gearUpButton()).toBeDisabled();
+
+      await geolocation.answer(40.7128, -74.006);
+      expect(placeField()).toHaveValue("Your location");
+      await user.click(gearUpButton());
+
+      expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+      expect(screen.getByText("Your location")).toBeInTheDocument();
+      expect(screen.getByText(/wind 15 mph/i)).toBeInTheDocument();
+      expect(weatherRequests).toEqual(["/api/weather?lat=40.7128&lon=-74.006"]);
+      expect(geolocation.getCurrentPosition).toHaveBeenCalledTimes(1);
+    });
+
+    it("says why when the weather for the device's location fails, and keeps the place", async () => {
+      const { toast } = await import("sonner");
+      const geolocation = mockGeolocation();
+      mockOutingApis(() => respond(502, { error: "Bad gateway" }));
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(useMyLocationButton());
+      await geolocation.answer(40.7128, -74.006);
+      await user.click(gearUpButton());
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not get weather for this location."));
+      expect(placeField()).toHaveValue("Your location");
+      expect(gearUpButton()).toBeEnabled();
+    });
+
+    it.each([
+      {
+        failure: "is denied",
+        code: 1,
+        message: "Location access is off for this site. Search for a place, or allow location access and try again.",
+      },
+      { failure: "times out", code: 3, message: "Finding your location took too long. Try again, or search for a place." },
+      { failure: "is unavailable", code: 2, message: "Your location isn't available. Try again, or search for a place." },
+    ])("says so when the location $failure, and the search still works from the keyboard", async ({ code, message }) => {
+      const geolocation = mockGeolocation();
+      const weatherRequests = mockOutingApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(useMyLocationButton());
+      await geolocation.fail(code);
+
+      expect(screen.getByText(message)).toBeInTheDocument();
+      expect(placeField()).toHaveValue("");
+      await user.type(placeField(), "Stowe");
+      await screen.findByRole("option", { name: /Stowe/ });
+      await user.keyboard("{ArrowDown}{Enter}");
+      expect(placeField()).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.queryByText(message)).not.toBeInTheDocument();
+
+      await user.click(gearUpButton());
+      expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+      expect(weatherRequests).toEqual(["/api/weather?lat=44.47&lon=-72.69"]);
+    });
+
+    it("says the location isn't available when the browser can't share it", async () => {
+      Object.defineProperty(navigator, "geolocation", { value: undefined, writable: true });
+      mockOutingApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(useMyLocationButton());
+
+      expect(
+        await screen.findByText("Your location isn't available. Try again, or search for a place.")
+      ).toBeInTheDocument();
+      expect(placeField()).toBeEnabled();
+    });
+
+    it("stops waiting for a location nobody answers for", async () => {
+      // Like a permission prompt left open, which the Geolocation API's own timeout doesn't cover.
+      mockGeolocation();
+      mockOutingApis();
+      render(<Home />);
+      await screen.findByRole("region");
+
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        fireEvent.click(useMyLocationButton());
+        await act(() => vi.advanceTimersByTimeAsync(LOCATION_TIMEOUT_MS - 1));
+        expect(screen.getByText("Finding your location…")).toBeInTheDocument();
+
+        await act(() => vi.advanceTimersByTimeAsync(1));
+        expect(
+          screen.getByText("Finding your location took too long. Try again, or search for a place.")
+        ).toBeInTheDocument();
+        expect(gearUpButton()).toBeEnabled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("keeps a place picked while the location is still being found", async () => {
+      const geolocation = mockGeolocation();
+      const weatherRequests = mockOutingApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(useMyLocationButton());
+      await chooseStowe(user, /where are you/i);
+      expect(screen.queryByText("Finding your location…")).not.toBeInTheDocument();
+
+      // The device's location arrives late.
+      await geolocation.answer(40.7128, -74.006);
+      expect(placeField()).toHaveValue("Stowe, Vermont, United States");
+
+      await user.click(gearUpButton());
+      expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+      expect(weatherRequests).toEqual(["/api/weather?lat=44.47&lon=-72.69"]);
+    });
+
+    it("stops finding the location on Cancel, and ignores it if it arrives later", async () => {
+      const geolocation = mockGeolocation();
+      mockOutingApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(useMyLocationButton());
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(screen.queryByText("Finding your location…")).not.toBeInTheDocument();
+      expect(useMyLocationButton()).toHaveFocus();
+      expect(gearUpButton()).toBeEnabled();
+
+      await geolocation.answer(40.7128, -74.006);
+      expect(placeField()).toHaveValue("");
+    });
+
+    it("asks for the location again only from Use my location", async () => {
+      const geolocation = mockGeolocation();
+      const weatherRequests = mockOutingApis();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(useMyLocationButton());
+      await geolocation.fail(1);
+      await user.click(gearUpButton());
+
+      expect(placeField()).toHaveFocus();
+      expect(geolocation.getCurrentPosition).toHaveBeenCalledTimes(1);
+
+      await user.click(useMyLocationButton());
+      await geolocation.answer(40.7128, -74.006);
+
+      expect(geolocation.getCurrentPosition).toHaveBeenCalledTimes(2);
+      expect(placeField()).toHaveValue("Your location");
+      expect(placeField()).toBeValid();
+      expect(weatherRequests).toEqual([]);
+    });
+
+    it("opens on the place search from the iOS shell's Gear Up link, without locating", async () => {
+      mockSearchParams.set("gearUp", "1");
+      const geolocation = mockGeolocation();
+      mockOutingApis();
+      render(<Home />);
+
+      expect(await screen.findByRole("combobox", { name: /where are you/i })).toBeEnabled();
+      expect(geolocation.getCurrentPosition).not.toHaveBeenCalled();
+    });
+
+    it("asks for a place when the iOS shell's Gear Up action has none", async () => {
+      const geolocation = mockGeolocation();
+      const weatherRequests = mockOutingApis();
+      render(<Home />);
+      await screen.findByRole("region");
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent("gearUp"));
+      });
+
+      expect(placeField()).toBeInvalid();
+      expect(placeField()).toHaveFocus();
+      expect(geolocation.getCurrentPosition).not.toHaveBeenCalled();
+      expect(weatherRequests).toEqual([]);
     });
   });
 
@@ -388,6 +439,15 @@ describe("Home Page", () => {
       });
     }
 
+    /** Uses the device's location, which mockOuting gives at once, and presses Gear Up. */
+    async function gearUpHere(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole("button", { name: "Use my location" }));
+      await waitFor(() =>
+        expect(screen.getByRole("combobox", { name: /where are you/i })).toHaveValue("Your location")
+      );
+      await user.click(screen.getByRole("button", { name: /gear up/i }));
+    }
+
     async function switchActivity(user: ReturnType<typeof userEvent.setup>, from: string, to: string) {
       await user.click(screen.getByRole("button", { name: from }));
       await user.click(await screen.findByRole("button", { name: to }));
@@ -399,7 +459,7 @@ describe("Home Page", () => {
 
       const user = userEvent.setup();
       render(<Home />);
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
+      await gearUpHere(user);
 
       // Alpine has static layers, shown as general guidance.
       expect(await screen.findByRole("heading", { name: "General guidance" })).toBeInTheDocument();
@@ -426,7 +486,7 @@ describe("Home Page", () => {
 
       const user = userEvent.setup();
       render(<Home />);
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
+      await gearUpHere(user);
       expect(await screen.findByText(/personalized layers couldn't load/i)).toBeInTheDocument();
 
       await switchActivity(user, "Alpine", "Running");
@@ -762,7 +822,7 @@ describe("Home Page", () => {
       expect(requests.weather).toHaveLength(1);
     });
 
-    it("doesn't label a Go Now request as building the plan", async () => {
+    it("doesn't label a Go Now request as building the plan, and lets it be cancelled", async () => {
       // Geolocation never answers, so Go Now stays in flight.
       const { getCurrentPosition } = mockPlanAheadApis();
       const user = userEvent.setup();
@@ -771,8 +831,73 @@ describe("Home Page", () => {
       await user.click(screen.getByRole("button", { name: /go now/i }));
 
       expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Finding your location…")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Build layer plan" })).toBeDisabled();
       expect(screen.queryByRole("button", { name: "Building layer plan…" })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(screen.queryByText("Finding your location…")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Build layer plan" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: /go now/i })).toHaveFocus();
+    });
+
+    it("gets current conditions at the device's location with Go Now", async () => {
+      const { requests } = mockPlanAheadApis({
+        weather: () => Promise.resolve(respond(200, { temperature: 30, windSpeed: 7, isForecast: false })),
+      });
+      const geolocation = mockGeolocation();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(screen.getByRole("button", { name: /go now/i }));
+      await geolocation.answer(40.7128, -74.006);
+
+      expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+      expect(screen.getByText("Your location")).toBeInTheDocument();
+      expect(requests.weather).toEqual(["/api/weather?lat=40.7128&lon=-74.006"]);
+    });
+
+    it("says why Go Now couldn't find the location, and keeps the plan", async () => {
+      const { requests } = mockPlanAheadApis();
+      const geolocation = mockGeolocation();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(screen.getByRole("button", { name: /single day/i }));
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "07:30" } });
+      await user.click(screen.getByRole("button", { name: /go now/i }));
+      await geolocation.fail(1);
+
+      expect(
+        screen.getByText("Location access is off for this site. Search for a place, or allow location access and try again.")
+      ).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByLabelText("Start time")).toHaveValue("07:30");
+      expect(screen.getByRole("button", { name: "See my layers" })).toBeEnabled();
+      expect(requests.weather).toEqual([]);
+    });
+
+    it("stops Go Now when a place is picked for the plan, and ignores a location that arrives later", async () => {
+      const { requests } = mockPlanAheadApis();
+      const geolocation = mockGeolocation();
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(screen.getByRole("button", { name: /go now/i }));
+      await chooseStowe(user);
+
+      expect(screen.queryByText("Finding your location…")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Build layer plan" })).toBeEnabled();
+
+      await geolocation.answer(40.7128, -74.006);
+
+      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
+      expect(requests.weather).toEqual([]);
     });
 
     it("keeps the submit action in the iOS shell, which hides the web tab bar", async () => {

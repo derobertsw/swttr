@@ -9,13 +9,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, CalendarDays, Layers, Locate, Loader2, Route, ChevronDown } from "lucide-react";
+import { CalendarIcon, CalendarDays, Layers, Loader2, Route, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LocationSuggestion } from "@/types/recommendations";
 import { FormEvent, RefObject, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { DeviceLocationButton } from "@/components/DeviceLocationButton";
 import { FieldError } from "@/components/FieldError";
+import type { DeviceLocationStatus } from "@/hooks/useDeviceLocation";
 import { FROSTED_INPUT, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
 import { Capacitor } from "@capacitor/core";
 
@@ -36,7 +38,11 @@ interface PlanAheadFormProps {
   onDurationDaysChange: (days: number) => void;
   /** Requests layers for the chosen place, date and duration. Called only when those are filled in. */
   onSubmit: () => void;
+  /** Finds the device's location and gets its current layers. */
   onGoNow?: () => void;
+  /** Where Go Now's request for the device's location stands. */
+  locationStatus: DeviceLocationStatus;
+  onCancelLocating: () => void;
   onLocationInputChange: (value: string) => void;
   onLocationFocus: () => void;
   onSelectLocation: (suggestion: LocationSuggestion) => void;
@@ -94,6 +100,8 @@ export function PlanAheadForm({
   onDurationDaysChange,
   onSubmit,
   onGoNow,
+  locationStatus,
+  onCancelLocating,
   onLocationInputChange,
   onLocationFocus,
   onSelectLocation,
@@ -202,19 +210,14 @@ export function PlanAheadForm({
 
       {onGoNow && (
         <>
-          <button
-            type="button"
+          <DeviceLocationButton
+            label="Go Now — Use Current Location"
+            status={locationStatus}
             disabled={loading}
-            onClick={handleGoNow}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/[0.14] px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(8,16,34,0.12)] backdrop-blur-xl transition hover:bg-white/[0.22] disabled:opacity-50"
-          >
-            {goNowPending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Locate className="size-4" />
-            )}
-            Go Now — Use Current Location
-          </button>
+            pending={goNowPending}
+            onLocate={handleGoNow}
+            onCancel={onCancelLocating}
+          />
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-white/20" />
             <span className="text-xs font-medium text-white/50">or plan ahead</span>

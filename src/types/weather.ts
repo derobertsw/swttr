@@ -4,7 +4,7 @@ export type PrecipitationType = 'rain' | 'snow' | 'mixed';
 export type WeatherContext =
   | {
       source: "current";
-      /** The place that was picked; absent for the device's own location. */
+      /** The place that was picked, e.g. "Stowe, Vermont, United States" or "Your location". */
       place?: string;
     }
   | {
@@ -22,9 +22,4 @@ export interface WeatherData {
   precipitation?: boolean;
   precipitationType?: PrecipitationType;
   context?: WeatherContext;
-}
-
-export interface WeatherResult {
-  data: WeatherData | null;
-  locationDenied: boolean;
 }

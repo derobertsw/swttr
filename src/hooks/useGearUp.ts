@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
+import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -8,7 +9,8 @@ import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useBiophysicsRecommendation } from "@/hooks/useBiophysicsRecommendation";
 import { useActivitySelection } from "@/hooks/useActivitySelection";
-import { fetchCurrentWeather, fetchWeatherAt } from "@/hooks/useCurrentWeather";
+import { fetchWeatherAt } from "@/hooks/useCurrentWeather";
+import { useDeviceLocation, yourLocation } from "@/hooks/useDeviceLocation";
 import {
   buildGearUpResult,
   createInitialState,
@@ -21,9 +23,10 @@ import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
 
 /**
- * State and actions for the home page's Gear Up flow: pick an activity, get
- * weather (current location, a searched location, or a multi-day forecast),
- * and fetch layer recommendations for it.
+ * State and actions for the home page's Gear Up flow: pick an activity and a
+ * place (searched for, or the device's own location when asked), get weather
+ * there (now, at a later time, or a multi-day forecast), and fetch layer
+ * recommendations for it.
  */
 export function useGearUp() {
   const searchParams = useSearchParams();
@@ -41,6 +44,8 @@ export function useGearUp() {
   const [state, dispatch] = useReducer(gearUpReducer, initialMode, createInitialState);
 
   const locationSearch = useLocationSearch();
+  const { status: locationStatus, locate, cancel: cancelLocating } = useDeviceLocation();
+  const placeInputRef = useRef<HTMLInputElement>(null);
   const biophysics = useBiophysicsRecommendation();
 
   const setDate = useCallback((d: Date | undefined) => dispatch({ type: "SET_DATE", date: d }), []);
@@ -83,16 +88,16 @@ export function useGearUp() {
     return true;
   }, [recommendFor]);
 
-  /** Recommendations for the device's current location. */
-  const recommendForCurrentLocation = useCallback(async () => {
-    const current = await fetchCurrentWeather();
-    if (current.data) return { result: await recommendFor(current.data) };
-    return { result: null, locationDenied: Boolean(current.locationDenied) };
-  }, [recommendFor]);
+  /** Makes the device's position the outing's place, once it's found. */
+  const handleUseMyLocation = useCallback(async () => {
+    const coordinates = await locate();
+    if (coordinates) locationSearch.handleSelectLocation(yourLocation(coordinates));
+  }, [locate, locationSearch]);
 
   const handleSubmit = useCallback(async () => {
-    // The iOS shell's Gear Up action can fire again while a request is running.
-    if (state.loading) return;
+    // The iOS shell's Gear Up action can fire again while a request is running,
+    // or before a requested location arrives.
+    if (state.loading || locationStatus === "locating") return;
     if (!activity) {
       toast.error("Please select an activity");
       return;
@@ -129,29 +134,20 @@ export function useGearUp() {
           dispatch({ type: "SUBMIT_ERROR" });
         }
       }
-    } else if (state.locationDenied && locationSearch.selectedLocation) {
+    } else if (locationSearch.selectedLocation) {
+      // Current weather at the chosen place, never silently at the device's location.
       dispatch({ type: "SUBMIT_START" });
       await recommendAt(locationSearch.selectedLocation);
     } else {
-      dispatch({ type: "SUBMIT_START" });
-      const { result, locationDenied } = await recommendForCurrentLocation();
-
-      if (result) {
-        dispatch({ type: "SUBMIT_SUCCESS", ...result });
-      } else {
-        toast.error(
-          locationDenied
-            ? "Location access denied. Please enter your location manually."
-            : "Could not get current weather. Please enter your location manually."
-        );
-        dispatch({ type: "LOCATION_DENIED" });
-        dispatch({ type: "SUBMIT_ERROR" });
-      }
+      // Render the error first, so the field is announced as invalid when it takes focus.
+      flushSync(() => dispatch({ type: "PLACE_MISSING" }));
+      placeInputRef.current?.focus();
     }
-  }, [activity, state, locationSearch, sensitivity, recommendAt, recommendForCurrentLocation]);
+  }, [activity, state, locationStatus, locationSearch, sensitivity, recommendAt]);
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches "gearUp"
-  // from its native Gear Up tab while this page is open...
+  // from its native Gear Up tab while this page is open, and otherwise opens
+  // /?gearUp=1, where the place search already shows.
   useEffect(() => {
     const onGearUp = () => {
       void handleSubmit();
@@ -159,14 +155,6 @@ export function useGearUp() {
     window.addEventListener("gearUp", onGearUp);
     return () => window.removeEventListener("gearUp", onGearUp);
   }, [handleSubmit]);
-
-  // ...and otherwise opens /?gearUp=1, which starts in manual location entry.
-  const handledGearUpParam = useRef(false);
-  useEffect(() => {
-    if (!searchParams.get("gearUp") || handledGearUpParam.current) return;
-    handledGearUpParam.current = true;
-    dispatch({ type: "LOCATION_DENIED" });
-  }, [searchParams]);
 
   const handleWeatherChange = useCallback((location: LocationSuggestion, localDateTime?: string) => {
     dispatch({ type: "SUBMIT_START" });
@@ -207,26 +195,24 @@ export function useGearUp() {
       toast.error("Please select an activity");
       return;
     }
+    // Loading covers finding the location too, so the plan can't be submitted meanwhile.
     dispatch({ type: "SUBMIT_START" });
-    const { result, locationDenied } = await recommendForCurrentLocation();
-    if (result) {
-      dispatch({ type: "SUBMIT_SUCCESS", ...result });
-    } else {
-      toast.error(
-        locationDenied
-          ? "Location access denied. Please enter a location or use Plan Ahead."
-          : "Could not get current weather."
-      );
+    const coordinates = await locate();
+    if (!coordinates) {
+      // The location button says why, unless the request was cancelled.
       dispatch({ type: "SUBMIT_ERROR" });
+      return;
     }
-  }, [activity, recommendForCurrentLocation]);
+    await recommendAt(yourLocation(coordinates));
+  }, [activity, locate, recommendAt]);
 
   const resetToInitialState = useCallback(() => {
     resetActivity();
+    cancelLocating();
     dispatch({ type: "RESET" });
     locationSearch.reset();
     biophysics.reset();
-  }, [resetActivity, locationSearch, biophysics]);
+  }, [resetActivity, cancelLocating, locationSearch, biophysics]);
 
   return {
     activity,
@@ -249,11 +235,27 @@ export function useGearUp() {
     durationDays: state.durationDays,
     setDurationDays,
     loading: state.loading,
-    locationDenied: state.locationDenied,
+    showPlaceError: state.showPlaceError,
+    locationStatus,
+    placeInputRef,
     biophysicsData: state.biophysicsData,
     biophysicsStatus: state.biophysicsStatus,
     multiDayPlan: state.multiDayPlan,
-    locationSearch,
+    // Typing or picking a place ends a pending location request, so a position
+    // that arrives late can't replace the place.
+    locationSearch: {
+      ...locationSearch,
+      handleLocationInputChange: (value: string) => {
+        cancelLocating();
+        locationSearch.handleLocationInputChange(value);
+      },
+      handleSelectLocation: (suggestion: LocationSuggestion) => {
+        cancelLocating();
+        locationSearch.handleSelectLocation(suggestion);
+      },
+    },
+    handleUseMyLocation,
+    cancelLocating,
     handleSubmit,
     handleGoNow,
     handleWeatherChange,

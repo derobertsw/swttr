@@ -2,9 +2,9 @@
 
 import { formatLocationName } from "@/hooks/useLocationSearch";
 import type { LocationSuggestion } from "@/types/recommendations";
-import type { WeatherData, WeatherResult } from "@/types/weather";
+import type { WeatherData } from "@/types/weather";
 
-function parseWeatherResponse(data: Record<string, unknown>, place?: string): WeatherData {
+function parseWeatherResponse(data: Record<string, unknown>, place: string): WeatherData {
   return {
     temperature: data.temperature as number,
     windSpeed: data.windSpeed as number,
@@ -15,40 +15,6 @@ function parseWeatherResponse(data: Record<string, unknown>, place?: string): We
         ? { source: "forecast", place, forecastTime: data.forecastTime, timeZone: data.timeZone }
         : { source: "current", place },
   };
-}
-
-export function fetchCurrentWeather(): Promise<WeatherResult> {
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) {
-      resolve({ data: null, locationDenied: false });
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const response = await fetch(
-            `/api/weather?lat=${latitude}&lon=${longitude}`
-          );
-
-          if (!response.ok) {
-            resolve({ data: null, locationDenied: false });
-            return;
-          }
-
-          const data = await response.json();
-          resolve({ data: parseWeatherResponse(data), locationDenied: false });
-        } catch {
-          resolve({ data: null, locationDenied: false });
-        }
-      },
-      (error) => {
-        const isDenied = error.code === error.PERMISSION_DENIED;
-        resolve({ data: null, locationDenied: isDenied });
-      }
-    );
-  });
 }
 
 /** Weather for a place, or the message to show when there is none. */
