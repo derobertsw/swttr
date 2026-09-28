@@ -29,7 +29,8 @@ interface GearUpState {
   time: string;
   durationDays: number;
   showResults: boolean;
-  locationDenied: boolean;
+  /** Set once Gear Up is pressed without a place, so the place field says it's needed. */
+  showPlaceError: boolean;
   loading: boolean;
   recommendation: Recommendation | null;
   biophysicsData: BiophysicsRecommendation | null;
@@ -62,7 +63,7 @@ type GearUpAction =
   | { type: "SET_DATE"; date: Date | undefined }
   | { type: "SET_TIME"; time: string }
   | { type: "SET_DURATION_DAYS"; durationDays: number }
-  | { type: "LOCATION_DENIED" }
+  | { type: "PLACE_MISSING" }
   | { type: "SUBMIT_START" }
   | ({ type: "SUBMIT_SUCCESS" } & GearUpResult)
   | ({ type: "SUBMIT_PLAN_SUCCESS" } & PlanAheadResult)
@@ -81,7 +82,7 @@ export function createInitialState(inputMode: InputMode): GearUpState {
     time: "12:00",
     durationDays: 3,
     showResults: false,
-    locationDenied: false,
+    showPlaceError: false,
     loading: false,
     recommendation: null,
     biophysicsData: null,
@@ -100,8 +101,8 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
       return { ...state, time: action.time };
     case "SET_DURATION_DAYS":
       return { ...state, durationDays: action.durationDays };
-    case "LOCATION_DENIED":
-      return { ...state, locationDenied: true };
+    case "PLACE_MISSING":
+      return { ...state, showPlaceError: true };
     case "SUBMIT_START":
       return { ...state, loading: true };
     case "SUBMIT_SUCCESS":

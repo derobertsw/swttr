@@ -8,9 +8,7 @@ const MIN_QUERY_LENGTH = 2;
 
 /** A place as shown once it's picked, e.g. "Stowe, Vermont, United States". */
 export function formatLocationName(suggestion: LocationSuggestion): string {
-  return suggestion.region
-    ? `${suggestion.name}, ${suggestion.region}, ${suggestion.country}`
-    : `${suggestion.name}, ${suggestion.country}`;
+  return [suggestion.name, suggestion.region, suggestion.country].filter(Boolean).join(", ");
 }
 
 export function useLocationSearch() {

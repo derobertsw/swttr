@@ -35,11 +35,15 @@ const HomeContent = () => {
     durationDays,
     setDurationDays,
     loading,
-    locationDenied,
+    showPlaceError,
+    locationStatus,
+    placeInputRef,
     biophysicsData,
     biophysicsStatus,
     multiDayPlan,
     locationSearch,
+    handleUseMyLocation,
+    cancelLocating,
     handleGoNow,
     handleSubmit,
     handleWeatherChange,
@@ -89,7 +93,7 @@ const HomeContent = () => {
                 onExertionChange={setExertion}
               />
             )}
-            {inputMode === "manual" && locationDenied ? (
+            {inputMode === "manual" ? (
               <LocationInput
                 activityName={ACTIVITIES.find(a => a.value === activity)?.name.toLowerCase() || ""}
                 location={locationSearch.location}
@@ -98,13 +102,19 @@ const HomeContent = () => {
                 showSuggestions={locationSearch.showSuggestions}
                 selectedLocation={locationSearch.selectedLocation}
                 isSearching={locationSearch.isSearching}
+                showErrors={showPlaceError}
+                locationStatus={locationStatus}
+                loading={loading}
+                inputRef={placeInputRef}
                 suggestionRef={locationSearch.suggestionRef}
                 onLocationInputChange={locationSearch.handleLocationInputChange}
                 onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
                 onSelectLocation={locationSearch.handleSelectLocation}
                 onDismiss={locationSearch.dismiss}
+                onUseMyLocation={() => void handleUseMyLocation()}
+                onCancelLocating={cancelLocating}
               />
-            ) : inputMode === "planAhead" ? (
+            ) : (
               <PlanAheadForm
                 date={date}
                 time={time}
@@ -121,19 +131,22 @@ const HomeContent = () => {
                 onTimeChange={setTime}
                 onDurationDaysChange={setDurationDays}
                 onSubmit={() => void handleSubmit()}
-                onGoNow={handleGoNow}
+                onGoNow={() => void handleGoNow()}
+                locationStatus={locationStatus}
+                onCancelLocating={cancelLocating}
                 onLocationInputChange={locationSearch.handleLocationInputChange}
                 onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
                 onSelectLocation={locationSearch.handleSelectLocation}
                 onDismiss={locationSearch.dismiss}
               />
-            ) : null}
+            )}
             {showGearUpButton && (
               <button
                 type="button"
                 aria-label="Gear Up"
                 onClick={() => void handleSubmit()}
-                disabled={loading}
+                // Waits for a requested location, which becomes the place.
+                disabled={loading || locationStatus === "locating"}
                 className="inline-flex h-12 w-full max-w-[420px] items-center justify-center gap-2 rounded-xl border border-white/10 bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] px-6 text-sm font-semibold text-white shadow-[0_14px_26px_rgba(0,0,0,0.44)] transition-transform duration-200 hover:bg-[#030712] disabled:opacity-70"
               >
                 {loading ? <Loader2 className="size-5 animate-spin" /> : <ActivityIcon className="size-5" />}
