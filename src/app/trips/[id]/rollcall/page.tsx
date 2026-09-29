@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useMemo } from "react";
 import Link from "next/link";
-import { ArrowLeft, BellRing } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -19,7 +19,6 @@ const REQUIRED_SLOTS = ["shirt", "midlayer", "shell", "pants", "gloves"];
 export default function RollCallPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data, loading, error } = useTrip(id);
-  const [poked, setPoked] = useState<Set<string>>(new Set());
 
   // Use the first day's kits as roll-call snapshot (the "trailhead" moment).
   const rollCall = useMemo(() => {
@@ -100,23 +99,6 @@ export default function RollCallPage({ params }: { params: Promise<{ id: string 
               <Chip variant={row.ready ? "default" : "warn"}>
                 {row.ready ? "ready" : "missing"}
               </Chip>
-              {!row.ready && row.member.role !== "organizer" && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPoked((s) => {
-                      const next = new Set(s);
-                      next.add(row.member.id);
-                      return next;
-                    })
-                  }
-                  disabled={poked.has(row.member.id)}
-                  className="inline-flex items-center gap-1 rounded-full border border-cyan-300/50 bg-cyan-300/22 px-2.5 py-0.5 text-xs text-white disabled:opacity-60"
-                >
-                  <BellRing className="size-3" />
-                  {poked.has(row.member.id) ? "poked" : "poke"}
-                </button>
-              )}
             </div>
           </Card>
         ))}

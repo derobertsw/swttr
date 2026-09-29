@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { ArrowLeft, Loader2, Trash2, UserPlus, X } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +13,7 @@ import {
   SectionLabel,
 } from "@/components/trips/trip-primitives";
 import { useTrip } from "@/hooks/useTrip";
+import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import type { TripMember } from "@/types/trips";
 
 export default function ManageCrewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,16 +26,15 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
   const [removing, setRemoving] = useState(false);
 
   const add = async () => {
-    if (!name.trim()) return;
+    const displayName = name.trim();
+    if (!displayName) return;
     setAdding(true);
     try {
-      await fetch(`/api/v1/trips/${id}/members`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: name.trim(), kind }),
-      });
+      await tripRequest(`/api/v1/trips/${id}/members`, "POST", { display_name: displayName, kind });
       setName("");
       await refresh();
+    } catch (err) {
+      toast.error(`Couldn't add ${displayName}`, { description: errorMessage(err) });
     } finally {
       setAdding(false);
     }
@@ -43,9 +44,14 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
     if (!confirming) return;
     setRemoving(true);
     try {
-      await fetch(`/api/v1/trips/${id}/members/${confirming.id}`, { method: "DELETE" });
+      await tripRequest(`/api/v1/trips/${id}/members/${confirming.id}`, "DELETE");
       setConfirming(null);
       await refresh();
+    } catch (err) {
+      // The dialog stays open, so the removal can be retried or cancelled.
+      toast.error(`Couldn't remove ${confirming.display_name}`, {
+        description: errorMessage(err),
+      });
     } finally {
       setRemoving(false);
     }

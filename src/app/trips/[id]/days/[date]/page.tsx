@@ -2,7 +2,8 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowLeft, ChevronLeft, ChevronRight, CloudOff, Loader2, MapPin } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -16,12 +17,16 @@ import {
 } from "@/components/trips/trip-primitives";
 import { useTrip } from "@/hooks/useTrip";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
+import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import type { TripEffort, TripKitState, TripMember, TripMemberDayKit, TripStop } from "@/types/trips";
 
 const KIT_SLOTS = ["shirt", "midlayer", "jacket", "shell", "pants", "gloves"] as const;
 const EFFORT_OPTIONS: TripEffort[] = ["easy", "steady", "hard"];
+
+/** tempF/wind in imperial units (matches /api/weather); precip is the day's peak probability as a 0–1 fraction. */
+type DayWeather = { tempF: number; precip: number; wind: number };
 
 export default function DayDetailPage({
   params,
@@ -30,11 +35,11 @@ export default function DayDetailPage({
 }) {
   const { id, date } = use(params);
   const { data, loading, error, refresh } = useTrip(id);
-  // tempF/wind in imperial units (matches /api/weather), precip is a 0–1 fraction
-  // representing the day's peak precipitation probability.
+  // `weather` is null when there's no forecast for the day, e.g. it's past the
+  // forecast window or the forecast request failed.
   const [weatherResult, setWeatherResult] = useState<{
     key: string;
-    weather: { tempF: number; precip: number; wind: number };
+    weather: DayWeather | null;
   } | null>(null);
 
   const day = data?.days.find((d) => d.date === date);
@@ -51,7 +56,7 @@ export default function DayDetailPage({
     effectiveStop?.latitude && effectiveStop?.longitude
       ? `${effectiveStop.latitude},${effectiveStop.longitude},${date}`
       : null;
-  const weather = weatherKey && weatherResult?.key === weatherKey ? weatherResult.weather : null;
+  const forecast = weatherKey && weatherResult?.key === weatherKey ? weatherResult : null;
 
   useEffect(() => {
     if (!weatherKey || !effectiveStop?.latitude || !effectiveStop?.longitude) return;
@@ -59,8 +64,8 @@ export default function DayDetailPage({
     fetch(
       `/api/weather?lat=${effectiveStop.latitude}&lon=${effectiveStop.longitude}&startDate=${date}&days=1`
     )
-      .then((r) => r.json())
-      .then((body: { hourly?: Array<{ time: string; temperature: number; windSpeed: number; precipitationProbability: number }> }) => {
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { hourly?: Array<{ time: string; temperature: number; windSpeed: number; precipitationProbability: number }> } | null) => {
         if (cancelled) return;
         const hourly = Array.isArray(body?.hourly) ? body.hourly : [];
         // Average across the active daytime window (8am–6pm) for a representative
@@ -71,7 +76,10 @@ export default function DayDetailPage({
           return hour >= 8 && hour <= 18;
         });
         const sample = daytime.length > 0 ? daytime : hourly;
-        if (sample.length === 0) return;
+        if (sample.length === 0) {
+          setWeatherResult({ key: weatherKey, weather: null });
+          return;
+        }
         const avgTemp =
           sample.reduce((acc, h) => acc + (h.temperature ?? 0), 0) / sample.length;
         const peakWind = sample.reduce((acc, h) => Math.max(acc, h.windSpeed ?? 0), 0);
@@ -88,7 +96,9 @@ export default function DayDetailPage({
           },
         });
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setWeatherResult({ key: weatherKey, weather: null });
+      });
     return () => {
       cancelled = true;
     };
@@ -183,7 +193,8 @@ export default function DayDetailPage({
             <WeatherCard
               tripId={id}
               stop={effectiveStop ?? null}
-              weather={weather}
+              forecastLoaded={forecast !== null}
+              weather={forecast?.weather ?? null}
               onLocationSaved={() => refresh()}
             />
 
@@ -214,12 +225,14 @@ export default function DayDetailPage({
 function WeatherCard({
   tripId,
   stop,
+  forecastLoaded,
   weather,
   onLocationSaved,
 }: {
   tripId: string;
   stop: TripStop | null;
-  weather: { tempF: number; precip: number; wind: number } | null;
+  forecastLoaded: boolean;
+  weather: DayWeather | null;
   onLocationSaved: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -237,30 +250,25 @@ function WeatherCard({
         ? `${selected.name}, ${selected.region}`
         : `${selected.name}, ${selected.country}`;
       if (stop) {
-        await fetch(`/api/v1/trips/${tripId}/stops/${stop.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name,
-            latitude: selected.latitude,
-            longitude: selected.longitude,
-          }),
+        await tripRequest(`/api/v1/trips/${tripId}/stops/${stop.id}`, "PATCH", {
+          name,
+          latitude: selected.latitude,
+          longitude: selected.longitude,
         });
       } else {
-        await fetch(`/api/v1/trips/${tripId}/stops`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name,
-            latitude: selected.latitude,
-            longitude: selected.longitude,
-            activities: [],
-          }),
+        await tripRequest(`/api/v1/trips/${tripId}/stops`, "POST", {
+          name,
+          latitude: selected.latitude,
+          longitude: selected.longitude,
+          activities: [],
         });
       }
       search.reset();
       setEditing(false);
       onLocationSaved();
+    } catch (err) {
+      // The picked place stays in the editor, so Save location can be tried again.
+      toast.error("Couldn't save the location", { description: errorMessage(err) });
     } finally {
       setSaving(false);
     }
@@ -269,10 +277,15 @@ function WeatherCard({
   return (
     <Card>
       <div className="flex items-center gap-3">
-        <WeatherGlyph
-          kind={weather ? inferWeatherKind(weather.tempF, weather.precip) : "cloud"}
-          className="size-8"
-        />
+        {weather ? (
+          <WeatherGlyph kind={inferWeatherKind(weather.tempF, weather.precip)} className="size-8" />
+        ) : !hasCoords ? (
+          <MapPin className="size-8 text-white/55" aria-hidden />
+        ) : forecastLoaded ? (
+          <CloudOff className="size-8 text-white/55" aria-hidden />
+        ) : (
+          <Loader2 className="size-8 animate-spin text-white/55" aria-hidden />
+        )}
         <div className="flex-1">
           {weather ? (
             <>
@@ -288,7 +301,9 @@ function WeatherCard({
               </p>
             </>
           ) : hasCoords ? (
-            <p className="text-sm text-white/60">Loading forecast…</p>
+            <p className="text-sm text-white/60">
+              {forecastLoaded ? "Forecast unavailable for this day." : "Loading forecast…"}
+            </p>
           ) : (
             <p className="text-sm text-white/60">
               {stop
@@ -387,12 +402,11 @@ function ActivityPicker({
     setValue(next);
     setSaving(true);
     try {
-      await fetch(`/api/v1/trips/${tripId}/days/${date}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activity: next }),
-      });
+      await tripRequest(`/api/v1/trips/${tripId}/days/${date}`, "PATCH", { activity: next });
       onChange();
+    } catch (err) {
+      setValue(current);
+      toast.error("Couldn't save the activity", { description: errorMessage(err) });
     } finally {
       setSaving(false);
     }
@@ -474,12 +488,15 @@ function MemberKitRow({
         state: next.state ?? state,
         note: kit?.note ?? null,
       };
-      await fetch(`/api/v1/trips/${tripId}/days/${date}/kits/${member.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      await tripRequest(`/api/v1/trips/${tripId}/days/${date}/kits/${member.id}`, "PUT", body);
       onChange();
+    } catch (err) {
+      // Show the saved kit again rather than an edit that didn't stick.
+      setEffort(kit?.effort ?? "steady");
+      setItems(kit?.items ?? []);
+      setState(kit?.state ?? "ok");
+      // Not "<name>'s kit": the organizer's display name is "You".
+      toast.error("Couldn't save the kit change", { description: errorMessage(err) });
     } finally {
       setSaving(false);
     }
