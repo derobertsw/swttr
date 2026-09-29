@@ -16,6 +16,7 @@ import {
   createInitialState,
   fetchPlanAhead,
   gearUpReducer,
+  showsPlanForm,
   type InputMode,
 } from "@/lib/gearUp";
 import { logWarn } from "@/lib/logger";
@@ -72,19 +73,38 @@ export function useGearUp() {
     [activity, sensitivity, biophysics, exertion, bodyMetrics]
   );
 
+  // Only the latest request's answer is used. Going to the plan form from
+  // anywhere else, or starting over, retires the running request, so a late
+  // answer can't show results or report an error for an outing that's gone.
+  const latestRequest = useRef(0);
+  /** Starts loading, and returns a check for whether this request is still the latest. */
+  const startRequest = useCallback(() => {
+    const request = ++latestRequest.current;
+    dispatch({ type: "SUBMIT_START" });
+    return () => latestRequest.current === request;
+  }, []);
+
   /**
    * Shows recommendations for a picked place's current weather, or for its
    * forecast at a local date-time there. Resolves false, after saying why,
-   * when there's no weather; the inputs stay as they were.
+   * when there's no weather; the inputs stay as they were. Nothing changes
+   * once `isCurrent` says the request was retired.
    */
-  const recommendAt = useCallback(async (location: LocationSuggestion, localDateTime?: string) => {
+  const recommendAt = useCallback(async (
+    isCurrent: () => boolean,
+    location: LocationSuggestion,
+    localDateTime?: string
+  ) => {
     const { data, error } = await fetchWeatherAt(location, localDateTime);
     if (!data) {
-      toast.error(error);
-      dispatch({ type: "SUBMIT_ERROR" });
+      if (isCurrent()) {
+        toast.error(error);
+        dispatch({ type: "SUBMIT_ERROR" });
+      }
       return false;
     }
-    dispatch({ type: "SUBMIT_SUCCESS", ...(await recommendFor(data)) });
+    const result = await recommendFor(data);
+    if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", ...result });
     return true;
   }, [recommendFor]);
 
@@ -113,10 +133,10 @@ export function useGearUp() {
         return;
       }
 
-      dispatch({ type: "SUBMIT_START" });
+      const isCurrent = startRequest();
       if (state.durationDays === 1) {
         // Single day: layers for the forecast hour the outing starts, read on the place's clock.
-        await recommendAt(locationSearch.selectedLocation, `${format(state.date, "yyyy-MM-dd")}T${state.time}`);
+        await recommendAt(isCurrent, locationSearch.selectedLocation, `${format(state.date, "yyyy-MM-dd")}T${state.time}`);
       } else {
         try {
           const result = await fetchPlanAhead({
@@ -127,23 +147,24 @@ export function useGearUp() {
             time: state.time,
             durationDays: state.durationDays,
           });
-          dispatch({ type: "SUBMIT_PLAN_SUCCESS", ...result });
+          if (isCurrent()) dispatch({ type: "SUBMIT_PLAN_SUCCESS", ...result });
         } catch (error) {
-          toast.error("Failed to fetch weather forecast");
           logWarn("useGearUp.handleSubmit", error);
-          dispatch({ type: "SUBMIT_ERROR" });
+          if (isCurrent()) {
+            toast.error("Failed to fetch weather forecast");
+            dispatch({ type: "SUBMIT_ERROR" });
+          }
         }
       }
     } else if (locationSearch.selectedLocation) {
       // Current weather at the chosen place, never silently at the device's location.
-      dispatch({ type: "SUBMIT_START" });
-      await recommendAt(locationSearch.selectedLocation);
+      await recommendAt(startRequest(), locationSearch.selectedLocation);
     } else {
       // Render the error first, so the field is announced as invalid when it takes focus.
       flushSync(() => dispatch({ type: "PLACE_MISSING" }));
       placeInputRef.current?.focus();
     }
-  }, [activity, state, locationStatus, locationSearch, sensitivity, recommendAt]);
+  }, [activity, state, locationStatus, locationSearch, sensitivity, startRequest, recommendAt]);
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches "gearUp"
   // from its native Gear Up tab while this page is open, and otherwise opens
@@ -156,14 +177,14 @@ export function useGearUp() {
     return () => window.removeEventListener("gearUp", onGearUp);
   }, [handleSubmit]);
 
-  const handleWeatherChange = useCallback((location: LocationSuggestion, localDateTime?: string) => {
-    dispatch({ type: "SUBMIT_START" });
-    return recommendAt(location, localDateTime);
-  }, [recommendAt]);
+  const handleWeatherChange = useCallback(
+    (location: LocationSuggestion, localDateTime?: string) => recommendAt(startRequest(), location, localDateTime),
+    [startRequest, recommendAt]
+  );
 
   /** Recommendations for the weather already shown, keeping the outing. */
   const recommendForShownWeather = useCallback(async (forActivity: string, failureMessage: string) => {
-    dispatch({ type: "SUBMIT_START" });
+    const isCurrent = startRequest();
     try {
       const shownWeather: WeatherData = {
         temperature: state.temperature,
@@ -172,13 +193,16 @@ export function useGearUp() {
         precipitationType: state.precipitationType,
         context: state.weatherContext ?? undefined,
       };
-      dispatch({ type: "SUBMIT_SUCCESS", ...(await recommendFor(shownWeather, forActivity)) });
+      const result = await recommendFor(shownWeather, forActivity);
+      if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", ...result });
     } catch (error) {
-      toast.error(failureMessage);
       logWarn("useGearUp.recommendForShownWeather", error);
-      dispatch({ type: "SUBMIT_ERROR" });
+      if (isCurrent()) {
+        toast.error(failureMessage);
+        dispatch({ type: "SUBMIT_ERROR" });
+      }
     }
-  }, [state.temperature, state.windspeed, state.precipitation, state.precipitationType, state.weatherContext, recommendFor]);
+  }, [state.temperature, state.windspeed, state.precipitation, state.precipitationType, state.weatherContext, startRequest, recommendFor]);
 
   const handleActivityChange = useCallback(async (newActivity: string) => {
     setActivity(newActivity);
@@ -196,23 +220,43 @@ export function useGearUp() {
       return;
     }
     // Loading covers finding the location too, so the plan can't be submitted meanwhile.
-    dispatch({ type: "SUBMIT_START" });
+    const isCurrent = startRequest();
     const coordinates = await locate();
     if (!coordinates) {
       // The location button says why, unless the request was cancelled.
-      dispatch({ type: "SUBMIT_ERROR" });
+      if (isCurrent()) dispatch({ type: "SUBMIT_ERROR" });
       return;
     }
-    await recommendAt(yourLocation(coordinates));
-  }, [activity, locate, recommendAt]);
+    await recommendAt(isCurrent, yourLocation(coordinates));
+  }, [activity, locate, startRequest, recommendAt]);
 
   const resetToInitialState = useCallback(() => {
+    latestRequest.current += 1;
     resetActivity();
     cancelLocating();
     dispatch({ type: "RESET" });
     locationSearch.reset();
     biophysics.reset();
   }, [resetActivity, cancelLocating, locationSearch, biophysics]);
+
+  const onPlanForm = showsPlanForm(state);
+  /**
+   * Back to the plan form, keeping the activity, place, date, time and
+   * duration. A request made from the plan form carries on; one from the
+   * results or the Now form is retired.
+   */
+  const showPlanForm = useCallback(() => {
+    if (!onPlanForm) latestRequest.current += 1;
+    dispatch({ type: "SHOW_PLAN_FORM" });
+  }, [onPlanForm]);
+
+  // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches
+  // "navigatePlanAhead" when its Plan tab is tapped again on this page, and
+  // otherwise opens /?mode=planAhead. Installed apps keep sending it.
+  useEffect(() => {
+    window.addEventListener("navigatePlanAhead", showPlanForm);
+    return () => window.removeEventListener("navigatePlanAhead", showPlanForm);
+  }, [showPlanForm]);
 
   return {
     activity,
@@ -261,6 +305,7 @@ export function useGearUp() {
     handleWeatherChange,
     handleActivityChange,
     handleRetry,
+    showPlanForm,
     resetToInitialState,
   };
 }

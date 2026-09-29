@@ -66,6 +66,35 @@ describe("gearUpReducer", () => {
     expect(gearUpReducer({ ...planning, loading: true }, { type: "SUBMIT_ERROR" }).loading).toBe(false);
     expect(gearUpReducer(planning, { type: "RESET" }).inputMode).toBe("manual");
   });
+
+  it("goes back to the plan form without its results, keeping what was entered", () => {
+    const entered = {
+      ...createInitialState("planAhead"),
+      date: new Date("2026-10-08T00:00:00"),
+      time: "07:30",
+      durationDays: 5,
+    };
+    const shown = gearUpReducer(entered, {
+      type: "SUBMIT_PLAN_SUCCESS",
+      plan: { days: [] } as unknown as MultiDayLayerPlan,
+      recommendation: null,
+      temperature: 18,
+      windspeed: 10,
+    });
+
+    expect(gearUpReducer(shown, { type: "SHOW_PLAN_FORM" })).toEqual(entered);
+    // From Now mode too, as when the iOS shell's Plan tab is tapped after the logo.
+    expect(gearUpReducer(createInitialState("manual"), { type: "SHOW_PLAN_FORM" })).toEqual(
+      createInitialState("planAhead")
+    );
+    // A request made from the plan form keeps it busy until it answers; one
+    // from the results or the Now form doesn't.
+    expect(gearUpReducer({ ...entered, loading: true }, { type: "SHOW_PLAN_FORM" }).loading).toBe(true);
+    expect(gearUpReducer({ ...shown, loading: true }, { type: "SHOW_PLAN_FORM" }).loading).toBe(false);
+    expect(
+      gearUpReducer({ ...createInitialState("manual"), loading: true }, { type: "SHOW_PLAN_FORM" }).loading
+    ).toBe(false);
+  });
 });
 
 describe("buildGearUpResult", () => {
