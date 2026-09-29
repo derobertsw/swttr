@@ -1,291 +1,116 @@
 import { describe, it, expect } from "vitest";
-import { buildXCEnsemble } from "./xc";
-import type { CategorizedGarments, GarmentRow } from "../types";
+import { categorizeGarments } from "../categorization";
+import { buildXCEnsemble, needsWindLayer } from "./xc";
+import type { GarmentRow } from "../types";
 
-function createGarment(overrides: Partial<GarmentRow>): GarmentRow {
+function garment(id: string, category: string, region: "torso" | "legs", clo: number, evap = 0.35): GarmentRow {
   return {
-    id: overrides.id ?? "garment-id",
-    brand: overrides.brand ?? "Brand",
-    model_name: overrides.model_name ?? "Model",
-    category: overrides.category ?? "base_layer",
-    covers_torso: overrides.covers_torso ?? false,
-    covers_arms: overrides.covers_arms ?? false,
-    covers_legs: overrides.covers_legs ?? false,
-    garment_thermal_properties: overrides.garment_thermal_properties ?? {
-      rcl_whole_body: 0.2,
-      evap_potential: 0.3,
+    id,
+    brand: "Test",
+    model_name: id,
+    category,
+    covers_torso: region === "torso",
+    covers_arms: region === "torso",
+    covers_legs: region === "legs",
+    garment_thermal_properties: {
+      rcl_torso: region === "torso" ? clo : 0,
+      rcl_arms: region === "torso" ? clo : 0,
+      rcl_legs: region === "legs" ? clo : 0,
+      evap_potential: evap,
     },
-    garment_protection: overrides.garment_protection,
-    garment_activity_ratings: overrides.garment_activity_ratings,
-    weight_grams: overrides.weight_grams,
   };
 }
 
+// Regional targets from the golden XC scenarios.
+const MILD = { min: { torso: 0.4, arms: 0.4, legs: 0.56 }, neutral: { torso: 0.66, arms: 0.66, legs: 0.88 } };
+const COOL = { min: { torso: 0.62, arms: 0.72, legs: 0.84 }, neutral: { torso: 0.94, arms: 1.1, legs: 1.28 } };
+const SNOWY = { min: { torso: 0.66, arms: 0.77, legs: 0.88 }, neutral: { torso: 1.08, arms: 1.26, legs: 1.44 } };
+const EXTREME = { min: { torso: 1.2, arms: 1.4, legs: 1.62 }, neutral: { torso: 1.66, arms: 1.94, legs: 2.24 } };
+
+function recommend(garments: GarmentRow[], targets: typeof MILD, windLayer: boolean) {
+  return buildXCEnsemble(categorizeGarments(garments), targets, 0.25, windLayer).map((g) => g.id);
+}
+
 describe("buildXCEnsemble", () => {
-  it("includes a leg shell when a torso shell is also selected", () => {
-    const torsoBase = createGarment({
-      id: "torso-base",
-      category: "base_layer",
-      model_name: "Torso Base",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_whole_body: 0.2, evap_potential: 0.35 },
-    });
+  const leggings = garment("leggings", "base_layer", "legs", 0.3, 0.42);
+  const fleecePants = garment("fleece-pants", "mid_layer_heavy", "legs", 0.75, 0.38);
+  const shellPants = garment("shell-pants", "soft_shell", "legs", 0.5, 0.42);
 
-    const legBase = createGarment({
-      id: "leg-base",
-      category: "base_layer",
-      model_name: "Leg Base",
-      covers_legs: true,
-      garment_thermal_properties: { rcl_whole_body: 0.15, evap_potential: 0.33 },
-    });
-
-    const torsoShell = createGarment({
-      id: "torso-shell",
-      category: "soft_shell",
-      brand: "Dynafit",
-      model_name: "Touring Jacket",
-      covers_torso: true,
-      covers_arms: true,
-      garment_thermal_properties: { rcl_whole_body: 0.25, evap_potential: 0.4 },
-    });
-
-    const windShieldPants = createGarment({
-      id: "wind-shield-pants",
-      category: "soft_shell",
-      brand: "Patagonia",
-      model_name: "Wind Shield Pants",
-      covers_legs: true,
-      garment_thermal_properties: { rcl_whole_body: 0.14, evap_potential: 0.32 },
-    });
-
-    const categorized: CategorizedGarments = {
-      baseLayers: [torsoBase, legBase],
-      midLayers: [],
-      insulation: [],
-      shells: [torsoShell, windShieldPants],
-    };
-
-    const ensemble = buildXCEnsemble(
-      categorized,
-      {
-        min: { torso: 0.4, legs: 0.3 },
-        neutral: { torso: 0.9, legs: 0.7 },
-      },
-      0.25
-    );
-
-    expect(ensemble.map((g) => g.id)).toContain("torso-shell");
-    expect(ensemble.map((g) => g.id)).toContain("wind-shield-pants");
+  it("adds shell pants in cold, windy or wet weather even when fleece pants alone fit", () => {
+    const garments = [leggings, fleecePants, shellPants];
+    expect(recommend(garments, SNOWY, true)).toEqual(["leggings", "fleece-pants", "shell-pants"]);
+    expect(recommend(garments, SNOWY, false)).toEqual(["leggings", "fleece-pants"]);
   });
 
-  it("adds torso and leg shells independently when each regional budget allows", () => {
-    const torsoBase = createGarment({
-      id: "torso-base",
-      category: "base_layer",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_whole_body: 0.2, evap_potential: 0.35 },
-    });
-
-    const legBase = createGarment({
-      id: "leg-base",
-      category: "base_layer",
-      covers_legs: true,
-      garment_thermal_properties: { rcl_whole_body: 0.15, evap_potential: 0.33 },
-    });
-
-    const torsoShell = createGarment({
-      id: "torso-shell",
-      category: "soft_shell",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_whole_body: 0.25, evap_potential: 0.4 },
-    });
-
-    const windShieldPants = createGarment({
-      id: "wind-shield-pants",
-      category: "soft_shell",
-      covers_legs: true,
-      garment_thermal_properties: { rcl_whole_body: 0.14, evap_potential: 0.32 },
-    });
-
-    const categorized: CategorizedGarments = {
-      baseLayers: [torsoBase, legBase],
-      midLayers: [],
-      insulation: [],
-      shells: [torsoShell, windShieldPants],
-    };
-
-    const ensemble = buildXCEnsemble(
-      categorized,
-      {
-        min: { torso: 0.4, legs: 0.3 },
-        neutral: { torso: 0.6, legs: 0.7 },
-      },
-      0.25
-    );
-
-    expect(ensemble.map((g) => g.id)).toContain("wind-shield-pants");
-    expect(ensemble.map((g) => g.id)).toContain("torso-shell");
+  it("chooses warmer shell pants over stacking a fleece under light ones", () => {
+    const softshellPants = garment("softshell-pants", "soft_shell", "legs", 0.85, 0.28);
+    expect(recommend([leggings, fleecePants, shellPants, softshellPants], SNOWY, true))
+      .toEqual(["leggings", "softshell-pants"]);
   });
 
-  it("allows leg shell even when torso shell exceeds torso regional budget", () => {
-    const torsoBase = createGarment({
-      id: "torso-base",
-      category: "base_layer",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_torso: 0.45, rcl_whole_body: 0.2, evap_potential: 0.35 },
-    });
-
-    const legBase = createGarment({
-      id: "leg-base",
-      category: "base_layer",
-      covers_legs: true,
-      garment_thermal_properties: { rcl_legs: 0.2, rcl_whole_body: 0.15, evap_potential: 0.33 },
-    });
-
-    const torsoShell = createGarment({
-      id: "torso-shell",
-      category: "soft_shell",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_torso: 0.2, rcl_whole_body: 0.25, evap_potential: 0.4 },
-    });
-
-    const windShieldPants = createGarment({
-      id: "wind-shield-pants",
-      category: "soft_shell",
-      covers_legs: true,
-      garment_thermal_properties: { rcl_legs: 0.16, rcl_whole_body: 0.14, evap_potential: 0.32 },
-    });
-
-    const categorized: CategorizedGarments = {
-      baseLayers: [torsoBase, legBase],
-      midLayers: [],
-      insulation: [],
-      shells: [torsoShell, windShieldPants],
-    };
-
-    const ensemble = buildXCEnsemble(
-      categorized,
-      {
-        min: { torso: 0.4, legs: 0.3 },
-        neutral: { torso: 0.6, legs: 0.8 },
-      },
-      0.25
-    );
-
-    expect(ensemble.map((g) => g.id)).toContain("wind-shield-pants");
-    expect(ensemble.map((g) => g.id)).not.toContain("torso-shell");
+  it("counts insulated pants as the leg shell instead of layering shell pants over them", () => {
+    const insulatedPants = garment("insulated-pants", "outer_insulated", "legs", 1.15, 0.18);
+    insulatedPants.garment_protection = { windproof_rating: "windproof", waterproof_rating: "waterproof" };
+    const result = recommend([
+      garment("merino-leggings", "base_layer", "legs", 0.7, 0.28),
+      insulatedPants,
+      garment("wind-pants", "soft_shell", "legs", 0.55, 0.32),
+    ], EXTREME, true);
+    expect(result).toEqual(["merino-leggings", "insulated-pants"]);
   });
 
-  it("keeps a torso mid-layer when budget allows by preferring region-specific mids", () => {
-    const torsoBase = createGarment({
-      id: "torso-base",
-      category: "base_layer",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_torso: 0.2, rcl_whole_body: 0.2, evap_potential: 0.35 },
-    });
-
-    const legBase = createGarment({
-      id: "leg-base",
-      category: "base_layer",
-      covers_legs: true,
-      garment_thermal_properties: { rcl_legs: 0.15, rcl_whole_body: 0.15, evap_potential: 0.33 },
-    });
-
-    const torsoMid = createGarment({
-      id: "torso-mid",
-      category: "mid_layer_light",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_torso: 0.2, rcl_whole_body: 0.2, evap_potential: 0.3 },
-    });
-
-    const bibMid = createGarment({
-      id: "bib-mid",
-      category: "mid_layer_light",
-      covers_torso: true,
-      covers_legs: true,
-      garment_thermal_properties: {
-        rcl_torso: 0.35,
-        rcl_legs: 0.2,
-        rcl_whole_body: 0.3,
-        evap_potential: 0.4,
-      },
-    });
-
-    const torsoShell = createGarment({
-      id: "torso-shell",
-      category: "soft_shell",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_torso: 0.2, rcl_whole_body: 0.2, evap_potential: 0.35 },
-    });
-
-    const categorized: CategorizedGarments = {
-      baseLayers: [torsoBase, legBase],
-      midLayers: [bibMid, torsoMid],
-      insulation: [],
-      shells: [torsoShell],
-    };
-
-    const ensemble = buildXCEnsemble(
-      categorized,
-      {
-        min: { torso: 0.5, legs: 0.3 },
-        neutral: { torso: 0.6, legs: 0.6 },
-      },
-      0.25
-    );
-
-    expect(ensemble.map((g) => g.id)).toContain("torso-mid");
-    expect(ensemble.map((g) => g.id)).not.toContain("bib-mid");
+  it("leaves the wind jacket off in mild, calm, dry weather when the base layer is warm enough", () => {
+    const garments = [garment("top", "base_layer", "torso", 0.55), garment("wind-jacket", "hard_shell", "torso", 0.15, 0.5)];
+    expect(recommend(garments, MILD, false)).toEqual(["top"]);
+    expect(recommend(garments, MILD, true)).toEqual(["top", "wind-jacket"]);
   });
 
-  it("reserves torso budget so base, mid, and shell can all be included when feasible", () => {
-    const torsoBaseWarm = createGarment({
-      id: "torso-base-warm",
-      category: "base_layer",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_torso: 0.45, rcl_whole_body: 0.35, evap_potential: 0.4 },
-    });
+  it("prefers the more breathable shell when both keep the legs in range", () => {
+    const result = recommend([
+      garment("merino-leggings", "base_layer", "legs", 0.7, 0.28),
+      garment("ski-bibs", "hard_shell", "legs", 0.22, 0.2),
+      garment("wind-pants", "soft_shell", "legs", 0.55, 0.32),
+    ], COOL, true);
+    expect(result).toEqual(["merino-leggings", "wind-pants"]);
+  });
 
-    const torsoBaseLight = createGarment({
-      id: "torso-base-light",
-      category: "base_layer",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_torso: 0.2, rcl_whole_body: 0.15, evap_potential: 0.3 },
-    });
+  it.each(["soft_shell", "windbreaker"])("fits light insulation under a %s to stay warm enough", (category) => {
+    const result = recommend([
+      garment("top", "base_layer", "torso", 0.35, 0.45),
+      garment("insulated-jacket", "insulation_synthetic", "torso", 0.7, 0.45),
+      garment("shell", category, "torso", 0.2, 0.38),
+    ], SNOWY, true);
+    expect(result).toEqual(["top", "insulated-jacket", "shell"]);
+  });
 
-    const torsoMid = createGarment({
-      id: "torso-mid",
-      category: "mid_layer_light",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_torso: 0.2, rcl_whole_body: 0.2, evap_potential: 0.3 },
-    });
+  it("does not put a puffy under insulated outerwear, but can use a fleece", () => {
+    const result = recommend([
+      garment("top", "base_layer", "torso", 0.35, 0.45),
+      garment("fleece", "mid_layer_heavy", "torso", 0.6, 0.35),
+      garment("puffy", "insulation_synthetic", "torso", 0.6, 0.45),
+      garment("insulated-jacket", "outer_insulated", "torso", 0.3, 0.3),
+    ], SNOWY, true);
+    expect(result).toEqual(["top", "fleece", "insulated-jacket"]);
+  });
 
-    const torsoShell = createGarment({
-      id: "torso-shell",
-      category: "soft_shell",
-      covers_torso: true,
-      garment_thermal_properties: { rcl_torso: 0.2, rcl_whole_body: 0.2, evap_potential: 0.35 },
-    });
+  it("prefers a breathable mid over one below the breathability bar", () => {
+    const result = recommend([
+      garment("top", "base_layer", "torso", 0.35, 0.45),
+      garment("sweater", "mid_layer_heavy", "torso", 0.7, 0.2),
+      garment("fleece", "mid_layer_light", "torso", 0.7, 0.35),
+      garment("wind-jacket", "hard_shell", "torso", 0.15, 0.5),
+    ], SNOWY, true);
+    expect(result).toEqual(["top", "fleece", "wind-jacket"]);
+  });
+});
 
-    const categorized: CategorizedGarments = {
-      baseLayers: [torsoBaseWarm, torsoBaseLight],
-      midLayers: [torsoMid],
-      insulation: [],
-      shells: [torsoShell],
-    };
-
-    const ensemble = buildXCEnsemble(
-      categorized,
-      {
-        min: { torso: 0.4, legs: 0.2 },
-        neutral: { torso: 0.6, legs: 0.6 },
-      },
-      0.25
-    );
-
-    expect(ensemble.map((g) => g.id)).toContain("torso-base-light");
-    expect(ensemble.map((g) => g.id)).not.toContain("torso-base-warm");
-    expect(ensemble.map((g) => g.id)).toContain("torso-mid");
-    expect(ensemble.map((g) => g.id)).toContain("torso-shell");
+describe("needsWindLayer", () => {
+  it.each([
+    { weather: "mild, calm and dry", tempC: 7, windMs: 2, precipitation: false, expected: false },
+    { weather: "freezing", tempC: 0, windMs: 2, precipitation: false, expected: true },
+    { weather: "windy", tempC: 7, windMs: 9, precipitation: false, expected: true },
+    { weather: "wet", tempC: 7, windMs: 2, precipitation: true, expected: true },
+  ])("is $expected when $weather", ({ tempC, windMs, precipitation, expected }) => {
+    expect(needsWindLayer({ tempC, windMs, precipitation })).toBe(expected);
   });
 });

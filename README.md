@@ -123,15 +123,17 @@ graph TD
 
 ### 3. Ensemble Building Flow
 
-Most sports select base layers, then mid layers, then shells. Alpine compares complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. It allows at most one item in each slot per covered region, including items that span multiple regions. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. Weather-protection scoring counts insulated outerwear as the shell. When targets cannot be met, alpine returns the best available wearable combination and warns about regional insulation shortfalls.
+Other sports select base layers, then mid layers, then shells. Alpine and XC compare complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. They allow at most one item in each slot per covered region, including items that span multiple regions, so insulated outerwear takes the outer slot and no shell goes over it. Alpine puts a puffy only under a hard shell; XC allows one under any shell, but not under insulated outerwear. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. XC requires an outer layer on the torso and legs when it is freezing, windy, or wet, minimizes the same shortfall and excess, and then prefers breathable layers. Weather-protection scoring counts windbreakers and insulated outerwear as shells. When targets cannot be met, alpine returns the best available wearable combination and warns about regional insulation shortfalls.
 
 ```mermaid
 graph TD
-    START[Target Clo Range from Pipeline] --> SPORT{Alpine?}
+    START[Target Clo Range from Pipeline] --> SPORT{Alpine or XC?}
     SPORT -->|Yes| COMB[Compare base + optional mid/puffy + outer<br/>for torso, then legs]
     COMB --> CAP[One item per slot per covered region<br/>Insulated outer replaces shell<br/>Bibs fill leg slots under a jacket]
-    CAP --> REG[Preserve coverage and rain protection<br/>Minimize combined shortfall and excess, then layers]
+    CAP --> RANK{Sport}
+    RANK -->|Alpine| REG[Preserve coverage and rain protection<br/>Minimize combined shortfall and excess, then layers]
     REG --> WARN[Warn about remaining regional shortfalls]
+    RANK -->|XC| XREG[Outer on torso and legs when freezing, windy, or wet<br/>Minimize combined shortfall and excess<br/>Then breathable and fewer layers]
     SPORT -->|No| SORT[Sort Pool by Sport Strategy]
     SORT --> BASE[Select Base Layer]
     BASE --> MID[Select Mid Layer]
@@ -189,10 +191,11 @@ graph TD
         A4 --> A5[Dual metabolic model:<br/>skiing + chairlift blend]
     end
 
-    subgraph "XC Skiing"
-        XC --> X1[Per-region clo budgets:<br/>torso and legs independent]
-        X1 --> X2[Single-region garments<br/>preferred over multi-region]
-        X2 --> X3[Hard breathability filter<br/>on base and mid layers]
+    subgraph "XC Skiing — regional builder shared with alpine"
+        XC --> X1[Compare complete regional outfits:<br/>torso and legs independent]
+        X1 --> X2[Outer layer required on torso and legs<br/>when freezing, windy, or wet]
+        X2 --> X3[Insulated outerwear occupies outer slot<br/>Puffies fit under any shell, not insulated outerwear]
+        X3 --> X4[Budget by regional clo, then prefer<br/>breathable and fewer layers]
     end
 
     subgraph "Ski Touring"
@@ -229,9 +232,12 @@ graph TD
     AWP --> ABUDGET
     ABUDGET --> ACAP[One outer per covered region<br/>No shell over insulated outerwear<br/>Bibs sit under the jacket]
 
-    XC --> XBREATH{Meets breathability<br/>threshold?}
-    XBREATH -->|Yes| XPREF[Select breathable shell]
-    XBREATH -->|No shells qualify| XFALL[Fall back to all shells]
+    XC --> XNEED{Freezing, wind over 8 m/s,<br/>or precipitation?}
+    XNEED -->|Yes| XREQ[Require an outer on torso and legs]
+    XNEED -->|No| XOPT[Outer optional —<br/>kept only if it helps fit regional targets]
+    XREQ --> XFIT[Fit regional insulation targets<br/>then prefer breathable outers, evap ≥ 0.20]
+    XOPT --> XFIT
+    XFIT --> XCAP[One outer per covered region<br/>No shell over insulated outerwear]
 
     TOUR --> THARD{Hard shell available?}
     THARD -->|Yes| THSEL[Select hard shell —<br/>soft shells excluded]

@@ -49,6 +49,7 @@ const HomeContent = () => {
     handleWeatherChange,
     handleActivityChange,
     handleRetry,
+    showPlanForm,
     resetToInitialState,
   } = useGearUp();
 
@@ -56,6 +57,9 @@ const HomeContent = () => {
 
   const ActivityIcon = ACTIVITIES.find((item) => item.value === activity)?.icon ?? Zap;
   const showGearUpButton = !showResults && inputMode !== "planAhead";
+  // Back from Plan Ahead results returns to the plan, keeping what was entered;
+  // from Now results it starts over, like the logo.
+  const handleBack = inputMode === "planAhead" ? showPlanForm : resetToInitialState;
 
   return (
     <PageLayout onLogoClick={resetToInitialState} chromeVariant="compact">
@@ -158,7 +162,7 @@ const HomeContent = () => {
           <MultiDayPlanDisplay
             plan={multiDayPlan}
             itemMappings={itemMappings}
-            onReset={resetToInitialState}
+            onReset={showPlanForm}
           />
         ) : (
           <LayerDisplay
@@ -172,7 +176,7 @@ const HomeContent = () => {
             itemMappings={itemMappings}
             biophysicsData={biophysicsData}
             biophysicsStatus={biophysicsStatus}
-            onReset={resetToInitialState}
+            onReset={handleBack}
             onRetry={() => void handleRetry()}
             onWeatherChange={handleWeatherChange}
             onActivityChange={handleActivityChange}
