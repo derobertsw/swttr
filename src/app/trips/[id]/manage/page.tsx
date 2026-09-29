@@ -172,7 +172,7 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
             </Card>
 
             <p className="text-center text-xs text-white/45">
-              Removing a member soft-deletes them. They keep their kit drafts on their device.
+              Removing someone also deletes their kits for this trip.
             </p>
             <div className="h-24" />
           </>
@@ -203,9 +203,9 @@ function RemoveConfirmModal({
   onConfirm: () => void;
 }) {
   const sideEffects = [
+    "delete their kits for this trip",
     "unassign their group gear",
     "drop them from roll call",
-    "keep their kit drafts on their device",
   ];
 
   useEffect(() => {

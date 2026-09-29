@@ -69,6 +69,8 @@ describe("Manage crew page", () => {
 
     await user.click(await screen.findByRole("button", { name: "Remove Sam" }));
     const dialog = screen.getByRole("dialog", { name: "Remove Sam from trip" });
+    // Removal deletes the member row, and their kits with it.
+    expect(within(dialog).getByText("delete their kits for this trip")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Remove Sam" }));
 
     await waitFor(() =>
