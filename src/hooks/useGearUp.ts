@@ -16,6 +16,7 @@ import {
   createInitialState,
   fetchPlanAhead,
   gearUpReducer,
+  showsPlanForm,
   type InputMode,
 } from "@/lib/gearUp";
 import { logWarn } from "@/lib/logger";
@@ -72,9 +73,9 @@ export function useGearUp() {
     [activity, sensitivity, biophysics, exertion, bodyMetrics]
   );
 
-  // Only the latest request's answer is used. Leaving results or starting over
-  // retires the running request, so a late answer can't reopen results or
-  // report an error for an outing that's gone.
+  // Only the latest request's answer is used. Going to the plan form from
+  // anywhere else, or starting over, retires the running request, so a late
+  // answer can't show results or report an error for an outing that's gone.
   const latestRequest = useRef(0);
   /** Starts loading, and returns a check for whether this request is still the latest. */
   const startRequest = useCallback(() => {
@@ -238,15 +239,16 @@ export function useGearUp() {
     biophysics.reset();
   }, [resetActivity, cancelLocating, locationSearch, biophysics]);
 
+  const onPlanForm = showsPlanForm(state);
   /**
    * Back to the plan form, keeping the activity, place, date, time and
-   * duration. A refresh started on the results is retired with them; a
-   * request made from the form carries on.
+   * duration. A request made from the plan form carries on; one from the
+   * results or the Now form is retired.
    */
   const showPlanForm = useCallback(() => {
-    if (state.showResults) latestRequest.current += 1;
+    if (!onPlanForm) latestRequest.current += 1;
     dispatch({ type: "SHOW_PLAN_FORM" });
-  }, [state.showResults]);
+  }, [onPlanForm]);
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches
   // "navigatePlanAhead" when its Plan tab is tapped again on this page, and

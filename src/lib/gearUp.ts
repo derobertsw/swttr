@@ -92,6 +92,11 @@ export function createInitialState(inputMode: InputMode): GearUpState {
   };
 }
 
+/** Whether the plan form is showing, so that a request still running was made from it. */
+export function showsPlanForm(state: { inputMode: InputMode; showResults: boolean }): boolean {
+  return state.inputMode === "planAhead" && !state.showResults;
+}
+
 export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpState {
   switch (action.type) {
     case "SET_INPUT_MODE":
@@ -137,10 +142,10 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
     case "SUBMIT_ERROR":
       return { ...state, loading: false };
     case "SHOW_PLAN_FORM": {
-      // Keeps what was entered. A refresh started on the results goes with them
-      // (useGearUp retires it); on the form, a request still running keeps it busy.
+      // Keeps what was entered. A request made from the plan form keeps it busy;
+      // one from the results or the Now form is retired (see useGearUp).
       const { date, time, durationDays } = state;
-      const loading = state.loading && !state.showResults;
+      const loading = state.loading && showsPlanForm(state);
       return { ...createInitialState("planAhead"), date, time, durationDays, loading };
     }
     case "RESET":
