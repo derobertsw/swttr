@@ -6,6 +6,9 @@ import { predictEnsembleThermal } from './ensemble';
 import { ACTIVITY_WEIGHTS, type ActivityType } from './constants';
 import type { EnsembleScore } from '@/types/garments';
 
+/** Wind speed (m/s) above which an ensemble without a shell loses weather protection. */
+export const SIGNIFICANT_WIND_MS = 8;
+
 export interface WeatherConditions {
   temperature: number;       // °C
   windSpeed: number;         // m/s
@@ -228,8 +231,7 @@ function calculateWeatherScore(
     }
   }
 
-  if (weather.windSpeed > 8) {
-    // Significant wind
+  if (weather.windSpeed > SIGNIFICANT_WIND_MS) {
     if (shells.length === 0) {
       score -= 30;
     } else {

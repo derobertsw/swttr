@@ -111,7 +111,9 @@ function useDatabase(userId: string | null, wardrobe: Row[]) {
   });
 }
 
-function expectWearableAlpine(body: BiophysicsRecommendation) {
+const OUTER_CATEGORIES = ["outer_insulated", "hard_shell", "soft_shell", "windbreaker"];
+
+function expectWearable(body: BiophysicsRecommendation) {
   const garments = body.recommendation?.garments ?? [];
   expect(garments.length).toBeGreaterThan(0);
   expect(new Set(garments.map((g) => g.id)).size).toBe(garments.length);
@@ -121,13 +123,21 @@ function expectWearableAlpine(body: BiophysicsRecommendation) {
     const layers = garments.filter((g) => g[`covers_${region}`] && !(region === "torso" && isBib(g)));
     const bases = layers.filter((g) => g.category === "base_layer");
     const mids = layers.filter((g) => ["mid_layer_light", "mid_layer_heavy", "insulation_down", "insulation_synthetic"].includes(g.category));
-    const outers = layers.filter((g) => ["outer_insulated", "hard_shell", "soft_shell", "windbreaker"].includes(g.category));
+    const outers = layers.filter((g) => OUTER_CATEGORIES.includes(g.category));
     expect(bases.length).toBeLessThanOrEqual(1);
     expect(mids.length).toBeLessThanOrEqual(1);
     expect(outers.length).toBeLessThanOrEqual(1);
     if (mids.some((g) => ["insulation_down", "insulation_synthetic"].includes(g.category)) && outers.length) {
       expect(outers[0].category).toBe("hard_shell");
     }
+  }
+}
+
+// XC needs a wind layer on the torso and legs unless it is mild, calm and dry.
+function expectWindLayers(body: BiophysicsRecommendation) {
+  const garments = body.recommendation?.garments ?? [];
+  for (const region of ["torso", "legs"] as const) {
+    expect(garments.some((g) => g[`covers_${region}`] && OUTER_CATEGORIES.includes(g.category))).toBe(true);
   }
 }
 
@@ -138,10 +148,11 @@ describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST, s
 
   for (const mode of MODES) {
     describe(mode.name, () => {
-      it.each(CONDITIONS)("$name", async ({ body }) => {
+      it.each(CONDITIONS)("$name", async ({ name, body }) => {
         useDatabase(mode.userId, mode.wardrobe);
         const result = await callRoute(POST, { ...body, ...mode.extraBody });
-        if (sport === "alpine") expectWearableAlpine(result.body);
+        if (sport === "alpine" || sport === "xc") expectWearable(result.body);
+        if (sport === "xc" && name !== "mild, calm, dry, easy") expectWindLayers(result.body);
         expect(result).toMatchSnapshot();
       });
     });
@@ -150,7 +161,7 @@ describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST, s
   it("signed in with an empty wardrobe falls back to the catalog", async () => {
     useDatabase(USER_ID, []);
     const result = await callRoute(POST, CONDITIONS[1].body);
-    if (sport === "alpine") expectWearableAlpine(result.body);
+    if (sport === "alpine" || sport === "xc") expectWearable(result.body);
     expect(result).toMatchSnapshot();
   });
 
