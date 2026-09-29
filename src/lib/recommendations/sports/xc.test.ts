@@ -74,6 +74,25 @@ describe("buildXCEnsemble", () => {
     expect(result).toEqual(["merino-leggings", "wind-pants"]);
   });
 
+  it.each(["soft_shell", "windbreaker"])("fits light insulation under a %s to stay warm enough", (category) => {
+    const result = recommend([
+      garment("top", "base_layer", "torso", 0.35, 0.45),
+      garment("insulated-jacket", "insulation_synthetic", "torso", 0.7, 0.45),
+      garment("shell", category, "torso", 0.2, 0.38),
+    ], SNOWY, true);
+    expect(result).toEqual(["top", "insulated-jacket", "shell"]);
+  });
+
+  it("does not put a puffy under insulated outerwear, but can use a fleece", () => {
+    const result = recommend([
+      garment("top", "base_layer", "torso", 0.35, 0.45),
+      garment("fleece", "mid_layer_heavy", "torso", 0.6, 0.35),
+      garment("puffy", "insulation_synthetic", "torso", 0.6, 0.45),
+      garment("insulated-jacket", "outer_insulated", "torso", 0.3, 0.3),
+    ], SNOWY, true);
+    expect(result).toEqual(["top", "fleece", "insulated-jacket"]);
+  });
+
   it("prefers a breathable mid over one below the breathability bar", () => {
     const result = recommend([
       garment("top", "base_layer", "torso", 0.35, 0.45),

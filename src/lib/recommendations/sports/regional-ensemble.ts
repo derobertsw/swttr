@@ -44,7 +44,7 @@ function regionalClo(ensemble: GarmentRow[], region: Region): number {
   return sum * ENSEMBLE_REGRESSION.thermal[key].coef;
 }
 
-function isWearable(ensemble: GarmentRow[]): boolean {
+function isWearable(ensemble: GarmentRow[], puffyFitsUnder: (outer: GarmentRow) => boolean): boolean {
   if (new Set(ensemble.map((g) => g.id)).size !== ensemble.length) return false;
 
   return REGIONS.every((region) => {
@@ -56,9 +56,7 @@ function isWearable(ensemble: GarmentRow[]): boolean {
     const mid = garments.find((g) => layer(g) === 'mid');
     const outer = garments.find((g) => layer(g) === 'outer');
     const puffy = mid?.category === 'insulation_down' || mid?.category === 'insulation_synthetic';
-    // Without garment fit measurements, use a conservative pairing: puffies
-    // can sit under a hard shell, but not another insulated or fitted outer.
-    return !puffy || !outer || outer.category === 'hard_shell';
+    return !puffy || !outer || puffyFitsUnder(outer);
   });
 }
 
@@ -103,10 +101,12 @@ export function targetFit(outfit: GarmentRow[], targets: PhaseTargets['regional'
  * layers already chosen and keeps the outfit with the lowest `rank`, compared
  * element by element. Allows at most one item per slot in each region it
  * fills, so insulated outerwear takes the outer slot and no shell goes over
- * it. Returns the garments in dressing order.
+ * it, and a puffy mid only under an outer that `puffyFitsUnder` accepts.
+ * Returns the garments in dressing order.
  */
 export function buildRegionalEnsemble(
   categorized: CategorizedGarments,
+  puffyFitsUnder: (outer: GarmentRow) => boolean,
   rank: (outfit: GarmentRow[], scoredRegions: Region[]) => number[]
 ): GarmentRow[] {
   const pools: Record<Layer, GarmentRow[]> = {
@@ -120,7 +120,7 @@ export function buildRegionalEnsemble(
     const scoredRegions: Region[] = region === 'torso' ? ['torso', 'arms'] : ['legs'];
     const options = (slot: Layer): Array<GarmentRow | undefined> => [
       undefined,
-      ...pools[slot].filter((g) => occupies(g, region) && isWearable([...ensemble, g])),
+      ...pools[slot].filter((g) => occupies(g, region) && isWearable([...ensemble, g], puffyFitsUnder)),
     ];
     const bases = options('base');
     const mids = options('mid');
@@ -132,7 +132,7 @@ export function buildRegionalEnsemble(
       for (const mid of mids) {
         for (const outer of outers) {
           const candidate = [...ensemble, ...[base, mid, outer].filter((g) => g !== undefined)];
-          if (!isWearable(candidate)) continue;
+          if (!isWearable(candidate, puffyFitsUnder)) continue;
 
           const candidateRank = rank(candidate, scoredRegions);
           if (isBetter(candidateRank, bestRank)) {

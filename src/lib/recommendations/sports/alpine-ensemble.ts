@@ -7,6 +7,10 @@ function isWaterproof(garment: GarmentRow): boolean {
   return protection?.waterproof_rating === 'waterproof' || (protection?.waterproof_mm ?? 0) > 0;
 }
 
+// Without garment fit measurements, use a conservative pairing: puffies can
+// sit under a hard shell, but not another insulated or fitted outer.
+const puffyFitsUnder = (outer: GarmentRow) => outer.category === 'hard_shell';
+
 /**
  * Pick a wearable base + optional mid/puffy + outer for each region. Compare
  * complete combinations so an insulated outer can replace a shell and its
@@ -18,7 +22,7 @@ export function buildAlpineEnsemble(
   targets: PhaseTargets['regional'],
   precipitation: boolean
 ): GarmentRow[] {
-  return buildRegionalEnsemble(categorized, (candidate, scoredRegions) => {
+  return buildRegionalEnsemble(categorized, puffyFitsUnder, (candidate, scoredRegions) => {
     const missingCoverage =
       missingLayers(candidate, scoredRegions, 'base') + missingLayers(candidate, scoredRegions, 'outer');
     const wetExposure = precipitation ? missingLayers(candidate, scoredRegions, 'outer', isWaterproof) : 0;

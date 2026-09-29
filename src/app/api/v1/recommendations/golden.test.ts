@@ -113,7 +113,13 @@ function useDatabase(userId: string | null, wardrobe: Row[]) {
 
 const OUTER_CATEGORIES = ["outer_insulated", "hard_shell", "soft_shell", "windbreaker"];
 
-function expectWearable(body: BiophysicsRecommendation) {
+// Outer layers each regional-ensemble sport allows over a puffy mid.
+const PUFFY_OUTERS: Record<string, string[]> = {
+  alpine: ["hard_shell"],
+  xc: ["hard_shell", "soft_shell", "windbreaker"],
+};
+
+function expectWearable(body: BiophysicsRecommendation, puffyOuters: string[]) {
   const garments = body.recommendation?.garments ?? [];
   expect(garments.length).toBeGreaterThan(0);
   expect(new Set(garments.map((g) => g.id)).size).toBe(garments.length);
@@ -128,7 +134,7 @@ function expectWearable(body: BiophysicsRecommendation) {
     expect(mids.length).toBeLessThanOrEqual(1);
     expect(outers.length).toBeLessThanOrEqual(1);
     if (mids.some((g) => ["insulation_down", "insulation_synthetic"].includes(g.category)) && outers.length) {
-      expect(outers[0].category).toBe("hard_shell");
+      expect(puffyOuters).toContain(outers[0].category);
     }
   }
 }
@@ -151,7 +157,7 @@ describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST, s
       it.each(CONDITIONS)("$name", async ({ name, body }) => {
         useDatabase(mode.userId, mode.wardrobe);
         const result = await callRoute(POST, { ...body, ...mode.extraBody });
-        if (sport === "alpine" || sport === "xc") expectWearable(result.body);
+        if (sport in PUFFY_OUTERS) expectWearable(result.body, PUFFY_OUTERS[sport]);
         if (sport === "xc" && name !== "mild, calm, dry, easy") expectWindLayers(result.body);
         expect(result).toMatchSnapshot();
       });
@@ -161,7 +167,7 @@ describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST, s
   it("signed in with an empty wardrobe falls back to the catalog", async () => {
     useDatabase(USER_ID, []);
     const result = await callRoute(POST, CONDITIONS[1].body);
-    if (sport === "alpine" || sport === "xc") expectWearable(result.body);
+    if (sport in PUFFY_OUTERS) expectWearable(result.body, PUFFY_OUTERS[sport]);
     expect(result).toMatchSnapshot();
   });
 

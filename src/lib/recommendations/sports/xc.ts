@@ -14,6 +14,10 @@ const MIN_EVAP_POTENTIAL = 0.25;
 /** Shells breathe less than base and mid layers, so they have a lower bar. */
 const MIN_SHELL_EVAP_POTENTIAL = 0.2;
 
+// XC skiers wear light insulation under a wind shell or soft shell, so a
+// puffy fits under any shell, but not under insulated outerwear.
+const puffyFitsUnder = (outer: GarmentRow) => outer.category !== 'outer_insulated';
+
 /**
  * XC skiers make their own wind, so the torso and legs need a wind layer
  * once it is freezing, windy, or wet. In mild, calm, dry weather a shell is
@@ -41,7 +45,7 @@ export function buildXCEnsemble(
 ): GarmentRow[] {
   const breathableFrom = { base: minEvapPotential, mid: minEvapPotential, outer: MIN_SHELL_EVAP_POTENTIAL };
 
-  return buildRegionalEnsemble(categorized, (candidate, scoredRegions) => {
+  return buildRegionalEnsemble(categorized, puffyFitsUnder, (candidate, scoredRegions) => {
     const missingCoverage = missingLayers(candidate, scoredRegions, 'base') +
       (windLayer ? missingLayers(candidate, scoredRegions, 'outer') : 0);
     const { excess, deficit, surplus } = targetFit(candidate, targets, scoredRegions);
