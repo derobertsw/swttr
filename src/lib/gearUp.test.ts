@@ -87,8 +87,10 @@ describe("gearUpReducer", () => {
     expect(gearUpReducer(createInitialState("manual"), { type: "SHOW_PLAN_FORM" })).toEqual(
       createInitialState("planAhead")
     );
-    // A request still running keeps the form busy until it answers.
+    // A request made from the form keeps it busy until it answers; a refresh
+    // started on the results goes with them.
     expect(gearUpReducer({ ...entered, loading: true }, { type: "SHOW_PLAN_FORM" }).loading).toBe(true);
+    expect(gearUpReducer({ ...shown, loading: true }, { type: "SHOW_PLAN_FORM" }).loading).toBe(false);
   });
 });
 

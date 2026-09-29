@@ -545,10 +545,14 @@ describe("Home Page", () => {
     };
 
     /**
-     * Plan-ahead requests succeed (the noon forecast: 28°F, wind 12 mph) unless `weather`
-     * says otherwise. Returns the requests made, and a geolocation spy that only Go Now uses.
+     * Plan-ahead requests succeed (the noon forecast: 28°F, wind 12 mph) unless `weather` or
+     * `recommendations` say otherwise. Returns the requests made, and a geolocation spy that
+     * only Go Now uses.
      */
-    function mockPlanAheadApis({ weather }: { weather?: () => Promise<MockResponse> } = {}) {
+    function mockPlanAheadApis({ weather, recommendations }: {
+      weather?: () => Promise<MockResponse>;
+      recommendations?: (url: string) => Promise<MockResponse>;
+    } = {}) {
       const requests = { weather: [] as string[], planAhead: [] as unknown[] };
       const getCurrentPosition = vi.fn();
       Object.defineProperty(navigator, "geolocation", {
@@ -562,6 +566,9 @@ describe("Home Page", () => {
         if (url.includes("/api/weather")) {
           requests.weather.push(url);
           return weather?.() ?? Promise.resolve(respond(200, NOON_FORECAST));
+        }
+        if (url.includes("/api/v1/recommendations/") && recommendations) {
+          return recommendations(url);
         }
         if (url.includes("/api/plan-ahead")) {
           requests.planAhead.push(JSON.parse(String(init?.body)));
@@ -1006,6 +1013,102 @@ describe("Home Page", () => {
       expect(screen.queryByRole("button", { name: "Gear Up" })).not.toBeInTheDocument();
       expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("");
       expect(screen.getByRole("button", { name: /pick start date/i })).toBeInTheDocument();
+    });
+
+    /** Lets a held response arrive, and whatever it triggers finish. */
+    async function answer(finish: () => void) {
+      await act(async () => {
+        finish();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+
+    it.each([
+      {
+        way: "Back",
+        leave: (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "Back" })),
+        form: "See my layers",
+      },
+      {
+        way: "the logo",
+        leave: (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("link", { name: "SWTTR" })),
+        form: "Gear Up",
+      },
+    ])("drops a layers refresh still running when $way leaves the results", async ({ leave, form }) => {
+      let finishRefresh = () => {};
+      mockPlanAheadApis({
+        recommendations: (url) =>
+          url.endsWith("/running")
+            ? new Promise((resolve) => {
+                finishRefresh = () => resolve(respond(500, { error: "Unavailable" }));
+              })
+            : Promise.resolve(respond(500, { error: "Unavailable" })),
+      });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await seeOneDayLayers(user);
+      await user.click(screen.getByRole("button", { name: "Alpine" }));
+      await user.click(await screen.findByRole("button", { name: "Running" }));
+      await leave(user);
+      await answer(finishRefresh);
+
+      expect(screen.queryByText(/wind 12 mph/i)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: form })).toBeEnabled();
+    });
+
+    it("drops a weather change still running when the iOS shell's Plan tab is tapped", async () => {
+      let finishChange = () => {};
+      const weatherResponses = [
+        () => Promise.resolve(respond(200, NOON_FORECAST)),
+        () =>
+          new Promise<MockResponse>((resolve) => {
+            finishChange = () => resolve(respond(200, { temperature: 30, windSpeed: 20, isForecast: false }));
+          }),
+      ];
+      mockPlanAheadApis({ weather: () => weatherResponses.shift()!() });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await seeOneDayLayers(user);
+      await user.click(screen.getByRole("button", { name: "Change weather location, date, or time" }));
+      // Plain click events, as in the drawer test above: jsdom lacks the CSS transforms its drag handling reads.
+      const drawer = await screen.findByRole("dialog", { name: "Update Weather" });
+      fireEvent.change(within(drawer).getByRole("combobox", { name: "Location" }), { target: { value: "Stowe" } });
+      fireEvent.click(await within(drawer).findByRole("option", { name: /Stowe/ }));
+      fireEvent.click(within(drawer).getByRole("button", { name: "Apply Weather" }));
+      act(() => {
+        window.dispatchEvent(new CustomEvent("navigatePlanAhead"));
+      });
+      await answer(finishChange);
+
+      expect(screen.queryByText(/wind 20 mph/i)).not.toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "See my layers" })).toBeEnabled();
+    });
+
+    it("keeps a request made from the plan form when the iOS shell's Plan tab is tapped", async () => {
+      let finishWeather = () => {};
+      mockPlanAheadApis({
+        weather: () =>
+          new Promise((resolve) => {
+            finishWeather = () => resolve(respond(200, NOON_FORECAST));
+          }),
+      });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await user.click(screen.getByRole("button", { name: /single day/i }));
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await user.click(screen.getByRole("button", { name: "See my layers" }));
+      act(() => {
+        window.dispatchEvent(new CustomEvent("navigatePlanAhead"));
+      });
+
+      expect(screen.getByRole("button", { name: "Getting your layers…" })).toBeDisabled();
+      await answer(finishWeather);
+      expect(await screen.findByText(/wind 12 mph/i)).toBeInTheDocument();
     });
   });
 });

@@ -137,8 +137,10 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
     case "SUBMIT_ERROR":
       return { ...state, loading: false };
     case "SHOW_PLAN_FORM": {
-      // Drops any results, but keeps what was entered and a request still running.
-      const { date, time, durationDays, loading } = state;
+      // Keeps what was entered. A refresh started on the results goes with them
+      // (useGearUp retires it); on the form, a request still running keeps it busy.
+      const { date, time, durationDays } = state;
+      const loading = state.loading && !state.showResults;
       return { ...createInitialState("planAhead"), date, time, durationDays, loading };
     }
     case "RESET":
