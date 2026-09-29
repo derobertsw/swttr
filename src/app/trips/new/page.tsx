@@ -480,11 +480,13 @@ function Step2Stops({
         </Card>
       )}
 
+      {/* Leaving mid-save would lose the chosen place if that save failed. */}
       <NavBar
         onBack={onBack}
+        backDisabled={adding || removingId !== null}
         onNext={onNext}
         nextLabel="Next"
-        nextDisabled={stops.length === 0}
+        nextDisabled={adding || removingId !== null || stops.length === 0}
       />
 
       {editing && (
@@ -780,7 +782,14 @@ function Step3Members({
         </div>
       </Card>
 
-      <NavBar onBack={onBack} onNext={onNext} nextLabel="Next" nextDisabled={false} />
+      {/* Leaving mid-save would lose the typed name if that save failed. */}
+      <NavBar
+        onBack={onBack}
+        backDisabled={adding || removingId !== null}
+        onNext={onNext}
+        nextLabel="Next"
+        nextDisabled={adding || removingId !== null}
+      />
     </div>
   );
 }
@@ -910,6 +919,7 @@ function Step4Review({
 function NavBar({
   onBack,
   backLabel = "Back",
+  backDisabled = false,
   onNext,
   nextLabel,
   nextDisabled = false,
@@ -917,6 +927,7 @@ function NavBar({
 }: {
   onBack: () => void;
   backLabel?: string;
+  backDisabled?: boolean;
   onNext: () => void;
   nextLabel: string;
   nextDisabled?: boolean;
@@ -927,7 +938,8 @@ function NavBar({
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-white/14 px-4 text-sm font-medium text-white/85 hover:bg-white/10"
+        disabled={backDisabled}
+        className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-white/14 px-4 text-sm font-medium text-white/85 hover:bg-white/10 disabled:opacity-50"
       >
         <ArrowLeft className="size-4" />
         {backLabel}

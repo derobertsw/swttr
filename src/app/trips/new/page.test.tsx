@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -222,6 +222,37 @@ describe("New trip wizard", () => {
     expect(search).toHaveValue("");
   });
 
+  it("stays on the stops step until a stop being added is saved", async () => {
+    setQuery("trip=trip-1&step=2");
+    let finishAdd = () => {};
+    vi.stubGlobal(
+      "fetch",
+      fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP] })),
+        "GET /api/geocode": reply(200, { results: [STOWE_PLACE] }),
+        // Hold the save open until the test finishes it.
+        "POST /api/v1/trips/trip-1/stops": () =>
+          new Promise((resolve) => {
+            finishAdd = () => resolve(reply(500, { error: "Database unavailable" }));
+          }),
+      })
+    );
+    const user = userEvent.setup();
+    render(<NewTripPage />);
+
+    const search = await screen.findByRole("combobox");
+    await user.type(search, "Stowe");
+    await user.click(await screen.findByRole("option", { name: /Stowe/ }));
+    await user.click(screen.getByRole("button", { name: "Add stop" }));
+
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
+
+    await act(async () => finishAdd());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Next" })).toBeEnabled());
+    expect(search).toHaveValue("Stowe, Vermont, United States");
+  });
+
   it("keeps a stop listed when removing it fails", async () => {
     setQuery("trip=trip-1&step=2");
     vi.stubGlobal(
@@ -269,5 +300,34 @@ describe("New trip wizard", () => {
     );
     expect(nameInput).toHaveValue("Sam");
     expect(screen.queryByText("invited · pending")).not.toBeInTheDocument();
+  });
+
+  it("stays on the crew step until someone being added is saved", async () => {
+    setQuery("trip=trip-1&step=3");
+    let finishAdd = () => {};
+    vi.stubGlobal(
+      "fetch",
+      fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull()),
+        // Hold the save open until the test finishes it.
+        "POST /api/v1/trips/trip-1/members": () =>
+          new Promise((resolve) => {
+            finishAdd = () => resolve(reply(500, { error: "Database unavailable" }));
+          }),
+      })
+    );
+    const user = userEvent.setup();
+    render(<NewTripPage />);
+
+    const nameInput = await screen.findByPlaceholderText("Display name");
+    await user.type(nameInput, "Sam");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
+
+    await act(async () => finishAdd());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Next" })).toBeEnabled());
+    expect(nameInput).toHaveValue("Sam");
   });
 });

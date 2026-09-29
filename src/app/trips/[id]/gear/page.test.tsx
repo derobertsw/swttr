@@ -117,6 +117,41 @@ describe("Group gear page", () => {
     expect(assignee).toBeEnabled();
   });
 
+  it("saves one row at a time, so another row's save can't re-enable it", async () => {
+    const stove: TripGroupGear = { ...TENT, id: "gear-stove", description: "Stove", sort_order: 1 };
+    let finishSave = () => {};
+    vi.stubGlobal(
+      "fetch",
+      fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(
+          200,
+          tripFull({ members: [ORGANIZER, SAM], gear: [TENT, stove] })
+        ),
+        // Hold the save open until the test finishes it.
+        "PATCH /api/v1/trips/trip-1/gear/gear-tent": () =>
+          new Promise((resolve) => {
+            finishSave = () =>
+              resolve(reply(200, { gear: { ...TENT, assignee_member_id: SAM.id } }));
+          }),
+      })
+    );
+    const user = userEvent.setup();
+    await renderPage();
+
+    await user.selectOptions(
+      await screen.findByRole("combobox", { name: "Who's bringing Tent" }),
+      "Sam"
+    );
+
+    expect(screen.getByRole("combobox", { name: "Who's bringing Stove" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove Stove" })).toBeDisabled();
+
+    await act(async () => finishSave());
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Who's bringing Stove" })).toBeEnabled()
+    );
+  });
+
   it("keeps an item listed when removing it fails", async () => {
     vi.stubGlobal(
       "fetch",

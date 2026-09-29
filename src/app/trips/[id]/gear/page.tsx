@@ -17,7 +17,8 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
   const [description, setDescription] = useState("");
   const [assignee, setAssignee] = useState<string>("");
   const [adding, setAdding] = useState(false);
-  // The gear row with a change on its way to the server.
+  // The gear row whose change is being saved. Every row stays disabled until
+  // that save and the reload after it finish, so saves never overlap.
   const [savingId, setSavingId] = useState<string | null>(null);
 
   const members = data?.members ?? [];
@@ -117,7 +118,7 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                         onChange={(e) =>
                           updateAssignee(g, e.target.value === "" ? null : e.target.value)
                         }
-                        disabled={saving}
+                        disabled={savingId !== null}
                         aria-label={`Who's bringing ${g.description}`}
                         className="rounded-md border border-white/14 bg-white/[0.06] px-2 py-1 text-xs text-white disabled:opacity-50"
                       >
@@ -136,7 +137,7 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                       <button
                         type="button"
                         onClick={() => remove(g)}
-                        disabled={saving}
+                        disabled={savingId !== null}
                         aria-label={`Remove ${g.description}`}
                         className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
                       >
