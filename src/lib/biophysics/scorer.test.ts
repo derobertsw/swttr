@@ -22,7 +22,7 @@ function jacket(category: string): GarmentWithProtection {
 }
 
 describe('scoreEnsemble weather protection', () => {
-  it.each(['hard_shell', 'outer_insulated'])('credits a waterproof %s as the shell in wind and snow', (category) => {
+  it.each(['hard_shell', 'windbreaker', 'outer_insulated'])('credits a waterproof %s as the shell in wind and snow', (category) => {
     const score = scoreEnsemble(
       [jacket(category)],
       { temperature: -5, windSpeed: 9, humidity: 85, precipitation: true, precipitationType: 'snow' },

@@ -15,7 +15,7 @@ import { POST as biking } from "./biking/route";
 import { POST as running } from "./running/route";
 import { POST as skiTouring } from "./ski-touring/route";
 import { POST as xc } from "./xc/route";
-import type { BiophysicsRecommendation } from "@/types/biophysics";
+import type { BiophysicsRecommendation, RecommendedGarment } from "@/types/biophysics";
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -113,6 +113,9 @@ function useDatabase(userId: string | null, wardrobe: Row[]) {
 
 const OUTER_CATEGORIES = ["outer_insulated", "hard_shell", "soft_shell", "windbreaker"];
 
+// Bibs cover the torso but sit under the jacket, so they only fill the legs slots.
+const isBib = (g: RecommendedGarment) => g.covers_legs && !g.covers_arms;
+
 // Outer layers each regional-ensemble sport allows over a puffy mid.
 const PUFFY_OUTERS: Record<string, string[]> = {
   alpine: ["hard_shell"],
@@ -124,8 +127,6 @@ function expectWearable(body: BiophysicsRecommendation, puffyOuters: string[]) {
   expect(garments.length).toBeGreaterThan(0);
   expect(new Set(garments.map((g) => g.id)).size).toBe(garments.length);
   for (const region of ["torso", "arms", "legs"] as const) {
-    // Bibs sit under the jacket, so they only fill the legs slots.
-    const isBib = (g: (typeof garments)[number]) => g.covers_legs && !g.covers_arms;
     const layers = garments.filter((g) => g[`covers_${region}`] && !(region === "torso" && isBib(g)));
     const bases = layers.filter((g) => g.category === "base_layer");
     const mids = layers.filter((g) => ["mid_layer_light", "mid_layer_heavy", "insulation_down", "insulation_synthetic"].includes(g.category));
@@ -143,7 +144,8 @@ function expectWearable(body: BiophysicsRecommendation, puffyOuters: string[]) {
 function expectWindLayers(body: BiophysicsRecommendation) {
   const garments = body.recommendation?.garments ?? [];
   for (const region of ["torso", "legs"] as const) {
-    expect(garments.some((g) => g[`covers_${region}`] && OUTER_CATEGORIES.includes(g.category))).toBe(true);
+    const layers = garments.filter((g) => g[`covers_${region}`] && !(region === "torso" && isBib(g)));
+    expect(layers.some((g) => OUTER_CATEGORIES.includes(g.category))).toBe(true);
   }
 }
 
