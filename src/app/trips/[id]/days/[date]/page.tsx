@@ -187,7 +187,7 @@ export default function DayDetailPage({
               date={date}
               current={day.activity ?? null}
               suggested={effectiveStop?.activities ?? []}
-              onChange={() => refresh()}
+              onSaved={refresh}
             />
 
             <WeatherCard
@@ -209,7 +209,7 @@ export default function DayDetailPage({
                   kit={data.kits.find(
                     (k) => k.trip_member_id === m.id && data.days.find((d) => d.id === k.trip_day_id)?.date === date
                   )}
-                  onChange={() => refresh()}
+                  onSaved={refresh}
                 />
               ))}
             </section>
@@ -374,13 +374,14 @@ function ActivityPicker({
   date,
   current,
   suggested,
-  onChange,
+  onSaved,
 }: {
   tripId: string;
   date: string;
   current: string | null;
   suggested: string[];
-  onChange: () => void;
+  /** Reloads the trip; the chips stay disabled until it finishes. */
+  onSaved: () => Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState<string | null>(current);
@@ -398,12 +399,15 @@ function ActivityPicker({
     return Array.from(set);
   }, [suggested, current]);
 
+  // The chips are disabled from a tap until the save and the reload after it
+  // finish. Saves never overlap, so `current` is still the saved activity if
+  // this one fails.
   const setActivity = async (next: string | null) => {
     setValue(next);
     setSaving(true);
     try {
       await tripRequest(`/api/v1/trips/${tripId}/days/${date}`, "PATCH", { activity: next });
-      onChange();
+      await onSaved();
     } catch (err) {
       setValue(current);
       toast.error("Couldn't save the activity", { description: errorMessage(err) });
@@ -427,8 +431,10 @@ function ActivityPicker({
               key={a}
               type="button"
               onClick={() => setActivity(on ? null : a)}
+              disabled={saving}
+              aria-pressed={on}
               className={
-                "rounded-full border px-3 py-1 text-xs transition-colors " +
+                "rounded-full border px-3 py-1 text-xs transition-colors disabled:opacity-60 " +
                 (on
                   ? "border-cyan-300/55 bg-cyan-300/22 text-white"
                   : fromStop
@@ -454,13 +460,14 @@ function MemberKitRow({
   date,
   member,
   kit,
-  onChange,
+  onSaved,
 }: {
   tripId: string;
   date: string;
   member: TripMember;
   kit: TripMemberDayKit | undefined;
-  onChange: () => void;
+  /** Reloads the trip; the row's controls stay disabled until it finishes. */
+  onSaved: () => Promise<void>;
 }) {
   const [effort, setEffort] = useState<TripEffort>(kit?.effort ?? "steady");
   const [items, setItems] = useState<string[]>(kit?.items ?? []);
@@ -475,6 +482,9 @@ function MemberKitRow({
     setState(kit?.state ?? "ok");
   }
 
+  // The row's controls are disabled from a tap until the save and the reload
+  // after it finish. Saves never overlap, so `kit` is still the saved kit if
+  // this one fails.
   const persist = async (next: {
     effort?: TripEffort;
     items?: string[];
@@ -489,7 +499,7 @@ function MemberKitRow({
         note: kit?.note ?? null,
       };
       await tripRequest(`/api/v1/trips/${tripId}/days/${date}/kits/${member.id}`, "PUT", body);
-      onChange();
+      await onSaved();
     } catch (err) {
       // Show the saved kit again rather than an edit that didn't stick.
       setEffort(kit?.effort ?? "steady");
@@ -535,8 +545,9 @@ function MemberKitRow({
                 setEffort(opt);
                 persist({ effort: opt });
               }}
+              disabled={saving}
               className={
-                "rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide " +
+                "rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide disabled:opacity-60 " +
                 (effort === opt
                   ? "border-cyan-300/55 bg-cyan-300/22 text-white"
                   : "border-white/14 bg-white/[0.05] text-white/65")
@@ -556,8 +567,9 @@ function MemberKitRow({
               key={slot}
               type="button"
               onClick={() => toggleItem(slot)}
+              disabled={saving}
               className={
-                "flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] uppercase tracking-wide " +
+                "flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] uppercase tracking-wide disabled:opacity-60 " +
                 (on
                   ? "border-cyan-300/55 bg-cyan-300/15 text-white"
                   : "border-white/12 bg-transparent text-white/55")
@@ -582,7 +594,8 @@ function MemberKitRow({
             setState(next);
             persist({ state: next });
           }}
-          className="rounded-full border border-white/14 px-2.5 py-0.5 text-[10px] text-white/65 hover:text-white"
+          disabled={saving}
+          className="rounded-full border border-white/14 px-2.5 py-0.5 text-[10px] text-white/65 hover:text-white disabled:opacity-60"
         >
           flag {state === "warn" ? "ok" : "warn"}
         </button>

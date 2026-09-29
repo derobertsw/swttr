@@ -81,7 +81,8 @@ interface FakeReply {
 
 export const reply = (status: number, body?: unknown): FakeReply => ({ status, body });
 
-type Route = FakeReply | ((requestBody: unknown) => FakeReply);
+/** A reply, or a function of the request's JSON body. It can return a promise to hold the response open. */
+type Route = FakeReply | ((requestBody: unknown) => FakeReply | Promise<FakeReply>);
 
 export function fakeTripApi(routes: Record<string, Route>) {
   return vi.fn(async (url: string, init?: RequestInit) => {
@@ -90,7 +91,7 @@ export function fakeTripApi(routes: Record<string, Route>) {
     const route = routes[key];
     if (!route) throw new Error(`Unexpected request: ${method} ${url}`);
     const requestBody = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
-    const { status, body } = typeof route === "function" ? route(requestBody) : route;
+    const { status, body } = typeof route === "function" ? await route(requestBody) : route;
     return {
       ok: status >= 200 && status < 300,
       status,
