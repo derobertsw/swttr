@@ -6,7 +6,6 @@ import { METABOLIC_RATES } from '@/lib/biophysics/constants';
 import { COWEDA_VALIDATION_SOURCE } from '@/lib/biophysics/coweda';
 import { DLE_ESTIMATION_METHOD } from '@/lib/biophysics/ireq';
 import { applyBodySizeMetabolicAdjustment } from '@/lib/biophysics/bodyMetrics';
-import { REGIONAL_DEFICIT_CLO_THRESHOLD } from '@/lib/biophysics/comfort';
 import type { IreqResult } from '@/types/garments';
 import type { SportRecommender } from '../handler';
 import { metabolicRateFor, phaseIreq, phaseTargets, type PhaseTargets } from '../thermal-targets';
@@ -24,6 +23,8 @@ const SKIING_SPEED_WIND_MS = 5;
 /** Weights for blending the skiing and chairlift phases. */
 const SKIING_WEIGHT = 0.6;
 const CHAIRLIFT_WEIGHT = 0.4;
+/** Warn when a region falls this far below its minimum, in clo. */
+const REGIONAL_WARNING_CLO = 0.12;
 
 interface AlpineTargets extends PhaseTargets {
   skiingRate: number;
@@ -43,7 +44,8 @@ export const alpine: SportRecommender<AlpineTargets> = {
     const chairlift = phaseIreq(conditions, windMs, chairliftRate);
 
     // The minimum blends both phases; comfort and exposure limits follow the
-    // static chairlift ride.
+    // static chairlift ride. Hands and head follow the skiing phase: their
+    // alpine multipliers already add the chairlift and wind exposure.
     const baseline: IreqResult = {
       ireqMin: skiing.ireqMin * SKIING_WEIGHT + chairlift.ireqMin * CHAIRLIFT_WEIGHT,
       ireqNeutral: chairlift.ireqNeutral,
@@ -56,7 +58,7 @@ export const alpine: SportRecommender<AlpineTargets> = {
       chairliftRate,
       skiing,
       chairlift,
-      ...phaseTargets('alpine_skiing', baseline, blendedRate, conditions, windMs),
+      ...phaseTargets('alpine_skiing', baseline, blendedRate, conditions, windMs, skiing),
     };
   },
 
@@ -107,21 +109,21 @@ export const alpine: SportRecommender<AlpineTargets> = {
         activityKey: 'alpine_skiing',
         comfortContext: {
           targetRange: targets.targetRange,
-          regionalNeutralTarget: targets.regional.neutral,
-          extremityNeutralTarget: targets.extremity.neutral,
+          regionalMinTarget: targets.regional.min,
+          extremityMinTarget: targets.extremity.min,
         },
       },
       handwear,
       headwear
     );
 
-    // Layer limits can leave a shortfall. The shared scorer uses the skiing
-    // phase, so also surface unmet regional targets for chairlift exposure.
+    // Layer limits can leave a region short of its share of the whole-body
+    // minimum, which blends the skiing and chairlift phases.
     const regionalClo = recommendation.ensemble_properties.regional_clo;
     if (regionalClo) {
       for (const region of ['torso', 'arms', 'legs'] as const) {
         const minimum = targets.regional.min[region];
-        if (minimum - regionalClo[region] > REGIONAL_DEFICIT_CLO_THRESHOLD) {
+        if (minimum - regionalClo[region] > REGIONAL_WARNING_CLO) {
           warnings.push(`Insufficient ${region} insulation: ${regionalClo[region].toFixed(1)} clo vs ${minimum.toFixed(1)} clo required for alpine conditions`);
         }
       }

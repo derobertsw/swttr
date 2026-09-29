@@ -161,6 +161,8 @@ describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST, s
         const result = await callRoute(POST, { ...body, ...mode.extraBody });
         if (sport in PUFFY_OUTERS) expectWearable(result.body, PUFFY_OUTERS[sport]);
         if (sport === "xc" && name !== "mild, calm, dry, easy") expectWindLayers(result.body);
+        // A score of 0 can't tell one outfit from another (#152).
+        expect(result.body.recommendation?.thermal_comfort_score).toBeGreaterThan(0);
         expect(result).toMatchSnapshot();
       });
     });
@@ -184,6 +186,19 @@ describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST, s
     expect(
       await callRoute(POST, { weather: { temperature: "cold", wind_speed: 5 } })
     ).toMatchSnapshot();
+  });
+});
+
+describe("POST /api/v1/recommendations/alpine (golden, comfort)", () => {
+  it("scores an outfit inside the target range as comfortable", async () => {
+    useDatabase(null, []);
+    const { body } = await callRoute(alpine, CONDITIONS[0].body);
+    const [min, max] = body.ireq.target_range;
+    const totalClo = body.recommendation.ensemble_properties.total_clo;
+
+    expect(totalClo).toBeGreaterThanOrEqual(min);
+    expect(totalClo).toBeLessThanOrEqual(max);
+    expect(body.recommendation.thermal_comfort_score).toBeGreaterThanOrEqual(85);
   });
 });
 

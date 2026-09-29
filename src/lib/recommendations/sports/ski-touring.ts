@@ -242,13 +242,13 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     const thermalComfortScore = calculateThermalComfortScore({
       totalClo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
       targetRange: uphill.targetRange,
-      maxRegionalDeficit: getMaxRegionalDeficit(regionalClo, uphill.regional.neutral),
+      maxRegionalDeficit: getMaxRegionalDeficit(regionalClo, uphill.regional.min),
       maxExtremityDeficit: getMaxExtremityDeficit(
         {
           hands: selectedHandwear?.rcl_clo ?? 0,
           head: (climbHeadwear.helmet?.rcl_clo ?? 0) + (climbHeadwear.headWarmth?.rcl_clo ?? 0) + (climbHeadwear.neckWarmth?.rcl_clo ?? 0),
         },
-        uphill.extremity.neutral
+        uphill.extremity.min
       ),
     });
     // Gloves carry over from the climb — only select warmer descent gloves if climb pair is insufficient

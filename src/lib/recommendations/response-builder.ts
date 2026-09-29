@@ -23,8 +23,10 @@ interface EnsembleScoringInput {
   activityKey: ActivityType;
   comfortContext?: {
     targetRange: [number, number];
-    regionalNeutralTarget?: RegionalCloValues;
-    extremityNeutralTarget?: ExtremityCloValues;
+    /** Minimum clo per region: below it the region is short. */
+    regionalMinTarget?: RegionalCloValues;
+    /** Minimum clo for the hands and head. */
+    extremityMinTarget?: ExtremityCloValues;
   };
 }
 
@@ -55,7 +57,7 @@ export function buildScoredRecommendation(
   } satisfies RegionalCloValues;
   const maxRegionalDeficit = getMaxRegionalDeficit(
     regionalClo,
-    input.comfortContext?.regionalNeutralTarget
+    input.comfortContext?.regionalMinTarget
   );
   // Sum hood clo contributions from garments in the ensemble.
   // When a helmet is selected, only helmet_compatible hoods count
@@ -76,7 +78,7 @@ export function buildScoredRecommendation(
   } satisfies ExtremityCloValues;
   const maxExtremityDeficit = getMaxExtremityDeficit(
     extremityClo,
-    input.comfortContext?.extremityNeutralTarget
+    input.comfortContext?.extremityMinTarget
   );
   const comfortScore = input.comfortContext
     ? calculateThermalComfortScore({

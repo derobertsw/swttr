@@ -19,8 +19,7 @@ import type {
 
 export const EVALUATED_BODY_PARTS: readonly EvaluatedBodyPart[] = ['torso', 'legs', 'hands', 'headNeck'];
 
-/** Pill thresholds for a body part's actual vs target clo. */
-const BODY_PART_UNDER_CLO = 0.15;
+/** How far a body part's clo can exceed its neutral target before it counts as over. */
 const BODY_PART_OVER_CLO = 0.35;
 
 /** Layering compresses air gaps, so stacked garments insulate less than their sum. */
@@ -54,13 +53,21 @@ function weightedBreakdown(torso: number, arms: number, legs: number) {
   };
 }
 
-function bodyPartStatus(delta: number): BodyPartEvaluation['status'] {
-  if (delta > BODY_PART_UNDER_CLO) return 'under';
-  if (-delta > BODY_PART_OVER_CLO) return 'over';
+/**
+ * Under when short of the minimum by more than the cold-warning tolerance,
+ * over when well above the neutral target, and in range in between.
+ */
+function bodyPartStatus(clo: number, minimum: number, target: number): BodyPartEvaluation['status'] {
+  if (minimum - clo > THERMAL_DISPLAY_CLO_EPSILON) return 'under';
+  if (clo - target > BODY_PART_OVER_CLO) return 'over';
   return 'in_range';
 }
 
 export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
+  // Measure shortfalls against each part's minimum, or its neutral target
+  // when the caller sent no minimum.
+  const minimum = (part: EvaluatedBodyPart) => input.minTargets?.[part] ?? input.targets[part];
+
   const bodyParts = Object.fromEntries(
     EVALUATED_BODY_PARTS.map((part) => {
       const rawClo = sum(input.itemClo[part]);
@@ -70,20 +77,20 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
       const evaluation: BodyPartEvaluation =
         target === undefined
           ? { clo }
-          : { clo, target, delta: target - clo, status: bodyPartStatus(target - clo) };
+          : { clo, target, delta: target - clo, status: bodyPartStatus(clo, minimum(part) ?? target, target) };
       return [part, evaluation];
     })
   ) as Record<EvaluatedBodyPart, BodyPartEvaluation>;
 
   const { torso, legs, hands, headNeck } = bodyParts;
   const maxRegionalDeficit = Math.max(
-    deficit(torso.target, torso.clo),
-    deficit(input.arms?.target, input.arms?.deficitClo ?? input.arms?.clo),
-    deficit(legs.target, legs.clo)
+    deficit(minimum('torso'), torso.clo),
+    deficit(input.arms?.minTarget ?? input.arms?.target, input.arms?.deficitClo ?? input.arms?.clo),
+    deficit(minimum('legs'), legs.clo)
   );
   const maxExtremityDeficit = Math.max(
-    deficit(hands.target, hands.clo),
-    deficit(headNeck.target, headNeck.clo)
+    deficit(minimum('hands'), hands.clo),
+    deficit(minimum('headNeck'), headNeck.clo)
   );
 
   const breakdown = input.arms ? weightedBreakdown(torso.clo, input.arms.clo, legs.clo) : undefined;

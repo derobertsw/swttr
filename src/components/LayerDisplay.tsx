@@ -73,16 +73,17 @@ interface PickerTarget {
 
 const NO_PACK_ITEMS: PackItemGarment[] = [];
 
-/** Each body part's neutral clo target from a recommendation's IREQ ranges. */
+/** Each body part's neutral (or minimum) clo target from a recommendation's IREQ ranges. */
 function bodyPartTargets(
   regional: RegionalIreqRange | undefined,
-  extremity: ExtremityIreqRange | undefined
+  extremity: ExtremityIreqRange | undefined,
+  bound: "min" | "neutral" = "neutral"
 ): PhaseEvaluationInput["targets"] {
   return {
-    torso: regional?.neutral?.torso,
-    legs: regional?.neutral?.legs,
-    hands: extremity?.neutral?.hands,
-    headNeck: extremity?.neutral?.head,
+    torso: regional?.[bound]?.torso,
+    legs: regional?.[bound]?.legs,
+    hands: extremity?.[bound]?.hands,
+    headNeck: extremity?.[bound]?.head,
   };
 }
 
@@ -173,18 +174,26 @@ const LayerDisplay = ({
   const climbInput: PhaseEvaluationInput = {
     itemClo: itemCloByBodyPart(climb.layers),
     targets: bodyPartTargets(ireq?.regional, ireq?.extremity),
-    arms: regionalClo ? { clo: regionalClo.arms, target: ireq?.regional?.neutral?.arms } : undefined,
+    minTargets: bodyPartTargets(ireq?.regional, ireq?.extremity, "min"),
+    arms: regionalClo
+      ? { clo: regionalClo.arms, target: ireq?.regional?.neutral?.arms, minTarget: ireq?.regional?.min?.arms }
+      : undefined,
     targetRange: ireq?.target_range,
   };
+  const descentRegional = descentBreakdown?.regional_ireq ?? ireq?.regional;
   const descentInput: PhaseEvaluationInput = {
     itemClo: itemCloByBodyPart(descent.layers),
     targets: descentBreakdown
       ? bodyPartTargets(descentBreakdown.regional_ireq, descentBreakdown.extremity_ireq)
       : climbInput.targets,
+    minTargets: descentBreakdown
+      ? bodyPartTargets(descentBreakdown.regional_ireq, descentBreakdown.extremity_ireq, "min")
+      : climbInput.minTargets,
     arms: regionalClo
       ? {
           clo: regionalClo.arms,
-          target: descentBreakdown?.regional_ireq?.neutral?.arms ?? ireq?.regional?.neutral?.arms,
+          target: descentRegional?.neutral?.arms,
+          minTarget: descentRegional?.min?.arms,
           deficitClo: descentBreakdown?.regional_clo?.arms ?? regionalClo.arms,
         }
       : undefined,

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from './targets';
+import { calculateActivityTargetRange, calculateRegionalTargets } from './targets';
+import { REGIONAL_IREQ_MULTIPLIERS, REGIONAL_WEIGHTS, type ActivityType } from './constants';
 
 describe('calculateActivityTargetRange', () => {
   it('returns ordered min/max with two-decimal precision', () => {
@@ -86,23 +87,38 @@ describe('calculateActivityTargetRange', () => {
   });
 });
 
-describe('scaleIreqShapeToTargetRange', () => {
-  it('scales min and neutral values to match adjusted whole-body targets', () => {
-    const shape = {
-      min: { torso: 1.0, legs: 1.2 },
-      neutral: { torso: 1.5, legs: 1.8 },
-    };
+describe('calculateRegionalTargets', () => {
+  const areaWeighted = (clo: { torso: number; arms: number; legs: number }) =>
+    clo.torso * REGIONAL_WEIGHTS.torso + clo.arms * REGIONAL_WEIGHTS.arm + clo.legs * REGIONAL_WEIGHTS.leg;
 
-    const scaled = scaleIreqShapeToTargetRange(shape, {
-      ireqMin: 1.0,
-      ireqNeutral: 1.5,
-      targetMin: 1.2,
-      targetMax: 1.95,
-    });
+  it.each(Object.keys(REGIONAL_IREQ_MULTIPLIERS) as ActivityType[])(
+    'splits the %s range so the regions average back to it',
+    (activity) => {
+      const targets = calculateRegionalTargets(activity, [2.44, 2.88]);
 
-    expect(scaled.min.torso).toBeCloseTo(1.2, 2);
-    expect(scaled.min.legs).toBeCloseTo(1.44, 2);
-    expect(scaled.neutral.torso).toBeCloseTo(1.95, 2);
-    expect(scaled.neutral.legs).toBeCloseTo(2.34, 2);
+      // Each regional target is rounded to 0.01 clo.
+      expect(Math.abs(areaWeighted(targets.min) - 2.44)).toBeLessThanOrEqual(0.005);
+      expect(Math.abs(areaWeighted(targets.neutral) - 2.88)).toBeLessThanOrEqual(0.005);
+    }
+  );
+
+  it('keeps the activity multipliers in proportion', () => {
+    // Alpine: torso 1.0, arms 1.0, legs 1.2, area-weighted mean 1.05.
+    const targets = calculateRegionalTargets('alpine_skiing', [2.44, 2.88]);
+
+    expect(targets.min).toEqual({ torso: 2.32, arms: 2.32, legs: 2.79 });
+    expect(targets.neutral).toEqual({ torso: 2.74, arms: 2.74, legs: 3.29 });
+  });
+
+  it('lets an outfit inside the whole-body range meet every regional minimum', () => {
+    // The alpine catalog outfit from #152 at 45°F, which used to score 0.
+    const targets = calculateRegionalTargets('alpine_skiing', [2.44, 2.88]);
+    const outfit = { torso: 2.89, arms: 2.40, legs: 2.83 };
+
+    expect(areaWeighted(outfit)).toBeGreaterThan(2.44);
+    expect(areaWeighted(outfit)).toBeLessThan(2.88);
+    expect(outfit.torso).toBeGreaterThanOrEqual(targets.min.torso);
+    expect(outfit.arms).toBeGreaterThanOrEqual(targets.min.arms);
+    expect(outfit.legs).toBeGreaterThanOrEqual(targets.min.legs);
   });
 });

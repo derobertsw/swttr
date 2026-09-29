@@ -46,12 +46,12 @@ graph TD
     B --> C[IREQ Calculation]
     C --> D[Activity Target Range]
     D --> E[CoWEDA Validation Buffer]
-    E --> F[Regional & Extremity IREQ]
+    E --> F[Regional & Extremity Targets<br/>see Thermal Targets and Comfort]
     F --> P[Load Gear Pool:<br/>wardrobe, or catalog filtered by activity score]
     P -->|No usable garments| T[Targets-only response]
     P --> G[Ensemble Building]
     G --> H[Ensemble Scoring]
-    H --> I[Comfort Evaluation]
+    H --> I[Comfort Evaluation:<br/>shortfalls below each minimum]
 
     subgraph "Shared Biophysics Core — thermal-targets.ts"
         B
@@ -250,7 +250,7 @@ Extremity recommendations handle headwear, handwear, and neck warmth with distin
 
 ```mermaid
 graph TD
-    EXT[Extremity IREQ Targets] --> HEAD[Headwear Selection]
+    EXT[Extremity IREQ Targets<br/>see Thermal Targets and Comfort] --> HEAD[Headwear Selection]
     EXT --> HAND[Handwear Selection]
     EXT --> NECK[Neck Warmth Selection]
 
@@ -282,6 +282,29 @@ graph TD
         NCHECK -->|Yes| NSEL[Select neck warmth item]
         NCHECK -->|No| NSKIP[No neck warmth]
     end
+```
+
+### 7. Thermal Targets and Comfort
+
+Body-part targets are bands, like the whole-body target range. The torso, arms and legs split the whole-body range by the activity's regional multipliers, rescaled so their area-weighted mean is 1: an outfit with every region at its minimum sits exactly at the whole-body minimum. Hands and head scale the whole-body IREQ of the phase they follow; alpine uses the skiing phase, since its extremity multipliers already add chairlift and wind exposure. The comfort status, the body-part pills, and the comfort score all judge shortfalls against the bottom of each band, in `src/lib/biophysics/comfort.ts`.
+
+```mermaid
+graph TD
+    RANGE[Whole-body target range] --> SPLIT[Split across torso, arms and legs<br/>multipliers rescaled to an area-weighted mean of 1]
+    SPLIT --> REG[Regional min and neutral targets]
+    PIREQ[Whole-body IREQ of the phase the hands and head follow<br/>alpine: skiing phase] --> EXT[Hand and head targets:<br/>activity multiplier × wind factor<br/>× temperature factor from 0.8 to 1<br/>+ CoWEDA extremity buffer]
+
+    RANGE --> DEC{Comfort decision}
+    REG --> DEC
+    EXT --> DEC
+    DEC -->|Whole body more than 0.05 clo below the range| COLD[Cold]
+    DEC -->|Whole body more than 0.3 clo above the range| HOT[Overheating]
+    DEC -->|A body part more than 0.05 clo below its minimum| COLD
+    DEC -->|Otherwise| OK[Comfortable]
+
+    OK --> S1[Score 85 to 100<br/>by distance from the middle of the range]
+    COLD --> S2[Score 85 × share of the needed insulation<br/>clothing plus 0.5 clo of surface air,<br/>set by the largest shortfall]
+    HOT --> S3[Score 78 − 35 × clo above the range]
 ```
 
 ## Getting Started

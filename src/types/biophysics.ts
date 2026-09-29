@@ -197,11 +197,16 @@ export interface PhaseEvaluationInput {
   /** Neutral clo target per body part, when the recommendation has one. */
   targets: Partial<Record<EvaluatedBodyPart, number>>;
   /**
+   * Minimum clo per body part: below it the part is short of insulation.
+   * Parts without one are measured against their neutral target.
+   */
+  minTargets?: Partial<Record<EvaluatedBodyPart, number>>;
+  /**
    * Arms aren't edited directly, so their clo comes from the recommendation.
    * `deficitClo` overrides `clo` for the arm deficit (the descent reports its
    * own arm clo); the whole-body total always uses `clo`.
    */
-  arms?: { clo: number; target?: number; deficitClo?: number };
+  arms?: { clo: number; target?: number; minTarget?: number; deficitClo?: number };
   targetRange?: [number, number];
 }
 
@@ -210,6 +215,7 @@ export interface BodyPartEvaluation {
   target?: number;
   /** target - clo: positive when more insulation is needed. */
   delta?: number;
+  /** Under its minimum, over its neutral target, or in between. */
   status?: "under" | "over" | "in_range";
 }
 

@@ -1,7 +1,11 @@
-export const REGIONAL_DEFICIT_CLO_THRESHOLD = 0.12;
-export const EXTREMITY_DEFICIT_CLO_THRESHOLD = 0.1;
 export const OVERHEAT_BUFFER_CLO = 0.3;
 export const THERMAL_DISPLAY_CLO_EPSILON = 0.05;
+/**
+ * Insulation of the air layer around the clothing, in clo. ISO 9920 puts it
+ * at about 0.7 clo in still air; wind and movement thin it, so this uses a
+ * light-breeze value.
+ */
+const SURFACE_AIR_CLO = 0.5;
 
 type ThermalRiskType = "comfortable" | "cold" | "overheat";
 type ThermalRiskSeverity = "moderate" | "high";
@@ -26,10 +30,10 @@ interface ThermalComfortDecision {
 interface ThermalComfortInput {
   totalClo: number | undefined;
   targetRange: [number, number] | undefined;
+  /** Largest shortfall of the torso, arms or legs below its minimum target, in clo. */
   maxRegionalDeficit?: number;
+  /** Largest shortfall of the hands or head below its minimum target, in clo. */
   maxExtremityDeficit?: number;
-  regionalDeficitThreshold?: number;
-  extremityDeficitThreshold?: number;
   overheatBufferClo?: number;
 }
 
@@ -47,83 +51,36 @@ function getSeverity(delta: number, targetRange: [number, number]): ThermalRiskS
 
 export function getMaxRegionalDeficit(
   regionalClo: RegionalCloValues | undefined,
-  regionalNeutralTarget: RegionalCloValues | undefined
+  regionalTarget: RegionalCloValues | undefined
 ): number {
-  if (!regionalClo || !regionalNeutralTarget) return 0;
+  if (!regionalClo || !regionalTarget) return 0;
 
   return Math.max(
     0,
-    regionalNeutralTarget.torso - regionalClo.torso,
-    regionalNeutralTarget.arms - regionalClo.arms,
-    regionalNeutralTarget.legs - regionalClo.legs
+    regionalTarget.torso - regionalClo.torso,
+    regionalTarget.arms - regionalClo.arms,
+    regionalTarget.legs - regionalClo.legs
   );
 }
 
 export function getMaxExtremityDeficit(
   extremityClo: ExtremityCloValues | undefined,
-  extremityNeutralTarget: ExtremityCloValues | undefined
+  extremityTarget: ExtremityCloValues | undefined
 ): number {
-  if (!extremityClo || !extremityNeutralTarget) return 0;
+  if (!extremityClo || !extremityTarget) return 0;
 
   return Math.max(
     0,
-    extremityNeutralTarget.hands - extremityClo.hands,
-    extremityNeutralTarget.head - extremityClo.head
+    extremityTarget.hands - extremityClo.hands,
+    extremityTarget.head - extremityClo.head
   );
 }
 
-function evaluateThermalComfortScoreState(input: ThermalComfortInput): ThermalComfortDecision | null {
-  const {
-    totalClo,
-    targetRange,
-    maxRegionalDeficit = 0,
-    maxExtremityDeficit = 0,
-    regionalDeficitThreshold = REGIONAL_DEFICIT_CLO_THRESHOLD,
-    extremityDeficitThreshold = EXTREMITY_DEFICIT_CLO_THRESHOLD,
-    overheatBufferClo = OVERHEAT_BUFFER_CLO,
-  } = input;
-
-  if (totalClo === undefined || !targetRange) return null;
-
-  const [targetMin, targetMax] = targetRange;
-
-  const localDeficit = Math.max(maxRegionalDeficit, maxExtremityDeficit);
-  const localThreshold = maxRegionalDeficit >= maxExtremityDeficit
-    ? regionalDeficitThreshold
-    : extremityDeficitThreshold;
-  if (localDeficit > localThreshold) {
-    return {
-      riskType: "cold",
-      severity: getSeverity(localDeficit, targetRange),
-      delta: localDeficit,
-    };
-  }
-
-  if (totalClo < targetMin) {
-    const deficit = targetMin - totalClo;
-    return {
-      riskType: "cold",
-      severity: getSeverity(deficit, targetRange),
-      delta: deficit,
-    };
-  }
-
-  if (totalClo > targetMax + overheatBufferClo) {
-    const excess = totalClo - targetMax;
-    return {
-      riskType: "overheat",
-      severity: getSeverity(excess, targetRange),
-      delta: excess,
-    };
-  }
-
-  return {
-    riskType: "comfortable",
-    severity: "moderate",
-    delta: 0,
-  };
-}
-
+/**
+ * Cold when the whole body is below its target range or a body part is below
+ * its minimum, overheating when the whole body is well above the range, and
+ * comfortable otherwise. `delta` is the largest shortfall or the excess, in clo.
+ */
 export function evaluateThermalComfort(input: ThermalComfortInput): ThermalComfortDecision | null {
   const {
     totalClo,
@@ -176,52 +133,34 @@ export function evaluateThermalComfort(input: ThermalComfortInput): ThermalComfo
   };
 }
 
+/**
+ * 0–100 score for the decision above. Comfortable outfits score 85–100 by
+ * how close they sit to the middle of the target range.
+ *
+ * Heat escapes through the clothing and the air layer around it, at a rate
+ * inversely proportional to their combined insulation (ISO 11079). A cold
+ * outfit scores 85 times the share of the minimum combined insulation it
+ * provides, judged by its largest shortfall: roughly the share of its heat
+ * loss the body can replace.
+ */
 export function calculateThermalComfortScore(input: ThermalComfortInput): number | null {
-  const {
-    totalClo,
-    targetRange,
-    maxRegionalDeficit = 0,
-    maxExtremityDeficit = 0,
-    regionalDeficitThreshold = REGIONAL_DEFICIT_CLO_THRESHOLD,
-    extremityDeficitThreshold = EXTREMITY_DEFICIT_CLO_THRESHOLD,
-    overheatBufferClo = OVERHEAT_BUFFER_CLO,
-  } = input;
-
-  if (totalClo === undefined || !targetRange) return null;
-
-  const decision = evaluateThermalComfortScoreState({
-    totalClo,
-    targetRange,
-    maxRegionalDeficit,
-    maxExtremityDeficit,
-    regionalDeficitThreshold,
-    extremityDeficitThreshold,
-    overheatBufferClo,
-  });
-  if (!decision) return null;
+  const decision = evaluateThermalComfort(input);
+  const { totalClo, targetRange } = input;
+  if (!decision || totalClo === undefined || !targetRange) return null;
 
   const [targetMin, targetMax] = targetRange;
-  const midpoint = (targetMin + targetMax) / 2;
-  const halfRange = Math.max(0.12, (targetMax - targetMin) / 2);
 
   let score: number;
 
   if (decision.riskType === "comfortable") {
+    const midpoint = (targetMin + targetMax) / 2;
+    const halfRange = Math.max(0.12, (targetMax - targetMin) / 2);
     const normalizedOffset = clamp(Math.abs(totalClo - midpoint) / halfRange, 0, 1);
     score = 100 - normalizedOffset * 15;
   } else if (decision.riskType === "cold") {
-    score = 78 - decision.delta * 42;
+    score = 85 * (1 - decision.delta / (Math.max(0, targetMin) + SURFACE_AIR_CLO));
   } else {
     score = 78 - decision.delta * 35;
-  }
-
-  if (maxRegionalDeficit > regionalDeficitThreshold) {
-    const extraDeficit = maxRegionalDeficit - regionalDeficitThreshold;
-    score -= 8 + (extraDeficit * 70);
-  }
-  if (maxExtremityDeficit > extremityDeficitThreshold) {
-    const extraDeficit = maxExtremityDeficit - extremityDeficitThreshold;
-    score -= 10 + (extraDeficit * 85);
   }
 
   return Math.round(clamp(score, 0, 100) * 10) / 10;

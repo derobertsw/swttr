@@ -43,17 +43,33 @@ describe("evaluatePhase", () => {
     expect(withOverride.totalClo).toBeCloseTo(evaluatePhase(base).totalClo!, 10);
   });
 
-  it("marks body parts under, over, or in range of their target", () => {
+  it("marks body parts under their minimum, over their target, or in range", () => {
     const { bodyParts } = evaluatePhase({
       ...base,
-      itemClo: { torso: [0.5], legs: [1.5], hands: [0.95], headNeck: [] },
+      itemClo: { torso: [0.5], legs: [1.5], hands: [0.9], headNeck: [] },
       targets: { torso: 1.0, legs: 0.6, hands: 1.0 },
+      minTargets: { torso: 0.8, legs: 0.5, hands: 0.85 },
     });
     expect(bodyParts.torso.status).toBe("under");
     expect(bodyParts.torso.delta).toBeCloseTo(1.0 - 0.5 * 0.836, 10);
     expect(bodyParts.legs.status).toBe("over");
+    // Above its minimum, though 0.1 clo below its target
     expect(bodyParts.hands.status).toBe("in_range");
+    expect(bodyParts.hands.delta).toBeCloseTo(0.1, 10);
     expect(bodyParts.headNeck).toEqual({ clo: 0 });
+  });
+
+  it("measures shortfalls from each part's minimum", () => {
+    const result = evaluatePhase({
+      ...base,
+      minTargets: { torso: 0.9, legs: 0.5, hands: 0.8, headNeck: 0.4 },
+      arms: { clo: 0.8, target: 0.9, minTarget: 0.75 },
+    });
+    // Every part clears its minimum, though arms and hands miss their targets.
+    expect(result.maxRegionalDeficit).toBe(0);
+    expect(result.maxExtremityDeficit).toBe(0);
+    expect(result.decision).toMatchObject({ riskType: "comfortable" });
+    expect(result.comfortScore).toBeGreaterThanOrEqual(85);
   });
 
   it("flags cold risk when a region is under target even if the total is in range", () => {
