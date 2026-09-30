@@ -1,14 +1,10 @@
 /**
  * Thermal targets shared by every sport: metabolic rate, IREQ, the activity
- * target range widened by the CoWEDA validation buffer, and the regional and
- * extremity targets scaled to that range.
+ * target range widened by the CoWEDA validation buffer, the regional targets
+ * that split that range across the body, and the extremity targets.
  */
-import {
-  calculateExtremityIreq,
-  calculateIreq,
-  calculateRegionalIreq,
-} from '@/lib/biophysics/ireq';
-import { calculateActivityTargetRange, scaleIreqShapeToTargetRange } from '@/lib/biophysics/targets';
+import { calculateExtremityIreq, calculateIreq } from '@/lib/biophysics/ireq';
+import { calculateActivityTargetRange, calculateRegionalTargets } from '@/lib/biophysics/targets';
 import { getMetabolicRateForActivity, type ExertionLevel } from '@/lib/biophysics/exertion';
 import { applyBodySizeMetabolicAdjustment } from '@/lib/biophysics/bodyMetrics';
 import {
@@ -52,14 +48,16 @@ export function phaseIreq(conditions: Conditions, windMs: number, metabolicRate:
  *
  * `baseline` is the IREQ the phase is designed against, `metabolicRate` sizes
  * the CoWEDA validation buffer, and `windMs` is the phase's effective wind
- * speed.
+ * speed. `extremityBaseline` is the IREQ the hands and head follow, when it
+ * differs from `baseline`.
  */
 export function phaseTargets(
   activity: ActivityType,
   baseline: IreqResult,
   metabolicRate: number,
   conditions: Conditions,
-  windMs: number
+  windMs: number,
+  extremityBaseline: IreqResult = baseline
 ) {
   const range = calculateActivityTargetRange({
     activity,
@@ -77,14 +75,9 @@ export function phaseTargets(
   const adjustedRange = applyCowedaBufferToTargetRange(range, validationBuffer);
   const targetRange: [number, number] = [adjustedRange.min, adjustedRange.max];
 
-  const regional = scaleIreqShapeToTargetRange(calculateRegionalIreq(baseline, activity), {
-    ireqMin: baseline.ireqMin,
-    ireqNeutral: baseline.ireqNeutral,
-    targetMin: targetRange[0],
-    targetMax: targetRange[1],
-  });
+  const regional = calculateRegionalTargets(activity, targetRange);
   const extremity = applyCowedaBufferToExtremityTargets(
-    calculateExtremityIreq(baseline, activity, conditions.tempC, windMs),
+    calculateExtremityIreq(extremityBaseline, activity, conditions.tempC, windMs),
     validationBuffer
   );
 

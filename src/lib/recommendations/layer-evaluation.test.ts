@@ -43,17 +43,48 @@ describe("evaluatePhase", () => {
     expect(withOverride.totalClo).toBeCloseTo(evaluatePhase(base).totalClo!, 10);
   });
 
-  it("marks body parts under, over, or in range of their target", () => {
+  it("marks body parts under their minimum, over their target, or in range", () => {
     const { bodyParts } = evaluatePhase({
       ...base,
-      itemClo: { torso: [0.5], legs: [1.5], hands: [0.95], headNeck: [] },
+      itemClo: { torso: [0.5], legs: [1.5], hands: [0.9], headNeck: [] },
       targets: { torso: 1.0, legs: 0.6, hands: 1.0 },
+      minTargets: { torso: 0.8, legs: 0.5, hands: 0.85 },
     });
     expect(bodyParts.torso.status).toBe("under");
     expect(bodyParts.torso.delta).toBeCloseTo(1.0 - 0.5 * 0.836, 10);
     expect(bodyParts.legs.status).toBe("over");
+    // Above its minimum, though 0.1 clo below its target
     expect(bodyParts.hands.status).toBe("in_range");
+    expect(bodyParts.hands.delta).toBeCloseTo(0.1, 10);
     expect(bodyParts.headNeck).toEqual({ clo: 0 });
+  });
+
+  it("measures shortfalls from each part's minimum", () => {
+    const result = evaluatePhase({
+      ...base,
+      minTargets: { torso: 0.9, legs: 0.5, hands: 0.8, headNeck: 0.4 },
+      arms: { clo: 0.8, target: 0.9, minTarget: 0.75 },
+    });
+    // Every part clears its minimum, though arms and hands miss their targets.
+    expect(result.maxRegionalDeficit).toBe(0);
+    expect(result.maxExtremityDeficit).toBe(0);
+    expect(result.decision).toMatchObject({ riskType: "comfortable" });
+    expect(result.comfortScore).toBeGreaterThanOrEqual(85);
+  });
+
+  it("scores gloves against the hand minimum when it exceeds the whole-body minimum", () => {
+    // Easy biking at -15°F in 40 mph wind: the hands need 3.42 clo, the whole
+    // body 1.99, and every other part sits at its minimum.
+    const withGloves = (gloveClo: number) => evaluatePhase({
+      itemClo: { torso: [2.4], legs: [2.1], hands: [gloveClo], headNeck: [1.0] },
+      targets: { torso: 2.2, legs: 2.3, hands: 3.6, headNeck: 1.2 },
+      minTargets: { torso: 2.0, legs: 2.0, hands: 3.42, headNeck: 1.0 },
+      arms: { clo: 2.0, target: 2.2, minTarget: 2.0 },
+      targetRange: [1.99, 2.11],
+    });
+
+    expect(withGloves(0.6).comfortScore).toBeCloseTo(23.9, 1);
+    expect(withGloves(0.9).comfortScore).toBeCloseTo(30.4, 1);
   });
 
   it("flags cold risk when a region is under target even if the total is in range", () => {

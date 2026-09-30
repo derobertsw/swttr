@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateIreq,
-  calculateRegionalIreq,
   calculateExtremityIreq,
   fahrenheitToCelsius,
   celsiusToFahrenheit,
@@ -284,51 +283,6 @@ describe('calculateIreq', () => {
   });
 });
 
-describe('calculateRegionalIreq', () => {
-  const baseIreq = {
-    ireqMin: 1.0,
-    ireqNeutral: 1.5,
-    dleHours: Infinity,
-  };
-
-  describe('XC skiing regional multipliers', () => {
-    it('should apply correct multipliers for XC skiing', () => {
-      const result = calculateRegionalIreq(baseIreq, 'xc_skiing');
-
-      // XC skiing: torso 0.85, arms 1.0, legs 1.15
-      expect(result.min.torso).toBeCloseTo(0.85, 2);
-      expect(result.min.arms).toBeCloseTo(1.0, 2);
-      expect(result.min.legs).toBeCloseTo(1.15, 2);
-
-      expect(result.neutral.torso).toBeCloseTo(1.275, 2);
-      expect(result.neutral.arms).toBeCloseTo(1.5, 2);
-      expect(result.neutral.legs).toBeCloseTo(1.725, 2);
-    });
-  });
-
-  describe('Alpine skiing regional multipliers', () => {
-    it('should apply correct multipliers for alpine skiing', () => {
-      const result = calculateRegionalIreq(baseIreq, 'alpine_skiing');
-
-      // Alpine skiing: torso 1.0, arms 1.0, legs 1.20
-      expect(result.min.torso).toBeCloseTo(1.0, 2);
-      expect(result.min.arms).toBeCloseTo(1.0, 2);
-      expect(result.min.legs).toBeCloseTo(1.2, 2);
-    });
-  });
-
-  describe('Unknown activity fallback', () => {
-    it('should use default multipliers for unknown activities', () => {
-      const result = calculateRegionalIreq(baseIreq, 'unknown_activity');
-
-      // Should apply default (1.0) multipliers
-      expect(result.min.torso).toBeCloseTo(1.0, 2);
-      expect(result.min.arms).toBeCloseTo(1.0, 2);
-      expect(result.min.legs).toBeCloseTo(1.0, 2);
-    });
-  });
-});
-
 describe('calculateExtremityIreq', () => {
   const baseIreq = {
     ireqMin: 1.0,
@@ -351,6 +305,17 @@ describe('calculateExtremityIreq', () => {
 
       expect(coldResult.min.hands).toBeGreaterThan(warmResult.min.hands);
       expect(coldResult.min.head).toBeGreaterThan(warmResult.min.head);
+    });
+
+    it('stops temperature scaling at the whole-body IREQ below -10°C', () => {
+      // IREQ already rises with the cold; gloves about as warm as the
+      // whole-body ensemble kept fingers warm at -30.6°C (Gao et al. 2016).
+      const atMinus10 = calculateExtremityIreq(baseIreq, 'xc_skiing', -10, 0);
+      const atMinus30 = calculateExtremityIreq(baseIreq, 'xc_skiing', -30, 0);
+
+      expect(atMinus30).toEqual(atMinus10);
+      // XC hands multiplier is 1.10
+      expect(atMinus30.neutral.hands).toBeCloseTo(1.65, 2);
     });
 
     it('should apply wind scaling', () => {

@@ -48,8 +48,9 @@ export const ENSEMBLE_REGRESSION = {
   },
 } as const;
 
-// Regional IREQ multipliers by activity
-// Adjusts whole-body IREQ to body-region-specific targets
+// Regional IREQ multipliers by activity: each region's relative insulation
+// need. calculateRegionalTargets rescales them to an area-weighted mean of 1,
+// so only their ratios matter.
 export const REGIONAL_IREQ_MULTIPLIERS = {
   running: {
     torso: 0.75,   // High core heat from sustained effort
@@ -83,15 +84,9 @@ export const REGIONAL_IREQ_MULTIPLIERS = {
   },
 } as const;
 
-// Default multipliers for unknown activities
-export const DEFAULT_REGIONAL_MULTIPLIERS = {
-  torso: 1.0,
-  arms: 1.0,
-  legs: 1.0,
-} as const;
-
-// Extremity base multipliers by activity
-// Hands and head need proportionally more insulation than core
+// Extremity multipliers by activity: scale the whole-body IREQ of the phase
+// the hands and head follow. Values above 1 stand for exposure that IREQ
+// doesn't capture, such as alpine's chairlift rides between skiing runs.
 export const EXTREMITY_IREQ_MULTIPLIERS = {
   running: {
     hands: 1.05,   // High exertion keeps hands warmer
@@ -182,7 +177,6 @@ export const ACTIVITY_WEIGHTS = {
 } as const;
 
 export type ActivityType = keyof typeof ACTIVITY_WEIGHTS;
-export type RegionalIreqActivity = keyof typeof REGIONAL_IREQ_MULTIPLIERS;
 export type ExtremityIreqActivity = keyof typeof EXTREMITY_IREQ_MULTIPLIERS;
 
 // Alpine skiing direct clo targets by temperature range

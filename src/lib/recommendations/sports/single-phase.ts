@@ -94,8 +94,8 @@ export function createSinglePhaseSport(
           activityKey: config.activity,
           comfortContext: {
             targetRange: targets.targetRange,
-            regionalNeutralTarget: targets.regional.neutral,
-            extremityNeutralTarget: targets.extremity.neutral,
+            regionalMinTarget: targets.regional.min,
+            extremityMinTarget: targets.extremity.min,
           },
         },
         handwear,
