@@ -10,7 +10,6 @@ import {
   MemberAvatar,
   SectionLabel,
   Spine,
-  WeatherGlyph,
   daysBetween,
   formatDateRange,
 } from "@/components/trips/trip-primitives";
@@ -221,7 +220,6 @@ function DayList({
                       {new Date(`${d.date}T00:00:00`).getDate()}
                     </p>
                   </div>
-                  <WeatherGlyph kind="cloud" />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-white/85">
                       {d.activity ?? "no activity set"}

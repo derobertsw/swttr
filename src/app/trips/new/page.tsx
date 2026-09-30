@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Calendar as CalIcon, GripVertical, Loader2, MapPin, Plus, UserPlus, X } from "lucide-react";
+import { Suspense, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { format } from "date-fns";
+import { toast } from "sonner";
+import { ArrowLeft, ArrowRight, Calendar as CalIcon, CheckCircle2, GripVertical, Loader2, MapPin, Plus, UserPlus, X } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Calendar } from "@/components/ui/calendar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import {
@@ -16,116 +19,215 @@ import {
   daysBetween,
   formatDateRange,
 } from "@/components/trips/trip-primitives";
+import { errorMessage, fetchTripFull, tripRequest } from "@/lib/trip-requests";
 import type { DateRange } from "react-day-picker";
 import type { Trip, TripMember, TripStop } from "@/types/trips";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
 
 type Step = 1 | 2 | 3 | 4;
 
+type TripBasics = Pick<Trip, "name" | "start_date" | "end_date">;
+
+/** A picked calendar day as a trip date. The calendar picks local days, so this doesn't go through UTC. */
+function toTripDate(day: Date): string {
+  return format(day, "yyyy-MM-dd");
+}
+
+/** A trip date as the local day the calendar shows. */
+function fromTripDate(isoDate: string): Date {
+  return new Date(`${isoDate}T00:00:00`);
+}
+
+/** The step in a reopened trip's URL. A trip is created on step 1, so it defaults to step 2. */
+function parseStep(value: string | null): Step {
+  const step = Number(value);
+  return step === 1 || step === 3 || step === 4 ? step : 2;
+}
+
+function draftBasics(name: string, range: DateRange | undefined): TripBasics | null {
+  if (!name.trim() || !range?.from || !range?.to) return null;
+  return { name: name.trim(), start_date: toTripDate(range.from), end_date: toTripDate(range.to) };
+}
+
+function changedBasics(trip: Trip, basics: TripBasics): Partial<TripBasics> {
+  const changes: Partial<TripBasics> = {};
+  for (const key of ["name", "start_date", "end_date"] as const) {
+    if (basics[key] !== trip[key]) changes[key] = basics[key];
+  }
+  return changes;
+}
+
 export default function NewTripPage() {
+  return (
+    <PageLayout chromeVariant="compact">
+      {/* useSearchParams needs a Suspense boundary for the page to prerender. */}
+      <Suspense fallback={<WizardSkeleton />}>
+        <NewTripWizard />
+      </Suspense>
+    </PageLayout>
+  );
+}
+
+function WizardSkeleton() {
+  return (
+    <div className="flex w-full max-w-2xl flex-col gap-5">
+      <Skeleton className="h-20 w-full rounded-2xl bg-white/12" />
+      <Skeleton className="h-64 w-full rounded-2xl bg-white/12" />
+    </div>
+  );
+}
+
+function NewTripWizard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Once the trip is created, its id and the current step go in the URL, so a
+  // refresh reopens that trip instead of starting a second one.
+  const [resume] = useState(() => ({
+    tripId: searchParams.get("trip"),
+    step: parseStep(searchParams.get("step")),
+  }));
   const [step, setStep] = useState<Step>(1);
   const [name, setName] = useState("");
   const [range, setRange] = useState<DateRange | undefined>(undefined);
   const [trip, setTrip] = useState<Trip | null>(null);
   const [stops, setStops] = useState<TripStop[]>([]);
   const [members, setMembers] = useState<TripMember[]>([]);
+  const [reopening, setReopening] = useState(resume.tripId !== null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // After we create the trip on step-2 enter, refresh the auto-seeded organizer.
   useEffect(() => {
-    if (!trip) return;
-    fetch(`/api/v1/trips/${trip.id}`)
-      .then((r) => r.json())
-      .then((data: { members: TripMember[]; stops: TripStop[] }) => {
-        if (data.members) setMembers(data.members);
-        if (data.stops) setStops(data.stops);
+    if (!resume.tripId) return;
+    let cancelled = false;
+    fetchTripFull(resume.tripId)
+      .then((full) => {
+        if (cancelled) return;
+        setTrip(full.trip);
+        setName(full.trip.name);
+        setRange({ from: fromTripDate(full.trip.start_date), to: fromTripDate(full.trip.end_date) });
+        setStops(full.stops);
+        setMembers(full.members);
+        setStep(resume.step);
       })
-      .catch(() => {});
-  }, [trip]);
+      .catch((err) => {
+        if (!cancelled) setError(`Couldn't reopen your trip: ${errorMessage(err)}`);
+      })
+      .finally(() => {
+        if (!cancelled) setReopening(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resume]);
 
-  const createTrip = async () => {
-    if (!range?.from || !range?.to || !name.trim()) {
+  const tripId = trip?.id;
+  useEffect(() => {
+    if (tripId) window.history.replaceState(null, "", `/trips/new?trip=${tripId}&step=${step}`);
+  }, [tripId, step]);
+
+  const draft = draftBasics(name, range);
+  const hasUnsavedBasics = !trip || !draft || Object.keys(changedBasics(trip, draft)).length > 0;
+
+  const saveBasics = async () => {
+    if (!draft) {
       setError("Add a trip name and pick a date range.");
+      return;
+    }
+    if (!hasUnsavedBasics) {
+      setError(null);
+      setStep(2);
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/v1/trips", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          start_date: range.from.toISOString().slice(0, 10),
-          end_date: range.to.toISOString().slice(0, 10),
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error ?? `Failed (${res.status})`);
+      if (trip) {
+        // Coming back to step 1 edits the trip that's already saved.
+        const { trip: updated } = await tripRequest<{ trip: Trip }>(
+          `/api/v1/trips/${trip.id}`,
+          "PATCH",
+          changedBasics(trip, draft)
+        );
+        setTrip(updated);
+      } else {
+        const { trip: created } = await tripRequest<{ trip: Trip }>("/api/v1/trips", "POST", draft);
+        setTrip(created);
+        // Creating a trip adds its organizer to the crew. The trip is saved
+        // even if loading them fails, so that doesn't stop the flow.
+        const full = await fetchTripFull(created.id).catch(() => null);
+        if (full) setMembers(full.members);
       }
-      const data = (await res.json()) as { trip: Trip };
-      setTrip(data.trip);
       setStep(2);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create trip");
+      setError(
+        `${trip ? "Couldn't save your changes" : "Couldn't create the trip"}: ${errorMessage(err)}`
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (reopening) return <WizardSkeleton />;
+
   return (
-    <PageLayout chromeVariant="compact">
-      <div className="flex w-full max-w-2xl flex-col gap-5">
-        <StepHeader step={step} />
-        {error && (
-          <div className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100">
-            {error}
-          </div>
-        )}
-        {step === 1 && (
-          <Step1Dates
-            name={name}
-            onNameChange={setName}
-            range={range}
-            onRangeChange={setRange}
-            submitting={submitting}
-            onNext={createTrip}
-            onBack={() => router.push("/trips")}
-          />
-        )}
-        {step === 2 && trip && (
-          <Step2Stops
-            trip={trip}
-            stops={stops}
-            onStopsChange={setStops}
-            onNext={() => setStep(3)}
-            onBack={() => setStep(1)}
-          />
-        )}
-        {step === 3 && trip && (
-          <Step3Members
-            trip={trip}
-            members={members}
-            onMembersChange={setMembers}
-            onNext={() => setStep(4)}
-            onBack={() => setStep(2)}
-          />
-        )}
-        {step === 4 && trip && (
-          <Step4Review
-            trip={trip}
-            stops={stops}
-            members={members}
-            onBack={() => setStep(3)}
-            onDone={() => router.push(`/trips/${trip.id}`)}
-          />
-        )}
-        <div className="h-24" />
-      </div>
-    </PageLayout>
+    <div className="flex w-full max-w-2xl flex-col gap-5">
+      <StepHeader step={step} />
+      {trip && (
+        <p role="status" className="flex items-center gap-1.5 text-xs text-white/62">
+          <CheckCircle2 className="size-3.5 shrink-0 text-emerald-300" />
+          Saved to your trips. Stops and crew save as you add them.
+        </p>
+      )}
+      {error && (
+        <div
+          role="alert"
+          className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100"
+        >
+          {error}
+        </div>
+      )}
+      {step === 1 && (
+        <Step1Dates
+          name={name}
+          onNameChange={setName}
+          range={range}
+          onRangeChange={setRange}
+          submitting={submitting}
+          nextLabel={!trip ? "Create trip" : hasUnsavedBasics ? "Save changes" : "Next"}
+          onNext={saveBasics}
+          backLabel={trip ? "Exit" : "Cancel"}
+          onBack={() => router.push(trip ? `/trips/${trip.id}` : "/trips")}
+        />
+      )}
+      {step === 2 && trip && (
+        <Step2Stops
+          trip={trip}
+          stops={stops}
+          onStopsChange={setStops}
+          onNext={() => setStep(3)}
+          onBack={() => setStep(1)}
+        />
+      )}
+      {step === 3 && trip && (
+        <Step3Members
+          trip={trip}
+          members={members}
+          onMembersChange={setMembers}
+          onNext={() => setStep(4)}
+          onBack={() => setStep(2)}
+        />
+      )}
+      {step === 4 && trip && (
+        <Step4Review
+          trip={trip}
+          stops={stops}
+          members={members}
+          onBack={() => setStep(3)}
+          onDone={() => router.push(`/trips/${trip.id}`)}
+        />
+      )}
+      <div className="h-24" />
+    </div>
   );
 }
 
@@ -169,7 +271,9 @@ function Step1Dates({
   range,
   onRangeChange,
   submitting,
+  nextLabel,
   onNext,
+  backLabel,
   onBack,
 }: {
   name: string;
@@ -177,13 +281,13 @@ function Step1Dates({
   range: DateRange | undefined;
   onRangeChange: (r: DateRange | undefined) => void;
   submitting: boolean;
+  nextLabel: string;
   onNext: () => void;
+  backLabel: string;
   onBack: () => void;
 }) {
   const days =
-    range?.from && range?.to
-      ? daysBetween(range.from.toISOString().slice(0, 10), range.to.toISOString().slice(0, 10))
-      : 0;
+    range?.from && range?.to ? daysBetween(toTripDate(range.from), toTripDate(range.to)) : 0;
   return (
     <div className="flex flex-col gap-4">
       <Card>
@@ -229,9 +333,9 @@ function Step1Dates({
       </Card>
       <NavBar
         onBack={onBack}
-        backLabel="Cancel"
+        backLabel={backLabel}
         onNext={onNext}
-        nextLabel={submitting ? "Saving…" : "Next"}
+        nextLabel={submitting ? "Saving…" : nextLabel}
         nextDisabled={submitting || !name.trim() || !range?.from || !range?.to}
         nextLoading={submitting}
       />
@@ -248,12 +352,13 @@ function Step2Stops({
 }: {
   trip: Trip;
   stops: TripStop[];
-  onStopsChange: (stops: TripStop[]) => void;
+  onStopsChange: Dispatch<SetStateAction<TripStop[]>>;
   onNext: () => void;
   onBack: () => void;
 }) {
   const [editing, setEditing] = useState<TripStop | null>(null);
   const [adding, setAdding] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const search = useLocationSearch();
 
   const addStop = async () => {
@@ -261,29 +366,38 @@ function Step2Stops({
     if (!selected) return;
     setAdding(true);
     try {
-      const res = await fetch(`/api/v1/trips/${trip.id}/stops`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { stop } = await tripRequest<{ stop: TripStop }>(
+        `/api/v1/trips/${trip.id}/stops`,
+        "POST",
+        {
           name: selected.region
             ? `${selected.name}, ${selected.region}`
             : `${selected.name}, ${selected.country}`,
           latitude: selected.latitude,
           longitude: selected.longitude,
           activities: [],
-        }),
-      });
-      const data = (await res.json()) as { stop?: TripStop };
-      if (data.stop) onStopsChange([...stops, data.stop]);
+        }
+      );
+      onStopsChange((current) => [...current, stop]);
       search.reset();
+    } catch (err) {
+      // The chosen place stays in the field, so Add stop can be tried again.
+      toast.error("Couldn't add the stop", { description: errorMessage(err) });
     } finally {
       setAdding(false);
     }
   };
 
   const removeStop = async (stopId: string) => {
-    await fetch(`/api/v1/trips/${trip.id}/stops/${stopId}`, { method: "DELETE" });
-    onStopsChange(stops.filter((s) => s.id !== stopId));
+    setRemovingId(stopId);
+    try {
+      await tripRequest(`/api/v1/trips/${trip.id}/stops/${stopId}`, "DELETE");
+      onStopsChange((current) => current.filter((s) => s.id !== stopId));
+    } catch (err) {
+      toast.error("Couldn't remove the stop", { description: errorMessage(err) });
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   return (
@@ -350,10 +464,15 @@ function Step2Stops({
                 <button
                   type="button"
                   onClick={() => removeStop(stop.id)}
-                  aria-label="Remove stop"
-                  className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white"
+                  disabled={removingId !== null}
+                  aria-label={`Remove ${stop.name}`}
+                  className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
                 >
-                  <X className="size-4" />
+                  {removingId === stop.id ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <X className="size-4" />
+                  )}
                 </button>
               </div>
             ))}
@@ -361,11 +480,13 @@ function Step2Stops({
         </Card>
       )}
 
+      {/* Leaving mid-save would lose the chosen place if that save failed. */}
       <NavBar
         onBack={onBack}
+        backDisabled={adding || removingId !== null}
         onNext={onNext}
         nextLabel="Next"
-        nextDisabled={stops.length === 0}
+        nextDisabled={adding || removingId !== null || stops.length === 0}
       />
 
       {editing && (
@@ -376,7 +497,7 @@ function Step2Stops({
           tripEnd={trip.end_date}
           onClose={() => setEditing(null)}
           onSaved={(updated) => {
-            onStopsChange(stops.map((s) => (s.id === updated.id ? updated : s)));
+            onStopsChange((current) => current.map((s) => (s.id === updated.id ? updated : s)));
             setEditing(null);
           }}
         />
@@ -437,13 +558,15 @@ function StopDetailSheet({
   const save = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/v1/trips/${tripId}/stops/${stop.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activities, day_dates: selectedDates }),
-      });
-      const data = (await res.json()) as { stop?: TripStop };
-      if (data.stop) onSaved(data.stop);
+      const { stop: updated } = await tripRequest<{ stop: TripStop }>(
+        `/api/v1/trips/${tripId}/stops/${stop.id}`,
+        "PATCH",
+        { activities, day_dates: selectedDates }
+      );
+      onSaved(updated);
+    } catch (err) {
+      // The sheet stays open with its picks, so Save stop can be tried again.
+      toast.error("Couldn't save the stop", { description: errorMessage(err) });
     } finally {
       setSaving(false);
     }
@@ -552,34 +675,44 @@ function Step3Members({
 }: {
   trip: Trip;
   members: TripMember[];
-  onMembersChange: (m: TripMember[]) => void;
+  onMembersChange: Dispatch<SetStateAction<TripMember[]>>;
   onNext: () => void;
   onBack: () => void;
 }) {
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"invite" | "guest">("invite");
   const [adding, setAdding] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const add = async () => {
-    if (!name.trim()) return;
+    const displayName = name.trim();
+    if (!displayName) return;
     setAdding(true);
     try {
-      const res = await fetch(`/api/v1/trips/${trip.id}/members`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: name.trim(), kind }),
-      });
-      const data = (await res.json()) as { member?: TripMember };
-      if (data.member) onMembersChange([...members, data.member]);
+      const { member } = await tripRequest<{ member: TripMember }>(
+        `/api/v1/trips/${trip.id}/members`,
+        "POST",
+        { display_name: displayName, kind }
+      );
+      onMembersChange((current) => [...current, member]);
       setName("");
+    } catch (err) {
+      toast.error(`Couldn't add ${displayName}`, { description: errorMessage(err) });
     } finally {
       setAdding(false);
     }
   };
 
-  const remove = async (memberId: string) => {
-    await fetch(`/api/v1/trips/${trip.id}/members/${memberId}`, { method: "DELETE" });
-    onMembersChange(members.filter((m) => m.id !== memberId));
+  const remove = async (member: TripMember) => {
+    setRemovingId(member.id);
+    try {
+      await tripRequest(`/api/v1/trips/${trip.id}/members/${member.id}`, "DELETE");
+      onMembersChange((current) => current.filter((m) => m.id !== member.id));
+    } catch (err) {
+      toast.error(`Couldn't remove ${member.display_name}`, { description: errorMessage(err) });
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   return (
@@ -593,7 +726,9 @@ function Step3Members({
               key={m.id}
               member={m}
               tripName={trip.name}
-              onRemove={m.role === "organizer" ? undefined : () => remove(m.id)}
+              onRemove={m.role === "organizer" ? undefined : () => remove(m)}
+              removeDisabled={removingId !== null}
+              removing={removingId === m.id}
             />
           ))}
         </div>
@@ -647,7 +782,14 @@ function Step3Members({
         </div>
       </Card>
 
-      <NavBar onBack={onBack} onNext={onNext} nextLabel="Next" nextDisabled={false} />
+      {/* Leaving mid-save would lose the typed name if that save failed. */}
+      <NavBar
+        onBack={onBack}
+        backDisabled={adding || removingId !== null}
+        onNext={onNext}
+        nextLabel="Next"
+        nextDisabled={adding || removingId !== null}
+      />
     </div>
   );
 }
@@ -655,10 +797,14 @@ function Step3Members({
 function MemberRow({
   member,
   onRemove,
+  removeDisabled = false,
+  removing = false,
   tripName,
 }: {
   member: TripMember;
   onRemove?: () => void;
+  removeDisabled?: boolean;
+  removing?: boolean;
   tripName?: string;
 }) {
   const state: "default" | "guest" | "invited" | "self" =
@@ -696,10 +842,11 @@ function MemberRow({
         <button
           type="button"
           onClick={onRemove}
-          className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white"
-          aria-label="Remove member"
+          disabled={removeDisabled}
+          className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
+          aria-label={`Remove ${member.display_name}`}
         >
-          <X className="size-4" />
+          {removing ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" />}
         </button>
       )}
     </div>
@@ -772,6 +919,7 @@ function Step4Review({
 function NavBar({
   onBack,
   backLabel = "Back",
+  backDisabled = false,
   onNext,
   nextLabel,
   nextDisabled = false,
@@ -779,6 +927,7 @@ function NavBar({
 }: {
   onBack: () => void;
   backLabel?: string;
+  backDisabled?: boolean;
   onNext: () => void;
   nextLabel: string;
   nextDisabled?: boolean;
@@ -789,7 +938,8 @@ function NavBar({
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-white/14 px-4 text-sm font-medium text-white/85 hover:bg-white/10"
+        disabled={backDisabled}
+        className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-white/14 px-4 text-sm font-medium text-white/85 hover:bg-white/10 disabled:opacity-50"
       >
         <ArrowLeft className="size-4" />
         {backLabel}
