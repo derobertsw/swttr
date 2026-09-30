@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
       }
 
       const endDate = addDaysToDateString(startDate, parsedDays - 1);
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&start_date=${startDate}&end_date=${endDate}&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&start_date=${startDate}&end_date=${endDate}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`;
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -139,13 +139,17 @@ export async function GET(request: NextRequest) {
       }
 
       const data = await response.json();
-      const hourlyTime: string[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
+      const timeZone: unknown = data?.timezone;
+      if (!isTimeZone(timeZone)) {
+        throw new Error("Forecast has no valid time zone");
+      }
+      const hourlyTime: number[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
       const hourlyTemps: number[] = Array.isArray(data?.hourly?.temperature_2m) ? data.hourly.temperature_2m : [];
       const hourlyWinds: number[] = Array.isArray(data?.hourly?.wind_speed_10m) ? data.hourly.wind_speed_10m : [];
       const hourlyPrecip: number[] = Array.isArray(data?.hourly?.precipitation_probability) ? data.hourly.precipitation_probability : [];
 
       const hourly = hourlyTime
-        .map((time: string, index: number) => ({
+        .map((time: number, index: number) => ({
           time,
           temperature: Math.round(Number(hourlyTemps[index] ?? 0)),
           windSpeed: Math.round(Number(hourlyWinds[index] ?? 0)),
@@ -153,12 +157,18 @@ export async function GET(request: NextRequest) {
         }))
         .filter((entry) => {
           return (
-            typeof entry.time === "string" &&
+            Number.isFinite(entry.time) &&
             Number.isFinite(entry.temperature) &&
             Number.isFinite(entry.windSpeed) &&
             Number.isFinite(entry.precipitationProbability)
           );
-        });
+        })
+        // Open-Meteo uses today's offset for its local labels. Use the offset
+        // at each instant instead, so the stop's clock stays right across DST.
+        .map((entry) => ({ ...entry, time: formatZonedTime(entry.time * 1000, timeZone) }))
+        // A fixed-offset response can spill into an adjacent local date after
+        // a clock change. Only return dates in the requested local window.
+        .filter((entry) => entry.time.slice(0, 10) >= startDate && entry.time.slice(0, 10) <= endDate);
 
       return NextResponse.json({
         startDate,

@@ -293,10 +293,11 @@ describe("Weather API Route", () => {
         ok: true,
         json: () =>
           Promise.resolve({
+            timezone: "America/New_York",
             hourly: {
               time: [
-                "2024-01-15T06:00",
-                "2024-01-15T07:00",
+                Date.parse("2024-01-15T11:00Z") / 1000,
+                Date.parse("2024-01-15T12:00Z") / 1000,
               ],
               temperature_2m: [28.4, 30.2],
               wind_speed_10m: [5.1, 7.8],
@@ -338,8 +339,9 @@ describe("Weather API Route", () => {
         ok: true,
         json: () =>
           Promise.resolve({
+            timezone: "America/New_York",
             hourly: {
-              time: ["2024-01-15T06:00"],
+              time: [Date.parse("2024-01-15T11:00Z") / 1000],
               temperature_2m: [30],
               wind_speed_10m: [5],
               precipitation_probability: [10],
@@ -362,6 +364,90 @@ describe("Weather API Route", () => {
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("precipitation_probability")
       );
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("timezone=auto&timeformat=unixtime")
+      );
+    });
+
+    it.each([
+      {
+        label: "Vermont's local date and daytime hours",
+        timezone: "America/New_York",
+        firstHour: "2026-10-08T04:00Z",
+        startDate: "2026-10-08",
+        count: 24,
+        daytimeIndices: [8, 18],
+      },
+      {
+        label: "Sydney's skipped hour when daylight saving starts",
+        timezone: "Australia/Sydney",
+        firstHour: "2026-10-03T14:00Z",
+        startDate: "2026-10-04",
+        count: 23,
+        daytimeIndices: [7, 17],
+      },
+      {
+        label: "Sydney's hours after daylight saving starts, with Open-Meteo's old offset",
+        timezone: "Australia/Sydney",
+        firstHour: "2026-10-04T14:00Z",
+        startDate: "2026-10-05",
+        count: 23,
+        daytimeIndices: [7, 17],
+      },
+      {
+        label: "Vermont's repeated hour when daylight saving ends",
+        timezone: "America/New_York",
+        firstHour: "2026-11-01T04:00Z",
+        startDate: "2026-11-01",
+        count: 25,
+        daytimeIndices: [9, 19],
+      },
+    ])("returns $label", async ({ timezone, firstHour, startDate, count, daytimeIndices }) => {
+      // Unix timestamps are independent of the server's zone and of the
+      // fixed offset Open-Meteo would use for ISO local-time labels.
+      const time = Array.from({ length: 48 }, (_, index) => Date.parse(firstHour) / 1000 + index * 3600);
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          timezone,
+          hourly: {
+            time,
+            temperature_2m: time.map((_, index) => index),
+            wind_speed_10m: time.map(() => 5),
+            precipitation_probability: time.map(() => 10),
+          },
+        }),
+      });
+
+      const response = await GET(new NextRequest(
+        `http://localhost:3000/api/weather?lat=44.47&lon=-72.69&startDate=${startDate}&days=1`
+      ));
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.hourly).toHaveLength(count);
+      expect(data.hourly.every((hour: { time: string }) => hour.time.startsWith(startDate))).toBe(true);
+      for (const [index, hour] of [8, 18].entries()) {
+        expect(data.hourly.find((entry: { time: string }) => entry.time === `${startDate}T${String(hour).padStart(2, "0")}:00`))
+          .toMatchObject({ temperature: daytimeIndices[index], windSpeed: 5, precipitationProbability: 10 });
+      }
+      if (count === 25) {
+        expect(data.hourly.filter((hour: { time: string }) => hour.time.endsWith("T01:00"))).toHaveLength(2);
+      }
+      if (startDate === "2026-10-04") {
+        expect(data.hourly.some((hour: { time: string }) => hour.time.endsWith("T02:00"))).toBe(false);
+      }
+    });
+
+    it.each([undefined, "Mars/Olympus"])("rejects a multi-day forecast with unusable time zone %s", async (timezone) => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ timezone, hourly: {} }) });
+
+      const response = await GET(new NextRequest(
+        "http://localhost:3000/api/weather?lat=44.47&lon=-72.69&startDate=2026-10-08&days=1"
+      ));
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ error: "Failed to fetch weather data" });
     });
 
     it("should return 400 for invalid days in multi-day requests", async () => {
