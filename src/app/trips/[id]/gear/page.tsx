@@ -2,11 +2,14 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { AlertTriangle, ArrowLeft, Loader2, Plus, X } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, SectionLabel } from "@/components/trips/trip-primitives";
 import { useTrip } from "@/hooks/useTrip";
+import { errorMessage, tripRequest } from "@/lib/trip-requests";
+import type { TripGroupGear } from "@/types/trips";
 
 export default function GroupGearPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -14,41 +17,58 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
   const [description, setDescription] = useState("");
   const [assignee, setAssignee] = useState<string>("");
   const [adding, setAdding] = useState(false);
+  // The gear row whose change is being saved. Every row stays disabled until
+  // that save and the reload after it finish, so saves never overlap.
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const members = data?.members ?? [];
 
   const addGear = async () => {
-    if (!description.trim()) return;
+    const item = description.trim();
+    if (!item) return;
     setAdding(true);
     try {
-      await fetch(`/api/v1/trips/${id}/gear`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          description: description.trim(),
-          assignee_member_id: assignee || null,
-        }),
+      await tripRequest(`/api/v1/trips/${id}/gear`, "POST", {
+        description: item,
+        assignee_member_id: assignee || null,
       });
       setDescription("");
       setAssignee("");
       await refresh();
+    } catch (err) {
+      // The form keeps the item and who's bringing it, so Add can be tried again.
+      toast.error(`Couldn't add ${item}`, { description: errorMessage(err) });
     } finally {
       setAdding(false);
     }
   };
 
-  const updateAssignee = async (gearId: string, memberId: string | null) => {
-    await fetch(`/api/v1/trips/${id}/gear/${gearId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assignee_member_id: memberId }),
-    });
-    await refresh();
+  const updateAssignee = async (gear: TripGroupGear, memberId: string | null) => {
+    setSavingId(gear.id);
+    try {
+      await tripRequest(`/api/v1/trips/${id}/gear/${gear.id}`, "PATCH", {
+        assignee_member_id: memberId,
+      });
+      await refresh();
+    } catch (err) {
+      toast.error(`Couldn't change who's bringing ${gear.description}`, {
+        description: errorMessage(err),
+      });
+    } finally {
+      setSavingId(null);
+    }
   };
 
-  const remove = async (gearId: string) => {
-    await fetch(`/api/v1/trips/${id}/gear/${gearId}`, { method: "DELETE" });
-    await refresh();
+  const remove = async (gear: TripGroupGear) => {
+    setSavingId(gear.id);
+    try {
+      await tripRequest(`/api/v1/trips/${id}/gear/${gear.id}`, "DELETE");
+      await refresh();
+    } catch (err) {
+      toast.error(`Couldn't remove ${gear.description}`, { description: errorMessage(err) });
+    } finally {
+      setSavingId(null);
+    }
   };
 
   return (
@@ -87,16 +107,20 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                 const assigned = g.assignee_member_id
                   ? members.find((m) => m.id === g.assignee_member_id)?.display_name
                   : null;
+                const saving = savingId === g.id;
                 return (
                   <Card key={g.id} highlighted={!assigned}>
                     <div className="flex items-center gap-3">
                       <p className="flex-1 truncate text-sm text-white/90">{g.description}</p>
+                      {saving && <Loader2 className="size-3.5 animate-spin text-white/45" />}
                       <select
                         value={g.assignee_member_id ?? ""}
                         onChange={(e) =>
-                          updateAssignee(g.id, e.target.value === "" ? null : e.target.value)
+                          updateAssignee(g, e.target.value === "" ? null : e.target.value)
                         }
-                        className="rounded-md border border-white/14 bg-white/[0.06] px-2 py-1 text-xs text-white"
+                        disabled={savingId !== null}
+                        aria-label={`Who's bringing ${g.description}`}
+                        className="rounded-md border border-white/14 bg-white/[0.06] px-2 py-1 text-xs text-white disabled:opacity-50"
                       >
                         <option value="">unassigned</option>
                         {members
@@ -112,9 +136,10 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                       )}
                       <button
                         type="button"
-                        onClick={() => remove(g.id)}
-                        aria-label="Remove gear"
-                        className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white"
+                        onClick={() => remove(g)}
+                        disabled={savingId !== null}
+                        aria-label={`Remove ${g.description}`}
+                        className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
                       >
                         <X className="size-4" />
                       </button>
@@ -137,6 +162,7 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                 <select
                   value={assignee}
                   onChange={(e) => setAssignee(e.target.value)}
+                  aria-label="Who's bringing it"
                   className="h-10 rounded-lg border border-white/12 bg-white/[0.06] px-2 text-sm text-white"
                 >
                   <option value="">unassigned</option>

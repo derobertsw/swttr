@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, Chip, SectionLabel } from "@/components/trips/trip-primitives";
+import { cn } from "@/lib/utils";
 import type { PackingListData } from "@/lib/packingList";
 
 interface TripPackResponse {
@@ -181,7 +182,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
                   key={`${s.name}-${i}`}
                   className="flex items-start gap-2 text-sm text-white/85"
                 >
-                  <span className="mt-1 inline-block size-3 shrink-0 rounded-sm border border-white/22" />
+                  <ListMarker className="mt-2" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate">
                       {it.label}
@@ -231,7 +232,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
             <ul className="mt-2 space-y-1.5">
               {extras.map((x) => (
                 <li key={x} className="flex items-center gap-2 text-sm text-white/85">
-                  <span className="inline-block size-3 rounded-sm border border-white/22" />
+                  <ListMarker />
                   {x}
                 </li>
               ))}
@@ -245,7 +246,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
             <ul className="mt-2 space-y-1.5">
               {groupGear.map((g) => (
                 <li key={g} className="flex items-center gap-2 text-sm text-white/85">
-                  <span className="inline-block size-3 rounded-sm border border-white/22" />
+                  <ListMarker />
                   {g}
                 </li>
               ))}
@@ -274,5 +275,15 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
         <div className="h-24" />
       </div>
     </PageLayout>
+  );
+}
+
+/** A plain bullet, not a checkbox: nothing records what's been packed yet. */
+function ListMarker({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn("inline-block size-1.5 shrink-0 rounded-full bg-white/45", className)}
+    />
   );
 }
