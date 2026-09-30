@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildGearUpResult, createInitialState, fetchPlanAhead, gearUpReducer } from "./gearUp";
+import { buildGearUpResult, createInitialState, fetchPlanAhead, gearUpReducer, PlanAheadError } from "./gearUp";
 import type { BiophysicsOutcome, BiophysicsRecommendation } from "@/types/biophysics";
 import type { MultiDayLayerPlan } from "@/types/plan";
 import type { WeatherContext } from "@/types/weather";
@@ -150,9 +150,18 @@ describe("fetchPlanAhead", () => {
     vi.unstubAllGlobals();
   });
 
-  it("surfaces the API's error message", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "Forecast unavailable" }, { status: 502 })));
-    await expect(fetchPlanAhead(PLAN_REQUEST)).rejects.toThrow("Forecast unavailable");
+  it("passes on the API's reason for a request it turns down, with the field to fix", async () => {
+    const error = "The forecast for this place covers Oct 1 to Oct 16. A 3-day plan can start from Oct 1 to Oct 14.";
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error, field: "startDate" }, { status: 422 })));
+    await expect(fetchPlanAhead(PLAN_REQUEST)).rejects.toEqual(new PlanAheadError(error, "startDate"));
+    await expect(fetchPlanAhead(PLAN_REQUEST)).rejects.toHaveProperty("field", "startDate");
+  });
+
+  it("asks to try again when the forecast service fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "Failed to fetch weather data" }, { status: 502 })));
+    const failure = fetchPlanAhead(PLAN_REQUEST);
+    await expect(failure).rejects.toThrow("Couldn't get the forecast for this place. Try again.");
+    await expect(failure).rejects.toHaveProperty("field", undefined);
   });
 
   it.each([
@@ -161,6 +170,6 @@ describe("fetchPlanAhead", () => {
   ])("fails with its own message, not a parse error, when it gets $page", async ({ status }) => {
     const html = "<!DOCTYPE html><html><body>Sign in</body></html>";
     vi.stubGlobal("fetch", vi.fn(async () => new Response(html, { status, headers: { "Content-Type": "text/html" } })));
-    await expect(fetchPlanAhead(PLAN_REQUEST)).rejects.toThrow(new Error("Failed to build plan"));
+    await expect(fetchPlanAhead(PLAN_REQUEST)).rejects.toThrow("Couldn't get the forecast for this place. Try again.");
   });
 });

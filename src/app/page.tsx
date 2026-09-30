@@ -36,6 +36,7 @@ const HomeContent = () => {
     setDurationDays,
     loading,
     showPlaceError,
+    startDateError,
     locationStatus,
     placeInputRef,
     biophysicsData,
@@ -124,6 +125,7 @@ const HomeContent = () => {
                 time={time}
                 durationDays={durationDays}
                 loading={loading}
+                startDateError={startDateError}
                 location={locationSearch.location}
                 locationQuery={locationSearch.locationQuery}
                 suggestions={locationSearch.suggestions}
