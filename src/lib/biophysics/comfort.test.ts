@@ -138,6 +138,20 @@ describe("calculateThermalComfortScore", () => {
     expect(warmer).toBeGreaterThan(cooler ?? 0);
   });
 
+  it("doesn't let extra insulation elsewhere raise the score of a body part that's short", () => {
+    const score = (totalClo: number) =>
+      calculateThermalComfortScore({ totalClo, targetRange: [1, 1.2], maxRegionalDeficit: 0.5 }) ?? 0;
+
+    // In range, the short body part sets the score.
+    expect(score(1.2)).toBeCloseTo(56.7, 1);
+    // Overheating overall, with the same body part still short.
+    expect(
+      evaluateThermalComfort({ totalClo: 1.51, targetRange: [1, 1.2], maxRegionalDeficit: 0.5 })?.riskType
+    ).toBe("overheat");
+    expect(score(1.51)).toBeLessThanOrEqual(score(1.2));
+    expect(score(2.0)).toBeLessThan(score(1.51));
+  });
+
   it("agrees with the displayed decision", () => {
     const cases = [
       { totalClo: 2.66, targetRange: [2.44, 2.88] as [number, number] },

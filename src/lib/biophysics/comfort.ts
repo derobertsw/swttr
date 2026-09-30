@@ -142,13 +142,18 @@ export function evaluateThermalComfort(input: ThermalComfortInput): ThermalComfo
  * outfit scores 85 times the share of the minimum combined insulation it
  * provides, judged by its largest shortfall: roughly the share of its heat
  * loss the body can replace.
+ *
+ * An overheating outfit can still leave a body part short. It gets the lower
+ * of the two scores, so extra insulation elsewhere never raises the score.
  */
 export function calculateThermalComfortScore(input: ThermalComfortInput): number | null {
   const decision = evaluateThermalComfort(input);
-  const { totalClo, targetRange } = input;
+  const { totalClo, targetRange, maxRegionalDeficit = 0, maxExtremityDeficit = 0 } = input;
   if (!decision || totalClo === undefined || !targetRange) return null;
 
   const [targetMin, targetMax] = targetRange;
+  const coldScore = (shortfall: number) =>
+    85 * (1 - shortfall / (Math.max(0, targetMin) + SURFACE_AIR_CLO));
 
   let score: number;
 
@@ -158,9 +163,13 @@ export function calculateThermalComfortScore(input: ThermalComfortInput): number
     const normalizedOffset = clamp(Math.abs(totalClo - midpoint) / halfRange, 0, 1);
     score = 100 - normalizedOffset * 15;
   } else if (decision.riskType === "cold") {
-    score = 85 * (1 - decision.delta / (Math.max(0, targetMin) + SURFACE_AIR_CLO));
+    score = coldScore(decision.delta);
   } else {
     score = 78 - decision.delta * 35;
+    const localDeficit = Math.max(maxRegionalDeficit, maxExtremityDeficit);
+    if (localDeficit > THERMAL_DISPLAY_CLO_EPSILON) {
+      score = Math.min(score, coldScore(localDeficit));
+    }
   }
 
   return Math.round(clamp(score, 0, 100) * 10) / 10;
