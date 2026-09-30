@@ -66,6 +66,21 @@ describe("POST /api/plan-ahead", () => {
     expect(plan.days[1].dayparts[0]).toMatchObject({ id: "morning", minTemp: 46 });
   });
 
+  it("leaves out hours with a missing value rather than read them as zero", async () => {
+    // Near the end of its window Open-Meteo returns null for some hours.
+    const forecast = forecastFixture("America/New_York", "2026-10-08T04:00Z", 48, () => -4);
+    forecast.hourly.temperature_2m[30] = null as unknown as number; // 6am Oct 9
+    forecast.hourly.precipitation_probability[31] = null as unknown as number; // 7am
+    forecast.hourly.wind_speed_10m[32] = null as unknown as number; // 8am
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(forecast) });
+
+    const response = await planAhead({ startDate: "2026-10-08", durationDays: 2 });
+    const { plan } = await response.json();
+
+    // The morning's coldest complete hour is 9am (49°F), not a 0°F placeholder.
+    expect(plan.days[1].dayparts[0]).toMatchObject({ id: "morning", minTemp: 49 });
+  });
+
   it("fails rather than use UTC hours when the forecast has no time zone", async () => {
     const withoutTimeZone = { ...forecastFixture("America/New_York", "2026-10-08T04:00Z", 48, () => -4), timezone: undefined };
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(withoutTimeZone) });
