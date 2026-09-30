@@ -1,25 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { formatZonedIsoTime, isLocalDateTime, isTimeZone, zonedTimeToInstant } from "@/lib/timeZones";
+import { addDaysToDateString, describeForecastCoverage, FORECAST_DAYS } from "@/lib/forecastRange";
+import { formatZonedIsoTime, formatZonedTime, isLocalDateTime, isTimeZone, zonedTimeToInstant } from "@/lib/timeZones";
 import type { PrecipitationType } from "@/types/weather";
 
-/** Days of hourly forecast Open-Meteo has, today included. */
-const FORECAST_DAYS = 16;
 const HOUR_SECONDS = 3600;
 
 function isValidDateString(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   return !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
-}
-
-function addDaysToDateString(dateString: string, daysToAdd: number): string {
-  const [year, month, day] = dateString.split("-").map((part) => Number.parseInt(part, 10));
-  const date = new Date(Date.UTC(year, month - 1, day));
-  date.setUTCDate(date.getUTCDate() + daysToAdd);
-
-  const yyyy = date.getUTCFullYear();
-  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(date.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
 }
 
 function decodePrecipitation(weatherCode: number): { precipitation: boolean; precipitationType?: PrecipitationType } {
@@ -38,9 +26,9 @@ function decodePrecipitation(weatherCode: number): { precipitation: boolean; pre
   return { precipitation: false };
 }
 
-/** A forecast day, e.g. "Oct 12", on the place's calendar. */
-function formatForecastDay(hourStart: number, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone, month: "short", day: "numeric" }).format(hourStart * 1000);
+/** The YYYY-MM-DD date an hour starts on, on the place's calendar. */
+function forecastDate(hourStart: number, timeZone: string): string {
+  return formatZonedTime(hourStart * 1000, timeZone).slice(0, 10);
 }
 
 /**
@@ -82,10 +70,12 @@ async function getHourlyForecast(lat: string, lon: string, localDateTime: string
   const hour = hours.findLast(({ start }) => start <= requested);
 
   if (!hour || requested >= hour.start + HOUR_SECONDS) {
-    const firstDay = formatForecastDay(hours[0].start, timeZone);
-    const lastDay = formatForecastDay(hours[hours.length - 1].start, timeZone);
+    const coverage = describeForecastCoverage(
+      forecastDate(hours[0].start, timeZone),
+      forecastDate(hours[hours.length - 1].start, timeZone)
+    );
     return NextResponse.json(
-      { error: `The forecast for this place covers ${firstDay} to ${lastDay}. Pick a date in that range.` },
+      { error: `${coverage} Pick a date in that range.` },
       { status: 422 }
     );
   }

@@ -31,6 +31,8 @@ interface GearUpState {
   showResults: boolean;
   /** Set once Gear Up is pressed without a place, so the place field says it's needed. */
   showPlaceError: boolean;
+  /** Why the plan's start date can't be used, like dates past the end of the forecast. */
+  startDateError: string | null;
   loading: boolean;
   recommendation: Recommendation | null;
   biophysicsData: BiophysicsRecommendation | null;
@@ -64,6 +66,7 @@ type GearUpAction =
   | { type: "SET_TIME"; time: string }
   | { type: "SET_DURATION_DAYS"; durationDays: number }
   | { type: "PLACE_MISSING" }
+  | { type: "START_DATE_INVALID"; error: string }
   | { type: "SUBMIT_START" }
   | ({ type: "SUBMIT_SUCCESS" } & GearUpResult)
   | ({ type: "SUBMIT_PLAN_SUCCESS" } & PlanAheadResult)
@@ -84,6 +87,7 @@ export function createInitialState(inputMode: InputMode): GearUpState {
     durationDays: 3,
     showResults: false,
     showPlaceError: false,
+    startDateError: null,
     loading: false,
     recommendation: null,
     biophysicsData: null,
@@ -102,15 +106,17 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
     case "SET_INPUT_MODE":
       return { ...state, inputMode: action.mode };
     case "SET_DATE":
-      return { ...state, date: action.date };
+      return { ...state, date: action.date, startDateError: null };
     case "SET_TIME":
       return { ...state, time: action.time };
     case "SET_DURATION_DAYS":
-      return { ...state, durationDays: action.durationDays };
+      return { ...state, durationDays: action.durationDays, startDateError: null };
     case "PLACE_MISSING":
       return { ...state, showPlaceError: true };
+    case "START_DATE_INVALID":
+      return { ...state, loading: false, startDateError: action.error };
     case "SUBMIT_START":
-      return { ...state, loading: true };
+      return { ...state, loading: true, startDateError: null };
     case "SUBMIT_SUCCESS":
       return {
         ...state,
@@ -207,7 +213,20 @@ export async function buildGearUpResult(
   };
 }
 
-/** Multi-day forecast plan for a location, starting on a date and hour. */
+/** Why a multi-day plan couldn't be built, and the form field to fix when there is one. */
+export class PlanAheadError extends Error {
+  constructor(message: string, readonly field?: "startDate") {
+    super(message);
+    this.name = "PlanAheadError";
+  }
+}
+
+const PLAN_AHEAD_FALLBACK_ERROR = "Couldn't get the forecast for this place. Try again.";
+
+/**
+ * Multi-day forecast plan for a location, starting on a date and hour.
+ * Throws a PlanAheadError that says what went wrong.
+ */
 export async function fetchPlanAhead(params: {
   activity: string;
   sensitivity: TemperatureSensitivity;
@@ -241,10 +260,16 @@ export async function fetchPlanAhead(params: {
       maxWindSpeed: number;
     };
     error?: string;
+    field?: string;
   } | null;
 
   if (!response.ok || !data?.plan || !data.baseline) {
-    throw new Error(data?.error ?? "Failed to build plan");
+    // Requests the API turns down, like dates past the end of the forecast, say what to change.
+    const fixableError = response.status >= 400 && response.status < 500 && typeof data?.error === "string"
+      ? data.error
+      : undefined;
+    if (!fixableError) throw new PlanAheadError(PLAN_AHEAD_FALLBACK_ERROR);
+    throw new PlanAheadError(fixableError, data?.field === "startDate" ? "startDate" : undefined);
   }
 
   return {

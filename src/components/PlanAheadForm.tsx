@@ -12,7 +12,7 @@ import {
 import { CalendarIcon, CalendarDays, Layers, Loader2, Route, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LocationSuggestion } from "@/types/recommendations";
-import { FormEvent, RefObject, useRef, useState, useSyncExternalStore } from "react";
+import { FormEvent, RefObject, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { DeviceLocationButton } from "@/components/DeviceLocationButton";
@@ -26,6 +26,8 @@ interface PlanAheadFormProps {
   time: string;
   durationDays: number;
   loading?: boolean;
+  /** Why the chosen start date can't be used, from the last request, like dates past the end of the forecast. */
+  startDateError?: string | null;
   location: string;
   locationQuery: string;
   suggestions: LocationSuggestion[];
@@ -88,6 +90,7 @@ export function PlanAheadForm({
   time,
   durationDays,
   loading = false,
+  startDateError,
   location,
   locationQuery,
   suggestions,
@@ -127,7 +130,8 @@ export function PlanAheadForm({
   const locationError = selectedLocation ? undefined : "Search for a place, then choose it from the list.";
   const dateError = date ? undefined : "Choose a start date.";
   const timeError = time ? undefined : "Enter a start time.";
-  const showDateError = showErrors && Boolean(dateError);
+  const shownDateError = (showErrors ? dateError : undefined) ?? startDateError ?? undefined;
+  const showDateError = Boolean(shownDateError);
   const showTimeError = showErrors && Boolean(timeError);
 
   // Both buttons share the page's loading flag, so remember which one started the request.
@@ -139,6 +143,11 @@ export function PlanAheadForm({
   const submitLabel = isMultiDay
     ? planPending ? "Building layer plan…" : "Build layer plan"
     : planPending ? "Getting your layers…" : "See my layers";
+
+  // A start date the request turned down takes focus, so its error is announced.
+  useEffect(() => {
+    if (startDateError) (dateInputRef.current ?? dateButtonRef.current)?.focus();
+  }, [startDateError]);
 
   const handleGoNow = () => {
     setPendingAction("goNow");
@@ -300,7 +309,7 @@ export function PlanAheadForm({
             />
           </div>
         </div>
-        {showDateError && <FieldError id="plan-start-date-error">{dateError}</FieldError>}
+        {showDateError && <FieldError id="plan-start-date-error">{shownDateError}</FieldError>}
         {showTimeError && <FieldError id="plan-start-time-error">{timeError}</FieldError>}
         <p className="text-xs text-white/70">Start time: {timeLabel}, local time at the location</p>
         <p className="text-xs text-white/65">

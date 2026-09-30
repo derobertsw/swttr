@@ -3,6 +3,7 @@ import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
 import { formatZonedTime, isTimeZone } from "@/lib/timeZones";
+import { FORECAST_DAYS, planOutsideForecast } from "@/lib/forecastRange";
 import { Recommendation } from "@/types/recommendations";
 import { TemperatureSensitivity } from "@/types/preferences";
 import { ForecastHour } from "@/types/plan";
@@ -11,17 +12,6 @@ import layerRecommendations from "@/data/layerRecommendations.json";
 function isValidDateString(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   return !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
-}
-
-function addDaysToDateString(dateString: string, daysToAdd: number): string {
-  const [year, month, day] = dateString.split("-").map((part) => Number.parseInt(part, 10));
-  const date = new Date(Date.UTC(year, month - 1, day));
-  date.setUTCDate(date.getUTCDate() + daysToAdd);
-
-  const yyyy = date.getUTCFullYear();
-  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(date.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
 }
 
 const VALID_SENSITIVITIES = new Set(["hot", "neutral", "cold"]);
@@ -91,10 +81,10 @@ export async function POST(request: NextRequest) {
   const parsedDays = Math.min(7, Math.max(1, Math.round(durationDays)));
 
   try {
-    // Hourly weather from Open-Meteo. The dates, start hour and daytime windows
-    // are all local time at the coordinates.
-    const endDate = addDaysToDateString(startDate, parsedDays - 1);
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&start_date=${startDate}&end_date=${endDate}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+    // The whole hourly forecast from Open-Meteo, so a plan past its end can say
+    // which dates it covers. The dates, start hour and daytime windows are all
+    // local time at the coordinates.
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&forecast_days=${FORECAST_DAYS}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`;
 
     const weatherResponse = await fetch(url);
     if (!weatherResponse.ok) {
@@ -135,6 +125,29 @@ export async function POST(request: NextRequest) {
       // today's UTC offset, which is an hour out after a daylight saving change.
       .map((entry) => ({ ...entry, time: formatZonedTime(entry.time * 1000, timeZone) }));
 
+    // The dates the forecast covers, on the place's calendar: those with a temperature.
+    const forecastDates = hourlyTime.flatMap((start, index) =>
+      typeof start === "number" && typeof hourlyTemps[index] === "number"
+        ? [formatZonedTime(start * 1000, timeZone).slice(0, 10)]
+        : []
+    );
+    if (forecastDates.length === 0) {
+      return NextResponse.json(
+        { error: "Failed to fetch weather data" },
+        { status: 502 }
+      );
+    }
+    const outsideForecast = planOutsideForecast(
+      startDate,
+      parsedDays,
+      forecastDates[0],
+      forecastDates[forecastDates.length - 1]
+    );
+    if (outsideForecast) {
+      // `field` tells the form which input to fix.
+      return NextResponse.json({ error: outsideForecast, field: "startDate" }, { status: 422 });
+    }
+
     // Build the multi-day plan
     const plan = buildMultiDayLayerPlan({
       startDate: new Date(`${startDate}T00:00:00`),
@@ -147,7 +160,7 @@ export async function POST(request: NextRequest) {
 
     if (plan.days.length === 0) {
       return NextResponse.json(
-        { error: "No daytime forecast data returned for the selected window" },
+        { error: "The forecast has no daytime hours (6am to 9pm) for this plan. Pick an earlier start time or another date." },
         { status: 422 }
       );
     }

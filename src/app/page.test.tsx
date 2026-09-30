@@ -583,9 +583,10 @@ describe("Home Page", () => {
      * `recommendations` say otherwise. Returns the requests made, and a geolocation spy that
      * only Go Now uses.
      */
-    function mockPlanAheadApis({ weather, recommendations }: {
+    function mockPlanAheadApis({ weather, recommendations, planAhead }: {
       weather?: () => Promise<MockResponse>;
       recommendations?: (url: string) => Promise<MockResponse>;
+      planAhead?: () => Promise<MockResponse>;
     } = {}) {
       const requests = { weather: [] as string[], planAhead: [] as unknown[] };
       const getCurrentPosition = vi.fn();
@@ -606,6 +607,7 @@ describe("Home Page", () => {
         }
         if (url.includes("/api/plan-ahead")) {
           requests.planAhead.push(JSON.parse(String(init?.body)));
+          if (planAhead) return planAhead();
           return Promise.resolve(respond(200, {
             plan: PLAN,
             baseline: { recommendation: null, effectiveTemperature: 28, maxWindSpeed: 12 },
@@ -794,6 +796,72 @@ describe("Home Page", () => {
         expect.objectContaining({ lat: 44.47, lon: -72.69, startDate: START_DATE, durationDays: 3 }),
       ]);
       expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("shows why the forecast can't cover the dates on the start date, until it's changed", async () => {
+      const { toast } = await import("sonner");
+      const rangeError = "The forecast for this place covers Oct 1 to Oct 16. A 7-day plan can start from Oct 1 to Oct 10.";
+      const responses = [
+        respond(422, { error: rangeError, field: "startDate" }),
+        respond(200, { plan: PLAN, baseline: { recommendation: null, effectiveTemperature: 28, maxWindSpeed: 12 } }),
+      ];
+      const { requests } = mockPlanAheadApis({ planAhead: () => Promise.resolve(responses.shift()!) });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await user.click(screen.getByRole("button", { name: "7d" }));
+      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+
+      const dateButton = await screen.findByRole("button", { name: "Oct 8, 2026" });
+      await waitFor(() => expect(dateButton).toHaveFocus());
+      expect(dateButton).toBeInvalid();
+      expect(dateButton).toHaveAccessibleDescription(rangeError);
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Build layer plan" })).toBeEnabled();
+      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByText("7 days")).toBeInTheDocument();
+
+      // A shorter plan fits, so the error goes.
+      await user.click(screen.getByRole("button", { name: "5d" }));
+      expect(screen.queryByText(rangeError)).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+
+      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      expect(requests.planAhead).toEqual([
+        expect.objectContaining({ startDate: START_DATE, durationDays: 7 }),
+        expect.objectContaining({ startDate: START_DATE, durationDays: 5 }),
+      ]);
+    });
+
+    it.each([
+      {
+        failure: "a window with no daytime forecast",
+        response: respond(422, { error: "The forecast has no daytime hours (6am to 9pm) for this plan. Pick an earlier start time or another date." }),
+        message: "The forecast has no daytime hours (6am to 9pm) for this plan. Pick an earlier start time or another date.",
+      },
+      {
+        failure: "a forecast service failure",
+        response: respond(502, { error: "Failed to fetch weather data" }),
+        message: "Couldn't get the forecast for this place. Try again.",
+      },
+    ])("explains $failure for a multi-day plan and keeps every input", async ({ response, message }) => {
+      const { toast } = await import("sonner");
+      mockPlanAheadApis({ planAhead: () => Promise.resolve(response) });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+      expect(await screen.findByRole("button", { name: "Build layer plan" })).toBeEnabled();
+      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).not.toHaveAccessibleDescription();
+      expect(screen.getByLabelText("Start time")).toHaveValue("12:00");
+      expect(screen.getByText("3 days")).toBeInTheDocument();
     });
 
     it("shows inline errors, focuses the first field to fix, and keeps what was entered", async () => {
