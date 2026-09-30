@@ -15,9 +15,14 @@ function isOptionalNumber(value: unknown): value is number | undefined {
   return value === undefined || isFiniteNumber(value);
 }
 
+function isTargetMap(value: unknown): boolean {
+  return !!value && typeof value === "object" &&
+    EVALUATED_BODY_PARTS.every((part) => isOptionalNumber((value as Record<string, unknown>)[part]));
+}
+
 function parsePhase(value: unknown): PhaseEvaluationInput | null {
   if (!value || typeof value !== "object") return null;
-  const { itemClo, targets, arms, targetRange } = value as Record<string, unknown>;
+  const { itemClo, targets, minTargets, arms, targetRange } = value as Record<string, unknown>;
 
   if (!itemClo || typeof itemClo !== "object") return null;
   for (const part of EVALUATED_BODY_PARTS) {
@@ -27,14 +32,19 @@ function parsePhase(value: unknown): PhaseEvaluationInput | null {
     }
   }
 
-  if (!targets || typeof targets !== "object") return null;
-  if (!EVALUATED_BODY_PARTS.every((part) => isOptionalNumber((targets as Record<string, unknown>)[part]))) {
-    return null;
-  }
+  if (!isTargetMap(targets)) return null;
+  if (minTargets !== undefined && !isTargetMap(minTargets)) return null;
 
   if (arms !== undefined) {
-    const { clo, target, deficitClo } = (arms ?? {}) as Record<string, unknown>;
-    if (!isFiniteNumber(clo) || !isOptionalNumber(target) || !isOptionalNumber(deficitClo)) return null;
+    const { clo, target, minTarget, deficitClo } = (arms ?? {}) as Record<string, unknown>;
+    if (
+      !isFiniteNumber(clo) ||
+      !isOptionalNumber(target) ||
+      !isOptionalNumber(minTarget) ||
+      !isOptionalNumber(deficitClo)
+    ) {
+      return null;
+    }
   }
 
   if (

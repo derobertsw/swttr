@@ -5,11 +5,8 @@ import {
   CLO_TO_M2KW,
   SKIN_TEMP_NEUTRAL,
   SKIN_TEMP_MINIMUM,
-  REGIONAL_IREQ_MULTIPLIERS,
-  DEFAULT_REGIONAL_MULTIPLIERS,
   EXTREMITY_IREQ_MULTIPLIERS,
   DEFAULT_EXTREMITY_MULTIPLIERS,
-  type RegionalIreqActivity,
   type ExtremityIreqActivity,
 } from './constants';
 import type { IreqResult } from '@/types/garments';
@@ -208,43 +205,6 @@ export function calculateIreq(input: IreqInput): IreqResult {
   };
 }
 
-interface RegionalIreq {
-  torso: number;
-  arms: number;
-  legs: number;
-}
-
-interface RegionalIreqResult {
-  min: RegionalIreq;
-  neutral: RegionalIreq;
-}
-
-/**
- * Convert whole-body IREQ to regional targets based on activity.
- * Different activities have different heat distribution patterns.
- */
-export function calculateRegionalIreq(
-  baseIreq: IreqResult,
-  activity: RegionalIreqActivity | string
-): RegionalIreqResult {
-  const multipliers = activity in REGIONAL_IREQ_MULTIPLIERS
-    ? REGIONAL_IREQ_MULTIPLIERS[activity as RegionalIreqActivity]
-    : DEFAULT_REGIONAL_MULTIPLIERS;
-
-  return {
-    min: {
-      torso: Math.round(baseIreq.ireqMin * multipliers.torso * 100) / 100,
-      arms: Math.round(baseIreq.ireqMin * multipliers.arms * 100) / 100,
-      legs: Math.round(baseIreq.ireqMin * multipliers.legs * 100) / 100,
-    },
-    neutral: {
-      torso: Math.round(baseIreq.ireqNeutral * multipliers.torso * 100) / 100,
-      arms: Math.round(baseIreq.ireqNeutral * multipliers.arms * 100) / 100,
-      legs: Math.round(baseIreq.ireqNeutral * multipliers.legs * 100) / 100,
-    },
-  };
-}
-
 interface ExtremityIreq {
   hands: number;
   head: number;
@@ -256,11 +216,14 @@ interface ExtremityIreqResult {
 }
 
 /**
- * Calculate IREQ targets for extremities (hands, head).
- * Extremities need proportionally more insulation due to:
- * - Higher surface-area-to-volume ratios
- * - Reduced local metabolic heat production
- * - Vasoconstriction in cold conditions
+ * Calculate IREQ targets for extremities (hands, head) from the whole-body
+ * IREQ of the phase they follow.
+ *
+ * ISO 11079 gives no method for local required insulation. Milder air lowers
+ * the targets, but colder air doesn't raise them past the whole-body IREQ,
+ * which already rises with the cold: at -30.6°C, with the whole body in heat
+ * balance, gloves about as warm as the whole-body ensemble kept fingers at
+ * 33°C (Gao et al. 2016).
  *
  * @param baseIreq - The whole-body IREQ result
  * @param activity - The activity type
@@ -277,12 +240,11 @@ export function calculateExtremityIreq(
     ? EXTREMITY_IREQ_MULTIPLIERS[activity as ExtremityIreqActivity]
     : DEFAULT_EXTREMITY_MULTIPLIERS;
 
-  // Temperature factor: colder = proportionally more insulation needed
-  // Increases 2% per degree below -10°C, decreases above
-  const tempFactor = Math.max(0.8, Math.min(1.5, 1.0 + (-airTempC - 10) * 0.02));
+  // Temperature factor: 0.8 at 0°C and above, rising 2% per degree to 1 at -10°C
+  const tempFactor = Math.max(0.8, Math.min(1.0, 1.0 + (-airTempC - 10) * 0.02));
 
-  // Wind factor: extremities more exposed to wind
-  // Increases 3% per m/s of wind
+  // Wind factor: hands and head are small, so wind strips more of their
+  // surface air layer. Increases 3% per m/s of wind
   const windFactor = 1.0 + (windSpeedMs * 0.03);
 
   // Calculate final multipliers
