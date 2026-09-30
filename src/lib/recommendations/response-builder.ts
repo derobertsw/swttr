@@ -7,8 +7,7 @@ import { scoreEnsemble, type WeatherConditions, type ActivityProfile } from '@/l
 import { HOOD_CLO_VALUES, type ActivityType, type HoodType } from '@/lib/biophysics/constants';
 import {
   calculateThermalComfortScore,
-  getMaxRegionalDeficit,
-  getMaxExtremityDeficit,
+  withMinimums,
   type RegionalCloValues,
   type ExtremityCloValues,
 } from '@/lib/biophysics/comfort';
@@ -23,8 +22,10 @@ interface EnsembleScoringInput {
   activityKey: ActivityType;
   comfortContext?: {
     targetRange: [number, number];
-    regionalNeutralTarget?: RegionalCloValues;
-    extremityNeutralTarget?: ExtremityCloValues;
+    /** Minimum clo per region: below it the region is short. */
+    regionalMinTarget?: RegionalCloValues;
+    /** Minimum clo for the hands and head. */
+    extremityMinTarget?: ExtremityCloValues;
   };
 }
 
@@ -53,10 +54,6 @@ export function buildScoredRecommendation(
     arms: ensembleProps.rcl.arm,
     legs: ensembleProps.rcl.leg,
   } satisfies RegionalCloValues;
-  const maxRegionalDeficit = getMaxRegionalDeficit(
-    regionalClo,
-    input.comfortContext?.regionalNeutralTarget
-  );
   // Sum hood clo contributions from garments in the ensemble.
   // When a helmet is selected, only helmet_compatible hoods count
   // (attached/removable hoods can't be worn under a helmet).
@@ -74,16 +71,14 @@ export function buildScoredRecommendation(
     hands: handwear?.rcl_clo ?? 0,
     head: (headwear.helmet?.rcl_clo ?? 0) + (headwear.headWarmth?.rcl_clo ?? 0) + (headwear.neckWarmth?.rcl_clo ?? 0) + hoodClo,
   } satisfies ExtremityCloValues;
-  const maxExtremityDeficit = getMaxExtremityDeficit(
-    extremityClo,
-    input.comfortContext?.extremityNeutralTarget
-  );
   const comfortScore = input.comfortContext
     ? calculateThermalComfortScore({
       totalClo: ensembleProps.rcl.wholeBody,
       targetRange: input.comfortContext.targetRange,
-      maxRegionalDeficit,
-      maxExtremityDeficit,
+      bodyParts: [
+        ...withMinimums(regionalClo, input.comfortContext.regionalMinTarget),
+        ...withMinimums(extremityClo, input.comfortContext.extremityMinTarget),
+      ],
     })
     : null;
   const fallbackComfortScore = Math.round(

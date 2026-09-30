@@ -16,6 +16,7 @@ import {
   createInitialState,
   fetchPlanAhead,
   gearUpReducer,
+  PlanAheadError,
   showsPlanForm,
   type InputMode,
 } from "@/lib/gearUp";
@@ -150,8 +151,12 @@ export function useGearUp() {
           if (isCurrent()) dispatch({ type: "SUBMIT_PLAN_SUCCESS", ...result });
         } catch (error) {
           logWarn("useGearUp.handleSubmit", error);
-          if (isCurrent()) {
-            toast.error("Failed to fetch weather forecast");
+          if (!isCurrent()) return;
+          if (error instanceof PlanAheadError && error.field === "startDate") {
+            // Shown on the start date, which is what needs to change.
+            dispatch({ type: "START_DATE_INVALID", error: error.message });
+          } else {
+            toast.error(error instanceof PlanAheadError ? error.message : "Couldn't build the plan. Try again.");
             dispatch({ type: "SUBMIT_ERROR" });
           }
         }
@@ -280,6 +285,7 @@ export function useGearUp() {
     setDurationDays,
     loading: state.loading,
     showPlaceError: state.showPlaceError,
+    startDateError: state.startDateError,
     locationStatus,
     placeInputRef,
     biophysicsData: state.biophysicsData,

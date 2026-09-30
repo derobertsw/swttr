@@ -28,6 +28,20 @@ describe("POST /api/v1/ensembles/evaluate", () => {
     expect(phases[1].decision).toMatchObject({ riskType: "cold" });
   });
 
+  it("measures shortfalls from the minimum targets when sent", async () => {
+    const withMinimums = {
+      ...phase,
+      minTargets: { torso: 0.9, legs: 0.5, hands: 0.8, headNeck: 0.25 },
+      arms: { ...phase.arms, minTarget: 0.75 },
+    };
+    const { phases: [neutralOnly] } = await (await post({ phases: [phase] })).json();
+    const { phases: [minimums] } = await (await post({ phases: [withMinimums] })).json();
+
+    expect(neutralOnly.maxExtremityDeficit).toBeCloseTo(0.2, 10);
+    expect(minimums.maxExtremityDeficit).toBe(0);
+    expect(minimums.maxRegionalDeficit).toBe(0);
+  });
+
   it.each([
     ["malformed JSON", "{"],
     ["no phases", { phases: [] }],
@@ -36,6 +50,8 @@ describe("POST /api/v1/ensembles/evaluate", () => {
     ["missing body part", { phases: [{ ...phase, itemClo: { torso: [0.5] } }] }],
     ["bad target range", { phases: [{ ...phase, targetRange: [1] }] }],
     ["arms without clo", { phases: [{ ...phase, arms: { target: 1 } }] }],
+    ["non-numeric minimum", { phases: [{ ...phase, minTargets: { torso: "low" } }] }],
+    ["non-numeric arm minimum", { phases: [{ ...phase, arms: { clo: 0.8, minTarget: "low" } }] }],
   ])("rejects %s with 400", async (_label, body) => {
     expect((await post(body)).status).toBe(400);
   });

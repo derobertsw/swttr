@@ -536,6 +536,23 @@ describe("LayerDisplay", () => {
       expect(screen.getByText("Actual 0.2 clo")).toBeInTheDocument();
     });
 
+    it("sends each body part's minimum so shortfalls are measured from it", async () => {
+      render(
+        <LayerDisplay
+          recommendation={null}
+          temperature={15}
+          windspeed={10}
+          biophysicsData={mockBiophysicsData}
+        />
+      );
+
+      await screen.findByText("Target 1.5 clo");
+      const [, init] = vi.mocked(fetch).mock.calls[0];
+      const { phases: [climb] } = JSON.parse(init?.body as string);
+      expect(climb.minTargets).toEqual({ torso: 1.0, legs: 0.9, hands: 0.5, headNeck: 0.4 });
+      expect(climb.arms).toMatchObject({ target: 1.2, minTarget: 0.8 });
+    });
+
     it("should render ThermalGauge with target range pill", async () => {
       render(
         <LayerDisplay

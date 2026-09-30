@@ -1,4 +1,4 @@
-import type { ActivityType } from './constants';
+import { REGIONAL_IREQ_MULTIPLIERS, REGIONAL_WEIGHTS, type ActivityType } from './constants';
 
 interface ActivityTargetRangeInput {
   activity: ActivityType;
@@ -14,7 +14,11 @@ interface ActivityTargetRangeResult {
   max: number;
 }
 
-type NumericProps<T extends object> = { [K in keyof T]: number };
+interface RegionalClo {
+  torso: number;
+  arms: number;
+  legs: number;
+}
 
 interface ActivityRangeProfile {
   baseMaxBuffer: number;
@@ -73,40 +77,30 @@ export function calculateActivityTargetRange(input: ActivityTargetRangeInput): A
 }
 
 /**
- * Scale regional/extremity IREQ values so body-part targets stay aligned with the
- * adjusted whole-body target range shown in the UI.
+ * Split the whole-body target range across the torso, arms and legs.
+ *
+ * Whole-body clo is the area-weighted mean of the regions' clo (see
+ * `predictEnsembleThermal`), so the activity's regional multipliers are
+ * rescaled to an area-weighted mean of 1. An outfit with every region at its
+ * minimum then sits exactly at the whole-body minimum, and one with every
+ * region at its neutral target at the whole-body maximum.
  */
-export function scaleIreqShapeToTargetRange<
-  TMin extends object,
-  TNeutral extends object
->(
-  value: { min: NumericProps<TMin>; neutral: NumericProps<TNeutral> },
-  input: {
-    ireqMin: number;
-    ireqNeutral: number;
-    targetMin: number;
-    targetMax: number;
-  }
-): { min: NumericProps<TMin>; neutral: NumericProps<TNeutral> } {
-  const minScale = input.ireqMin > 0
-    ? clamp(input.targetMin / input.ireqMin, 0.8, 2.2)
-    : 1;
-  const neutralScale = input.ireqNeutral > 0
-    ? clamp(input.targetMax / input.ireqNeutral, 0.8, 2.2)
-    : 1;
-
-  const scaledMin = { ...value.min } as NumericProps<TMin>;
-  for (const key of Object.keys(scaledMin) as Array<keyof TMin>) {
-    scaledMin[key] = round2(scaledMin[key] * minScale);
-  }
-
-  const scaledNeutral = { ...value.neutral } as NumericProps<TNeutral>;
-  for (const key of Object.keys(scaledNeutral) as Array<keyof TNeutral>) {
-    scaledNeutral[key] = round2(scaledNeutral[key] * neutralScale);
-  }
+export function calculateRegionalTargets(
+  activity: ActivityType,
+  targetRange: [number, number]
+): { min: RegionalClo; neutral: RegionalClo } {
+  const multipliers = REGIONAL_IREQ_MULTIPLIERS[activity];
+  const mean = (multipliers.torso * REGIONAL_WEIGHTS.torso)
+    + (multipliers.arms * REGIONAL_WEIGHTS.arm)
+    + (multipliers.legs * REGIONAL_WEIGHTS.leg);
+  const distribute = (wholeBodyClo: number): RegionalClo => ({
+    torso: round2(wholeBodyClo * multipliers.torso / mean),
+    arms: round2(wholeBodyClo * multipliers.arms / mean),
+    legs: round2(wholeBodyClo * multipliers.legs / mean),
+  });
 
   return {
-    min: scaledMin,
-    neutral: scaledNeutral,
+    min: distribute(targetRange[0]),
+    neutral: distribute(targetRange[1]),
   };
 }
