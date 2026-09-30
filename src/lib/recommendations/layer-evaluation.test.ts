@@ -72,6 +72,21 @@ describe("evaluatePhase", () => {
     expect(result.comfortScore).toBeGreaterThanOrEqual(85);
   });
 
+  it("scores gloves against the hand minimum when it exceeds the whole-body minimum", () => {
+    // Easy biking at -15°F in 40 mph wind: the hands need 3.42 clo, the whole
+    // body 1.99, and every other part sits at its minimum.
+    const withGloves = (gloveClo: number) => evaluatePhase({
+      itemClo: { torso: [2.4], legs: [2.1], hands: [gloveClo], headNeck: [1.0] },
+      targets: { torso: 2.2, legs: 2.3, hands: 3.6, headNeck: 1.2 },
+      minTargets: { torso: 2.0, legs: 2.0, hands: 3.42, headNeck: 1.0 },
+      arms: { clo: 2.0, target: 2.2, minTarget: 2.0 },
+      targetRange: [1.99, 2.11],
+    });
+
+    expect(withGloves(0.6).comfortScore).toBeCloseTo(23.9, 1);
+    expect(withGloves(0.9).comfortScore).toBeCloseTo(30.4, 1);
+  });
+
   it("flags cold risk when a region is under target even if the total is in range", () => {
     const result = evaluatePhase({
       ...base,

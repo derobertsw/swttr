@@ -135,8 +135,8 @@ const ScoreDisplay = ({
           <p className="text-slate-500">
             Cold warnings show when total insulation falls more than {THERMAL_DISPLAY_CLO_EPSILON.toFixed(2)} clo
             below the target band or a body part falls more than {THERMAL_DISPLAY_CLO_EPSILON.toFixed(2)} clo
-            below its minimum. A cold outfit scores up to 85, in proportion to the share of the needed
-            insulation it provides. Overheating only triggers above target max + {OVERHEAT_BUFFER_CLO.toFixed(1)} clo.
+            below its minimum. A cold outfit scores up to 85, in proportion to the share of its needed
+            insulation the worst-covered part has. Overheating only triggers above target max + {OVERHEAT_BUFFER_CLO.toFixed(1)} clo.
           </p>
           {totalClo !== undefined && targetRange && (
             <p className="text-slate-500">

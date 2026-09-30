@@ -9,6 +9,7 @@ import {
   calculateThermalComfortScore,
   evaluateThermalComfort,
   THERMAL_DISPLAY_CLO_EPSILON,
+  type BodyPartClo,
 } from '@/lib/biophysics/comfort';
 import type {
   BodyPartEvaluation,
@@ -32,9 +33,17 @@ function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
 
-function deficit(target: number | undefined, current: number | undefined): number {
-  if (target === undefined) return 0;
-  return Math.max(0, target - (current ?? 0));
+interface PartAgainstMinimum {
+  clo: number;
+  minimum: number | undefined;
+}
+
+function hasMinimum(part: PartAgainstMinimum): part is BodyPartClo {
+  return part.minimum !== undefined;
+}
+
+function maxDeficit(parts: PartAgainstMinimum[]): number {
+  return Math.max(0, ...parts.filter(hasMinimum).map((part) => part.minimum - part.clo));
 }
 
 /**
@@ -83,23 +92,29 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
   ) as Record<EvaluatedBodyPart, BodyPartEvaluation>;
 
   const { torso, legs, hands, headNeck } = bodyParts;
-  const maxRegionalDeficit = Math.max(
-    deficit(minimum('torso'), torso.clo),
-    deficit(input.arms?.minTarget ?? input.arms?.target, input.arms?.deficitClo ?? input.arms?.clo),
-    deficit(minimum('legs'), legs.clo)
-  );
-  const maxExtremityDeficit = Math.max(
-    deficit(minimum('hands'), hands.clo),
-    deficit(minimum('headNeck'), headNeck.clo)
-  );
+  const regions: PartAgainstMinimum[] = [
+    { clo: torso.clo, minimum: minimum('torso') },
+    { clo: legs.clo, minimum: minimum('legs') },
+  ];
+  if (input.arms) {
+    regions.push({
+      clo: input.arms.deficitClo ?? input.arms.clo,
+      minimum: input.arms.minTarget ?? input.arms.target,
+    });
+  }
+  const extremities: PartAgainstMinimum[] = [
+    { clo: hands.clo, minimum: minimum('hands') },
+    { clo: headNeck.clo, minimum: minimum('headNeck') },
+  ];
+  const maxRegionalDeficit = maxDeficit(regions);
+  const maxExtremityDeficit = maxDeficit(extremities);
 
   const breakdown = input.arms ? weightedBreakdown(torso.clo, input.arms.clo, legs.clo) : undefined;
 
   const comfortInput = {
     totalClo: breakdown?.total,
     targetRange: input.targetRange,
-    maxRegionalDeficit,
-    maxExtremityDeficit,
+    bodyParts: [...regions, ...extremities].filter(hasMinimum),
   };
 
   return {

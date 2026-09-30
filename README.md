@@ -303,7 +303,7 @@ graph TD
     DEC -->|Otherwise| OK[Comfortable]
 
     OK --> S1[Score 85 to 100<br/>by distance from the middle of the range]
-    COLD --> S2[Score 85 × share of the needed insulation<br/>clothing plus 0.5 clo of surface air,<br/>set by the largest shortfall]
+    COLD --> S2[Score 85 × the share of needed insulation<br/>the worst-covered part has: the whole body<br/>or a body part, each against its own minimum<br/>plus 0.5 clo of surface air]
     HOT --> S3[Score 78 − 35 × clo above the range,<br/>or a short body part's cold score if lower]
 ```
 

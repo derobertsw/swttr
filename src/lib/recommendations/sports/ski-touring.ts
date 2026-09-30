@@ -5,7 +5,7 @@
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { DLE_ESTIMATION_METHOD } from '@/lib/biophysics/ireq';
 import { scoreEnsemble } from '@/lib/biophysics/scorer';
-import { calculateThermalComfortScore, getMaxExtremityDeficit, getMaxRegionalDeficit } from '@/lib/biophysics/comfort';
+import { calculateThermalComfortScore, withMinimums } from '@/lib/biophysics/comfort';
 import type { ExertionLevel } from '@/lib/biophysics/exertion';
 import { applyBodySizeMetabolicAdjustment } from '@/lib/biophysics/bodyMetrics';
 import { COWEDA_VALIDATION_SOURCE } from '@/lib/biophysics/coweda';
@@ -242,14 +242,16 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     const thermalComfortScore = calculateThermalComfortScore({
       totalClo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
       targetRange: uphill.targetRange,
-      maxRegionalDeficit: getMaxRegionalDeficit(regionalClo, uphill.regional.min),
-      maxExtremityDeficit: getMaxExtremityDeficit(
-        {
-          hands: selectedHandwear?.rcl_clo ?? 0,
-          head: (climbHeadwear.helmet?.rcl_clo ?? 0) + (climbHeadwear.headWarmth?.rcl_clo ?? 0) + (climbHeadwear.neckWarmth?.rcl_clo ?? 0),
-        },
-        uphill.extremity.min
-      ),
+      bodyParts: [
+        ...withMinimums(regionalClo, uphill.regional.min),
+        ...withMinimums(
+          {
+            hands: selectedHandwear?.rcl_clo ?? 0,
+            head: (climbHeadwear.helmet?.rcl_clo ?? 0) + (climbHeadwear.headWarmth?.rcl_clo ?? 0) + (climbHeadwear.neckWarmth?.rcl_clo ?? 0),
+          },
+          uphill.extremity.min
+        ),
+      ],
     });
     // Gloves carry over from the climb — only select warmer descent gloves if climb pair is insufficient
     const descentHandwear = selectedHandwear && selectedHandwear.rcl_clo >= downhill.extremity.neutral.hands
