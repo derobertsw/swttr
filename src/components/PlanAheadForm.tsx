@@ -254,9 +254,9 @@ export function PlanAheadForm({
 
       <section className="flex flex-col gap-2 rounded-[1.6rem] border border-white/28 bg-white/[0.1] p-4 shadow-[0_12px_30px_rgba(8,16,34,0.14)] backdrop-blur-xl">
         <label className="text-sm font-medium text-white/80">3. Start</label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 min-[375px]:flex-row">
           {useNativeIOSDatePicker ? (
-            <div className="relative flex-1">
+            <div className="relative min-[375px]:flex-1">
               <CalendarIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/75" />
               <Input
                 ref={dateInputRef}
@@ -278,7 +278,7 @@ export function PlanAheadForm({
                   aria-invalid={showDateError || undefined}
                   aria-describedby={showDateError ? "plan-start-date-error" : undefined}
                   className={cn(
-                    `h-12 flex-1 justify-start text-left font-normal ${FROSTED_INPUT} hover:bg-white/25 hover:text-white`,
+                    `h-12 justify-start min-[375px]:flex-1 text-left font-normal ${FROSTED_INPUT} hover:bg-white/25 hover:text-white`,
                     !date && "text-white/50"
                   )}
                 >
@@ -296,7 +296,7 @@ export function PlanAheadForm({
               </PopoverContent>
             </Popover>
           )}
-          <div className="w-40 sm:w-44">
+          <div className="min-[375px]:w-40 sm:w-44">
             <Input
               ref={timeInputRef}
               type="time"
