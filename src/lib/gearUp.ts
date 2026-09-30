@@ -31,8 +31,11 @@ interface GearUpState {
   showResults: boolean;
   /** Set once Gear Up is pressed without a place, so the place field says it's needed. */
   showPlaceError: boolean;
-  /** Why the plan's start date can't be used, like dates past the end of the forecast. */
-  startDateError: string | null;
+  /**
+   * Why the plan's start date can't be used at a place, like dates past the end
+   * of its forecast. Coverage differs by place, so it applies only to that one.
+   */
+  startDateError: { message: string; location: LocationSuggestion } | null;
   loading: boolean;
   recommendation: Recommendation | null;
   biophysicsData: BiophysicsRecommendation | null;
@@ -66,7 +69,7 @@ type GearUpAction =
   | { type: "SET_TIME"; time: string }
   | { type: "SET_DURATION_DAYS"; durationDays: number }
   | { type: "PLACE_MISSING" }
-  | { type: "START_DATE_INVALID"; error: string }
+  | { type: "START_DATE_INVALID"; error: string; location: LocationSuggestion }
   | { type: "SUBMIT_START" }
   | ({ type: "SUBMIT_SUCCESS" } & GearUpResult)
   | ({ type: "SUBMIT_PLAN_SUCCESS" } & PlanAheadResult)
@@ -114,7 +117,7 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
     case "PLACE_MISSING":
       return { ...state, showPlaceError: true };
     case "START_DATE_INVALID":
-      return { ...state, loading: false, startDateError: action.error };
+      return { ...state, loading: false, startDateError: { message: action.error, location: action.location } };
     case "SUBMIT_START":
       return { ...state, loading: true, startDateError: null };
     case "SUBMIT_SUCCESS":

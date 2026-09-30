@@ -823,6 +823,15 @@ describe("Home Page", () => {
       expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
       expect(screen.getByText("7 days")).toBeInTheDocument();
 
+      // Another place's forecast may cover the dates, so the error goes with the place.
+      const place = screen.getByRole("combobox", { name: /location/i });
+      await user.clear(place);
+      expect(screen.queryByText(rangeError)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeValid();
+      // Picking the same place again brings it back, since its forecast hasn't changed.
+      await chooseStowe(user);
+      expect(screen.getByText(rangeError)).toBeInTheDocument();
+
       // A shorter plan fits, so the error goes.
       await user.click(screen.getByRole("button", { name: "5d" }));
       expect(screen.queryByText(rangeError)).not.toBeInTheDocument();
