@@ -6,6 +6,7 @@ import { fetchUserWardrobeItems } from "@/lib/userWardrobe";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
 import { tripActivityToRecommendationKey } from "@/lib/trip-activities";
+import { formatZonedTime, isTimeZone } from "@/lib/timeZones";
 import layerRecommendations from "@/data/layerRecommendations.json";
 import type { ForecastHour, DailyLayerPlan } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
@@ -31,11 +32,13 @@ async function fetchHourly(
   startDate: string,
   endDate: string
 ): Promise<ForecastHour[]> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&start_date=${startDate}&end_date=${endDate}&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&start_date=${startDate}&end_date=${endDate}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`;
   const res = await fetch(url);
   if (!res.ok) return [];
   const data = await res.json();
-  const time: string[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
+  const timeZone: unknown = data?.timezone;
+  if (!isTimeZone(timeZone)) return [];
+  const time: number[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
   const temp: number[] = Array.isArray(data?.hourly?.temperature_2m) ? data.hourly.temperature_2m : [];
   const wind: number[] = Array.isArray(data?.hourly?.wind_speed_10m) ? data.hourly.wind_speed_10m : [];
   const precip: number[] = Array.isArray(data?.hourly?.precipitation_probability) ? data.hourly.precipitation_probability : [];
@@ -48,11 +51,14 @@ async function fetchHourly(
     }))
     .filter(
       (h) =>
-        typeof h.time === "string" &&
+        Number.isFinite(h.time) &&
         Number.isFinite(h.temperature) &&
         Number.isFinite(h.windSpeed) &&
         Number.isFinite(h.precipitationProbability)
-    );
+    )
+    // Label hours on the stop's clock at each instant, rather than with
+    // Open-Meteo's fixed offset, so daytime windows remain correct across DST.
+    .map((h) => ({ ...h, time: formatZonedTime(h.time * 1000, timeZone) }));
 }
 
 function chooseStop(day: TripDay, stops: TripStop[]): TripStop | undefined {
