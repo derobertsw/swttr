@@ -66,4 +66,32 @@ describe("useTrip", () => {
     await waitFor(() => expect(olderDone).toBe(true));
     expect(result.current.data?.trip.name).toBe("After both saves");
   });
+
+  it("drops a load still running when the trip is cleared", async () => {
+    const loads = heldLoads();
+    const { result, rerender } = renderHook(({ tripId }) => useTrip(tripId), {
+      initialProps: { tripId: TRIP.id as string | null },
+    });
+
+    rerender({ tripId: null });
+    await loads.finish(0, "The previous trip");
+
+    expect(result.current.data).toBeNull();
+  });
+
+  it("drops a reload still running when the trip is cleared", async () => {
+    const loads = heldLoads();
+    const { result, rerender } = renderHook(({ tripId }) => useTrip(tripId), {
+      initialProps: { tripId: TRIP.id as string | null },
+    });
+    await loads.finish(0, "Initial");
+
+    act(() => {
+      void result.current.refresh();
+    });
+    rerender({ tripId: null });
+    await loads.finish(1, "The previous trip, reloaded");
+
+    expect(result.current.data?.trip.name).toBe("Initial");
+  });
 });

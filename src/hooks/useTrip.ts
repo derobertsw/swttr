@@ -35,7 +35,13 @@ export function useTrip(tripId: string | null) {
   }, []);
 
   useEffect(() => {
-    if (tripId) void load(tripId);
+    if (!tripId) return;
+    void load(tripId);
+    // When the trip changes or is cleared, or the page unmounts, a load still
+    // running for it no longer counts as the newest, so it's dropped.
+    return () => {
+      newestLoad.current = null;
+    };
   }, [tripId, load]);
 
   // Reloads after a mutation; the initial load relies on `loading` starting
