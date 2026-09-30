@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addDaysToDateString, describeForecastCoverage, FORECAST_DAYS } from "@/lib/forecastRange";
 import { formatZonedIsoTime, formatZonedTime, isLocalDateTime, isTimeZone, zonedTimeToInstant } from "@/lib/timeZones";
+import { parseOpenMeteoHourly } from "@/lib/openMeteoHourly";
 import type { PrecipitationType } from "@/types/weather";
 
 const HOUR_SECONDS = 3600;
@@ -143,29 +144,7 @@ export async function GET(request: NextRequest) {
       if (!isTimeZone(timeZone)) {
         throw new Error("Forecast has no valid time zone");
       }
-      const hourlyTime: number[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
-      const hourlyTemps: number[] = Array.isArray(data?.hourly?.temperature_2m) ? data.hourly.temperature_2m : [];
-      const hourlyWinds: number[] = Array.isArray(data?.hourly?.wind_speed_10m) ? data.hourly.wind_speed_10m : [];
-      const hourlyPrecip: number[] = Array.isArray(data?.hourly?.precipitation_probability) ? data.hourly.precipitation_probability : [];
-
-      const hourly = hourlyTime
-        .map((time: number, index: number) => ({
-          time,
-          temperature: Math.round(Number(hourlyTemps[index] ?? 0)),
-          windSpeed: Math.round(Number(hourlyWinds[index] ?? 0)),
-          precipitationProbability: Math.round(Number(hourlyPrecip[index] ?? 0)),
-        }))
-        .filter((entry) => {
-          return (
-            Number.isFinite(entry.time) &&
-            Number.isFinite(entry.temperature) &&
-            Number.isFinite(entry.windSpeed) &&
-            Number.isFinite(entry.precipitationProbability)
-          );
-        })
-        // Open-Meteo uses today's offset for its local labels. Use the offset
-        // at each instant instead, so the stop's clock stays right across DST.
-        .map((entry) => ({ ...entry, time: formatZonedTime(entry.time * 1000, timeZone) }))
+      const hourly = parseOpenMeteoHourly(data, timeZone)
         // A fixed-offset response can spill into an adjacent local date after
         // a clock change. Only return dates in the requested local window.
         .filter((entry) => entry.time.slice(0, 10) >= startDate && entry.time.slice(0, 10) <= endDate);

@@ -6,7 +6,8 @@ import { fetchUserWardrobeItems } from "@/lib/userWardrobe";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
 import { tripActivityToRecommendationKey } from "@/lib/trip-activities";
-import { formatZonedTime, isTimeZone } from "@/lib/timeZones";
+import { isTimeZone } from "@/lib/timeZones";
+import { parseOpenMeteoHourly } from "@/lib/openMeteoHourly";
 import layerRecommendations from "@/data/layerRecommendations.json";
 import type { ForecastHour, DailyLayerPlan } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
@@ -38,27 +39,7 @@ async function fetchHourly(
   const data = await res.json();
   const timeZone: unknown = data?.timezone;
   if (!isTimeZone(timeZone)) return [];
-  const time: number[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
-  const temp: number[] = Array.isArray(data?.hourly?.temperature_2m) ? data.hourly.temperature_2m : [];
-  const wind: number[] = Array.isArray(data?.hourly?.wind_speed_10m) ? data.hourly.wind_speed_10m : [];
-  const precip: number[] = Array.isArray(data?.hourly?.precipitation_probability) ? data.hourly.precipitation_probability : [];
-  return time
-    .map((t, i) => ({
-      time: t,
-      temperature: Math.round(Number(temp[i] ?? 0)),
-      windSpeed: Math.round(Number(wind[i] ?? 0)),
-      precipitationProbability: Math.round(Number(precip[i] ?? 0)),
-    }))
-    .filter(
-      (h) =>
-        Number.isFinite(h.time) &&
-        Number.isFinite(h.temperature) &&
-        Number.isFinite(h.windSpeed) &&
-        Number.isFinite(h.precipitationProbability)
-    )
-    // Label hours on the stop's clock at each instant, rather than with
-    // Open-Meteo's fixed offset, so daytime windows remain correct across DST.
-    .map((h) => ({ ...h, time: formatZonedTime(h.time * 1000, timeZone) }));
+  return parseOpenMeteoHourly(data, timeZone);
 }
 
 function chooseStop(day: TripDay, stops: TripStop[]): TripStop | undefined {
