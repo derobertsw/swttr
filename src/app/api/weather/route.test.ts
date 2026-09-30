@@ -334,6 +334,34 @@ describe("Weather API Route", () => {
       ]);
     });
 
+    it("leaves out hours with a missing value rather than report them as zero", async () => {
+      // Near the end of its window Open-Meteo returns null for some hours.
+      const time = [11, 12, 13, 14].map((hour) => Date.parse(`2024-01-15T${hour}:00Z`) / 1000);
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            timezone: "America/New_York",
+            hourly: {
+              time,
+              temperature_2m: [null, 30, 31, 32],
+              wind_speed_10m: [5, null, 6, 7],
+              precipitation_probability: [10, 20, null, 40],
+            },
+          }),
+      });
+
+      const response = await GET(
+        new NextRequest("http://localhost:3000/api/weather?lat=40.7128&lon=-74.006&startDate=2024-01-15&days=1")
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.hourly).toEqual([
+        { time: "2024-01-15T09:00", temperature: 32, windSpeed: 7, precipitationProbability: 40 },
+      ]);
+    });
+
     it("should call Open-Meteo API with range dates, plus a day either side, for multi-day requests", async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
