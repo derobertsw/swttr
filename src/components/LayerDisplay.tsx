@@ -107,6 +107,8 @@ function recommendedCatalogItems(layers: BodyPartLayers): RecommendedItem[] {
 /**
  * Displays layered clothing recommendations organized by body part.
  * Supports both static recommendations and biophysics-based recommendations.
+ * Static layers are general guidance and can't be edited, since nothing
+ * evaluates edits to them.
  * Without either, keeps the outing on screen and explains why there are no
  * layers instead.
  */
@@ -282,6 +284,7 @@ const LayerDisplay = ({
         bodyPart={bodyPart}
         layers={layers}
         biophysicsActive={biophysicsActive}
+        readOnly={!biophysicsActive}
         currentClo={bodyPartEvaluation?.clo}
         targetClo={bodyPartEvaluation?.target}
         status={bodyPartEvaluation?.status}
