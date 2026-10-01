@@ -28,7 +28,7 @@ describe("PreferencesDrawer", () => {
       await user.click(screen.getByRole("button", { name: /open preferences/i }));
 
       await waitFor(() => {
-        expect(screen.getByText("Preferences")).toBeInTheDocument();
+        expect(screen.getByText("Settings")).toBeInTheDocument();
       });
     });
 
@@ -149,7 +149,7 @@ describe("PreferencesDrawer", () => {
   describe("controlled open state", () => {
     it("should be open when open prop is true", () => {
       render(<PreferencesDrawer {...defaultProps} open={true} />);
-      expect(screen.getByText("Preferences")).toBeInTheDocument();
+      expect(screen.getByText("Settings")).toBeInTheDocument();
     });
 
     it("should call onOpenChange when drawer state changes", async () => {

@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Map, Shirt, Settings, HelpCircle, MessageSquare } from "lucide-react";
+import { Settings, HelpCircle, MessageSquare } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,13 +16,9 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { PRIMARY_NAV_ITEMS, isNavItemActive } from "@/components/AppNavigation";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
-
-const NAV_ITEMS = [
-  { href: "/trips", label: "Trips", icon: Map },
-  { href: "/wardrobe", label: "Wardrobe", icon: Shirt },
-];
 
 const FOOTER_ITEMS = [
   { href: "/faq", label: "FAQ", icon: HelpCircle },
@@ -60,9 +56,9 @@ export function AppSidebar() {
         <div className="flex items-start justify-between gap-2">
           <Link href="/" className="group-data-[collapsible=icon]:hidden">
             <div className="rounded-xl border border-slate-300/70 bg-white/85 px-3 py-2 shadow-sm backdrop-blur-[2px]">
-              <h1 className="leading-none text-[1.6rem] font-extrabold tracking-[0.24em] text-slate-900">
+              <span className="block leading-none text-[1.6rem] font-extrabold tracking-[0.24em] text-slate-900">
                 SWTTR
-              </h1>
+              </span>
               <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600/85">
                 Thermal Layering
               </p>
@@ -74,28 +70,34 @@ export function AppSidebar() {
       <SidebarContent className="px-2 pb-3 pt-1">
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={
-                      item.href === "/trips"
-                        ? pathname.startsWith("/trips")
-                        : pathname === item.href
-                    }
-                    tooltip={item.label}
-                    className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
-                  >
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+            <nav aria-label="Primary">
+              <SidebarMenu>
+                {PRIMARY_NAV_ITEMS.map((item) => {
+                  const isActive = isNavItemActive(item.href, pathname);
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.label}
+                        className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
+                      >
+                        <Link href={item.href} aria-current={isActive ? "page" : undefined}>
+                          <item.icon />
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </nav>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-              {/* Preferences as drawer trigger */}
+        <SidebarFooter className="px-0">
+          <nav aria-label="Settings and help">
+            <SidebarMenu>
               <SidebarMenuItem>
                 <PreferencesDrawer
                   sensitivity={sensitivity}
@@ -107,43 +109,38 @@ export function AppSidebar() {
                   onBodyMetricsChange={updateBodyMetrics}
                 >
                   <SidebarMenuButton
-                    tooltip="Preferences"
+                    tooltip="Settings"
                     className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
                   >
                     <Settings />
-                    <span>Preferences</span>
+                    <span>Settings</span>
                   </SidebarMenuButton>
                 </PreferencesDrawer>
               </SidebarMenuItem>
+              {FOOTER_ITEMS.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href}
+                    tooltip={item.label}
+                    className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
+                  >
+                    {item.external ? (
+                      <a href={item.href} target="_blank" rel="noopener noreferrer">
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </a>
+                    ) : (
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </Link>
+                    )}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarFooter className="px-0">
-          <SidebarMenu>
-            {FOOTER_ITEMS.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.href}
-                  tooltip={item.label}
-                  className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
-                >
-                  {item.external ? (
-                    <a href={item.href} target="_blank" rel="noopener noreferrer">
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </a>
-                  ) : (
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </Link>
-                  )}
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
+          </nav>
         </SidebarFooter>
       </SidebarContent>
     </Sidebar>

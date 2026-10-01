@@ -112,7 +112,7 @@ export function PreferencesDrawer({
           <DrawerHeader className="sticky top-0 z-10 border-b border-border/60 bg-background/95 pb-3 text-left backdrop-blur">
             <div className="flex items-center justify-between">
               <div>
-                <DrawerTitle>Preferences</DrawerTitle>
+                <DrawerTitle>Settings</DrawerTitle>
                 <DrawerDescription>
                   Customize your recommendations
                 </DrawerDescription>

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { logWarn } from "@/lib/logger";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
+import { useNativeTabShell } from "@/hooks/useNativeTabShell";
 import {
   Sheet,
   SheetContent,
@@ -28,6 +29,9 @@ interface HeaderProps {
 const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  // The native shell has no web sidebar, so its menu and logo show at every width.
+  const isNativeTabShell = useNativeTabShell();
+  const mobileOnly = isNativeTabShell ? undefined : "md:hidden";
   const {
     sensitivity,
     defaultActivity,
@@ -72,16 +76,16 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
     )}>
       <div className="flex items-center gap-2">
         {/* Mobile: show logo */}
-        <Link href="/" onClick={onLogoClick} className="md:hidden">
-          <h1 className={cn("site-header", variant === "compact" && "site-header--compact")}>
+        <Link href="/" onClick={onLogoClick} className={mobileOnly}>
+          <span className={cn("site-header block", variant === "compact" && "site-header--compact")}>
             SWTTR
-          </h1>
+          </span>
         </Link>
       </div>
 
       <div className="flex items-center gap-4">
         {/* Desktop: show UserButton or Sign In */}
-        <div className="hidden md:flex items-center gap-4">
+        <div className={cn("hidden items-center gap-4", !isNativeTabShell && "md:flex")}>
           <SignedIn>
             <UserButton>
               <UserButton.MenuItems>
@@ -99,7 +103,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
 
         {/* Mobile: hamburger menu */}
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-          <SheetTrigger asChild className="md:hidden">
+          <SheetTrigger asChild className={mobileOnly}>
             <Button
               variant="ghost"
               size="icon"
@@ -117,7 +121,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
               <SheetTitle>Menu</SheetTitle>
               <SheetDescription className="sr-only">Navigation and account options</SheetDescription>
             </SheetHeader>
-            <nav className="flex flex-col gap-4 p-4">
+            <nav aria-label="Menu" className="flex flex-col gap-4 p-4">
               <SignedIn>
                 <div className="flex items-center gap-3 pb-4 border-b">
                   <UserButton />
