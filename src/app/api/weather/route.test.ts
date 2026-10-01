@@ -401,17 +401,19 @@ describe("Weather API Route", () => {
      * Open-Meteo's answer to `start_date`/`end_date` with `timezone=auto` and
      * `timeformat=unixtime`: every hour from midnight on the start date to
      * 23:00 on the end date, both at one fixed UTC offset (the place's offset
-     * today). Past `lastDate` it answers 400, as it does past its last
-     * forecast day. Each hour's temperature is its UTC hour of day.
+     * today). Outside `firstDate` to `lastDate` it answers 400, as it does
+     * outside the dates it serves. Each hour's temperature is its UTC hour of
+     * day.
      */
-    function mockRangeForecast(timezone: string, offsetHours: number, lastDate = "2026-12-31") {
+    function mockRangeForecast(timezone: string, offsetHours: number, lastDate = "2026-12-31", firstDate = "2026-01-01") {
       const fetchMock = vi.fn(async (url: string) => {
         const params = new URL(url).searchParams;
+        const startDate = params.get("start_date") as string;
         const endDate = params.get("end_date") as string;
-        if (endDate > lastDate) {
+        if (startDate < firstDate || endDate > lastDate) {
           return { ok: false, status: 400, json: () => Promise.resolve({ error: true, reason: "Parameter 'end_date' is out of allowed range" }) };
         }
-        const first = Date.parse(`${params.get("start_date")}T00:00Z`) / 1000 - offsetHours * 3600;
+        const first = Date.parse(`${startDate}T00:00Z`) / 1000 - offsetHours * 3600;
         const last = Date.parse(`${endDate}T23:00Z`) / 1000 - offsetHours * 3600;
         const time = Array.from({ length: (last - first) / 3600 + 1 }, (_, index) => first + index * 3600);
         return {
@@ -489,7 +491,7 @@ describe("Weather API Route", () => {
       }
     });
 
-    it("falls back to the requested dates when the day after is past the forecast", async () => {
+    it("drops the day after when it's past the forecast", async () => {
       const fetchMock = mockRangeForecast("America/New_York", -4, "2026-10-15");
 
       const response = await GET(new NextRequest(
@@ -500,7 +502,36 @@ describe("Weather API Route", () => {
       expect(response.status).toBe(200);
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(fetchMock.mock.calls[0][0]).toContain("start_date=2026-10-14&end_date=2026-10-16");
-      expect(fetchMock.mock.calls[1][0]).toContain("start_date=2026-10-15&end_date=2026-10-15");
+      expect(fetchMock.mock.calls[1][0]).toContain("start_date=2026-10-14&end_date=2026-10-15");
+      expect(data.hourly).toHaveLength(24);
+    });
+
+    it("keeps midnight on the forecast's last day after a clock change", async () => {
+      // Sydney's clocks went forward on October 4, but Open-Meteo still uses
+      // today's UTC+10, so local midnight on the 15th is its 23:00 on the 14th.
+      mockRangeForecast("Australia/Sydney", 10, "2026-10-15");
+
+      const response = await GET(new NextRequest(
+        "http://localhost:3000/api/weather?lat=-33.87&lon=151.21&startDate=2026-10-15&days=1"
+      ));
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.hourly).toHaveLength(24);
+      expect(data.hourly[0].time).toBe("2026-10-15T00:00");
+    });
+
+    it("drops the day before too at the start of the dates Open-Meteo serves", async () => {
+      const fetchMock = mockRangeForecast("America/New_York", -4, "2026-12-31", "2026-07-01");
+
+      const response = await GET(new NextRequest(
+        "http://localhost:3000/api/weather?lat=44.47&lon=-72.69&startDate=2026-07-01&days=1"
+      ));
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock.mock.calls[2][0]).toContain("start_date=2026-07-01&end_date=2026-07-01");
       expect(data.hourly).toHaveLength(24);
     });
 

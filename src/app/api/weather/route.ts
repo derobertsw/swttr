@@ -36,12 +36,15 @@ function forecastDate(hourStart: number, timeZone: string): string {
  * Open-Meteo's hourly forecast covering the local dates `startDate` to
  * `endDate`. It picks hours by date at today's UTC offset, so after a clock
  * change a date's first or last hour falls on the adjacent date in its frame.
- * Ask for a day either side, and fall back to the dates alone when that
- * reaches past the range Open-Meteo serves (it answers 400).
+ * Ask for a day either side. Where that reaches past the range Open-Meteo
+ * serves (it answers 400), drop the day after, as on its last forecast day,
+ * and then the day before too.
  */
 async function fetchHourlyRange(lat: string, lon: string, startDate: string, endDate: string) {
+  const dayBefore = addDaysToDateString(startDate, -1);
   const ranges = [
-    [addDaysToDateString(startDate, -1), addDaysToDateString(endDate, 1)],
+    [dayBefore, addDaysToDateString(endDate, 1)],
+    [dayBefore, endDate],
     [startDate, endDate],
   ];
   for (const [from, to] of ranges) {
