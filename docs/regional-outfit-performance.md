@@ -27,12 +27,12 @@ Local warm measurements with Node.js 26.10.0 on macOS:
 
 | Alpine pool | Previous search, mean | Cached search, mean | Speedup |
 | --- | ---: | ---: | ---: |
-| 73 garments | 10.526 ms | 0.294 ms | 35.76x |
-| 365 garments (5x) | 2115.36 ms | 45.748 ms | 46.24x |
+| 73 garments | 10.742 ms | 0.304 ms | 35.39x |
+| 365 garments (5x) | 1077.18 ms | 30.772 ms | 35.01x |
 
 These timings vary by machine and load. They are benchmark evidence, not CI time
 limits. The previous 5x search has a noisy five-sample baseline; the cached search
-averaged 11 samples with 0.39% relative margin of error in this run.
+averaged 17 samples with 0.40% relative margin of error in this run.
 
 ## Behavioral validation
 
