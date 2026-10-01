@@ -10,10 +10,14 @@ import MultiDayPlanDisplay from "@/components/MultiDayPlanDisplay";
 import { LocationInput } from "@/components/LocationInput";
 import { useItemMappings } from "@/hooks/useItemMappings";
 import { useGearUp } from "@/hooks/useGearUp";
+import { useUserId } from "@/hooks/useUserId";
+import { useWebMCPTools } from "@/hooks/useWebMCPTools";
 import { ACTIVITIES } from "@/data/activities";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const HomeContent = () => {
+  // #185/#186 supply the real tools once the shared outing action is ready.
+  useWebMCPTools([], useUserId() ?? "signed-out");
   const {
     activity,
     setActivity,

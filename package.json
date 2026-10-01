@@ -11,6 +11,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
+    "test:webmcp": "node scripts/webmcp-smoke.mjs",
     "knip": "knip"
   },
   "dependencies": {
