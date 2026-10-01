@@ -295,6 +295,7 @@ function LayerGroup({
  * Each item is tappable (to open picker) and swipeable (to remove).
  * Items can be dragged between layer types via the grip handle.
  * Includes an "Add" button per layer type.
+ * Read-only layers show just the filled layer types, with no controls.
  */
 export function LayerItems({
   layers,
@@ -406,6 +407,7 @@ export function LayerItems({
     <>
       {layerTypes.map((layerType) => {
         const items = getDisplayItems(layers[layerType] ?? [], layerType);
+        if (readOnly && items.length === 0) return null;
         const otherPhaseItemsForType = otherPhaseLayers ? (otherPhaseLayers[layerType] ?? []) : undefined;
         const isDropTarget = drag?.active === true && drag.overLayerType === layerType && drag.layerType !== layerType;
 

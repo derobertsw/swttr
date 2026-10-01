@@ -18,6 +18,7 @@ interface BodyPartSectionProps {
   itemMappings?: Map<string, string>;
   defaultCollapsed?: boolean;
   colorScheme?: "climb" | "descent";
+  /** General guidance: no editing controls, and only the slots it fills. */
   readOnly?: boolean;
   otherPhaseLayers?: LayerSet;
   syncLabel?: string;
@@ -141,7 +142,9 @@ export function BodyPartSection({
         <div className="overflow-hidden">
           <div className="pt-2.5">
             {!hasContent && (
-              <p className="mb-3 text-sm text-slate-700">{getEmptyStateMessage(bodyPart)}</p>
+              <p className={cn("text-sm text-slate-700", !readOnly && "mb-3")}>
+                {readOnly ? "Nothing needed here at this temperature." : getEmptyStateMessage(bodyPart)}
+              </p>
             )}
             <ul className="space-y-3" style={{ listStyle: "none", padding: 0, margin: 0 }}>
               <LayerItems
