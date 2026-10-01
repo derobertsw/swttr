@@ -171,8 +171,8 @@ describe("LayerDisplay", () => {
     });
   });
 
-  describe("empty layers", () => {
-    it("should show add link when all layers are empty", () => {
+  describe("general guidance is read-only", () => {
+    it("says a body area needs nothing when the general guide leaves it empty", () => {
       const emptyRecommendation = {
         torso: { base: [], outer: [] },
         legs: { base: [], outer: [] },
@@ -182,42 +182,14 @@ describe("LayerDisplay", () => {
 
       render(<LayerDisplay recommendation={emptyRecommendation} temperature={25} windspeed={10} />);
 
-      // Should show empty state messages for each body part
-      expect(screen.getByText("Add torso layers for core warmth")).toBeInTheDocument();
-      expect(screen.getByText("Your legs need protection in these conditions")).toBeInTheDocument();
-      expect(screen.getByText("No hand insulation selected")).toBeInTheDocument();
-      expect(screen.getByText("Head and neck are exposed to the elements")).toBeInTheDocument();
+      expect(screen.getAllByText("Nothing needed here at this temperature.")).toHaveLength(4);
+      expect(screen.queryByText("Add torso layers for core warmth")).not.toBeInTheDocument();
+      expect(screen.queryByText("Base")).not.toBeInTheDocument();
     });
 
-    it("should show mid layer group with add button when torso mid layer is not present", () => {
+    it("lists only the layer types the general guide fills", () => {
       const noMidRecommendation = {
-        torso: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
-        legs: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
-        hands: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
-        headNeck: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
-      };
-
-      render(<LayerDisplay recommendation={noMidRecommendation} temperature={25} windspeed={10} />);
-      expect(screen.getAllByText("Mid").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("Add mid").length).toBeGreaterThan(0);
-    });
-
-    it("should show mid layer group with add button when torso mid layer is an empty array", () => {
-      const emptyMidRecommendation = {
         torso: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
-        legs: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
-        hands: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
-        headNeck: { base: [{ name: "Base layer" }], mid: [], outer: [{ name: "Outer layer" }] },
-      };
-
-      render(<LayerDisplay recommendation={emptyMidRecommendation} temperature={25} windspeed={10} />);
-      expect(screen.getAllByText("Mid").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("Add mid").length).toBeGreaterThan(0);
-    });
-
-    it("should show add buttons for each layer type when empty", () => {
-      const noMidRecommendation = {
-        torso: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
         legs: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
         hands: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
         headNeck: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
@@ -225,9 +197,20 @@ describe("LayerDisplay", () => {
 
       render(<LayerDisplay recommendation={noMidRecommendation} temperature={25} windspeed={10} />);
 
-      // Should have add buttons for each layer type (base, mid, outer per body part)
-      const addButtons = screen.getAllByText(/^Add (base|mid|outer)$/);
-      expect(addButtons.length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Base")).toHaveLength(4);
+      expect(screen.getAllByText("Outer")).toHaveLength(4);
+      expect(screen.queryByText("Mid")).not.toBeInTheDocument();
+    });
+
+    it("offers no way to add, remove or swap general layers", () => {
+      render(<LayerDisplay {...defaultProps} biophysicsStatus="auth_required" />);
+
+      expect(screen.queryByRole("button", { name: /^Add (base|mid|outer)$/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("Fleece jacket"));
+      expect(screen.queryByText("Pick catalog fleece")).not.toBeInTheDocument();
+      expect(screen.getByText("Fleece jacket")).toBeInTheDocument();
     });
   });
 
@@ -433,6 +416,19 @@ describe("LayerDisplay", () => {
       warnings: [],
       guidance: ["Layer up for the chairlift"],
     };
+
+    it("offers a client-side route to the wardrobe after picking an item not in it", () => {
+      render(<LayerDisplay recommendation={null} temperature={15} windspeed={10} biophysicsData={mockBiophysicsData} />);
+      const legs = screen.getByRole("button", { name: /legs/i }).parentElement!;
+      fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
+      fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+      expect(within(legs).getByText("Catalog fleece")).toBeInTheDocument();
+      const action = vi.mocked(toast.info).mock.lastCall?.[1]?.action as { label: string; onClick: () => void };
+      expect(action.label).toBe("Go to Wardrobe");
+      action.onClick();
+      expect(mockPush).toHaveBeenCalledWith("/wardrobe");
+    });
 
     it("should render correctly when recommendation is null but biophysicsData exists", () => {
       render(
@@ -1016,27 +1012,6 @@ describe("LayerDisplay", () => {
         expect(screen.getByRole("heading", { name: "Add gear for Running layers" })).toBeInTheDocument();
         expect(screen.getByRole("link", { name: /add gear/i })).toHaveAttribute("href", "/wardrobe");
       });
-    });
-  });
-
-  describe("layer picker", () => {
-    it("offers a client-side route to the wardrobe after picking an item not in it", () => {
-      const noMidRecommendation = {
-        torso: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
-        legs: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
-        hands: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
-        headNeck: { base: [{ name: "Base layer" }], outer: [{ name: "Outer layer" }] },
-      };
-
-      render(<LayerDisplay recommendation={noMidRecommendation} temperature={25} windspeed={10} />);
-      fireEvent.click(screen.getAllByText("Add mid")[0]);
-      fireEvent.click(screen.getByText("Pick catalog fleece"));
-
-      expect(screen.getByText("Catalog fleece")).toBeInTheDocument();
-      const action = vi.mocked(toast.info).mock.lastCall?.[1]?.action as { label: string; onClick: () => void };
-      expect(action.label).toBe("Go to Wardrobe");
-      action.onClick();
-      expect(mockPush).toHaveBeenCalledWith("/wardrobe");
     });
   });
 });
