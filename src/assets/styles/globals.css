@@ -30,6 +30,13 @@
   letter-spacing: 0.16em;
 }
 
+/* Scrolling a focused control into view clears the fixed mobile tab bar. */
+@media (max-width: 767px) {
+  html:has([data-mobile-tab-bar]) {
+    scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+}
+
 @supports (-webkit-touch-callout: none) {
   body {
     font-family: var(--font-sans-ios);
