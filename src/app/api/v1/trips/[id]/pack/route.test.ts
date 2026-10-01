@@ -139,6 +139,23 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     expect(data.packingList.extras).toEqual(["Removable mid-layer for daytime swings"]);
   });
 
+  it("leaves out hours with a missing value rather than pack for zero", async () => {
+    mockTrip(["2026-10-08"]);
+    // Near the end of its window Open-Meteo returns null for some hours.
+    const forecast = forecastFixture("America/New_York", "2026-10-08T04:00Z", 24, () => -4);
+    forecast.hourly.temperature_2m[6] = null as unknown as number; // 6am
+    forecast.hourly.precipitation_probability[7] = null as unknown as number; // 7am
+    forecast.hourly.wind_speed_10m[8] = null as unknown as number; // 8am
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(forecast) });
+
+    const response = await getPack();
+
+    expect(response.status).toBe(200);
+    const [day] = vi.mocked(packingList.buildPackingListFromDays).mock.calls[0][0];
+    expect(day.baseline).toMatchObject({ minTemp: 49, maxWindSpeed: 0, maxPrecipProbability: 0 });
+    expect(day.dayparts[0]).toMatchObject({ id: "morning", minTemp: 49 });
+  });
+
   it.each([undefined, "Mars/Olympus"])("doesn't pack using UTC when the forecast time zone is %s", async (timezone) => {
     mockTrip(["2026-10-08"]);
     const fixture = forecastFixture("America/New_York", "2026-10-08T04:00Z", 24, () => -4);
