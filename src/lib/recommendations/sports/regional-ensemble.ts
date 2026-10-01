@@ -1,63 +1,118 @@
-/**
- * Ensemble builder shared by alpine and XC skiing: compares complete
- * base + optional mid + outer outfits for each body region, and each sport
- * ranks them by its own priorities.
- */
+/** Shared regional outfit search for alpine and XC skiing. */
 import { ENSEMBLE_REGRESSION } from '@/lib/biophysics/constants';
 import type { PhaseTargets } from '../thermal-targets';
 import type { CategorizedGarments, GarmentRow } from '../types';
 
-type Region = 'torso' | 'arms' | 'legs';
 type Layer = 'base' | 'mid' | 'outer';
-const REGIONS: Region[] = ['torso', 'arms', 'legs'];
+const TORSO = 1;
+const ARMS = 2;
+const LEGS = 4;
 const EPSILON = 1e-6;
 
-function covers(garment: GarmentRow, region: Region): boolean {
-  return garment[`covers_${region}`];
+interface OutfitTotals {
+  baseMask: number;
+  outerMask: number;
+  waterproofMask: number;
+  torsoClo: number;
+  armsClo: number;
+  legsClo: number;
+  breathability: number;
+  unbreathable: number;
+  count: number;
 }
 
-/**
- * Bibs cover the torso but sit under a jacket, so they fill only the legs
- * slots. One-piece suits also cover the arms and fill every region's slots.
- */
-function occupies(garment: GarmentRow, region: Region): boolean {
-  if (region === 'torso' && garment.covers_legs && !garment.covers_arms) return false;
-  return covers(garment, region);
+interface GarmentFeatures extends OutfitTotals {
+  garment: GarmentRow;
+  layer: Layer;
+  occupancy: number;
+  puffy: boolean;
+  acceptsPuffy: boolean;
 }
 
-export function layer(garment: GarmentRow): Layer {
+interface OutfitRankInput {
+  missingBase: number;
+  missingOuter: number;
+  missingWaterproof: number;
+  excess: number;
+  deficit: number;
+  surplus: number;
+  count: number;
+  breathability: number;
+  unbreathable: number;
+}
+
+interface SearchOptions {
+  puffyFitsUnder: (outer: GarmentRow) => boolean;
+  rank: (outfit: OutfitRankInput) => number[];
+  breathableFrom?: Record<Layer, number>;
+}
+
+const EMPTY: OutfitTotals = {
+  baseMask: 0, outerMask: 0, waterproofMask: 0,
+  torsoClo: 0, armsClo: 0, legsClo: 0,
+  breathability: 0, unbreathable: 0, count: 0,
+};
+
+function layer(garment: GarmentRow): Layer {
   if (garment.category === 'base_layer') return 'base';
-  if (['hard_shell', 'soft_shell', 'windbreaker', 'outer_insulated'].includes(garment.category)) {
-    return 'outer';
-  }
+  if (['hard_shell', 'soft_shell', 'windbreaker', 'outer_insulated'].includes(garment.category)) return 'outer';
   return 'mid';
 }
 
-function regionalClo(ensemble: GarmentRow[], region: Region): number {
-  const sum = ensemble.reduce((total, garment) => {
-    if (!covers(garment, region)) return total;
-    const thermal = garment.garment_thermal_properties;
-    // Match ensemble scoring: whole-body clo is not regional insulation.
-    return total + (thermal?.[`rcl_${region}`] ?? 0);
-  }, 0);
-  const key = region === 'arms' ? 'arm' : region === 'legs' ? 'leg' : region;
-  return sum * ENSEMBLE_REGRESSION.thermal[key].coef;
+function features(garment: GarmentRow, options: SearchOptions): GarmentFeatures {
+  const slot = layer(garment);
+  // Bibs insulate the torso but sit underneath its jacket, occupying only leg slots.
+  const occupancy = (garment.covers_torso && !(garment.covers_legs && !garment.covers_arms) ? TORSO : 0) |
+    (garment.covers_arms ? ARMS : 0) | (garment.covers_legs ? LEGS : 0);
+  const thermal = garment.garment_thermal_properties;
+  const protection = garment.garment_protection;
+  const outerMask = slot === 'outer' ? occupancy : 0;
+  const waterproof = protection?.waterproof_rating === 'waterproof' || (protection?.waterproof_mm ?? 0) > 0;
+  const breathability = thermal?.evap_potential ?? 0;
+  return {
+    garment, layer: slot, occupancy,
+    baseMask: slot === 'base' ? occupancy : 0,
+    outerMask,
+    waterproofMask: waterproof ? outerMask : 0,
+    torsoClo: garment.covers_torso ? thermal?.rcl_torso ?? 0 : 0,
+    armsClo: garment.covers_arms ? thermal?.rcl_arms ?? 0 : 0,
+    legsClo: garment.covers_legs ? thermal?.rcl_legs ?? 0 : 0,
+    breathability,
+    unbreathable: options.breathableFrom && breathability < options.breathableFrom[slot] ? 1 : 0,
+    count: 1,
+    puffy: garment.category === 'insulation_down' || garment.category === 'insulation_synthetic',
+    acceptsPuffy: slot === 'outer' && options.puffyFitsUnder(garment),
+  };
 }
 
-function isWearable(ensemble: GarmentRow[], puffyFitsUnder: (outer: GarmentRow) => boolean): boolean {
-  if (new Set(ensemble.map((g) => g.id)).size !== ensemble.length) return false;
+/** The slot, identity and puffy-pairing rules are all pairwise. */
+function compatible(a: GarmentFeatures | undefined, b: GarmentFeatures | undefined): boolean {
+  if (!a || !b) return true;
+  if (a.garment.id === b.garment.id) return false;
+  if (!(a.occupancy & b.occupancy)) return true;
+  if (a.layer === b.layer) return false;
+  return !(a.puffy && b.layer === 'outer' && !b.acceptsPuffy) &&
+    !(b.puffy && a.layer === 'outer' && !a.acceptsPuffy);
+}
 
-  return REGIONS.every((region) => {
-    const garments = ensemble.filter((g) => occupies(g, region));
-    // An item spanning regions occupies its slot in every region it fills.
-    for (const slot of ['base', 'mid', 'outer'] as const) {
-      if (garments.filter((g) => layer(g) === slot).length > 1) return false;
-    }
-    const mid = garments.find((g) => layer(g) === 'mid');
-    const outer = garments.find((g) => layer(g) === 'outer');
-    const puffy = mid?.category === 'insulation_down' || mid?.category === 'insulation_synthetic';
-    return !puffy || !outer || puffyFitsUnder(outer);
-  });
+/** Add in dressing order, preserving the previous search's floating-point sums. */
+function extend(prefix: OutfitTotals, item: GarmentFeatures | undefined): OutfitTotals {
+  if (!item) return prefix;
+  return {
+    baseMask: prefix.baseMask | item.baseMask,
+    outerMask: prefix.outerMask | item.outerMask,
+    waterproofMask: prefix.waterproofMask | item.waterproofMask,
+    torsoClo: prefix.torsoClo + item.torsoClo,
+    armsClo: prefix.armsClo + item.armsClo,
+    legsClo: prefix.legsClo + item.legsClo,
+    breathability: prefix.breathability + item.breathability,
+    unbreathable: prefix.unbreathable + item.unbreathable,
+    count: prefix.count + 1,
+  };
+}
+
+function missing(mask: number, region: number): number {
+  return region === LEGS ? Number(!(mask & LEGS)) : Number(!(mask & TORSO)) + Number(!(mask & ARMS));
 }
 
 function isBetter(rank: number[], best: number[]): boolean {
@@ -67,76 +122,63 @@ function isBetter(rank: number[], best: number[]): boolean {
   return false;
 }
 
-export function evapPotential(garment: GarmentRow): number {
-  return garment.garment_thermal_properties?.evap_potential ?? 0;
-}
-
-/** How many of `regions` lack a `slot` layer, counting only garments that pass `accept`. */
-export function missingLayers(
-  outfit: GarmentRow[],
-  regions: Region[],
-  slot: Layer,
-  accept: (garment: GarmentRow) => boolean = () => true
-): number {
-  return regions.filter((r) => !outfit.some((g) => occupies(g, r) && layer(g) === slot && accept(g))).length;
-}
-
 /**
- * Regional warmth against the min–neutral band, in the units ensemble scoring
- * uses: `deficit` below the minimum and `surplus` above it in the regions
- * being scored, and `excess` above the neutral target in any region.
- */
-export function targetFit(outfit: GarmentRow[], targets: PhaseTargets['regional'], scoredRegions: Region[]) {
-  const clo = Object.fromEntries(REGIONS.map((r) => [r, regionalClo(outfit, r)])) as Record<Region, number>;
-  return {
-    excess: REGIONS.reduce((sum, r) => sum + Math.max(0, clo[r] - targets.neutral[r]), 0),
-    deficit: scoredRegions.reduce((sum, r) => sum + Math.max(0, targets.min[r] - clo[r]), 0),
-    surplus: scoredRegions.reduce((sum, r) => sum + Math.max(0, clo[r] - targets.min[r]), 0),
-  };
-}
-
-/**
- * Dress the torso (scored together with the arms), then the legs. Each step
- * tries every wearable base + optional mid + optional outer on top of the
- * layers already chosen and keeps the outfit with the lowest `rank`, compared
- * element by element. Allows at most one item per slot in each region it
- * fills, so insulated outerwear takes the outer slot and no shell goes over
- * it, and a puffy mid only under an outer that `puffyFitsUnder` accepts.
- * Returns the garments in dressing order.
+ * Dress torso/arms, then legs, comparing wearable base + optional mid + outer
+ * combinations. Cache garment features and the prefix/base/mid sums; only
+ * compute the outer contribution and rank in the innermost loop. Allocate
+ * garment arrays only for winning outfits, keeping enumeration and ties intact.
  */
 export function buildRegionalEnsemble(
   categorized: CategorizedGarments,
-  puffyFitsUnder: (outer: GarmentRow) => boolean,
-  rank: (outfit: GarmentRow[], scoredRegions: Region[]) => number[]
+  targets: PhaseTargets['regional'],
+  options: SearchOptions
 ): GarmentRow[] {
-  const pools: Record<Layer, GarmentRow[]> = {
-    base: categorized.baseLayers,
-    mid: [...categorized.midLayers, ...categorized.insulation.filter((g) => g.category !== 'outer_insulated')],
-    outer: [...categorized.shells, ...categorized.insulation.filter((g) => g.category === 'outer_insulated')],
+  const pools: Record<Layer, GarmentFeatures[]> = {
+    base: categorized.baseLayers.map((g) => features(g, options)),
+    mid: [...categorized.midLayers, ...categorized.insulation.filter((g) => g.category !== 'outer_insulated')]
+      .map((g) => features(g, options)),
+    outer: [...categorized.shells, ...categorized.insulation.filter((g) => g.category === 'outer_insulated')]
+      .map((g) => features(g, options)),
   };
-  let ensemble: GarmentRow[] = [];
+  let ensemble: GarmentFeatures[] = [];
 
-  for (const region of ['torso', 'legs'] as const) {
-    const scoredRegions: Region[] = region === 'torso' ? ['torso', 'arms'] : ['legs'];
-    const options = (slot: Layer): Array<GarmentRow | undefined> => [
+  for (const region of [TORSO, LEGS]) {
+    const prefix = ensemble.reduce(extend, EMPTY);
+    const choices = (slot: Layer): Array<GarmentFeatures | undefined> => [
       undefined,
-      ...pools[slot].filter((g) => occupies(g, region) && isWearable([...ensemble, g], puffyFitsUnder)),
+      ...pools[slot].filter((g) => (g.occupancy & region) && ensemble.every((chosen) => compatible(chosen, g))),
     ];
-    const bases = options('base');
-    const mids = options('mid');
-    const outers = options('outer');
+    const bases = choices('base');
+    const mids = choices('mid');
+    const outers = choices('outer');
     let best = ensemble;
     let bestRank = [Infinity];
 
     for (const base of bases) {
+      const withBase = extend(prefix, base);
       for (const mid of mids) {
+        if (!compatible(base, mid)) continue;
+        const partial = extend(withBase, mid);
         for (const outer of outers) {
-          const candidate = [...ensemble, ...[base, mid, outer].filter((g) => g !== undefined)];
-          if (!isWearable(candidate, puffyFitsUnder)) continue;
-
-          const candidateRank = rank(candidate, scoredRegions);
+          if (!compatible(base, outer) || !compatible(mid, outer)) continue;
+          const torso = (partial.torsoClo + (outer?.torsoClo ?? 0)) * ENSEMBLE_REGRESSION.thermal.torso.coef;
+          const arms = (partial.armsClo + (outer?.armsClo ?? 0)) * ENSEMBLE_REGRESSION.thermal.arm.coef;
+          const legs = (partial.legsClo + (outer?.legsClo ?? 0)) * ENSEMBLE_REGRESSION.thermal.leg.coef;
+          const candidateRank = options.rank({
+            missingBase: missing(partial.baseMask | (outer?.baseMask ?? 0), region),
+            missingOuter: missing(partial.outerMask | (outer?.outerMask ?? 0), region),
+            missingWaterproof: missing(partial.waterproofMask | (outer?.waterproofMask ?? 0), region),
+            excess: Math.max(0, torso - targets.neutral.torso) + Math.max(0, arms - targets.neutral.arms) + Math.max(0, legs - targets.neutral.legs),
+            deficit: region === LEGS ? Math.max(0, targets.min.legs - legs) :
+              Math.max(0, targets.min.torso - torso) + Math.max(0, targets.min.arms - arms),
+            surplus: region === LEGS ? Math.max(0, legs - targets.min.legs) :
+              Math.max(0, torso - targets.min.torso) + Math.max(0, arms - targets.min.arms),
+            count: partial.count + (outer ? 1 : 0),
+            breathability: partial.breathability + (outer?.breathability ?? 0),
+            unbreathable: partial.unbreathable + (outer?.unbreathable ?? 0),
+          });
           if (isBetter(candidateRank, bestRank)) {
-            best = candidate;
+            best = [...ensemble, ...[base, mid, outer].filter((g) => g !== undefined)];
             bestRank = candidateRank;
           }
         }
@@ -145,7 +187,6 @@ export function buildRegionalEnsemble(
     ensemble = best;
   }
 
-  // Return conventional dressing order, including multi-region items once.
   const order = { base: 0, mid: 1, outer: 2 };
-  return ensemble.sort((a, b) => order[layer(a)] - order[layer(b)]);
+  return ensemble.sort((a, b) => order[a.layer] - order[b.layer]).map((g) => g.garment);
 }
