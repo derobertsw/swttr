@@ -24,6 +24,10 @@ import { logWarn } from "@/lib/logger";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
 
+function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boolean {
+  return b !== null && a.latitude === b.latitude && a.longitude === b.longitude;
+}
+
 /**
  * State and actions for the home page's Gear Up flow: pick an activity and a
  * place (searched for, or the device's own location when asked), get weather
@@ -139,11 +143,12 @@ export function useGearUp() {
         // Single day: layers for the forecast hour the outing starts, read on the place's clock.
         await recommendAt(isCurrent, locationSearch.selectedLocation, `${format(state.date, "yyyy-MM-dd")}T${state.time}`);
       } else {
+        const planLocation = locationSearch.selectedLocation;
         try {
           const result = await fetchPlanAhead({
             activity,
             sensitivity,
-            location: locationSearch.selectedLocation,
+            location: planLocation,
             date: state.date,
             time: state.time,
             durationDays: state.durationDays,
@@ -154,7 +159,7 @@ export function useGearUp() {
           if (!isCurrent()) return;
           if (error instanceof PlanAheadError && error.field === "startDate") {
             // Shown on the start date, which is what needs to change.
-            dispatch({ type: "START_DATE_INVALID", error: error.message });
+            dispatch({ type: "START_DATE_INVALID", error: error.message, location: planLocation });
           } else {
             toast.error(error instanceof PlanAheadError ? error.message : "Couldn't build the plan. Try again.");
             dispatch({ type: "SUBMIT_ERROR" });
@@ -285,7 +290,10 @@ export function useGearUp() {
     setDurationDays,
     loading: state.loading,
     showPlaceError: state.showPlaceError,
-    startDateError: state.startDateError,
+    // Only for the place it was found at: another place's forecast may cover the dates.
+    startDateError: state.startDateError && isSamePlace(state.startDateError.location, locationSearch.selectedLocation)
+      ? state.startDateError.message
+      : null,
     locationStatus,
     placeInputRef,
     biophysicsData: state.biophysicsData,

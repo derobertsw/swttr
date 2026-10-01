@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addDaysToDateString, describeForecastCoverage, FORECAST_DAYS } from "@/lib/forecastRange";
 import { formatZonedIsoTime, formatZonedTime, isLocalDateTime, isTimeZone, zonedTimeToInstant } from "@/lib/timeZones";
+import { parseOpenMeteoHourly } from "@/lib/openMeteoHourly";
 import type { PrecipitationType } from "@/types/weather";
 
 const HOUR_SECONDS = 3600;
@@ -29,6 +30,29 @@ function decodePrecipitation(weatherCode: number): { precipitation: boolean; pre
 /** The YYYY-MM-DD date an hour starts on, on the place's calendar. */
 function forecastDate(hourStart: number, timeZone: string): string {
   return formatZonedTime(hourStart * 1000, timeZone).slice(0, 10);
+}
+
+/**
+ * Open-Meteo's hourly forecast covering the local dates `startDate` to
+ * `endDate`. It picks hours by date at today's UTC offset, so after a clock
+ * change a date's first or last hour falls on the adjacent date in its frame.
+ * Ask for a day either side. Where that reaches past the range Open-Meteo
+ * serves (it answers 400), drop the day after, as on its last forecast day,
+ * and then the day before too.
+ */
+async function fetchHourlyRange(lat: string, lon: string, startDate: string, endDate: string) {
+  const dayBefore = addDaysToDateString(startDate, -1);
+  const ranges = [
+    [dayBefore, addDaysToDateString(endDate, 1)],
+    [dayBefore, endDate],
+    [startDate, endDate],
+  ];
+  for (const [from, to] of ranges) {
+    const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&start_date=${from}&end_date=${to}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`);
+    if (response.ok) return response.json();
+    if (response.status !== 400) break;
+  }
+  throw new Error("Failed to fetch weather data");
 }
 
 /**
@@ -131,43 +155,14 @@ export async function GET(request: NextRequest) {
       }
 
       const endDate = addDaysToDateString(startDate, parsedDays - 1);
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&start_date=${startDate}&end_date=${endDate}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch weather data");
-      }
-
-      const data = await response.json();
+      const data = await fetchHourlyRange(lat, lon, startDate, endDate);
       const timeZone: unknown = data?.timezone;
       if (!isTimeZone(timeZone)) {
         throw new Error("Forecast has no valid time zone");
       }
-      const hourlyTime: number[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
-      const hourlyTemps: number[] = Array.isArray(data?.hourly?.temperature_2m) ? data.hourly.temperature_2m : [];
-      const hourlyWinds: number[] = Array.isArray(data?.hourly?.wind_speed_10m) ? data.hourly.wind_speed_10m : [];
-      const hourlyPrecip: number[] = Array.isArray(data?.hourly?.precipitation_probability) ? data.hourly.precipitation_probability : [];
-
-      const hourly = hourlyTime
-        .map((time: number, index: number) => ({
-          time,
-          temperature: Math.round(Number(hourlyTemps[index] ?? 0)),
-          windSpeed: Math.round(Number(hourlyWinds[index] ?? 0)),
-          precipitationProbability: Math.round(Number(hourlyPrecip[index] ?? 0)),
-        }))
-        .filter((entry) => {
-          return (
-            Number.isFinite(entry.time) &&
-            Number.isFinite(entry.temperature) &&
-            Number.isFinite(entry.windSpeed) &&
-            Number.isFinite(entry.precipitationProbability)
-          );
-        })
-        // Open-Meteo uses today's offset for its local labels. Use the offset
-        // at each instant instead, so the stop's clock stays right across DST.
-        .map((entry) => ({ ...entry, time: formatZonedTime(entry.time * 1000, timeZone) }))
-        // A fixed-offset response can spill into an adjacent local date after
-        // a clock change. Only return dates in the requested local window.
+      const hourly = parseOpenMeteoHourly(data, timeZone)
+        // The response includes hours from the adjacent dates. Only return
+        // dates in the requested local window.
         .filter((entry) => entry.time.slice(0, 10) >= startDate && entry.time.slice(0, 10) <= endDate);
 
       return NextResponse.json({

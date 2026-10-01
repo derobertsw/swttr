@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
-import { formatZonedTime, isTimeZone } from "@/lib/timeZones";
+import { isTimeZone } from "@/lib/timeZones";
+import { parseOpenMeteoHourly } from "@/lib/openMeteoHourly";
 import { FORECAST_DAYS, planOutsideForecast } from "@/lib/forecastRange";
 import { Recommendation } from "@/types/recommendations";
 import { TemperatureSensitivity } from "@/types/preferences";
-import { ForecastHour } from "@/types/plan";
 import layerRecommendations from "@/data/layerRecommendations.json";
 
 function isValidDateString(value: string): boolean {
@@ -103,34 +103,11 @@ export async function POST(request: NextRequest) {
         { status: 502 }
       );
     }
-    const hourlyTime: number[] = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
-    const hourlyTemps: number[] = Array.isArray(data?.hourly?.temperature_2m) ? data.hourly.temperature_2m : [];
-    const hourlyWinds: number[] = Array.isArray(data?.hourly?.wind_speed_10m) ? data.hourly.wind_speed_10m : [];
-    const hourlyPrecip: number[] = Array.isArray(data?.hourly?.precipitation_probability) ? data.hourly.precipitation_probability : [];
+    const hourly = parseOpenMeteoHourly(data, timeZone);
 
-    const hourly: ForecastHour[] = hourlyTime
-      .map((time: number, index: number) => ({
-        time,
-        temperature: Math.round(Number(hourlyTemps[index] ?? 0)),
-        windSpeed: Math.round(Number(hourlyWinds[index] ?? 0)),
-        precipitationProbability: Math.round(Number(hourlyPrecip[index] ?? 0)),
-      }))
-      .filter((entry) => (
-        Number.isFinite(entry.time) &&
-        Number.isFinite(entry.temperature) &&
-        Number.isFinite(entry.windSpeed) &&
-        Number.isFinite(entry.precipitationProbability)
-      ))
-      // Label each hour by the local clock then. Open-Meteo's own labels use
-      // today's UTC offset, which is an hour out after a daylight saving change.
-      .map((entry) => ({ ...entry, time: formatZonedTime(entry.time * 1000, timeZone) }));
-
-    // The dates the forecast covers, on the place's calendar: those with a temperature.
-    const forecastDates = hourlyTime.flatMap((start, index) =>
-      typeof start === "number" && typeof hourlyTemps[index] === "number"
-        ? [formatZonedTime(start * 1000, timeZone).slice(0, 10)]
-        : []
-    );
+    // The dates the forecast covers, on the place's calendar: those with a
+    // complete hour. Hours missing a value near the window's end don't count.
+    const forecastDates = hourly.map((hour) => hour.time.slice(0, 10));
     if (forecastDates.length === 0) {
       return NextResponse.json(
         { error: "Failed to fetch weather data" },
