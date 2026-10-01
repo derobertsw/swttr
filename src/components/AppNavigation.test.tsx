@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { MobileTabBar } from "./AppNavigation";
+import { MobileTabBar, isNavItemActive } from "./AppNavigation";
 import { AppSidebar } from "./AppSidebar";
 
 let mockPathname = "/";
@@ -38,10 +38,12 @@ describe("AppNavigation", () => {
   });
 
   describe("rendering", () => {
-    it("renders Trips and Wardrobe tabs", () => {
+    it("renders Gear up, Trips and Wardrobe tabs in that order", () => {
       render(<MobileTabBar />);
-      expect(screen.getByRole("link", { name: "Trips" })).toHaveAttribute("href", "/trips");
-      expect(screen.getByRole("link", { name: "Wardrobe" })).toHaveAttribute("href", "/wardrobe");
+      const nav = screen.getByRole("navigation", { name: "Primary" });
+      const links = within(nav).getAllByRole("link");
+      expect(links.map((link) => link.textContent)).toEqual(["Gear up", "Trips", "Wardrobe"]);
+      expect(links.map((link) => link.getAttribute("href"))).toEqual(["/", "/trips", "/wardrobe"]);
     });
 
     it("does not render a Plan tab", () => {
@@ -49,7 +51,8 @@ describe("AppNavigation", () => {
       expect(screen.queryAllByText("Plan")).toHaveLength(0);
     });
 
-    it("does not render a Gear Up button", () => {
+    // Navigating to Gear up must not submit a recommendation.
+    it("makes Gear up a link, not a submit button", () => {
       render(<MobileTabBar />);
       expect(screen.queryByRole("button", { name: /gear up/i })).toBeNull();
       expect(screen.queryByRole("button", { name: /start recommendation/i })).toBeNull();
@@ -69,38 +72,80 @@ describe("AppNavigation", () => {
     });
   });
 
-  describe("Trips tab active state", () => {
-    it("marks Trips active on /trips", () => {
-      mockPathname = "/trips";
+  describe("active tab", () => {
+    it.each([
+      ["/", "Gear up"],
+      ["/trips", "Trips"],
+      ["/trips/abc-123", "Trips"],
+      ["/trips/abc-123/days/2026-01-02", "Trips"],
+      ["/trips/new", "Trips"],
+      ["/wardrobe", "Wardrobe"],
+    ])("marks only %s's tab, %s, as the current page", (pathname, label) => {
+      mockPathname = pathname;
       render(<MobileTabBar />);
-      expect(screen.getByRole("link", { name: "Trips" })).toHaveAttribute("aria-current", "page");
-      expect(screen.getByRole("link", { name: "Wardrobe" })).not.toHaveAttribute("aria-current");
+      const current = screen
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("aria-current") === "page");
+      expect(current.map((link) => link.textContent)).toEqual([label]);
     });
 
-    it("marks Trips active on nested trip routes", () => {
-      mockPathname = "/trips/abc-123";
+    it("marks no tab on pages outside the three destinations", () => {
+      mockPathname = "/faq";
       render(<MobileTabBar />);
-      expect(screen.getByRole("link", { name: "Trips" })).toHaveAttribute("aria-current", "page");
-    });
-
-    it("marks Wardrobe active on /wardrobe", () => {
-      mockPathname = "/wardrobe";
-      render(<MobileTabBar />);
-      expect(screen.getByRole("link", { name: "Wardrobe" })).toHaveAttribute("aria-current", "page");
-      expect(screen.getByRole("link", { name: "Trips" })).not.toHaveAttribute("aria-current");
+      for (const link of screen.getAllByRole("link")) {
+        expect(link).not.toHaveAttribute("aria-current");
+      }
     });
   });
 
-  // Desktop has no bottom dock, so the sidebar is its only route to these pages.
+  describe("isNavItemActive", () => {
+    it("matches Gear up only at the root", () => {
+      expect(isNavItemActive("/", "/")).toBe(true);
+      expect(isNavItemActive("/", "/trips")).toBe(false);
+    });
+
+    it("does not treat a shared prefix as a nested route", () => {
+      expect(isNavItemActive("/trips", "/tripsheet")).toBe(false);
+      expect(isNavItemActive("/wardrobe", "/wardrobe/items")).toBe(true);
+    });
+  });
+
   describe("desktop sidebar", () => {
-    it("links to Trips and Wardrobe", () => {
+    const renderSidebar = () =>
       render(
         <SidebarProvider>
           <AppSidebar />
         </SidebarProvider>
       );
-      expect(screen.getByRole("link", { name: "Trips" })).toHaveAttribute("href", "/trips");
-      expect(screen.getByRole("link", { name: "Wardrobe" })).toHaveAttribute("href", "/wardrobe");
+
+    it("lists Gear up, Trips and Wardrobe in its primary navigation", () => {
+      renderSidebar();
+      const nav = screen.getByRole("navigation", { name: "Primary" });
+      const links = within(nav).getAllByRole("link");
+      expect(links.map((link) => link.textContent)).toEqual(["Gear up", "Trips", "Wardrobe"]);
+      expect(links.map((link) => link.getAttribute("href"))).toEqual(["/", "/trips", "/wardrobe"]);
+    });
+
+    it("keeps Settings, FAQ and Feedback in a separate secondary navigation", () => {
+      renderSidebar();
+      const secondary = screen.getByRole("navigation", { name: "Settings and help" });
+      expect(within(secondary).getByRole("button", { name: "Settings" })).toBeInTheDocument();
+      expect(within(secondary).getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq");
+      expect(within(secondary).getByRole("link", { name: "Feedback" })).toBeInTheDocument();
+      expect(screen.queryByText("Preferences")).toBeNull();
+    });
+
+    it("highlights Trips on nested trip routes", () => {
+      mockPathname = "/trips/abc-123/pack";
+      renderSidebar();
+      const nav = screen.getByRole("navigation", { name: "Primary" });
+      expect(within(nav).getByRole("link", { name: "Trips" })).toHaveAttribute("aria-current", "page");
+      expect(within(nav).getByRole("link", { name: "Gear up" })).not.toHaveAttribute("aria-current");
+    });
+
+    it("does not use the wordmark as a page heading", () => {
+      renderSidebar();
+      expect(screen.queryByRole("heading")).toBeNull();
     });
   });
 });
