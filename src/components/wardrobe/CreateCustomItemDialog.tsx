@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Drawer,
+  DrawerBody,
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
@@ -29,7 +30,9 @@ import {
 } from "@/components/ui/select";
 import type { BodyPart, LayerType } from "@/types/wardrobe";
 import { getGenericOptions, getGenericLayerClo } from "@/data/genericLayerClo";
+import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { logError } from "@/lib/logger";
+import { cn } from "@/lib/utils";
 
 interface CreateCustomItemDialogProps {
   open: boolean;
@@ -155,19 +158,22 @@ export function CreateCustomItemDialog({
   const content = (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Body Part Selection */}
-      <div className="space-y-3">
-        <label className="block text-sm font-semibold text-slate-900">Body Part</label>
-        <div className="flex flex-wrap gap-2">
+      <div className="space-y-2">
+        <p id="custom-item-body-part" className="text-sm font-medium text-foreground">
+          Body Part
+        </p>
+        <div
+          role="group"
+          aria-labelledby="custom-item-body-part"
+          className={cn(segmentedGroupClassName, "grid-cols-2 sm:grid-cols-4")}
+        >
           {BODY_PART_OPTIONS.map((option) => (
             <button
               key={option.value}
               type="button"
+              aria-pressed={bodyPart === option.value}
               onClick={() => handleBodyPartChange(option.value)}
-              className={`rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-all ${
-                bodyPart === option.value
-                  ? "border-emerald-700 bg-emerald-700 text-white shadow-lg ring-2 ring-emerald-300 ring-offset-2"
-                  : "border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50 hover:shadow-sm"
-              }`}
+              className={segmentedItemClassName}
             >
               {option.label}
             </button>
@@ -175,22 +181,24 @@ export function CreateCustomItemDialog({
         </div>
       </div>
 
-      <div className="space-y-3">
-        <label className="block text-sm font-semibold text-slate-900">Layer Type</label>
+      <div className="space-y-2">
+        <p id="custom-item-layer-type" className="text-sm font-medium text-foreground">
+          Layer Type
+        </p>
         <Tabs value={layerType} onValueChange={(v) => handleLayerTypeChange(v as LayerType)}>
-          <TabsList className="grid w-full grid-cols-3 bg-slate-100">
-            <TabsTrigger value="base" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Base</TabsTrigger>
-            <TabsTrigger value="mid" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Mid</TabsTrigger>
-            <TabsTrigger value="outer" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Outer</TabsTrigger>
+          <TabsList aria-labelledby="custom-item-layer-type" className="grid w-full grid-cols-3">
+            <TabsTrigger value="base">Base</TabsTrigger>
+            <TabsTrigger value="mid">Mid</TabsTrigger>
+            <TabsTrigger value="outer">Outer</TabsTrigger>
           </TabsList>
 
           <TabsContent value={layerType} className="mt-5 space-y-5">
-            <div className="space-y-3">
-              <label htmlFor="insulation-level" className="block text-sm font-semibold text-slate-900">
+            <div className="space-y-2">
+              <label htmlFor="insulation-level" className="block text-sm font-medium text-foreground">
                 Insulation Level
               </label>
               <Select value={genericOption} onValueChange={setGenericOption}>
-                <SelectTrigger id="insulation-level" className="h-11 border-slate-300 bg-white">
+                <SelectTrigger id="insulation-level" className="w-full">
                   <SelectValue placeholder="Select insulation level" />
                 </SelectTrigger>
                 <SelectContent>
@@ -204,21 +212,21 @@ export function CreateCustomItemDialog({
             </div>
 
             {cloValue !== null && (
-              <div className="rounded-lg border-2 border-sky-200 bg-sky-50 p-4">
-                <div className="flex items-baseline justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Thermal Insulation</p>
-                  <p className="font-mono text-3xl font-bold text-sky-800">
+              <div className="rounded-control bg-muted p-4">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-sm font-medium text-muted-foreground">Thermal Insulation</p>
+                  <p className="font-mono text-3xl font-bold text-foreground">
                     {cloValue.toFixed(2)}
                   </p>
                 </div>
-                <p className="mt-1.5 text-xs text-sky-700">
+                <p className="mt-1.5 text-sm text-muted-foreground">
                   CLO value for {genericOption.toLowerCase()} {layerType} layer
                 </p>
               </div>
             )}
 
-            <div className="space-y-3">
-              <label htmlFor="custom-name" className="block text-sm font-semibold text-slate-900">
+            <div className="space-y-2">
+              <label htmlFor="custom-name" className="block text-sm font-medium text-foreground">
                 Custom Name
               </label>
               <Input
@@ -228,29 +236,30 @@ export function CreateCustomItemDialog({
                 placeholder="e.g., My favorite merino base layer"
                 maxLength={50}
                 required
-                className="h-11 border-slate-300 bg-white"
               />
-              <p className="text-xs text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 {customName.length}/50 characters
               </p>
             </div>
 
             {error && (
-              <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4">
-                <p className="text-sm font-medium text-red-800">{error}</p>
+              <div role="alert" className="rounded-control bg-destructive-soft p-4">
+                <p className="text-sm font-medium text-destructive">{error}</p>
               </div>
             )}
 
             <Button
               type="submit"
-              className="h-12 w-full bg-emerald-600 text-base font-semibold hover:bg-emerald-700"
-              disabled={creating || !genericOption || !customName.trim()}
+              size="lg"
+              className="w-full"
+              loading={creating}
+              disabled={!creating && (!genericOption || !customName.trim())}
             >
               {creating ? (
                 "Adding..."
               ) : (
                 <>
-                  <Plus className="mr-2 size-5" />
+                  <Plus className="size-5" />
                   Add to Wardrobe
                 </>
               )}
@@ -264,21 +273,17 @@ export function CreateCustomItemDialog({
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={handleOpenChange}>
-        <DrawerContent className="h-[90vh] rounded-t-2xl border-t-border/60 bg-background">
-          <div className="flex h-full w-full flex-col">
-            <DrawerHeader className="flex-none px-4 pb-3 pt-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="size-5 text-emerald-600" />
-                <DrawerTitle className="text-xl font-semibold">
-                  Add Custom Item
-                </DrawerTitle>
-              </div>
-              <DrawerDescription className="text-sm text-muted-foreground">
-                Create a generic item with custom name and insulation level
-              </DrawerDescription>
-            </DrawerHeader>
-            <div className="flex-1 overflow-y-auto px-4 pb-safe">{content}</div>
-          </div>
+        <DrawerContent showCloseButton className="h-[90dvh]">
+          <DrawerHeader className="pr-14 pb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-5 text-primary" />
+              <DrawerTitle>Add Custom Item</DrawerTitle>
+            </div>
+            <DrawerDescription>
+              Create a generic item with custom name and insulation level
+            </DrawerDescription>
+          </DrawerHeader>
+          <DrawerBody className="pb-6">{content}</DrawerBody>
         </DrawerContent>
       </Drawer>
     );
@@ -286,13 +291,13 @@ export function CreateCustomItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="flex h-[85vh] max-w-2xl flex-col overflow-hidden border-border/60 bg-background p-0">
-        <DialogHeader className="flex-none border-b border-border/60 px-6 py-4">
+      <DialogContent className="flex h-[85vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="flex-none border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="size-5 text-emerald-600" />
-            <DialogTitle className="text-xl font-semibold">Add Custom Item</DialogTitle>
+            <Sparkles className="size-5 text-primary" />
+            <DialogTitle>Add Custom Item</DialogTitle>
           </div>
-          <DialogDescription className="text-sm text-muted-foreground">
+          <DialogDescription>
             Create a generic item with custom name and insulation level
           </DialogDescription>
         </DialogHeader>

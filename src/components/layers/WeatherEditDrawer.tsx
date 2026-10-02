@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Clock3, Loader2, MapPin } from "lucide-react";
+import { CalendarIcon, Clock3, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/popover";
 import {
   Drawer,
+  DrawerBody,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/drawer";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { formatLocationName, useLocationSearch } from "@/hooks/useLocationSearch";
+import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { cn } from "@/lib/utils";
 import type { LocationSuggestion } from "@/types/recommendations";
 
@@ -90,7 +92,7 @@ export function WeatherEditDrawer({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="max-h-[84vh]">
+      <DrawerContent>
         <DrawerHeader className="pb-2">
           <DrawerTitle>Update Weather</DrawerTitle>
           <DrawerDescription>
@@ -98,15 +100,15 @@ export function WeatherEditDrawer({
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="flex flex-col gap-4 px-4 pb-2">
-          <div className="rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-2.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Selection Preview</p>
-            <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-slate-800">
-              <MapPin className="size-3.5 text-slate-500" />
+        <DrawerBody className="flex flex-col gap-4 pb-4">
+          <div className="rounded-control bg-muted px-3 py-2.5">
+            <p className="text-sm font-medium text-muted-foreground">Selection Preview</p>
+            <p className="mt-1 flex items-center gap-1.5 text-base font-medium text-foreground">
+              <MapPin className="size-4 text-muted-foreground" />
               {selectedLocationLabel}
             </p>
-            <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-slate-600">
-              <Clock3 className="size-3.5 text-slate-500" />
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Clock3 className="size-4" />
               {selectedTimeLabel}
             </p>
           </div>
@@ -115,7 +117,6 @@ export function WeatherEditDrawer({
             id="weather-edit-location"
             label="Location"
             placeholder="Search for a city..."
-            variant="default"
             location={locationSearch.location}
             locationQuery={locationSearch.locationQuery}
             suggestions={locationSearch.suggestions}
@@ -132,61 +133,55 @@ export function WeatherEditDrawer({
             onDismiss={locationSearch.dismiss}
           />
           {!locationSearch.selectedLocation && (
-            <p className="-mt-1 text-xs text-slate-500">
+            <p className="-mt-2 text-sm text-muted-foreground">
               Select a city to enable weather update.
             </p>
           )}
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-muted-foreground">
+            <p id="weather-edit-timing" className="text-sm font-medium text-foreground">
               Forecast timing
-            </label>
-            <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
+            </p>
+            <div
+              role="group"
+              aria-labelledby="weather-edit-timing"
+              className={cn(segmentedGroupClassName, "grid-cols-2")}
+            >
               <button
                 type="button"
+                aria-pressed={!useScheduledTime}
                 onClick={resetToNow}
-                className={cn(
-                  "rounded-md px-2 py-2 text-xs font-medium transition-colors",
-                  !useScheduledTime
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-600 hover:bg-white/70"
-                )}
+                className={segmentedItemClassName}
               >
                 Use now
               </button>
               <button
                 type="button"
+                aria-pressed={useScheduledTime}
                 onClick={() => {
                   setUseScheduledTime(true);
                   setDate((prev) => prev ?? new Date());
                 }}
-                className={cn(
-                  "rounded-md px-2 py-2 text-xs font-medium transition-colors",
-                  useScheduledTime
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-600 hover:bg-white/70"
-                )}
+                className={segmentedItemClassName}
               >
                 Pick date & time
               </button>
             </div>
             {useScheduledTime && (
               <div className="mt-1 space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
-                  Date & Time
-                </label>
-                <p className="text-xs text-slate-500">Local time at the location.</p>
+                <p className="text-sm font-medium text-foreground">Date & Time</p>
+                <p className="text-sm text-muted-foreground">Local time at the location.</p>
                 <div className="flex gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
-                          "flex-1 justify-start text-left font-normal h-10",
+                          "flex-1 justify-start text-left text-base font-normal",
                           !date && "text-muted-foreground"
                         )}
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        <CalendarIcon className="text-muted-foreground" />
                         {date ? format(date, "MMM d, yyyy") : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
@@ -199,12 +194,12 @@ export function WeatherEditDrawer({
                       />
                     </PopoverContent>
                   </Popover>
-                  <div className="w-28">
+                  <div className="w-36 shrink-0">
                     <Input
                       type="time"
                       value={time}
                       onChange={(e) => setTime(e.target.value)}
-                      className="h-10 tabular-nums"
+                      className="tabular-nums"
                       aria-label="Time"
                     />
                   </div>
@@ -212,27 +207,24 @@ export function WeatherEditDrawer({
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="sm"
-                    className="h-8 px-2 text-xs"
                     onClick={() => setQuickDate(0)}
                   >
                     Today
                   </Button>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="sm"
-                    className="h-8 px-2 text-xs"
                     onClick={() => setQuickDate(1)}
                   >
                     Tomorrow
                   </Button>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="sm"
-                    className="h-8 px-2 text-xs"
                     onClick={resetToNow}
                   >
                     Use now instead
@@ -241,9 +233,9 @@ export function WeatherEditDrawer({
               </div>
             )}
           </div>
-        </div>
+        </DrawerBody>
 
-        <DrawerFooter className="border-t border-slate-200 bg-white/95">
+        <DrawerFooter>
           <div className="flex gap-2">
             <Button
               type="button"
@@ -256,17 +248,11 @@ export function WeatherEditDrawer({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!canSubmit}
+              disabled={!canSubmit && !loading}
+              loading={loading}
               className="flex-1"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                "Apply Weather"
-              )}
+              {loading ? "Updating..." : "Apply Weather"}
             </Button>
           </div>
         </DrawerFooter>

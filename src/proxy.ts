@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 const isPublicRoute = createRouteMatcher([
   "/",
   "/faq",
+  // Design reference; 404s in production (see src/app/design/page.tsx).
+  "/design",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/trips/invite(.*)",

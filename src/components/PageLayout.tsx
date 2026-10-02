@@ -71,7 +71,7 @@ const PageLayout = ({
     <>
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-[calc(1rem_+_env(safe-area-inset-top))] focus:z-[60] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-slate-900 focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-[calc(1rem_+_env(safe-area-inset-top))] focus:z-[60] focus:rounded-control focus:bg-popover focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-popover-foreground focus:shadow-lg"
       >
         Skip to content
       </a>

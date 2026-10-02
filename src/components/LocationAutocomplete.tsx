@@ -4,16 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Loader2, MapPin } from "lucide-react";
 import { LocationSuggestion } from "@/types/recommendations";
 import { Ref, RefObject, useEffect, useRef, useState } from "react";
-import { FROSTED_INPUT_FULL, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
 import { FieldError } from "@/components/FieldError";
-
-type LocationAutocompleteVariant = "frosted" | "default";
+import { cn } from "@/lib/utils";
 
 interface LocationAutocompleteProps {
   id?: string;
   label?: string;
   placeholder?: string;
-  variant?: LocationAutocompleteVariant;
   location: string;
   locationQuery: string;
   suggestions: LocationSuggestion[];
@@ -34,7 +31,6 @@ export function LocationAutocomplete({
   id = "location",
   label,
   placeholder = "Search for a city...",
-  variant = "frosted",
   location,
   locationQuery,
   suggestions,
@@ -49,7 +45,6 @@ export function LocationAutocomplete({
   onSelectLocation,
   onDismiss,
 }: LocationAutocompleteProps) {
-  const isFrosted = variant === "frosted";
   const [activeIndex, setActiveIndex] = useState(-1);
   const [flipUp, setFlipUp] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
@@ -129,15 +124,15 @@ export function LocationAutocomplete({
   return (
     <div className="flex flex-col gap-2">
       {label && (
-        <label htmlFor={id} className={`text-sm font-medium ${isFrosted ? "text-white/80" : "text-foreground"}`}>
+        <label htmlFor={id} className="text-sm font-medium text-foreground">
           {label}
         </label>
       )}
       <div className="relative" ref={suggestionRef}>
         {isSearching ? (
-          <Loader2 className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 animate-spin ${isFrosted ? "text-white/75" : "text-muted-foreground"}`} />
+          <Loader2 className="absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
         ) : (
-          <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 ${isFrosted ? "text-white/75" : "text-muted-foreground"}`} />
+          <MapPin className="absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
         )}
         <Input
           ref={inputRef}
@@ -154,7 +149,7 @@ export function LocationAutocomplete({
           onChange={(e) => onLocationInputChange(e.target.value)}
           onFocus={onLocationFocus}
           onKeyDown={handleKeyDown}
-          className={`pl-10 h-12 ${isFrosted ? FROSTED_INPUT_FULL : ""}`}
+          className="h-12 pl-10"
           autoComplete="off"
         />
         {open && (
@@ -162,7 +157,10 @@ export function LocationAutocomplete({
             id={listboxId}
             role="listbox"
             ref={listRef}
-            className={`absolute left-0 right-0 ${flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${isFrosted ? SUGGESTIONS_DROPDOWN : "bg-popover text-popover-foreground border rounded-xl shadow-lg"} z-50 max-h-60 overflow-auto`}
+            className={cn(
+              "absolute inset-x-0 z-50 max-h-60 overflow-auto rounded-control border border-border bg-popover p-1 text-popover-foreground shadow-lg",
+              flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
+            )}
           >
             {suggestions.map((suggestion, i) => (
               <li
@@ -170,15 +168,18 @@ export function LocationAutocomplete({
                 id={optionId(i)}
                 role="option"
                 aria-selected={i === activeIndex}
-                className={`w-full px-4 py-2.5 text-left text-sm transition-colors cursor-pointer hover:bg-muted/50 ${
-                  i === activeIndex ? "bg-muted/50" : ""
-                }`}
+                className={cn(
+                  "flex min-h-11 w-full cursor-pointer items-center rounded-[calc(var(--radius)-4px)] px-3 py-2 text-left text-base transition-colors hover:bg-accent md:min-h-9 md:text-sm pointer-coarse:min-h-11",
+                  i === activeIndex && "bg-accent text-accent-foreground"
+                )}
                 onClick={() => onSelectLocation(suggestion)}
                 onMouseEnter={() => setActiveIndex(i)}
               >
-                <span className="font-medium">{suggestion.name}</span>
-                <span className="text-muted-foreground/65">
-                  {suggestion.region ? `, ${suggestion.region}` : ""}, {suggestion.country}
+                <span>
+                  <span className="font-medium">{suggestion.name}</span>
+                  <span className="text-muted-foreground">
+                    {suggestion.region ? `, ${suggestion.region}` : ""}, {suggestion.country}
+                  </span>
                 </span>
               </li>
             ))}
@@ -186,7 +187,7 @@ export function LocationAutocomplete({
         )}
       </div>
       {error && (
-        <FieldError id={errorId} variant={isFrosted ? "frosted" : "default"}>
+        <FieldError id={errorId}>
           {error}
         </FieldError>
       )}
