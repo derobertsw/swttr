@@ -88,6 +88,23 @@ describe("WeatherEditDrawer", () => {
     expect(onSubmit).toHaveBeenCalledWith(SYDNEY, "2026-10-02T07:15");
   });
 
+  it("reads the place's clock again on Apply, after the drawer stays open past midnight there", async () => {
+    // 11:30 pm on Friday, October 2 in Sydney.
+    vi.setSystemTime(new Date("2026-10-02T13:30:00Z"));
+    const { drawer, onSubmit } = renderDrawer();
+
+    await chooseSydney(drawer);
+    fireEvent.click(within(drawer).getByRole("button", { name: "Pick date & time" }));
+    fireEvent.click(within(drawer).getByRole("button", { name: "Tomorrow" }));
+    expect(within(drawer).getByText("Sat, Oct 3 at 23:00")).toBeInTheDocument();
+
+    // 12:05 am on Saturday there, with nothing rendered since.
+    vi.setSystemTime(new Date("2026-10-02T14:05:00Z"));
+    fireEvent.click(within(drawer).getByRole("button", { name: "Apply Weather" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(SYDNEY, "2026-10-04T00:00");
+  });
+
   it("marks today at the place on the calendar", async () => {
     const { drawer } = renderDrawer();
 

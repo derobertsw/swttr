@@ -51,12 +51,18 @@ export function WeatherEditDrawer({
 
   // Shortcuts and the default time read the place's clock, even when the place
   // is picked after them. Until there's a place, they read the device's.
-  const nowThere = zonedNow(locationSearch.selectedLocation?.timeZone);
-  const todayThere = nowThere.slice(0, 10);
-  const date = day
-    ? "date" in day ? day.date : toPickerDate(addDaysToDateString(todayThere, day.daysFromToday))
-    : undefined;
-  const time = chosenTime ?? `${nowThere.slice(11, 13)}:00`;
+  const readClockThere = () => {
+    const nowThere = zonedNow(locationSearch.selectedLocation?.timeZone);
+    const todayThere = nowThere.slice(0, 10);
+    return {
+      todayThere,
+      date: day
+        ? "date" in day ? day.date : toPickerDate(addDaysToDateString(todayThere, day.daysFromToday))
+        : undefined,
+      time: chosenTime ?? `${nowThere.slice(11, 13)}:00`,
+    };
+  };
+  const { todayThere, date, time } = readClockThere();
 
   const selectedLocationLabel = locationSearch.selectedLocation
     ? formatLocationName(locationSearch.selectedLocation)
@@ -72,11 +78,12 @@ export function WeatherEditDrawer({
   const handleSubmit = async () => {
     if (!locationSearch.selectedLocation) return;
 
-    // Local time at the location, wherever the device is.
+    // Local time at the location, wherever the device is. The clock is read
+    // again, since the drawer may have stayed open past the hour or midnight there.
     let localDateTime: string | undefined;
-    if (useScheduledTime && date) {
-      const dateStr = format(date, "yyyy-MM-dd");
-      localDateTime = `${dateStr}T${time}`;
+    const choice = readClockThere();
+    if (useScheduledTime && choice.date) {
+      localDateTime = `${format(choice.date, "yyyy-MM-dd")}T${choice.time}`;
     }
 
     if (await onSubmit(locationSearch.selectedLocation, localDateTime)) {
