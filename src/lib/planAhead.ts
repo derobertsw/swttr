@@ -6,6 +6,7 @@ import {
   DailyLayerPlan,
   ForecastHour,
   MultiDayLayerPlan,
+  UncoveredPlanDay,
 } from "@/types/plan";
 
 interface DaypartDefinition {
@@ -44,6 +45,11 @@ const DAYPARTS: DaypartDefinition[] = [
 function parseHour(time: string): number {
   const hour = Number.parseInt(time.slice(11, 13), 10);
   return Number.isFinite(hour) ? hour : -1;
+}
+
+/** A YYYY-MM-DD date as a day heading, e.g. "Thu, Jan 15". */
+function formatDayLabel(dayKey: string): string {
+  return format(new Date(`${dayKey}T00:00:00`), "EEE, MMM d");
 }
 
 function parseDateKey(time: string): string {
@@ -213,6 +219,7 @@ export function buildMultiDayLayerPlan({
   const dayKeySet = new Set(dayKeys);
 
   const groupedHours = new Map<string, ForecastHour[]>();
+  let firstDayHasHoursBeforeStart = false;
   for (const hour of hourlyForecast) {
     if (!hour?.time) continue;
     const dayKey = parseDateKey(hour.time);
@@ -220,7 +227,10 @@ export function buildMultiDayLayerPlan({
 
     const parsedHour = parseHour(hour.time);
     if (!isRelevantHour(parsedHour)) continue;
-    if (dayKey === dayKeys[0] && parsedHour < firstDayStartHour) continue;
+    if (dayKey === dayKeys[0] && parsedHour < firstDayStartHour) {
+      firstDayHasHoursBeforeStart = true;
+      continue;
+    }
 
     const existing = groupedHours.get(dayKey) ?? [];
     existing.push(hour);
@@ -228,9 +238,17 @@ export function buildMultiDayLayerPlan({
   }
 
   const days: DailyLayerPlan[] = [];
+  const uncoveredDays: UncoveredPlanDay[] = [];
   for (const dayKey of dayKeys) {
     const dayHours = groupedHours.get(dayKey) ?? [];
-    if (dayHours.length === 0) continue;
+    if (dayHours.length === 0) {
+      uncoveredDays.push({
+        date: dayKey,
+        label: formatDayLabel(dayKey),
+        reason: dayKey === dayKeys[0] && firstDayHasHoursBeforeStart ? "afterStartTime" : "noForecast",
+      });
+      continue;
+    }
 
     dayHours.sort((a, b) => a.time.localeCompare(b.time));
     const baselineSummary = summarizeWeather(dayHours);
@@ -240,7 +258,7 @@ export function buildMultiDayLayerPlan({
 
     days.push({
       date: dayKey,
-      label: format(new Date(`${dayKey}T00:00:00`), "EEE, MMM d"),
+      label: formatDayLabel(dayKey),
       baseline: {
         minTemp: baselineSummary.minTemp,
         maxTemp: baselineSummary.maxTemp,
@@ -262,5 +280,6 @@ export function buildMultiDayLayerPlan({
     dayStartHour: RELEVANT_DAY_START_HOUR,
     dayEndHour: RELEVANT_DAY_END_HOUR,
     days,
+    uncoveredDays,
   };
 }

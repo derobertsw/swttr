@@ -1,9 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
-import { toast } from "sonner";
 import type { LocationSuggestion, Recommendation } from "@/types/recommendations";
 import type { PrecipitationType, WeatherContext } from "@/types/weather";
 import type {
@@ -87,16 +85,18 @@ function bodyPartTargets(
   };
 }
 
-/** Catalog items in the layers that the user picked from recommendations, once each. */
-function recommendedCatalogItems(layers: BodyPartLayers): RecommendedItem[] {
+/** Catalog items the user picked into any phase's layers and doesn't own, once each. */
+function recommendedCatalogItems(phases: BodyPartLayers[]): RecommendedItem[] {
   const items: RecommendedItem[] = [];
   const seen = new Set<string>();
-  for (const bodyPart of BODY_PARTS) {
-    for (const layerType of ["base", "mid", "outer"] as const) {
-      for (const item of layers[bodyPart][layerType] ?? []) {
-        if (item.isRecommended && item.sourceId && !seen.has(item.sourceId)) {
-          seen.add(item.sourceId);
-          items.push({ name: item.name, brand: item.brand ?? "", sourceId: item.sourceId, bodyPart });
+  for (const layers of phases) {
+    for (const bodyPart of BODY_PARTS) {
+      for (const layerType of ["base", "mid", "outer"] as const) {
+        for (const item of layers[bodyPart][layerType] ?? []) {
+          if (item.isRecommended && item.sourceId && !seen.has(item.sourceId)) {
+            seen.add(item.sourceId);
+            items.push({ name: item.name, brand: item.brand ?? "", sourceId: item.sourceId, bodyPart });
+          }
         }
       }
     }
@@ -129,7 +129,6 @@ const LayerDisplay = ({
   onActivityChange,
   weatherLoading,
 }: LayerDisplayProps) => {
-  const router = useRouter();
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
   const [activePhase, setActivePhase] = useState<Phase>("climb");
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
@@ -220,7 +219,7 @@ const LayerDisplay = ({
     for (const id of collectInUseIds(descent.layers)) ids.add(id);
     return ids;
   }, [climb.layers, descent.layers]);
-  const { getItems: getPickerItems } = useLayerPicker(inUseItemIds);
+  const { getItems: getPickerItems, reload: reloadPickerWardrobe } = useLayerPicker(inUseItemIds);
 
   const pickerItems = useMemo(() => {
     if (!pickerTarget) return { wardrobeItems: [], recommendedItems: [] };
@@ -250,17 +249,19 @@ const LayerDisplay = ({
       isRecommended: !item.isOwned,
       brand: item.brand,
     };
+    // A catalog item joins the outfit only; "I own this" adds it to the wardrobe.
     if (replaceIndex !== null) {
       layers.replaceItem(bodyPart, item.nativeLayerType, replaceIndex, newItem);
     } else {
       layers.addItem(bodyPart, item.nativeLayerType, newItem);
     }
-    if (!item.isOwned) {
-      toast.info("This item isn't in your wardrobe yet. Add it for better future recommendations.", {
-        action: { label: "Go to Wardrobe", onClick: () => router.push("/wardrobe") },
-      });
-    }
     setPickerTarget(null);
+  };
+
+  const handleItemOwned = (item: RecommendedItem) => {
+    climb.markOwned(item.sourceId);
+    descent.markOwned(item.sourceId);
+    reloadPickerWardrobe();
   };
 
   const handlePickerRemove = () => {
@@ -316,7 +317,7 @@ const LayerDisplay = ({
   const packedItems = showDescent
     ? itemNamesMissingFrom(phaseLayers(shownPhase === "climb" ? "descent" : "climb").layers, phaseLayers(shownPhase).layers)
     : [];
-  const recommendedItems = recommendedCatalogItems(climb.layers);
+  const recommendedItems = recommendedCatalogItems([climb.layers, descent.layers]);
 
   return (
     <div className="flex flex-col gap-8 pb-24">
@@ -427,7 +428,7 @@ const LayerDisplay = ({
               </details>
             )}
 
-            <RecommendedItemsCard items={recommendedItems} />
+            <RecommendedItemsCard items={recommendedItems} onOwned={handleItemOwned} />
           </>
         )}
       </div>
