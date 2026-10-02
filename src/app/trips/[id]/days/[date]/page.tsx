@@ -20,13 +20,11 @@ import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
 import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
+import type { TripDayForecastResponse } from "@/types/trip-coverage";
 import type { TripEffort, TripKitState, TripMember, TripMemberDayKit, TripStop } from "@/types/trips";
 
 const KIT_SLOTS = ["shirt", "midlayer", "jacket", "shell", "pants", "gloves"] as const;
 const EFFORT_OPTIONS: TripEffort[] = ["easy", "steady", "hard"];
-
-/** tempF/wind in imperial units (matches /api/weather); precip is the day's peak probability as a 0–1 fraction. */
-type DayWeather = { tempF: number; precip: number; wind: number };
 
 export default function DayDetailPage({
   params,
@@ -35,11 +33,10 @@ export default function DayDetailPage({
 }) {
   const { id, date } = use(params);
   const { data, loading, error, refresh } = useTrip(id);
-  // `weather` is null when there's no forecast for the day, e.g. it's past the
-  // forecast window or the forecast request failed.
+  const [weatherAttempt, setWeatherAttempt] = useState(0);
   const [weatherResult, setWeatherResult] = useState<{
     key: string;
-    weather: DayWeather | null;
+    result: TripDayForecastResponse;
   } | null>(null);
 
   const day = data?.days.find((d) => d.date === date);
@@ -52,57 +49,45 @@ export default function DayDetailPage({
   const usingBaseFallback = !assignedStop && !!baseStop;
   // Forecasts are stored with the stop/date they were fetched for, so one never
   // shows against a different stop.
-  const weatherKey =
-    effectiveStop?.latitude && effectiveStop?.longitude
-      ? `${effectiveStop.latitude},${effectiveStop.longitude},${date}`
-      : null;
-  const forecast = weatherKey && weatherResult?.key === weatherKey ? weatherResult : null;
+  const hasCoords = typeof effectiveStop?.latitude === "number" && Number.isFinite(effectiveStop.latitude)
+    && typeof effectiveStop.longitude === "number" && Number.isFinite(effectiveStop.longitude);
+  const weatherKey = hasCoords
+    ? `${id}:${effectiveStop?.latitude},${effectiveStop?.longitude},${date}:${weatherAttempt}`
+    : null;
+  const forecast = weatherKey && weatherResult?.key === weatherKey ? weatherResult.result : null;
 
   useEffect(() => {
-    if (!weatherKey || !effectiveStop?.latitude || !effectiveStop?.longitude) return;
+    if (!weatherKey) return;
     let cancelled = false;
-    fetch(
-      `/api/weather?lat=${effectiveStop.latitude}&lon=${effectiveStop.longitude}&startDate=${date}&days=1`
-    )
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body: { hourly?: Array<{ time: string; temperature: number; windSpeed: number; precipitationProbability: number }> } | null) => {
-        if (cancelled) return;
-        const hourly = Array.isArray(body?.hourly) ? body.hourly : [];
-        // Average across the active daytime window (8am–6pm) for a representative
-        // "what's the day going to feel like" reading, with peak-precip and
-        // peak-wind so kit decisions don't miss a single bad hour.
-        const daytime = hourly.filter((h) => {
-          const hour = Number(h.time?.slice(11, 13));
-          return hour >= 8 && hour <= 18;
-        });
-        const sample = daytime.length > 0 ? daytime : hourly;
-        if (sample.length === 0) {
-          setWeatherResult({ key: weatherKey, weather: null });
-          return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20_000);
+    fetch(`/api/v1/trips/${id}/days/${date}/weather`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Forecast request failed");
+        const body = await response.json() as TripDayForecastResponse;
+        if (!body?.forecast || !["not_requested", "available", "partial", "unavailable", "error"].includes(body.forecast.status)) {
+          throw new Error("Invalid forecast response");
         }
-        const avgTemp =
-          sample.reduce((acc, h) => acc + (h.temperature ?? 0), 0) / sample.length;
-        const peakWind = sample.reduce((acc, h) => Math.max(acc, h.windSpeed ?? 0), 0);
-        const peakPrecip = sample.reduce(
-          (acc, h) => Math.max(acc, h.precipitationProbability ?? 0),
-          0
-        );
-        setWeatherResult({
-          key: weatherKey,
-          weather: {
-            tempF: avgTemp,
-            wind: peakWind,
-            precip: peakPrecip / 100, // /api/weather returns 0–100, normalize for inferWeatherKind
-          },
-        });
+        if (["available", "partial"].includes(body.forecast.status) &&
+          (!body.weather || ![body.weather.tempF, body.weather.wind, body.weather.precip].every((value) => typeof value === "number" && Number.isFinite(value)))) {
+          throw new Error("Invalid weather values");
+        }
+        if (!cancelled) setWeatherResult({ key: weatherKey, result: body });
       })
       .catch(() => {
-        if (!cancelled) setWeatherResult({ key: weatherKey, weather: null });
-      });
+        if (!cancelled) setWeatherResult({ key: weatherKey, result: {
+          forecast: { status: "error", availableHours: 0, expectedHours: 16, reason: "service_error",
+            message: "Couldn't load the forecast. Retry weather or plan your kit manually." },
+          weather: null,
+        } });
+      })
+      .finally(() => window.clearTimeout(timeout));
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
+      controller.abort();
     };
-  }, [weatherKey, effectiveStop?.latitude, effectiveStop?.longitude, date]);
+  }, [weatherKey, id, date]);
 
   const dateObj = new Date(`${date}T00:00:00`);
   const dateLabel = dateObj.toLocaleDateString(undefined, {
@@ -160,6 +145,12 @@ export default function DayDetailPage({
           </div>
         )}
 
+        {data && !day && !loading && (
+          <Card>
+            <h1 className="text-base font-semibold text-white">{dateLabel}</h1>
+            <p className="mt-2 text-sm text-white/75">This date has no saved day plan. Return to the trip overview to review dates and destinations.</p>
+          </Card>
+        )}
         {data && day && (
           <>
             <header>
@@ -193,8 +184,8 @@ export default function DayDetailPage({
             <WeatherCard
               tripId={id}
               stop={effectiveStop ?? null}
-              forecastLoaded={forecast !== null}
-              weather={forecast?.weather ?? null}
+              result={forecast}
+              onRetry={() => setWeatherAttempt((attempt) => attempt + 1)}
               onLocationSaved={() => refresh()}
             />
 
@@ -225,21 +216,23 @@ export default function DayDetailPage({
 function WeatherCard({
   tripId,
   stop,
-  forecastLoaded,
-  weather,
+  result,
+  onRetry,
   onLocationSaved,
 }: {
   tripId: string;
   stop: TripStop | null;
-  forecastLoaded: boolean;
-  weather: DayWeather | null;
+  result: TripDayForecastResponse | null;
+  onRetry: () => void;
   onLocationSaved: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const search = useLocationSearch();
 
-  const hasCoords = !!stop?.latitude && !!stop?.longitude;
+  const hasCoords = typeof stop?.latitude === "number" && Number.isFinite(stop.latitude)
+    && typeof stop.longitude === "number" && Number.isFinite(stop.longitude);
+  const weather = result?.weather;
 
   const save = async () => {
     const selected = search.selectedLocation;
@@ -276,21 +269,21 @@ function WeatherCard({
 
   return (
     <Card>
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         {weather ? (
-          <WeatherGlyph kind={inferWeatherKind(weather.tempF, weather.precip)} className="size-8" />
+          <WeatherGlyph kind={inferWeatherKind(weather.tempF, weather.precip)} className="size-8 shrink-0" />
         ) : !hasCoords ? (
-          <MapPin className="size-8 text-white/55" aria-hidden />
-        ) : forecastLoaded ? (
-          <CloudOff className="size-8 text-white/55" aria-hidden />
+          <MapPin className="size-8 shrink-0 text-white/55" aria-hidden />
+        ) : result ? (
+          <CloudOff className="size-8 shrink-0 text-white/55" aria-hidden />
         ) : (
-          <Loader2 className="size-8 animate-spin text-white/55" aria-hidden />
+          <Loader2 className="size-8 shrink-0 animate-spin text-white/55" aria-hidden />
         )}
-        <div className="flex-1">
+        <div className="min-w-0 flex-1" role="status" aria-live="polite">
           {weather ? (
             <>
               <p className="text-base font-semibold text-white">
-                {Math.round(weather.tempF)}°F · {Math.round(weather.wind)} mph
+                {weather.tempF}°F · {weather.wind} mph
               </p>
               <p className="text-xs text-white/55">
                 {weather.precip > 0.6
@@ -299,10 +292,11 @@ function WeatherCard({
                   ? "showers possible"
                   : "dry"}
               </p>
+              <p className="mt-1 text-xs text-white/65">{result?.forecast.message}</p>
             </>
           ) : hasCoords ? (
             <p className="text-sm text-white/60">
-              {forecastLoaded ? "Forecast unavailable for this day." : "Loading forecast…"}
+              {result ? result.forecast.message : "Loading forecast…"}
             </p>
           ) : (
             <p className="text-sm text-white/60">
@@ -312,11 +306,19 @@ function WeatherCard({
             </p>
           )}
         </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 pl-11">
+        {hasCoords && result && ["error", "unavailable", "partial"].includes(result.forecast.status) && (
+          <button type="button" onClick={onRetry}
+            className="min-h-11 rounded-md border border-white/12 px-3 text-xs text-white/85 hover:bg-white/[0.08]">
+            Retry weather
+          </button>
+        )}
         {hasCoords ? (
           <button
             type="button"
             onClick={() => setEditing((v) => !v)}
-            className="rounded-md border border-white/12 px-2 py-1 text-[11px] text-white/65 hover:bg-white/[0.08]"
+            className="min-h-11 rounded-md border border-white/12 px-3 text-xs text-white/75 hover:bg-white/[0.08]"
           >
             {editing ? "Cancel" : "Change"}
           </button>
@@ -324,7 +326,7 @@ function WeatherCard({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="rounded-md border border-cyan-300/45 bg-cyan-300/15 px-2.5 py-1 text-[11px] font-medium text-cyan-50 hover:bg-cyan-300/25"
+            className="min-h-11 rounded-md border border-cyan-300/45 bg-cyan-300/15 px-3 text-xs font-medium text-cyan-50 hover:bg-cyan-300/25"
           >
             Set location
           </button>

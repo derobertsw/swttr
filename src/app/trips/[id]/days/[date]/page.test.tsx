@@ -51,6 +51,7 @@ describe("Trip day page", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("shows the day's forecast", async () => {
@@ -58,11 +59,9 @@ describe("Trip day page", () => {
       "fetch",
       fakeTripApi({
         "GET /api/v1/trips/trip-1": TRIP_ROUTE,
-        "GET /api/weather": reply(200, {
-          hourly: [
-            { time: "2026-10-10T10:00", temperature: 44, windSpeed: 8, precipitationProbability: 10 },
-            { time: "2026-10-10T14:00", temperature: 48, windSpeed: 12, precipitationProbability: 20 },
-          ],
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": reply(200, {
+          forecast: { status: "partial", availableHours: 2, expectedHours: 16, message: "Partial forecast: 2 of 16 daytime hours available." },
+          weather: { tempF: 46, wind: 12, precip: 0.2 },
         }),
       })
     );
@@ -71,14 +70,14 @@ describe("Trip day page", () => {
     expect(await screen.findByText("46°F · 12 mph")).toBeInTheDocument();
   });
 
-  it("says the forecast is unavailable rather than loading forever", async () => {
+  it("offers retry after a forecast failure rather than loading forever", async () => {
     vi.stubGlobal(
       "fetch",
-      fakeTripApi({ "GET /api/v1/trips/trip-1": TRIP_ROUTE, "GET /api/weather": NO_FORECAST })
+      fakeTripApi({ "GET /api/v1/trips/trip-1": TRIP_ROUTE, "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST })
     );
     await renderPage();
 
-    expect(await screen.findByText("Forecast unavailable for this day.")).toBeInTheDocument();
+    expect(await screen.findByText("Couldn't load the forecast. Retry weather or plan your kit manually.")).toBeInTheDocument();
     expect(screen.queryByText("Loading forecast…")).not.toBeInTheDocument();
   });
 
@@ -87,7 +86,7 @@ describe("Trip day page", () => {
       "fetch",
       fakeTripApi({
         "GET /api/v1/trips/trip-1": TRIP_ROUTE,
-        "GET /api/weather": NO_FORECAST,
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
         "PATCH /api/v1/trips/trip-1/days/2026-10-10": reply(500, { error: "Database unavailable" }),
       })
     );
@@ -113,7 +112,7 @@ describe("Trip day page", () => {
       fakeTripApi({
         "GET /api/v1/trips/trip-1": () =>
           reply(200, tripFull({ stops: [STOWE_STOP], days: [{ ...DAY, activity }] })),
-        "GET /api/weather": NO_FORECAST,
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
         "PATCH /api/v1/trips/trip-1/days/2026-10-10": (body) => {
           saves += 1;
           if (saves > 1) return reply(500, { error: "Database unavailable" });
@@ -151,7 +150,7 @@ describe("Trip day page", () => {
       "fetch",
       fakeTripApi({
         "GET /api/v1/trips/trip-1": TRIP_ROUTE,
-        "GET /api/weather": NO_FORECAST,
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
         "PUT /api/v1/trips/trip-1/days/2026-10-10/kits/member-you": reply(500, {
           error: "Database unavailable",
         }),
@@ -205,7 +204,7 @@ describe("Trip day page", () => {
             finishReload = () => resolve(trip);
           });
         },
-        "GET /api/weather": NO_FORECAST,
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
         "PUT /api/v1/trips/trip-1/days/2026-10-10/kits/member-you": (body) => {
           saves += 1;
           if (saves > 1) return reply(500, { error: "Database unavailable" });
@@ -249,7 +248,7 @@ describe("Trip day page", () => {
       "fetch",
       fakeTripApi({
         "GET /api/v1/trips/trip-1": TRIP_ROUTE,
-        "GET /api/weather": NO_FORECAST,
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
         "GET /api/geocode": reply(200, { results: [STOWE_PLACE] }),
         "PATCH /api/v1/trips/trip-1/stops/stop-stowe": reply(500, { error: "Database unavailable" }),
       })
@@ -271,4 +270,68 @@ describe("Trip day page", () => {
     expect(search).toHaveValue("Stowe, Vermont, United States");
     expect(screen.getByRole("button", { name: "Save location" })).toBeEnabled();
   });
+
+  it("retries a failed forecast and replaces the error with weather", async () => {
+    let attempt = 0;
+    const fetchMock = fakeTripApi({
+      "GET /api/v1/trips/trip-1": TRIP_ROUTE,
+      "GET /api/v1/trips/trip-1/days/2026-10-10/weather": () => {
+        attempt += 1;
+        return attempt === 1 ? NO_FORECAST : reply(200, {
+          forecast: { status: "available", availableHours: 16, expectedHours: 16, message: "Full daytime forecast." },
+          weather: { tempF: 50, wind: 4, precip: 0 },
+        });
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("button", { name: "Retry weather" }));
+    expect(await screen.findByText("50°F · 4 mph")).toBeInTheDocument();
+    expect(screen.queryByText(/Couldn't load the forecast/)).not.toBeInTheDocument();
+    expect(attempt).toBe(2);
+  });
+
+  it.each([
+    { forecast: { status: "unavailable", availableHours: 0, expectedHours: 16, message: "Forecast unavailable for this day." }, weather: null },
+    { hourly: [] },
+    { forecast: { status: "available" }, weather: { tempF: null, wind: 0, precip: 0 } },
+  ])("resolves unavailable or invalid data to a terminal state", async (body) => {
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": TRIP_ROUTE,
+      "GET /api/v1/trips/trip-1/days/2026-10-10/weather": reply(200, body),
+    }));
+    await renderPage();
+    expect(await screen.findByRole("button", { name: "Retry weather" })).toBeInTheDocument();
+    expect(screen.queryByText("Loading forecast…")).not.toBeInTheDocument();
+    expect(screen.queryByText(/0°F/)).not.toBeInTheDocument();
+  });
+
+  it("loads weather for a location at zero latitude and longitude", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [{ ...STOWE_STOP, latitude: 0, longitude: 0 }], days: [DAY] })),
+      "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+    }));
+    await renderPage();
+    expect(await screen.findByRole("button", { name: "Retry weather" })).toBeInTheDocument();
+    expect(screen.queryByText("This stop has no coordinates yet.")).not.toBeInTheDocument();
+  });
+
+
+  it("times out a stalled forecast to a retryable error", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const tripFetch = fakeTripApi({ "GET /api/v1/trips/trip-1": TRIP_ROUTE });
+    vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+      if (url.endsWith("/weather")) return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error("Aborted")), { once: true });
+      });
+      return tripFetch(url, init);
+    }));
+    await renderPage();
+    expect(screen.getByText("Loading forecast…")).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+    expect(screen.getByRole("button", { name: "Retry weather" })).toBeInTheDocument();
+    expect(screen.queryByText("Loading forecast…")).not.toBeInTheDocument();
+  });
+
 });
