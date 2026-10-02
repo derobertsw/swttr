@@ -477,6 +477,29 @@ describe("Home Page", () => {
       expect(screen.getByRole("button", { name: "See my layers" })).toBeEnabled();
     });
 
+    it("drops a request still running when Later is picked on the form", async () => {
+      let finishWeather: (() => void) | undefined;
+      mockOutingApis(
+        () =>
+          new Promise((resolve) => {
+            finishWeather = () => resolve(respond(200, { temperature: 30, windSpeed: 7, isForecast: false }));
+          })
+      );
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await chooseStowe(user);
+      await user.click(gearUpButton());
+      expect(screen.getByRole("button", { name: "Getting your layers…" })).toHaveAttribute("aria-busy", "true");
+      await user.click(screen.getByRole("radio", { name: "Later" }));
+      await answer(finishWeather!);
+
+      // The Now result never shows, so Back can't open a Later form for it.
+      expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Later" })).toBeChecked();
+      expect(screen.getByRole("button", { name: "See my layers" })).not.toHaveAttribute("aria-busy");
+    });
+
     it("gets layers for a later day from the form at /, on the place's clock", async () => {
       // Today is Thursday, October 1, 2026, in New York.
       vi.setSystemTime(new Date("2026-10-01T16:00:00Z"));

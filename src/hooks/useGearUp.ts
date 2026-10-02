@@ -62,7 +62,6 @@ export function useGearUp() {
   const formRef = useRef<HTMLFormElement>(null);
   const biophysics = useBiophysicsRecommendation();
 
-  const setInputMode = useCallback((mode: InputMode) => dispatch({ type: "SET_INPUT_MODE", mode }), []);
   const setDate = useCallback((d: Date | undefined) => dispatch({ type: "SET_DATE", date: d }), []);
   const setTime = useCallback((t: string) => dispatch({ type: "SET_TIME", time: t }), []);
   const setDurationDays = useCallback((days: number) => {
@@ -88,9 +87,9 @@ export function useGearUp() {
   );
 
   // Only the latest request's answer is used. Going to the form from the
-  // results, switching the form to the other mode from the iOS shell, or
-  // starting over retires the running request, so a late answer can't show
-  // results or report an error for an outing that's gone.
+  // results, switching the form between Now and Later, or starting over
+  // retires the running request, so a late answer can't show results or
+  // report an error for an outing that's gone.
   const latestRequest = useRef(0);
   /** Starts loading, and returns a check for whether this request is still the latest. */
   const startRequest = useCallback(() => {
@@ -254,6 +253,12 @@ export function useGearUp() {
     if (formShowing !== mode) latestRequest.current += 1;
     dispatch({ type: "SHOW_FORM", mode });
   }, [formShowing]);
+  /**
+   * Now or Later on the form. A request still running was made for the other
+   * mode, so it's retired: its result would otherwise come back to a form,
+   * and an Edit outing, on the mode it wasn't asked for.
+   */
+  const setInputMode = showForm;
   const showPlanForm = useCallback(() => showForm("later"), [showForm]);
   /** Edit outing: back to the form as the results were requested from it, with what was entered. */
   const editOuting = useCallback(() => showForm(state.inputMode), [showForm, state.inputMode]);

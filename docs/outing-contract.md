@@ -53,7 +53,7 @@ The advice kind and the request status are separate:
   - switching the activity;
   - changing the weather's place or time;
   - Try again.
-- **Only the latest request lands.** Each request gets a number, and only the latest one may change the page. Starting over, Edit outing, or the iOS Plan tab switching the form to Later retires the running request, so a late answer can't replace a newer outing. A request made from the form being shown stays current, including when Now or Later is changed on the form.
+- **Only the latest request lands.** Each request gets a number, and only the latest one may change the page. Starting over, Edit outing, or switching the form between Now and Later (on the form, or with the iOS Plan tab) retires the running request, so a late answer can't replace a newer outing. A request made from the form being shown otherwise stays current.
 - **The shown result stays put.** While a newer request loads, and when it fails, the page keeps showing the last result with its own activity, place and time. The results header shows the result's activity until the new advice arrives.
 
 ## Edit outing and Start over
