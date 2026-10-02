@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LOCATION_TIMEOUT_MS } from "@/hooks/useDeviceLocation";
+import type { MultiDayLayerPlan } from "@/types/plan";
 import Home from "./page";
 
 // Mock sonner toast
@@ -674,7 +675,8 @@ describe("Home Page", () => {
       dayStartHour: 6,
       dayEndHour: 21,
       days: [],
-    };
+      uncoveredDays: [],
+    } satisfies MultiDayLayerPlan;
     /** /api/weather's forecast for noon in Stowe on the start date. */
     const NOON_FORECAST = {
       temperature: 28,
