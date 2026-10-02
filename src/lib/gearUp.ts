@@ -23,15 +23,16 @@ import type {
 // State
 // ---------------------------------------------------------------------------
 
-export type InputMode = "manual" | "planAhead";
+/** Whether the form asks for layers now, or for a later date and time. */
+export type InputMode = OutingTime["mode"];
 
 interface GearUpState {
   inputMode: InputMode;
   date: Date | undefined;
   time: string;
   durationDays: number;
-  /** Set once Gear Up is pressed without a place, so the place field says it's needed. */
-  showPlaceError: boolean;
+  /** Set once the form is submitted with a field left empty, so each empty field says it's needed. */
+  showFieldErrors: boolean;
   /**
    * Why the plan's start date can't be used at a place, like dates past the end
    * of its forecast. Coverage differs by place, so it applies only to that one.
@@ -50,7 +51,7 @@ type GearUpAction =
   | { type: "SET_DATE"; date: Date | undefined }
   | { type: "SET_TIME"; time: string }
   | { type: "SET_DURATION_DAYS"; durationDays: number }
-  | { type: "PLACE_MISSING" }
+  | { type: "FIELDS_MISSING" }
   | { type: "START_DATE_INVALID"; error: string; location: LocationSuggestion }
   | { type: "SUBMIT_START" }
   | { type: "SUBMIT_SUCCESS"; result: OutingResult }
@@ -63,15 +64,15 @@ export function createInitialState(inputMode: InputMode): GearUpState {
     inputMode,
     date: undefined,
     time: "12:00",
-    durationDays: 3,
-    showPlaceError: false,
+    durationDays: 1,
+    showFieldErrors: false,
     startDateError: null,
     loading: false,
     result: null,
   };
 }
 
-/** Whether the form for `mode` is showing, so that a request still running was made from it. */
+/** Whether the form is showing in `mode`, so that a request still running was made from it. */
 function showsForm(state: { inputMode: InputMode; result: OutingResult | null }, mode: InputMode): boolean {
   return state.result === null && state.inputMode === mode;
 }
@@ -86,8 +87,8 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
       return { ...state, time: action.time };
     case "SET_DURATION_DAYS":
       return { ...state, durationDays: action.durationDays, startDateError: null };
-    case "PLACE_MISSING":
-      return { ...state, showPlaceError: true };
+    case "FIELDS_MISSING":
+      return { ...state, showFieldErrors: true };
     case "START_DATE_INVALID":
       return { ...state, loading: false, startDateError: { message: action.error, location: action.location } };
     case "SUBMIT_START":
@@ -97,14 +98,15 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
     case "SUBMIT_ERROR":
       return { ...state, loading: false };
     case "SHOW_FORM": {
-      // Keeps what was entered. A request made from this form keeps it busy;
-      // one from the results or the other form is retired (see useGearUp).
+      // Keeps what was entered. A request made from the form in this mode
+      // keeps it busy; one from the results, or from the form in the other
+      // mode, is retired (see useGearUp).
       const { date, time, durationDays } = state;
       const loading = state.loading && showsForm(state, action.mode);
       return { ...createInitialState(action.mode), date, time, durationDays, loading };
     }
     case "RESET":
-      return createInitialState("manual");
+      return createInitialState("now");
     default:
       return state;
   }
