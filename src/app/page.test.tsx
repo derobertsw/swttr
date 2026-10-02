@@ -62,9 +62,9 @@ const STOWE = {
   timeZone: "America/New_York",
 };
 
-/** Searches for Stowe in the place field labeled `field`, and picks it. */
-async function chooseStowe(user: ReturnType<typeof userEvent.setup>, field: RegExp = /location/i) {
-  await user.type(screen.getByRole("combobox", { name: field }), "Stowe");
+/** Searches for Stowe in the form's place field, and picks it. */
+async function chooseStowe(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByRole("combobox", { name: "Where?" }), "Stowe");
   await user.click(await screen.findByRole("option", { name: /Stowe/ }));
 }
 
@@ -138,17 +138,15 @@ describe("Home Page", () => {
   });
 
   describe("initial rendering", () => {
-    it("should render activity selector carousel", async () => {
+    it("asks what to wear with every activity, the place and Now, and one submit button", async () => {
       render(<Home />);
-      expect(await screen.findByRole("region")).toHaveAttribute(
-        "aria-roledescription",
-        "carousel"
-      );
-    });
 
-    it("should render Gear Up button", () => {
-      render(<Home />);
-      expect(screen.getByRole("button", { name: /gear up/i })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "What should I wear?" })).toBeInTheDocument();
+      const activity = await screen.findByRole("radiogroup", { name: "Activity" });
+      expect(within(activity).getAllByRole("radio")).toHaveLength(6);
+      expect(screen.getByRole("combobox", { name: "Where?" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Now" })).toBeChecked();
+      expect(screen.getByRole("button", { name: "See my layers" })).toHaveAttribute("type", "submit");
     });
 
     it("should NOT render weather sliders initially", () => {
@@ -159,8 +157,8 @@ describe("Home Page", () => {
   });
 
   describe("choosing where", () => {
-    const placeField = () => screen.getByRole("combobox", { name: /where are you/i });
-    const gearUpButton = () => screen.getByRole("button", { name: /gear up/i });
+    const placeField = () => screen.getByRole("combobox", { name: "Where?" });
+    const gearUpButton = () => screen.getByRole("button", { name: "See my layers" });
     const useMyLocationButton = () => screen.getByRole("button", { name: "Use my location" });
 
     /** Geocoding finds Stowe; weather requests get `weather`. Returns the weather requests made. */
@@ -205,7 +203,7 @@ describe("Home Page", () => {
       const user = userEvent.setup();
       render(<Home />);
 
-      await chooseStowe(user, /where are you/i);
+      await chooseStowe(user);
       await user.click(gearUpButton());
 
       expect(await screen.findByText("Current conditions")).toBeInTheDocument();
@@ -223,7 +221,7 @@ describe("Home Page", () => {
 
       await screen.findByRole("radiogroup", { name: "Activity" });
       await user.click(within(activity()).getByRole("radio", { name: /xc skiing/i }));
-      await chooseStowe(user, /where are you/i);
+      await chooseStowe(user);
       await user.click(gearUpButton());
       expect(await screen.findByText("Current conditions")).toBeInTheDocument();
 
@@ -253,10 +251,10 @@ describe("Home Page", () => {
       const user = userEvent.setup();
       render(<Home />);
 
-      await chooseStowe(user, /where are you/i);
+      await chooseStowe(user);
       await user.click(gearUpButton());
       await user.click(screen.getByRole("link", { name: "SWTTR" }));
-      await chooseStowe(user, /where are you/i);
+      await chooseStowe(user);
       await user.click(gearUpButton());
       expect(await screen.findByText(/wind 7 mph/i)).toBeInTheDocument();
 
@@ -352,7 +350,7 @@ describe("Home Page", () => {
       mockGeolocation();
       mockOutingApis();
       render(<Home />);
-      await screen.findByRole("region");
+      await screen.findByRole("radiogroup", { name: "Activity" });
 
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       try {
@@ -377,7 +375,7 @@ describe("Home Page", () => {
       render(<Home />);
 
       await user.click(useMyLocationButton());
-      await chooseStowe(user, /where are you/i);
+      await chooseStowe(user);
       expect(screen.queryByText("Finding your location…")).not.toBeInTheDocument();
 
       // The device's location arrives late.
@@ -434,7 +432,7 @@ describe("Home Page", () => {
       mockOutingApis();
       render(<Home />);
 
-      expect(await screen.findByRole("combobox", { name: /where are you/i })).toBeEnabled();
+      expect(await screen.findByRole("combobox", { name: "Where?" })).toBeEnabled();
       expect(geolocation.getCurrentPosition).not.toHaveBeenCalled();
     });
 
@@ -442,7 +440,7 @@ describe("Home Page", () => {
       const geolocation = mockGeolocation();
       const weatherRequests = mockOutingApis();
       render(<Home />);
-      await screen.findByRole("region");
+      await screen.findByRole("radiogroup", { name: "Activity" });
 
       act(() => {
         window.dispatchEvent(new CustomEvent("gearUp"));
@@ -465,7 +463,7 @@ describe("Home Page", () => {
       const user = userEvent.setup();
       render(<Home />);
 
-      await chooseStowe(user, /where are you/i);
+      await chooseStowe(user);
       await user.click(gearUpButton());
       expect(finishWeather).toBeDefined();
       act(() => {
@@ -474,8 +472,61 @@ describe("Home Page", () => {
       await answer(finishWeather!);
 
       expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
-      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
-      expect(screen.getByRole("button", { name: "Build layer plan" })).toBeEnabled();
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("radio", { name: "Later" })).toBeChecked();
+      expect(screen.getByRole("button", { name: "See my layers" })).toBeEnabled();
+    });
+
+    it("drops a request still running when Later is picked on the form", async () => {
+      let finishWeather: (() => void) | undefined;
+      mockOutingApis(
+        () =>
+          new Promise((resolve) => {
+            finishWeather = () => resolve(respond(200, { temperature: 30, windSpeed: 7, isForecast: false }));
+          })
+      );
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await chooseStowe(user);
+      await user.click(gearUpButton());
+      expect(screen.getByRole("button", { name: "Getting your layers…" })).toHaveAttribute("aria-busy", "true");
+      await user.click(screen.getByRole("radio", { name: "Later" }));
+      await answer(finishWeather!);
+
+      // The Now result never shows, so Back can't open a Later form for it.
+      expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Later" })).toBeChecked();
+      expect(screen.getByRole("button", { name: "See my layers" })).not.toHaveAttribute("aria-busy");
+    });
+
+    it("gets layers for a later day from the form at /, on the place's clock", async () => {
+      // Today is Thursday, October 1, 2026, in New York.
+      vi.setSystemTime(new Date("2026-10-01T16:00:00Z"));
+      try {
+        const weatherRequests = mockOutingApis(() =>
+          respond(200, { temperature: 28, windSpeed: 12, isForecast: true, forecastTime: "2026-10-08T07:00-04:00", timeZone: "America/New_York" })
+        );
+        const user = userEvent.setup();
+        render(<Home />);
+
+        await chooseStowe(user);
+        await user.click(screen.getByRole("radio", { name: "Later" }));
+        await user.click(screen.getByRole("button", { name: "Start date Pick a date" }));
+        await user.click(screen.getByRole("button", { name: /October 8th/ }));
+        fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "07:30" } });
+        await user.click(screen.getByRole("button", { name: "See my layers" }));
+
+        expect(await screen.findByText("Forecast · Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+        expect(weatherRequests).toEqual(["/api/weather?lat=44.47&lon=-72.69&datetime=2026-10-08T07:30"]);
+
+        // Back keeps Later and what was entered.
+        await user.click(screen.getByRole("button", { name: "Back" }));
+        expect(screen.getByRole("radio", { name: "Later" })).toBeChecked();
+        expect(screen.getByLabelText("Start time")).toHaveValue("07:30");
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -530,9 +581,9 @@ describe("Home Page", () => {
     async function gearUpHere(user: ReturnType<typeof userEvent.setup>) {
       await user.click(screen.getByRole("button", { name: "Use my location" }));
       await waitFor(() =>
-        expect(screen.getByRole("combobox", { name: /where are you/i })).toHaveValue("Your location")
+        expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Your location")
       );
-      await user.click(screen.getByRole("button", { name: /gear up/i }));
+      await user.click(screen.getByRole("button", { name: "See my layers" }));
     }
 
     async function switchActivity(user: ReturnType<typeof userEvent.setup>, from: string, to: string) {
@@ -643,26 +694,16 @@ describe("Home Page", () => {
     });
   });
 
-  describe("Plan ahead mode via URL param", () => {
-    it("should show plan ahead form when mode=planAhead in URL", () => {
+  describe("Later via /?mode=planAhead, which the iOS shell's Plan tab opens", () => {
+    it("opens on Later for one day, with the place, start date and start time", () => {
       mockSearchParams.set("mode", "planAhead");
       render(<Home />);
 
-      expect(screen.getByPlaceholderText(/search for a city/i)).toBeInTheDocument();
-    });
-
-    it("should show date picker in plan ahead mode", () => {
-      mockSearchParams.set("mode", "planAhead");
-      render(<Home />);
-
-      expect(screen.getByRole("button", { name: /pick start date/i })).toBeInTheDocument();
-    });
-
-    it("should show time input in plan ahead mode", () => {
-      mockSearchParams.set("mode", "planAhead");
-      render(<Home />);
-
-      expect(screen.getByDisplayValue("12:00")).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Later" })).toBeChecked();
+      expect(screen.getByRole("radio", { name: "One day" })).toBeChecked();
+      expect(screen.getByRole("combobox", { name: "Where?" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Start date Pick a date" })).toBeInTheDocument();
+      expect(screen.getByLabelText("Start time")).toHaveValue("12:00");
     });
   });
 
@@ -690,7 +731,7 @@ describe("Home Page", () => {
     /**
      * Plan-ahead requests succeed (the noon forecast: 28°F, wind 12 mph) unless `weather` or
      * `recommendations` say otherwise. Returns the requests made, and a geolocation spy that
-     * only Go Now uses.
+     * only Use my location calls.
      */
     function mockPlanAheadApis({ weather, recommendations, planAhead }: {
       weather?: () => Promise<MockResponse>;
@@ -734,8 +775,18 @@ describe("Home Page", () => {
     }
 
     async function chooseStartDate(user: ReturnType<typeof userEvent.setup>) {
-      await user.click(screen.getByRole("button", { name: /pick start date/i }));
+      await user.click(screen.getByRole("button", { name: "Start date Pick a date" }));
       await user.click(screen.getByRole("button", { name: /October 8th/ }));
+    }
+
+    /** Switches the form to a plan, which starts at three days. */
+    async function chooseSeveralDays(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole("radio", { name: "Several days" }));
+    }
+
+    /** Presses More days or Fewer days `times` times. */
+    async function changeDays(user: ReturnType<typeof userEvent.setup>, button: "More days" | "Fewer days", times: number) {
+      for (let i = 0; i < times; i++) await user.click(screen.getByRole("button", { name: button }));
     }
 
     beforeEach(() => {
@@ -754,7 +805,6 @@ describe("Home Page", () => {
       const user = userEvent.setup();
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: /single day/i }));
       await chooseStowe(user);
       await chooseStartDate(user);
       await user.click(screen.getByRole("button", { name: "See my layers" }));
@@ -777,7 +827,6 @@ describe("Home Page", () => {
       const user = userEvent.setup();
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: /single day/i }));
       await chooseStowe(user);
       await chooseStartDate(user);
       fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "07:30" } });
@@ -804,15 +853,14 @@ describe("Home Page", () => {
       const user = userEvent.setup();
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: /single day/i }));
       await chooseStowe(user);
       await chooseStartDate(user);
       await user.click(screen.getByRole("button", { name: "See my layers" }));
 
       await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
       expect(await screen.findByRole("button", { name: "See my layers" })).toBeEnabled();
-      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
-      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
       expect(screen.getByLabelText("Start time")).toHaveValue("12:00");
       expect(screen.queryByText(/wind/i)).not.toBeInTheDocument();
       expect(requests.weather).toEqual([`/api/weather?lat=44.47&lon=-72.69&datetime=${START_DATE}T12:00`]);
@@ -830,7 +878,6 @@ describe("Home Page", () => {
       const user = userEvent.setup();
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: /single day/i }));
       await chooseStowe(user);
       await chooseStartDate(user);
       await user.click(screen.getByRole("button", { name: "See my layers" }));
@@ -865,14 +912,15 @@ describe("Home Page", () => {
       ]);
     });
 
-    it("builds a multi-day plan with Build layer plan", async () => {
+    it("builds a multi-day plan with Build my plan", async () => {
       const { requests, getCurrentPosition } = mockPlanAheadApis();
       const user = userEvent.setup();
       render(<Home />);
 
       await chooseStowe(user);
       await chooseStartDate(user);
-      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+      await chooseSeveralDays(user);
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
 
       expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
       expect(requests.planAhead).toEqual([
@@ -898,7 +946,8 @@ describe("Home Page", () => {
 
       await chooseStowe(user);
       await chooseStartDate(user);
-      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+      await chooseSeveralDays(user);
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
 
       expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
       expect(requests.planAhead).toEqual([
@@ -920,31 +969,32 @@ describe("Home Page", () => {
 
       await chooseStowe(user);
       await chooseStartDate(user);
-      await user.click(screen.getByRole("button", { name: "7d" }));
-      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+      await chooseSeveralDays(user);
+      await changeDays(user, "More days", 4);
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
 
-      const dateButton = await screen.findByRole("button", { name: "Oct 8, 2026" });
+      const dateButton = await screen.findByRole("button", { name: "Start date Oct 8, 2026" });
       await waitFor(() => expect(dateButton).toHaveFocus());
       expect(dateButton).toBeInvalid();
       expect(dateButton).toHaveAccessibleDescription(rangeError);
       expect(toast.error).not.toHaveBeenCalled();
-      expect(screen.getByRole("button", { name: "Build layer plan" })).toBeEnabled();
-      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Build my plan" })).toBeEnabled();
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
       expect(screen.getByText("7 days")).toBeInTheDocument();
 
       // Another place's forecast may cover the dates, so the error goes with the place.
-      const place = screen.getByRole("combobox", { name: /location/i });
+      const place = screen.getByRole("combobox", { name: "Where?" });
       await user.clear(place);
       expect(screen.queryByText(rangeError)).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeValid();
+      expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeValid();
       // Picking the same place again brings it back, since its forecast hasn't changed.
       await chooseStowe(user);
       expect(screen.getByText(rangeError)).toBeInTheDocument();
 
       // A shorter plan fits, so the error goes.
-      await user.click(screen.getByRole("button", { name: "5d" }));
+      await changeDays(user, "Fewer days", 2);
       expect(screen.queryByText(rangeError)).not.toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
 
       expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
       expect(requests.planAhead).toEqual([
@@ -972,12 +1022,13 @@ describe("Home Page", () => {
 
       await chooseStowe(user);
       await chooseStartDate(user);
-      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+      await chooseSeveralDays(user);
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
 
       await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
-      expect(await screen.findByRole("button", { name: "Build layer plan" })).toBeEnabled();
-      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
-      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).not.toHaveAccessibleDescription();
+      expect(await screen.findByRole("button", { name: "Build my plan" })).toBeEnabled();
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).not.toHaveAccessibleDescription();
       expect(screen.getByLabelText("Start time")).toHaveValue("12:00");
       expect(screen.getByText("3 days")).toBeInTheDocument();
     });
@@ -987,32 +1038,33 @@ describe("Home Page", () => {
       const user = userEvent.setup();
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+      await chooseSeveralDays(user);
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
 
-      const location = screen.getByRole("combobox", { name: /location/i });
+      const location = screen.getByRole("combobox", { name: "Where?" });
       expect(location).toHaveFocus();
       expect(location).toBeInvalid();
-      expect(location).toHaveAccessibleDescription("Search for a place, then choose it from the list.");
+      expect(location).toHaveAccessibleDescription("Search for a place, or use your location.");
       expect(screen.getByText("Choose a start date.")).toBeInTheDocument();
 
       await chooseStowe(user);
       expect(location).toBeValid();
-      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
 
-      const dateButton = screen.getByRole("button", { name: /pick start date/i });
+      const dateButton = screen.getByRole("button", { name: "Start date Pick a date" });
       expect(dateButton).toHaveFocus();
       expect(dateButton).toHaveAccessibleDescription("Choose a start date.");
 
       await chooseStartDate(user);
       const time = screen.getByLabelText("Start time");
       await user.clear(time);
-      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
 
       expect(time).toHaveFocus();
       expect(time).toHaveAccessibleDescription("Enter a start time.");
       expect(screen.queryByText("Choose a start date.")).not.toBeInTheDocument();
       expect(location).toHaveValue("Stowe, Vermont, United States");
-      expect(screen.getByRole("button", { name: /multi day/i })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Several days" })).toBeChecked();
       expect(screen.getByText("3 days")).toBeInTheDocument();
       expect(requests.planAhead).toEqual([]);
     });
@@ -1028,14 +1080,14 @@ describe("Home Page", () => {
       const user = userEvent.setup();
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: /single day/i }));
       await chooseStowe(user);
       await chooseStartDate(user);
       await user.click(screen.getByRole("button", { name: "See my layers" }));
 
       const pending = await screen.findByRole("button", { name: "Getting your layers…" });
-      expect(pending).toBeDisabled();
-      expect(screen.getByRole("button", { name: /go now/i })).toBeDisabled();
+      expect(pending).toHaveAttribute("aria-disabled", "true");
+      expect(pending).toHaveFocus();
+      expect(screen.getByRole("button", { name: "Use my location" })).toBeDisabled();
 
       await user.click(pending);
       // The iOS shell's Gear Up action submits the same plan.
@@ -1049,81 +1101,61 @@ describe("Home Page", () => {
       expect(requests.weather).toHaveLength(1);
     });
 
-    it("doesn't label a Go Now request as building the plan, and lets it be cancelled", async () => {
-      // Geolocation never answers, so Go Now stays in flight.
+    it("waits for Use my location before submitting, and lets it be cancelled", async () => {
+      // Geolocation never answers, so the location stays in flight.
       const { getCurrentPosition } = mockPlanAheadApis();
       const user = userEvent.setup();
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: /go now/i }));
+      await chooseSeveralDays(user);
+      await user.click(screen.getByRole("button", { name: "Use my location" }));
 
       expect(getCurrentPosition).toHaveBeenCalledTimes(1);
       expect(screen.getByText("Finding your location…")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Build layer plan" })).toBeDisabled();
-      expect(screen.queryByRole("button", { name: "Building layer plan…" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Build my plan" })).toBeDisabled();
 
       await user.click(screen.getByRole("button", { name: "Cancel" }));
 
       expect(screen.queryByText("Finding your location…")).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Build layer plan" })).toBeEnabled();
-      expect(screen.getByRole("button", { name: /go now/i })).toHaveFocus();
+      expect(screen.getByRole("button", { name: "Build my plan" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Use my location" })).toHaveFocus();
     });
 
-    it("gets current conditions at the device's location with Go Now", async () => {
-      const { requests } = mockPlanAheadApis({
-        weather: () => Promise.resolve(respond(200, { temperature: 30, windSpeed: 7, isForecast: false })),
-      });
-      const geolocation = mockGeolocation();
-      const user = userEvent.setup();
-      render(<Home />);
-
-      await user.click(screen.getByRole("button", { name: /go now/i }));
-      await geolocation.answer(40.7128, -74.006);
-
-      expect(await screen.findByText("Current conditions")).toBeInTheDocument();
-      expect(screen.getByText("Your location")).toBeInTheDocument();
-      expect(requests.weather).toEqual(["/api/weather?lat=40.7128&lon=-74.006"]);
-    });
-
-    it("says why Go Now couldn't find the location, and keeps the plan", async () => {
+    it("gets a later day's forecast at the device's location", async () => {
       const { requests } = mockPlanAheadApis();
       const geolocation = mockGeolocation();
       const user = userEvent.setup();
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: /single day/i }));
+      await user.click(screen.getByRole("button", { name: "Use my location" }));
+      await geolocation.answer(40.7128, -74.006);
+      await chooseStartDate(user);
+      await user.click(screen.getByRole("button", { name: "See my layers" }));
+
+      expect(await screen.findByText(/wind 12 mph/i)).toBeInTheDocument();
+      expect(screen.getByText("Your location")).toBeInTheDocument();
+      expect(requests.weather).toEqual([`/api/weather?lat=40.7128&lon=-74.006&datetime=${START_DATE}T12:00`]);
+    });
+
+    it("says why Use my location couldn't find the location, and keeps the plan", async () => {
+      const { requests } = mockPlanAheadApis();
+      const geolocation = mockGeolocation();
+      const user = userEvent.setup();
+      render(<Home />);
+
       await chooseStowe(user);
       await chooseStartDate(user);
       fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "07:30" } });
-      await user.click(screen.getByRole("button", { name: /go now/i }));
+      await user.click(screen.getByRole("button", { name: "Use my location" }));
       await geolocation.fail(1);
 
       expect(
         screen.getByText("Location access is off for this site. Search for a place, or allow location access and try again.")
       ).toBeInTheDocument();
-      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
-      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
       expect(screen.getByLabelText("Start time")).toHaveValue("07:30");
       expect(screen.getByRole("button", { name: "See my layers" })).toBeEnabled();
-      expect(requests.weather).toEqual([]);
-    });
-
-    it("stops Go Now when a place is picked for the plan, and ignores a location that arrives later", async () => {
-      const { requests } = mockPlanAheadApis();
-      const geolocation = mockGeolocation();
-      const user = userEvent.setup();
-      render(<Home />);
-
-      await user.click(screen.getByRole("button", { name: /go now/i }));
-      await chooseStowe(user);
-
-      expect(screen.queryByText("Finding your location…")).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Build layer plan" })).toBeEnabled();
-
-      await geolocation.answer(40.7128, -74.006);
-
-      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
-      expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
       expect(requests.weather).toEqual([]);
     });
 
@@ -1136,7 +1168,6 @@ describe("Home Page", () => {
         const user = userEvent.setup();
         render(<Home />);
 
-        await user.click(screen.getByRole("button", { name: /single day/i }));
         await chooseStowe(user);
         fireEvent.change(screen.getByLabelText("Start date"), { target: { value: START_DATE } });
         await user.click(screen.getByRole("button", { name: "See my layers" }));
@@ -1150,7 +1181,6 @@ describe("Home Page", () => {
 
     /** Gets a one-day plan's layers for Stowe on the start date at 07:30. */
     async function seeOneDayLayers(user: ReturnType<typeof userEvent.setup>) {
-      await user.click(screen.getByRole("button", { name: /single day/i }));
       await chooseStowe(user);
       await chooseStartDate(user);
       fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "07:30" } });
@@ -1167,9 +1197,9 @@ describe("Home Page", () => {
       await user.click(screen.getByRole("button", { name: "Back" }));
 
       expect(screen.queryByText(/wind 12 mph/i)).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Gear Up" })).not.toBeInTheDocument();
-      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
-      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Later" })).toBeChecked();
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
       expect(screen.getByLabelText("Start time")).toHaveValue("07:30");
 
       await user.click(screen.getByRole("button", { name: "See my layers" }));
@@ -1188,15 +1218,16 @@ describe("Home Page", () => {
 
       await chooseStowe(user);
       await chooseStartDate(user);
-      await user.click(screen.getByRole("button", { name: "Increase duration" }));
-      await user.click(screen.getByRole("button", { name: "Build layer plan" }));
+      await chooseSeveralDays(user);
+      await changeDays(user, "More days", 1);
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
       await user.click(await screen.findByRole("button", { name: "Plan Another Trip" }));
 
       expect(screen.queryByRole("heading", { name: "Multi-Day Layer Plan" })).not.toBeInTheDocument();
-      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
-      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
       expect(screen.getByText("4 days")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Build layer plan" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Build my plan" })).toBeEnabled();
     });
 
     it("returns to the plan when the iOS shell's Plan tab is tapped again", async () => {
@@ -1210,12 +1241,12 @@ describe("Home Page", () => {
       });
 
       expect(screen.queryByText(/wind 12 mph/i)).not.toBeInTheDocument();
-      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
-      expect(screen.getByRole("button", { name: "Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
       expect(screen.getByLabelText("Start time")).toHaveValue("07:30");
     });
 
-    it("starts over in Now mode from the logo, until the iOS shell's Plan tab is tapped again", async () => {
+    it("starts over on Now from the logo, until the iOS shell's Plan tab is tapped again", async () => {
       mockPlanAheadApis();
       const user = userEvent.setup();
       render(<Home />);
@@ -1223,30 +1254,31 @@ describe("Home Page", () => {
       await seeOneDayLayers(user);
       await user.click(screen.getByRole("link", { name: "SWTTR" }));
 
-      expect(screen.getByRole("button", { name: "Gear Up" })).toBeInTheDocument();
-      expect(screen.getByRole("combobox", { name: /where are you/i })).toHaveValue("");
+      expect(screen.getByRole("radio", { name: "Now" })).toBeChecked();
+      expect(screen.queryByLabelText("Start time")).not.toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("");
 
       act(() => {
         window.dispatchEvent(new CustomEvent("navigatePlanAhead"));
       });
 
-      expect(screen.queryByRole("button", { name: "Gear Up" })).not.toBeInTheDocument();
-      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("");
-      expect(screen.getByRole("button", { name: /pick start date/i })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Later" })).toBeChecked();
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("");
+      expect(screen.getByRole("button", { name: "Start date Pick a date" })).toBeInTheDocument();
     });
 
     it.each([
       {
         way: "Back",
         leave: (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "Back" })),
-        form: "See my layers",
+        when: "Later",
       },
       {
         way: "the logo",
         leave: (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("link", { name: "SWTTR" })),
-        form: "Gear Up",
+        when: "Now",
       },
-    ])("drops a layers refresh still running when $way leaves the results", async ({ leave, form }) => {
+    ])("drops a layers refresh still running when $way leaves the results", async ({ leave, when }) => {
       let finishRefresh: (() => void) | undefined;
       mockPlanAheadApis({
         recommendations: (url) =>
@@ -1267,7 +1299,8 @@ describe("Home Page", () => {
       await answer(finishRefresh!);
 
       expect(screen.queryByText(/wind 12 mph/i)).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: form })).toBeEnabled();
+      expect(screen.getByRole("radio", { name: when })).toBeChecked();
+      expect(screen.getByRole("button", { name: "See my layers" })).not.toHaveAttribute("aria-busy");
       // The form opens on the activity that was shown, not the one that never loaded.
       const activity = screen.getByRole("radiogroup", { name: "Activity" });
       expect(within(activity).getByRole("radio", { name: /alpine skiing/i })).toBeChecked();
@@ -1300,7 +1333,7 @@ describe("Home Page", () => {
       await answer(finishChange!);
 
       expect(screen.queryByText(/wind 20 mph/i)).not.toBeInTheDocument();
-      expect(screen.getByRole("combobox", { name: /location/i })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
       expect(screen.getByRole("button", { name: "See my layers" })).toBeEnabled();
     });
 
@@ -1315,7 +1348,6 @@ describe("Home Page", () => {
       const user = userEvent.setup();
       render(<Home />);
 
-      await user.click(screen.getByRole("button", { name: /single day/i }));
       await chooseStowe(user);
       await chooseStartDate(user);
       await user.click(screen.getByRole("button", { name: "See my layers" }));
@@ -1323,7 +1355,7 @@ describe("Home Page", () => {
         window.dispatchEvent(new CustomEvent("navigatePlanAhead"));
       });
 
-      expect(screen.getByRole("button", { name: "Getting your layers…" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Getting your layers…" })).toHaveAttribute("aria-busy", "true");
       await answer(finishWeather);
       expect(await screen.findByText(/wind 12 mph/i)).toBeInTheDocument();
     });

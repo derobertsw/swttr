@@ -1,19 +1,15 @@
 "use client";
 
 import { Suspense } from "react";
-import { Loader2, Zap } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
-import ActivitySelection from "@/components/ActivitySelection";
 import LayerDisplay from "@/components/LayerDisplay";
-import { PlanAheadForm } from "@/components/PlanAheadForm";
+import { GearUpForm } from "@/components/GearUpForm";
 import MultiDayPlanDisplay from "@/components/MultiDayPlanDisplay";
-import { LocationInput } from "@/components/LocationInput";
 import { useItemMappings } from "@/hooks/useItemMappings";
 import { useGearUp } from "@/hooks/useGearUp";
 import { layerDisplayAdvice } from "@/lib/gearUp";
 import { useUserId } from "@/hooks/useUserId";
 import { useWebMCPTools } from "@/hooks/useWebMCPTools";
-import { ACTIVITIES } from "@/data/activities";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const HomeContent = () => {
@@ -27,6 +23,7 @@ const HomeContent = () => {
     setExertion,
     result,
     inputMode,
+    setInputMode,
     date,
     setDate,
     time,
@@ -34,14 +31,13 @@ const HomeContent = () => {
     durationDays,
     setDurationDays,
     loading,
-    showPlaceError,
+    showFieldErrors,
     startDateError,
     locationStatus,
-    placeInputRef,
+    formRef,
     locationSearch,
     handleUseMyLocation,
     cancelLocating,
-    handleGoNow,
     handleSubmit,
     handleWeatherChange,
     handleActivityChange,
@@ -53,107 +49,53 @@ const HomeContent = () => {
 
   const { itemMappings } = useItemMappings();
 
-  const ActivityIcon = ACTIVITIES.find((item) => item.value === activity)?.icon ?? Zap;
-  const showGearUpButton = !result && inputMode !== "planAhead";
-
   return (
     <PageLayout onLogoClick={resetToInitialState} chromeVariant="compact">
-      <h1 className="sr-only">Gear up</h1>
       <div
         key={result ? "results" : "form"}
         className="flex w-full flex-col items-center gap-6 animate-in fade-in duration-300 sm:gap-7"
       >
+        {result && <h1 className="sr-only">Gear up</h1>}
         {!result ? (
           <>
-            <div className="mb-1 flex max-w-md flex-col items-center gap-2 text-center">
-              <p className="text-[1.75rem] font-semibold leading-tight tracking-[-0.01em] text-white/95 sm:text-[1.95rem]">
-                Pick your activity
-              </p>
-              <p className="max-w-[24rem] text-[0.95rem] leading-relaxed text-white/64">
-                This sets your layering baseline.
-              </p>
+            <div className="flex w-full max-w-md flex-col gap-1">
+              <h1 className="text-title font-semibold text-foreground md:text-title-lg">What should I wear?</h1>
+              <p className="text-base text-muted-foreground">Layer advice for your activity and conditions.</p>
             </div>
-            {activityInitializing ? (
-              <div className="mx-auto w-full max-w-md">
-                <div className="mb-2 flex items-center justify-between px-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
-                  <span>Loading activity</span>
-                  <span>{ACTIVITIES.length} options</span>
-                </div>
-                <div className="grid grid-cols-3 gap-3 py-6">
-                  <Skeleton className="h-36 rounded-xl bg-white/15" />
-                  <Skeleton className="h-44 rounded-xl bg-white/20" />
-                  <Skeleton className="h-36 rounded-xl bg-white/15" />
-                </div>
-              </div>
-            ) : (
-              <ActivitySelection
-                value={activity}
-                onChange={setActivity}
-                exertion={exertion}
-                onExertionChange={setExertion}
-              />
-            )}
-            {inputMode === "manual" ? (
-              <LocationInput
-                activityName={ACTIVITIES.find(a => a.value === activity)?.name.toLowerCase() || ""}
-                location={locationSearch.location}
-                locationQuery={locationSearch.locationQuery}
-                suggestions={locationSearch.suggestions}
-                showSuggestions={locationSearch.showSuggestions}
-                selectedLocation={locationSearch.selectedLocation}
-                isSearching={locationSearch.isSearching}
-                showErrors={showPlaceError}
-                locationStatus={locationStatus}
-                loading={loading}
-                inputRef={placeInputRef}
-                suggestionRef={locationSearch.suggestionRef}
-                onLocationInputChange={locationSearch.handleLocationInputChange}
-                onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
-                onSelectLocation={locationSearch.handleSelectLocation}
-                onDismiss={locationSearch.dismiss}
-                onUseMyLocation={() => void handleUseMyLocation()}
-                onCancelLocating={cancelLocating}
-              />
-            ) : (
-              <PlanAheadForm
-                date={date}
-                time={time}
-                durationDays={durationDays}
-                loading={loading}
-                startDateError={startDateError}
-                location={locationSearch.location}
-                locationQuery={locationSearch.locationQuery}
-                suggestions={locationSearch.suggestions}
-                showSuggestions={locationSearch.showSuggestions}
-                selectedLocation={locationSearch.selectedLocation}
-                isSearching={locationSearch.isSearching}
-                suggestionRef={locationSearch.suggestionRef}
-                onDateChange={setDate}
-                onTimeChange={setTime}
-                onDurationDaysChange={setDurationDays}
-                onSubmit={() => void handleSubmit()}
-                onGoNow={() => void handleGoNow()}
-                locationStatus={locationStatus}
-                onCancelLocating={cancelLocating}
-                onLocationInputChange={locationSearch.handleLocationInputChange}
-                onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
-                onSelectLocation={locationSearch.handleSelectLocation}
-                onDismiss={locationSearch.dismiss}
-              />
-            )}
-            {showGearUpButton && (
-              <button
-                type="button"
-                aria-label="Gear Up"
-                onClick={() => void handleSubmit()}
-                // Waits for a requested location, which becomes the place.
-                disabled={loading || locationStatus === "locating"}
-                className="inline-flex h-12 w-full max-w-[420px] items-center justify-center gap-2 rounded-xl border border-white/10 bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] px-6 text-sm font-semibold text-white shadow-[0_14px_26px_rgba(0,0,0,0.44)] transition-transform duration-200 hover:bg-[#030712] disabled:opacity-70"
-              >
-                {loading ? <Loader2 className="size-5 animate-spin" /> : <ActivityIcon className="size-5" />}
-                <span className="tracking-wide">Gear Up</span>
-              </button>
-            )}
+            <GearUpForm
+              formRef={formRef}
+              activity={activity}
+              onActivityChange={setActivity}
+              activityInitializing={activityInitializing}
+              exertion={exertion}
+              onExertionChange={setExertion}
+              location={locationSearch.location}
+              locationQuery={locationSearch.locationQuery}
+              suggestions={locationSearch.suggestions}
+              showSuggestions={locationSearch.showSuggestions}
+              selectedLocation={locationSearch.selectedLocation}
+              isSearching={locationSearch.isSearching}
+              suggestionRef={locationSearch.suggestionRef}
+              onLocationInputChange={locationSearch.handleLocationInputChange}
+              onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
+              onSelectLocation={locationSearch.handleSelectLocation}
+              onDismissSuggestions={locationSearch.dismiss}
+              locationStatus={locationStatus}
+              onUseMyLocation={() => void handleUseMyLocation()}
+              onCancelLocating={cancelLocating}
+              inputMode={inputMode}
+              onInputModeChange={setInputMode}
+              date={date}
+              onDateChange={setDate}
+              time={time}
+              onTimeChange={setTime}
+              durationDays={durationDays}
+              onDurationDaysChange={setDurationDays}
+              showFieldErrors={showFieldErrors}
+              startDateError={startDateError}
+              loading={loading}
+              onSubmit={() => void handleSubmit()}
+            />
           </>
         ) : result.kind === "plan" ? (
           <MultiDayPlanDisplay
@@ -187,14 +129,14 @@ const HomeContent = () => {
 
 const HomeLoading = () => (
   <PageLayout chromeVariant="compact">
-    <div className="mx-auto w-full max-w-md">
-      <div className="flex justify-center gap-4 py-6">
-        <Skeleton className="h-24 w-24 rounded-xl" />
-        <Skeleton className="h-28 w-28 rounded-xl" />
-        <Skeleton className="h-24 w-24 rounded-xl" />
+    <div className="flex w-full max-w-md flex-col gap-6">
+      <Skeleton className="h-9 w-3/4 rounded-control" />
+      <div className="grid grid-cols-2 gap-2 min-[400px]:grid-cols-3">
+        {Array.from({ length: 6 }, (_, index) => (
+          <Skeleton key={index} className="h-18 rounded-control" />
+        ))}
       </div>
     </div>
-    <Skeleton className="h-12 w-32 rounded-lg" />
   </PageLayout>
 );
 
