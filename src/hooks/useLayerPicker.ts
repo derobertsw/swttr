@@ -86,6 +86,14 @@ function getRegionalClo(item: WardrobeItem, bodyPart: BodyPart): number {
   return getClo(item) ?? 0;
 }
 
+/** The `items` an API route returns; throws when the request fails. */
+async function fetchItems<T>(url: string): Promise<T[]> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url} returned ${res.status}`);
+  const data = await res.json() as { items?: T[] };
+  return data.items ?? [];
+}
+
 const EMPTY_WARDROBE_ITEMS: WardrobeItem[] = [];
 const EMPTY_AVAILABLE_ITEMS: AvailableItem[] = [];
 
@@ -98,32 +106,39 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
     wardrobeItems: WardrobeItem[];
     availableItems: AvailableItem[];
   } | null>(null);
+  // Bumped to reload the wardrobe after it changes.
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     if (!userId) return;
 
     let cancelled = false;
     const fetchData = async () => {
-      let wardrobeItems: WardrobeItem[] = [];
-      let availableItems: AvailableItem[] = [];
-      try {
-        const [gearRes, availableRes] = await Promise.all([
-          fetch("/api/wardrobe/gear"),
-          fetch("/api/wardrobe/available"),
-        ]);
-        const gearData = await gearRes.json();
-        const availableData = await availableRes.json();
-        wardrobeItems = gearData.items || [];
-        availableItems = availableData.items || [];
-      } catch (err) {
-        logWarn("useLayerPicker.fetchData", err);
-      }
-      if (!cancelled) setData({ userId, wardrobeItems, availableItems });
+      const [gear, available] = await Promise.allSettled([
+        fetchItems<WardrobeItem>("/api/wardrobe/gear"),
+        fetchItems<AvailableItem>("/api/wardrobe/available"),
+      ]);
+      if (gear.status === "rejected") logWarn("useLayerPicker.fetchData", gear.reason);
+      if (available.status === "rejected") logWarn("useLayerPicker.fetchData", available.reason);
+      if (cancelled) return;
+      // A list that fails to load keeps what was loaded before for this user
+      // (empty on the first load), so a failed reload doesn't clear the picker.
+      setData((prev) => {
+        const previous = prev?.userId === userId ? prev : null;
+        return {
+          userId,
+          wardrobeItems: gear.status === "fulfilled" ? gear.value : previous?.wardrobeItems ?? [],
+          availableItems: available.status === "fulfilled" ? available.value : previous?.availableItems ?? [],
+        };
+      });
     };
 
     fetchData();
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, reloadCount]);
+
+  /** Loads the wardrobe again; the current items stay until it arrives. */
+  const reload = useCallback(() => setReloadCount((count) => count + 1), []);
 
   const isCurrent = data !== null && data.userId === userId;
   const loading = userId !== null && !isCurrent;
@@ -190,5 +205,5 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
     [wardrobeItems, availableItems, wardrobeItemIds, inUseItemIds]
   );
 
-  return { loading, getItems };
+  return { loading, getItems, reload };
 }

@@ -76,6 +76,20 @@ describe("useEditableLayers", () => {
     expect(result.current.layers).toBe(before);
   });
 
+  it("marks a catalog item as owned wherever it's worn", () => {
+    const { result } = renderHook(() => useLayersFor(null, null));
+    const catalogFleece = { name: "Catalog fleece", rcl: 0.3, sourceId: "fleece-1", isRecommended: true };
+
+    act(() => result.current.addItem("torso", "mid", catalogFleece));
+    act(() => result.current.addItem("legs", "mid", catalogFleece));
+    act(() => result.current.addItem("hands", "outer", { name: "Catalog glove", sourceId: "glove-9", isRecommended: true }));
+    act(() => result.current.markOwned("fleece-1"));
+
+    expect(result.current.layers.torso.mid).toEqual([{ ...catalogFleece, isRecommended: false }]);
+    expect(result.current.layers.legs.mid).toEqual([{ ...catalogFleece, isRecommended: false }]);
+    expect(result.current.layers.hands.outer).toEqual([{ name: "Catalog glove", sourceId: "glove-9", isRecommended: true }]);
+  });
+
   it("moves an item to another layer type and copies a layer", () => {
     const initial: BodyPartLayers = {
       torso: { base: [{ name: "Tee" }], mid: [{ name: "Fleece" }], outer: [] },

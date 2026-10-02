@@ -1,26 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarRange, CloudRain, Thermometer, Wind } from "lucide-react";
+import { AlertTriangle, CalendarRange, CloudRain, Thermometer, Wind } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import type { MultiDayLayerPlan } from "@/types/plan";
+import type { MultiDayLayerPlan, UncoveredPlanDay } from "@/types/plan";
 import { BODY_PART_LABELS, LAYER_LABELS } from "@/lib/layers";
 import type { PackingListData } from "@/lib/packingList";
 import { BODY_PART_ORDER, LAYER_TYPE_ORDER } from "@/lib/packingList";
-
-type BodyPartKey = "torso" | "legs" | "hands" | "headNeck";
-type PackingView = "packOnce" | "perDay";
-type PackingFilter = "all" | "gaps" | BodyPartKey;
-
-const PACKING_FILTER_OPTIONS: Array<{ value: PackingFilter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "gaps", label: "Only gaps" },
-  { value: "torso", label: "Torso" },
-  { value: "legs", label: "Legs" },
-  { value: "hands", label: "Hands" },
-  { value: "headNeck", label: "Head/Neck" },
-];
 
 interface MultiDayPlanDisplayProps {
   plan: MultiDayLayerPlan;
@@ -34,37 +21,32 @@ function formatPlanRange(startDate: string, endDate: string): string {
   return start === end ? start : `${start} - ${end}`;
 }
 
-const EMPTY_PACKING_LIST: PackingListData = {
-  byBodyPart: {
-    torso: { base: [], mid: [], outer: [] },
-    legs: { base: [], mid: [], outer: [] },
-    hands: { base: [], mid: [], outer: [] },
-    headNeck: { base: [], mid: [], outer: [] },
-  },
-  gaps: [],
-  extras: [],
-  totalAssignedItems: 0,
-  totalRequiredSlots: 0,
-};
+/** Why a day in the plan's range has no layers. */
+function describeUncoveredDay(day: UncoveredPlanDay, dayEndHour: number): string {
+  return day.reason === "afterStartTime"
+    ? `The start time is after its last daytime hour (${dayEndHour}:00).`
+    : "The forecast has no daytime hours for it.";
+}
 
 export default function MultiDayPlanDisplay({
   plan,
   itemMappings,
   onReset,
 }: MultiDayPlanDisplayProps) {
+  // `list` is null when the request failed.
   const [packingResult, setPackingResult] = useState<{
     days: MultiDayLayerPlan["days"];
     itemMappings: Map<string, string> | undefined;
-    list: PackingListData;
+    attempt: number;
+    list: PackingListData | null;
   } | null>(null);
-  const [packingView, setPackingView] = useState<PackingView>("packOnce");
-  const [activeFilter, setActiveFilter] = useState<PackingFilter>("all");
+  const [packingAttempt, setPackingAttempt] = useState(0);
 
   useEffect(() => {
     let isCancelled = false;
 
     const fetchPackingList = async () => {
-      let list = EMPTY_PACKING_LIST;
+      let list: PackingListData | null = null;
       try {
         const response = await fetch("/api/packing-list", {
           method: "POST",
@@ -75,31 +57,31 @@ export default function MultiDayPlanDisplay({
           }),
         });
         if (response.ok) {
-          const data = await response.json() as { packingList: PackingListData };
-          list = data.packingList;
+          const data = await response.json() as { packingList?: PackingListData };
+          list = data.packingList ?? null;
         }
       } catch {
-        // Fall back to an empty packing list.
+        // Shown as unavailable, with a retry.
       }
-      if (!isCancelled) setPackingResult({ days: plan.days, itemMappings, list });
+      if (!isCancelled) setPackingResult({ days: plan.days, itemMappings, attempt: packingAttempt, list });
     };
 
     void fetchPackingList();
     return () => { isCancelled = true; };
-  }, [plan.days, itemMappings]);
+  }, [plan.days, itemMappings, packingAttempt]);
 
-  // Loading until the stored result matches the current inputs; the previous
+  // Loading until the stored result matches the current request; a previous
   // list stays on screen while a refetch is in flight.
-  const packingLoading = packingResult?.days !== plan.days || packingResult?.itemMappings !== itemMappings;
-  const packingList = packingResult?.list ?? EMPTY_PACKING_LIST;
+  const packingLoading = packingResult?.days !== plan.days
+    || packingResult?.itemMappings !== itemMappings
+    || packingResult?.attempt !== packingAttempt;
+  const packingList = packingResult?.list ?? null;
+  const packingFailed = !packingLoading && packingList === null;
 
   const rangeLabel = formatPlanRange(plan.startDate, plan.endDate);
 
-  const handleFixGapsClick = () => {
-    setPackingView("packOnce");
-    setActiveFilter("gaps");
-    const gapsPanel = document.getElementById("packing-gaps");
-    gapsPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const handleSeeGapsClick = () => {
+    document.getElementById("packing-gaps")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -126,6 +108,23 @@ export default function MultiDayPlanDisplay({
             Uses {plan.dayStartHour}:00-{plan.dayEndHour}:00 local hours
           </span>
         </div>
+
+        {plan.uncoveredDays.length > 0 ? (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-950">
+            <p className="flex items-center gap-1.5 text-sm font-semibold">
+              <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
+              This plan covers {plan.days.length} of {plan.durationDays} days
+            </p>
+            <p className="mt-1 text-xs">The packing list and daily layers below leave out:</p>
+            <ul className="mt-1 space-y-0.5 text-xs">
+              {plan.uncoveredDays.map((day) => (
+                <li key={day.date}>
+                  <span className="font-semibold">{day.label}.</span> {describeUncoveredDay(day, plan.dayEndHour)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
 
       <article className="rounded-xl border border-white/35 bg-white/95 p-4 text-slate-900 shadow-[0_6px_22px_rgba(0,0,0,0.12)]">
@@ -134,166 +133,152 @@ export default function MultiDayPlanDisplay({
             <h3 className="text-base font-semibold">Clothing Packing List</h3>
             <p className="text-xs text-slate-600">Mapped and auto-matched to your wardrobe items.</p>
             {packingLoading ? (
-              <p className="mt-2 text-xs text-slate-400">Loading packing list...</p>
-            ) : (
+              <p role="status" className="mt-2 text-xs text-slate-400">Loading packing list...</p>
+            ) : packingList ? (
               <p className="mt-2 text-xs text-slate-500">
                 {packingList.totalRequiredSlots} required layer slots across this trip.
               </p>
-            )}
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800">
-                {packingList.totalAssignedItems} assigned
-              </span>
-              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-900">
-                {packingList.gaps.length} gaps
-              </span>
-            </div>
-            {packingList.gaps.length > 0 ? (
-              <Button
-                type="button"
-                size="sm"
-                className="h-8 bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800"
-                onClick={handleFixGapsClick}
-              >
-                Fix {packingList.gaps.length} gaps
-              </Button>
             ) : null}
-            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5">
-              <button
-                type="button"
-                onClick={() => setPackingView("packOnce")}
-                className={
-                  packingView === "packOnce"
-                    ? "rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-slate-900 shadow-sm"
-                    : "rounded-md px-2.5 py-1 text-xs font-medium text-slate-600"
-                }
-              >
-                Pack Once
-              </button>
-              <button
-                type="button"
-                onClick={() => setPackingView("perDay")}
-                className={
-                  packingView === "perDay"
-                    ? "rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-slate-900 shadow-sm"
-                    : "rounded-md px-2.5 py-1 text-xs font-medium text-slate-600"
-                }
-              >
-                Per Day
-              </button>
-            </div>
           </div>
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {PACKING_FILTER_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setActiveFilter(option.value)}
-              className={
-                activeFilter === option.value
-                  ? "rounded-full border border-slate-300 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white"
-                  : "rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
-              }
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {BODY_PART_ORDER.map((bodyPart) => {
-            const section = packingList.byBodyPart[bodyPart];
-            const hasContent = section.base.length > 0 || section.mid.length > 0 || section.outer.length > 0;
-            return (
-              <div
-                key={bodyPart}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2.5"
-              >
-                <p className="text-sm font-semibold">{BODY_PART_LABELS[bodyPart]}</p>
-                {hasContent ? (
-                  <div className="mt-2 space-y-1.5">
-                    {LAYER_TYPE_ORDER.map((layerType) =>
-                      section[layerType].length > 0 ? (
-                        <div key={layerType}>
-                          <p className="text-xs font-medium text-slate-700">{LAYER_LABELS[layerType]}:</p>
-                          <div className="mt-1 flex flex-wrap gap-1.5">
-                            {section[layerType].map((entry) => (
-                              <span
-                                key={`${entry.standardOption}:${entry.specificItem}`}
-                                className={
-                                  entry.source === "mapped"
-                                    ? "rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-900"
-                                    : "rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] text-sky-900"
-                                }
-                                title={`Mapped from ${entry.standardOption}`}
-                              >
-                                {entry.specificItem}
-                                {entry.source === "auto" ? " (auto)" : ""}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null
-                    )}
-                  </div>
-                ) : (
-                  <p className="mt-2 text-xs text-slate-500">No specific items mapped yet.</p>
-                )}
+          {packingList ? (
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800">
+                  {packingList.totalAssignedItems} assigned
+                </span>
+                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-900">
+                  {packingList.gaps.length} gaps
+                </span>
               </div>
-            );
-          })}
+              {packingList.gaps.length > 0 ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800"
+                  onClick={handleSeeGapsClick}
+                >
+                  See {packingList.gaps.length} gaps
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
-        {packingList.gaps.length > 0 ? (
-          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">
-              Gaps To Fill
+        {packingFailed ? (
+          <div role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-red-950">
+            <p className="flex items-center gap-1.5 text-sm font-semibold">
+              <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
+              Packing list unavailable
             </p>
-            <p className="mt-1 text-xs text-amber-900/80">
-              No wardrobe match found for these slots.
+            <p className="mt-1 text-xs">
+              Something went wrong building it. The daily layers below aren&apos;t affected.
             </p>
-            <div className="mt-2 grid gap-2">
-              {packingList.gaps.map((gap) => (
-                <div
-                  key={`${gap.bodyPart}:${gap.layerType}:${gap.standardOption}`}
-                  className="rounded-md border border-amber-300 bg-white px-2.5 py-2 text-[11px] text-amber-950"
-                >
-                  <p className="font-medium">
-                    {BODY_PART_LABELS[gap.bodyPart]} {LAYER_LABELS[gap.layerType]}: {gap.standardOption}
-                  </p>
-                  {gap.suggestions.length > 0 ? (
-                    <p className="mt-0.5 text-[11px] text-amber-900/80">
-                      Likely owned: {gap.suggestions.join(", ")}
-                    </p>
-                  ) : (
-                    <p className="mt-0.5 text-[11px] text-amber-900/70">
-                      No likely wardrobe match found.
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-2 h-8 text-xs"
+              onClick={() => setPackingAttempt((attempt) => attempt + 1)}
+            >
+              Try again
+            </Button>
           </div>
         ) : null}
 
-        {packingList.extras.length > 0 ? (
-          <div className="mt-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trip Extras</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {packingList.extras.map((item) => (
-                <span
-                  key={item}
-                  className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-900"
-                >
-                  {item}
-                </span>
-              ))}
+        {packingList ? (
+          <>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {BODY_PART_ORDER.map((bodyPart) => {
+                const section = packingList.byBodyPart[bodyPart];
+                const hasContent = section.base.length > 0 || section.mid.length > 0 || section.outer.length > 0;
+                return (
+                  <div
+                    key={bodyPart}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2.5"
+                  >
+                    <p className="text-sm font-semibold">{BODY_PART_LABELS[bodyPart]}</p>
+                    {hasContent ? (
+                      <div className="mt-2 space-y-1.5">
+                        {LAYER_TYPE_ORDER.map((layerType) =>
+                          section[layerType].length > 0 ? (
+                            <div key={layerType}>
+                              <p className="text-xs font-medium text-slate-700">{LAYER_LABELS[layerType]}:</p>
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                {section[layerType].map((entry) => (
+                                  <span
+                                    key={`${entry.standardOption}:${entry.specificItem}`}
+                                    className={
+                                      entry.source === "mapped"
+                                        ? "rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-900"
+                                        : "rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] text-sky-900"
+                                    }
+                                    title={`Mapped from ${entry.standardOption}`}
+                                  >
+                                    {entry.specificItem}
+                                    {entry.source === "auto" ? " (auto)" : ""}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null
+                        )}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-xs text-slate-500">No specific items mapped yet.</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          </div>
+
+            {packingList.gaps.length > 0 ? (
+              <div id="packing-gaps" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">
+                  Gaps To Fill
+                </p>
+                <p className="mt-1 text-xs text-amber-900/80">
+                  No wardrobe match found for these slots.
+                </p>
+                <div className="mt-2 grid gap-2">
+                  {packingList.gaps.map((gap) => (
+                    <div
+                      key={`${gap.bodyPart}:${gap.layerType}:${gap.standardOption}`}
+                      className="rounded-md border border-amber-300 bg-white px-2.5 py-2 text-[11px] text-amber-950"
+                    >
+                      <p className="font-medium">
+                        {BODY_PART_LABELS[gap.bodyPart]} {LAYER_LABELS[gap.layerType]}: {gap.standardOption}
+                      </p>
+                      {gap.suggestions.length > 0 ? (
+                        <p className="mt-0.5 text-[11px] text-amber-900/80">
+                          Likely owned: {gap.suggestions.join(", ")}
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 text-[11px] text-amber-900/70">
+                          No likely wardrobe match found.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {packingList.extras.length > 0 ? (
+              <div className="mt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trip Extras</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {packingList.extras.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-900"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
         ) : null}
       </article>
 
