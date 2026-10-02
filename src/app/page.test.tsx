@@ -215,6 +215,57 @@ describe("Home Page", () => {
       expect(geolocation.getCurrentPosition).not.toHaveBeenCalled();
     });
 
+    it("goes Back from the results to the form with the activity and place kept, and starts over from the logo", async () => {
+      mockOutingApis();
+      const user = userEvent.setup();
+      render(<Home />);
+      const activity = () => screen.getByRole("radiogroup", { name: "Activity" });
+
+      await screen.findByRole("radiogroup", { name: "Activity" });
+      await user.click(within(activity()).getByRole("radio", { name: /xc skiing/i }));
+      await chooseStowe(user, /where are you/i);
+      await user.click(gearUpButton());
+      expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Back" }));
+
+      expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
+      expect(within(activity()).getByRole("radio", { name: /xc skiing/i })).toBeChecked();
+      expect(placeField()).toHaveValue("Stowe, Vermont, United States");
+      expect(gearUpButton()).toBeEnabled();
+
+      await user.click(screen.getByRole("link", { name: "SWTTR" }));
+
+      expect(within(activity()).getByRole("radio", { name: /alpine skiing/i })).toBeChecked();
+      expect(placeField()).toHaveValue("");
+    });
+
+    it("doesn't let a late answer for an outing that was started over replace the newer one", async () => {
+      let finishFirst: (() => void) | undefined;
+      const weatherResponses = [
+        () =>
+          new Promise<MockResponse>((resolve) => {
+            finishFirst = () => resolve(respond(200, { temperature: 10, windSpeed: 30 }));
+          }),
+        () => respond(200, { temperature: 30, windSpeed: 7 }),
+      ];
+      mockOutingApis(() => weatherResponses.shift()!());
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await chooseStowe(user, /where are you/i);
+      await user.click(gearUpButton());
+      await user.click(screen.getByRole("link", { name: "SWTTR" }));
+      await chooseStowe(user, /where are you/i);
+      await user.click(gearUpButton());
+      expect(await screen.findByText(/wind 7 mph/i)).toBeInTheDocument();
+
+      await answer(finishFirst!);
+
+      expect(screen.getByText(/wind 7 mph/i)).toBeInTheDocument();
+      expect(screen.queryByText(/wind 30 mph/i)).not.toBeInTheDocument();
+    });
+
     it("gets current conditions at the device's location once Use my location finds it", async () => {
       const geolocation = mockGeolocation();
       const weatherRequests = mockOutingApis();
@@ -449,7 +500,7 @@ describe("Home Page", () => {
     };
 
     /** Located at 32°F with 15 mph wind; recommendation requests get the given response. */
-    function mockOuting(recommendationResponse: (url: string) => MockResponse) {
+    function mockOuting(recommendationResponse: (url: string) => MockResponse | Promise<MockResponse>) {
       Object.defineProperty(navigator, "geolocation", {
         value: {
           getCurrentPosition: vi.fn((success) => {
@@ -508,6 +559,61 @@ describe("Home Page", () => {
       expect(screen.getByText("Current conditions")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Running" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Change weather location, date, or time" })).toBeInTheDocument();
+    });
+
+    it.each([
+      {
+        failure: "an expired session",
+        response: respond(401, { error: "Authentication required" }),
+        notice: "Sign in for Running layers",
+        action: { name: /sign in/i, href: "/sign-in" },
+      },
+      {
+        failure: "targets without usable gear",
+        response: respond(200, { message: "No suitable garments found in database", ireq: { min: 1, neutral: 1.4 } }),
+        notice: "Add gear for Running layers",
+        action: { name: /add gear/i, href: "/wardrobe" },
+      },
+    ])("tells a signed-in user what personalized layers need after $failure", async ({ response, notice, action }) => {
+      mockOuting(() => response);
+      const user = userEvent.setup();
+      render(<Home />);
+      await gearUpHere(user);
+
+      const guidance = await screen.findByRole("region", { name: "General guidance" });
+      expect(within(guidance).getByRole("link", { name: action.name })).toHaveAttribute("href", action.href);
+
+      await switchActivity(user, "Alpine", "Running");
+
+      const region = await screen.findByRole("region", { name: notice });
+      expect(within(region).getByRole("link", { name: action.name })).toHaveAttribute("href", action.href);
+    });
+
+    it("keeps the shown layers under their own activity while another activity's layers load", async () => {
+      let finishRunning: (() => void) | undefined;
+      mockOuting((url) =>
+        url.endsWith("/running")
+          ? new Promise((resolve) => {
+              finishRunning = () => resolve(respond(200, RUNNING_RECOMMENDATION));
+            })
+          : respond(500, { error: "Unavailable" })
+      );
+      const user = userEvent.setup();
+      render(<Home />);
+      await gearUpHere(user);
+      expect(await screen.findByText(/personalized layers couldn't load/i)).toBeInTheDocument();
+
+      await switchActivity(user, "Alpine", "Running");
+
+      expect(finishRunning).toBeDefined();
+      expect(screen.getByRole("button", { name: "Alpine" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Running" })).not.toBeInTheDocument();
+      expect(screen.getByText(/personalized layers couldn't load/i)).toBeInTheDocument();
+
+      await answer(finishRunning!);
+
+      expect((await screen.findAllByText("Running tights")).length).toBeGreaterThan(0);
+      expect(screen.getByRole("button", { name: "Running" })).toBeEnabled();
     });
 
     it("retries a failed request for the same outing", async () => {
@@ -1162,6 +1268,9 @@ describe("Home Page", () => {
 
       expect(screen.queryByText(/wind 12 mph/i)).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: form })).toBeEnabled();
+      // The form opens on the activity that was shown, not the one that never loaded.
+      const activity = screen.getByRole("radiogroup", { name: "Activity" });
+      expect(within(activity).getByRole("radio", { name: /alpine skiing/i })).toBeChecked();
     });
 
     it("drops a weather change still running when the iOS shell's Plan tab is tapped", async () => {
