@@ -53,6 +53,10 @@ const SORT_LABELS: Record<WardrobeSearchProps["searchSort"], string> = {
   clo: "Highest clo",
 };
 
+// Two rows of chips. If even this doesn't fit beside the other controls, the
+// whole catalog scrolls instead.
+const MIN_FILTER_PANEL_HEIGHT = 120;
+
 
 export function WardrobeSearch({
   search,
@@ -85,7 +89,9 @@ export function WardrobeSearch({
   // ResizeObserver for Safari-safe scroll
   const controlsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const filterPanelRef = useRef<HTMLDivElement>(null);
   const [resultsMaxHeight, setResultsMaxHeight] = useState<number | null>(null);
+  const [filterPanelMaxHeight, setFilterPanelMaxHeight] = useState<number | null>(null);
 
   useEffect(() => {
     const controls = controlsRef.current;
@@ -95,6 +101,14 @@ export function WardrobeSearch({
     const update = () => {
       const containerHeight = container.clientHeight;
       const controlsHeight = controls.offsetHeight;
+      // On short screens the open filter panel can outgrow the catalog, so it
+      // scrolls within the room the other controls leave. The 14px is the
+      // results list's top margin and border.
+      const filterPanel = filterPanelRef.current;
+      if (filterPanel) {
+        const otherControlsHeight = controlsHeight - filterPanel.offsetHeight;
+        setFilterPanelMaxHeight(Math.max(MIN_FILTER_PANEL_HEIGHT, containerHeight - otherControlsHeight - 14));
+      }
       setResultsMaxHeight(Math.max(0, containerHeight - controlsHeight - 12));
     };
 
@@ -172,7 +186,7 @@ export function WardrobeSearch({
   );
 
   return (
-    <div ref={containerRef} className="h-full overflow-hidden">
+    <div ref={containerRef} className="h-full overflow-y-auto">
       <div ref={controlsRef}>
         <div className="relative">
           <Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -261,8 +275,10 @@ export function WardrobeSearch({
 
         {filtersExpanded && (
           <div
+            ref={filterPanelRef}
             id="wardrobe-filter-panel"
-            className="mt-2 space-y-3 rounded-control bg-muted p-3"
+            className="mt-2 space-y-3 overflow-y-auto rounded-control bg-muted p-3"
+            style={filterPanelMaxHeight !== null ? { maxHeight: filterPanelMaxHeight } : undefined}
           >
             {/* Layer */}
             <div role="group" aria-labelledby="wardrobe-filter-layer">

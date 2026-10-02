@@ -73,7 +73,13 @@ export function WardrobeItemCard({
             {brandLabel}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <Badge size="sm" variant={isDisabled ? "outline" : isCustom ? "primary" : "neutral"}>
+            <Badge
+              size="sm"
+              variant={isDisabled ? "outline" : isCustom ? "primary" : "neutral"}
+              // Long custom labels wrap inside the text column. The control
+              // radius matches a pill on one line and stays tidy on several.
+              className="max-w-full shrink whitespace-normal rounded-control"
+            >
               {categoryLabel}
             </Badge>
           </div>
