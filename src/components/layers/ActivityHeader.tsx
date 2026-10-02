@@ -66,8 +66,8 @@ export function ActivityHeader({ activity, onReset, onActivityChange, loading }:
                   key={act.value}
                   type="button"
                   className={cn(
-                    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors hover:bg-slate-100",
-                    act.value === activity && "bg-slate-50 font-semibold"
+                    "flex min-h-9 w-full items-center gap-2.5 rounded-[calc(var(--radius)-4px)] px-3 py-2 text-base transition-colors hover:bg-accent hover:text-accent-foreground max-md:min-h-11 pointer-coarse:min-h-11 md:text-sm",
+                    act.value === activity && "font-semibold"
                   )}
                   onClick={() => {
                     setOpen(false);
@@ -76,9 +76,9 @@ export function ActivityHeader({ activity, onReset, onActivityChange, loading }:
                     }
                   }}
                 >
-                  <act.icon className="size-4 shrink-0 text-slate-500" />
+                  <act.icon className="size-4 shrink-0 text-muted-foreground" />
                   <span className="flex-1 text-left">{act.name}</span>
-                  {act.value === activity && <Check className="size-3.5 text-slate-500" />}
+                  {act.value === activity && <Check className="size-4 text-primary" />}
                 </button>
               ))}
             </PopoverContent>

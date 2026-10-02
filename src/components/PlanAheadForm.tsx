@@ -18,7 +18,6 @@ import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { DeviceLocationButton } from "@/components/DeviceLocationButton";
 import { FieldError } from "@/components/FieldError";
 import type { DeviceLocationStatus } from "@/hooks/useDeviceLocation";
-import { FROSTED_INPUT, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
 import { Capacitor } from "@capacitor/core";
 
 interface PlanAheadFormProps {
@@ -257,13 +256,13 @@ export function PlanAheadForm({
         <div className="flex flex-col gap-2 min-[375px]:flex-row">
           {useNativeIOSDatePicker ? (
             <div className="relative min-[375px]:flex-1">
-              <CalendarIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/75" />
+              <CalendarIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 ref={dateInputRef}
                 type="date"
                 value={dateValue}
                 onChange={(event) => onDateChange(parseDateInputValue(event.target.value))}
-                className={`h-12 pl-10 ${FROSTED_INPUT}`}
+                className="h-12 pl-10"
                 aria-label="Start date"
                 aria-invalid={showDateError || undefined}
                 aria-describedby={showDateError ? "plan-start-date-error" : undefined}
@@ -278,15 +277,15 @@ export function PlanAheadForm({
                   aria-invalid={showDateError || undefined}
                   aria-describedby={showDateError ? "plan-start-date-error" : undefined}
                   className={cn(
-                    `h-12 justify-start min-[375px]:flex-1 text-left font-normal ${FROSTED_INPUT} hover:bg-white/25 hover:text-white`,
-                    !date && "text-white/50"
+                    "h-12 justify-start text-left text-base font-normal min-[375px]:flex-1",
+                    !date && "text-muted-foreground"
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="text-muted-foreground" />
                   {date ? format(date, "MMM d, yyyy") : "Pick start date"}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className={`w-auto rounded-xl p-0 ${SUGGESTIONS_DROPDOWN}`}>
+              <PopoverContent className="w-auto p-0">
                 <Calendar
                   mode="single"
                   selected={date}
@@ -302,7 +301,7 @@ export function PlanAheadForm({
               type="time"
               value={time}
               onChange={(e) => onTimeChange(e.target.value)}
-              className={`h-12 tabular-nums ${FROSTED_INPUT}`}
+              className="h-12 tabular-nums"
               aria-label="Start time"
               aria-invalid={showTimeError || undefined}
               aria-describedby={showTimeError ? "plan-start-time-error" : undefined}

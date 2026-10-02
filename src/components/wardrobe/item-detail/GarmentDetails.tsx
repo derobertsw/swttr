@@ -13,7 +13,7 @@ export function GarmentDetails({ details }: { details: WardrobeItem["details"] }
   return (
     <>
       <Tabs defaultValue="clo" className="mt-1">
-        <TabsList className="w-full bg-muted/45">
+        <TabsList className="w-full">
           <TabsTrigger value="clo">Clo</TabsTrigger>
           <TabsTrigger value="evap">Evap</TabsTrigger>
           <TabsTrigger value="breath">Breathability</TabsTrigger>

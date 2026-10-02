@@ -290,18 +290,20 @@ export default function Wardrobe() {
         }}
       />
 
-      {/* Browse Catalog Modal */}
+      {/* Browse Catalog Modal. WardrobeSearch is still styled for a light
+          surface, so the catalog keeps the light palette until the Wardrobe
+          screens move to the design tokens (#119). */}
       {isMobile ? (
         <Drawer open={showSearch} onOpenChange={(open) => { setShowSearch(open); if (!open) { clearSearchFilters(); setSearch(""); } }}>
-          <DrawerContent className="h-[95vh] rounded-t-2xl border-t-border/60 bg-background">
-            <div className="flex h-full w-full flex-col">
-              <DrawerHeader className="flex-none px-4 pb-3 pt-3">
-                <DrawerTitle className="text-xl font-semibold">Browse Catalog</DrawerTitle>
-                <DrawerDescription className="text-sm text-muted-foreground">
+          <DrawerContent data-appearance="light" showCloseButton className="h-[95dvh]">
+            <div className="flex min-h-0 w-full flex-1 flex-col">
+              <DrawerHeader className="flex-none pr-14 pb-3">
+                <DrawerTitle>Browse Catalog</DrawerTitle>
+                <DrawerDescription>
                   {totalAvailableCount} items available
                 </DrawerDescription>
               </DrawerHeader>
-              <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-safe">
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
                 <WardrobeSearch
                   search={search}
                   onSearchChange={setSearch}
@@ -331,10 +333,13 @@ export default function Wardrobe() {
         </Drawer>
       ) : (
         <Dialog open={showSearch} onOpenChange={(open) => { setShowSearch(open); if (!open) { clearSearchFilters(); setSearch(""); } }}>
-          <DialogContent className="flex h-[90vh] max-w-4xl flex-col overflow-hidden border-border/60 bg-background p-0">
-            <DialogHeader className="flex-none border-b border-border/60 px-6 py-4">
-              <DialogTitle className="text-xl font-semibold">Browse Catalog</DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">
+          <DialogContent
+            data-appearance="light"
+            className="flex h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0"
+          >
+            <DialogHeader className="flex-none border-b border-border px-6 py-4">
+              <DialogTitle>Browse Catalog</DialogTitle>
+              <DialogDescription>
                 {totalAvailableCount} items available
               </DialogDescription>
             </DialogHeader>

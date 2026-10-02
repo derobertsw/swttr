@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "@/assets/styles/globals.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -38,19 +38,28 @@ export const metadata: Metadata = {
   },
 };
 
+// Matches the pinned dark canvas in globals.css.
+export const viewport: Viewport = {
+  themeColor: "#0f1d2a",
+};
+
 const RootLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <ClerkProvider>
-      <html lang="en">
+      {/* Pinned to dark until every screen reads the design tokens (#119);
+          then the app follows the system appearance. */}
+      <html
+        lang="en"
+        data-appearance="dark"
+        className={`${geistSans.variable} ${geistMono.variable}`}
+      >
         <head>
           <meta
             name="viewport"
             content="width=device-width, initial-scale=1, viewport-fit=cover"
           />
         </head>
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
+        <body className="antialiased">
           {children}
           <Toaster />
         </body>
