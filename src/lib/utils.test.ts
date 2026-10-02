@@ -28,6 +28,13 @@ describe("cn utility function", () => {
     expect(cn({ foo: true, bar: false, baz: true })).toBe("foo baz");
   });
 
+  it("should merge the design system's radius and title sizes", () => {
+    expect(cn("rounded-full", "rounded-control")).toBe("rounded-control");
+    expect(cn("rounded-control", "rounded-card")).toBe("rounded-card");
+    expect(cn("text-sm", "text-title")).toBe("text-title");
+    expect(cn("text-foreground", "text-title")).toBe("text-foreground text-title");
+  });
+
   it("should handle empty inputs", () => {
     expect(cn()).toBe("");
     expect(cn("")).toBe("");
