@@ -61,6 +61,7 @@ function PickerItemRow({
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-muted-foreground">{item.brand}</p>
         <p className="truncate text-base font-semibold text-foreground">{item.name}</p>
+        {!item.isOwned && <p className="text-xs font-medium text-primary">Not in your wardrobe</p>}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {item.isInUse && <Badge size="sm">In use</Badge>}
@@ -196,7 +197,7 @@ export function LayerPickerDrawer({
           {/* Wardrobe items */}
           <div className="border-t border-border pt-3">
             <PickerSection
-              title="Your Wardrobe"
+              title="Your wardrobe"
               items={wardrobeItems}
               maxHeight="168px"
               emptyMessage="No matching items in your wardrobe"
@@ -204,13 +205,13 @@ export function LayerPickerDrawer({
             />
           </div>
 
-          {/* Recommended items */}
+          {/* Catalog items the user doesn't own */}
           <div className="mt-4 border-t border-border pt-3">
             <PickerSection
-              title="SWTTR Recommends"
+              title="Other options"
               items={recommendedItems}
               maxHeight="240px"
-              emptyMessage="No recommendations available"
+              emptyMessage="No other options for this layer"
               onSelect={onSelect}
               variant="recommended"
             />

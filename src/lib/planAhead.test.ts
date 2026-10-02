@@ -57,6 +57,49 @@ describe("buildMultiDayLayerPlan", () => {
     expect(result.startDate).toBe("2026-01-15");
     expect(result.endDate).toBe("2026-01-21");
     expect(result.days).toHaveLength(2);
+    expect(result.uncoveredDays.map((day) => day.date)).toEqual([
+      "2026-01-17",
+      "2026-01-18",
+      "2026-01-19",
+      "2026-01-20",
+      "2026-01-21",
+    ]);
+    expect(result.uncoveredDays[0]).toEqual({ date: "2026-01-17", label: "Sat, Jan 17", reason: "noForecast" });
+  });
+
+  it("says when the first day's daytime hours all come before the start time", () => {
+    const hours: ForecastHour[] = [
+      { time: "2026-01-15T12:00", temperature: 35, windSpeed: 8, precipitationProbability: 0 },
+      { time: "2026-01-15T21:00", temperature: 30, windSpeed: 8, precipitationProbability: 0 },
+      { time: "2026-01-16T09:00", temperature: 32, windSpeed: 8, precipitationProbability: 0 },
+    ];
+
+    const result = buildMultiDayLayerPlan({
+      startDate: new Date("2026-01-15T00:00:00"),
+      durationDays: 2,
+      startHour: 22,
+      hourlyForecast: hours,
+      getRecommendation: () => makeRecommendation(2),
+    });
+
+    expect(result.days.map((day) => day.date)).toEqual(["2026-01-16"]);
+    expect(result.uncoveredDays).toEqual([{ date: "2026-01-15", label: "Thu, Jan 15", reason: "afterStartTime" }]);
+  });
+
+  it("leaves no days uncovered when every day has daytime hours", () => {
+    const hours: ForecastHour[] = [
+      { time: "2026-01-15T08:00", temperature: 35, windSpeed: 10, precipitationProbability: 0 },
+      { time: "2026-01-16T09:00", temperature: 36, windSpeed: 10, precipitationProbability: 0 },
+    ];
+
+    const result = buildMultiDayLayerPlan({
+      startDate: new Date("2026-01-15T00:00:00"),
+      durationDays: 2,
+      hourlyForecast: hours,
+      getRecommendation: () => makeRecommendation(2),
+    });
+
+    expect(result.uncoveredDays).toEqual([]);
   });
 
   it("respects start hour on the first day", () => {

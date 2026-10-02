@@ -160,8 +160,8 @@ function SwipeableLayerItem({
         <span className="min-w-0 flex-1 text-slate-900 font-semibold leading-snug">
           {item.name}
           {item.isRecommended && (
-            <span className="ml-2 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-              SWTTR
+            <span className="ml-2 inline-block whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+              Not in your wardrobe
             </span>
           )}
         </span>

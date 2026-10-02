@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { BodyPart, BodyPartLayers, LayerItem, LayerType } from "@/lib/layers";
+import { BODY_PARTS, type BodyPart, type BodyPartLayers, type LayerItem, type LayerType } from "@/lib/layers";
+
+const LAYER_TYPES: LayerType[] = ["base", "mid", "outer"];
 
 /**
  * An editable copy of `initialLayers`. Edits are discarded when the initial
@@ -86,5 +88,21 @@ export function useEditableLayers(initialLayers: BodyPartLayers) {
     []
   );
 
-  return { layers, addItem, removeItem, replaceItem, setLayerItems, moveItem };
+  /** Stop marking a catalog item as not owned, wherever it's worn, once it's in the wardrobe. */
+  const markOwned = useCallback(
+    (sourceId: string) => {
+      for (const bodyPart of BODY_PARTS) {
+        for (const layerType of LAYER_TYPES) {
+          updateLayer(bodyPart, layerType, (items) =>
+            items.some((item) => item.isRecommended && item.sourceId === sourceId)
+              ? items.map((item) => (item.sourceId === sourceId ? { ...item, isRecommended: false } : item))
+              : items
+          );
+        }
+      }
+    },
+    [updateLayer]
+  );
+
+  return { layers, addItem, removeItem, replaceItem, setLayerItems, moveItem, markOwned };
 }

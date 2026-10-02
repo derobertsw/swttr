@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { NextRequest } from "next/server";
 import { toast } from "sonner";
 import { POST as evaluateLayers } from "@/app/api/v1/ensembles/evaluate/route";
@@ -41,8 +41,9 @@ vi.mock("sonner", () => ({
 }));
 
 // Mock useLayerPicker — no wardrobe items available in tests
+const mockReloadPicker = vi.fn();
 vi.mock("@/hooks/useLayerPicker", () => ({
-  useLayerPicker: () => ({ loading: false, getItems: () => [] }),
+  useLayerPicker: () => ({ loading: false, getItems: () => [], reload: mockReloadPicker }),
 }));
 
 // Mock LayerPickerDrawer — while open, offers one item that isn't in the wardrobe
@@ -417,17 +418,107 @@ describe("LayerDisplay", () => {
       guidance: ["Layer up for the chairlift"],
     };
 
-    it("offers a client-side route to the wardrobe after picking an item not in it", () => {
-      render(<LayerDisplay recommendation={null} temperature={15} windspeed={10} biophysicsData={mockBiophysicsData} />);
-      const legs = screen.getByRole("button", { name: /legs/i }).parentElement!;
-      fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
-      fireEvent.click(screen.getByText("Pick catalog fleece"));
+    describe("items not in the wardrobe", () => {
+      beforeEach(() => {
+        vi.clearAllMocks();
+      });
 
-      expect(within(legs).getByText("Catalog fleece")).toBeInTheDocument();
-      const action = vi.mocked(toast.info).mock.lastCall?.[1]?.action as { label: string; onClick: () => void };
-      expect(action.label).toBe("Go to Wardrobe");
-      action.onClick();
-      expect(mockPush).toHaveBeenCalledWith("/wardrobe");
+      /** Answers adds to the wardrobe with `status`, and keeps serving layer evaluation. */
+      function stubWardrobeAdd(status: number) {
+        const evaluate = vi.mocked(fetch);
+        const addRequests: unknown[] = [];
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            if (String(input) !== "/api/wardrobe/gear") return evaluate(input, init);
+            addRequests.push(JSON.parse(init?.body as string));
+            return Response.json({}, { status });
+          })
+        );
+        return addRequests;
+      }
+
+      function renderAndPickCatalogFleeceForLegs() {
+        render(<LayerDisplay recommendation={null} temperature={15} windspeed={10} biophysicsData={mockBiophysicsData} />);
+        const legs = screen.getByRole("button", { name: /legs/i }).parentElement!;
+        fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+        return { legs, card: screen.getByRole("region", { name: "Not in your wardrobe" }) };
+      }
+
+      it("adds a picked catalog item to the outfit, not to the wardrobe", () => {
+        const addRequests = stubWardrobeAdd(201);
+        const { legs, card } = renderAndPickCatalogFleeceForLegs();
+
+        expect(within(legs).getByText("Catalog fleece")).toHaveTextContent("Not in your wardrobe");
+        expect(within(card).getByText("Catalog fleece")).toBeInTheDocument();
+        expect(addRequests).toEqual([]);
+        expect(toast.info).not.toHaveBeenCalled();
+      });
+
+      it("labels the web search for an item as a search", () => {
+        stubWardrobeAdd(201);
+        const { card } = renderAndPickCatalogFleeceForLegs();
+
+        const search = within(card).getByRole("link", { name: /^Search for this item/ });
+        expect(search).toHaveAttribute("href", "https://www.google.com/search?q=Test%20Brand%20Catalog%20fleece");
+        expect(search).toHaveAttribute("target", "_blank");
+        expect(within(card).queryByText(/buy/i)).not.toBeInTheDocument();
+      });
+
+      it("adds the item to the wardrobe only when the user says they own it", async () => {
+        const addRequests = stubWardrobeAdd(201);
+        const { legs, card } = renderAndPickCatalogFleeceForLegs();
+
+        fireEvent.click(within(card).getByRole("button", { name: /^I own this/ }));
+
+        await waitFor(() =>
+          expect(screen.queryByRole("region", { name: "Not in your wardrobe" })).not.toBeInTheDocument()
+        );
+        expect(addRequests).toEqual([{ item_type: "garment", item_id: "catalog-fleece" }]);
+        expect(toast.success).toHaveBeenCalledWith("Catalog fleece added to your wardrobe");
+        expect(within(legs).getByText("Catalog fleece")).not.toHaveTextContent("Not in your wardrobe");
+        expect(mockReloadPicker).toHaveBeenCalledTimes(1);
+      });
+
+      it("lists an item picked for the descent", () => {
+        stubWardrobeAdd(201);
+        const touringData = {
+          ...mockBiophysicsData,
+          ireq: { ...mockBiophysicsData.ireq, downhill_target_range: [1.0, 1.6] as [number, number] },
+        };
+        render(
+          <LayerDisplay
+            activity="backcountry_skiing"
+            recommendation={null}
+            temperature={15}
+            windspeed={10}
+            biophysicsData={touringData}
+          />
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Descent" }));
+        const legs = screen.getByRole("button", { name: /legs/i }).parentElement!;
+        fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+        const card = screen.getByRole("region", { name: "Not in your wardrobe" });
+        expect(within(card).getByText("Catalog fleece")).toBeInTheDocument();
+      });
+
+      it("still shows the item as not owned when adding it fails", async () => {
+        stubWardrobeAdd(500);
+        const { legs, card } = renderAndPickCatalogFleeceForLegs();
+
+        fireEvent.click(within(card).getByRole("button", { name: /^I own this/ }));
+
+        await waitFor(() =>
+          expect(toast.error).toHaveBeenCalledWith("Couldn't add Catalog fleece to your wardrobe. Try again.")
+        );
+        expect(within(legs).getByText("Catalog fleece")).toHaveTextContent("Not in your wardrobe");
+        expect(within(card).getByRole("button", { name: /^I own this/ })).toBeEnabled();
+        expect(mockReloadPicker).not.toHaveBeenCalled();
+      });
     });
 
     it("should render correctly when recommendation is null but biophysicsData exists", () => {

@@ -83,6 +83,26 @@ describe("Geocode API Route", () => {
       });
     });
 
+    it("passes on each place's time zone, which the client reads dates in", async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            results: [
+              { id: 2147714, name: "Sydney", admin1: "New South Wales", country: "Australia", latitude: -33.87, longitude: 151.21, timezone: "Australia/Sydney" },
+              { id: 1, name: "Nowhere", country: "Nowhere", latitude: 0, longitude: 0, timezone: "Mars/Olympus" },
+            ],
+          }),
+      });
+
+      const response = await GET(new NextRequest("http://localhost:3000/api/geocode?q=Sydney"));
+      const data = await response.json();
+
+      expect(data.results[0].timeZone).toBe("Australia/Sydney");
+      // A zone Intl doesn't know would be read as the device's own, so it's left out.
+      expect(data.results[1]).not.toHaveProperty("timeZone");
+    });
+
     it("should handle results without admin1 (region)", async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
