@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 const isPublicRoute = createRouteMatcher([
   "/",
   "/faq",
+  // Design reference; 404s outside dev and Vercel previews (see src/app/design/page.tsx).
+  "/design",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/trips/invite(.*)",

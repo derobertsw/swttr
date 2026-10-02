@@ -2,6 +2,7 @@
 
 import {
   Drawer,
+  DrawerBody,
   DrawerClose,
   DrawerContent,
   DrawerDescription,
@@ -26,6 +27,8 @@ import {
   MIN_WEIGHT_LBS,
 } from "@/lib/biophysics/bodyMetrics";
 import { Check, Settings2, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { cn } from "@/lib/utils";
 
 const SENSITIVITY_OPTIONS: { value: TemperatureSensitivity; label: string; description: string }[] = [
@@ -107,50 +110,59 @@ export function PreferencesDrawer({
   return (
       <Drawer open={open} onOpenChange={onOpenChange}>
       {children && <DrawerTrigger asChild>{children}</DrawerTrigger>}
-      <DrawerContent className="max-h-[88vh]">
-        <div className="mx-auto flex max-h-[88vh] w-full max-w-sm flex-col">
-          <DrawerHeader className="sticky top-0 z-10 border-b border-border/60 bg-background/95 pb-3 text-left backdrop-blur">
-            <div className="flex items-center justify-between">
+      <DrawerContent>
+        <div className="mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col">
+          <DrawerHeader className="border-b border-border pb-3">
+            <div className="flex items-start justify-between gap-3">
               <div>
                 <DrawerTitle>Settings</DrawerTitle>
                 <DrawerDescription>
                   Customize your recommendations
                 </DrawerDescription>
-                <p className="mt-1 text-xs text-muted-foreground/90">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Changes save automatically.
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {saveState === "saving" && (
-                  <span className="text-xs font-medium text-muted-foreground">Saving...</span>
-                )}
-                {saveState === "saved" && (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
-                    <Check className="size-3.5" />
-                    Saved
-                  </span>
-                )}
-                <DrawerClose className="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted">
-                  Done
+                <span role="status" className="text-sm font-medium">
+                  {saveState === "saving" && (
+                    <span className="text-muted-foreground">Saving...</span>
+                  )}
+                  {saveState === "saved" && (
+                    <span className="inline-flex items-center gap-1 text-success">
+                      <Check className="size-4" />
+                      Saved
+                    </span>
+                  )}
+                </span>
+                <DrawerClose asChild>
+                  <Button variant="outline" size="sm">
+                    Done
+                  </Button>
                 </DrawerClose>
               </div>
             </div>
           </DrawerHeader>
 
-          <div className="flex-1 space-y-6 overflow-y-auto px-4 pb-10 pt-4">
-            <section className="rounded-xl border border-border/70 bg-muted/[0.2] p-3.5">
-              <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <Settings2 className="size-3.5" />
+          <DrawerBody className="space-y-6 pt-5 pb-8">
+            <section aria-labelledby="settings-recommendations" className="space-y-5">
+              <h3
+                id="settings-recommendations"
+                className="flex items-center gap-2 text-base font-semibold text-foreground"
+              >
+                <Settings2 className="size-4 text-muted-foreground" />
                 Recommendations
-              </div>
+              </h3>
 
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium">Default Activity</label>
+                <label htmlFor="settings-default-activity" className="text-sm font-medium text-foreground">
+                  Default Activity
+                </label>
                 <Select
                   value={defaultActivity}
                   onValueChange={(value) => runWithSaveState(() => onDefaultActivityChange(value))}
                 >
-                  <SelectTrigger className="h-11 w-full">
+                  <SelectTrigger id="settings-default-activity" className="w-full">
                     <SelectValue placeholder="Select activity" />
                   </SelectTrigger>
                   <SelectContent>
@@ -167,12 +179,14 @@ export function PreferencesDrawer({
                 </p>
               </div>
 
-              <div className="mt-5 flex flex-col gap-2">
-                <label className="text-sm font-medium">Temperature Sensitivity</label>
+              <div className="flex flex-col gap-2">
+                <p id="settings-sensitivity" className="text-sm font-medium text-foreground">
+                  Temperature Sensitivity
+                </p>
                 <div
-                  className="grid grid-cols-3 gap-2"
+                  className={cn(segmentedGroupClassName, "grid-cols-3")}
                   role="radiogroup"
-                  aria-label="Temperature sensitivity"
+                  aria-labelledby="settings-sensitivity"
                 >
                   {SENSITIVITY_OPTIONS.map((option) => {
                     const isSelected = option.value === sensitivity;
@@ -185,12 +199,7 @@ export function PreferencesDrawer({
                         onClick={() =>
                           runWithSaveState(() => onSensitivityChange(option.value))
                         }
-                        className={cn(
-                          "rounded-lg border px-2 py-2 text-center text-xs font-medium transition-colors",
-                          isSelected
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-border bg-background/80 text-muted-foreground hover:bg-muted"
-                        )}
+                        className={segmentedItemClassName}
                       >
                         {option.label}
                       </button>
@@ -205,22 +214,30 @@ export function PreferencesDrawer({
               </div>
             </section>
 
-            <section className="rounded-xl border border-border/70 bg-muted/[0.2] p-3.5">
-              <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <User className="size-3.5" />
+            <section
+              aria-labelledby="settings-body-profile"
+              className="space-y-4 border-t border-border pt-6"
+            >
+              <h3
+                id="settings-body-profile"
+                className="flex items-center gap-2 text-base font-semibold text-foreground"
+              >
+                <User className="size-4 text-muted-foreground" />
                 Body Profile
-              </div>
+              </h3>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">Height (ft/in)</label>
+                  <label htmlFor="settings-height" className="text-sm font-medium text-foreground">
+                    Height (ft/in)
+                  </label>
                   <Select
                     value={heightInches !== undefined ? String(heightInches) : undefined}
                     onValueChange={(value) =>
                       runWithSaveState(() => onBodyMetricsChange({ heightInches: Number(value) }))
                     }
                   >
-                    <SelectTrigger className="h-11 w-full">
+                    <SelectTrigger id="settings-height" className="w-full">
                       <SelectValue placeholder="Height" />
                     </SelectTrigger>
                     <SelectContent>
@@ -234,14 +251,16 @@ export function PreferencesDrawer({
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">Weight (lb)</label>
+                  <label htmlFor="settings-weight" className="text-sm font-medium text-foreground">
+                    Weight (lb)
+                  </label>
                   <Select
                     value={weightLbs !== undefined ? String(weightLbs) : undefined}
                     onValueChange={(value) =>
                       runWithSaveState(() => onBodyMetricsChange({ weightLbs: Number(value) }))
                     }
                   >
-                    <SelectTrigger className="h-11 w-full">
+                    <SelectTrigger id="settings-weight" className="w-full">
                       <SelectValue placeholder="Weight" />
                     </SelectTrigger>
                     <SelectContent>
@@ -254,11 +273,11 @@ export function PreferencesDrawer({
                   </Select>
                 </div>
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Used only for personalized thermal modeling.
               </p>
             </section>
-          </div>
+          </DrawerBody>
         </div>
       </DrawerContent>
     </Drawer>
