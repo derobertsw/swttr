@@ -43,7 +43,7 @@ export function BodyPartSection({
               <BodyPartIcon part={part} className="size-4 text-muted-foreground" />
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-base font-semibold text-foreground">
+              <h2 className="truncate text-xl font-semibold text-foreground">
                 {label}
               </h2>
               <p className="truncate text-sm text-muted-foreground">

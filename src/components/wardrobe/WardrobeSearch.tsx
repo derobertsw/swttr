@@ -6,6 +6,7 @@ import { chipClassName } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AvailableItem } from "@/types/wardrobe";
+import { getCatalogHeights } from "./catalog-layout";
 import { typeIcons, typeLabels, formatCategory } from "./wardrobe-utils";
 
 interface WardrobeSearchProps {
@@ -53,14 +54,6 @@ const SORT_LABELS: Record<WardrobeSearchProps["searchSort"], string> = {
   clo: "Highest clo",
 };
 
-// Two rows of chips. If even this doesn't fit beside the other controls, the
-// whole catalog scrolls instead.
-const MIN_FILTER_PANEL_HEIGHT = 120;
-
-// The results header and about a row. With less room than this, the results
-// list drops its own scroller and the whole catalog scrolls to it.
-const MIN_RESULTS_HEIGHT = 120;
-
 
 export function WardrobeSearch({
   search,
@@ -103,18 +96,13 @@ export function WardrobeSearch({
     if (!controls || !container) return;
 
     const update = () => {
-      const containerHeight = container.clientHeight;
-      const controlsHeight = controls.offsetHeight;
-      // On short screens the open filter panel can outgrow the catalog, so it
-      // scrolls within the room the other controls leave. The 14px is the
-      // results list's top margin and border.
-      const filterPanel = filterPanelRef.current;
-      if (filterPanel) {
-        const otherControlsHeight = controlsHeight - filterPanel.offsetHeight;
-        setFilterPanelMaxHeight(Math.max(MIN_FILTER_PANEL_HEIGHT, containerHeight - otherControlsHeight - 14));
-      }
-      const resultsRoom = containerHeight - controlsHeight - 12;
-      setResultsMaxHeight(resultsRoom >= MIN_RESULTS_HEIGHT ? resultsRoom : null);
+      const heights = getCatalogHeights({
+        containerHeight: container.clientHeight,
+        controlsHeight: controls.offsetHeight,
+        filterPanelHeight: filterPanelRef.current?.offsetHeight ?? null,
+      });
+      setFilterPanelMaxHeight(heights.filterPanelMaxHeight);
+      setResultsMaxHeight(heights.resultsMaxHeight);
     };
 
     const observer = new ResizeObserver(update);
@@ -203,14 +191,17 @@ export function WardrobeSearch({
             className="pl-10 pr-11"
           />
           {hasSearch && (
-            <button
+            // 36px, 44px on phones and touch, where it fills the field's height.
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-sm"
               onClick={() => onSearchChange("")}
-              className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground max-md:right-0 pointer-coarse:right-0"
               aria-label="Clear search"
             >
-              <X className="size-4" />
-            </button>
+              <X />
+            </Button>
           )}
         </div>
 
