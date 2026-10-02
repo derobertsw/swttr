@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { WardrobeItem } from "@/types/wardrobe";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { BodyPartIcon, formatBodyPartLabel } from "./wardrobe-utils";
 import { WardrobeItemCard } from "./WardrobeItemCard";
@@ -36,35 +37,35 @@ export function BodyPartSection({
   return (
     <section id={sectionId} className="flex scroll-mt-24 flex-col gap-2">
       <div className={cn("sticky top-0 z-10", !isFirst && "pt-1.5")}>
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/12 bg-slate-950/26 px-3 py-2.5 backdrop-blur-xl">
+        <div className="flex items-center justify-between gap-3 rounded-card border border-border bg-card px-3 py-2.5">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/8">
-              <BodyPartIcon part={part} className="size-4 text-white/74" />
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
+              <BodyPartIcon part={part} className="size-4 text-muted-foreground" />
             </div>
             <div className="min-w-0">
-              <h4 className="truncate text-[12px] font-semibold uppercase tracking-[0.16em] text-white/88">
+              <h2 className="truncate text-base font-semibold text-foreground">
                 {label}
-              </h4>
-              <p className="truncate text-[11px] text-white/56">
+              </h2>
+              <p className="truncate text-sm text-muted-foreground">
                 {items.length > 0 ? `${items.length} active` : "No active gear"}
                 {disabledItems.length > 0 ? ` · ${disabledItems.length} paused` : ""}
                 {sectionCount === 0 ? " yet" : ""}
               </p>
             </div>
           </div>
-          <span className="rounded-full border border-white/15 bg-white/8 px-2 py-0.5 text-[10px] font-medium text-white/65">
+          <Badge size="sm" className="tabular-nums" aria-hidden="true">
             {sectionCount}
-          </span>
+          </Badge>
         </div>
       </div>
       {items.length === 0 && disabledItems.length === 0 ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-white/18 bg-white/[0.06] px-4 py-4">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/6">
-            <BodyPartIcon part={part} className="size-5 text-white/35" />
+        <div className="flex items-center gap-3 rounded-card border border-dashed border-border px-4 py-4">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-control bg-muted">
+            <BodyPartIcon part={part} className="size-5 text-muted-foreground" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-white/74">No {label.toLowerCase()} gear yet</div>
-            <div className="mt-1 text-xs leading-5 text-white/48">
+            <div className="text-sm font-medium text-foreground">No {label.toLowerCase()} gear yet</div>
+            <div className="mt-1 text-sm text-muted-foreground">
               Add a piece here so recommendations can account for this zone.
             </div>
           </div>
@@ -83,13 +84,13 @@ export function BodyPartSection({
           ))}
 
           {disabledItems.length > 0 && (
-            <div className="mt-2 rounded-2xl border border-white/10 bg-black/10 p-2">
+            <div className="mt-2 rounded-card bg-muted p-2">
               <button
                 type="button"
                 onClick={onToggleCollapsed}
                 aria-expanded={!isCollapsed}
                 aria-controls={pausedPanelId}
-                className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-white/56 transition-colors hover:bg-white/6 hover:text-white/76"
+                className="flex min-h-9 w-full items-center justify-between gap-2 rounded-control px-2 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground max-md:min-h-11 pointer-coarse:min-h-11"
               >
                 <span className="flex items-center gap-1.5">
                   {isCollapsed ? (
@@ -97,18 +98,16 @@ export function BodyPartSection({
                   ) : (
                     <ChevronDown className="size-3.5" />
                   )}
-                  <span className="text-[10px] font-medium uppercase tracking-[0.14em]">
-                    Paused For This Trip
-                  </span>
+                  <span className="text-sm font-medium">Paused for this trip</span>
                 </span>
-                <span className="rounded-full border border-white/12 bg-white/6 px-2 py-0.5 text-[10px]">
+                <Badge size="sm" variant="outline" className="tabular-nums">
                   {disabledItems.length}
-                </span>
+                </Badge>
               </button>
               <div
                 id={pausedPanelId}
                 hidden={isCollapsed}
-                className="mt-2 flex flex-col gap-2 border-l border-dashed border-white/12 pl-2"
+                className="mt-2 flex flex-col gap-2 border-l border-dashed border-border pl-2"
               >
                 {!isCollapsed &&
                   disabledItems.map((item) => (

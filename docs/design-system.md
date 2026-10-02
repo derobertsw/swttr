@@ -86,6 +86,7 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Input | `ui/input.tsx` | 44px, 16px text, `border-input`. Set `aria-invalid` and point `aria-describedby` at a `FieldError`. `fieldClassName` gives field-like triggers the same look. |
 | Select | `ui/select.tsx` | Trigger matches Input. Items are 44px on touch, and the chosen item gets a check mark. Pair the trigger with a `<label htmlFor>`. |
 | Segmented choice | `ui/segmented.tsx` | `segmentedGroupClassName` and `segmentedItemClassName`. The caller keeps its markup and keyboard handling. The selected look follows `aria-checked` or `aria-pressed`, so selection is always announced. |
+| Filter chips | `ui/chip.ts` | `chipClassName` for a wrapping row of `<button>` chips, such as Wardrobe's body area, layer, sort and brand filters. A toggle chip sets `aria-pressed` and gets the segmented selected look. 36px, 44px on phones and touch. Use segmented choices when the options fit one row. |
 | Tabs | `ui/tabs.tsx` | Same selected look as segmented choices. The `line` variant underlines the active tab. |
 | Card | `ui/card.tsx` | `variant`: `default`, `muted`, `selected`. `padding`: `none`, `sm`, `default`, `lg`. Use `interactive` with `asChild` when the whole card is a link or button. `CardTitle` takes `asChild` to render a heading. |
 | Badge | `ui/badge.tsx` | Variants: `neutral`, `primary`, `success`, `warning`, `destructive`, `outline`, in two sizes. Give each status a word or an icon as well as its color. |
@@ -132,11 +133,10 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Navigation: sidebar, mobile tab bar, header, menu sheet | Uses tokens |
 | Overlays: Settings, Update Weather, layer picker, Add Custom Item, item details, popovers, location suggestions | Uses tokens |
 | Gear up and results (`src/app/page.tsx`, `ActivitySelection`, `PlanAheadForm`, `layers/*`, `MultiDayPlanDisplay`) | Still hardcoded white-on-dark glass. Next migration. |
-| Wardrobe (`src/app/wardrobe`, `wardrobe/*`) | Still hardcoded |
+| Wardrobe (`src/app/wardrobe`, `wardrobe/*`, `SwipeableItem`), including Browse Catalog | Uses tokens |
 | Trips (`src/app/trips/**`, `trips/trip-primitives.tsx`) | Still hardcoded |
 
 Remaining exceptions, each with a reason:
-- **Browse Catalog** (Wardrobe) is pinned to the light palette with `data-appearance="light"`, because `WardrobeSearch` is still styled for a white surface.
 - **Product image wells** stay white in both appearances, because catalog photos have white backgrounds.
 - **Clerk's sign-in and account UI** keep Clerk's own styling.
 - **Comfort status dots** in `ScoreDisplay` keep their status hues until the results migration.

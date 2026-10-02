@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { SwipeableItem } from "@/components/SwipeableItem";
+import { Badge } from "@/components/ui/badge";
 import type { WardrobeItem } from "@/types/wardrobe";
 import { cn } from "@/lib/utils";
 import { formatCategory, getClo, ItemIcon } from "./wardrobe-utils";
@@ -41,15 +42,15 @@ export function WardrobeItemCard({
       onToggleDisabled={onToggleDisabled}
       isDisabled={isDisabled}
     >
-      <div className={cn("flex items-start gap-3 px-3.5", isDisabled ? "py-3 opacity-80" : "py-3.5")}>
+      <div className={cn("flex items-start gap-3 px-3.5", isDisabled ? "py-3" : "py-3.5")}>
         <div
           className={cn(
-            "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-2xl border",
+            "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-control",
             isDisabled
-              ? "border-slate-300/70 bg-white/55 text-slate-500"
+              ? "bg-muted text-muted-foreground"
               : isCustom
-              ? "border-emerald-300/70 bg-emerald-100/70 text-emerald-800"
-              : "border-slate-300/80 bg-white/75 text-slate-700"
+              ? "bg-primary-soft text-foreground"
+              : "bg-muted text-foreground"
           )}
         >
           <ItemIcon
@@ -62,81 +63,45 @@ export function WardrobeItemCard({
         <div className="min-w-0 flex-1">
           <p
             className={cn(
-              "overflow-hidden text-ellipsis text-[15px] leading-[1.15] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]",
-              isDisabled ? "font-medium text-slate-900/72" : "font-semibold text-slate-900"
+              "line-clamp-2 text-base leading-tight",
+              isDisabled ? "font-medium text-muted-foreground" : "font-semibold text-foreground"
             )}
           >
             {item.details.model_name}
           </p>
-          <p className={cn("mt-1 truncate text-[12px]", isDisabled ? "text-slate-600/72" : "text-slate-700/78")}>
+          <p className="mt-1 truncate text-sm text-muted-foreground">
             {brandLabel}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span
-              className={cn(
-                "inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]",
-                isDisabled
-                  ? "border-slate-300/70 bg-slate-100/65 text-slate-700/70"
-                  : isCustom
-                  ? "border-emerald-400/55 bg-emerald-200/65 text-emerald-900"
-                  : "border-slate-400/55 bg-slate-200/65 text-slate-800"
-              )}
-            >
+            <Badge size="sm" variant={isDisabled ? "outline" : isCustom ? "primary" : "neutral"}>
               {categoryLabel}
-            </span>
+            </Badge>
           </div>
           {isDisabled && (
-            <div className="mt-2 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-600/75">
+            <p className="mt-2 text-xs font-medium text-muted-foreground">
               Paused for this trip
-            </div>
+            </p>
           )}
         </div>
         <div className="ml-1 flex shrink-0 items-center gap-1.5">
-          {clo !== undefined ? (
-            <div
-              className={cn(
-                "flex h-10 w-[4.25rem] flex-col items-center justify-center rounded-xl border px-1",
-                isDisabled
-                  ? "border-blue-300/50 bg-blue-50/55"
-                  : "border-blue-400/60 bg-blue-100/75"
-              )}
-            >
-              <div
-                className={cn(
-                  "font-mono text-[13px] font-bold leading-none",
-                  isDisabled ? "text-blue-700/70" : "text-blue-800"
-                )}
-              >
-                {clo.toFixed(2)}
-              </div>
-              <div
-                className={cn(
-                  "mt-0.5 text-[9px] font-medium uppercase tracking-wider",
-                  isDisabled ? "text-blue-600/60" : "text-blue-700/75"
-                )}
-              >
-                clo
-              </div>
-            </div>
-          ) : (
-            <div
-              className={cn(
-                "flex h-10 w-[4.25rem] items-center justify-center rounded-xl border px-1",
-                isDisabled
-                  ? "border-slate-300/60 bg-slate-100/60"
-                  : "border-slate-400/50 bg-slate-200/60"
-              )}
-            >
-              <div className="text-center text-[9px] font-medium text-slate-600/72">
-                Pending
-              </div>
-            </div>
-          )}
-          {onClick && (
-            <div className="text-slate-500/75">
-              <ChevronRight className="size-4" />
-            </div>
-          )}
+          <div className="flex h-10 w-[4.25rem] flex-col items-center justify-center rounded-control bg-muted px-1">
+            {clo !== undefined ? (
+              <>
+                <div
+                  className={cn(
+                    "font-mono text-sm font-bold leading-none",
+                    isDisabled ? "text-muted-foreground" : "text-foreground"
+                  )}
+                >
+                  {clo.toFixed(2)}
+                </div>
+                <div className="mt-0.5 text-xs leading-none text-muted-foreground">clo</div>
+              </>
+            ) : (
+              <div className="text-center text-xs text-muted-foreground">Pending</div>
+            )}
+          </div>
+          {onClick && <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" />}
         </div>
       </div>
     </SwipeableItem>
