@@ -59,6 +59,7 @@ const STOWE = {
   country: "United States",
   latitude: 44.47,
   longitude: -72.69,
+  timeZone: "America/New_York",
 };
 
 /** Searches for Stowe in the place field labeled `field`, and picks it. */
