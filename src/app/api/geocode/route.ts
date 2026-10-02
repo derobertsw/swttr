@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isTimeZone } from "@/lib/timeZones";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
       country: string;
       latitude: number;
       longitude: number;
+      timezone?: string;
     }) => ({
       id: result.id,
       name: result.name,
@@ -33,6 +35,8 @@ export async function GET(request: NextRequest) {
       country: result.country,
       latitude: result.latitude,
       longitude: result.longitude,
+      // Date shortcuts and default times on the client read the place's clock.
+      timeZone: isTimeZone(result.timezone) ? result.timezone : undefined,
     }));
 
     return NextResponse.json({ results });

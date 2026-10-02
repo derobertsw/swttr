@@ -4,6 +4,8 @@ import {
   formatZonedTime,
   isLocalDateTime,
   isTimeZone,
+  toPickerDate,
+  zonedNow,
   zonedTimeToInstant,
 } from "./timeZones";
 
@@ -86,5 +88,42 @@ describe("formatZonedTime and formatZonedIsoTime", () => {
   it("show both readings of a repeated hour with their own offsets", () => {
     expect(formatZonedIsoTime(at("2026-11-01T05:30Z"), "America/New_York")).toBe("2026-11-01T01:30-04:00");
     expect(formatZonedIsoTime(at("2026-11-01T06:30Z"), "America/New_York")).toBe("2026-11-01T01:30-05:00");
+  });
+});
+
+describe("zonedNow", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it("reads the place's clock, whatever the device's time zone", () => {
+    // 7:30 pm Thursday in New York is already Friday morning in Sydney.
+    vi.setSystemTime(at("2026-10-01T23:30Z"));
+    vi.stubEnv("TZ", "America/New_York");
+    expect(zonedNow("Australia/Sydney")).toBe("2026-10-02T09:30");
+    expect(zonedNow("America/Los_Angeles")).toBe("2026-10-01T16:30");
+  });
+
+  it("reads the device's clock without a time zone", () => {
+    vi.setSystemTime(at("2026-10-01T23:30Z"));
+    vi.stubEnv("TZ", "America/New_York");
+    expect(zonedNow()).toBe("2026-10-01T19:30");
+    vi.stubEnv("TZ", "Asia/Tokyo");
+    expect(zonedNow()).toBe("2026-10-02T08:30");
+  });
+});
+
+describe("toPickerDate", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("is the same day on the device's calendar, in any time zone", () => {
+    for (const timeZone of ["America/New_York", "Asia/Tokyo", "Pacific/Kiritimati", "Pacific/Pago_Pago"]) {
+      vi.stubEnv("TZ", timeZone);
+      const date = toPickerDate("2026-10-02");
+      expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 9, 2]);
+    }
   });
 });

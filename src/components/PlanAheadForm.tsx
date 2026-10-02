@@ -19,6 +19,7 @@ import { DeviceLocationButton } from "@/components/DeviceLocationButton";
 import { FieldError } from "@/components/FieldError";
 import type { DeviceLocationStatus } from "@/hooks/useDeviceLocation";
 import { FROSTED_INPUT, SUGGESTIONS_DROPDOWN } from "@/lib/styling";
+import { toPickerDate, zonedNow } from "@/lib/timeZones";
 import { Capacitor } from "@capacitor/core";
 
 interface PlanAheadFormProps {
@@ -291,6 +292,8 @@ export function PlanAheadForm({
                   mode="single"
                   selected={date}
                   onSelect={onDateChange}
+                  // Today at the place, which may not be the device's today.
+                  today={toPickerDate(zonedNow(selectedLocation?.timeZone).slice(0, 10))}
                   autoFocus
                 />
               </PopoverContent>

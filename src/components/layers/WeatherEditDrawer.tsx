@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { CalendarIcon, Clock3, Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/drawer";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { formatLocationName, useLocationSearch } from "@/hooks/useLocationSearch";
+import { addDaysToDateString } from "@/lib/forecastRange";
+import { toPickerDate, zonedNow } from "@/lib/timeZones";
 import { cn } from "@/lib/utils";
 import type { LocationSuggestion } from "@/types/recommendations";
 
@@ -32,11 +34,8 @@ interface WeatherEditDrawerProps {
   loading?: boolean;
 }
 
-function getDefaultTime(): string {
-  const now = new Date();
-  const hours = now.getHours().toString().padStart(2, "0");
-  return `${hours}:00`;
-}
+/** A date picked on the calendar, or a shortcut's days from today at the place. */
+type ForecastDay = { date: Date } | { daysFromToday: number };
 
 export function WeatherEditDrawer({
   open,
@@ -45,18 +44,28 @@ export function WeatherEditDrawer({
   loading = false,
 }: WeatherEditDrawerProps) {
   const locationSearch = useLocationSearch();
-  const [date, setDate] = useState<Date | undefined>(undefined);
-  const [time, setTime] = useState(getDefaultTime);
+  const [day, setDay] = useState<ForecastDay | null>(null);
+  // Null until a time is entered, which means the current hour at the place.
+  const [chosenTime, setChosenTime] = useState<string | null>(null);
   const [useScheduledTime, setUseScheduledTime] = useState(false);
+
+  // Shortcuts and the default time read the place's clock, even when the place
+  // is picked after them. Until there's a place, they read the device's.
+  const nowThere = zonedNow(locationSearch.selectedLocation?.timeZone);
+  const todayThere = nowThere.slice(0, 10);
+  const date = day
+    ? "date" in day ? day.date : toPickerDate(addDaysToDateString(todayThere, day.daysFromToday))
+    : undefined;
+  const time = chosenTime ?? `${nowThere.slice(11, 13)}:00`;
+
   const selectedLocationLabel = locationSearch.selectedLocation
     ? formatLocationName(locationSearch.selectedLocation)
     : "No location selected yet";
-  const selectedTimeLabel = useMemo(() => {
-    if (!useScheduledTime) return "Using current conditions (now)";
-    if (!date) return "Choose a date and time";
-    const timeSuffix = time ? ` at ${time}` : "";
-    return `${format(date, "EEE, MMM d")}${timeSuffix}`;
-  }, [date, time, useScheduledTime]);
+  const selectedTimeLabel = !useScheduledTime
+    ? "Using current conditions (now)"
+    : date
+      ? `${format(date, "EEE, MMM d")}${time ? ` at ${time}` : ""}`
+      : "Choose a date and time";
 
   const canSubmit = locationSearch.selectedLocation !== null && !loading && (!useScheduledTime || !!date);
 
@@ -77,15 +86,13 @@ export function WeatherEditDrawer({
 
   const resetToNow = () => {
     setUseScheduledTime(false);
-    setDate(undefined);
-    setTime(getDefaultTime());
+    setDay(null);
+    setChosenTime(null);
   };
 
-  const setQuickDate = (offsetDays: number) => {
-    const nextDate = new Date();
-    nextDate.setDate(nextDate.getDate() + offsetDays);
+  const setQuickDate = (daysFromToday: number) => {
     setUseScheduledTime(true);
-    setDate(nextDate);
+    setDay({ daysFromToday });
   };
 
   return (
@@ -158,7 +165,7 @@ export function WeatherEditDrawer({
                 type="button"
                 onClick={() => {
                   setUseScheduledTime(true);
-                  setDate((prev) => prev ?? new Date());
+                  setDay((prev) => prev ?? { daysFromToday: 0 });
                 }}
                 className={cn(
                   "rounded-md px-2 py-2 text-xs font-medium transition-colors",
@@ -194,7 +201,8 @@ export function WeatherEditDrawer({
                       <Calendar
                         mode="single"
                         selected={date}
-                        onSelect={setDate}
+                        onSelect={(picked) => setDay(picked ? { date: picked } : null)}
+                        today={toPickerDate(todayThere)}
                         autoFocus
                       />
                     </PopoverContent>
@@ -203,7 +211,7 @@ export function WeatherEditDrawer({
                     <Input
                       type="time"
                       value={time}
-                      onChange={(e) => setTime(e.target.value)}
+                      onChange={(e) => setChosenTime(e.target.value)}
                       className="h-10 tabular-nums"
                       aria-label="Time"
                     />

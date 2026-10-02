@@ -27,4 +27,6 @@ export interface LocationSuggestion {
   country: string;
   latitude: number;
   longitude: number;
+  /** The place's IANA time zone, e.g. "Australia/Sydney". Missing for the device's own location. */
+  timeZone?: string;
 }
