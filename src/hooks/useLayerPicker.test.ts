@@ -189,4 +189,55 @@ describe("useLayerPicker", () => {
     );
     expect(result.current.getItems("hands", "outer").recommendedItems).toEqual([]);
   });
+
+  describe("when loading fails", () => {
+    const catalogHeadband: AvailableItem = {
+      id: "headband-1",
+      type: "headwear",
+      brand: "BrandHead",
+      model_name: "Headband",
+      category: "",
+      rcl_clo: 0.1,
+    };
+
+    /** Fails `failing` URLs (500, or a network error) and serves the rest. */
+    function mockFetchFailing(failing: Record<string, "500" | "network">) {
+      const fetchMock = vi.fn((url: string) => {
+        const failure = Object.entries(failing).find(([path]) => url.includes(path))?.[1];
+        if (failure === "network") return Promise.reject(new TypeError("Failed to fetch"));
+        if (failure === "500") return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({ error: "boom" }) });
+        const items = url.includes("/api/wardrobe/gear") ? [BEANIE_WARDROBE] : [catalogHeadband];
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ items }) });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    }
+
+    const headNeckIds = (result: { current: ReturnType<typeof useLayerPicker> }) => {
+      const { wardrobeItems, recommendedItems } = result.current.getItems("headNeck", "base");
+      return { wardrobe: wardrobeItems.map((item) => item.id), other: recommendedItems.map((item) => item.id) };
+    };
+
+    it("keeps the loaded items when a reload fails", async () => {
+      mockFetchFailing({});
+      const { result } = renderHook(() => useLayerPicker(new Set()));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(headNeckIds(result)).toEqual({ wardrobe: ["beanie-1"], other: ["headband-1"] });
+
+      const fetchMock = mockFetchFailing({ "/api/wardrobe/gear": "network", "/api/wardrobe/available": "500" });
+      act(() => result.current.reload());
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      await act(async () => {});
+
+      expect(headNeckIds(result)).toEqual({ wardrobe: ["beanie-1"], other: ["headband-1"] });
+    });
+
+    it("shows the wardrobe when only the catalog fails on the first load", async () => {
+      mockFetchFailing({ "/api/wardrobe/available": "500" });
+      const { result } = renderHook(() => useLayerPicker(new Set()));
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(headNeckIds(result)).toEqual({ wardrobe: ["beanie-1"], other: [] });
+    });
+  });
 });

@@ -86,6 +86,14 @@ function getRegionalClo(item: WardrobeItem, bodyPart: BodyPart): number {
   return getClo(item) ?? 0;
 }
 
+/** The `items` an API route returns; throws when the request fails. */
+async function fetchItems<T>(url: string): Promise<T[]> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url} returned ${res.status}`);
+  const data = await res.json() as { items?: T[] };
+  return data.items ?? [];
+}
+
 const EMPTY_WARDROBE_ITEMS: WardrobeItem[] = [];
 const EMPTY_AVAILABLE_ITEMS: AvailableItem[] = [];
 
@@ -106,21 +114,23 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
 
     let cancelled = false;
     const fetchData = async () => {
-      let wardrobeItems: WardrobeItem[] = [];
-      let availableItems: AvailableItem[] = [];
-      try {
-        const [gearRes, availableRes] = await Promise.all([
-          fetch("/api/wardrobe/gear"),
-          fetch("/api/wardrobe/available"),
-        ]);
-        const gearData = await gearRes.json();
-        const availableData = await availableRes.json();
-        wardrobeItems = gearData.items || [];
-        availableItems = availableData.items || [];
-      } catch (err) {
-        logWarn("useLayerPicker.fetchData", err);
-      }
-      if (!cancelled) setData({ userId, wardrobeItems, availableItems });
+      const [gear, available] = await Promise.allSettled([
+        fetchItems<WardrobeItem>("/api/wardrobe/gear"),
+        fetchItems<AvailableItem>("/api/wardrobe/available"),
+      ]);
+      if (gear.status === "rejected") logWarn("useLayerPicker.fetchData", gear.reason);
+      if (available.status === "rejected") logWarn("useLayerPicker.fetchData", available.reason);
+      if (cancelled) return;
+      // A list that fails to load keeps what was loaded before for this user
+      // (empty on the first load), so a failed reload doesn't clear the picker.
+      setData((prev) => {
+        const previous = prev?.userId === userId ? prev : null;
+        return {
+          userId,
+          wardrobeItems: gear.status === "fulfilled" ? gear.value : previous?.wardrobeItems ?? [],
+          availableItems: available.status === "fulfilled" ? available.value : previous?.availableItems ?? [],
+        };
+      });
     };
 
     fetchData();
