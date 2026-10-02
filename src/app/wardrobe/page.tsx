@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { RotateCcw, X, Search, Sparkles } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -93,23 +94,21 @@ export default function Wardrobe() {
       <div className="flex w-full max-w-3xl flex-col gap-4">
         {loading ? (
           <div className="flex flex-col gap-4 py-2">
-            <Skeleton className="h-72 w-full rounded-[28px] bg-white/18" />
-            <Skeleton className="h-14 w-full rounded-2xl bg-white/15" />
-            <Skeleton className="h-28 w-full rounded-2xl bg-white/15" />
-            <Skeleton className="h-28 w-full rounded-2xl bg-white/15" />
+            <Skeleton className="h-72 w-full rounded-card" />
+            <Skeleton className="h-14 w-full rounded-card" />
+            <Skeleton className="h-28 w-full rounded-card" />
+            <Skeleton className="h-28 w-full rounded-card" />
           </div>
         ) : (
           <>
             <header>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/42">
-                Wardrobe
-              </p>
-              <h1 className="mt-1 text-[2.25rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
-                My Gear
+              <p className="text-sm font-medium text-muted-foreground">Wardrobe</p>
+              <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
+                My gear
               </h1>
-              <p className="mt-1 text-sm text-white/62">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {overview.headline}
-                <span className="text-white/42"> · </span>
+                <span aria-hidden="true"> · </span>
                 {overview.activeItems} {overview.activeItems === 1 ? "item is" : "items are"} shaping recommendations
                 {overview.totalDisabledItems > 0 ? ` · ${overview.totalDisabledItems} paused for this trip` : ""}
               </p>
@@ -121,62 +120,56 @@ export default function Wardrobe() {
                 { label: "Active", value: overview.activeItems },
                 { label: "Paused", value: overview.totalDisabledItems },
               ].map((stat) => (
-                <div
-                  key={stat.label}
-                  className="rounded-2xl border border-white/10 bg-slate-950/18 px-3 py-2.5 backdrop-blur-sm"
-                >
-                  <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/44">
-                    {stat.label}
-                  </p>
-                  <p className="mt-1 text-xl font-semibold leading-none text-white">
+                <Card key={stat.label} variant="muted" className="px-3 py-2.5">
+                  <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
+                  <p className="mt-1 text-xl font-semibold leading-none tabular-nums text-foreground">
                     {stat.value}
                   </p>
-                </div>
+                </Card>
               ))}
             </section>
 
             <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setShowSearch(true)}
-                className="flex items-center gap-3 rounded-2xl border border-white/14 bg-white/[0.08] px-3.5 py-3 text-left transition-colors hover:bg-white/[0.12]"
-              >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-cyan-200/12">
-                  <Search className="size-[18px] text-cyan-50" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white">Browse catalog</p>
-                  <p className="truncate text-xs text-white/58">{totalAvailableCount} items available</p>
-                </div>
-              </button>
+              <Card asChild interactive padding="none" className="flex items-center gap-3 px-3.5 py-3 text-left">
+                <button type="button" onClick={() => setShowSearch(true)}>
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-soft">
+                    <Search className="size-[18px] text-foreground" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Browse catalog</p>
+                    <p className="truncate text-xs text-muted-foreground">{totalAvailableCount} items available</p>
+                  </div>
+                </button>
+              </Card>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setCustomDialogBodyPart(undefined);
-                  setShowCustomDialog(true);
-                }}
-                className="flex items-center gap-3 rounded-2xl border border-white/14 bg-white/[0.08] px-3.5 py-3 text-left transition-colors hover:bg-white/[0.12]"
-              >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-emerald-200/12">
-                  <Sparkles className="size-[18px] text-emerald-50" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white">Custom item</p>
-                  <p className="text-xs text-white/58">Create a stand-in piece</p>
-                </div>
-              </button>
+              <Card asChild interactive padding="none" className="flex items-center gap-3 px-3.5 py-3 text-left">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomDialogBodyPart(undefined);
+                    setShowCustomDialog(true);
+                  }}
+                >
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-soft">
+                    <Sparkles className="size-[18px] text-foreground" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Custom item</p>
+                    <p className="text-xs text-muted-foreground">Create a stand-in piece</p>
+                  </div>
+                </button>
+              </Card>
             </div>
 
             <div className="pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
               <div className="mt-0.5 flex flex-col gap-4">
                 {wardrobeItems.length === 0 ? (
-                  <div className="rounded-[26px] border border-dashed border-white/22 bg-white/[0.08] px-5 py-5 backdrop-blur-sm">
-                    <p className="text-base font-semibold text-white/92">No gear added yet</p>
-                    <p className="mt-2 text-sm leading-6 text-white/66">
+                  <div className="rounded-card border border-dashed border-border px-5 py-5">
+                    <p className="text-base font-semibold text-foreground">No gear added yet</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
                       Start with the pieces you use most often. Even a few key layers make recommendations far more useful.
                     </p>
-                    <p className="mt-3 text-xs uppercase tracking-[0.16em] text-white/42">
+                    <p className="mt-3 text-sm text-muted-foreground">
                       Tip: use Browse catalog or Custom item above to add your first piece.
                     </p>
                   </div>
@@ -203,24 +196,19 @@ export default function Wardrobe() {
 
               {/* Recently removed items */}
               {recentlyRemoved.length > 0 && (
-                <div className="mt-6 flex flex-col gap-2 rounded-xl border border-white/25 bg-white/10 p-3">
+                <Card padding="sm" className="mt-6 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-white/90">
-                      Recently Removed ({recentlyRemoved.length})
-                    </h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-white/70 hover:text-white"
-                      onClick={clearRecentlyRemoved}
-                    >
-                      <X className="mr-1 size-3" />
+                    <h2 className="text-sm font-semibold text-foreground">
+                      Recently removed ({recentlyRemoved.length})
+                    </h2>
+                    <Button variant="ghost" size="sm" onClick={clearRecentlyRemoved}>
+                      <X />
                       Dismiss
                     </Button>
                   </div>
-                  <p className="text-[11px] text-white/60">Items can be restored while this page is open.</p>
+                  <p className="text-sm text-muted-foreground">Items can be restored while this page is open.</p>
 
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col divide-y divide-border">
                     {recentlyRemoved.map((item) => {
                       const category =
                         item.details.category ||
@@ -230,37 +218,34 @@ export default function Wardrobe() {
                       const clo = getClo(item);
 
                       return (
-                        <div
-                          key={item.item_id}
-                          className="flex items-center gap-3 rounded-lg border border-white/30 bg-white/5 p-3"
-                        >
-                          <ItemIcon itemType={item.item_type} garmentType={item.details.garment_type} category={item.details.category} className="size-5 flex-shrink-0 text-white/65" />
+                        <div key={item.item_id} className="flex items-center gap-3 py-3">
+                          <ItemIcon itemType={item.item_type} garmentType={item.details.garment_type} category={item.details.category} className="size-5 shrink-0 text-muted-foreground" />
                           <div className="min-w-0 flex-1">
-                            <div className="truncate font-medium text-white/85">
+                            <div className="truncate font-medium text-foreground">
                               {item.details.brand} {item.details.model_name}
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-white/65">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <span>{formatCategory(category)}</span>
                               {clo !== undefined && (
-                                <span className="font-mono text-[10px]">{clo.toFixed(2)} clo</span>
+                                <span className="font-mono text-xs">{clo.toFixed(2)} clo</span>
                               )}
                             </div>
                           </div>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-shrink-0 border-white/30 bg-white/10 text-xs text-white/90 hover:bg-white/20"
+                            className="shrink-0"
                             onClick={() => restoreItem(item)}
                             disabled={adding === item.item_id}
                           >
-                            <RotateCcw className="mr-1 size-3" />
+                            <RotateCcw />
                             Restore
                           </Button>
                         </div>
                       );
                     })}
                   </div>
-                </div>
+                </Card>
               )}
             </div>
           </>
@@ -290,15 +275,13 @@ export default function Wardrobe() {
         }}
       />
 
-      {/* Browse Catalog Modal. WardrobeSearch is still styled for a light
-          surface, so the catalog keeps the light palette until the Wardrobe
-          screens move to the design tokens (#119). */}
+      {/* Browse Catalog Modal */}
       {isMobile ? (
         <Drawer open={showSearch} onOpenChange={(open) => { setShowSearch(open); if (!open) { clearSearchFilters(); setSearch(""); } }}>
-          <DrawerContent data-appearance="light" showCloseButton className="h-[95dvh]">
+          <DrawerContent showCloseButton className="h-[95dvh]">
             <div className="flex min-h-0 w-full flex-1 flex-col">
               <DrawerHeader className="flex-none pr-14 pb-3">
-                <DrawerTitle>Browse Catalog</DrawerTitle>
+                <DrawerTitle>Browse catalog</DrawerTitle>
                 <DrawerDescription>
                   {totalAvailableCount} items available
                 </DrawerDescription>
@@ -333,12 +316,9 @@ export default function Wardrobe() {
         </Drawer>
       ) : (
         <Dialog open={showSearch} onOpenChange={(open) => { setShowSearch(open); if (!open) { clearSearchFilters(); setSearch(""); } }}>
-          <DialogContent
-            data-appearance="light"
-            className="flex h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0"
-          >
+          <DialogContent className="flex h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
             <DialogHeader className="flex-none border-b border-border px-6 py-4">
-              <DialogTitle>Browse Catalog</DialogTitle>
+              <DialogTitle>Browse catalog</DialogTitle>
               <DialogDescription>
                 {totalAvailableCount} items available
               </DialogDescription>

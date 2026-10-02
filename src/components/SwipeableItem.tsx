@@ -100,7 +100,7 @@ export function SwipeableItem({
   }, [translateX]);
 
   return (
-    <div ref={containerRef} className="relative overflow-hidden rounded-2xl">
+    <div ref={containerRef} className="relative overflow-hidden rounded-card">
       {/* Actions behind */}
       <div
         className="absolute inset-y-0 right-0 flex items-stretch transition-opacity"
@@ -113,9 +113,12 @@ export function SwipeableItem({
         {hasToggle && (
           <button
             onClick={handleToggleDisabled}
-            className={`flex flex-col items-center justify-center text-white ${
-              isDisabled ? "rounded-r-2xl bg-emerald-600/90" : "bg-amber-500/90"
-            }`}
+            className={cn(
+              "flex flex-col items-center justify-center",
+              isDisabled
+                ? "rounded-r-card bg-primary text-primary-foreground"
+                : "bg-secondary text-secondary-foreground"
+            )}
             style={{ width: ACTION_WIDTH }}
           >
             {isDisabled ? (
@@ -123,7 +126,7 @@ export function SwipeableItem({
             ) : (
               <Ban className="size-5" />
             )}
-            <span className="text-[10px] mt-1">
+            <span className="mt-1 text-xs font-medium">
               {isDisabled ? "Include" : "Pause"}
             </span>
           </button>
@@ -133,11 +136,11 @@ export function SwipeableItem({
         {!isDisabled && (
           <button
             onClick={handleDelete}
-            className="flex flex-col items-center justify-center rounded-r-2xl bg-red-500/90 text-white"
+            className="flex flex-col items-center justify-center rounded-r-card bg-destructive text-destructive-foreground"
             style={{ width: ACTION_WIDTH }}
           >
             <Trash2 className="size-5" />
-            <span className="text-[10px] mt-1">Remove</span>
+            <span className="mt-1 text-xs font-medium">Remove</span>
           </button>
         )}
       </div>
@@ -145,8 +148,8 @@ export function SwipeableItem({
       {/* Main content */}
       <div
         className={cn(
-          "relative rounded-2xl border border-white/35 bg-[linear-gradient(145deg,rgba(249,252,255,0.94),rgba(226,236,243,0.84))] shadow-[0_8px_24px_rgba(8,18,36,0.14)] backdrop-blur-[6px] touch-pan-y",
-          onClick ? "cursor-pointer" : "cursor-default"
+          "relative touch-pan-y rounded-card border border-border bg-card text-card-foreground",
+          onClick ? "cursor-pointer hover:border-input" : "cursor-default"
         )}
         style={{
           transform: `translateX(${translateX}px)`,
