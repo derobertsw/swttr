@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireTripAccess, loadTripFull } from "@/lib/trips";
+import { requireTripAccess, loadTripFull, enumerateDates } from "@/lib/trips";
 import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 import { buildPackingListFromDays } from "@/lib/packingList";
 import { fetchUserWardrobeItems } from "@/lib/userWardrobe";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
 import { tripActivityToRecommendationKey } from "@/lib/trip-activities";
-import { isTimeZone } from "@/lib/timeZones";
-import { parseOpenMeteoHourly } from "@/lib/openMeteoHourly";
+import { fetchTripForecast, hasTripCoordinates, resolveTripStop, tripDayForecast, tripForecastDateOutsideWindow } from "@/lib/trip-forecast";
 import layerRecommendations from "@/data/layerRecommendations.json";
-import type { ForecastHour, DailyLayerPlan } from "@/types/plan";
+import type { DailyLayerPlan } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
 import type { TemperatureSensitivity } from "@/types/preferences";
-import type { TripDay, TripStop } from "@/types/trips";
+import type { TripDayCoverage } from "@/types/trip-coverage";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -25,35 +24,6 @@ function makeRecommendationFor(activity: string, sensitivity: TemperatureSensiti
     if (!legacy) return null;
     return convertLegacyRecommendation(legacy as LegacyRecommendation);
   };
-}
-
-async function fetchHourly(
-  lat: number,
-  lon: number,
-  startDate: string,
-  endDate: string
-): Promise<ForecastHour[]> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&start_date=${startDate}&end_date=${endDate}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`;
-  const res = await fetch(url);
-  if (!res.ok) return [];
-  const data = await res.json();
-  const timeZone: unknown = data?.timezone;
-  if (!isTimeZone(timeZone)) return [];
-  return parseOpenMeteoHourly(data, timeZone);
-}
-
-function chooseStop(day: TripDay, stops: TripStop[]): TripStop | undefined {
-  if (day.stop_id) {
-    const found = stops.find((s) => s.id === day.stop_id);
-    if (found) return found;
-  }
-  return stops[0];
-}
-
-function chooseActivity(day: TripDay, stop: TripStop | undefined): string | null {
-  if (day.activity) return day.activity;
-  if (stop && stop.activities.length > 0) return stop.activities[0];
-  return null;
 }
 
 export async function GET(_request: NextRequest, ctx: RouteContext) {
@@ -80,74 +50,81 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     // Fall back to neutral if preferences can't be read.
   }
 
-  // Group days by (stopId, activityKey) so we can issue one weather fetch per
-  // location-range and call the recommendation engine once per group.
-  const groups = new Map<
-    string,
-    { stop: TripStop; activityKey: string; days: TripDay[] }
-  >();
-  const skipped: { date: string; reason: string }[] = [];
-  for (const day of full.days) {
-    const stop = chooseStop(day, full.stops);
-    const activity = chooseActivity(day, stop);
-    if (!stop) {
-      skipped.push({ date: day.date, reason: "no_stop" });
-      continue;
-    }
-    if (!stop.latitude || !stop.longitude) {
-      skipped.push({ date: day.date, reason: "no_coords" });
-      continue;
-    }
-    if (!activity) {
-      skipped.push({ date: day.date, reason: "no_activity" });
-      continue;
-    }
+  const dates = enumerateDates(full.trip.start_date, full.trip.end_date);
+  const myMember = full.members.find((member) => member.user_id === userId && member.status !== "left");
+  const daysForCoverage = dates.map((date) => {
+    const day = full.days.find((day) => day.date === date);
+    const stop = resolveTripStop(day ?? { stop_id: null }, full.stops);
+    const activity = day?.activity || stop?.activities[0] || null;
     const activityKey = tripActivityToRecommendationKey(activity);
-    if (!activityKey) {
-      skipped.push({ date: day.date, reason: "activity_unsupported" });
-      continue;
-    }
-    const groupKey = `${stop.id}:${activityKey}`;
-    const existing = groups.get(groupKey);
-    if (existing) {
-      existing.days.push(day);
-    } else {
-      groups.set(groupKey, { stop, activityKey, days: [day] });
-    }
+    const manualKit = day && myMember && full.kits.find((kit) =>
+      kit.trip_day_id === day.id && kit.trip_member_id === myMember.id && kit.items.length > 0);
+    const outsideWindow = tripForecastDateOutsideWindow(date);
+    const needsForecast = !!day && activity !== "Rest" && !manualKit && !!activityKey
+      && Object.hasOwn(layerRecommendations, activityKey) && hasTripCoordinates(stop) && !outsideWindow;
+    return { date, day, stop, activity, activityKey, manualKit, outsideWindow, needsForecast };
+  });
+  const requestedStops = new Map<string, NonNullable<ReturnType<typeof resolveTripStop>>>();
+  for (const { stop, needsForecast } of daysForCoverage) {
+    if (stop && needsForecast) requestedStops.set(stop.id, stop);
   }
+  // Fetch only stops used by automatic guidance, once each, with at most three
+  // requests in flight. Each provider request also has a 15-second timeout.
+  const stops = [...requestedStops.values()];
+  const sources = new Map<string, Awaited<ReturnType<typeof fetchTripForecast>>>();
+  let nextStop = 0;
+  await Promise.all(Array.from({ length: Math.min(3, stops.length) }, async () => {
+    while (nextStop < stops.length) {
+      const stop = stops[nextStop++];
+      sources.set(stop.id, await fetchTripForecast(stop));
+    }
+  }));
 
   const dailyPlans: DailyLayerPlan[] = [];
-  for (const group of groups.values()) {
-    const dates = group.days.map((d) => d.date).sort();
-    const startDate = dates[0];
-    const endDate = dates[dates.length - 1];
-    const hourly = await fetchHourly(
-      Number(group.stop.latitude),
-      Number(group.stop.longitude),
-      startDate,
-      endDate
-    );
-    if (hourly.length === 0) continue;
-    const durationDays =
-      Math.round(
-        (new Date(`${endDate}T00:00:00Z`).getTime() -
-          new Date(`${startDate}T00:00:00Z`).getTime()) /
-          86400000
-      ) + 1;
-    const plan = buildMultiDayLayerPlan({
-      startDate: new Date(`${startDate}T00:00:00`),
-      durationDays,
-      hourlyForecast: hourly,
-      getRecommendation: makeRecommendationFor(group.activityKey, sensitivity),
-    });
-    const dayDateSet = new Set(group.days.map((d) => d.date));
-    for (const day of plan.days) {
-      // Only include days that actually belong to this group (the plan may
-      // include extra dates inside the start/end span that belong to other
-      // groups).
-      if (dayDateSet.has(day.date)) dailyPlans.push(day);
+  const coverage: TripDayCoverage[] = daysForCoverage.map(({ date, day, stop, activity, activityKey, manualKit, outsideWindow }) => {
+    const { forecast, hours } = tripDayForecast(date,
+      outsideWindow ? undefined : stop ? sources.get(stop.id) : undefined,
+      outsideWindow ?? (hasTripCoordinates(stop) ? "not_needed" : "no_location"));
+    const entry: TripDayCoverage = {
+      date, activity, stopName: stop?.name ?? null, forecast,
+      advice: "unavailable", message: forecast.message, action: "plan_manually",
+    };
+    if (!day) {
+      return { ...entry, advice: "missing_inputs", reason: "no_day", message: "This date has no saved day plan. Open this day to create one.", action: "review_day" };
     }
-  }
+    if (manualKit) {
+      return { ...entry, advice: "manual", reason: "manual_kit", message: "Manual kit saved. Review it on this day; it is not included in automatic packing." };
+    }
+    if (activity === "Rest") {
+      return { ...entry, advice: "rest", reason: "rest_day", message: "Rest day; review personal items manually." };
+    }
+    if (!activity) {
+      return { ...entry, advice: "missing_inputs", reason: "no_activity", message: "Choose an activity for this day.", action: "set_activity" };
+    }
+    if (!hasTripCoordinates(stop)) {
+      return { ...entry, advice: "missing_inputs", reason: stop ? "no_coords" : "no_stop", message: forecast.message, action: "set_location" };
+    }
+    // Trips invokes the static table, whose capabilities differ from Gear up's biophysics routes.
+    if (!activityKey || !Object.hasOwn(layerRecommendations, activityKey)) {
+      return { ...entry, advice: "unsupported", reason: "activity_unsupported", message: `Automatic trip clothing guidance is unavailable for ${activity}. Plan your kit manually.` };
+    }
+    if (activity === "Climb") entry.approximation = "Climb uses general hiking guidance; climbing-specific equipment is not included.";
+    if (hours.length === 0) {
+      return { ...entry, reason: forecast.reason, action: forecast.status === "error" || forecast.reason === "no_daytime_hours" ? "retry_weather" : forecast.reason === "past" ? "plan_manually" : "check_later" };
+    }
+    // Plan each requested date explicitly; the quick-plan builder's seven-day limit does not truncate trips.
+    const plan = buildMultiDayLayerPlan({
+      startDate: new Date(`${date}T12:00:00`), durationDays: 1,
+      hourlyForecast: hours, getRecommendation: makeRecommendationFor(activityKey, sensitivity),
+    }).days[0];
+    if (!plan?.baseline.recommendation) {
+      return { ...entry, reason: "no_recommendation", message: "No clothing guidance is available for these conditions. Plan your kit manually." };
+    }
+    dailyPlans.push(plan);
+    return { ...entry, advice: "available", message: "General clothing guidance available.", action: "review_day" };
+  });
+  const skipped = coverage.filter((day) => day.advice !== "available")
+    .map((day) => ({ date: day.date, reason: day.reason ?? day.advice }));
 
   // Pull this user's item mappings + wardrobe so the engine can resolve
   // standard layer slots to the specific gear they own.
@@ -169,7 +146,6 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   const packingList = buildPackingListFromDays(dailyPlans, itemMappings, wardrobeItems);
 
   // Find the requesting user's TripMember row and any group gear assigned to them.
-  const myMember = full.members.find((m) => m.user_id === userId);
   const myGear = myMember
     ? full.gear
         .filter((g) => g.assignee_member_id === myMember.id)
@@ -184,7 +160,8 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
       end_date: full.trip.end_date,
     },
     coveredDays: dailyPlans.length,
-    totalDays: full.days.length,
+    totalDays: dates.length,
+    coverage,
     skipped,
     packingList,
     groupGear: myGear,
