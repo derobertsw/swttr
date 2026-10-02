@@ -4,7 +4,7 @@ export interface TripForecastCoverage {
   status: "not_requested" | "available" | "partial" | "unavailable" | "error";
   availableHours: number;
   expectedHours: number;
-  reason?: "no_location" | "past" | "outside_forecast" | "no_daytime_hours" | "service_error";
+  reason?: "no_location" | "not_needed" | "past" | "outside_forecast" | "no_daytime_hours" | "service_error";
   message: string;
 }
 

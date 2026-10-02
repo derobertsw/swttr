@@ -34,11 +34,11 @@ const TRIP_ROUTE = reply(200, tripFull({ stops: [STOWE_STOP], days: [DAY] }));
 const NO_FORECAST = reply(500, { error: "Failed to fetch weather data" });
 
 /** The page suspends until its params resolve, so rendering is awaited. */
-async function renderPage() {
+async function renderPage(date = DAY.date) {
   await act(async () => {
     render(
       <Suspense fallback={null}>
-        <DayDetailPage params={Promise.resolve({ id: TRIP.id, date: DAY.date })} />
+        <DayDetailPage params={Promise.resolve({ id: TRIP.id, date })} />
       </Suspense>
     );
   });
@@ -293,7 +293,7 @@ describe("Trip day page", () => {
   });
 
   it.each([
-    { forecast: { status: "unavailable", availableHours: 0, expectedHours: 16, message: "Forecast unavailable for this day." }, weather: null },
+    { forecast: { status: "unavailable", reason: "no_daytime_hours", availableHours: 0, expectedHours: 16, message: "Forecast unavailable for this day." }, weather: null },
     { hourly: [] },
     { forecast: { status: "available" }, weather: { tempF: null, wind: 0, precip: 0 } },
   ])("resolves unavailable or invalid data to a terminal state", async (body) => {
@@ -305,6 +305,79 @@ describe("Trip day page", () => {
     expect(await screen.findByRole("button", { name: "Retry weather" })).toBeInTheDocument();
     expect(screen.queryByText("Loading forecast…")).not.toBeInTheDocument();
     expect(screen.queryByText(/0°F/)).not.toBeInTheDocument();
+  });
+
+  it.each(["past", "outside_forecast"])("doesn't offer retry when the date is %s", async (reason) => {
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": TRIP_ROUTE,
+      "GET /api/v1/trips/trip-1/days/2026-10-10/weather": reply(200, {
+        forecast: { status: "unavailable", reason, availableHours: 0, expectedHours: 16, message: "Forecast not available for this date. Plan manually or check later." },
+        weather: null,
+      }),
+    }));
+    await renderPage();
+    expect(await screen.findByText(/Forecast not available for this date/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry weather" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "shell" })).toBeInTheDocument();
+  });
+
+  it("offers retry for partial forecasts", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": TRIP_ROUTE,
+      "GET /api/v1/trips/trip-1/days/2026-10-10/weather": reply(200, {
+        forecast: { status: "partial", availableHours: 8, expectedHours: 16, message: "Partial daytime forecast." },
+        weather: { tempF: 50, wind: 4, precip: 0 },
+      }),
+    }));
+    await renderPage();
+    expect(await screen.findByRole("button", { name: "Retry weather" })).toBeInTheDocument();
+  });
+
+  it("creates a missing day so its activity, location and kit controls can be used", async () => {
+    let created = false;
+    let finishCreate = () => {};
+    const fetchMock = fakeTripApi({
+      "GET /api/v1/trips/trip-1": () => reply(200, tripFull({ days: created ? [DAY] : [] })),
+      "POST /api/v1/trips/trip-1/days/2026-10-10": () => new Promise((resolve) => {
+        finishCreate = () => { created = true; resolve(reply(200, { day: DAY })); };
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("button", { name: "Create day plan" }));
+    expect(screen.getByRole("button", { name: "Creating day plan…" })).toBeDisabled();
+    expect(created).toBe(false);
+    await act(async () => finishCreate());
+    expect(await screen.findByRole("button", { name: "Hike" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Set location" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "shell" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Create day plan" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the missing day recovery available after a failed create", async () => {
+    const fetchMock = fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull()),
+      "POST /api/v1/trips/trip-1/days/2026-10-10": reply(500, { error: "Database unavailable" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("button", { name: "Create day plan" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Database unavailable");
+    expect(screen.getByRole("button", { name: "Create day plan" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Create day plan" }));
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Hike" })).not.toBeInTheDocument();
+  });
+
+  it("doesn't offer to create a day outside the trip dates", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": reply(200, tripFull()) }));
+    await renderPage("2026-10-13");
+    expect(await screen.findByText(/This date is outside the trip/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create day plan" })).not.toBeInTheDocument();
   });
 
   it("loads weather for a location at zero latitude and longitude", async () => {

@@ -6,7 +6,7 @@ import { fetchUserWardrobeItems } from "@/lib/userWardrobe";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
 import { tripActivityToRecommendationKey } from "@/lib/trip-activities";
-import { fetchTripForecast, hasTripCoordinates, resolveTripStop, tripDayForecast } from "@/lib/trip-forecast";
+import { fetchTripForecast, hasTripCoordinates, resolveTripStop, tripDayForecast, tripForecastDateOutsideWindow } from "@/lib/trip-forecast";
 import layerRecommendations from "@/data/layerRecommendations.json";
 import type { DailyLayerPlan } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
@@ -52,36 +52,51 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
 
   const dates = enumerateDates(full.trip.start_date, full.trip.end_date);
   const myMember = full.members.find((member) => member.user_id === userId && member.status !== "left");
-  const requestedStops = new Map<string, NonNullable<ReturnType<typeof resolveTripStop>>>();
-  // One bounded request per stop, independent of activity and non-contiguous return visits.
-  for (const date of dates) {
-    const day = full.days.find((day) => day.date === date);
-    const stop = resolveTripStop(day ?? { stop_id: null }, full.stops);
-    if (hasTripCoordinates(stop)) requestedStops.set(stop.id, stop);
-  }
-  const sources = new Map(await Promise.all([...requestedStops.values()].map(async (stop) =>
-    [stop.id, await fetchTripForecast(stop)] as const)));
-
-  const dailyPlans: DailyLayerPlan[] = [];
-  const coverage: TripDayCoverage[] = dates.map((date) => {
+  const daysForCoverage = dates.map((date) => {
     const day = full.days.find((day) => day.date === date);
     const stop = resolveTripStop(day ?? { stop_id: null }, full.stops);
     const activity = day?.activity || stop?.activities[0] || null;
-    const { forecast, hours } = tripDayForecast(date, stop ? sources.get(stop.id) : undefined);
+    const activityKey = tripActivityToRecommendationKey(activity);
+    const manualKit = day && myMember && full.kits.find((kit) =>
+      kit.trip_day_id === day.id && kit.trip_member_id === myMember.id && kit.items.length > 0);
+    const outsideWindow = tripForecastDateOutsideWindow(date);
+    const needsForecast = !!day && activity !== "Rest" && !manualKit && !!activityKey
+      && Object.hasOwn(layerRecommendations, activityKey) && hasTripCoordinates(stop) && !outsideWindow;
+    return { date, day, stop, activity, activityKey, manualKit, outsideWindow, needsForecast };
+  });
+  const requestedStops = new Map<string, NonNullable<ReturnType<typeof resolveTripStop>>>();
+  for (const { stop, needsForecast } of daysForCoverage) {
+    if (stop && needsForecast) requestedStops.set(stop.id, stop);
+  }
+  // Fetch only stops used by automatic guidance, once each, with at most three
+  // requests in flight. Each provider request also has a 15-second timeout.
+  const stops = [...requestedStops.values()];
+  const sources = new Map<string, Awaited<ReturnType<typeof fetchTripForecast>>>();
+  let nextStop = 0;
+  await Promise.all(Array.from({ length: Math.min(3, stops.length) }, async () => {
+    while (nextStop < stops.length) {
+      const stop = stops[nextStop++];
+      sources.set(stop.id, await fetchTripForecast(stop));
+    }
+  }));
+
+  const dailyPlans: DailyLayerPlan[] = [];
+  const coverage: TripDayCoverage[] = daysForCoverage.map(({ date, day, stop, activity, activityKey, manualKit, outsideWindow }) => {
+    const { forecast, hours } = tripDayForecast(date,
+      outsideWindow ? undefined : stop ? sources.get(stop.id) : undefined,
+      outsideWindow ?? (hasTripCoordinates(stop) ? "not_needed" : "no_location"));
     const entry: TripDayCoverage = {
       date, activity, stopName: stop?.name ?? null, forecast,
       advice: "unavailable", message: forecast.message, action: "plan_manually",
     };
     if (!day) {
-      return { ...entry, advice: "missing_inputs", reason: "no_day", message: "This date has no saved day plan. Review the trip dates and destinations.", action: "review_day" };
+      return { ...entry, advice: "missing_inputs", reason: "no_day", message: "This date has no saved day plan. Open this day to create one.", action: "review_day" };
+    }
+    if (manualKit) {
+      return { ...entry, advice: "manual", reason: "manual_kit", message: "Manual kit saved. Review it on this day; it is not included in automatic packing." };
     }
     if (activity === "Rest") {
       return { ...entry, advice: "rest", reason: "rest_day", message: "Rest day; review personal items manually." };
-    }
-    const manualKit = day && myMember && full.kits.find((kit) =>
-      kit.trip_day_id === day.id && kit.trip_member_id === myMember.id && kit.items.length > 0);
-    if (manualKit) {
-      return { ...entry, advice: "manual", reason: "manual_kit", message: "Manual kit saved. Review it on this day; it is not included in automatic packing." };
     }
     if (!activity) {
       return { ...entry, advice: "missing_inputs", reason: "no_activity", message: "Choose an activity for this day.", action: "set_activity" };
@@ -89,7 +104,6 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     if (!hasTripCoordinates(stop)) {
       return { ...entry, advice: "missing_inputs", reason: stop ? "no_coords" : "no_stop", message: forecast.message, action: "set_location" };
     }
-    const activityKey = tripActivityToRecommendationKey(activity);
     // Trips invokes the static table, whose capabilities differ from Gear up's biophysics routes.
     if (!activityKey || !Object.hasOwn(layerRecommendations, activityKey)) {
       return { ...entry, advice: "unsupported", reason: "activity_unsupported", message: `Automatic trip clothing guidance is unavailable for ${activity}. Plan your kit manually.` };

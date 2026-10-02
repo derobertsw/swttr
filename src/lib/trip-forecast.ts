@@ -39,15 +39,31 @@ export async function fetchTripForecast(stop: TripStop): Promise<TripForecast> {
   }
 }
 
-export function tripDayForecast(date: string, source: TripForecast | undefined): TripDayForecastResponse & { hours: ForecastHour[] } {
+// Without a destination time zone, its current date may be one day either
+// side of UTC. Skip only dates outside every possible local forecast window.
+export function tripForecastDateOutsideWindow(date: string): "past" | "outside_forecast" | undefined {
+  const utcToday = new Date(Date.now()).toISOString().slice(0, 10);
+  if (date < addDaysToDateString(utcToday, -1)) return "past";
+  if (date > addDaysToDateString(utcToday, FORECAST_DAYS)) return "outside_forecast";
+}
+
+const UNREQUESTED_MESSAGES = {
+  no_location: "Choose a location with coordinates to load weather.",
+  not_needed: "Weather was not requested for automatic packing. Open this day to load its forecast.",
+  past: "This day is in the past; live forecasts are unavailable. Review your kit manually.",
+  outside_forecast: "Forecast not available yet. Check closer to this date or plan your kit manually.",
+};
+
+export function tripDayForecast(date: string, source: TripForecast | undefined,
+  unrequestedReason: keyof typeof UNREQUESTED_MESSAGES = "no_location"): TripDayForecastResponse & { hours: ForecastHour[] } {
   const forecast: TripDayForecastResponse["forecast"] = {
     status: "unavailable", availableHours: 0, expectedHours: 16, message: "",
   };
   const empty = { forecast, weather: null, hours: [] };
   if (source === undefined) {
-    forecast.status = "not_requested";
-    forecast.reason = "no_location";
-    forecast.message = "Choose a location with coordinates to load weather.";
+    forecast.status = unrequestedReason === "past" || unrequestedReason === "outside_forecast" ? "unavailable" : "not_requested";
+    forecast.reason = unrequestedReason;
+    forecast.message = UNREQUESTED_MESSAGES[unrequestedReason];
     return empty;
   }
   if (source === null) {
@@ -58,9 +74,7 @@ export function tripDayForecast(date: string, source: TripForecast | undefined):
   }
   if (date < source.today || date > source.lastDate) {
     forecast.reason = date < source.today ? "past" : "outside_forecast";
-    forecast.message = date < source.today
-      ? "This day is in the past; live forecasts are unavailable. Review your kit manually."
-      : "Forecast not available yet. Check closer to this date or plan your kit manually.";
+    forecast.message = UNREQUESTED_MESSAGES[forecast.reason];
     return empty;
   }
   // Deduplicate local hours and require all three values. Missing values never become zero weather.

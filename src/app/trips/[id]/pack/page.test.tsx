@@ -48,7 +48,18 @@ describe("Trip packing coverage", () => {
     expect(screen.getByText(partial.message)).toBeInTheDocument();
     expect(screen.getByText("Manual kit saved. Review separately.")).toBeInTheDocument();
     expect(screen.getByText("Rest day; review personal items manually.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review manual kit for 2026-10-11" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Plan kit manually for 2026-10-12" })).toBeInTheDocument();
     expect(screen.getByText("Climb uses general hiking guidance.")).toBeInTheDocument();
+  });
+
+  it.each(["unsupported", "unavailable"] as const)("asks to plan a kit for %s days without a saved kit", async (advice) => {
+    vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1/pack": reply(200, pack([
+      entry("2026-10-10", { advice, action: "plan_manually" }),
+    ])) }));
+    await renderPage();
+    expect(await screen.findByRole("link", { name: "Plan kit manually for 2026-10-10" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Review manual kit/ })).not.toBeInTheDocument();
   });
 
   it("retains the last list when regeneration fails and announces the failure", async () => {

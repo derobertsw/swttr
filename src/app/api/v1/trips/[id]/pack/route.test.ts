@@ -225,10 +225,15 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     expect(data.coveredDays).toBe(supported ? 1 : 0);
     expect(data.coverage[0]).toMatchObject({
       advice: supported ? "available" : activity === "Rest" ? "rest" : "unsupported",
-      forecast: { status: "available", availableHours: 16 },
+      forecast: { status: supported ? "available" : "not_requested", availableHours: supported ? 16 : 0 },
     });
     if (activity === "Climb") expect(data.coverage[0].approximation).toMatch(/hiking guidance/);
-    if (!supported) expect(data.packingList.totalRequiredSlots).toBe(0);
+    if (!supported) {
+      expect(data.packingList.totalRequiredSlots).toBe(0);
+      expect(data.coverage[0].forecast.reason).toBe("not_needed");
+      expect(data.coverage[0].forecast.message).not.toMatch(/Choose a location/);
+      expect(global.fetch).not.toHaveBeenCalled();
+    }
   });
 
   it.each([[], null])("accounts for empty or null forecast values (%s)", async (values) => {
@@ -276,8 +281,9 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     expect(data.skipped.map((day: { date: string }) => day.date)).toEqual(["2026-10-07", "2026-10-24", "2026-10-25"]);
   });
 
-  it("reports only the requesting member's saved kit as manual, without claiming automatic coverage", async () => {
+  it.each(["Alpine", "Rest"])("reports only the requesting member's saved %s kit as manual, without claiming automatic coverage", async (activity) => {
     const full = mockTrip(["2026-10-08", "2026-10-09"]);
+    full.days[0].activity = activity;
     full.members = [ORGANIZER, SAM];
     full.kits = full.days.map((day, index) => ({
       id: `kit-${index}`, trip_day_id: day.id, trip_member_id: index === 0 ? ORGANIZER.id : SAM.id,
@@ -302,6 +308,92 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     expect(data.coveredDays).toBe(0);
     expect(data.coverage[0]).toMatchObject({ advice: "missing_inputs", reason,
       action: reason === "no_activity" ? "set_activity" : "set_location" });
+  });
+
+  it.each(["past", "distant", "manual", "no_day", "no_activity"])("doesn't request weather for an entirely %s trip", async (kind) => {
+    const dates = kind === "past" ? ["2026-10-05", "2026-10-06"]
+      : kind === "distant" ? ["2026-10-25", "2026-10-26"] : ["2026-10-08", "2026-10-09"];
+    const full = mockTrip(dates);
+    if (kind === "manual") {
+      full.members = [ORGANIZER];
+      full.kits = full.days.map((day) => ({
+        id: `kit-${day.id}`, trip_day_id: day.id, trip_member_id: ORGANIZER.id,
+        effort: "steady", items: ["shell"], note: null, state: "ok", updated_at: "2026-10-01T00:00Z",
+      }));
+    }
+    if (kind === "no_day") full.days = [];
+    if (kind === "no_activity") {
+      full.stops[0].activities = [];
+      full.days.forEach((day) => { day.activity = null; });
+    }
+    global.fetch = vi.fn().mockRejectedValue(new Error("Provider should not be called"));
+    const data = await (await getPack()).json();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(data.coveredDays).toBe(0);
+    expect(data.coverage).toHaveLength(2);
+    for (const day of data.coverage) {
+      expect(day.forecast).toMatchObject(kind === "past" ? { status: "unavailable", reason: "past" }
+        : kind === "distant" ? { status: "unavailable", reason: "outside_forecast" }
+        : { status: "not_requested", reason: "not_needed" });
+      expect(day.forecast.message).not.toMatch(/Choose a location/);
+    }
+  });
+
+  it("requests only the stop needed by automatic guidance in a mixed trip", async () => {
+    const dates = Array.from({ length: 5 }, (_, index) => addDaysToDateString("2026-10-08", index));
+    const full = mockTrip(dates);
+    full.stops = dates.map((_, index) => ({ ...full.stops[0], id: `stop-${index}`, latitude: 40 + index }));
+    full.days.forEach((day, index) => { day.stop_id = full.stops[index].id; });
+    full.days[1].activity = "Rest";
+    full.days[2].activity = "Run";
+    full.members = [ORGANIZER];
+    full.kits = [{ id: "kit-3", trip_day_id: full.days[3].id, trip_member_id: ORGANIZER.id,
+      effort: "steady", items: ["shell"], note: null, state: "ok", updated_at: "2026-10-01T00:00Z" }];
+    full.days.pop();
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () =>
+      forecastFixture("America/New_York", "2026-10-08T04:00Z", 120, () => -4) });
+    const data = await (await getPack()).json();
+    expect(data.coveredDays).toBe(1);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(new URL(vi.mocked(global.fetch).mock.calls[0][0] as string).searchParams.get("latitude")).toBe("40");
+    expect(data.coverage.slice(1, 4).every((day: { forecast: { reason: string } }) => day.forecast.reason === "not_needed")).toBe(true);
+    // The missing date uses the base stop: already-fetched weather can be reused.
+    expect(data.coverage[4]).toMatchObject({ reason: "no_day", forecast: { status: "available" } });
+  });
+
+  it("limits concurrent forecast requests and still accounts for every required stop", async () => {
+    const dates = Array.from({ length: 7 }, (_, index) => addDaysToDateString("2026-10-08", index));
+    const full = mockTrip(dates);
+    full.stops = dates.map((_, index) => ({ ...full.stops[0], id: `stop-${index}` }));
+    full.days.forEach((day, index) => { day.stop_id = full.stops[index].id; });
+    let inFlight = 0;
+    let peak = 0;
+    global.fetch = vi.fn().mockImplementation(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return { ok: true, json: async () => forecastFixture("America/New_York", "2026-10-08T04:00Z", 168, () => -4) };
+    });
+    const data = await (await getPack()).json();
+    expect(peak).toBe(3);
+    expect(inFlight).toBe(0);
+    expect(global.fetch).toHaveBeenCalledTimes(7);
+    expect(data.coveredDays).toBe(7);
+    expect(data.totalDays).toBe(7);
+  });
+
+  it.each([
+    { now: "2026-10-08T00:30Z", date: "2026-10-07", timezone: "America/Los_Angeles", firstHour: "2026-10-07T07:00Z", offset: -7 },
+    { now: "2026-10-08T23:30Z", date: "2026-10-24", timezone: "Pacific/Kiritimati", firstHour: "2026-10-23T10:00Z", offset: 14 },
+  ])("doesn't skip a forecastable local boundary date $date", async ({ now, date, timezone, firstHour, offset }) => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse(now));
+    mockTrip([date]);
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () =>
+      forecastFixture(timezone, firstHour, 24, () => offset) });
+    const data = await (await getPack()).json();
+    expect(data.coveredDays).toBe(1);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("accepts valid zero coordinates", async () => {

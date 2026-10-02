@@ -23,9 +23,13 @@ const LAYER_LABEL: Record<string, string> = {
 };
 
 const COVERAGE_ACTION_LABEL: Record<TripDayCoverage["action"], string> = {
-  set_location: "Choose location", set_activity: "Choose activity", plan_manually: "Review manual kit",
+  set_location: "Choose location", set_activity: "Choose activity", plan_manually: "Plan kit manually",
   retry_weather: "Retry weather", check_later: "Review day", review_day: "Review day",
 };
+
+function coverageActionLabel(day: TripDayCoverage) {
+  return day.advice === "manual" ? "Review manual kit" : COVERAGE_ACTION_LABEL[day.action];
+}
 
 async function fetchPackList(tripId: string): Promise<TripPackResponse> {
   const res = await fetch(`/api/v1/trips/${tripId}/pack`);
@@ -175,8 +179,8 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
                   {day.approximation && <p className="mt-1 text-xs text-white/75">{day.approximation}</p>}
                   <Link href={`/trips/${id}/days/${day.date}`}
                     className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-cyan-200 underline underline-offset-4"
-                    aria-label={`${COVERAGE_ACTION_LABEL[day.action]} for ${day.date}`}>
-                    {COVERAGE_ACTION_LABEL[day.action]}
+                    aria-label={`${coverageActionLabel(day)} for ${day.date}`}>
+                    {coverageActionLabel(day)}
                   </Link>
                 </li>
               ))}

@@ -90,6 +90,12 @@ export default function DayDetailPage({
   }, [weatherKey, id, date]);
 
   const dateObj = new Date(`${date}T00:00:00`);
+  const canCreateDay = !!data && /^\d{4}-\d{2}-\d{2}$/.test(date)
+    && Number.isFinite(dateObj.getTime())
+    && dateObj.getFullYear() === Number(date.slice(0, 4))
+    && dateObj.getMonth() + 1 === Number(date.slice(5, 7))
+    && dateObj.getDate() === Number(date.slice(8, 10))
+    && date >= data.trip.start_date && date <= data.trip.end_date;
   const dateLabel = dateObj.toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",
@@ -145,11 +151,8 @@ export default function DayDetailPage({
           </div>
         )}
 
-        {data && !day && !loading && (
-          <Card>
-            <h1 className="text-base font-semibold text-white">{dateLabel}</h1>
-            <p className="mt-2 text-sm text-white/75">This date has no saved day plan. Return to the trip overview to review dates and destinations.</p>
-          </Card>
+        {data && !day && (
+          <MissingDayPlan tripId={id} date={date} dateLabel={dateLabel} canCreate={canCreateDay} onSaved={refresh} />
         )}
         {data && day && (
           <>
@@ -213,6 +216,38 @@ export default function DayDetailPage({
   );
 }
 
+function MissingDayPlan({ tripId, date, dateLabel, canCreate, onSaved }: {
+  tripId: string; date: string; dateLabel: string; canCreate: boolean; onSaved: () => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const create = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await tripRequest(`/api/v1/trips/${tripId}/days/${date}`, "POST");
+      await onSaved();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Card>
+      <h1 className="text-base font-semibold text-white">{dateLabel}</h1>
+      <p className="mt-2 text-sm text-white/75">{canCreate
+        ? "This date has no saved day plan. Create one to choose an activity and plan your kit."
+        : "This date is outside the trip. Return to the trip overview to review its dates."}</p>
+      {error && <p role="alert" className="mt-2 text-sm text-orange-100">Couldn&apos;t create the day plan: {error}</p>}
+      {canCreate && <button type="button" onClick={() => void create()} disabled={saving} aria-busy={saving}
+        className="mt-3 min-h-11 rounded-md border border-cyan-300/45 bg-cyan-300/15 px-3 text-sm font-medium text-cyan-50 hover:bg-cyan-300/25 disabled:opacity-50">
+        {saving ? "Creating day plan…" : "Create day plan"}
+      </button>}
+    </Card>
+  );
+}
+
 function WeatherCard({
   tripId,
   stop,
@@ -233,6 +268,8 @@ function WeatherCard({
   const hasCoords = typeof stop?.latitude === "number" && Number.isFinite(stop.latitude)
     && typeof stop.longitude === "number" && Number.isFinite(stop.longitude);
   const weather = result?.weather;
+  const canRetry = result?.forecast.status === "error" || result?.forecast.status === "partial"
+    || result?.forecast.reason === "no_daytime_hours";
 
   const save = async () => {
     const selected = search.selectedLocation;
@@ -308,7 +345,7 @@ function WeatherCard({
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2 pl-11">
-        {hasCoords && result && ["error", "unavailable", "partial"].includes(result.forecast.status) && (
+        {hasCoords && canRetry && (
           <button type="button" onClick={onRetry}
             className="min-h-11 rounded-md border border-white/12 px-3 text-xs text-white/85 hover:bg-white/[0.08]">
             Retry weather
