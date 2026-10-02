@@ -83,6 +83,20 @@ export function formatZonedTime(instant: number, timeZone: string): string {
   return new Date(clockReadingAt(instant, timeZone)).toISOString().slice(0, 16);
 }
 
+/** The local date-time now in a time zone, or on the device's clock without one. */
+export function zonedNow(timeZone?: string): string {
+  return formatZonedTime(Date.now(), timeZone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone);
+}
+
+/**
+ * A "YYYY-MM-DD" date as the Date a date picker shows for it, which is read
+ * on the device's calendar. Noon, since some zones skip midnight.
+ */
+export function toPickerDate(dateString: string): Date {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day, 12);
+}
+
 /** An instant as ISO 8601 with the time zone's offset then, e.g. "2026-10-15T14:00-04:00". */
 export function formatZonedIsoTime(instant: number, timeZone: string): string {
   const offsetMinutes = Math.round(utcOffsetAt(instant, timeZone) / MINUTE_MS);
