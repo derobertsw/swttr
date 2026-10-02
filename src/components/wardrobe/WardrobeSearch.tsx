@@ -303,7 +303,7 @@ export function WardrobeSearch({
             {/* Brand */}
             <div role="group" aria-labelledby="wardrobe-filter-brand">
               <p id="wardrobe-filter-brand" className="mb-1.5 text-sm font-medium text-foreground">Brand</p>
-              <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+              <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
                 <button
                   type="button"
                   aria-pressed={brandFilter === null}
