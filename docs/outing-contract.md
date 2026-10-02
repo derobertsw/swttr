@@ -58,7 +58,7 @@ The advice kind and the request status are separate:
 
 ## Edit outing and Start over
 
-- **Back (Edit outing)** returns to the form the results came from, with the activity, effort, place, date, time and duration as they were entered.
+- **Back (Edit outing)** returns to the form the results came from, with the activity, effort, place, date, time and duration as they were entered. An activity picked on the results reaches the form only once its layers arrive, so Back while they load, or after they fail, opens on the activity that was shown.
 - **Plan Another Trip** and the iOS Plan tab's `navigatePlanAhead` event do the same for the plan form.
 - **The logo (Start over)** clears the inputs and returns to the Now form with the default activity.
 

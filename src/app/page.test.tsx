@@ -1265,6 +1265,9 @@ describe("Home Page", () => {
 
       expect(screen.queryByText(/wind 12 mph/i)).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: form })).toBeEnabled();
+      // The form opens on the activity that was shown, not the one that never loaded.
+      const activity = screen.getByRole("radiogroup", { name: "Activity" });
+      expect(within(activity).getByRole("radio", { name: /alpine skiing/i })).toBeChecked();
     });
 
     it("drops a weather change still running when the iOS shell's Plan tab is tapped", async () => {

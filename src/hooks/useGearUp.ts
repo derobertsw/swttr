@@ -201,25 +201,34 @@ export function useGearUp() {
     [shownResult, startRequest, recommendFor]
   );
 
-  /** Layers again for the shown outing's weather, with any changes to the outing. */
+  /**
+   * Layers again for the shown outing's weather, with any changes to the
+   * outing. Resolves true once they're shown.
+   */
   const recommendForShownWeather = useCallback(async (changes: Partial<Outing>, failureMessage: string) => {
-    if (shownResult?.kind !== "layers") return;
+    if (shownResult?.kind !== "layers") return false;
     const isCurrent = startRequest();
     try {
       const result = await layersFor({ ...shownResult.outing, ...changes }, shownResult.weather);
-      if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", result });
+      if (!isCurrent()) return false;
+      dispatch({ type: "SUBMIT_SUCCESS", result });
+      return true;
     } catch (error) {
       logWarn("useGearUp.recommendForShownWeather", error);
       if (isCurrent()) {
         toast.error(failureMessage);
         dispatch({ type: "SUBMIT_ERROR" });
       }
+      return false;
     }
   }, [shownResult, startRequest, layersFor]);
 
+  // The form takes the new activity only with its layers, so Edit outing
+  // while they load, or after they fail, opens on the activity still shown.
   const handleActivityChange = useCallback(async (newActivity: string) => {
-    setActivity(newActivity);
-    await recommendForShownWeather({ activity: newActivity }, "Failed to update activity");
+    if (await recommendForShownWeather({ activity: newActivity }, "Failed to update activity")) {
+      setActivity(newActivity);
+    }
   }, [setActivity, recommendForShownWeather]);
 
   const handleRetry = useCallback(
