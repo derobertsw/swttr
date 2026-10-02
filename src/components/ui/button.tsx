@@ -37,8 +37,11 @@ const buttonVariants = cva(
   }
 )
 
+// Runs in the capture phase too: with asChild, Slot calls the child's own
+// onClick before ours, so stopping the event there is the only way to block it.
 function preventClick(event: React.MouseEvent) {
   event.preventDefault()
+  event.stopPropagation()
 }
 
 function Button({
@@ -48,6 +51,7 @@ function Button({
   asChild = false,
   loading = false,
   onClick,
+  onClickCapture,
   children,
   ...props
 }: React.ComponentProps<"button"> &
@@ -66,6 +70,7 @@ function Button({
       className={cn(buttonVariants({ variant, size, className }))}
       aria-busy={loading || undefined}
       aria-disabled={loading || undefined}
+      onClickCapture={loading ? preventClick : onClickCapture}
       onClick={loading ? preventClick : onClick}
       {...props}
     >

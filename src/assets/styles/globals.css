@@ -64,7 +64,7 @@
 }
 
 /* Dark: navy surfaces with light-mint actions. Keep both dark blocks identical
-   (src/test/designTokens.test.ts checks this). */
+   (globals.test.ts checks this). */
 [data-appearance="dark"] {
   color-scheme: dark;
   --background: #0f1d2a;

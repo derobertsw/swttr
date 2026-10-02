@@ -22,6 +22,21 @@ describe("Button", () => {
     expect(button).toHaveFocus();
   });
 
+  it("blocks an asChild element's own click handler while loading", async () => {
+    const user = userEvent.setup();
+    const onChildClick = vi.fn();
+    render(
+      <Button asChild loading>
+        <a href="#details" onClick={onChildClick}>
+          Details
+        </a>
+      </Button>
+    );
+
+    await user.click(screen.getByRole("link", { name: "Details" }));
+    expect(onChildClick).not.toHaveBeenCalled();
+  });
+
   it("does not submit its form while loading", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());

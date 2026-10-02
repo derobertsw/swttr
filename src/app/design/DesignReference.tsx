@@ -370,8 +370,9 @@ export function DesignReference() {
       <header className="space-y-2">
         <h1 className="text-title font-semibold md:text-title-lg">SWTTR design system</h1>
         <p className="max-w-2xl text-muted-foreground">
-          Tokens and shared components in both appearances. The app follows the system
-          setting; see docs/design-system.md for the rules behind these examples.
+          Tokens and shared components in both appearances. The app stays on the dark
+          palette until every screen uses these tokens, then follows the system setting.
+          See docs/design-system.md for the rules behind these examples.
         </p>
       </header>
       <div className="grid gap-6 lg:grid-cols-2">

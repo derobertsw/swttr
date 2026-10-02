@@ -5,7 +5,7 @@ SWTTR's interface should read like a calm outdoor field guide. The navy and teal
 The system is a thin layer over the existing shadcn/Radix components:
 - Tokens live in [`src/assets/styles/globals.css`](../src/assets/styles/globals.css).
 - Components live in [`src/components/ui/`](../src/components/ui/).
-- The `/design` page renders every token and component in both appearances. It runs in local and preview builds and returns 404 in production.
+- The `/design` page renders every token and component in both appearances. Only the dev server and Vercel preview deployments serve it; every other build returns 404.
 
 ## Appearance
 

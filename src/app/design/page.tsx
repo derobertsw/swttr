@@ -7,9 +7,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// A working reference for the shared tokens and components. It ships to local
-// and preview builds only; docs/design-system.md describes the same rules.
+// A working reference for the shared tokens and components, served only by
+// the dev server and Vercel preview deployments; everywhere else, including
+// `next start` without VERCEL_ENV, it 404s. docs/design-system.md describes
+// the same rules.
 export default function DesignPage() {
-  if (process.env.VERCEL_ENV === "production") notFound();
+  if (process.env.NODE_ENV !== "development" && process.env.VERCEL_ENV !== "preview") {
+    notFound();
+  }
   return <DesignReference />;
 }
