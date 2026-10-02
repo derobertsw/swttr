@@ -70,9 +70,9 @@ const faqs = [
       "The algorithm tracks evaporative resistance (how easily sweat vapor passes through each layer) alongside thermal insulation. It calculates an overall permeability index using the ISO 9920 formula, then derives an evaporative potential (moisture transmission per unit of insulation). For high-exertion activities, garments below the breathability threshold are deprioritized. If overall breathability is below 70% of the target for your activity, you'll see a warning about overheating risk from moisture buildup.",
   },
   {
-    question: "What does 'Plan Ahead' do?",
+    question: "Can I plan for a later day or a multi-day trip?",
     answer:
-      "Plan Ahead lets you get clothing recommendations for a future date and location. Enter a city, select a date and time, and SWTTR fetches the forecast from Open-Meteo and runs the full biophysics calculation against those conditions. Works best within a 7-day window for forecast accuracy.",
+      "Yes. On Gear up, choose Later, then pick a start date and time at the place you're going. SWTTR fetches the forecast from Open-Meteo for that hour and runs the full biophysics calculation against those conditions. Choose Several days for a plan of two to seven days, with layers for each day from 6 am to 9 pm. Dates are limited to what the forecast covers.",
   },
   {
     question: "How do I add my gear?",

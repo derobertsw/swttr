@@ -34,7 +34,8 @@ function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boole
  * State and actions for the home page's Gear Up flow: pick an activity and a
  * place (searched for, or the device's own location when asked), get weather
  * there (now, at a later time, or a multi-day forecast), and fetch layer
- * recommendations for it.
+ * recommendations for it. One form asks for all of it; Now or Later picks
+ * which time fields it shows.
  *
  * Each request reads its inputs from one Outing, and its result keeps that
  * outing (see docs/outing-contract.md). Changes made from the results start
@@ -52,14 +53,16 @@ export function useGearUp() {
   const { activity, setActivity, exertion, setExertion, initializing, resetActivity } =
     useActivitySelection(defaultActivity, hasStoredDefaultActivity || !preferencesLoading);
 
-  const initialMode: InputMode = searchParams.get("mode") === "planAhead" ? "planAhead" : "manual";
+  // /?mode=planAhead, which the iOS shell's Plan tab opens, starts on Later.
+  const initialMode: InputMode = searchParams.get("mode") === "planAhead" ? "later" : "now";
   const [state, dispatch] = useReducer(gearUpReducer, initialMode, createInitialState);
 
   const locationSearch = useLocationSearch();
   const { status: locationStatus, locate, cancel: cancelLocating } = useDeviceLocation();
-  const placeInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const biophysics = useBiophysicsRecommendation();
 
+  const setInputMode = useCallback((mode: InputMode) => dispatch({ type: "SET_INPUT_MODE", mode }), []);
   const setDate = useCallback((d: Date | undefined) => dispatch({ type: "SET_DATE", date: d }), []);
   const setTime = useCallback((t: string) => dispatch({ type: "SET_TIME", time: t }), []);
   const setDurationDays = useCallback((days: number) => {
@@ -70,8 +73,8 @@ export function useGearUp() {
   // Update input mode when URL param changes
   useEffect(() => {
     const mode = searchParams.get("mode");
-    if (mode === "planAhead" && state.inputMode !== "planAhead") {
-      dispatch({ type: "SET_INPUT_MODE", mode: "planAhead" });
+    if (mode === "planAhead" && state.inputMode !== "later") {
+      dispatch({ type: "SET_INPUT_MODE", mode: "later" });
     }
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -84,10 +87,10 @@ export function useGearUp() {
     [sensitivity, biophysics, bodyMetrics]
   );
 
-  // Only the latest request's answer is used. Going to a form from the
-  // results or from the other form, or starting over, retires the running
-  // request, so a late answer can't show results or report an error for an
-  // outing that's gone.
+  // Only the latest request's answer is used. Going to the form from the
+  // results, switching the form to the other mode from the iOS shell, or
+  // starting over retires the running request, so a late answer can't show
+  // results or report an error for an outing that's gone.
   const latestRequest = useRef(0);
   /** Starts loading, and returns a check for whether this request is still the latest. */
   const startRequest = useCallback(() => {
@@ -132,50 +135,46 @@ export function useGearUp() {
     }
 
     const place = locationSearch.selectedLocation;
-    if (state.inputMode === "planAhead") {
-      if (!place) {
-        toast.error("Please select a location");
-        return;
-      }
-      if (!state.date) {
-        toast.error("Please select a date");
-        return;
-      }
+    const later = state.inputMode === "later";
+    if (!place || (later && (!state.date || !state.time))) {
+      // Render the errors first, so the first field to fix is announced as invalid when it takes focus.
+      flushSync(() => dispatch({ type: "FIELDS_MISSING" }));
+      formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus();
+      return;
+    }
 
-      const when: LaterTime = {
-        mode: "later",
-        date: format(state.date, "yyyy-MM-dd"),
-        time: state.time,
-        durationDays: state.durationDays,
-      };
-      const outing = { activity, exertion, place, when };
-      const isCurrent = startRequest();
-      if (when.durationDays === 1) {
-        // Single day: layers for the forecast hour the outing starts, read on the place's clock.
-        await recommendFor(isCurrent, outing);
-      } else {
-        try {
-          const result = await fetchPlanAhead(outing, sensitivity);
-          if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", result });
-        } catch (error) {
-          logWarn("useGearUp.handleSubmit", error);
-          if (!isCurrent()) return;
-          if (error instanceof PlanAheadError && error.field === "startDate") {
-            // Shown on the start date, which is what needs to change.
-            dispatch({ type: "START_DATE_INVALID", error: error.message, location: place });
-          } else {
-            toast.error(error instanceof PlanAheadError ? error.message : "Couldn't build the plan. Try again.");
-            dispatch({ type: "SUBMIT_ERROR" });
-          }
-        }
-      }
-    } else if (place) {
+    if (!later) {
       // Current weather at the chosen place, never silently at the device's location.
       await recommendFor(startRequest(), { activity, exertion, place, when: { mode: "now" } });
-    } else {
-      // Render the error first, so the field is announced as invalid when it takes focus.
-      flushSync(() => dispatch({ type: "PLACE_MISSING" }));
-      placeInputRef.current?.focus();
+      return;
+    }
+
+    const when: LaterTime = {
+      mode: "later",
+      date: format(state.date!, "yyyy-MM-dd"),
+      time: state.time,
+      durationDays: state.durationDays,
+    };
+    const outing = { activity, exertion, place, when };
+    const isCurrent = startRequest();
+    if (when.durationDays === 1) {
+      // Single day: layers for the forecast hour the outing starts, read on the place's clock.
+      await recommendFor(isCurrent, outing);
+      return;
+    }
+    try {
+      const result = await fetchPlanAhead(outing, sensitivity);
+      if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", result });
+    } catch (error) {
+      logWarn("useGearUp.handleSubmit", error);
+      if (!isCurrent()) return;
+      if (error instanceof PlanAheadError && error.field === "startDate") {
+        // Shown on the start date, which is what needs to change.
+        dispatch({ type: "START_DATE_INVALID", error: error.message, location: place });
+      } else {
+        toast.error(error instanceof PlanAheadError ? error.message : "Couldn't build the plan. Try again.");
+        dispatch({ type: "SUBMIT_ERROR" });
+      }
     }
   }, [activity, exertion, state, locationStatus, locationSearch, sensitivity, startRequest, recommendFor]);
 
@@ -236,22 +235,6 @@ export function useGearUp() {
     [recommendForShownWeather]
   );
 
-  const handleGoNow = useCallback(async () => {
-    if (!activity) {
-      toast.error("Please select an activity");
-      return;
-    }
-    // Loading covers finding the location too, so the plan can't be submitted meanwhile.
-    const isCurrent = startRequest();
-    const coordinates = await locate();
-    if (!coordinates) {
-      // The location button says why, unless the request was cancelled.
-      if (isCurrent()) dispatch({ type: "SUBMIT_ERROR" });
-      return;
-    }
-    await recommendFor(isCurrent, { activity, exertion, place: yourLocation(coordinates), when: { mode: "now" } });
-  }, [activity, exertion, locate, startRequest, recommendFor]);
-
   const resetToInitialState = useCallback(() => {
     latestRequest.current += 1;
     resetActivity();
@@ -263,16 +246,16 @@ export function useGearUp() {
 
   const formShowing: InputMode | null = state.result === null ? state.inputMode : null;
   /**
-   * Back to a form, keeping the activity, place, date, time and duration. A
-   * request made from that form carries on; one from the results or the
-   * other form is retired.
+   * Back to the form in `mode`, keeping the activity, place, date, time and
+   * duration. A request made from the form in that mode carries on; one from
+   * the results, or from the form in the other mode, is retired.
    */
   const showForm = useCallback((mode: InputMode) => {
     if (formShowing !== mode) latestRequest.current += 1;
     dispatch({ type: "SHOW_FORM", mode });
   }, [formShowing]);
-  const showPlanForm = useCallback(() => showForm("planAhead"), [showForm]);
-  /** Edit outing: back to the form the results came from, with what was entered. */
+  const showPlanForm = useCallback(() => showForm("later"), [showForm]);
+  /** Edit outing: back to the form as the results were requested from it, with what was entered. */
   const editOuting = useCallback(() => showForm(state.inputMode), [showForm, state.inputMode]);
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches
@@ -291,6 +274,7 @@ export function useGearUp() {
     setExertion,
     result: state.result,
     inputMode: state.inputMode,
+    setInputMode,
     date: state.date,
     setDate,
     time: state.time,
@@ -298,13 +282,13 @@ export function useGearUp() {
     durationDays: state.durationDays,
     setDurationDays,
     loading: state.loading,
-    showPlaceError: state.showPlaceError,
+    showFieldErrors: state.showFieldErrors,
     // Only for the place it was found at: another place's forecast may cover the dates.
     startDateError: state.startDateError && isSamePlace(state.startDateError.location, locationSearch.selectedLocation)
       ? state.startDateError.message
       : null,
     locationStatus,
-    placeInputRef,
+    formRef,
     // Typing or picking a place ends a pending location request, so a position
     // that arrives late can't replace the place.
     locationSearch: {
@@ -321,7 +305,6 @@ export function useGearUp() {
     handleUseMyLocation,
     cancelLocating,
     handleSubmit,
-    handleGoNow,
     handleWeatherChange,
     handleActivityChange,
     handleRetry,

@@ -53,14 +53,14 @@ The advice kind and the request status are separate:
   - switching the activity;
   - changing the weather's place or time;
   - Try again.
-- **Only the latest request lands.** Each request gets a number, and only the latest one may change the page. Starting over, Edit outing, or switching to the plan form retires the running request, so a late answer can't replace a newer outing. A request made from the form being shown stays current.
+- **Only the latest request lands.** Each request gets a number, and only the latest one may change the page. Starting over, Edit outing, or the iOS Plan tab switching the form to Later retires the running request, so a late answer can't replace a newer outing. A request made from the form being shown stays current, including when Now or Later is changed on the form.
 - **The shown result stays put.** While a newer request loads, and when it fails, the page keeps showing the last result with its own activity, place and time. The results header shows the result's activity until the new advice arrives.
 
 ## Edit outing and Start over
 
-- **Back (Edit outing)** returns to the form the results came from, with the activity, effort, place, date, time and duration as they were entered. An activity picked on the results reaches the form only once its layers arrive, so Back while they load, or after they fail, opens on the activity that was shown.
-- **Plan Another Trip** and the iOS Plan tab's `navigatePlanAhead` event do the same for the plan form.
-- **The logo (Start over)** clears the inputs and returns to the Now form with the default activity.
+- **Back (Edit outing)** returns to the form on Now or Later, as the results were requested, with the activity, effort, place, date, time and duration as they were entered. An activity picked on the results reaches the form only once its layers arrive, so Back while they load, or after they fail, opens on the activity that was shown.
+- **Plan Another Trip** and the iOS Plan tab's `navigatePlanAhead` event do the same, on Later.
+- **The logo (Start over)** clears the inputs and returns to the form on Now with the default activity.
 
 Known gap: the form keeps what was typed into it. If the weather drawer moved the results to another place or time, Edit outing still shows the form's place. #126/#127 replace the drawer with Edit outing.
 
