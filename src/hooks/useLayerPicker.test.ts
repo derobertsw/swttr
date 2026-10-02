@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { useLayerPicker } from "./useLayerPicker";
 import type { WardrobeItem, AvailableItem } from "@/types/wardrobe";
 
@@ -165,5 +165,28 @@ describe("useLayerPicker", () => {
 
     const { wardrobeItems } = result.current.getItems("hands", "outer");
     expect(wardrobeItems[0].isInUse).toBe(true);
+  });
+
+  it("lists a catalog item under the wardrobe after it's added and the wardrobe reloads", async () => {
+    const catalogGlove: AvailableItem = {
+      id: "glove-1",
+      type: "handwear",
+      brand: "BrandH",
+      model_name: "Warm Glove",
+      category: "",
+      rcl_clo: 0.55,
+    };
+    mockFetchResponses([], [catalogGlove]);
+    const { result } = renderHook(() => useLayerPicker(new Set()));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.getItems("hands", "outer").recommendedItems.map((item) => item.id)).toEqual(["glove-1"]);
+
+    mockFetchResponses([GLOVE_WARDROBE], [catalogGlove]);
+    act(() => result.current.reload());
+
+    await waitFor(() =>
+      expect(result.current.getItems("hands", "outer").wardrobeItems.map((item) => item.id)).toEqual(["glove-1"])
+    );
+    expect(result.current.getItems("hands", "outer").recommendedItems).toEqual([]);
   });
 });

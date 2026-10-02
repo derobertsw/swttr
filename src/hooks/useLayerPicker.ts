@@ -98,6 +98,8 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
     wardrobeItems: WardrobeItem[];
     availableItems: AvailableItem[];
   } | null>(null);
+  // Bumped to reload the wardrobe after it changes.
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     if (!userId) return;
@@ -123,7 +125,10 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
 
     fetchData();
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, reloadCount]);
+
+  /** Loads the wardrobe again; the current items stay until it arrives. */
+  const reload = useCallback(() => setReloadCount((count) => count + 1), []);
 
   const isCurrent = data !== null && data.userId === userId;
   const loading = userId !== null && !isCurrent;
@@ -190,5 +195,5 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
     [wardrobeItems, availableItems, wardrobeItemIds, inUseItemIds]
   );
 
-  return { loading, getItems };
+  return { loading, getItems, reload };
 }
