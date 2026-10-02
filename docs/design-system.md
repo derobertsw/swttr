@@ -131,7 +131,8 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Tokens, components, focus, reduced motion | Done (#119 foundations) |
 | Navigation: sidebar, mobile tab bar, header, menu sheet | Uses tokens |
 | Overlays: Settings, Update Weather, layer picker, Add Custom Item, item details, popovers, location suggestions | Uses tokens |
-| Gear up and results (`src/app/page.tsx`, `ActivitySelection`, `PlanAheadForm`, `layers/*`, `MultiDayPlanDisplay`) | Still hardcoded white-on-dark glass. Next migration. |
+| Gear up form (`src/app/page.tsx`, `GearUpForm`, `ActivitySelection`, `SegmentedChoice`, `DeviceLocationButton`) | Uses tokens (#126) |
+| Gear up results (`LayerDisplay`, `layers/*`, `MultiDayPlanDisplay`) | Still hardcoded white-on-dark glass. Next migration. |
 | Wardrobe (`src/app/wardrobe`, `wardrobe/*`) | Still hardcoded |
 | Trips (`src/app/trips/**`, `trips/trip-primitives.tsx`) | Still hardcoded |
 

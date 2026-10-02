@@ -45,51 +45,66 @@ const PLAN_RESULT: OutingResult = {
 
 describe("gearUpReducer", () => {
   it("shows a result with the outing it was requested for", () => {
-    const loading = gearUpReducer(createInitialState("manual"), { type: "SUBMIT_START" });
+    const loading = gearUpReducer(createInitialState("now"), { type: "SUBMIT_START" });
     const state = gearUpReducer(loading, { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
     expect(state).toMatchObject({ loading: false, result: LAYERS_RESULT });
   });
 
   it("keeps the shown result while a newer request loads, and when it fails", () => {
-    const shown = gearUpReducer(createInitialState("manual"), { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
+    const shown = gearUpReducer(createInitialState("now"), { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
     const loading = gearUpReducer(shown, { type: "SUBMIT_START" });
     expect(loading).toMatchObject({ loading: true, result: LAYERS_RESULT });
     expect(gearUpReducer(loading, { type: "SUBMIT_ERROR" })).toMatchObject({ loading: false, result: LAYERS_RESULT });
   });
 
-  it("stops loading on error and resets to manual mode", () => {
-    const planning = createInitialState("planAhead");
+  it("stops loading on error and starts over on Now", () => {
+    const planning = createInitialState("later");
     expect(gearUpReducer({ ...planning, loading: true }, { type: "SUBMIT_ERROR" }).loading).toBe(false);
-    expect(gearUpReducer(planning, { type: "RESET" }).inputMode).toBe("manual");
+    expect(gearUpReducer(planning, { type: "RESET" }).inputMode).toBe("now");
+  });
+
+  it("starts a later outing as one day, and switches between Now and Later keeping what was entered", () => {
+    const later = gearUpReducer(createInitialState("now"), { type: "SET_INPUT_MODE", mode: "later" });
+    expect(later).toMatchObject({ inputMode: "later", durationDays: 1 });
+
+    const dated = gearUpReducer(later, { type: "SET_DATE", date: new Date("2026-10-08T00:00:00") });
+    const now = gearUpReducer(dated, { type: "SET_INPUT_MODE", mode: "now" });
+    expect(gearUpReducer(now, { type: "SET_INPUT_MODE", mode: "later" })).toEqual(dated);
+  });
+
+  it("marks empty fields once the form is submitted with them, until the form is shown again", () => {
+    const missing = gearUpReducer(createInitialState("later"), { type: "FIELDS_MISSING" });
+    expect(missing.showFieldErrors).toBe(true);
+    expect(gearUpReducer(missing, { type: "SHOW_FORM", mode: "later" }).showFieldErrors).toBe(false);
   });
 
   it("goes back to a form without its results, keeping what was entered", () => {
     const entered = {
-      ...createInitialState("planAhead"),
+      ...createInitialState("later"),
       date: new Date("2026-10-08T00:00:00"),
       time: "07:30",
       durationDays: 5,
     };
     const shown = gearUpReducer(entered, { type: "SUBMIT_SUCCESS", result: PLAN_RESULT });
-    expect(gearUpReducer(shown, { type: "SHOW_FORM", mode: "planAhead" })).toEqual(entered);
+    expect(gearUpReducer(shown, { type: "SHOW_FORM", mode: "later" })).toEqual(entered);
 
-    const shownNow = gearUpReducer(createInitialState("manual"), { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
-    expect(gearUpReducer(shownNow, { type: "SHOW_FORM", mode: "manual" })).toEqual(createInitialState("manual"));
-    // From Now mode to the plan, as when the iOS shell's Plan tab is tapped after the logo.
-    expect(gearUpReducer(createInitialState("manual"), { type: "SHOW_FORM", mode: "planAhead" })).toEqual(
-      createInitialState("planAhead")
+    const shownNow = gearUpReducer(createInitialState("now"), { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
+    expect(gearUpReducer(shownNow, { type: "SHOW_FORM", mode: "now" })).toEqual(createInitialState("now"));
+    // From Now to Later, as when the iOS shell's Plan tab is tapped after the logo.
+    expect(gearUpReducer(createInitialState("now"), { type: "SHOW_FORM", mode: "later" })).toEqual(
+      createInitialState("later")
     );
   });
 
-  it("keeps a request busy only when it was made from the form being shown", () => {
+  it("keeps a request busy only when it was made from the form in the mode being shown", () => {
     const busy = (state: ReturnType<typeof createInitialState>) => ({ ...state, loading: true });
-    const shown = gearUpReducer(createInitialState("planAhead"), { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
-    const showPlan = { type: "SHOW_FORM", mode: "planAhead" } as const;
+    const shown = gearUpReducer(createInitialState("later"), { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
+    const showPlan = { type: "SHOW_FORM", mode: "later" } as const;
 
-    expect(gearUpReducer(busy(createInitialState("planAhead")), showPlan).loading).toBe(true);
+    expect(gearUpReducer(busy(createInitialState("later")), showPlan).loading).toBe(true);
     expect(gearUpReducer(busy(shown), showPlan).loading).toBe(false);
-    expect(gearUpReducer(busy(createInitialState("manual")), showPlan).loading).toBe(false);
-    expect(gearUpReducer(busy(createInitialState("manual")), { type: "SHOW_FORM", mode: "manual" }).loading).toBe(true);
+    expect(gearUpReducer(busy(createInitialState("now")), showPlan).loading).toBe(false);
+    expect(gearUpReducer(busy(createInitialState("now")), { type: "SHOW_FORM", mode: "now" }).loading).toBe(true);
   });
 });
 
