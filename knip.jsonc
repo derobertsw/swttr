@@ -1,6 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "tags": ["-lintignore"],
+  // Benchmarks run separately from Vitest's test.include patterns.
+  "entry": ["src/**/*.bench.ts"],
   "ignoreDependencies": [
     // Linked natively by ios/App/CapApp-SPM/Package.swift; never imported from JS.
     "@capacitor/splash-screen",

@@ -8,7 +8,7 @@ import type { PhaseTargets } from '../thermal-targets';
 import type { RecommendationRequest } from '../request';
 import type { CategorizedGarments, GarmentRow } from '../types';
 import { createSinglePhaseSport } from './single-phase';
-import { buildRegionalEnsemble, evapPotential, layer, missingLayers, targetFit } from './regional-ensemble';
+import { buildRegionalEnsemble } from './regional-ensemble';
 
 const MIN_EVAP_POTENTIAL = 0.25;
 /** Shells breathe less than base and mid layers, so they have a lower bar. */
@@ -45,13 +45,14 @@ export function buildXCEnsemble(
 ): GarmentRow[] {
   const breathableFrom = { base: minEvapPotential, mid: minEvapPotential, outer: MIN_SHELL_EVAP_POTENTIAL };
 
-  return buildRegionalEnsemble(categorized, puffyFitsUnder, (candidate, scoredRegions) => {
-    const missingCoverage = missingLayers(candidate, scoredRegions, 'base') +
-      (windLayer ? missingLayers(candidate, scoredRegions, 'outer') : 0);
-    const { excess, deficit, surplus } = targetFit(candidate, targets, scoredRegions);
-    const unbreathable = candidate.filter((g) => evapPotential(g) < breathableFrom[layer(g)]).length;
-    const breathability = candidate.reduce((sum, g) => sum + evapPotential(g), 0);
-    return [missingCoverage, deficit + excess, unbreathable, candidate.length, -breathability, surplus];
+  return buildRegionalEnsemble(categorized, targets, {
+    puffyFitsUnder,
+    breathableFrom,
+    rank: (candidate) => {
+      const missingCoverage = candidate.missingBase + (windLayer ? candidate.missingOuter : 0);
+      const { excess, deficit, surplus, unbreathable, breathability, count } = candidate;
+      return [missingCoverage, deficit + excess, unbreathable, count, -breathability, surplus];
+    },
   });
 }
 

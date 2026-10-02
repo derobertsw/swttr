@@ -101,9 +101,9 @@ export default function FAQ() {
     <PageLayout>
       <div className="flex flex-col gap-6 w-full max-w-2xl">
         <header>
-          <h2 className="text-2xl font-semibold text-white/90 tracking-wide">
+          <h1 className="text-2xl font-semibold text-white/90 tracking-wide">
             Frequently Asked Questions
-          </h2>
+          </h1>
           <p className="text-[13px] text-white/55 mt-1">
             How SWTTR works and how to get the most out of it.
           </p>

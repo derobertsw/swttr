@@ -68,6 +68,7 @@ const HomeContent = () => {
 
   return (
     <PageLayout onLogoClick={resetToInitialState} chromeVariant="compact">
+      <h1 className="sr-only">Gear up</h1>
       <div
         key={showResults ? "results" : "form"}
         className="flex w-full flex-col items-center gap-6 animate-in fade-in duration-300 sm:gap-7"

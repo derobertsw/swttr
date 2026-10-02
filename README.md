@@ -128,7 +128,8 @@ Other sports select base layers, then mid layers, then shells. Alpine and XC com
 ```mermaid
 graph TD
     START[Target Clo Range from Pipeline] --> SPORT{Alpine or XC?}
-    SPORT -->|Yes| COMB[Compare base + optional mid/puffy + outer<br/>for torso, then legs]
+    SPORT -->|Yes| CACHE[Cache garment features once<br/>Reuse prefix and base/mid totals]
+    CACHE --> COMB[Compare base + optional mid/puffy + outer<br/>for torso, then legs]
     COMB --> CAP[One item per slot per covered region<br/>Insulated outer replaces shell<br/>Bibs fill leg slots under a jacket]
     CAP --> RANK{Sport}
     RANK -->|Alpine| REG[Preserve coverage and rain protection<br/>Minimize combined shortfall and excess, then layers]
@@ -382,6 +383,8 @@ npm run test:coverage
 ```
 
 Route tests use `src/test/fakeSupabase.ts`, an in-memory stand-in for the Supabase query builder. The recommendation golden tests run against `src/test/fixtures/gear-catalog.json`, a snapshot of the real gear catalog.
+
+The alpine/XC outfit search also has parity tests against its previous implementation and an isolated [performance benchmark](docs/regional-outfit-performance.md).
 
 ## Project Structure
 
