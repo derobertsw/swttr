@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 import { toast } from "sonner";
 import { POST as evaluateLayers } from "@/app/api/v1/ensembles/evaluate/route";
 import type { PickerItem } from "@/hooks/useLayerPicker";
-import { buildGearUpResult } from "@/lib/gearUp";
+import { buildLayersResult, layerDisplayAdvice } from "@/lib/gearUp";
 import LayerDisplay from "./LayerDisplay";
 
 // Layer evaluation runs on the server; serve it from the real route handler.
@@ -1041,17 +1041,22 @@ describe("LayerDisplay", () => {
     it.each(["running", "biking", "backcountry_skiing"])(
       "gives a signed-out %s result the outing and a sign-in path",
       async (activity) => {
-        const result = await buildGearUpResult({ temperature: 25, windSpeed: 10 }, activity, "neutral", async () => ({
+        const outing = {
+          activity,
+          exertion: "moderate" as const,
+          place: { id: 1, name: "Stowe", country: "United States", latitude: 44.47, longitude: -72.69 },
+          when: { mode: "now" as const },
+        };
+        const result = await buildLayersResult(outing, { temperature: 25, windSpeed: 10 }, "neutral", async () => ({
           status: "auth_required",
           data: null,
         }));
         render(
           <LayerDisplay
-            activity={activity}
-            recommendation={result.recommendation}
-            biophysicsStatus={result.biophysicsStatus}
-            temperature={result.temperature}
-            windspeed={result.windspeed}
+            activity={result.outing.activity}
+            {...layerDisplayAdvice(result.advice)}
+            temperature={result.weather.temperature}
+            windspeed={result.weather.windSpeed}
           />
         );
 

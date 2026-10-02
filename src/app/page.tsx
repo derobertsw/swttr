@@ -10,6 +10,7 @@ import MultiDayPlanDisplay from "@/components/MultiDayPlanDisplay";
 import { LocationInput } from "@/components/LocationInput";
 import { useItemMappings } from "@/hooks/useItemMappings";
 import { useGearUp } from "@/hooks/useGearUp";
+import { layerDisplayAdvice } from "@/lib/gearUp";
 import { useUserId } from "@/hooks/useUserId";
 import { useWebMCPTools } from "@/hooks/useWebMCPTools";
 import { ACTIVITIES } from "@/data/activities";
@@ -24,13 +25,7 @@ const HomeContent = () => {
     activityInitializing,
     exertion,
     setExertion,
-    temperature,
-    windspeed,
-    precipitation,
-    precipitationType,
-    weatherContext,
-    recommendation,
-    showResults,
+    result,
     inputMode,
     date,
     setDate,
@@ -43,9 +38,6 @@ const HomeContent = () => {
     startDateError,
     locationStatus,
     placeInputRef,
-    biophysicsData,
-    biophysicsStatus,
-    multiDayPlan,
     locationSearch,
     handleUseMyLocation,
     cancelLocating,
@@ -55,25 +47,23 @@ const HomeContent = () => {
     handleActivityChange,
     handleRetry,
     showPlanForm,
+    editOuting,
     resetToInitialState,
   } = useGearUp();
 
   const { itemMappings } = useItemMappings();
 
   const ActivityIcon = ACTIVITIES.find((item) => item.value === activity)?.icon ?? Zap;
-  const showGearUpButton = !showResults && inputMode !== "planAhead";
-  // Back from Plan Ahead results returns to the plan, keeping what was entered;
-  // from Now results it starts over, like the logo.
-  const handleBack = inputMode === "planAhead" ? showPlanForm : resetToInitialState;
+  const showGearUpButton = !result && inputMode !== "planAhead";
 
   return (
     <PageLayout onLogoClick={resetToInitialState} chromeVariant="compact">
       <h1 className="sr-only">Gear up</h1>
       <div
-        key={showResults ? "results" : "form"}
+        key={result ? "results" : "form"}
         className="flex w-full flex-col items-center gap-6 animate-in fade-in duration-300 sm:gap-7"
       >
-        {!showResults ? (
+        {!result ? (
           <>
             <div className="mb-1 flex max-w-md flex-col items-center gap-2 text-center">
               <p className="text-[1.75rem] font-semibold leading-tight tracking-[-0.01em] text-white/95 sm:text-[1.95rem]">
@@ -165,25 +155,25 @@ const HomeContent = () => {
               </button>
             )}
           </>
-        ) : inputMode === "planAhead" && multiDayPlan ? (
+        ) : result.kind === "plan" ? (
           <MultiDayPlanDisplay
-            plan={multiDayPlan}
+            plan={result.plan}
             itemMappings={itemMappings}
             onReset={showPlanForm}
           />
         ) : (
+          // Everything shown comes from the result, so it stays tied to the
+          // outing it was requested for while a change loads or fails.
           <LayerDisplay
-            activity={activity}
-            recommendation={recommendation}
-            temperature={temperature}
-            windspeed={windspeed}
-            precipitation={precipitation}
-            precipitationType={precipitationType}
-            weatherContext={weatherContext}
+            activity={result.outing.activity}
+            {...layerDisplayAdvice(result.advice)}
+            temperature={result.weather.temperature}
+            windspeed={result.weather.windSpeed}
+            precipitation={result.weather.precipitation}
+            precipitationType={result.weather.precipitationType}
+            weatherContext={result.weather.context}
             itemMappings={itemMappings}
-            biophysicsData={biophysicsData}
-            biophysicsStatus={biophysicsStatus}
-            onReset={handleBack}
+            onReset={editOuting}
             onRetry={() => void handleRetry()}
             onWeatherChange={handleWeatherChange}
             onActivityChange={handleActivityChange}
