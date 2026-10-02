@@ -12,15 +12,17 @@ import { useActivitySelection } from "@/hooks/useActivitySelection";
 import { fetchWeatherAt } from "@/hooks/useCurrentWeather";
 import { useDeviceLocation, yourLocation } from "@/hooks/useDeviceLocation";
 import {
-  buildGearUpResult,
+  buildLayersResult,
   createInitialState,
   fetchPlanAhead,
+  forecastDateTime,
   gearUpReducer,
+  outingTimeAt,
   PlanAheadError,
-  showsPlanForm,
   type InputMode,
 } from "@/lib/gearUp";
 import { logWarn } from "@/lib/logger";
+import type { LaterTime, Outing } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
 
@@ -33,6 +35,10 @@ function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boole
  * place (searched for, or the device's own location when asked), get weather
  * there (now, at a later time, or a multi-day forecast), and fetch layer
  * recommendations for it.
+ *
+ * Each request reads its inputs from one Outing, and its result keeps that
+ * outing (see docs/outing-contract.md). Changes made from the results start
+ * from the shown result's outing, not from the form.
  */
 export function useGearUp() {
   const searchParams = useSearchParams();
@@ -69,18 +75,19 @@ export function useGearUp() {
     }
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Recommendations for the given weather and activity. */
-  const recommendFor = useCallback(
-    (weather: WeatherData, forActivity: string = activity) =>
-      buildGearUpResult(weather, forActivity, sensitivity, (act, w) =>
-        biophysics.fetch(act, w, exertion, bodyMetrics)
+  /** Layers for an outing in the given weather. */
+  const layersFor = useCallback(
+    (outing: Outing, weather: WeatherData) =>
+      buildLayersResult(outing, weather, sensitivity, (o, w) =>
+        biophysics.fetch(o.activity, w, o.exertion, bodyMetrics)
       ),
-    [activity, sensitivity, biophysics, exertion, bodyMetrics]
+    [sensitivity, biophysics, bodyMetrics]
   );
 
-  // Only the latest request's answer is used. Going to the plan form from
-  // anywhere else, or starting over, retires the running request, so a late
-  // answer can't show results or report an error for an outing that's gone.
+  // Only the latest request's answer is used. Going to a form from the
+  // results or from the other form, or starting over, retires the running
+  // request, so a late answer can't show results or report an error for an
+  // outing that's gone.
   const latestRequest = useRef(0);
   /** Starts loading, and returns a check for whether this request is still the latest. */
   const startRequest = useCallback(() => {
@@ -90,17 +97,13 @@ export function useGearUp() {
   }, []);
 
   /**
-   * Shows recommendations for a picked place's current weather, or for its
-   * forecast at a local date-time there. Resolves false, after saying why,
-   * when there's no weather; the inputs stay as they were. Nothing changes
-   * once `isCurrent` says the request was retired.
+   * Shows layers for a one-day outing, from its place's current weather or its
+   * forecast at the outing's local date-time there. Resolves false, after
+   * saying why, when there's no weather; the inputs and the shown result stay
+   * as they were. Nothing changes once `isCurrent` says the request was retired.
    */
-  const recommendAt = useCallback(async (
-    isCurrent: () => boolean,
-    location: LocationSuggestion,
-    localDateTime?: string
-  ) => {
-    const { data, error } = await fetchWeatherAt(location, localDateTime);
+  const recommendFor = useCallback(async (isCurrent: () => boolean, outing: Outing) => {
+    const { data, error } = await fetchWeatherAt(outing.place, forecastDateTime(outing.when));
     if (!data) {
       if (isCurrent()) {
         toast.error(error);
@@ -108,10 +111,10 @@ export function useGearUp() {
       }
       return false;
     }
-    const result = await recommendFor(data);
-    if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", ...result });
+    const result = await layersFor(outing, data);
+    if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", result });
     return true;
-  }, [recommendFor]);
+  }, [layersFor]);
 
   /** Makes the device's position the outing's place, once it's found. */
   const handleUseMyLocation = useCallback(async () => {
@@ -128,8 +131,9 @@ export function useGearUp() {
       return;
     }
 
+    const place = locationSearch.selectedLocation;
     if (state.inputMode === "planAhead") {
-      if (!locationSearch.selectedLocation) {
+      if (!place) {
         toast.error("Please select a location");
         return;
       }
@@ -138,43 +142,42 @@ export function useGearUp() {
         return;
       }
 
+      const when: LaterTime = {
+        mode: "later",
+        date: format(state.date, "yyyy-MM-dd"),
+        time: state.time,
+        durationDays: state.durationDays,
+      };
+      const outing = { activity, exertion, place, when };
       const isCurrent = startRequest();
-      if (state.durationDays === 1) {
+      if (when.durationDays === 1) {
         // Single day: layers for the forecast hour the outing starts, read on the place's clock.
-        await recommendAt(isCurrent, locationSearch.selectedLocation, `${format(state.date, "yyyy-MM-dd")}T${state.time}`);
+        await recommendFor(isCurrent, outing);
       } else {
-        const planLocation = locationSearch.selectedLocation;
         try {
-          const result = await fetchPlanAhead({
-            activity,
-            sensitivity,
-            location: planLocation,
-            date: state.date,
-            time: state.time,
-            durationDays: state.durationDays,
-          });
-          if (isCurrent()) dispatch({ type: "SUBMIT_PLAN_SUCCESS", ...result });
+          const result = await fetchPlanAhead(outing, sensitivity);
+          if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", result });
         } catch (error) {
           logWarn("useGearUp.handleSubmit", error);
           if (!isCurrent()) return;
           if (error instanceof PlanAheadError && error.field === "startDate") {
             // Shown on the start date, which is what needs to change.
-            dispatch({ type: "START_DATE_INVALID", error: error.message, location: planLocation });
+            dispatch({ type: "START_DATE_INVALID", error: error.message, location: place });
           } else {
             toast.error(error instanceof PlanAheadError ? error.message : "Couldn't build the plan. Try again.");
             dispatch({ type: "SUBMIT_ERROR" });
           }
         }
       }
-    } else if (locationSearch.selectedLocation) {
+    } else if (place) {
       // Current weather at the chosen place, never silently at the device's location.
-      await recommendAt(startRequest(), locationSearch.selectedLocation);
+      await recommendFor(startRequest(), { activity, exertion, place, when: { mode: "now" } });
     } else {
       // Render the error first, so the field is announced as invalid when it takes focus.
       flushSync(() => dispatch({ type: "PLACE_MISSING" }));
       placeInputRef.current?.focus();
     }
-  }, [activity, state, locationStatus, locationSearch, sensitivity, startRequest, recommendAt]);
+  }, [activity, exertion, state, locationStatus, locationSearch, sensitivity, startRequest, recommendFor]);
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches "gearUp"
   // from its native Gear Up tab while this page is open, and otherwise opens
@@ -187,24 +190,24 @@ export function useGearUp() {
     return () => window.removeEventListener("gearUp", onGearUp);
   }, [handleSubmit]);
 
+  const shownResult = state.result;
+
+  /** The shown outing's layers at another place, or another local time there. */
   const handleWeatherChange = useCallback(
-    (location: LocationSuggestion, localDateTime?: string) => recommendAt(startRequest(), location, localDateTime),
-    [startRequest, recommendAt]
+    async (place: LocationSuggestion, localDateTime?: string) => {
+      if (shownResult?.kind !== "layers") return false;
+      return recommendFor(startRequest(), { ...shownResult.outing, place, when: outingTimeAt(localDateTime) });
+    },
+    [shownResult, startRequest, recommendFor]
   );
 
-  /** Recommendations for the weather already shown, keeping the outing. */
-  const recommendForShownWeather = useCallback(async (forActivity: string, failureMessage: string) => {
+  /** Layers again for the shown outing's weather, with any changes to the outing. */
+  const recommendForShownWeather = useCallback(async (changes: Partial<Outing>, failureMessage: string) => {
+    if (shownResult?.kind !== "layers") return;
     const isCurrent = startRequest();
     try {
-      const shownWeather: WeatherData = {
-        temperature: state.temperature,
-        windSpeed: state.windspeed,
-        precipitation: state.precipitation,
-        precipitationType: state.precipitationType,
-        context: state.weatherContext ?? undefined,
-      };
-      const result = await recommendFor(shownWeather, forActivity);
-      if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", ...result });
+      const result = await layersFor({ ...shownResult.outing, ...changes }, shownResult.weather);
+      if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", result });
     } catch (error) {
       logWarn("useGearUp.recommendForShownWeather", error);
       if (isCurrent()) {
@@ -212,16 +215,16 @@ export function useGearUp() {
         dispatch({ type: "SUBMIT_ERROR" });
       }
     }
-  }, [state.temperature, state.windspeed, state.precipitation, state.precipitationType, state.weatherContext, startRequest, recommendFor]);
+  }, [shownResult, startRequest, layersFor]);
 
   const handleActivityChange = useCallback(async (newActivity: string) => {
     setActivity(newActivity);
-    await recommendForShownWeather(newActivity, "Failed to update activity");
+    await recommendForShownWeather({ activity: newActivity }, "Failed to update activity");
   }, [setActivity, recommendForShownWeather]);
 
   const handleRetry = useCallback(
-    () => recommendForShownWeather(activity, "Failed to load layers"),
-    [activity, recommendForShownWeather]
+    () => recommendForShownWeather({}, "Failed to load layers"),
+    [recommendForShownWeather]
   );
 
   const handleGoNow = useCallback(async () => {
@@ -237,8 +240,8 @@ export function useGearUp() {
       if (isCurrent()) dispatch({ type: "SUBMIT_ERROR" });
       return;
     }
-    await recommendAt(isCurrent, yourLocation(coordinates));
-  }, [activity, locate, startRequest, recommendAt]);
+    await recommendFor(isCurrent, { activity, exertion, place: yourLocation(coordinates), when: { mode: "now" } });
+  }, [activity, exertion, locate, startRequest, recommendFor]);
 
   const resetToInitialState = useCallback(() => {
     latestRequest.current += 1;
@@ -249,16 +252,19 @@ export function useGearUp() {
     biophysics.reset();
   }, [resetActivity, cancelLocating, locationSearch, biophysics]);
 
-  const onPlanForm = showsPlanForm(state);
+  const formShowing: InputMode | null = state.result === null ? state.inputMode : null;
   /**
-   * Back to the plan form, keeping the activity, place, date, time and
-   * duration. A request made from the plan form carries on; one from the
-   * results or the Now form is retired.
+   * Back to a form, keeping the activity, place, date, time and duration. A
+   * request made from that form carries on; one from the results or the
+   * other form is retired.
    */
-  const showPlanForm = useCallback(() => {
-    if (!onPlanForm) latestRequest.current += 1;
-    dispatch({ type: "SHOW_PLAN_FORM" });
-  }, [onPlanForm]);
+  const showForm = useCallback((mode: InputMode) => {
+    if (formShowing !== mode) latestRequest.current += 1;
+    dispatch({ type: "SHOW_FORM", mode });
+  }, [formShowing]);
+  const showPlanForm = useCallback(() => showForm("planAhead"), [showForm]);
+  /** Edit outing: back to the form the results came from, with what was entered. */
+  const editOuting = useCallback(() => showForm(state.inputMode), [showForm, state.inputMode]);
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches
   // "navigatePlanAhead" when its Plan tab is tapped again on this page, and
@@ -274,13 +280,7 @@ export function useGearUp() {
     activityInitializing: initializing,
     exertion,
     setExertion,
-    temperature: state.temperature,
-    windspeed: state.windspeed,
-    precipitation: state.precipitation,
-    precipitationType: state.precipitationType,
-    weatherContext: state.weatherContext,
-    recommendation: state.recommendation,
-    showResults: state.showResults,
+    result: state.result,
     inputMode: state.inputMode,
     date: state.date,
     setDate,
@@ -296,9 +296,6 @@ export function useGearUp() {
       : null,
     locationStatus,
     placeInputRef,
-    biophysicsData: state.biophysicsData,
-    biophysicsStatus: state.biophysicsStatus,
-    multiDayPlan: state.multiDayPlan,
     // Typing or picking a place ends a pending location request, so a position
     // that arrives late can't replace the place.
     locationSearch: {
@@ -320,6 +317,7 @@ export function useGearUp() {
     handleActivityChange,
     handleRetry,
     showPlanForm,
+    editOuting,
     resetToInitialState,
   };
 }
