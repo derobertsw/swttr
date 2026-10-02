@@ -26,6 +26,9 @@ interface HeaderProps {
   variant?: "default" | "compact";
 }
 
+const MENU_ITEM_CLASS =
+  "flex min-h-11 w-full items-center gap-3 rounded-control px-3 text-left text-base font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground [&>svg]:size-5 [&>svg]:text-muted-foreground";
+
 const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -76,8 +79,15 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
     )}>
       <div className="flex items-center gap-2">
         {/* Mobile: show logo */}
-        <Link href="/" onClick={onLogoClick} className={mobileOnly}>
-          <span className={cn("site-header block", variant === "compact" && "site-header--compact")}>
+        <Link href="/" onClick={onLogoClick} className={cn("rounded-control", mobileOnly)}>
+          <span
+            className={cn(
+              "block leading-none font-bold text-foreground",
+              variant === "compact"
+                ? "text-[2rem] tracking-[0.16em]"
+                : "text-[2.5rem] tracking-[0.2em]"
+            )}
+          >
             SWTTR
           </span>
         </Link>
@@ -95,7 +105,10 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
             </UserButton>
           </SignedIn>
           <SignedOut>
-            <Link href="/sign-in" className="text-sm text-white/90 hover:text-white hover:underline">
+            <Link
+              href="/sign-in"
+              className="inline-flex min-h-11 items-center rounded-control px-2 text-sm font-semibold text-foreground underline-offset-4 hover:underline"
+            >
               Sign In
             </Link>
           </SignedOut>
@@ -104,15 +117,8 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
         {/* Mobile: hamburger menu */}
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild className={mobileOnly}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "rounded-full text-white/95 hover:bg-white/10",
-                variant === "compact" ? "h-10 w-10" : "h-11 w-11"
-              )}
-            >
-              <Menu className={cn("text-white/95", variant === "compact" ? "size-[18px]" : "size-5")} />
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <Menu className="size-5" />
               <span className="sr-only">Open menu</span>
             </Button>
           </SheetTrigger>
@@ -121,9 +127,9 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
               <SheetTitle>Menu</SheetTitle>
               <SheetDescription className="sr-only">Navigation and account options</SheetDescription>
             </SheetHeader>
-            <nav aria-label="Menu" className="flex flex-col gap-4 p-4">
+            <nav aria-label="Menu" className="flex flex-col gap-1 px-2 pb-4">
               <SignedIn>
-                <div className="flex items-center gap-3 pb-4 border-b">
+                <div className="mb-2 flex items-center gap-3 border-b border-border px-3 pb-4">
                   <UserButton />
                   <span className="text-sm text-muted-foreground">Account</span>
                 </div>
@@ -132,7 +138,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
                 <SheetClose asChild>
                   <Link
                     href="/sign-in"
-                    className="flex items-center gap-3 text-sm font-medium hover:text-primary"
+                    className={MENU_ITEM_CLASS}
                   >
                     Sign In
                   </Link>
@@ -141,9 +147,9 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
               <SheetClose asChild>
                 <Link
                   href="/faq"
-                  className="flex items-center gap-3 text-sm font-medium hover:text-primary"
+                  className={MENU_ITEM_CLASS}
                 >
-                  <HelpCircle className="size-4" />
+                  <HelpCircle />
                   FAQ
                 </Link>
               </SheetClose>
@@ -151,23 +157,23 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
                 href="https://docs.google.com/forms/d/e/1FAIpQLSfpX2tVx485Q0ybdNH_t48_-Z_WY0ldx3VhhkUeGKIXQ2N9fg/viewform?usp=publish-editor"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 text-sm font-medium hover:text-primary"
+                className={MENU_ITEM_CLASS}
               >
-                <MessageSquare className="size-4" />
+                <MessageSquare />
                 Feedback
               </a>
               <button
                 onClick={openPreferencesFromMenu}
-                className="flex items-center gap-3 text-sm font-medium hover:text-primary text-left"
+                className={MENU_ITEM_CLASS}
               >
-                <Settings className="size-4" />
+                <Settings />
                 Settings
               </button>
               <button
                 onClick={handleShare}
-                className="flex items-center gap-3 text-sm font-medium hover:text-primary text-left"
+                className={MENU_ITEM_CLASS}
               >
-                <Share2 className="size-4" />
+                <Share2 />
                 Share
               </button>
             </nav>

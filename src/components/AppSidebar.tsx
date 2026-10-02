@@ -19,6 +19,7 @@ import {
 import { PRIMARY_NAV_ITEMS, isNavItemActive } from "@/components/AppNavigation";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
+import { cn } from "@/lib/utils";
 
 const FOOTER_ITEMS = [
   { href: "/faq", label: "FAQ", icon: HelpCircle },
@@ -29,6 +30,13 @@ const FOOTER_ITEMS = [
     external: true,
   },
 ];
+
+// The active destination gets a fill, a heavier label and a teal icon. On
+// touch screens the collapsed rail's icon buttons grow to 44px, so the rail
+// padding shrinks to keep them inside its 52px width.
+const SIDEBAR_ITEM_CLASS =
+  "rounded-control data-[active=true]:font-semibold data-[active=true]:[&>svg]:text-primary pointer-coarse:group-data-[collapsible=icon]:size-11! pointer-coarse:group-data-[collapsible=icon]:p-3.5!";
+const COLLAPSED_COARSE_INSET = "pointer-coarse:group-data-[collapsible=icon]:px-1";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -44,7 +52,6 @@ export function AppSidebar() {
   return (
     <Sidebar
       collapsible="icon"
-      className="md:border-r md:border-white/20 md:bg-[rgba(239,245,251,0.86)] md:backdrop-blur-lg"
       style={
         {
           "--sidebar-width": "15rem",
@@ -52,23 +59,21 @@ export function AppSidebar() {
         } as CSSProperties
       }
     >
-      <SidebarHeader className="p-4 pb-3">
+      <SidebarHeader className={cn("p-4 pb-3 group-data-[collapsible=icon]:px-2", COLLAPSED_COARSE_INSET)}>
         <div className="flex items-start justify-between gap-2">
-          <Link href="/" className="group-data-[collapsible=icon]:hidden">
-            <div className="rounded-xl border border-slate-300/70 bg-white/85 px-3 py-2 shadow-sm backdrop-blur-[2px]">
-              <span className="block leading-none text-[1.6rem] font-extrabold tracking-[0.24em] text-slate-900">
-                SWTTR
-              </span>
-              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600/85">
-                Thermal Layering
-              </p>
-            </div>
+          <Link href="/" className="rounded-control px-1 py-0.5 group-data-[collapsible=icon]:hidden">
+            <span className="block text-[1.6rem] leading-none font-extrabold tracking-[0.24em] text-foreground">
+              SWTTR
+            </span>
+            <span className="mt-1.5 block text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+              Thermal Layering
+            </span>
           </Link>
-          <SidebarTrigger className="hidden md:inline-flex size-8 rounded-md border border-slate-300/70 bg-white/70 text-slate-700 hover:bg-white/90" />
+          <SidebarTrigger className="hidden size-9 text-muted-foreground md:inline-flex pointer-coarse:size-11" />
         </div>
       </SidebarHeader>
-      <SidebarContent className="px-2 pb-3 pt-1">
-        <SidebarGroup>
+      <SidebarContent className={cn("px-2 pb-3 pt-1", COLLAPSED_COARSE_INSET)}>
+        <SidebarGroup className="pointer-coarse:group-data-[collapsible=icon]:px-0">
           <SidebarGroupContent>
             <nav aria-label="Primary">
               <SidebarMenu>
@@ -80,7 +85,7 @@ export function AppSidebar() {
                         asChild
                         isActive={isActive}
                         tooltip={item.label}
-                        className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
+                        className={SIDEBAR_ITEM_CLASS}
                       >
                         <Link href={item.href} aria-current={isActive ? "page" : undefined}>
                           <item.icon />
@@ -110,7 +115,7 @@ export function AppSidebar() {
                 >
                   <SidebarMenuButton
                     tooltip="Settings"
-                    className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
+                    className={SIDEBAR_ITEM_CLASS}
                   >
                     <Settings />
                     <span>Settings</span>
@@ -123,7 +128,7 @@ export function AppSidebar() {
                     asChild
                     isActive={pathname === item.href}
                     tooltip={item.label}
-                    className="rounded-lg data-[active=true]:bg-slate-200/90 data-[active=true]:text-slate-900"
+                    className={SIDEBAR_ITEM_CLASS}
                   >
                     {item.external ? (
                       <a href={item.href} target="_blank" rel="noopener noreferrer">

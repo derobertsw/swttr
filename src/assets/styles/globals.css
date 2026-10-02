@@ -1,33 +1,249 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
-
-@layer theme {
-  :root {
-    --color-background: var(--background);
-    --color-foreground: var(--foreground);
-    --font-sans: var(--font-geist-sans);
-    --font-mono: var(--font-geist-mono);
-    --font-sans-ios: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", sans-serif;
-    --ios-surface: rgba(255, 255, 255, 0.11);
-    --ios-surface-strong: rgba(255, 255, 255, 0.18);
-    --ios-border: rgba(255, 255, 255, 0.26);
-    --ios-hairline: rgba(255, 255, 255, 0.18);
+/*
+ * SWTTR design tokens. See docs/design-system.md.
+ *
+ * The app follows the system appearance: light by default, dark when the
+ * device prefers it. data-appearance="light" | "dark" on an element pins its
+ * subtree to one palette. The root layout pins the app to dark until every
+ * screen reads these tokens instead of hardcoded white-on-dark classes (#119).
+ *
+ * Components use the semantic colors below, never raw hex values or dark:
+ * variants, so a pinned subtree always matches its palette.
+ */
+@custom-variant dark {
+  &:where([data-appearance="dark"], [data-appearance="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-appearance]) *) {
+      @slot;
+    }
   }
 }
 
-.site-header {
-  font-size: 2.5rem;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  color: rgba(255, 255, 255, 0.95);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+/* Light: a muted field-guide page with deep-teal actions. */
+:root,
+[data-appearance="light"] {
+  color-scheme: light;
+  --background: #f1f0ea;
+  --foreground: #13222f;
+  --card: #fbfaf7;
+  --card-foreground: #13222f;
+  --popover: #ffffff;
+  --popover-foreground: #13222f;
+  --primary: #0b6b63;
+  --primary-foreground: #ffffff;
+  --primary-soft: #dcefea;
+  --secondary: #e7e6df;
+  --secondary-foreground: #13222f;
+  --muted: #e7e6df;
+  --muted-foreground: #4b5b67;
+  --accent: #dfded6;
+  --accent-foreground: #13222f;
+  --destructive: #b3261e;
+  --destructive-foreground: #ffffff;
+  --destructive-soft: #f9e2df;
+  --success: #1f6b3b;
+  --success-soft: #e1f0e4;
+  --warning: #7a5200;
+  --warning-soft: #f8ebcf;
+  --border: #d3d2ca;
+  --input: #6a7781;
+  --ring: #1f5fcc;
+  --scrim: rgb(19 34 47 / 0.45);
+  --sidebar: #fbfaf7;
+  --sidebar-foreground: #13222f;
+  --sidebar-primary: #0b6b63;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dcefea;
+  --sidebar-accent-foreground: #13222f;
+  --sidebar-border: #d3d2ca;
+  --sidebar-ring: #1f5fcc;
 }
 
-.site-header--compact {
-  font-size: 2rem;
-  letter-spacing: 0.16em;
+/* Dark: navy surfaces with light-mint actions. Keep both dark blocks identical
+   (globals.test.ts checks this). */
+[data-appearance="dark"] {
+  color-scheme: dark;
+  --background: #0f1d2a;
+  --foreground: #f4f8fa;
+  --card: #172b3a;
+  --card-foreground: #f4f8fa;
+  --popover: #203a4b;
+  --popover-foreground: #f4f8fa;
+  --primary: #74e0cf;
+  --primary-foreground: #0b2427;
+  --primary-soft: #264852;
+  --secondary: #203a4b;
+  --secondary-foreground: #f4f8fa;
+  --muted: #203a4b;
+  --muted-foreground: #b7c8d4;
+  --accent: #2a4a5e;
+  --accent-foreground: #f4f8fa;
+  --destructive: #ffb4ab;
+  --destructive-foreground: #690005;
+  --destructive-soft: #373e4a;
+  --success: #a7e3ba;
+  --success-soft: #2b454c;
+  --warning: #f4c778;
+  --warning-soft: #364143;
+  --border: #456477;
+  --input: #7a96a7;
+  --ring: #96beff;
+  --scrim: rgb(3 10 16 / 0.65);
+  --sidebar: #172b3a;
+  --sidebar-foreground: #f4f8fa;
+  --sidebar-primary: #74e0cf;
+  --sidebar-primary-foreground: #0b2427;
+  --sidebar-accent: #264852;
+  --sidebar-accent-foreground: #f4f8fa;
+  --sidebar-border: #456477;
+  --sidebar-ring: #96beff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance="light"]) {
+    color-scheme: dark;
+    --background: #0f1d2a;
+    --foreground: #f4f8fa;
+    --card: #172b3a;
+    --card-foreground: #f4f8fa;
+    --popover: #203a4b;
+    --popover-foreground: #f4f8fa;
+    --primary: #74e0cf;
+    --primary-foreground: #0b2427;
+    --primary-soft: #264852;
+    --secondary: #203a4b;
+    --secondary-foreground: #f4f8fa;
+    --muted: #203a4b;
+    --muted-foreground: #b7c8d4;
+    --accent: #2a4a5e;
+    --accent-foreground: #f4f8fa;
+    --destructive: #ffb4ab;
+    --destructive-foreground: #690005;
+    --destructive-soft: #373e4a;
+    --success: #a7e3ba;
+    --success-soft: #2b454c;
+    --warning: #f4c778;
+    --warning-soft: #364143;
+    --border: #456477;
+    --input: #7a96a7;
+    --ring: #96beff;
+    --scrim: rgb(3 10 16 / 0.65);
+    --sidebar: #172b3a;
+    --sidebar-foreground: #f4f8fa;
+    --sidebar-primary: #74e0cf;
+    --sidebar-primary-foreground: #0b2427;
+    --sidebar-accent: #264852;
+    --sidebar-accent-foreground: #f4f8fa;
+    --sidebar-border: #456477;
+    --sidebar-ring: #96beff;
+  }
+}
+
+:root {
+  /* Controls. Cards and sheets use the larger radius-card and radius-sheet. */
+  --radius: 0.625rem;
+  /* Geist, from the next/font variables on <html>. iOS uses the system font. */
+  --font-ui: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+@supports (-webkit-touch-callout: none) {
+  :root {
+    --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", sans-serif;
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Page titles: 28/34 on phones, 32/40 from md. Sections use text-xl (20/28),
+     body and fields text-base (16/24), supporting text text-sm (14/20), and
+     short nonessential metadata text-xs (12/16). */
+  --text-title: 1.75rem;
+  --text-title--line-height: 2.125rem;
+  --text-title--letter-spacing: -0.01em;
+  --text-title-lg: 2rem;
+  --text-title-lg--line-height: 2.5rem;
+  --text-title-lg--letter-spacing: -0.015em;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --radius-control: var(--radius);
+  --radius-card: 1rem;
+  --radius-sheet: 1.25rem;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    min-height: 100vh;
+  }
+
+  /* A visible focus indicator for every control; components may restyle it
+     but must not remove it. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 /* Scrolling a focused control into view clears the fixed mobile tab bar. */
@@ -39,179 +255,8 @@
 
 @supports (-webkit-touch-callout: none) {
   body {
-    font-family: var(--font-sans-ios);
     letter-spacing: -0.01em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-
-}
-
-@keyframes checkmark-pop {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes gauge-thumb-enter {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.5);
-  }
-  60% {
-    transform: translate(-50%, -50%) scale(1.1);
-  }
-  100% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
-
-@theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}
-
-:root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply text-foreground;
-    background:
-      radial-gradient(120% 88% at 50% -24%, rgba(139, 180, 255, 0.22) 0%, rgba(139, 180, 255, 0) 54%),
-      linear-gradient(165deg, #14243f 0%, #1c3557 36%, #0f5f67 68%, #0a8a82 100%);
-    background-attachment: fixed;
-    min-height: 100vh;
-  }
-}
-
-/* Subtle monochrome noise overlay for premium outdoor brand feel
-   Inspired by Arc'teryx, Patagonia - imperceptible texture that removes digital flatness */
-body::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  mix-blend-mode: overlay;
 }

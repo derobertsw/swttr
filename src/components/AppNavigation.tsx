@@ -36,23 +36,21 @@ export function MobileTabBar() {
         href={item.href}
         aria-current={isActive ? "page" : undefined}
         className={cn(
-          "flex min-w-16 flex-col items-center gap-1 rounded-xl px-2 py-1 text-[11px] font-medium leading-none tracking-[0.01em] transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80",
-          isActive ? "text-white" : "text-white/70"
+          "flex min-h-11 min-w-16 flex-col items-center justify-center gap-1 rounded-control px-2 py-1 text-xs leading-none transition-colors",
+          isActive
+            ? "font-semibold text-foreground"
+            : "font-medium text-muted-foreground hover:text-foreground"
         )}
       >
         <div
           className={cn(
-            "flex size-8 items-center justify-center rounded-full transition-all motion-reduce:transition-none",
-            isActive ? "bg-white/22 shadow-[0_4px_12px_rgba(0,0,0,0.2)]" : "bg-transparent"
+            "flex h-8 w-12 items-center justify-center rounded-full transition-colors",
+            isActive && "bg-primary-soft text-primary"
           )}
         >
-          <item.icon
-            className={cn("size-5", !isActive && "opacity-80")}
-            strokeWidth={isActive ? 2.25 : 2}
-          />
+          <item.icon className="size-5" strokeWidth={isActive ? 2.25 : 2} />
         </div>
-        <span className={cn(!isActive && "opacity-80")}>{item.label}</span>
+        <span>{item.label}</span>
       </Link>
     );
   };
@@ -65,12 +63,10 @@ export function MobileTabBar() {
     <nav
       aria-label="Primary"
       data-mobile-tab-bar
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] text-white/80"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card pb-[calc(env(safe-area-inset-bottom)+0.4rem)] md:hidden"
     >
-      <div className="h-[64px] border-t border-white/20 bg-[rgba(17,45,62,0.74)] backdrop-blur-2xl">
-        <div className="flex h-full items-center justify-around px-6 pb-1 pt-1.5">
-          {PRIMARY_NAV_ITEMS.map(renderTab)}
-        </div>
+      <div className="flex h-16 items-center justify-around px-6">
+        {PRIMARY_NAV_ITEMS.map(renderTab)}
       </div>
     </nav>
   );

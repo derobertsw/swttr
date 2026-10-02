@@ -128,35 +128,35 @@ const ScoreDisplay = ({
             Thermal comfort score: {roundedScore}/100
           </PopoverDescription>
         </PopoverHeader>
-        <div className="mt-3 space-y-3 text-xs">
-          <p className="text-slate-600">
+        <div className="mt-3 space-y-3 text-sm">
+          <p className="text-foreground">
             {config.description}
           </p>
-          <p className="text-slate-500">
+          <p className="text-muted-foreground">
             Cold warnings show when total insulation falls more than {THERMAL_DISPLAY_CLO_EPSILON.toFixed(2)} clo
             below the target band or a body part falls more than {THERMAL_DISPLAY_CLO_EPSILON.toFixed(2)} clo
             below its minimum. A cold outfit scores up to 85, in proportion to the share of its needed
             insulation the worst-covered part has. Overheating only triggers above target max + {OVERHEAT_BUFFER_CLO.toFixed(1)} clo.
           </p>
           {totalClo !== undefined && targetRange && (
-            <p className="text-slate-500">
+            <p className="text-muted-foreground">
               Current insulation: {totalClo.toFixed(2)} clo, target range: {targetRange[0].toFixed(2)}-{targetRange[1].toFixed(2)} clo.
             </p>
           )}
-          <div className="space-y-1.5 pt-2 border-t border-slate-100">
-            <div className="flex items-center gap-2 text-slate-600">
+          <div className="space-y-1.5 border-t border-border pt-2">
+            <div className="flex items-center gap-2 text-foreground">
               <span className="size-2 rounded-full bg-teal-500" />
               <span>Optimal: in range + score 85+</span>
             </div>
-            <div className="flex items-center gap-2 text-slate-600">
+            <div className="flex items-center gap-2 text-foreground">
               <span className="size-2 rounded-full bg-green-500" />
               <span>Comfortable: in range below 85</span>
             </div>
-            <div className="flex items-center gap-2 text-slate-600">
+            <div className="flex items-center gap-2 text-foreground">
               <span className="size-2 rounded-full bg-blue-500" />
               <span>Cold stress: below the target band or a body part is below its minimum</span>
             </div>
-            <div className="flex items-center gap-2 text-slate-600">
+            <div className="flex items-center gap-2 text-foreground">
               <span className="size-2 rounded-full bg-amber-500" />
               <span>Overheating: clo above target max + {OVERHEAT_BUFFER_CLO.toFixed(1)}</span>
             </div>
