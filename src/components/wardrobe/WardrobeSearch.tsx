@@ -57,6 +57,10 @@ const SORT_LABELS: Record<WardrobeSearchProps["searchSort"], string> = {
 // whole catalog scrolls instead.
 const MIN_FILTER_PANEL_HEIGHT = 120;
 
+// The results header and about a row. With less room than this, the results
+// list drops its own scroller and the whole catalog scrolls to it.
+const MIN_RESULTS_HEIGHT = 120;
+
 
 export function WardrobeSearch({
   search,
@@ -109,7 +113,8 @@ export function WardrobeSearch({
         const otherControlsHeight = controlsHeight - filterPanel.offsetHeight;
         setFilterPanelMaxHeight(Math.max(MIN_FILTER_PANEL_HEIGHT, containerHeight - otherControlsHeight - 14));
       }
-      setResultsMaxHeight(Math.max(0, containerHeight - controlsHeight - 12));
+      const resultsRoom = containerHeight - controlsHeight - 12;
+      setResultsMaxHeight(resultsRoom >= MIN_RESULTS_HEIGHT ? resultsRoom : null);
     };
 
     const observer = new ResizeObserver(update);
