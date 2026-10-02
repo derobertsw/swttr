@@ -312,7 +312,7 @@ export function GearUpForm({
 
             <p className="text-sm text-muted-foreground">
               {severalDays
-                ? "Each day's layers use the forecast from 6 am to 9 pm. The first day starts at your start time."
+                ? "Each day's layers use the forecast from 6 am to 9 pm. On the first day, they start at your start time if it's after 6 am."
                 : "Layers use the forecast for the hour you start."}{" "}
               Dates and times are local to the place.
             </p>
