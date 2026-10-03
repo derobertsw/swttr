@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, getNodeText, render, screen, waitFor, within } from "@testing-library/react";
 import { NextRequest } from "next/server";
 import { toast } from "sonner";
 import { POST as evaluateLayers } from "@/app/api/v1/ensembles/evaluate/route";
@@ -46,7 +46,8 @@ vi.mock("@/hooks/useLayerPicker", () => ({
   useLayerPicker: () => ({ loading: false, getItems: () => [], reload: mockReloadPicker }),
 }));
 
-// Mock LayerPickerDrawer — while open, offers one item that isn't in the wardrobe
+// Mock LayerPickerDrawer — while open, offers a mid layer that isn't in the wardrobe
+// and a base layer that is, whichever layer it was opened for
 const catalogFleece: PickerItem = {
   id: "catalog-fleece",
   name: "Catalog fleece",
@@ -56,9 +57,24 @@ const catalogFleece: PickerItem = {
   isInUse: false,
   isOwned: false,
 };
+const merinoCrew: PickerItem = {
+  id: "merino-crew",
+  name: "Merino crew",
+  brand: "Test Brand",
+  rcl: 0.2,
+  nativeLayerType: "base",
+  isInUse: false,
+  isOwned: true,
+};
 vi.mock("@/components/layers/LayerPickerDrawer", () => ({
   LayerPickerDrawer: ({ open, onSelect }: { open: boolean; onSelect: (item: PickerItem) => void }) =>
-    open ? <button onClick={() => onSelect(catalogFleece)}>Pick catalog fleece</button> : null,
+    open ? (
+      <>
+        {[catalogFleece, merinoCrew].map((item) => (
+          <button key={item.id} onClick={() => onSelect(item)}>{`Pick ${item.name.toLowerCase()}`}</button>
+        ))}
+      </>
+    ) : null,
 }));
 
 const mockRecommendation = {
@@ -500,6 +516,62 @@ describe("LayerDisplay", () => {
         expect(within(legs).getByText("Catalog fleece")).toHaveTextContent("Not in your wardrobe");
         expect(within(card).getByRole("button", { name: /^I own this/ })).toBeEnabled();
         expect(mockReloadPicker).not.toHaveBeenCalled();
+      });
+    });
+
+    // The picker for a layer also offers items from the layers next to it;
+    // a picked item is worn under its own layer (#62).
+    describe("picking an item", () => {
+      function changeArea(name: string) {
+        render(<LayerDisplay recommendation={null} temperature={15} windspeed={10} biophysicsData={mockBiophysicsData} />);
+        const area = screen.getByRole("region", { name });
+        fireEvent.click(within(area).getByRole("button", { name: `Change ${name.toLowerCase()}` }));
+        return area;
+      }
+
+      /** Closes Change and returns each item the area lists, as "Layer: name". */
+      function finishChanging(area: HTMLElement) {
+        fireEvent.click(within(area).getByRole("button", { name: /^Done changing/ }));
+        return within(area)
+          .getAllByRole("listitem")
+          .map((row) => Array.from(row.children as HTMLCollectionOf<HTMLElement>, getNodeText).join(": "));
+      }
+
+      it("replaces a tapped item in place with one from the same layer", () => {
+        const torso = changeArea("Upper body");
+        fireEvent.click(within(torso).getByRole("button", { name: /Down Puffy/ }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+        expect(finishChanging(torso)).toEqual(["Base: Merino Base Layer", "Mid: Catalog fleece", "Outer: Gore-Tex Shell"]);
+      });
+
+      it("replaces a tapped item with one from another layer, worn under its own layer", () => {
+        const torso = changeArea("Upper body");
+        fireEvent.click(within(torso).getByRole("button", { name: /Down Puffy/ }));
+        fireEvent.click(screen.getByText("Pick merino crew"));
+
+        expect(finishChanging(torso)).toEqual(["Base: Merino Base Layer", "Base: Merino crew", "Outer: Gore-Tex Shell"]);
+      });
+
+      it("replaces a tapped item with one whose own layer is empty", () => {
+        const legs = changeArea("Legs");
+        fireEvent.click(within(legs).getByRole("button", { name: /Thermal Tights/ }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+        expect(finishChanging(legs)).toEqual(["Mid: Catalog fleece"]);
+      });
+
+      it("adds an item under its own layer, whichever layer's Add was used", () => {
+        const torso = changeArea("Upper body");
+        fireEvent.click(within(torso).getByRole("button", { name: "Add base" }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+        expect(finishChanging(torso)).toEqual([
+          "Base: Merino Base Layer",
+          "Mid: Down Puffy",
+          "Mid: Catalog fleece",
+          "Outer: Gore-Tex Shell",
+        ]);
       });
     });
 
@@ -1070,6 +1142,187 @@ describe("LayerDisplay", () => {
         const legs = screen.getByRole("region", { name: "Legs" });
         expect(await within(legs).findByText("Needs more warmth")).toBeInTheDocument();
         expect(within(screen.getByRole("region", { name: "Upper body" })).queryByText("Needs more warmth")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("changing the outfit", () => {
+      /** Keeps serving layer evaluation from the route, except while `failing` is set. */
+      function stubEvaluation() {
+        const evaluate = vi.mocked(fetch);
+        const control = { failing: false };
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+            control.failing ? Response.json({ error: "Unavailable" }, { status: 503 }) : evaluate(input, init)
+          )
+        );
+        return control;
+      }
+
+      /** Renders the result and waits for the suggested outfit's first check. */
+      async function renderChecked() {
+        render(
+          <LayerDisplay activity="alpine_skiing" recommendation={null} temperature={15} windspeed={10} biophysicsData={mockBiophysicsData} />
+        );
+        const legs = screen.getByRole("region", { name: "Legs" });
+        await within(legs).findByText("Needs more warmth");
+        return legs;
+      }
+
+      function addCatalogFleece(legs: HTMLElement) {
+        const change = within(legs).queryByRole("button", { name: "Change legs" });
+        if (change) fireEvent.click(change);
+        fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+      }
+
+      it("labels the comfort check as updating until the changed outfit is checked", async () => {
+        const legs = await renderChecked();
+
+        addCatalogFleece(legs);
+        expect(screen.getByText("Updating…")).toBeInTheDocument();
+        expect(screen.getByText("Updating comfort check…")).toBeInTheDocument();
+
+        expect(await screen.findByText("Comfort check updated.")).toBeInTheDocument();
+        expect(screen.queryByText("Updating…")).not.toBeInTheDocument();
+      });
+
+      it("keeps the earlier check labeled when checking a change fails, and tries again", async () => {
+        const evaluation = stubEvaluation();
+        const legs = await renderChecked();
+
+        evaluation.failing = true;
+        addCatalogFleece(legs);
+        const failure = await screen.findByRole("region", { name: "Couldn't check these layers" });
+        expect(failure).toHaveTextContent("for your layers before the last change");
+        expect(screen.getByText("Before your change")).toBeInTheDocument();
+        // Nothing else claims to describe the changed outfit.
+        expect(within(legs).queryByText("Needs more warmth")).not.toBeInTheDocument();
+        expect(within(legs).getByText("Catalog fleece")).toBeInTheDocument();
+
+        evaluation.failing = false;
+        const tryAgain = within(failure).getByRole("button", { name: "Try again" });
+        tryAgain.focus();
+        fireEvent.click(tryAgain);
+        await waitFor(() =>
+          expect(screen.queryByRole("region", { name: "Couldn't check these layers" })).not.toBeInTheDocument()
+        );
+        // Focus doesn't drop to the page with the Try again button.
+        await waitFor(() => expect(screen.getByRole("heading", { name: "Wear" })).toHaveFocus());
+        expect(within(legs).getByText("Needs more warmth")).toBeInTheDocument();
+        expect(within(legs).getByText("Catalog fleece")).toBeInTheDocument();
+        expect(screen.queryByText("Before your change")).not.toBeInTheDocument();
+      });
+
+      it("undoes a change that couldn't be checked", async () => {
+        const evaluation = stubEvaluation();
+        const legs = await renderChecked();
+
+        evaluation.failing = true;
+        addCatalogFleece(legs);
+        const failure = await screen.findByRole("region", { name: "Couldn't check these layers" });
+        fireEvent.click(within(failure).getByRole("button", { name: "Undo change" }));
+
+        expect(within(legs).queryByText("Catalog fleece")).not.toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "Couldn't check these layers" })).not.toBeInTheDocument();
+        expect(within(legs).getByText("Needs more warmth")).toBeInTheDocument();
+      });
+
+      it("checks layers that failed before as a new check when they're chosen again", async () => {
+        const evaluation = stubEvaluation();
+        const legs = await renderChecked();
+
+        evaluation.failing = true;
+        addCatalogFleece(legs);
+        const failure = await screen.findByRole("region", { name: "Couldn't check these layers" });
+        fireEvent.click(within(failure).getByRole("button", { name: "Undo change" }));
+        addCatalogFleece(legs);
+
+        expect(screen.queryByRole("region", { name: "Couldn't check these layers" })).not.toBeInTheDocument();
+        expect(screen.getByText("Updating…")).toBeInTheDocument();
+      });
+
+      it("doesn't keep a replaced recommendation's verdict when the new one can't be checked", async () => {
+        const evaluation = stubEvaluation();
+        const props = { activity: "alpine_skiing", recommendation: null, temperature: 15, windspeed: 10 };
+        const { rerender } = render(<LayerDisplay {...props} biophysicsData={mockBiophysicsData} />);
+        await within(screen.getByRole("region", { name: "Legs" })).findByText("Needs more warmth");
+
+        evaluation.failing = true;
+        rerender(<LayerDisplay {...props} biophysicsData={{ ...mockBiophysicsData }} />);
+
+        const failure = await screen.findByRole("region", { name: "Couldn't check these layers" });
+        expect(failure).toHaveTextContent("Try again to see whether they'll keep you comfortable.");
+        expect(screen.queryByText("Before your change")).not.toBeInTheDocument();
+        expect(screen.queryByText(/risk: |comfort range/i)).not.toBeInTheDocument();
+      });
+
+      it("undoes and resets changes from beside Wear", async () => {
+        const legs = await renderChecked();
+        expect(screen.queryByRole("button", { name: "Undo last change" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Reset to the suggested layers" })).not.toBeInTheDocument();
+
+        addCatalogFleece(legs);
+        addCatalogFleece(legs);
+        expect(within(legs).getAllByText("Catalog fleece")).toHaveLength(2);
+
+        fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+        expect(within(legs).getAllByText("Catalog fleece")).toHaveLength(1);
+
+        const reset = screen.getByRole("button", { name: "Reset to the suggested layers" });
+        reset.focus();
+        fireEvent.click(reset);
+        expect(within(legs).queryByText("Catalog fleece")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Reset to the suggested layers" })).not.toBeInTheDocument();
+        // Focus doesn't drop to the page when the Reset button goes away.
+        await waitFor(() => expect(screen.getByRole("heading", { name: "Wear" })).toHaveFocus());
+
+        fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+        expect(within(legs).getAllByText("Catalog fleece")).toHaveLength(1);
+      });
+
+      it("undoes the change that failed, in its own phase, from the other phase's view", async () => {
+        const evaluation = stubEvaluation();
+        const touringData = {
+          ...mockBiophysicsData,
+          ireq: { ...mockBiophysicsData.ireq, downhill_target_range: [1.0, 1.6] as [number, number] },
+        };
+        render(
+          <LayerDisplay activity="backcountry_skiing" recommendation={null} temperature={15} windspeed={10} biophysicsData={touringData} />
+        );
+        await within(screen.getByRole("region", { name: "Legs" })).findByText("Needs more warmth");
+
+        evaluation.failing = true;
+        fireEvent.click(screen.getByRole("button", { name: /^Descent/ }));
+        addCatalogFleece(screen.getByRole("region", { name: "Legs" }));
+        await screen.findByRole("region", { name: "Couldn't check these layers" });
+        fireEvent.click(screen.getByRole("button", { name: /^Climb/ }));
+
+        fireEvent.click(screen.getByRole("button", { name: "Undo descent change" }));
+        expect(screen.getByRole("button", { name: /^Descent/ })).toHaveAttribute("aria-pressed", "true");
+        expect(within(screen.getByRole("region", { name: "Legs" })).queryByText("Catalog fleece")).not.toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "Couldn't check these layers" })).not.toBeInTheDocument();
+      });
+
+      it("keeps a change, and its undo, to the phase it was made in", () => {
+        const touringData = {
+          ...mockBiophysicsData,
+          ireq: { ...mockBiophysicsData.ireq, downhill_target_range: [1.0, 1.6] as [number, number] },
+        };
+        render(
+          <LayerDisplay activity="backcountry_skiing" recommendation={null} temperature={15} windspeed={10} biophysicsData={touringData} />
+        );
+        const descentTab = screen.getByRole("button", { name: /^Descent/ });
+
+        fireEvent.click(descentTab);
+        addCatalogFleece(screen.getByRole("region", { name: "Legs" }));
+        fireEvent.click(screen.getByRole("button", { name: /^Climb/ }));
+        expect(within(screen.getByRole("region", { name: "Legs" })).queryByText("Catalog fleece")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /^Undo last/ })).not.toBeInTheDocument();
+
+        fireEvent.click(descentTab);
+        fireEvent.click(screen.getByRole("button", { name: "Undo last descent change" }));
+        expect(within(screen.getByRole("region", { name: "Legs" })).queryByText("Catalog fleece")).not.toBeInTheDocument();
       });
     });
   });
