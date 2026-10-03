@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -171,6 +171,19 @@ describe("New trip wizard", () => {
     expect(screen.getByRole("heading", { name: "When?" })).toBeInTheDocument();
   });
 
+  it("loads saved stop assignments when reopening a legacy wizard link", async () => {
+    setQuery("trip=trip-1&step=2");
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP], days: [{ id: "day-1", trip_id: TRIP.id, date: "2026-10-11", stop_id: STOWE_STOP.id, activity: null }] })),
+    }));
+    const user = userEvent.setup();
+    render(<NewTripPage />);
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit stop Stowe, Vermont" });
+    await within(dialog).findByText(/Already assigned to Stowe, Vermont: 2026-10-11/);
+    expect(within(dialog).getByRole("button", { name: /Sunday, October 11/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("keeps the form when the trip can't be created", async () => {
     vi.stubGlobal("fetch", fakeTripApi({ "POST /api/v1/trips": reply(401) }));
     const user = userEvent.setup();
@@ -184,6 +197,30 @@ describe("New trip wizard", () => {
     expect(screen.getByPlaceholderText("Whistler Powder")).toHaveValue("Whistler");
     expect(screen.getByRole("button", { name: "Create trip" })).toBeEnabled();
     expect(window.location.search).toBe("");
+  });
+
+  it.each([false, true])("blocks leaving while %s saved trip basics are pending and retains input after failure", async (existing) => {
+    let finish = () => {};
+    const pending = () => new Promise<ReturnType<typeof reply>>((resolve) => { finish = () => resolve(reply(500, { error: "Unavailable" })); });
+    if (existing) setQuery("trip=trip-1&step=1");
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull()),
+      "POST /api/v1/trips": pending,
+      "PATCH /api/v1/trips/trip-1": pending,
+    }));
+    const user = userEvent.setup(); render(<NewTripPage />);
+    if (existing) {
+      await user.type(await screen.findByPlaceholderText("Whistler Powder"), " Powder");
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+    } else { await createTrip(user); }
+    const back = screen.getByRole("button", { name: existing ? "Exit" : "Cancel" });
+    expect(back).toBeDisabled();
+    await user.click(back);
+    expect(mockPush).not.toHaveBeenCalled();
+    await act(async () => finish());
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unavailable");
+    expect(back).toBeEnabled();
+    expect(screen.getByPlaceholderText("Whistler Powder")).toHaveValue(existing ? "Whistler Powder" : "Whistler");
   });
 
   it("keeps the chosen place when a stop can't be added, so it can be retried", async () => {

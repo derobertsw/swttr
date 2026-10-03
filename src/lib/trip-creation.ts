@@ -15,14 +15,17 @@ function validDate(value: unknown): value is string {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-/** Validate before sending a typed, bounded request to the database transaction. */
+/** Validate the typed request before sending it to the database transaction. */
 export function parseTripCreation(body: unknown): TripCreationInput | string {
   if (!body || typeof body !== "object") return "Add a trip name and valid start and end dates.";
   const input = body as Record<string, unknown>;
   if (typeof input.name !== "string" || !input.name.trim() || input.name.trim().length > 200) return "Trip name must be 1–200 characters.";
   if (!validDate(input.start_date) || !validDate(input.end_date)) return "Choose valid start and end dates.";
   if (input.start_date > input.end_date) return "Start date must be on or before end date.";
-  if ((Date.parse(input.end_date) - Date.parse(input.start_date)) / 86400000 >= 366) return "Choose a trip of up to 366 days.";
+  // Older name-and-date-only callers accepted longer trips. Bound the new
+  // creation contract without narrowing those existing requests.
+  const legacyDateOnly = input.creation_id === undefined && input.destination === undefined && input.activity == null;
+  if (!legacyDateOnly && (Date.parse(input.end_date) - Date.parse(input.start_date)) / 86400000 >= 366) return "Choose a trip of up to 366 days.";
   if (input.creation_id !== undefined && (typeof input.creation_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.creation_id))) return "Invalid draft identity. Reopen the new trip page.";
   if (input.activity != null && !(TRIP_ACTIVITY_OPTIONS as readonly unknown[]).includes(input.activity)) return "Choose a supported trip activity.";
   let destination: TripCreationInput["destination"];

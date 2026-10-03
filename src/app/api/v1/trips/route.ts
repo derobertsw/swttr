@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   });
   if (error || !data?.trip) {
     return NextResponse.json(
-      { error: error?.code === "42501" ? "Draft identity unavailable. Return to your trips." : "Couldn't save the trip. Retry with the same draft." },
+      { error: error?.code === "42501" ? "Draft identity unavailable. Start a new draft." : "Couldn't save the trip. Retry with the same draft." },
       { status: error?.code === "42501" ? 409 : 500 }
     );
   }

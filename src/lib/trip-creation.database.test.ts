@@ -49,6 +49,10 @@ describe("Trip creation transaction in Postgres", () => {
     await create("user-1", null, null); expect(await counts()).toEqual({ trips: 1, stops: 0, days: 3, members: 1 });
     expect((await db.query<{ stop_id: string | null; activity: string | null }>("SELECT stop_id, activity FROM trip_days")).rows.every((day) => day.stop_id === null && day.activity === null)).toBe(true);
   });
+  it("seeds every day of a longer legacy date-only trip", async () => {
+    await db.query("SELECT public.create_trip_draft($1, 'user-1', 'Long old draft', '2026-10-10', '2027-10-11', 'planning', NULL, NULL)", [id]);
+    expect(await counts()).toEqual({ trips: 1, stops: 0, days: 367, members: 1 });
+  });
   it("grants RPC execution only to the service role", async () => {
     const signature = "public.create_trip_draft(uuid,text,text,date,date,public.trip_status,jsonb,text)";
     const result = await db.query("SELECT has_function_privilege('anon', $1, 'EXECUTE') AS anon, has_function_privilege('authenticated', $1, 'EXECUTE') AS authenticated, has_function_privilege('service_role', $1, 'EXECUTE') AS service", [signature]);

@@ -136,9 +136,13 @@ function TripDraftForm({ userId }: { userId: string }) {
       router.replace(`/trips/${encodeURIComponent(trip.id)}`);
     } catch (err) {
       if (account.current === generation) {
-        // A validation response confirms no transaction ran; allow correction.
-        if (err instanceof TripRequestError && err.status === 400) persist({ ...draft, submitted: undefined });
-        setError(`Couldn't create the trip: ${errorMessage(err)}${err instanceof TripRequestError && err.status === 400 ? " Edit the details and try again." : " Retry checks the same draft."}`);
+        const status = err instanceof TripRequestError ? err.status : undefined;
+        // Validation runs before creation. A collision cannot succeed for this
+        // account, so retire that identity while keeping the editable input.
+        if (status === 400) persist({ ...draft, submitted: undefined });
+        else if (status === 409) persist({ ...draft, id: crypto.randomUUID(), submitted: undefined });
+        const hint = status === 400 ? " Edit the details and try again." : status === 409 ? " A fresh draft is ready. Try creating the trip again." : " Retry checks the same draft.";
+        setError(`Couldn't create the trip: ${errorMessage(err)}${hint}`);
       }
     } finally {
       window.clearTimeout(timeout);
@@ -191,7 +195,10 @@ function TripDraftForm({ userId }: { userId: string }) {
             </Card>
             {storageError && <p role="alert" className="text-sm text-destructive">Browser storage is unavailable. Enable session storage to keep this draft safe across retries and reloads.</p>}
             {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-            {!!draft.submitted && !saving && <p className="text-sm text-muted-foreground">Your submitted details are kept until this attempt is resolved. Retry to open the saved trip or finish creating it.</p>}
+            {!!draft.submitted && !saving && <div className="flex flex-col gap-3 text-sm text-muted-foreground">
+              <p>Retry to open the saved trip or finish creating it. An earlier attempt may already have saved a trip. <Link href="/trips" className="underline">Check your trips</Link> before discarding this draft.</p>
+              <Button type="button" variant="outline" onClick={() => { search.reset(); persist(emptyDraft()); setError(null); }}>Discard and start over</Button>
+            </div>}
             <p role="status" className="sr-only">{saving ? "Saving your trip…" : ""}</p>
             <Button type="submit" size="lg" loading={saving} disabled={storageError || (!draft.submitted && (!draft.place || !draft.name.trim() || !draft.start || !draft.end))}>{saving ? "Creating trip…" : draft.submitted ? "Retry create trip" : "Create trip"}</Button>
           </form>

@@ -334,6 +334,7 @@ function Step1Dates({
       </Card>
       <NavBar
         onBack={onBack}
+        backDisabled={submitting}
         backLabel={backLabel}
         onNext={onNext}
         nextLabel={submitting ? "Saving…" : nextLabel}
@@ -539,7 +540,24 @@ function StopDetailSheet({
 }) {
   const [activities, setActivities] = useState<string[]>(stop.activities);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [assignedDates, setAssignedDates] = useState<string[] | null>(null);
+  const [assignmentLoadError, setAssignmentLoadError] = useState<string | null>(null);
+  const [assignmentLoadAttempt, setAssignmentLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
+
+  // Read the current assignments each time the editor opens, including after
+  // a save or a date change in the legacy wizard.
+  useEffect(() => {
+    let cancelled = false;
+    fetchTripFull(tripId)
+      .then((full) => {
+        if (!cancelled) setAssignedDates(full.days.filter((day) => day.stop_id === stop.id).map((day) => day.date));
+      })
+      .catch((err) => {
+        if (!cancelled) setAssignmentLoadError(errorMessage(err));
+      });
+    return () => { cancelled = true; };
+  }, [tripId, stop.id, assignmentLoadAttempt]);
 
   // Enumerate dates inline (avoids importing server lib into client bundle).
   const tripDates: string[] = (() => {
@@ -564,6 +582,7 @@ function StopDetailSheet({
     );
 
   const save = async () => {
+    if (assignedDates === null) return;
     setSaving(true);
     try {
       const { stop: updated } = await tripRequest<{ stop: TripStop }>(
@@ -589,6 +608,15 @@ function StopDetailSheet({
         </DialogHeader>
         <div className="mt-4">
           <SectionLabel>Assign days to this stop</SectionLabel>
+          {assignmentLoadError ? (
+            <div role="alert" className="mt-2 text-sm text-orange-100">
+              <p>Couldn&apos;t load saved day assignments: {assignmentLoadError}</p>
+              <button type="button" className="mt-2 min-h-11 underline" onClick={() => { setAssignmentLoadError(null); setAssignmentLoadAttempt((attempt) => attempt + 1); }}>Retry loading days</button>
+            </div>
+          ) : assignedDates === null ? <p role="status" className="mt-2 text-sm text-white/75">Loading saved day assignments…</p> : null}
+          {assignedDates && assignedDates.length > 0 && (
+            <p className="mt-2 text-sm text-white/75">Already assigned to {stop.name}: {assignedDates.slice().sort().join(", ")}. To move these days, select them when editing another stop.</p>
+          )}
           <p className="mt-2 text-sm text-white/75">
             {selectedDates.length === 0
               ? "No day assignments will change."
@@ -599,16 +627,18 @@ function StopDetailSheet({
               const date = new Date(`${iso}T00:00:00`);
               const dow = date.toLocaleDateString(undefined, { weekday: "short" });
               const day = date.getDate();
-              const on = selectedDates.includes(iso);
+              const alreadyAssigned = assignedDates?.includes(iso) ?? false;
+              const on = alreadyAssigned || selectedDates.includes(iso);
               return (
                 <button
                   key={iso}
                   type="button"
                   onClick={() => toggleDate(iso)}
+                  disabled={assignedDates === null || alreadyAssigned || saving}
                   aria-pressed={on}
                   aria-label={date.toLocaleDateString(undefined, { dateStyle: "full" })}
                   className={
-                    "flex w-14 flex-col items-center rounded-lg border px-2 py-1.5 text-center text-xs transition-colors " +
+                    "flex w-14 flex-col items-center rounded-lg border px-2 py-1.5 text-center text-xs transition-colors disabled:cursor-default " +
                     (on
                       ? "border-cyan-300/55 bg-cyan-300/15 text-white"
                       : "border-white/14 bg-white/[0.05] text-white/72")
@@ -632,6 +662,8 @@ function StopDetailSheet({
                   key={a}
                   type="button"
                   onClick={() => toggleActivity(a)}
+                  disabled={saving}
+                  aria-pressed={on}
                   className={
                     "min-h-11 rounded-full border px-3 py-1 text-xs " +
                     (on
@@ -649,7 +681,7 @@ function StopDetailSheet({
         <button
           type="button"
           onClick={save}
-          disabled={saving}
+          disabled={saving || assignedDates === null}
           className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-cyan-300/22 text-sm font-semibold text-white"
         >
           {saving ? <Loader2 className="size-4 animate-spin" /> : null}

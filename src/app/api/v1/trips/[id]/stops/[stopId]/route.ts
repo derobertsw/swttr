@@ -31,14 +31,19 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
 
   // Allow assigning days to this stop in the same call.
   if (Array.isArray(body?.day_dates)) {
-    const dates = body.day_dates as string[];
+    const dates = [...new Set(body.day_dates as string[])];
     if (dates.length > 0) {
-      const { error: assignmentError } = await supabase
+      const { data: assignedDays, error: assignmentError } = await supabase
         .from("trip_days")
         .update({ stop_id: stopId })
         .eq("trip_id", id)
-        .in("date", dates);
+        .in("date", dates)
+        .select("date");
       if (assignmentError) return NextResponse.json({ error: "Stop details saved, but day assignments failed. Retry to assign the selected days." }, { status: 500 });
+      const assignedDates = new Set((assignedDays ?? []).map((day) => day.date));
+      if (dates.some((date) => !assignedDates.has(date))) {
+        return NextResponse.json({ error: "Stop details saved, but some selected days are missing and could not be assigned. Reload the trip and try again." }, { status: 500 });
+      }
     }
   }
 

@@ -24,6 +24,21 @@ describe("Atomic trip creation route", () => {
     expect((await create({ name: "Old draft", start_date: input.start_date, end_date: input.end_date })).status).toBe(201);
     expect(rpc).toHaveBeenCalledWith("create_trip_draft", expect.objectContaining({ p_trip_id: expect.any(String), p_destination: null, p_activity: null }));
   });
+  it("preserves longer trips for legacy name-and-date-only callers", async () => {
+    expect((await create({ name: "Long old draft", start_date: "2026-10-10", end_date: "2027-10-11" })).status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("create_trip_draft", expect.objectContaining({ p_start_date: "2026-10-10", p_end_date: "2027-10-11", p_destination: null }));
+  });
+  it("accepts 366 days for the new creation contract", async () => {
+    expect((await create({ ...input, end_date: "2027-10-10" })).status).toBe(201);
+  });
+  it.each([
+    { ...input, end_date: "2027-10-11" },
+    { name: "Long new draft", start_date: "2026-10-10", end_date: "2027-10-11", destination: input.destination },
+    { name: "Long new draft", start_date: "2026-10-10", end_date: "2027-10-11", activity: "Alpine" },
+  ])("keeps the new creation contract bounded to 366 days (%#)", async (body) => {
+    expect((await create(body)).status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
   it("accepts zero coordinates and one-day trips", async () => {
     expect((await create({ ...input, end_date: input.start_date, destination: { name: "Equator", latitude: 0, longitude: 0 } })).status).toBe(201);
   });

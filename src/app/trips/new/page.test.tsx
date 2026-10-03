@@ -59,6 +59,7 @@ describe("Single-form trip creation", () => {
     const stored = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.TRIP_CREATION_DRAFT)!);
     expect(stored.draft.submitted).toEqual(sentBodies(fetchMock, "POST /api/v1/trips")[0]);
     expect(screen.getByLabelText("Trip name")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Discard and start over" })).not.toBeInTheDocument();
     await act(async () => finish());
   });
 
@@ -84,6 +85,48 @@ describe("Single-form trip creation", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Edit the details and try again");
     expect(screen.getByLabelText("End date")).toBeEnabled();
     expect(screen.getByRole("button", { name: "Create trip" })).toBeEnabled();
+  });
+
+  it("replaces a rejected identity and preserves editable input across reload", async () => {
+    let attempts = 0;
+    const fetchMock = fakeTripApi({ ...routes, "POST /api/v1/trips": () => ++attempts === 1 ? reply(409, { error: "Draft identity unavailable. Start a new draft." }) : reply(201, { trip: TRIP }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    const page = render(<NewTripPage />);
+    await fill(user);
+    await user.click(screen.getByRole("button", { name: "Create trip" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("A fresh draft is ready");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Retry checks the same draft");
+    expect(screen.getByLabelText("Trip name")).toBeEnabled();
+    const first = sentBodies(fetchMock, "POST /api/v1/trips")[0] as { creation_id: string };
+    const restoredId = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.TRIP_CREATION_DRAFT)!).draft.id;
+    expect(restoredId).not.toBe(first.creation_id);
+    page.unmount(); render(<NewTripPage />);
+    expect(await screen.findByLabelText("Trip name")).toHaveValue("Stowe trip");
+    await user.click(screen.getByRole("button", { name: "Create trip" }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1"));
+    expect(sentBodies(fetchMock, "POST /api/v1/trips")[1]).toEqual({ ...first, creation_id: restoredId });
+  });
+
+  it("lets the user discard an uncertain attempt after warning about an earlier save", async () => {
+    let attempts = 0;
+    const fetchMock = fakeTripApi({ ...routes, "POST /api/v1/trips": () => ++attempts === 1 ? reply(500, { error: "Unavailable" }) : reply(201, { trip: TRIP }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup(); const page = render(<NewTripPage />);
+    await fill(user); await user.click(screen.getByRole("button", { name: "Create trip" }));
+    await screen.findByRole("alert");
+    expect(screen.getByText(/An earlier attempt may already have saved a trip/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Check your trips" })).toHaveAttribute("href", "/trips");
+    await user.click(screen.getByRole("button", { name: "Discard and start over" }));
+    expect(screen.getByLabelText("Trip name")).toHaveValue("");
+    expect(screen.getByLabelText("Trip name")).toBeEnabled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(sentBodies(fetchMock, "POST /api/v1/trips")).toHaveLength(1);
+    page.unmount(); render(<NewTripPage />);
+    await fill(user); await user.click(screen.getByRole("button", { name: "Create trip" }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1"));
+    const bodies = sentBodies(fetchMock, "POST /api/v1/trips") as { creation_id: string }[];
+    expect(bodies[1].creation_id).not.toBe(bodies[0].creation_id);
   });
 
   it("times out a stalled request and retains its identity for retry", async () => {
