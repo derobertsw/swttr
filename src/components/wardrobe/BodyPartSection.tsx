@@ -24,7 +24,7 @@ export function BodyPartSection({ area, itemCount, onAddGear, children }: BodyPa
 
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
-      <h2 id={headingId} tabIndex={-1} className="flex items-baseline gap-2 text-lg font-semibold text-foreground outline-none">
+      <h2 id={headingId} tabIndex={-1} className="flex items-baseline gap-2 text-lg font-semibold text-foreground">
         {label}
         <span className="text-sm font-medium text-muted-foreground tabular-nums">
           {itemCount}

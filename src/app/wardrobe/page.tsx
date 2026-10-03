@@ -47,6 +47,38 @@ function focusLater(getTarget: () => HTMLElement | null) {
   requestAnimationFrame(() => getTarget()?.focus());
 }
 
+/**
+ * Radix returns focus only to a DialogTrigger, and these overlays open from
+ * code. Each remembers the control that opened it and returns focus there,
+ * or to a fallback when a tap didn't focus it.
+ */
+function useReturnFocus() {
+  const opener = useRef<{ element: HTMLElement | null; fallbackId: string } | null>(null);
+
+  const remember = (fallbackId: string) => {
+    const active = document.activeElement;
+    opener.current = {
+      element: active instanceof HTMLElement && active !== document.body ? active : null,
+      fallbackId,
+    };
+  };
+
+  const restore = (event: Event) => {
+    event.preventDefault();
+    const saved = opener.current;
+    opener.current = null;
+    if (!saved) return;
+    if (saved.element?.isConnected) {
+      saved.element.focus();
+    } else {
+      // A tap leaves nothing focused; don't scroll the list to the fallback.
+      document.getElementById(saved.fallbackId)?.focus({ preventScroll: true });
+    }
+  };
+
+  return { remember, restore };
+}
+
 export default function Wardrobe() {
   const isMobile = useIsMobile();
   const {
@@ -97,20 +129,29 @@ export default function Wardrobe() {
     removeByItemId,
   } = useWardrobe();
   const [catalogOpen, setCatalogOpen] = useState(false);
+  // The details keep their item while they close, so they can animate out.
+  const [detailOpen, setDetailOpen] = useState(false);
+  const catalogFocus = useReturnFocus();
+  const detailFocus = useReturnFocus();
+  // Set while the catalog hands over to the custom item form, which then owns focus.
+  const handingOffToCustomForm = useRef(false);
   // A new key per opening starts the custom item form fresh.
   const [customForm, setCustomForm] = useState<{
     open: boolean;
     key: number;
     defaults?: { bodyPart?: BodyPart; name?: string };
   }>({ open: false, key: 0 });
-  // Where focus goes when the custom item form closes, when its trigger is gone.
+  // Where focus goes when the custom item form closes: Add gear, or the new row.
   const customReturnFocusId = useRef<string | null>(null);
 
   const overview = useMemo(() => buildWardrobeOverview(wardrobeItems), [wardrobeItems]);
   const isReady = wardrobeStatus === "ready";
+  // An empty wardrobe has its own call to add the first item.
+  const isEmpty = isReady && overview.totalItems === 0;
   const isFiltering = ownedSearch.trim() !== "" || ownedBodyArea !== "all";
 
   const openCatalog = (options?: { bodyArea?: BodyPart; query?: string }) => {
+    catalogFocus.remember(ADD_GEAR_ID);
     clearSearchFilters();
     setSearchBodyPartFilter(options?.bodyArea ?? "all");
     setSearch(options?.query ?? "");
@@ -122,6 +163,7 @@ export default function Wardrobe() {
 
   // The catalog closes, so focus returns to Add gear rather than its button.
   const addSimilarFromCatalog = () => {
+    handingOffToCustomForm.current = true;
     customReturnFocusId.current = ADD_GEAR_ID;
     setCatalogOpen(false);
     openCustomForm({
@@ -139,14 +181,29 @@ export default function Wardrobe() {
   };
 
   const handleCustomCloseAutoFocus = (event: Event) => {
-    const targetId = customReturnFocusId.current;
-    customReturnFocusId.current = null;
-    if (!targetId) return;
     event.preventDefault();
+    const targetId = customReturnFocusId.current ?? ADD_GEAR_ID;
+    customReturnFocusId.current = null;
     document.getElementById(targetId)?.focus();
   };
 
-  const handleRemove = async (item: WardrobeItem) => {
+  const handleCatalogCloseAutoFocus = (event: Event) => {
+    if (handingOffToCustomForm.current) {
+      handingOffToCustomForm.current = false;
+      event.preventDefault();
+      return;
+    }
+    catalogFocus.restore(event);
+  };
+
+  const openDetails = (item: WardrobeItem) => {
+    detailFocus.remember(rowButtonId(item.id));
+    setSelectedItemId(item.id);
+    setDetailOpen(true);
+  };
+
+  /** `fromDetails`: the details dialog was open, so focus always moves on. */
+  const handleRemove = async (item: WardrobeItem, { fromDetails = false } = {}) => {
     const order = ownedGroups.flatMap((group) => group.items.map((i) => i.id));
     const index = order.indexOf(item.id);
     const neighborId = order[index + 1] ?? order[index - 1];
@@ -155,7 +212,8 @@ export default function Wardrobe() {
     // The removed row took focus with it. Move to the next row, else the
     // section heading, unless the user has already moved on.
     focusLater(() => {
-      if (document.activeElement && document.activeElement !== document.body) return null;
+      const focusLost = !document.activeElement || document.activeElement === document.body;
+      if (!fromDetails && !focusLost) return null;
       return (
         (neighborId ? document.getElementById(rowActionsId(neighborId)) : null) ??
         document.getElementById(sectionHeadingId(getItemBodyArea(item))) ??
@@ -219,12 +277,14 @@ export default function Wardrobe() {
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-title font-semibold text-foreground md:text-title-lg">Wardrobe</h1>
-            {isReady && <p className="mt-1 text-sm text-muted-foreground">{overview.countLine}</p>}
+            {isReady && !isEmpty && <p className="mt-1 text-sm text-muted-foreground">{overview.countLine}</p>}
           </div>
-          <Button id={ADD_GEAR_ID} type="button" disabled={!isReady} onClick={() => openCatalog()}>
-            <Plus />
-            Add gear
-          </Button>
+          {!isEmpty && (
+            <Button id={ADD_GEAR_ID} type="button" disabled={!isReady} onClick={() => openCatalog()}>
+              <Plus />
+              Add gear
+            </Button>
+          )}
         </header>
 
         <p role="status" className="sr-only">
@@ -255,7 +315,7 @@ export default function Wardrobe() {
           </Card>
         )}
 
-        {isReady && overview.totalItems === 0 && (
+        {isEmpty && (
           <section aria-labelledby="wardrobe-empty" className="rounded-card border border-dashed border-border p-5">
             <h2 id="wardrobe-empty" className="text-base font-semibold text-foreground">
               Add the gear you own
@@ -370,7 +430,7 @@ export default function Wardrobe() {
                           key={item.id}
                           item={item}
                           state={rowStates[item.id]}
-                          onOpen={() => setSelectedItemId(item.id)}
+                          onOpen={() => openDetails(item)}
                           onSetExcluded={(excluded) => void setExcluded(item.id, excluded)}
                           onRemove={() => void handleRemove(item)}
                           onRetry={() => retryRow(item.id)}
@@ -434,21 +494,20 @@ export default function Wardrobe() {
       <ItemDetailCard
         item={selectedItem}
         state={selectedItem ? rowStates[selectedItem.id] : undefined}
-        open={selectedItem !== null}
-        onOpenChange={(open) => {
-          if (!open) setSelectedItemId(null);
-        }}
+        open={detailOpen && selectedItem !== null}
+        onOpenChange={setDetailOpen}
         onSetExcluded={(excluded) => {
           if (selectedItem) void setExcluded(selectedItem.id, excluded);
         }}
         onRemove={() => {
           if (!selectedItem) return;
-          setSelectedItemId(null);
-          void handleRemove(selectedItem);
+          setDetailOpen(false);
+          void handleRemove(selectedItem, { fromDetails: true });
         }}
         onRetry={() => {
           if (selectedItem) retryRow(selectedItem.id);
         }}
+        onCloseAutoFocus={detailFocus.restore}
       />
 
       <CreateCustomItemDialog
@@ -462,7 +521,7 @@ export default function Wardrobe() {
 
       {isMobile ? (
         <Drawer open={catalogOpen} onOpenChange={setCatalogOpen}>
-          <DrawerContent showCloseButton className="h-[95dvh]">
+          <DrawerContent showCloseButton className="h-[95dvh]" onCloseAutoFocus={handleCatalogCloseAutoFocus}>
             <div className="flex min-h-0 w-full flex-1 flex-col">
               <DrawerHeader className="flex-none pr-14 pb-3">
                 <DrawerTitle>Add gear</DrawerTitle>
@@ -475,7 +534,10 @@ export default function Wardrobe() {
         </Drawer>
       ) : (
         <Dialog open={catalogOpen} onOpenChange={setCatalogOpen}>
-          <DialogContent className="flex h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogContent
+            className="flex h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+            onCloseAutoFocus={handleCatalogCloseAutoFocus}
+          >
             <DialogHeader className="flex-none border-b border-border px-6 py-4">
               <DialogTitle>Add gear</DialogTitle>
               <DialogDescription>{catalogDescription}</DialogDescription>

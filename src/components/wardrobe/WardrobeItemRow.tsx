@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { CircleCheck, CircleSlash, EllipsisVertical, Trash2, X } from "lucide-react";
 import type { WardrobeItem } from "@/types/wardrobe";
 import type { ActionState, RowAction } from "@/hooks/useWardrobe";
@@ -58,6 +59,13 @@ export function WardrobeItemRow({
   const name = item.details.model_name;
   const pending = state && !state.failed ? state.action : null;
   const failed = state?.failed ? state.action : null;
+  const actionsRef = useRef<HTMLButtonElement>(null);
+  // Retry and Dismiss remove the error strip they sit in, so focus moves to
+  // the row's actions first.
+  const fromErrorStrip = (action: () => void) => () => {
+    actionsRef.current?.focus();
+    action();
+  };
 
   return (
     <li aria-busy={pending !== null} className="rounded-card border border-border bg-card text-card-foreground">
@@ -71,7 +79,7 @@ export function WardrobeItemRow({
           <ItemThumbnail item={item} className={cn(item.disabled && "opacity-60")} />
           <span className="min-w-0 flex-1">
             <span className="line-clamp-2 font-semibold leading-tight text-foreground">{name}</span>
-            <span className="mt-0.5 block truncate text-sm text-muted-foreground">
+            <span className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
               {getItemCategoryLabel(item)} · {getItemBrandLabel(item)}
             </span>
             {item.disabled && (
@@ -87,6 +95,7 @@ export function WardrobeItemRow({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
+              ref={actionsRef}
               id={rowActionsId(item.id)}
               type="button"
               variant="ghost"
@@ -122,10 +131,10 @@ export function WardrobeItemRow({
       {failed && (
         <div role="alert" className="flex items-center gap-2 border-t border-border py-1.5 pr-1.5 pl-3">
           <p className="min-w-0 flex-1 text-sm font-medium text-destructive">{FAILED_LABELS[failed]}</p>
-          <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          <Button type="button" variant="outline" size="sm" onClick={fromErrorStrip(onRetry)}>
             Retry
           </Button>
-          <Button type="button" variant="ghost" size="icon-sm" onClick={onDismissError} aria-label="Dismiss">
+          <Button type="button" variant="ghost" size="icon-sm" onClick={fromErrorStrip(onDismissError)} aria-label="Dismiss">
             <X />
           </Button>
         </div>

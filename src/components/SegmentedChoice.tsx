@@ -23,6 +23,8 @@ interface SegmentedChoiceProps<T extends string> {
   /** Shown under the choices and read with the group. */
   description?: ReactNode;
   className?: string;
+  /** Classes for the row of choices, e.g. to wrap them into a grid on phones. */
+  groupClassName?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export function SegmentedChoice<T extends string>({
   onChange,
   description,
   className,
+  groupClassName,
 }: SegmentedChoiceProps<T>) {
   const id = useId();
   const labelId = `${id}-label`;
@@ -60,7 +63,7 @@ export function SegmentedChoice<T extends string>({
         role="radiogroup"
         aria-labelledby={labelId}
         aria-describedby={description ? descriptionId : undefined}
-        className={cn(segmentedGroupClassName, "auto-cols-fr grid-flow-col")}
+        className={cn(segmentedGroupClassName, "auto-cols-fr grid-flow-col", groupClassName)}
       >
         {options.map((option, index) => {
           const isSelected = option.value === value;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Dialog,
@@ -32,6 +33,8 @@ interface ItemDetailCardProps {
   onSetExcluded: (excluded: boolean) => void;
   onRemove: () => void;
   onRetry: () => void;
+  /** Where focus goes on close; these details open from code, not a trigger. */
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 const FAILED_LABELS: Record<RowAction, string> = {
@@ -40,8 +43,18 @@ const FAILED_LABELS: Record<RowAction, string> = {
   include: "Couldn't include this item.",
 };
 
-export function ItemDetailCard({ item, state, open, onOpenChange, onSetExcluded, onRemove, onRetry }: ItemDetailCardProps) {
+export function ItemDetailCard({
+  item,
+  state,
+  open,
+  onOpenChange,
+  onSetExcluded,
+  onRemove,
+  onRetry,
+  onCloseAutoFocus,
+}: ItemDetailCardProps) {
   const isMobile = useIsMobile();
+  const inclusionButtonRef = useRef<HTMLButtonElement>(null);
 
   if (!item) return null;
 
@@ -62,6 +75,7 @@ export function ItemDetailCard({ item, state, open, onOpenChange, onSetExcluded,
             : "Recommendations can suggest it. Excluding it applies everywhere on your account, not just one trip."}
         </p>
         <Button
+          ref={inclusionButtonRef}
           type="button"
           variant="outline"
           size="sm"
@@ -78,7 +92,16 @@ export function ItemDetailCard({ item, state, open, onOpenChange, onSetExcluded,
       {state?.failed && (
         <div role="alert" className="flex items-center gap-2 rounded-control bg-destructive-soft py-1.5 pr-1.5 pl-3">
           <p className="min-w-0 flex-1 text-sm font-medium text-destructive">{FAILED_LABELS[state.action]}</p>
-          <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // The alert goes away on retry; keep focus on the change being retried.
+              inclusionButtonRef.current?.focus();
+              onRetry();
+            }}
+          >
             Retry
           </Button>
         </div>
@@ -105,7 +128,7 @@ export function ItemDetailCard({ item, state, open, onOpenChange, onSetExcluded,
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent showCloseButton>
+        <DrawerContent showCloseButton onCloseAutoFocus={onCloseAutoFocus}>
           <div className="mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col">
             <DrawerHeader className="pr-14 pb-2">
               <DrawerTitle>{title}</DrawerTitle>
@@ -123,7 +146,7 @@ export function ItemDetailCard({ item, state, open, onOpenChange, onSetExcluded,
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

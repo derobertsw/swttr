@@ -105,6 +105,40 @@ describe("Wardrobe page", () => {
     ]);
   });
 
+  it("returns focus to the row or button that opened an overlay", async () => {
+    stubApi({ "GET /api/wardrobe/gear": reply(200, { items: [fleece, gloves] }) });
+    const user = userEvent.setup();
+    render(<Wardrobe />);
+
+    const row = await screen.findByRole("button", { name: /^R1 Hoody/ });
+    await user.click(row);
+    expect(await screen.findByRole("dialog", { name: "R1 Hoody" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(row).toHaveFocus());
+
+    const addGear = screen.getByRole("button", { name: "Add gear" });
+    await user.click(addGear);
+    expect(await screen.findByRole("dialog", { name: "Add gear" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(addGear).toHaveFocus());
+  });
+
+  it("keeps focus on the row's actions when retrying a failed change", async () => {
+    stubApi({
+      "GET /api/wardrobe/gear": reply(200, { items: [fleece] }),
+      "PATCH /api/wardrobe/gear": inTurn(reply(500, { error: "Failed" }), reply(200, { item: {} })),
+    });
+    const user = userEvent.setup();
+    render(<Wardrobe />);
+
+    const menu = await openRowMenu(user, "R1 Hoody");
+    await user.click(within(menu).getByRole("menuitem", { name: "Exclude from recommendations" }));
+    await user.click(await screen.findByRole("button", { name: "Retry" }));
+
+    expect(screen.getByRole("button", { name: "Actions for R1 Hoody" })).toHaveFocus();
+    expect(await screen.findByText("Excluded from recommendations")).toBeInTheDocument();
+  });
+
   it("keeps the row when removing it fails", async () => {
     stubApi({
       "GET /api/wardrobe/gear": reply(200, { items: [fleece] }),
@@ -138,12 +172,14 @@ describe("Wardrobe page", () => {
     expect(screen.queryByRole("button", { name: "Actions for R1 Hoody" })).not.toBeInTheDocument();
     expect(screen.getByText("1 item")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Removed R1 Hoody.");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Actions for Army Leather Heli" })).toHaveFocus());
 
     await user.click(within(removed).getByRole("button", { name: "Restore R1 Hoody" }));
 
     expect(await screen.findByRole("button", { name: "Actions for R1 Hoody" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Recently removed" })).not.toBeInTheDocument();
     expect(screen.getByText("2 items")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Restored R1 Hoody to your wardrobe.");
     expect(sentBodies(fetchMock, "POST /api/wardrobe/gear")).toEqual([{ item_type: "garment", item_id: "g1" }]);
   });
 

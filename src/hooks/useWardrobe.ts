@@ -310,7 +310,11 @@ export function useWardrobe() {
   };
 
   /** Adds a catalog item, or restores a removed one. Resolves to the new entry. */
-  const addByItemId = async (itemType: WardrobeItem["item_type"], itemId: string): Promise<WardrobeItem | null> => {
+  const addByItemId = async (
+    itemType: WardrobeItem["item_type"],
+    itemId: string,
+    verb: "Added" | "Restored"
+  ): Promise<WardrobeItem | null> => {
     const key = `item:${itemId}`;
     if (!userId || inFlight.current.has(key)) return null;
     inFlight.current.add(key);
@@ -334,7 +338,7 @@ export function useWardrobe() {
       const item = withDetails(((await res.json()) as { item: WardrobeItem }).item);
       insertItem(item);
       setCatalogState(itemId, null);
-      setAnnouncement(`Added ${itemName(item)} to your wardrobe.`);
+      setAnnouncement(`${verb} ${itemName(item)} to your wardrobe.`);
       return item;
     } catch (err) {
       logWarn("useWardrobe.addByItemId", err);
@@ -345,9 +349,9 @@ export function useWardrobe() {
     }
   };
 
-  const addItem = (item: AvailableItem) => addByItemId(item.type, item.id);
+  const addItem = (item: AvailableItem) => addByItemId(item.type, item.id, "Added");
 
-  const restoreItem = (item: WardrobeItem) => addByItemId(item.item_type, item.item_id);
+  const restoreItem = (item: WardrobeItem) => addByItemId(item.item_type, item.item_id, "Restored");
 
   /** Lists an item the custom item form just created. */
   const addCreatedItem = (item: WardrobeItem) => {

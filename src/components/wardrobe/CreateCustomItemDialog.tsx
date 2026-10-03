@@ -153,6 +153,9 @@ function CustomItemForm({
     setError(null);
     if (!kind || !name.trim()) {
       setShowMissing(true);
+      // Take the user to the first thing that's missing.
+      if (!kind) kindRefs.current[0]?.focus();
+      else document.getElementById(`${id}-name`)?.focus();
       return;
     }
 
@@ -194,6 +197,7 @@ function CustomItemForm({
         options={BODY_AREA_OPTIONS}
         value={bodyPart}
         onChange={handleBodyPartChange}
+        groupClassName="grid-flow-row grid-cols-2 sm:grid-cols-4"
       />
 
       <div className="flex flex-col gap-2">

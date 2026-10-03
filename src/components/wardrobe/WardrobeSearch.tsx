@@ -418,7 +418,7 @@ function CatalogRow({ item, owned, state, onAdd, onRemove }: CatalogRowProps) {
   return (
     <li className="flex items-center gap-2 py-2 pr-2 pl-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold leading-tight text-foreground">{item.model_name}</p>
+        <p className="line-clamp-2 text-sm font-semibold leading-tight text-foreground">{item.model_name}</p>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {item.brand}
           {item.category && <span className="ml-1.5">· {formatCategory(item.category)}</span>}
@@ -426,6 +426,12 @@ function CatalogRow({ item, owned, state, onAdd, onRemove }: CatalogRowProps) {
             <span className="ml-1.5 font-medium">· {item.rcl_clo.toFixed(2)} clo</span>
           )}
         </p>
+        {owned && (
+          <Badge size="sm" variant="success" className="mt-1">
+            <Check aria-hidden="true" />
+            In wardrobe
+          </Badge>
+        )}
         {state?.failed && (
           <p role="alert" className="mt-1 text-xs font-medium text-destructive">
             {FAILED_LABELS[state.action]}
@@ -433,38 +439,19 @@ function CatalogRow({ item, owned, state, onAdd, onRemove }: CatalogRowProps) {
         )}
       </div>
 
-      {owned ? (
-        <>
-          <Badge size="sm" variant="success" className="shrink-0">
-            <Check aria-hidden="true" />
-            In wardrobe
-          </Badge>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            loading={pending === "remove"}
-            onClick={onRemove}
-            aria-label={`Remove ${name} from wardrobe`}
-            className="shrink-0"
-          >
-            Remove
-          </Button>
-        </>
-      ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          loading={pending === "add"}
-          onClick={onAdd}
-          aria-label={`Add ${name} to wardrobe`}
-          className="shrink-0"
-        >
-          <Plus />
-          Add
-        </Button>
-      )}
+      {/* One button that changes role, so focus stays put after Add or Remove. */}
+      <Button
+        type="button"
+        variant={owned ? "ghost" : "outline"}
+        size="sm"
+        loading={pending !== null}
+        onClick={owned ? onRemove : onAdd}
+        aria-label={owned ? `Remove ${name} from wardrobe` : `Add ${name} to wardrobe`}
+        className="shrink-0"
+      >
+        {!owned && <Plus />}
+        {owned ? "Remove" : "Add"}
+      </Button>
     </li>
   );
 }
