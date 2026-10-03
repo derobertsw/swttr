@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { chipClassName } from "@/components/ui/chip";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FieldError } from "@/components/FieldError";
@@ -67,6 +68,7 @@ const MARKS = [
 ];
 
 const EFFORTS = ["Easy", "Moderate", "Hard"] as const;
+const BODY_AREAS = ["All", "Torso", "Legs", "Hands", "Head + Neck"] as const;
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -91,6 +93,7 @@ function Swatch({ token, role, swatch }: { token: string; role: string; swatch: 
 
 function PalettePanel({ appearance }: { appearance: Appearance }) {
   const [effort, setEffort] = useState<(typeof EFFORTS)[number]>("Moderate");
+  const [bodyArea, setBodyArea] = useState<(typeof BODY_AREAS)[number]>("All");
   const id = (name: string) => `${appearance}-${name}`;
 
   return (
@@ -223,6 +226,27 @@ function PalettePanel({ appearance }: { appearance: Appearance }) {
               </button>
             ))}
           </div>
+        </div>
+        <div className="space-y-2">
+          <p id={id("body-area")} className="text-sm font-medium">
+            Body area
+          </p>
+          <div role="group" aria-labelledby={id("body-area")} className="flex flex-wrap gap-2">
+            {BODY_AREAS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={bodyArea === option}
+                onClick={() => setBodyArea(option)}
+                className={chipClassName}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Chips wrap, so they suit long lists such as brands.
+          </p>
         </div>
         <Tabs defaultValue="wear">
           <TabsList className="grid w-full grid-cols-2">
