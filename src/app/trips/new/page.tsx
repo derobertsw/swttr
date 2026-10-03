@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Calendar as CalIcon, CheckCircle2, GripVertical, Loader2, MapPin, Plus, UserPlus, X } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
+import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -19,6 +20,8 @@ import {
   daysBetween,
   formatDateRange,
 } from "@/components/trips/trip-primitives";
+import { TripSheet, TripSheetTitle } from "@/components/trips/TripSheet";
+import { useReturnFocus } from "@/components/trips/useReturnFocus";
 import { errorMessage, fetchTripFull, tripRequest } from "@/lib/trip-requests";
 import type { DateRange } from "react-day-picker";
 import type { Trip, TripMember, TripStop } from "@/types/trips";
@@ -47,6 +50,11 @@ function parseStep(value: string | null): Step {
 function draftBasics(name: string, range: DateRange | undefined): TripBasics | null {
   if (!name.trim() || !range?.from || !range?.to) return null;
   return { name: name.trim(), start_date: toTripDate(range.from), end_date: toTripDate(range.to) };
+}
+
+/** The id of a stop's Edit button, which takes focus back from the stop sheet. */
+function editStopButtonId(stopId: string) {
+  return `edit-stop-${stopId}`;
 }
 
 function changedBasics(trip: Trip, basics: TripBasics): Partial<TripBasics> {
@@ -356,10 +364,24 @@ function Step2Stops({
   onNext: () => void;
   onBack: () => void;
 }) {
-  const [editing, setEditing] = useState<TripStop | null>(null);
+  // The sheet keeps its stop while it closes, so it can animate out. A new
+  // key per opening starts it fresh.
+  const [editing, setEditing] = useState<{ stop: TripStop; open: boolean; key: number } | null>(null);
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const search = useLocationSearch();
+  const editFocus = useReturnFocus();
+
+  const openEditor = (stop: TripStop, opener: HTMLElement) => {
+    // On iOS a tap leaves focus where it was, e.g. in the stop search, and
+    // that field shouldn't get focus back when the sheet closes.
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== opener) active.blur();
+    editFocus.remember(() => document.getElementById(editStopButtonId(stop.id)));
+    setEditing((prev) => ({ stop, open: true, key: (prev?.key ?? 0) + 1 }));
+  };
+
+  const closeEditor = () => setEditing((prev) => prev && { ...prev, open: false });
 
   const addStop = async () => {
     const selected = search.selectedLocation;
@@ -456,7 +478,8 @@ function Step2Stops({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setEditing(stop)}
+                  id={editStopButtonId(stop.id)}
+                  onClick={(event) => openEditor(stop, event.currentTarget)}
                   className="rounded-md border border-white/14 px-2 py-1 text-xs text-white/75 hover:bg-white/10"
                 >
                   Edit
@@ -491,15 +514,18 @@ function Step2Stops({
 
       {editing && (
         <StopDetailSheet
+          key={editing.key}
+          open={editing.open}
           tripId={trip.id}
-          stop={editing}
+          stop={editing.stop}
           tripStart={trip.start_date}
           tripEnd={trip.end_date}
-          onClose={() => setEditing(null)}
+          onClose={closeEditor}
           onSaved={(updated) => {
             onStopsChange((current) => current.map((s) => (s.id === updated.id ? updated : s)));
-            setEditing(null);
+            closeEditor();
           }}
+          onCloseAutoFocus={editFocus.restore}
         />
       )}
     </div>
@@ -507,31 +533,27 @@ function Step2Stops({
 }
 
 function StopDetailSheet({
+  open,
   tripId,
   stop,
   tripStart,
   tripEnd,
   onClose,
   onSaved,
+  onCloseAutoFocus,
 }: {
+  open: boolean;
   tripId: string;
   stop: TripStop;
   tripStart: string;
   tripEnd: string;
   onClose: () => void;
   onSaved: (s: TripStop) => void;
+  onCloseAutoFocus: (event: Event) => void;
 }) {
   const [activities, setActivities] = useState<string[]>(stop.activities);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !saving) onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, saving]);
 
   // Enumerate dates inline (avoids importing server lib into client bundle).
   const tripDates: string[] = (() => {
@@ -573,96 +595,83 @@ function StopDetailSheet({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Edit stop ${stop.name}`}
-      onClick={() => !saving && onClose()}
-      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/55 backdrop-blur-sm sm:items-center"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl rounded-t-3xl border-t border-white/14 bg-slate-950/95 px-5 pt-4 shadow-[0_-12px_40px_rgba(0,0,0,0.5)] pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:rounded-3xl sm:pb-6"
-      >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/22" />
-        <div className="flex items-center justify-between">
-          <div>
-            <SectionLabel>Stop detail</SectionLabel>
-            <p className="text-base font-semibold text-white">{stop.name}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-1.5 text-white/55 hover:bg-white/10"
-            aria-label="Close"
-          >
-            <X className="size-5" />
-          </button>
-        </div>
-
-        <div className="mt-4">
-          <SectionLabel>Which days at this stop?</SectionLabel>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {tripDates.map((iso) => {
-              const date = new Date(`${iso}T00:00:00`);
-              const dow = date.toLocaleDateString(undefined, { weekday: "short" });
-              const day = date.getDate();
-              const on = selectedDates.includes(iso);
-              return (
-                <button
-                  key={iso}
-                  type="button"
-                  onClick={() => toggleDate(iso)}
-                  className={
-                    "flex w-14 flex-col items-center rounded-lg border px-2 py-1.5 text-center text-xs transition-colors " +
-                    (on
-                      ? "border-cyan-300/55 bg-cyan-300/15 text-white"
-                      : "border-white/14 bg-white/[0.05] text-white/72")
-                  }
-                >
-                  <span className="text-[10px] uppercase tracking-wide text-white/55">{dow}</span>
-                  <span className="text-base font-semibold leading-none">{day}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <SectionLabel>Activities at this stop</SectionLabel>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {TRIP_ACTIVITY_OPTIONS.map((a) => {
-              const on = activities.includes(a);
-              return (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() => toggleActivity(a)}
-                  className={
-                    "rounded-full border px-3 py-1 text-xs " +
-                    (on
-                      ? "border-cyan-300/55 bg-cyan-300/22 text-white"
-                      : "border-white/16 bg-white/[0.05] text-white/72")
-                  }
-                >
-                  {a}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <button
+    <TripSheet
+      open={open}
+      onClose={onClose}
+      busy={saving}
+      described={false}
+      className="sm:max-w-2xl"
+      onCloseAutoFocus={onCloseAutoFocus}
+      header={
+        <>
+          <SectionLabel>Stop detail</SectionLabel>
+          <TripSheetTitle>
+            <span className="sr-only">Edit stop </span>
+            {stop.name}
+          </TripSheetTitle>
+        </>
+      }
+      footer={
+        <Button
           type="button"
           onClick={save}
-          disabled={saving}
-          className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-cyan-300/22 text-sm font-semibold text-white"
+          loading={saving}
+          className="w-full rounded-xl border border-white/12 bg-cyan-300/22 text-white hover:bg-cyan-300/30"
         >
-          {saving ? <Loader2 className="size-4 animate-spin" /> : null}
           Save stop
-        </button>
+        </Button>
+      }
+    >
+      <SectionLabel>Which days at this stop?</SectionLabel>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {tripDates.map((iso) => {
+          const date = new Date(`${iso}T00:00:00`);
+          const dow = date.toLocaleDateString(undefined, { weekday: "short" });
+          const day = date.getDate();
+          const on = selectedDates.includes(iso);
+          return (
+            <button
+              key={iso}
+              type="button"
+              onClick={() => toggleDate(iso)}
+              aria-pressed={on}
+              className={
+                "flex w-14 flex-col items-center rounded-lg border px-2 py-1.5 text-center text-xs transition-colors " +
+                (on
+                  ? "border-cyan-300/55 bg-cyan-300/15 text-white"
+                  : "border-white/14 bg-white/[0.05] text-white/72")
+              }
+            >
+              <span className="text-[10px] uppercase tracking-wide text-white/55">{dow}</span>
+              <span className="text-base font-semibold leading-none">{day}</span>
+            </button>
+          );
+        })}
       </div>
-    </div>
+
+      <SectionLabel className="mt-4">Activities at this stop</SectionLabel>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {TRIP_ACTIVITY_OPTIONS.map((a) => {
+          const on = activities.includes(a);
+          return (
+            <button
+              key={a}
+              type="button"
+              onClick={() => toggleActivity(a)}
+              aria-pressed={on}
+              className={
+                "rounded-full border px-3 py-1 text-xs " +
+                (on
+                  ? "border-cyan-300/55 bg-cyan-300/22 text-white"
+                  : "border-white/16 bg-white/[0.05] text-white/72")
+              }
+            >
+              {a}
+            </button>
+          );
+        })}
+      </div>
+    </TripSheet>
   );
 }
 

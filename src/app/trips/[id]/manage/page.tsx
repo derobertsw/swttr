@@ -1,20 +1,31 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Trash2, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2, UserPlus } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
   InviteLinkButton,
   MemberAvatar,
   SectionLabel,
+  sectionLabelClassName,
 } from "@/components/trips/trip-primitives";
+import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
+import { useReturnFocus } from "@/components/trips/useReturnFocus";
 import { useTrip } from "@/hooks/useTrip";
 import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import type { TripMember } from "@/types/trips";
+
+const HEADING_ID = "manage-crew-heading";
+
+/** The id of a member's Remove button, which takes focus back from the dialog. */
+function removeButtonId(memberId: string) {
+  return `remove-member-${memberId}`;
+}
 
 export default function ManageCrewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -22,8 +33,35 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"invite" | "guest">("invite");
-  const [confirming, setConfirming] = useState<TripMember | null>(null);
+  // The dialog keeps its member while it closes, so it can animate out.
+  const [confirming, setConfirming] = useState<{ member: TripMember; open: boolean } | null>(null);
   const [removing, setRemoving] = useState(false);
+  const confirmFocus = useReturnFocus();
+  // Set when a removal closes the dialog: that member's row is going away.
+  const focusAfterRemoval = useRef<(() => HTMLElement | null) | null>(null);
+
+  const openConfirm = (member: TripMember, opener: HTMLElement) => {
+    // On iOS a tap leaves focus where it was, e.g. in Add member's name, and
+    // that field shouldn't get focus back when the dialog closes.
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== opener) active.blur();
+    confirmFocus.remember(() => document.getElementById(removeButtonId(member.id)));
+    setConfirming({ member, open: true });
+  };
+
+  const closeConfirm = () => setConfirming((prev) => prev && { ...prev, open: false });
+
+  const handleConfirmCloseAutoFocus = (event: Event) => {
+    const next = focusAfterRemoval.current;
+    focusAfterRemoval.current = null;
+    if (!next) {
+      confirmFocus.restore(event);
+      return;
+    }
+    event.preventDefault();
+    confirmFocus.forget();
+    next()?.focus();
+  };
 
   const add = async () => {
     const displayName = name.trim();
@@ -42,14 +80,22 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
 
   const remove = async () => {
     if (!confirming) return;
+    const { member } = confirming;
+    // Focus moves on to the next member who can be removed, else the heading.
+    const removable = data?.members.filter((m) => m.role !== "organizer") ?? [];
+    const index = removable.findIndex((m) => m.id === member.id);
+    const neighbor = removable[index + 1] ?? removable[index - 1];
     setRemoving(true);
     try {
-      await tripRequest(`/api/v1/trips/${id}/members/${confirming.id}`, "DELETE");
-      setConfirming(null);
+      await tripRequest(`/api/v1/trips/${id}/members/${member.id}`, "DELETE");
+      focusAfterRemoval.current = () =>
+        (neighbor ? document.getElementById(removeButtonId(neighbor.id)) : null) ??
+        document.getElementById(HEADING_ID);
+      closeConfirm();
       await refresh();
     } catch (err) {
       // The dialog stays open, so the removal can be retried or cancelled.
-      toast.error(`Couldn't remove ${confirming.display_name}`, {
+      toast.error(`Couldn't remove ${member.display_name}`, {
         description: errorMessage(err),
       });
     } finally {
@@ -69,7 +115,11 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
         </Link>
         <header>
           <SectionLabel>Trip settings</SectionLabel>
-          <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
+          <h1
+            id={HEADING_ID}
+            tabIndex={-1}
+            className="mt-1 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-white/94"
+          >
             Manage crew
           </h1>
         </header>
@@ -118,7 +168,8 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
                       {m.role !== "organizer" && (
                         <button
                           type="button"
-                          onClick={() => setConfirming(m)}
+                          id={removeButtonId(m.id)}
+                          onClick={(event) => openConfirm(m, event.currentTarget)}
                           className="inline-flex items-center gap-1 rounded-md border border-white/12 px-2.5 py-1.5 text-xs text-white/70 hover:border-orange-300/40 hover:bg-orange-300/10 hover:text-orange-50"
                           aria-label={`Remove ${m.display_name}`}
                         >
@@ -179,11 +230,13 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
         )}
 
         {confirming && (
-          <RemoveConfirmModal
-            member={confirming}
+          <RemoveConfirmSheet
+            member={confirming.member}
+            open={confirming.open}
             removing={removing}
-            onCancel={() => setConfirming(null)}
+            onCancel={closeConfirm}
             onConfirm={remove}
+            onCloseAutoFocus={handleConfirmCloseAutoFocus}
           />
         )}
       </div>
@@ -191,88 +244,88 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
   );
 }
 
-function RemoveConfirmModal({
+function RemoveConfirmSheet({
   member,
+  open,
   removing,
   onCancel,
   onConfirm,
+  onCloseAutoFocus,
 }: {
   member: TripMember;
+  open: boolean;
   removing: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  onCloseAutoFocus: (event: Event) => void;
 }) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const sideEffects = [
     "delete their kits for this trip",
     "unassign their group gear",
     "drop them from roll call",
   ];
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !removing) onCancel();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel, removing]);
-
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Remove ${member.display_name} from trip`}
-      onClick={() => !removing && onCancel()}
-      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/55 backdrop-blur-sm sm:items-center"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-t-3xl border border-white/14 bg-slate-950/95 p-5 shadow-[0_-12px_40px_rgba(0,0,0,0.5)] pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:rounded-3xl sm:pb-5"
-      >
-        <button
-          type="button"
-          onClick={onCancel}
-          aria-label="Close"
-          className="absolute right-3 top-3 rounded-md p-1.5 text-white/55 hover:bg-white/10 hover:text-white"
-        >
-          <X className="size-5" />
-        </button>
-        <SectionLabel>Remove from trip</SectionLabel>
-        <div className="mt-3 flex items-center gap-3 rounded-2xl border border-orange-400/35 bg-orange-300/10 px-3 py-3">
-          <MemberAvatar name={member.display_name} size={40} />
-          <div>
-            <p className="text-base font-semibold text-white">{member.display_name}</p>
-            <p className="text-xs text-white/65">{member.role} · {member.status}</p>
-          </div>
-        </div>
-        <p className="mt-4 text-sm text-white/85">Removing {member.display_name} will:</p>
-        <ul className="mt-2 space-y-1.5">
-          {sideEffects.map((t) => (
-            <li key={t} className="flex gap-2 text-xs text-white/75">
-              <span className="text-cyan-300">·</span>
-              {t}
-            </li>
-          ))}
-        </ul>
-        <div className="mt-5 flex flex-col gap-2">
-          <button
+    <TripSheet
+      open={open}
+      onClose={onCancel}
+      busy={removing}
+      className="sm:max-w-md"
+      // Start on Cancel, so Enter can't remove someone by accident.
+      onOpenAutoFocus={(event) => {
+        event.preventDefault();
+        cancelRef.current?.focus();
+      }}
+      onCloseAutoFocus={onCloseAutoFocus}
+      header={
+        <TripSheetTitle className={sectionLabelClassName}>
+          Remove <span className="sr-only">{member.display_name} </span>from trip
+        </TripSheetTitle>
+      }
+      footer={
+        <>
+          <Button
             type="button"
             onClick={onConfirm}
-            disabled={removing}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-orange-300/45 bg-orange-300/22 text-sm font-semibold text-white disabled:opacity-50"
+            loading={removing}
+            className="rounded-xl border border-orange-300/45 bg-orange-300/22 text-white hover:bg-orange-300/30"
           >
-            {removing && <Loader2 className="size-4 animate-spin" />}
             Remove {member.display_name}
-          </button>
-          <button
+          </Button>
+          <Button
+            ref={cancelRef}
             type="button"
+            variant="ghost"
             onClick={onCancel}
             disabled={removing}
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-white/14 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50"
+            className="rounded-xl border border-white/14 font-normal text-white/80 hover:bg-white/10 hover:text-white"
           >
             Cancel
-          </button>
+          </Button>
+        </>
+      }
+    >
+      <div className="flex items-center gap-3 rounded-2xl border border-orange-400/35 bg-orange-300/10 px-3 py-3">
+        <MemberAvatar name={member.display_name} size={40} />
+        <div>
+          <p className="text-base font-semibold text-white">{member.display_name}</p>
+          <p className="text-xs text-white/65">{member.role} · {member.status}</p>
         </div>
       </div>
-    </div>
+      <TripSheetDescription asChild>
+        <div className="mt-4">
+          <p>Removing {member.display_name} will:</p>
+          <ul className="mt-2 space-y-1.5">
+            {sideEffects.map((t) => (
+              <li key={t} className="flex gap-2 text-xs text-white/75">
+                <span aria-hidden="true" className="text-cyan-300">·</span>
+                {t}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </TripSheetDescription>
+    </TripSheet>
   );
 }
