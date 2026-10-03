@@ -1,6 +1,5 @@
 import type { PhaseEvaluation } from "@/types/biophysics";
 import { ThermalGauge, type CloBreakdown } from "./ThermalGauge";
-import { RiskCard } from "./RiskCard";
 
 const REGION_LABELS = { torso: "Torso", arms: "Arms", legs: "Legs" } as const;
 
@@ -22,53 +21,37 @@ function toCloBreakdown(breakdown: PhaseEvaluation["breakdown"]): CloBreakdown |
 }
 
 /**
- * Whole-body insulation against the target range, with a risk card when
- * outside it. Ski touring shows climb and descent separately.
+ * Whole-body insulation against the target range. Ski touring shows climb
+ * and descent separately.
  */
 export function ComfortOverview({ climb, descent }: { climb: PhaseComfort; descent?: PhaseComfort }) {
   if (!descent) {
     return (
-      <>
-        <ThermalGauge
-          totalClo={climb.evaluation?.totalClo}
-          targetRange={climb.targetRange}
-          showStatusPill={false}
-          hideMarkerLabel
-          cloBreakdown={toCloBreakdown(climb.evaluation?.breakdown)}
-        />
-        <RiskCard decision={climb.evaluation?.decision} />
-      </>
+      <ThermalGauge
+        totalClo={climb.evaluation?.totalClo}
+        targetRange={climb.targetRange}
+        showStatusPill={false}
+        hideMarkerLabel
+        cloBreakdown={toCloBreakdown(climb.evaluation?.breakdown)}
+      />
     );
   }
 
   return (
-    <section className="rounded-xl border border-white/20 bg-white/[0.06] px-3 py-3 sm:px-4">
-      <div className="space-y-4">
-        <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">Climb</p>
+    <div className="flex flex-col gap-4">
+      {([["Climb", climb], ["Descent", descent]] as const).map(([label, phase]) => (
+        <div key={label}>
+          <p className="mb-1 text-sm font-semibold text-foreground">{label}</p>
           <ThermalGauge
-            totalClo={climb.evaluation?.totalClo}
-            targetRange={climb.targetRange}
+            totalClo={phase.evaluation?.totalClo}
+            targetRange={phase.targetRange}
             markerLabel=""
             showStatusPill={false}
             hideMarkerLabel
-            cloBreakdown={toCloBreakdown(climb.evaluation?.breakdown)}
+            cloBreakdown={toCloBreakdown(phase.evaluation?.breakdown)}
           />
         </div>
-        <RiskCard decision={climb.evaluation?.decision} phase="Climb" />
-        <div className="border-t border-white/15 pt-4">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">Descent</p>
-          <ThermalGauge
-            totalClo={descent.evaluation?.totalClo}
-            targetRange={descent.targetRange}
-            markerLabel=""
-            showStatusPill={false}
-            hideMarkerLabel
-            cloBreakdown={toCloBreakdown(descent.evaluation?.breakdown)}
-          />
-        </div>
-        <RiskCard decision={descent.evaluation?.decision} phase="Descent" />
-      </div>
-    </section>
+      ))}
+    </div>
   );
 }
