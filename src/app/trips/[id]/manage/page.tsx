@@ -40,7 +40,11 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
   // Set when a removal closes the dialog: that member's row is going away.
   const focusAfterRemoval = useRef<(() => HTMLElement | null) | null>(null);
 
-  const openConfirm = (member: TripMember) => {
+  const openConfirm = (member: TripMember, opener: HTMLElement) => {
+    // On iOS a tap leaves focus where it was, e.g. in Add member's name, and
+    // that field shouldn't get focus back when the dialog closes.
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== opener) active.blur();
     confirmFocus.remember(() => document.getElementById(removeButtonId(member.id)));
     setConfirming({ member, open: true });
   };
@@ -165,7 +169,7 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
                         <button
                           type="button"
                           id={removeButtonId(m.id)}
-                          onClick={() => openConfirm(m)}
+                          onClick={(event) => openConfirm(m, event.currentTarget)}
                           className="inline-flex items-center gap-1 rounded-md border border-white/12 px-2.5 py-1.5 text-xs text-white/70 hover:border-orange-300/40 hover:bg-orange-300/10 hover:text-orange-50"
                           aria-label={`Remove ${m.display_name}`}
                         >

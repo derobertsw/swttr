@@ -380,6 +380,19 @@ describe("New trip wizard", () => {
       expect(edit).toHaveFocus();
     });
 
+    it("doesn't hand focus back to a field a tap left it in", async () => {
+      const { user, edit } = await openStops();
+
+      // On iOS, tapping a button leaves focus in the field being typed in.
+      screen.getByRole("combobox").focus();
+      fireEvent.click(edit);
+      await screen.findByRole("dialog");
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(edit).toHaveFocus();
+    });
+
     it("can't be closed while saving, and stays open with its picks when the save fails", async () => {
       let finishSave = () => {};
       const { user, edit } = await openStops({

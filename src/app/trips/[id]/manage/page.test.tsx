@@ -145,6 +145,25 @@ describe("Manage crew page", () => {
       expect(opener).toHaveFocus();
     });
 
+    it("doesn't hand focus back to a field a tap left it in", async () => {
+      vi.stubGlobal(
+        "fetch",
+        fakeTripApi({ "GET /api/v1/trips/trip-1": reply(200, tripFull({ members: [ORGANIZER, SAM] })) })
+      );
+      const user = userEvent.setup();
+      await renderPage();
+      const opener = await screen.findByRole("button", { name: "Remove Sam" });
+
+      // On iOS, tapping a button leaves focus in the field being typed in.
+      screen.getByPlaceholderText("Display name").focus();
+      fireEvent.click(opener);
+      await screen.findByRole("dialog");
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(opener).toHaveFocus();
+    });
+
     it("can't be closed while the removal is saving", async () => {
       let finishRemove = () => {};
       vi.stubGlobal(
