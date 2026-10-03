@@ -125,6 +125,18 @@ describe("useEditableLayers", () => {
     expect(result.current.edited).toBe(false);
   });
 
+  it("replaces an item with one for another layer as one edit", () => {
+    const { result } = renderHook(() => useLayersFor(HANDWEAR_A, null));
+
+    act(() => result.current.replaceItem("hands", "outer", 0, { name: "Liner", rcl: 0.1 }, "base"));
+    expect(result.current.layers.hands).toMatchObject({ base: [{ name: "Liner" }], outer: [] });
+
+    act(() => result.current.undo());
+    expect(result.current.layers.hands.base).toEqual([]);
+    expect(result.current.layers.hands.outer.map((i) => i.name)).toEqual(["Glove A"]);
+    expect(result.current.canUndo).toBe(false);
+  });
+
   it("resets to the initial layers, and undo brings the edits back", () => {
     const { result } = renderHook(() => useLayersFor(HANDWEAR_A, null));
 

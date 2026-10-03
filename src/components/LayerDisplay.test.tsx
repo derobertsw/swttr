@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, getNodeText, render, screen, waitFor, within } from "@testing-library/react";
 import { NextRequest } from "next/server";
 import { toast } from "sonner";
 import { POST as evaluateLayers } from "@/app/api/v1/ensembles/evaluate/route";
@@ -46,7 +46,8 @@ vi.mock("@/hooks/useLayerPicker", () => ({
   useLayerPicker: () => ({ loading: false, getItems: () => [], reload: mockReloadPicker }),
 }));
 
-// Mock LayerPickerDrawer — while open, offers one item that isn't in the wardrobe
+// Mock LayerPickerDrawer — while open, offers a mid layer that isn't in the wardrobe
+// and a base layer that is, whichever layer it was opened for
 const catalogFleece: PickerItem = {
   id: "catalog-fleece",
   name: "Catalog fleece",
@@ -56,9 +57,24 @@ const catalogFleece: PickerItem = {
   isInUse: false,
   isOwned: false,
 };
+const merinoCrew: PickerItem = {
+  id: "merino-crew",
+  name: "Merino crew",
+  brand: "Test Brand",
+  rcl: 0.2,
+  nativeLayerType: "base",
+  isInUse: false,
+  isOwned: true,
+};
 vi.mock("@/components/layers/LayerPickerDrawer", () => ({
   LayerPickerDrawer: ({ open, onSelect }: { open: boolean; onSelect: (item: PickerItem) => void }) =>
-    open ? <button onClick={() => onSelect(catalogFleece)}>Pick catalog fleece</button> : null,
+    open ? (
+      <>
+        {[catalogFleece, merinoCrew].map((item) => (
+          <button key={item.id} onClick={() => onSelect(item)}>{`Pick ${item.name.toLowerCase()}`}</button>
+        ))}
+      </>
+    ) : null,
 }));
 
 const mockRecommendation = {
@@ -500,6 +516,62 @@ describe("LayerDisplay", () => {
         expect(within(legs).getByText("Catalog fleece")).toHaveTextContent("Not in your wardrobe");
         expect(within(card).getByRole("button", { name: /^I own this/ })).toBeEnabled();
         expect(mockReloadPicker).not.toHaveBeenCalled();
+      });
+    });
+
+    // The picker for a layer also offers items from the layers next to it;
+    // a picked item is worn under its own layer (#62).
+    describe("picking an item", () => {
+      function changeArea(name: string) {
+        render(<LayerDisplay recommendation={null} temperature={15} windspeed={10} biophysicsData={mockBiophysicsData} />);
+        const area = screen.getByRole("region", { name });
+        fireEvent.click(within(area).getByRole("button", { name: `Change ${name.toLowerCase()}` }));
+        return area;
+      }
+
+      /** Closes Change and returns each item the area lists, as "Layer: name". */
+      function finishChanging(area: HTMLElement) {
+        fireEvent.click(within(area).getByRole("button", { name: /^Done changing/ }));
+        return within(area)
+          .getAllByRole("listitem")
+          .map((row) => Array.from(row.children as HTMLCollectionOf<HTMLElement>, getNodeText).join(": "));
+      }
+
+      it("replaces a tapped item in place with one from the same layer", () => {
+        const torso = changeArea("Upper body");
+        fireEvent.click(within(torso).getByRole("button", { name: /Down Puffy/ }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+        expect(finishChanging(torso)).toEqual(["Base: Merino Base Layer", "Mid: Catalog fleece", "Outer: Gore-Tex Shell"]);
+      });
+
+      it("replaces a tapped item with one from another layer, worn under its own layer", () => {
+        const torso = changeArea("Upper body");
+        fireEvent.click(within(torso).getByRole("button", { name: /Down Puffy/ }));
+        fireEvent.click(screen.getByText("Pick merino crew"));
+
+        expect(finishChanging(torso)).toEqual(["Base: Merino Base Layer", "Base: Merino crew", "Outer: Gore-Tex Shell"]);
+      });
+
+      it("replaces a tapped item with one whose own layer is empty", () => {
+        const legs = changeArea("Legs");
+        fireEvent.click(within(legs).getByRole("button", { name: /Thermal Tights/ }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+        expect(finishChanging(legs)).toEqual(["Mid: Catalog fleece"]);
+      });
+
+      it("adds an item under its own layer, whichever layer's Add was used", () => {
+        const torso = changeArea("Upper body");
+        fireEvent.click(within(torso).getByRole("button", { name: "Add base" }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+        expect(finishChanging(torso)).toEqual([
+          "Base: Merino Base Layer",
+          "Mid: Down Puffy",
+          "Mid: Catalog fleece",
+          "Outer: Gore-Tex Shell",
+        ]);
       });
     });
 

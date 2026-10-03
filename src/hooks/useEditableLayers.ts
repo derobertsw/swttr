@@ -81,11 +81,32 @@ export function useEditableLayers(initialLayers: BodyPartLayers) {
     [updateLayer]
   );
 
+  /**
+   * Replace an item, in one edit. An item for another layer type takes the
+   * old one's place by joining that layer instead.
+   */
   const replaceItem = useCallback(
-    (bodyPart: BodyPart, layerType: LayerType, index: number, item: LayerItem) =>
-      updateLayer(bodyPart, layerType, (items) =>
-        index >= 0 && index < items.length ? items.map((existing, i) => (i === index ? item : existing)) : items
-      ),
+    (bodyPart: BodyPart, layerType: LayerType, index: number, item: LayerItem, itemLayerType: LayerType = layerType) => {
+      if (itemLayerType === layerType) {
+        updateLayer(bodyPart, layerType, (items) =>
+          index >= 0 && index < items.length ? items.map((existing, i) => (i === index ? item : existing)) : items
+        );
+        return;
+      }
+      setState((prev) => {
+        const part = prev.layers[bodyPart];
+        const items = part[layerType] ?? [];
+        if (index < 0 || index >= items.length) return prev;
+        return withEdit(prev, {
+          ...prev.layers,
+          [bodyPart]: {
+            ...part,
+            [layerType]: items.filter((_, i) => i !== index),
+            [itemLayerType]: [...(part[itemLayerType] ?? []), item],
+          },
+        });
+      });
+    },
     [updateLayer]
   );
 
