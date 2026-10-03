@@ -18,7 +18,10 @@ const failedInsert = (code: string) => ({
  * The fake client, with user_custom_items' one-per-type unique constraint.
  * `failWardrobeInsert` makes adding the wardrobe entry fail.
  */
-function fakeClient(tables: Record<string, Row[]>, { failWardrobeInsert = false } = {}) {
+function fakeClient(
+  tables: Record<string, Row[]>,
+  { failWardrobeInsert = false, beforeWardrobeInsert }: { failWardrobeInsert?: boolean; beforeWardrobeInsert?: () => void } = {}
+) {
   const client = createFakeSupabase(tables);
   const sameType = (a: Row, b: Row) =>
     ["user_id", "body_part", "layer_type", "generic_option"].every((key) => a[key] === b[key]);
@@ -28,6 +31,18 @@ function fakeClient(tables: Record<string, Row[]>, { failWardrobeInsert = false 
       const insert = query.insert.bind(query);
       if (table === "user_wardrobe" && failWardrobeInsert) {
         return Object.assign(query, { insert: () => failedInsert("08006") });
+      }
+      if (table === "user_wardrobe" && beforeWardrobeInsert) {
+        return Object.assign(query, {
+          insert: (values: Row) => {
+            beforeWardrobeInsert();
+            // user_wardrobe is unique per (user, item_type, item_id).
+            const taken = tables.user_wardrobe.some((row) =>
+              ["user_id", "item_type", "item_id"].every((key) => row[key] === values[key])
+            );
+            return taken ? failedInsert("23505") : insert(values);
+          },
+        });
       }
       if (table !== "user_custom_items") return query;
       return Object.assign(query, {
@@ -117,6 +132,23 @@ describe("POST /api/wardrobe/custom", () => {
 
     expect(res.status).toBe(500);
     expect(state.tables.user_custom_items).toEqual([expect.objectContaining({ id: "c1", custom_name: "Old shell" })]);
+  });
+
+  it("leaves a reused item alone when a concurrent request re-added it first", async () => {
+    state.tables.user_custom_items.push({ id: "c1", ...snowShell, custom_name: "Old shell", rcl_clo: 0.25 });
+    // The other request renames the item and adds it while this one is running.
+    state.client = fakeClient(state.tables, {
+      beforeWardrobeInsert: () => {
+        state.tables.user_custom_items[0].custom_name = "Their shell";
+        state.tables.user_wardrobe.push({ id: "w9", user_id: "user_1", item_type: "custom", item_id: "c1" });
+      },
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await post({ ...snowShell, custom_name: "New shell" });
+
+    expect(res.status).toBe(409);
+    expect(state.tables.user_custom_items[0].custom_name).toBe("Their shell");
   });
 
   it("rejects an option that doesn't exist for the body area", async () => {

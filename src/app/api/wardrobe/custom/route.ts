@@ -36,6 +36,16 @@ async function findRemovedCustomItem(
   return entry ? null : existing;
 }
 
+/** The response when the user's wardrobe already has a custom item of this type. */
+function duplicateTypeResponse(genericOption: string, layerType: LayerType) {
+  return NextResponse.json(
+    {
+      error: `Your wardrobe already has a custom ${genericOption.toLowerCase()} ${layerType} layer for this body area. Remove it first, or choose a different type.`,
+    },
+    { status: 409 }
+  );
+}
+
 /**
  * POST /api/wardrobe/custom
  * Create a new custom item and add it to the wardrobe. Returns the wardrobe
@@ -110,14 +120,7 @@ export async function POST(request: NextRequest) {
       // The user already has this type. Reuse it if they removed it from
       // their wardrobe; otherwise it's a real duplicate.
       const removed = await findRemovedCustomItem(supabase, userId, { body_part, layer_type, generic_option });
-      if (!removed) {
-        return NextResponse.json(
-          {
-            error: `Your wardrobe already has a custom ${generic_option.toLowerCase()} ${layer_type} layer for this body area. Remove it first, or choose a different type.`,
-          },
-          { status: 409 }
-        );
-      }
+      if (!removed) return duplicateTypeResponse(generic_option, layer_type);
       const { error: renameError } = await supabase
         .from("user_custom_items")
         .update({ custom_name: name })
@@ -151,11 +154,23 @@ export async function POST(request: NextRequest) {
       if (reusedName === null) {
         await supabase.from("user_custom_items").delete().eq("id", customItem.id).eq("user_id", userId);
       } else {
+        // A concurrent request may have re-added the item, possibly renaming
+        // it again. Restore the old name only if it's still out of the
+        // wardrobe and still has the name this request gave it.
+        const { data: addedMeanwhile } = await supabase
+          .from("user_wardrobe")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("item_type", "custom")
+          .eq("item_id", customItem.id)
+          .maybeSingle();
+        if (addedMeanwhile) return duplicateTypeResponse(generic_option, layer_type);
         await supabase
           .from("user_custom_items")
           .update({ custom_name: reusedName })
           .eq("id", customItem.id)
-          .eq("user_id", userId);
+          .eq("user_id", userId)
+          .eq("custom_name", name);
       }
       logError("POST /api/wardrobe/custom - insert wardrobe", wardrobeError);
       return NextResponse.json(
