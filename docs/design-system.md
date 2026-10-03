@@ -133,11 +133,12 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Navigation: sidebar, mobile tab bar, header, menu sheet | Uses tokens |
 | Overlays: Settings, Update Weather, layer picker, Add Custom Item, item details, popovers, location suggestions | Uses tokens |
 | Gear up form (`src/app/page.tsx`, `GearUpForm`, `ActivitySelection`, `SegmentedChoice`, `DeviceLocationButton`) | Uses tokens (#126) |
-| Gear up results (`LayerDisplay`, `layers/*`, `MultiDayPlanDisplay`) | Still hardcoded white-on-dark glass. Next migration. |
+| One-day results (`LayerDisplay`, `layers/*`, `ScoreDisplay`, `BiophysicsDetails`) | Uses tokens (#127) |
+| Multi-day plan (`MultiDayPlanDisplay`) | Still hardcoded. Next migration (#127). |
 | Wardrobe (`src/app/wardrobe`, `wardrobe/*`, `SwipeableItem`), including Browse Catalog | Uses tokens |
 | Trips (`src/app/trips/**`, `trips/trip-primitives.tsx`) | Still hardcoded |
 
 Remaining exceptions, each with a reason:
 - **Product image wells** stay white in both appearances, because catalog photos have white backgrounds.
 - **Clerk's sign-in and account UI** keep Clerk's own styling.
-- **Comfort status dots** in `ScoreDisplay` keep their status hues until the results migration.
+- **The thermal gauge's cold-to-hot gradient** in `layers/ThermalGauge.tsx` keeps its fixed blue-to-amber hues. It's a scale, not a status, and its marker, band and labels use tokens.

@@ -39,26 +39,26 @@ const STATUS_CONFIG: Record<ThermalStatus, StatusConfig> = {
   optimal: {
     label: "Optimal",
     description: "Your insulation is well-matched for these conditions",
-    pillClass: "bg-teal-50 text-teal-700 border-teal-200",
-    dotClass: "bg-teal-500",
+    pillClass: "bg-success-soft text-success",
+    dotClass: "bg-success",
   },
   comfortable: {
     label: "Comfortable",
     description: "Minor adjustments may improve thermal balance",
-    pillClass: "bg-green-50 text-green-700 border-green-200",
-    dotClass: "bg-green-500",
+    pillClass: "bg-primary-soft text-foreground",
+    dotClass: "bg-primary",
   },
   cold_stress: {
     label: "Cold Stress",
     description: "Insufficient insulation for these conditions",
-    pillClass: "bg-blue-50 text-blue-700 border-blue-200",
-    dotClass: "bg-blue-500",
+    pillClass: "bg-warning-soft text-warning",
+    dotClass: "bg-warning",
   },
   overheating: {
     label: "Overheating Risk",
     description: "Over-insulated for these conditions—reduce layers",
-    pillClass: "bg-amber-50 text-amber-700 border-amber-200",
-    dotClass: "bg-amber-500",
+    pillClass: "bg-warning-soft text-warning",
+    dotClass: "bg-warning",
   },
 };
 
@@ -110,20 +110,21 @@ const ScoreDisplay = ({
     <Popover>
       <PopoverTrigger asChild>
         <button
+          type="button"
           className={cn(
-            "inline-flex items-center whitespace-nowrap rounded-full border font-medium cursor-help transition-colors hover:bg-slate-50",
+            "inline-flex cursor-help items-center whitespace-nowrap rounded-full font-semibold max-md:min-h-11 pointer-coarse:min-h-11",
             config.pillClass,
             sizeClasses[size],
             className
           )}
         >
-          <span className={cn("rounded-full", config.dotClass, dotSizeClasses[size])} />
+          <span className={cn("rounded-full", config.dotClass, dotSizeClasses[size])} aria-hidden="true" />
           <span>{config.label}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-64">
         <PopoverHeader>
-          <PopoverTitle>Thermal Comfort Status</PopoverTitle>
+          <PopoverTitle>Thermal comfort status</PopoverTitle>
           <PopoverDescription>
             Thermal comfort score: {roundedScore}/100
           </PopoverDescription>
@@ -145,19 +146,19 @@ const ScoreDisplay = ({
           )}
           <div className="space-y-1.5 border-t border-border pt-2">
             <div className="flex items-center gap-2 text-foreground">
-              <span className="size-2 rounded-full bg-teal-500" />
+              <span className="size-2 shrink-0 rounded-full bg-success" aria-hidden="true" />
               <span>Optimal: in range + score 85+</span>
             </div>
             <div className="flex items-center gap-2 text-foreground">
-              <span className="size-2 rounded-full bg-green-500" />
+              <span className="size-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
               <span>Comfortable: in range below 85</span>
             </div>
             <div className="flex items-center gap-2 text-foreground">
-              <span className="size-2 rounded-full bg-blue-500" />
+              <span className="size-2 shrink-0 rounded-full bg-warning" aria-hidden="true" />
               <span>Cold stress: below the target band or a body part is below its minimum</span>
             </div>
             <div className="flex items-center gap-2 text-foreground">
-              <span className="size-2 rounded-full bg-amber-500" />
+              <span className="size-2 shrink-0 rounded-full bg-warning" aria-hidden="true" />
               <span>Overheating: clo above target max + {OVERHEAT_BUFFER_CLO.toFixed(1)}</span>
             </div>
           </div>
