@@ -175,6 +175,7 @@ export function LayerPickerDrawer({
               {currentItemName && onRemove && (
                 <div className="flex items-center gap-2 rounded-control bg-muted py-1 pr-1 pl-3">
                   <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-muted-foreground">Wearing now</p>
                     <p className="truncate text-sm font-semibold text-foreground">{currentItemName}</p>
                   </div>
                   {currentItemClo !== undefined && (
