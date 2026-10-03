@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, Undo2 } from "lucide-react";
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
 import type { LocationSuggestion, Recommendation } from "@/types/recommendations";
@@ -190,6 +190,12 @@ const LayerDisplay = ({
   const climb = useEditableLayers(recommendedLayers);
   const descent = useEditableLayers(initialDescentLayers);
   const phaseLayers = (phase: Phase) => (phase === "descent" ? descent : climb);
+  // The phase of the latest edit, which a failed check's Undo change reverts.
+  const [lastEditedPhase, setLastEditedPhase] = useState<Phase>("climb");
+  const editLayers = (phase: Phase) => {
+    setLastEditedPhase(phase);
+    return phaseLayers(phase);
+  };
 
   const downhillTargetRange: [number, number] | undefined = ireq?.downhill_target_range
     ?? (ireq?.downhill ? [ireq.downhill.min, ireq.downhill.neutral] : undefined);
@@ -233,7 +239,10 @@ const LayerDisplay = ({
     failed: evaluationFailed,
     retrying: evaluationRetrying,
     retry: retryEvaluation,
-  } = useLayerEvaluation(biophysicsActive ? (showDescent ? [climbInput, descentInput] : [climbInput]) : null);
+  } = useLayerEvaluation(
+    biophysicsActive ? (showDescent ? [climbInput, descentInput] : [climbInput]) : null,
+    biophysicsData
+  );
   // After a failed check the last evaluation is for earlier layers, so nothing
   // but its labeled decision is shown for the current ones.
   const evaluation = evaluationFailed ? null : lastEvaluation;
@@ -275,7 +284,7 @@ const LayerDisplay = ({
   const handlePickerSelect = (item: PickerItem) => {
     if (!pickerTarget) return;
     const { bodyPart, replaceIndex, phase } = pickerTarget;
-    const layers = phaseLayers(phase);
+    const layers = editLayers(phase);
     const newItem: LayerItem = {
       name: item.name,
       rcl: item.rcl,
@@ -301,7 +310,7 @@ const LayerDisplay = ({
   const handlePickerRemove = () => {
     if (!pickerTarget || pickerTarget.replaceIndex === null) return;
     const { bodyPart, layerType, replaceIndex, phase } = pickerTarget;
-    phaseLayers(phase).removeItem(bodyPart, layerType, replaceIndex);
+    editLayers(phase).removeItem(bodyPart, layerType, replaceIndex);
     setPickerTarget(null);
   };
 
@@ -327,18 +336,18 @@ const LayerDisplay = ({
           otherPhaseLayers: phaseLayers(otherPhase).layers[bodyPart],
           syncLabel: phase === "descent" ? "Use climb" : "Use descent",
           onSyncFromOtherPhase: (layerType: LayerType) =>
-            phaseLayers(phase).setLayerItems(
+            editLayers(phase).setLayerItems(
               bodyPart,
               layerType,
               phaseLayers(otherPhase).layers[bodyPart][layerType] ?? []
             ),
         })}
         onItemTap={(layerType, index) => setPickerTarget({ bodyPart, layerType, replaceIndex: index, phase })}
-        onItemRemove={(layerType, index) => phaseLayers(phase).removeItem(bodyPart, layerType, index)}
+        onItemRemove={(layerType, index) => editLayers(phase).removeItem(bodyPart, layerType, index)}
         onAddLayer={(layerType) => setPickerTarget({ bodyPart, layerType, replaceIndex: null, phase })}
         onMoveItem={biophysicsActive
           ? (fromLayerType, fromIndex, toLayerType) =>
-              phaseLayers(phase).moveItem(bodyPart, fromLayerType, fromIndex, toLayerType)
+              editLayers(phase).moveItem(bodyPart, fromLayerType, fromIndex, toLayerType)
           : undefined}
       />
     );
@@ -359,14 +368,21 @@ const LayerDisplay = ({
   const guidance = biophysicsData?.guidance ?? [];
 
   const shownLayers = phaseLayers(shownPhase);
+  const focusWear = useCallback(() => wearHeadingRef.current?.focus(), []);
   /** Runs an undo or reset; if the control that had focus went away, focus moves to Wear. */
   const changeOutfit = (change: () => void) => {
     change();
     requestAnimationFrame(() => {
-      if (!document.activeElement || document.activeElement === document.body) wearHeadingRef.current?.focus();
+      if (!document.activeElement || document.activeElement === document.body) focusWear();
     });
   };
   const phaseName = phaseLabel ? `${phaseLabel.toLowerCase()} ` : "";
+  // A failed check's Undo change reverts the latest edit, and shows its phase.
+  const failedEditLayers = phaseLayers(lastEditedPhase);
+  const undoFailedEdit = () => {
+    setActivePhase(lastEditedPhase);
+    failedEditLayers.undo();
+  };
 
   return (
     <div className="flex w-full flex-col gap-6 pb-24">
@@ -446,7 +462,9 @@ const LayerDisplay = ({
                   retrying={evaluationRetrying}
                   hasPreviousCheck={lastEvaluation !== null}
                   onRetry={retryEvaluation}
-                  onUndo={shownLayers.canUndo ? () => changeOutfit(shownLayers.undo) : undefined}
+                  onUndo={failedEditLayers.canUndo ? () => changeOutfit(undoFailedEdit) : undefined}
+                  undoLabel={showDescent ? `Undo ${lastEditedPhase} change` : undefined}
+                  onFocusLost={focusWear}
                 />
               )}
 
@@ -474,7 +492,7 @@ const LayerDisplay = ({
                           variant="ghost"
                           size="sm"
                           aria-label={`Undo last ${phaseName}change`}
-                          onClick={() => changeOutfit(shownLayers.undo)}
+                          onClick={() => changeOutfit(() => editLayers(shownPhase).undo())}
                         >
                           <Undo2 aria-hidden="true" />
                           Undo
@@ -486,7 +504,7 @@ const LayerDisplay = ({
                           variant="ghost"
                           size="sm"
                           aria-label={`Reset ${phaseName}to the suggested layers`}
-                          onClick={() => changeOutfit(shownLayers.reset)}
+                          onClick={() => changeOutfit(() => editLayers(shownPhase).reset())}
                         >
                           Reset
                         </Button>

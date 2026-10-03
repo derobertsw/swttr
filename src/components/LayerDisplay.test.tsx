@@ -1129,10 +1129,14 @@ describe("LayerDisplay", () => {
         expect(within(legs).getByText("Catalog fleece")).toBeInTheDocument();
 
         evaluation.failing = false;
-        fireEvent.click(within(failure).getByRole("button", { name: "Try again" }));
+        const tryAgain = within(failure).getByRole("button", { name: "Try again" });
+        tryAgain.focus();
+        fireEvent.click(tryAgain);
         await waitFor(() =>
           expect(screen.queryByRole("region", { name: "Couldn't check these layers" })).not.toBeInTheDocument()
         );
+        // Focus doesn't drop to the page with the Try again button.
+        await waitFor(() => expect(screen.getByRole("heading", { name: "Wear" })).toHaveFocus());
         expect(within(legs).getByText("Needs more warmth")).toBeInTheDocument();
         expect(within(legs).getByText("Catalog fleece")).toBeInTheDocument();
         expect(screen.queryByText("Before your change")).not.toBeInTheDocument();
@@ -1150,6 +1154,35 @@ describe("LayerDisplay", () => {
         expect(within(legs).queryByText("Catalog fleece")).not.toBeInTheDocument();
         expect(screen.queryByRole("region", { name: "Couldn't check these layers" })).not.toBeInTheDocument();
         expect(within(legs).getByText("Needs more warmth")).toBeInTheDocument();
+      });
+
+      it("checks layers that failed before as a new check when they're chosen again", async () => {
+        const evaluation = stubEvaluation();
+        const legs = await renderChecked();
+
+        evaluation.failing = true;
+        addCatalogFleece(legs);
+        const failure = await screen.findByRole("region", { name: "Couldn't check these layers" });
+        fireEvent.click(within(failure).getByRole("button", { name: "Undo change" }));
+        addCatalogFleece(legs);
+
+        expect(screen.queryByRole("region", { name: "Couldn't check these layers" })).not.toBeInTheDocument();
+        expect(screen.getByText("Updating…")).toBeInTheDocument();
+      });
+
+      it("doesn't keep a replaced recommendation's verdict when the new one can't be checked", async () => {
+        const evaluation = stubEvaluation();
+        const props = { activity: "alpine_skiing", recommendation: null, temperature: 15, windspeed: 10 };
+        const { rerender } = render(<LayerDisplay {...props} biophysicsData={mockBiophysicsData} />);
+        await within(screen.getByRole("region", { name: "Legs" })).findByText("Needs more warmth");
+
+        evaluation.failing = true;
+        rerender(<LayerDisplay {...props} biophysicsData={{ ...mockBiophysicsData }} />);
+
+        const failure = await screen.findByRole("region", { name: "Couldn't check these layers" });
+        expect(failure).toHaveTextContent("Try again to see whether they'll keep you comfortable.");
+        expect(screen.queryByText("Before your change")).not.toBeInTheDocument();
+        expect(screen.queryByText(/risk: |comfort range/i)).not.toBeInTheDocument();
       });
 
       it("undoes and resets changes from beside Wear", async () => {
@@ -1174,6 +1207,29 @@ describe("LayerDisplay", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
         expect(within(legs).getAllByText("Catalog fleece")).toHaveLength(1);
+      });
+
+      it("undoes the change that failed, in its own phase, from the other phase's view", async () => {
+        const evaluation = stubEvaluation();
+        const touringData = {
+          ...mockBiophysicsData,
+          ireq: { ...mockBiophysicsData.ireq, downhill_target_range: [1.0, 1.6] as [number, number] },
+        };
+        render(
+          <LayerDisplay activity="backcountry_skiing" recommendation={null} temperature={15} windspeed={10} biophysicsData={touringData} />
+        );
+        await within(screen.getByRole("region", { name: "Legs" })).findByText("Needs more warmth");
+
+        evaluation.failing = true;
+        fireEvent.click(screen.getByRole("button", { name: /^Descent/ }));
+        addCatalogFleece(screen.getByRole("region", { name: "Legs" }));
+        await screen.findByRole("region", { name: "Couldn't check these layers" });
+        fireEvent.click(screen.getByRole("button", { name: /^Climb/ }));
+
+        fireEvent.click(screen.getByRole("button", { name: "Undo descent change" }));
+        expect(screen.getByRole("button", { name: /^Descent/ })).toHaveAttribute("aria-pressed", "true");
+        expect(within(screen.getByRole("region", { name: "Legs" })).queryByText("Catalog fleece")).not.toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "Couldn't check these layers" })).not.toBeInTheDocument();
       });
 
       it("keeps a change, and its undo, to the phase it was made in", () => {

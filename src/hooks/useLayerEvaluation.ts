@@ -12,15 +12,30 @@ import type { PhaseEvaluation, PhaseEvaluationInput } from "@/types/biophysics";
  * `pending` and `failed` say the evaluation is for other layers than the
  * current ones: the check is still running, or it failed and `retry` can
  * send it again.
+ *
+ * An evaluation is kept only for the same `scope` (the recommendation the
+ * layers came from), so a new recommendation starts without a previous one.
  */
-export function useLayerEvaluation(phases: PhaseEvaluationInput[] | null) {
+export function useLayerEvaluation(phases: PhaseEvaluationInput[] | null, scope?: unknown) {
   // The serialized request doubles as the effect key, so equal inputs rebuilt
   // on re-render don't trigger a new request.
   const body = phases ? JSON.stringify({ phases }) : null;
-  const [result, setResult] = useState<{ body: string; phases: PhaseEvaluation[]; count: number } | null>(null);
+  const [result, setResult] = useState<{
+    body: string;
+    scope: unknown;
+    phases: PhaseEvaluation[];
+  } | null>(null);
   // Bumped by retry to send the same request again.
   const [attempt, setAttempt] = useState(0);
   const [failure, setFailure] = useState<{ body: string; attempt: number } | null>(null);
+
+  // New layers or a new recommendation send a new request, which an earlier
+  // failure doesn't describe, even for layers that failed before.
+  const [requested, setRequested] = useState({ body, scope });
+  if (requested.body !== body || requested.scope !== scope) {
+    setRequested({ body, scope });
+    setFailure(null);
+  }
 
   useEffect(() => {
     if (!body) return;
@@ -36,7 +51,7 @@ export function useLayerEvaluation(phases: PhaseEvaluationInput[] | null) {
       .then((data: { phases?: PhaseEvaluation[] }) => {
         if (!Array.isArray(data?.phases)) throw new Error("Malformed evaluation response");
         if (!controller.signal.aborted) {
-          setResult((prev) => ({ body, phases: data.phases!, count: (prev?.count ?? 0) + 1 }));
+          setResult({ body, scope, phases: data.phases });
         }
       })
       .catch((err) => {
@@ -46,22 +61,21 @@ export function useLayerEvaluation(phases: PhaseEvaluationInput[] | null) {
       });
 
     return () => controller.abort();
-  }, [body, attempt]);
+  }, [body, scope, attempt]);
 
   const retry = useCallback(() => setAttempt((count) => count + 1), []);
 
-  const current = body !== null && result?.body === body;
+  const sameScope = result?.scope === scope;
+  const current = body !== null && sameScope && result?.body === body;
   const failedBefore = !current && body !== null && failure?.body === body;
   const failed = failedBefore && failure.attempt === attempt;
 
   return {
-    evaluation: body ? (result?.phases ?? null) : null,
+    evaluation: body && sameScope ? (result?.phases ?? null) : null,
     pending: body !== null && !current && !failed,
     failed,
     /** Sending a failed check again. */
     retrying: failedBefore && !failed,
-    /** Evaluations received so far; more than one means an update replaced the first. */
-    count: result?.count ?? 0,
     retry,
   };
 }

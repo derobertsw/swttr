@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { AlertTriangle, RotateCw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,6 +21,10 @@ interface EvaluationStatusProps {
   onRetry: () => void;
   /** Undoes the last change, when there is one. */
   onUndo?: () => void;
+  /** Names what Undo change reverts, e.g. "Undo descent change". */
+  undoLabel?: string;
+  /** Moves focus somewhere useful when the card closes and takes focus with it. */
+  onFocusLost?: () => void;
 }
 
 /**
@@ -28,9 +32,31 @@ interface EvaluationStatusProps {
  * when a check starts, finishes or fails, without focus moving. A failed check
  * offers Try again and Undo change.
  */
-export function EvaluationStatus({ pending, failed, retrying, hasPreviousCheck, onRetry, onUndo }: EvaluationStatusProps) {
+export function EvaluationStatus({
+  pending,
+  failed,
+  retrying,
+  hasPreviousCheck,
+  onRetry,
+  onUndo,
+  undoLabel,
+  onFocusLost,
+}: EvaluationStatusProps) {
   const titleId = useId();
   const [message, setMessage] = useState("");
+  const showCard = failed || retrying;
+
+  // A successful retry removes the card, and Try again with it.
+  const cardShown = useRef(false);
+  useEffect(() => {
+    if (showCard) {
+      cardShown.current = true;
+      return;
+    }
+    if (!cardShown.current) return;
+    cardShown.current = false;
+    if (!document.activeElement || document.activeElement === document.body) onFocusLost?.();
+  }, [showCard, onFocusLost]);
 
   // The first check after the result loads isn't announced; later ones are,
   // and once one is, so is its outcome.
@@ -42,7 +68,7 @@ export function EvaluationStatus({ pending, failed, retrying, hasPreviousCheck, 
   return (
     <>
       <p role="status" className="sr-only">{nextMessage}</p>
-      {(failed || retrying) && (
+      {showCard && (
         <Card asChild variant="muted">
           <section aria-labelledby={titleId} className="flex gap-3">
             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" />
@@ -61,7 +87,7 @@ export function EvaluationStatus({ pending, failed, retrying, hasPreviousCheck, 
                   Try again
                 </Button>
                 {onUndo && (
-                  <Button type="button" size="sm" variant="ghost" onClick={onUndo}>
+                  <Button type="button" size="sm" variant="ghost" aria-label={undoLabel} onClick={onUndo}>
                     <Undo2 aria-hidden="true" />
                     Undo change
                   </Button>
