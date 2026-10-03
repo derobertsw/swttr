@@ -386,6 +386,8 @@ Route tests use `src/test/fakeSupabase.ts`, an in-memory stand-in for the Supaba
 
 The alpine/XC outfit search also has parity tests against its previous implementation and an isolated [performance benchmark](docs/regional-outfit-performance.md).
 
+Trip packing reports one coverage record per trip date, with forecast availability separate from clothing guidance. It uses the static table (Alpine, XC and Hiking; Climb is an explicit hiking approximation), rather than the sport-specific biophysics endpoints. Partial daytime forecasts remain visible, past/out-of-window dates stay planned, and saved manual kits are reviewed separately until packing can derive requirements from those kits. Packing fetches forecasts only for stops needed by automatic guidance, with up to three requests in flight, and labels skipped weather requests explicitly. Missing day plans can be restored from day detail without overwriting existing plans. Trip day weather is summarized server-side by the authenticated `/api/v1/trips/[id]/days/[date]/weather` route.
+
 ## Project Structure
 
 ```

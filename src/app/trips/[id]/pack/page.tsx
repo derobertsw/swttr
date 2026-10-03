@@ -7,16 +7,7 @@ import PageLayout from "@/components/PageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, Chip, SectionLabel } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
-import type { PackingListData } from "@/lib/packingList";
-
-interface TripPackResponse {
-  trip: { id: string; name: string; start_date: string; end_date: string };
-  coveredDays: number;
-  totalDays: number;
-  skipped: { date: string; reason: string }[];
-  packingList: PackingListData;
-  groupGear: string[];
-}
+import type { TripDayCoverage, TripPackResponse } from "@/types/trip-coverage";
 
 const BODY_PART_LABEL: Record<string, string> = {
   torso: "Torso",
@@ -31,12 +22,14 @@ const LAYER_LABEL: Record<string, string> = {
   outer: "Outer",
 };
 
-const SKIP_REASON_LABEL: Record<string, string> = {
-  no_stop: "trip has no base location yet",
-  no_coords: "base location missing coordinates",
-  no_activity: "no activity set",
-  activity_unsupported: "activity not yet supported by the engine",
+const COVERAGE_ACTION_LABEL: Record<TripDayCoverage["action"], string> = {
+  set_location: "Choose location", set_activity: "Choose activity", plan_manually: "Plan kit manually",
+  retry_weather: "Retry weather", check_later: "Review day", review_day: "Review day",
 };
+
+function coverageActionLabel(day: TripDayCoverage) {
+  return day.advice === "manual" ? "Review manual kit" : COVERAGE_ACTION_LABEL[day.action];
+}
 
 async function fetchPackList(tripId: string): Promise<TripPackResponse> {
   const res = await fetch(`/api/v1/trips/${tripId}/pack`);
@@ -114,7 +107,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   const gaps = data?.packingList.gaps ?? [];
   const extras = data?.packingList.extras ?? [];
   const groupGear = data?.groupGear ?? [];
-  const skipped = data?.skipped ?? [];
+  const needsReview = data?.coverage.filter((day) => day.advice !== "available" || day.forecast.status !== "available" || day.approximation) ?? [];
 
   return (
     <PageLayout chromeVariant="compact">
@@ -126,16 +119,17 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
           <ArrowLeft className="size-4" />
           Trip
         </Link>
-        <header className="flex items-start justify-between gap-3">
-          <div>
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 basis-52">
             <SectionLabel>Your bag</SectionLabel>
             <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
               What to pack
             </h1>
             {data && (
-              <p className="mt-1 text-sm text-white/62">
-                Auto-generated from {data.coveredDays} of {data.totalDays}{" "}
+              <p className="mt-1 text-sm text-white/75">
+                General clothing guidance for {data.coveredDays} of {data.totalDays}{" "}
                 {data.totalDays === 1 ? "day" : "days"} · activity + weather.
+                Saved manual kits are reviewed separately.
               </p>
             )}
           </div>
@@ -144,9 +138,10 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
             onClick={() => {
               void refresh();
             }}
-            disabled={refreshing}
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-white/14 bg-white/[0.06] px-3 text-xs font-medium text-white/85 hover:bg-white/[0.10] disabled:opacity-50"
+            disabled={loading || refreshing}
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-white/14 bg-white/[0.06] px-3 text-xs font-medium text-white/85 hover:bg-white/[0.10] disabled:opacity-50"
             aria-label="Regenerate pack list"
+            aria-busy={refreshing}
           >
             {refreshing ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -159,16 +154,45 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
 
         {loading && <Skeleton className="h-48 w-full rounded-2xl bg-white/12" />}
         {error && (
-          <div className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100">
+          <div role="alert" className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100">
             {error}
           </div>
         )}
 
-        {data && sections.length === 0 && (
+        {data && needsReview.length > 0 && (
           <Card>
-            <p className="text-sm text-white/65">
-              Nothing to pack yet — assign activities and a base location to your trip days and the
-              list will populate.
+            <h2 className="text-base font-semibold text-white">Days to review</h2>
+            <p className="mt-1 text-sm text-white/65">
+              Weather availability and clothing guidance are separate. Partial forecasts and manual kits need your review.
+            </p>
+            <ul className="mt-3 divide-y divide-white/10">
+              {needsReview.map((day) => (
+                <li key={day.date} className="py-3 text-sm">
+                  <p className="font-medium text-white/90">
+                    {new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, {
+                      weekday: "short", month: "short", day: "numeric",
+                    })} · {day.activity ?? "Activity not set"}
+                  </p>
+                  {day.stopName && <p className="break-words text-xs text-white/65">{day.stopName}</p>}
+                  <p className="mt-1 text-white/75">{day.message}</p>
+                  {day.message !== day.forecast.message && <p className="mt-1 text-xs text-white/65">{day.forecast.message}</p>}
+                  {day.approximation && <p className="mt-1 text-xs text-white/75">{day.approximation}</p>}
+                  <Link href={`/trips/${id}/days/${day.date}`}
+                    className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-cyan-200 underline underline-offset-4"
+                    aria-label={`${coverageActionLabel(day)} for ${day.date}`}>
+                    {coverageActionLabel(day)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        {data && data.packingList.totalRequiredSlots === 0 && (
+          <Card>
+            <p className="text-sm text-white/75">
+              No automatic clothing list is available. Review the days above for missing inputs,
+              forecast availability or manual planning. Group gear is listed separately when assigned.
             </p>
           </Card>
         )}
@@ -204,7 +228,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
           <Card>
             <SectionLabel className="mb-1">Gaps you don&apos;t own yet</SectionLabel>
             <p className="text-xs text-white/55">
-              Standard slots the recommendation engine called for that nothing in your wardrobe
+              Clothing slots the general guidance called for that nothing in your wardrobe
               maps to. Add an item in the Wardrobe tab to fill these in.
             </p>
             <ul className="mt-2 space-y-1.5">
@@ -248,24 +272,6 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
                 <li key={g} className="flex items-center gap-2 text-sm text-white/85">
                   <ListMarker />
                   {g}
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
-
-        {skipped.length > 0 && (
-          <Card>
-            <SectionLabel className="mb-1">Days not covered</SectionLabel>
-            <ul className="mt-2 space-y-1 text-xs text-white/55">
-              {skipped.map((s) => (
-                <li key={s.date}>
-                  {new Date(`${s.date}T00:00:00`).toLocaleDateString(undefined, {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })}{" "}
-                  · {SKIP_REASON_LABEL[s.reason] ?? s.reason}
                 </li>
               ))}
             </ul>
