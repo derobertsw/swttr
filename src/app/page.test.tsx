@@ -598,13 +598,13 @@ describe("Home Page", () => {
         }
       });
 
-      it("steps back over the results' entry when Back on the page leaves them", async () => {
+      it("steps back over the results' entry when Edit outing leaves them", async () => {
         mockOutingApis();
         const user = userEvent.setup();
         render(<Home />);
 
         await seeXcAtStowe(user);
-        await user.click(screen.getByRole("button", { name: "Back" }));
+        await user.click(screen.getByRole("button", { name: "Edit outing" }));
         await waitFor(() => expect(onResultsEntry()).toBe(false));
 
         // New results replace the ones left, so the browser's Back from them reaches the form.
@@ -652,7 +652,7 @@ describe("Home Page", () => {
         expect(weatherRequests).toEqual(["/api/weather?lat=44.47&lon=-72.69", "after reload"]);
         expect(onResultsEntry()).toBe(true);
 
-        await user.click(screen.getByRole("button", { name: "Back" }));
+        await user.click(screen.getByRole("button", { name: "Edit outing" }));
 
         expect(within(activity()).getByRole("radio", { name: /xc skiing/i })).toBeChecked();
         expect(placeField()).toHaveValue("Stowe, Vermont, United States");
