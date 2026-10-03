@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { WardrobeItem } from "@/types/wardrobe";
 import { buildWardrobeOverview } from "./wardrobe-overview";
-import { formatBodyPartLabel } from "./wardrobe-utils";
 
-function createWardrobeItem(id: string): WardrobeItem {
+function createWardrobeItem(id: string, disabled = false): WardrobeItem {
   return {
     id,
     item_id: id,
     item_type: "garment",
+    disabled,
     details: {
       brand: "Test Brand",
       model_name: `Model ${id}`,
@@ -19,65 +19,26 @@ function createWardrobeItem(id: string): WardrobeItem {
 }
 
 describe("buildWardrobeOverview", () => {
-  it("formats canonical body-part keys for display", () => {
-    expect(formatBodyPartLabel("headNeck")).toBe("Head + Neck");
+  it("counts an empty wardrobe without calling it all excluded", () => {
+    expect(buildWardrobeOverview([])).toEqual({
+      totalItems: 0,
+      excludedItems: 0,
+      allExcluded: false,
+      countLine: "0 items",
+    });
   });
 
-  it("returns starter guidance for an empty wardrobe", () => {
-    const overview = buildWardrobeOverview({
-      wardrobeItems: [],
-      groupedWardrobeItems: {},
-      disabledItemsByPart: {},
-    });
-
-    expect(overview.totalItems).toBe(0);
-    expect(overview.coveredBodyParts).toBe(0);
-    expect(overview.missingBodyParts).toBe(4);
-    expect(overview.headline).toBe("Start building your kit");
-    expect(overview.message).toBe("Add a few core pieces to unlock gear-aware recommendations.");
+  it("only mentions exclusion when something is excluded", () => {
+    expect(buildWardrobeOverview([createWardrobeItem("a")]).countLine).toBe("1 item");
+    expect(
+      buildWardrobeOverview([createWardrobeItem("a"), createWardrobeItem("b", true), createWardrobeItem("c")]).countLine
+    ).toBe("3 items · 1 excluded from recommendations");
   });
 
-  it("calls out missing zones when coverage is partial", () => {
-    const overview = buildWardrobeOverview({
-      wardrobeItems: [createWardrobeItem("torso-1"), createWardrobeItem("legs-1")],
-      groupedWardrobeItems: {
-        torso: [createWardrobeItem("torso-1")],
-        legs: [createWardrobeItem("legs-1")],
-      },
-      disabledItemsByPart: {},
-    });
+  it("flags a wardrobe where every item is excluded", () => {
+    const overview = buildWardrobeOverview([createWardrobeItem("a", true), createWardrobeItem("b", true)]);
 
-    expect(overview.coveredBodyParts).toBe(2);
-    expect(overview.missingLabels).toEqual(["Hands", "Head + Neck"]);
-    expect(overview.headline).toBe("Fill 2 remaining gear zones");
-    expect(overview.message).toBe("Add Hands and Head + Neck to improve recommendation accuracy.");
-  });
-
-  it("surfaces paused items when every zone is represented", () => {
-    const pausedHands = createWardrobeItem("hands-1");
-    pausedHands.disabled = true;
-
-    const overview = buildWardrobeOverview({
-      wardrobeItems: [
-        createWardrobeItem("torso-1"),
-        createWardrobeItem("legs-1"),
-        pausedHands,
-        createWardrobeItem("head-1"),
-      ],
-      groupedWardrobeItems: {
-        torso: [createWardrobeItem("torso-1")],
-        legs: [createWardrobeItem("legs-1")],
-        hands: [],
-        "head & neck": [createWardrobeItem("head-1")],
-      },
-      disabledItemsByPart: {
-        hands: [pausedHands],
-      },
-    });
-
-    expect(overview.coveredBodyParts).toBe(4);
-    expect(overview.totalDisabledItems).toBe(1);
-    expect(overview.headline).toBe("Your coverage is in good shape");
-    expect(overview.message).toBe("All zones are covered. Re-include paused pieces whenever you need them.");
+    expect(overview.allExcluded).toBe(true);
+    expect(overview.countLine).toBe("2 items · 2 excluded from recommendations");
   });
 });

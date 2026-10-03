@@ -1,4 +1,5 @@
 import type { WardrobeItem } from "@/types/wardrobe";
+import { formatBodyPartLabel, getClo, getItemBodyArea, getItemCategoryLabel } from "../wardrobe-utils";
 
 export function formatDetailValue(
   value: number | undefined | null,
@@ -25,25 +26,43 @@ function getHeadCoverageAreas(details: WardrobeItem["details"]): string[] {
   return coverage;
 }
 
-export function getItemHeaderContext(item: WardrobeItem): string {
-  if (item.nickname?.trim()) return item.nickname.trim();
+interface ItemFact {
+  label: string;
+  value: string;
+}
 
-  if (item.item_type === "garment") {
-    const coverage = getGarmentCoverageAreas(item.details);
-    if (coverage.length === 0) return "Used in thermal recommendations.";
-    return `Used for ${coverage.join(", ").toLowerCase()} recommendations.`;
+function joinLowercase(areas: string[]): string {
+  const text = areas.join(", ").toLowerCase();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** The plain facts item details lead with, before any technical tables. */
+export function getItemFacts(item: WardrobeItem): ItemFact[] {
+  const { details } = item;
+  const facts: ItemFact[] = [
+    { label: "Type", value: getItemCategoryLabel(item) },
+    { label: "Body area", value: formatBodyPartLabel(getItemBodyArea(item)) },
+  ];
+
+  const coverage =
+    item.item_type === "garment"
+      ? getGarmentCoverageAreas(details)
+      : item.item_type === "headwear"
+        ? getHeadCoverageAreas(details)
+        : [];
+  if (coverage.length > 0) facts.push({ label: "Covers", value: joinLowercase(coverage) });
+
+  const clo = getClo(item);
+  if (clo !== undefined) {
+    facts.push({
+      label: "Insulation",
+      value: `${clo.toFixed(2)} clo${item.item_type === "custom" ? " (estimated)" : ""}`,
+    });
   }
 
-  if (item.item_type === "handwear") {
-    const handwearType = item.details.handwear_type?.replace(/_/g, " ");
-    return handwearType
-      ? `${handwearType.charAt(0).toUpperCase()}${handwearType.slice(1)} guidance item.`
-      : "Used for hand recommendations.";
+  if (item.item_type === "handwear" && details.dexterity_score !== undefined) {
+    facts.push({ label: "Dexterity", value: `${details.dexterity_score}/10` });
   }
 
-  const coverage = getHeadCoverageAreas(item.details);
-  if (coverage.length > 0) {
-    return `Used for ${coverage.join(", ").toLowerCase()} coverage guidance.`;
-  }
-  return "Used for head/neck recommendations.";
+  return facts;
 }
