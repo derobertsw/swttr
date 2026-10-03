@@ -264,7 +264,7 @@ const LayerDisplay = ({
 
   const handlePickerSelect = (item: PickerItem) => {
     if (!pickerTarget) return;
-    const { bodyPart, replaceIndex, phase } = pickerTarget;
+    const { bodyPart, layerType, replaceIndex, phase } = pickerTarget;
     const layers = phaseLayers(phase);
     const newItem: LayerItem = {
       name: item.name,
@@ -274,9 +274,14 @@ const LayerDisplay = ({
       brand: item.brand,
     };
     // A catalog item joins the outfit only; "I own this" adds it to the wardrobe.
-    if (replaceIndex !== null) {
-      layers.replaceItem(bodyPart, item.nativeLayerType, replaceIndex, newItem);
+    // The picker also offers items from neighbouring layers, and a picked item
+    // is worn under its own layer, whichever layer it was picked for (#62).
+    if (replaceIndex === null) {
+      layers.addItem(bodyPart, item.nativeLayerType, newItem);
+    } else if (item.nativeLayerType === layerType) {
+      layers.replaceItem(bodyPart, layerType, replaceIndex, newItem);
     } else {
+      layers.removeItem(bodyPart, layerType, replaceIndex);
       layers.addItem(bodyPart, item.nativeLayerType, newItem);
     }
     setPickerTarget(null);
