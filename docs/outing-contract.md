@@ -109,7 +109,7 @@ Single-day outings, now or later:
 Multi-day outings (2–7 days) are the same for guests and signed-in users:
 - `/api/plan-ahead` is public and uses the static table.
 - Alpine, XC and hiking get general layers for each day and daypart.
-- Running, Biking and Backcountry get each day's forecast with "No layer recommendation available" in place of layers.
-- The packing list reads the wardrobe only for a signed-in user.
+- Running, Biking and Backcountry get each day's forecast, with a notice that the general guide doesn't cover the activity.
+- The packing list reads the wardrobe only for a signed-in user. Its `wardrobe` field says how it was matched: `matched`, `signedOut`, or `unavailable` when a signed-in user's wardrobe couldn't be read.
 
 The auth boundary is set in [`src/proxy.ts`](../src/proxy.ts). `/api/v1/recommendations/*` needs a signed-in user; `/api/weather`, `/api/plan-ahead` and `/api/packing-list` are public. #130 checks this matrix on the device.

@@ -38,6 +38,12 @@ export interface PackingListData {
   totalRequiredSlots: number;
 }
 
+/**
+ * Whether a packing list was matched against the user's wardrobe. Signed out,
+ * there's no wardrobe; "unavailable" means it couldn't be read.
+ */
+export type PackingListWardrobe = "matched" | "signedOut" | "unavailable";
+
 interface WardrobeCandidate {
   label: string;
   searchText: string;

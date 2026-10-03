@@ -142,4 +142,109 @@ describe("buildMultiDayLayerPlan", () => {
     expect(result.days[0].carryItems).toContain("Warm gloves and head insulation");
     expect(result.days[0].carryItems).toContain("Removable mid-layer for daytime swings");
   });
+
+  it("starts the first day at the start time, but not before the daytime hours", () => {
+    const hours: ForecastHour[] = [
+      { time: "2026-01-15T12:00", temperature: 35, windSpeed: 8, precipitationProbability: 0 },
+    ];
+    const plan = (startHour?: number) => buildMultiDayLayerPlan({
+      startDate: new Date("2026-01-15T00:00:00"),
+      durationDays: 1,
+      startHour,
+      hourlyForecast: hours,
+      getRecommendation: () => makeRecommendation(2),
+    });
+
+    expect(plan(12).firstDayStartHour).toBe(12);
+    expect(plan(4).firstDayStartHour).toBe(6);
+    expect(plan().firstDayStartHour).toBe(6);
+  });
+
+  describe("layer changes", () => {
+    // Colder than 25°F after the wind: a second torso mid and a second hat.
+    const getRecommendation = (temp: number) => {
+      const layers = makeRecommendation(3);
+      if (temp >= 25) return layers;
+      return {
+        ...layers,
+        torso: { ...layers.torso, mid: [...(layers.torso.mid ?? []), { name: "Down vest" }] },
+        headNeck: { base: [...layers.headNeck.base, { name: "Neck gaiter" }], outer: [] },
+      };
+    };
+    const hours: ForecastHour[] = [
+      // Thu: a cold morning, then a warmer midday.
+      { time: "2026-01-15T07:00", temperature: 20, windSpeed: 0, precipitationProbability: 0 },
+      { time: "2026-01-15T12:00", temperature: 30, windSpeed: 0, precipitationProbability: 0 },
+      // Fri: as cold as Thu.
+      { time: "2026-01-16T09:00", temperature: 20, windSpeed: 0, precipitationProbability: 0 },
+      // Sat: warmer.
+      { time: "2026-01-17T09:00", temperature: 30, windSpeed: 0, precipitationProbability: 0 },
+    ];
+    const plan = () => buildMultiDayLayerPlan({
+      startDate: new Date("2026-01-15T00:00:00"),
+      durationDays: 3,
+      hourlyForecast: hours,
+      getRecommendation,
+    });
+
+    it("lists what each daypart takes off or puts on, from the day's layers", () => {
+      const [thursday] = plan().days;
+
+      expect(thursday.dayparts.map((part) => [part.id, part.changes])).toEqual([
+        ["morning", { add: [], remove: [] }],
+        ["midday", {
+          add: [],
+          remove: [
+            { bodyPart: "torso", layerType: "mid", name: "Down vest" },
+            { bodyPart: "headNeck", layerType: "base", name: "Neck gaiter" },
+          ],
+        }],
+      ]);
+    });
+
+    it("lists what changes from the day before, after the first day", () => {
+      const [thursday, friday, saturday] = plan().days;
+
+      expect(thursday.changesFromPreviousDay).toBeNull();
+      expect(friday.changesFromPreviousDay).toEqual({ add: [], remove: [] });
+      expect(saturday.changesFromPreviousDay).toEqual({
+        add: [],
+        remove: [
+          { bodyPart: "torso", layerType: "mid", name: "Down vest" },
+          { bodyPart: "headNeck", layerType: "base", name: "Neck gaiter" },
+        ],
+      });
+    });
+
+    it("puts on what the other layers have and these don't", () => {
+      const [, friday] = buildMultiDayLayerPlan({
+        startDate: new Date("2026-01-15T00:00:00"),
+        durationDays: 2,
+        hourlyForecast: [hours[1], hours[2]],
+        getRecommendation,
+      }).days;
+
+      expect(friday.changesFromPreviousDay).toEqual({
+        add: [
+          { bodyPart: "torso", layerType: "mid", name: "Down vest" },
+          { bodyPart: "headNeck", layerType: "base", name: "Neck gaiter" },
+        ],
+        remove: [],
+      });
+    });
+
+    it("has no changes when either side has no layers", () => {
+      const result = buildMultiDayLayerPlan({
+        startDate: new Date("2026-01-15T00:00:00"),
+        durationDays: 3,
+        hourlyForecast: hours,
+        getRecommendation: (temp) => (temp < 25 ? null : makeRecommendation(3)),
+      });
+      const [thursday, friday, saturday] = result.days;
+
+      expect(thursday.dayparts.map((part) => part.changes)).toEqual([null, null]);
+      expect(friday.changesFromPreviousDay).toBeNull();
+      expect(saturday.changesFromPreviousDay).toBeNull();
+    });
+  });
 });

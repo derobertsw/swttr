@@ -1,4 +1,5 @@
 import { Recommendation } from "@/types/recommendations";
+import type { BodyPart, LayerType } from "@/types/wardrobe";
 
 export type DaypartId = "morning" | "midday" | "evening";
 
@@ -7,6 +8,19 @@ export interface ForecastHour {
   temperature: number;
   windSpeed: number;
   precipitationProbability: number;
+}
+
+/** One worn item in a layer recommendation. */
+export interface PlanLayerItem {
+  bodyPart: BodyPart;
+  layerType: LayerType;
+  name: string;
+}
+
+/** What to put on and take off to go from one layer recommendation to another. */
+export interface LayerChanges {
+  add: PlanLayerItem[];
+  remove: PlanLayerItem[];
 }
 
 export interface DaypartLayerPlan {
@@ -19,7 +33,8 @@ export interface DaypartLayerPlan {
   maxPrecipProbability: number;
   effectiveTemperature: number;
   recommendation: Recommendation | null;
-  adjustment: string;
+  /** From the day's layers to this daypart's; null when either has none. */
+  changes: LayerChanges | null;
 }
 
 export interface DailyBaselinePlan {
@@ -28,14 +43,19 @@ export interface DailyBaselinePlan {
   maxWindSpeed: number;
   maxPrecipProbability: number;
   effectiveTemperature: number;
+  /** For the day's coldest conditions. */
   recommendation: Recommendation | null;
-  summary: string;
 }
 
 export interface DailyLayerPlan {
   date: string;
   label: string;
   baseline: DailyBaselinePlan;
+  /**
+   * From the previous day in `days` to this one; null for the first day, and
+   * when either day has no layers.
+   */
+  changesFromPreviousDay: LayerChanges | null;
   dayparts: DaypartLayerPlan[];
   carryItems: string[];
 }
@@ -57,6 +77,8 @@ export interface MultiDayLayerPlan {
   durationDays: number;
   dayStartHour: number;
   dayEndHour: number;
+  /** The first day starts at the later of the start time and `dayStartHour`. */
+  firstDayStartHour: number;
   days: DailyLayerPlan[];
   uncoveredDays: UncoveredPlanDay[];
 }
