@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { useId, useMemo, useState, type ReactNode } from "react";
+import { AlertTriangle, ChevronDown } from "lucide-react";
+import type { ExertionLevel } from "@/lib/biophysics/exertion";
 import type { LocationSuggestion, Recommendation } from "@/types/recommendations";
 import type { PrecipitationType, WeatherContext } from "@/types/weather";
 import type {
@@ -13,8 +14,12 @@ import type {
   RegionalIreqRange,
 } from "@/types/biophysics";
 import BiophysicsDetails from "@/components/BiophysicsDetails";
+import ScoreDisplay from "@/components/ScoreDisplay";
+import { Card } from "@/components/ui/card";
+import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import {
   BODY_PARTS,
+  BODY_PART_LABELS,
   buildDescentLayers,
   buildRecommendedLayers,
   collectInUseIds,
@@ -27,12 +32,13 @@ import {
   type LayerType,
 } from "@/lib/layers";
 import { cn } from "@/lib/utils";
-import { WeatherHeader, BodyPartSection, WeatherEditDrawer } from "@/components/layers";
-import { LayerPickerDrawer } from "@/components/layers/LayerPickerDrawer";
-import { ActivityHeader } from "@/components/layers/ActivityHeader";
+import { BodyPartSection, WeatherEditDrawer } from "@/components/layers";
+import { CarryCard } from "@/components/layers/CarryCard";
+import { ComfortDecision } from "@/components/layers/ComfortDecision";
 import { ComfortOverview } from "@/components/layers/ComfortOverview";
-import { PackItemsCard } from "@/components/layers/PackItemsCard";
+import { LayerPickerDrawer } from "@/components/layers/LayerPickerDrawer";
 import { RecommendationNotice } from "@/components/layers/RecommendationNotice";
+import { ResultHeader } from "@/components/layers/ResultHeader";
 import { RecommendedItemsCard, type RecommendedItem } from "@/components/layers/RecommendedItemsCard";
 import { useEditableLayers } from "@/hooks/useEditableLayers";
 import { useLayerEvaluation } from "@/hooks/useLayerEvaluation";
@@ -40,6 +46,7 @@ import { useLayerPicker, type PickerItem } from "@/hooks/useLayerPicker";
 
 interface LayerDisplayProps {
   activity?: string;
+  exertion?: ExertionLevel;
   recommendation: Recommendation | null;
   temperature: number;
   windspeed: number;
@@ -51,6 +58,7 @@ interface LayerDisplayProps {
   biophysicsData?: BiophysicsRecommendation | null;
   /** Why biophysicsData is missing, when it is. */
   biophysicsStatus?: BiophysicsStatus | null;
+  /** Edit outing: back to the form with the outing as entered. */
   onReset?: () => void;
   /** Requests the same recommendation again after a failure. */
   onRetry?: () => void;
@@ -104,8 +112,22 @@ function recommendedCatalogItems(phases: BodyPartLayers[]): RecommendedItem[] {
   return items;
 }
 
+/** A collapsed section of supporting detail below the outfit. */
+function ResultDisclosure({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <details className="group rounded-card border border-border bg-card">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-card px-4 py-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+        {title}
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+      </summary>
+      <div className="border-t border-border px-4 py-4">{children}</div>
+    </details>
+  );
+}
+
 /**
- * Displays layered clothing recommendations organized by body part.
+ * The layers for an outing, outfit first: what to wear on each body area and
+ * what to carry, then why, with the numbers behind it under Technical details.
  * Supports both static recommendations and biophysics-based recommendations.
  * Static layers are general guidance and can't be edited, since nothing
  * evaluates edits to them.
@@ -114,6 +136,7 @@ function recommendedCatalogItems(phases: BodyPartLayers[]): RecommendedItem[] {
  */
 const LayerDisplay = ({
   activity,
+  exertion,
   recommendation,
   temperature,
   windspeed,
@@ -132,6 +155,7 @@ const LayerDisplay = ({
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
   const [activePhase, setActivePhase] = useState<Phase>("climb");
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
+  const wearHeadingId = useId();
 
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
   const hasLayers = biophysicsActive || recommendation !== null;
@@ -284,14 +308,12 @@ const LayerDisplay = ({
         key={bodyPart}
         bodyPart={bodyPart}
         layers={layers}
-        biophysicsActive={biophysicsActive}
         readOnly={!biophysicsActive}
         currentClo={bodyPartEvaluation?.clo}
         targetClo={bodyPartEvaluation?.target}
         status={bodyPartEvaluation?.status}
         itemMappings={itemMappings}
         {...(showDescent && {
-          colorScheme: phase,
           otherPhaseLayers: phaseLayers(otherPhase).layers[bodyPart],
           syncLabel: phase === "descent" ? "Use climb" : "Use descent",
           onSyncFromOtherPhase: (layerType: LayerType) =>
@@ -319,38 +341,39 @@ const LayerDisplay = ({
     : [];
   const recommendedItems = recommendedCatalogItems([climb.layers, descent.layers]);
 
+  const shownEvaluation = phaseEvaluation(shownPhase);
+  const phaseLabel = showDescent ? (shownPhase === "climb" ? "Climb" : "Descent") : undefined;
+  const guidance = biophysicsData?.guidance ?? [];
+
   return (
-    <div className="flex flex-col gap-8 pb-24">
-      <ActivityHeader
+    <div className="flex w-full flex-col gap-6 pb-24">
+      <ResultHeader
         activity={activity}
-        onReset={onReset}
+        exertion={exertion}
+        adviceKind={biophysicsActive ? "personalized" : recommendation ? "general" : undefined}
+        temperature={temperature}
+        windspeed={windspeed}
+        precipitation={precipitation}
+        precipitationType={precipitationType}
+        context={weatherContext}
+        onEditOuting={onReset}
         onActivityChange={onActivityChange}
+        onEditWeather={onWeatherChange ? () => setWeatherDrawerOpen(true) : undefined}
         loading={weatherLoading}
       />
-
-      <div className={cn("flex flex-col gap-8 transition-opacity duration-200", weatherLoading && "opacity-50 pointer-events-none")}>
-        <WeatherHeader
-          temperature={temperature}
-          windspeed={windspeed}
-          precipitation={precipitation}
-          precipitationType={precipitationType}
-          context={weatherContext}
-          score={showDescent ? undefined : comfortScore}
-          totalClo={climbEvaluation?.totalClo}
-          targetRange={ireq?.target_range}
-          decision={climbEvaluation?.decision}
-          interactive={Boolean(onWeatherChange)}
-          onEditWeather={onWeatherChange ? () => setWeatherDrawerOpen(true) : undefined}
+      {onWeatherChange && (
+        <WeatherEditDrawer
+          open={weatherDrawerOpen}
+          onOpenChange={setWeatherDrawerOpen}
+          onSubmit={onWeatherChange}
+          loading={weatherLoading}
         />
-        {onWeatherChange && (
-          <WeatherEditDrawer
-            open={weatherDrawerOpen}
-            onOpenChange={setWeatherDrawerOpen}
-            onSubmit={onWeatherChange}
-            loading={weatherLoading}
-          />
-        )}
+      )}
 
+      <div
+        aria-busy={weatherLoading || undefined}
+        className={cn("flex flex-col gap-6 transition-opacity", weatherLoading && "pointer-events-none opacity-50")}
+      >
         {!biophysicsActive && (
           <RecommendationNotice
             activity={activity}
@@ -362,74 +385,125 @@ const LayerDisplay = ({
         )}
 
         {hasLayers && (
-          <>
-            <ComfortOverview
-              climb={{ evaluation: climbEvaluation, targetRange: ireq?.target_range }}
-              descent={showDescent ? { evaluation: descentEvaluation, targetRange: downhillTargetRange } : undefined}
-            />
-
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-white/75">
-                Detailed Layer Breakdown
-              </h3>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-8">
+            <div className="flex min-w-0 flex-col gap-4">
               {showDescent && (
-                <div className="flex gap-1.5">
-                  {(["climb", "descent"] as const).map((phase) => (
-                    <button
-                      key={phase}
-                      type="button"
-                      onClick={() => setActivePhase(phase)}
-                      className={cn(
-                        "rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors",
-                        activePhase === phase
-                          ? phase === "climb"
-                            ? "border border-violet-400/60 bg-violet-500/25 text-violet-200"
-                            : "border border-teal-400/60 bg-teal-500/25 text-teal-200"
-                          : "border border-white/20 bg-white/[0.06] text-white/50 hover:text-white/70"
-                      )}
-                    >
-                      {phase === "climb" ? "Climb" : "Descent"}
-                    </button>
-                  ))}
+                <div className="flex flex-col gap-2">
+                  <div role="group" aria-label="Phase" className={cn(segmentedGroupClassName, "grid-cols-2")}>
+                    {(["climb", "descent"] as const).map((phase) => {
+                      const label = phase === "climb" ? "Climb" : "Descent";
+                      // A risk in the phase not shown stays visible on its tab.
+                      const risk = phaseEvaluation(phase)?.decision?.riskType;
+                      const riskLabel = risk === "cold" ? "cold risk" : risk === "overheat" ? "overheating risk" : null;
+                      return (
+                        <button
+                          key={phase}
+                          type="button"
+                          aria-pressed={activePhase === phase}
+                          aria-label={riskLabel ? `${label}, ${riskLabel}` : undefined}
+                          onClick={() => setActivePhase(phase)}
+                          className={segmentedItemClassName}
+                        >
+                          {riskLabel && <AlertTriangle className="size-4 text-warning" aria-hidden="true" />}
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {activePhase === "climb" ? "What to wear skinning up." : "What to wear for the ride down."}
+                  </p>
                 </div>
               )}
+
+              <ComfortDecision decision={shownEvaluation?.decision} phase={phaseLabel} />
+
+              <section aria-labelledby={wearHeadingId} className="flex flex-col gap-3">
+                <h3 id={wearHeadingId} className="text-xl font-semibold text-foreground">Wear</h3>
+                <Card padding="none" className="divide-y divide-border px-4">
+                  {BODY_PARTS.map((bodyPart) => renderSection(bodyPart, shownPhase))}
+                </Card>
+              </section>
             </div>
-            <p className="-mt-4 text-xs text-white/60">
-              Tap a body area to collapse or expand details.
-            </p>
-            <div className="flex flex-col gap-6">
-              {BODY_PARTS.map((bodyPart) => renderSection(bodyPart, shownPhase))}
-              {showDescent && <PackItemsCard items={packedItems} />}
+
+            <div className="flex min-w-0 flex-col gap-6">
+              {showDescent && <CarryCard items={packedItems} phase={shownPhase} />}
+
+              <RecommendedItemsCard items={recommendedItems} onOwned={handleItemOwned} />
+
+              {guidance.length > 0 && (
+                <ResultDisclosure title="Why these layers?">
+                  <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-foreground">
+                    {guidance.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </ResultDisclosure>
+              )}
+
+              {biophysicsData?.recommendation && (
+                <ResultDisclosure title="Technical details">
+                  <div className="flex flex-col gap-6">
+                    {!showDescent && comfortScore !== undefined && (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-foreground">Comfort</p>
+                        <ScoreDisplay
+                          score={comfortScore}
+                          size="sm"
+                          totalClo={climbEvaluation?.totalClo}
+                          targetRange={ireq?.target_range}
+                          decision={climbEvaluation?.decision}
+                        />
+                      </div>
+                    )}
+                    <ComfortOverview
+                      climb={{ evaluation: climbEvaluation, targetRange: ireq?.target_range }}
+                      descent={showDescent ? { evaluation: descentEvaluation, targetRange: downhillTargetRange } : undefined}
+                    />
+                    {shownEvaluation && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">
+                          Body areas{phaseLabel ? ` · ${phaseLabel}` : ""}
+                        </h4>
+                        <dl className="mt-2 flex flex-col gap-1.5 text-sm">
+                          {BODY_PARTS.map((bodyPart) => {
+                            const part = shownEvaluation.bodyParts[bodyPart];
+                            if (!part || part.target === undefined) return null;
+                            return (
+                              <div key={bodyPart} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                                <dt className="text-muted-foreground">{BODY_PART_LABELS[bodyPart]}</dt>
+                                <dd className="flex gap-2 tabular-nums text-foreground">
+                                  <span>Actual {part.clo.toFixed(1)} clo</span>
+                                  <span className="text-muted-foreground">Target {part.target.toFixed(1)} clo</span>
+                                </dd>
+                              </div>
+                            );
+                          })}
+                        </dl>
+                      </div>
+                    )}
+                    <BiophysicsDetails data={biophysicsData} />
+                  </div>
+                </ResultDisclosure>
+              )}
             </div>
+          </div>
+        )}
 
-            <LayerPickerDrawer
-              open={pickerTarget !== null}
-              onOpenChange={(open) => { if (!open) setPickerTarget(null); }}
-              bodyPart={pickerTarget?.bodyPart ?? "torso"}
-              layerType={pickerTarget?.layerType ?? "base"}
-              wardrobeItems={pickerItems.wardrobeItems}
-              recommendedItems={pickerItems.recommendedItems}
-              currentItemName={pickerCurrentItem?.name}
-              currentItemClo={pickerCurrentItem?.rcl}
-              cloContext={pickerCloContext}
-              onSelect={handlePickerSelect}
-              onRemove={pickerTarget?.replaceIndex !== null ? handlePickerRemove : undefined}
-            />
-
-            {biophysicsData?.recommendation && (
-              <details className="group rounded-xl border border-white/25 bg-white/10 p-4">
-                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold tracking-wide text-white/85 transition-colors hover:text-white [&::-webkit-details-marker]:hidden">
-                  <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
-                  <span>Advanced Biophysics Details</span>
-                </summary>
-                <div className="mt-4">
-                  <BiophysicsDetails data={biophysicsData} />
-                </div>
-              </details>
-            )}
-
-            <RecommendedItemsCard items={recommendedItems} onOwned={handleItemOwned} />
-          </>
+        {hasLayers && (
+          <LayerPickerDrawer
+            open={pickerTarget !== null}
+            onOpenChange={(open) => { if (!open) setPickerTarget(null); }}
+            bodyPart={pickerTarget?.bodyPart ?? "torso"}
+            layerType={pickerTarget?.layerType ?? "base"}
+            wardrobeItems={pickerItems.wardrobeItems}
+            recommendedItems={pickerItems.recommendedItems}
+            currentItemName={pickerCurrentItem?.name}
+            currentItemClo={pickerCurrentItem?.rcl}
+            cloContext={pickerCloContext}
+            onSelect={handlePickerSelect}
+            onRemove={pickerTarget?.replaceIndex !== null ? handlePickerRemove : undefined}
+          />
         )}
       </div>
     </div>

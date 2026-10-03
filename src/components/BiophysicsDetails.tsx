@@ -7,12 +7,12 @@ interface BiophysicsDetailsProps {
 }
 
 const scoreLabels: Record<string, { label: string; icon: React.ReactNode }> = {
-  coldProtection: { label: "Cold Protection", icon: <ThermometerSnowflake className="size-3" /> },
-  overheatPrevention: { label: "Overheat Prevention", icon: <ThermometerSnowflake className="size-3" /> },
-  breathability: { label: "Breathability", icon: <Droplets className="size-3" /> },
-  weatherProtection: { label: "Weather Protection", icon: <Shield className="size-3" /> },
-  weight: { label: "Weight", icon: <Gauge className="size-3" /> },
-  mobility: { label: "Mobility", icon: <Activity className="size-3" /> }, // backward compatibility for older payloads
+  coldProtection: { label: "Cold protection", icon: <ThermometerSnowflake className="size-3.5" aria-hidden="true" /> },
+  overheatPrevention: { label: "Overheat prevention", icon: <ThermometerSnowflake className="size-3.5" aria-hidden="true" /> },
+  breathability: { label: "Breathability", icon: <Droplets className="size-3.5" aria-hidden="true" /> },
+  weatherProtection: { label: "Weather protection", icon: <Shield className="size-3.5" aria-hidden="true" /> },
+  weight: { label: "Weight", icon: <Gauge className="size-3.5" aria-hidden="true" /> },
+  mobility: { label: "Mobility", icon: <Activity className="size-3.5" aria-hidden="true" /> }, // backward compatibility for older payloads
 };
 
 const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
@@ -31,14 +31,14 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
   const displayedScores = Object.entries(component_scores).filter(([key]) => Boolean(scoreLabels[key]));
 
   return (
-    <div className="rounded-lg border border-slate-200/70 bg-white/88 px-4 py-4">
+    <div className="text-foreground">
       <div className="flex flex-col gap-6 text-sm">
         {/* Analyzed Garments */}
         {recommendation.garments.length > 0 && (
           <div>
-            <h4 className="mb-2 flex items-center gap-2 font-medium">
-              <Shirt className="size-4" />
-              Garment Thermal Properties
+            <h4 className="mb-2 flex items-center gap-2 font-semibold">
+              <Shirt className="size-4" aria-hidden="true" />
+              Garment thermal properties
             </h4>
             <p className="mb-2 text-xs text-muted-foreground">
               Rcl = thermal resistance (clo), Recl = evaporative resistance (m²Pa/W)
@@ -48,7 +48,7 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
                 <div key={garment.id} className="text-xs">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{garment.name}</span>
-                    <span className="text-[10px] capitalize text-muted-foreground">
+                    <span className="text-xs text-muted-foreground first-letter:uppercase">
                       {garment.category.replace(/_/g, " ")}
                     </span>
                   </div>
@@ -64,7 +64,7 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
 
         {/* IREQ Range */}
         <div>
-          <h4 className="mb-1 font-medium">Required Insulation (IREQ)</h4>
+          <h4 className="mb-1 font-semibold">Required insulation (IREQ)</h4>
           <p className="mb-2 text-xs text-muted-foreground">
             Target clo range based on activity and conditions
           </p>
@@ -83,7 +83,7 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
             </div>
             <div className="flex items-center gap-2">
               <span className="w-12 text-xs text-muted-foreground">Delta:</span>
-              <span className={`font-mono text-xs ${delta >= 0 ? "text-green-600" : "text-amber-600"}`}>
+              <span className={`font-mono text-xs ${delta >= 0 ? "text-success" : "text-warning"}`}>
                 {delta >= 0 ? "+" : ""}
                 {delta.toFixed(2)} clo
               </span>
@@ -97,21 +97,21 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
               </div>
             )}
           </div>
-          <p className="mt-2 text-[10px] text-muted-foreground">
+          <p className="mt-2 text-xs text-muted-foreground">
             * DLE is currently a bounded exposure-planning heuristic.
           </p>
         </div>
 
         {/* Ensemble Properties */}
         <div>
-          <h4 className="mb-1 font-medium">Ensemble Properties</h4>
+          <h4 className="mb-1 font-semibold">Ensemble properties</h4>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             <div className="flex justify-between">
-              <span className="text-xs text-muted-foreground">Total Clo</span>
+              <span className="text-xs text-muted-foreground">Total clo</span>
               <span className="font-mono text-xs">{ensemble_properties.total_clo.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-muted-foreground">Evap Potential</span>
+              <span className="text-xs text-muted-foreground">Evap potential</span>
               <span className="font-mono text-xs">{ensemble_properties.evap_potential.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
@@ -124,7 +124,7 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
         {/* Component Scores */}
         {displayedScores.length > 0 && (
           <div>
-            <h4 className="mb-2 font-medium">Component Scores</h4>
+            <h4 className="mb-2 font-semibold">Component scores</h4>
             <div className="flex flex-col gap-2">
               {displayedScores.map(([key, value]) => {
                 const config = scoreLabels[key];

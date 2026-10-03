@@ -108,6 +108,7 @@ const HomeContent = () => {
           // outing it was requested for while a change loads or fails.
           <LayerDisplay
             activity={result.outing.activity}
+            exertion={result.outing.exertion}
             {...layerDisplayAdvice(result.advice)}
             temperature={result.weather.temperature}
             windspeed={result.weather.windSpeed}

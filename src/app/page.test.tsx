@@ -225,7 +225,7 @@ describe("Home Page", () => {
       await user.click(gearUpButton());
       expect(await screen.findByText("Current conditions")).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Back" }));
+      await user.click(screen.getByRole("button", { name: "Edit outing" }));
 
       expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
       expect(within(activity()).getByRole("radio", { name: /xc skiing/i })).toBeChecked();
@@ -517,11 +517,11 @@ describe("Home Page", () => {
         fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "07:30" } });
         await user.click(screen.getByRole("button", { name: "See my layers" }));
 
-        expect(await screen.findByText("Forecast · Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+        expect(await screen.findByText("Forecast for Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
         expect(weatherRequests).toEqual(["/api/weather?lat=44.47&lon=-72.69&datetime=2026-10-08T07:30"]);
 
         // Back keeps Later and what was entered.
-        await user.click(screen.getByRole("button", { name: "Back" }));
+        await user.click(screen.getByRole("button", { name: "Edit outing" }));
         expect(screen.getByRole("radio", { name: "Later" })).toBeChecked();
         expect(screen.getByLabelText("Start time")).toHaveValue("07:30");
       } finally {
@@ -587,7 +587,7 @@ describe("Home Page", () => {
     }
 
     async function switchActivity(user: ReturnType<typeof userEvent.setup>, from: string, to: string) {
-      await user.click(screen.getByRole("button", { name: from }));
+      await user.click(screen.getByRole("button", { name: `${from}, change activity` }));
       await user.click(await screen.findByRole("button", { name: to }));
     }
 
@@ -602,14 +602,14 @@ describe("Home Page", () => {
       // Alpine has static layers, shown as general guidance.
       expect(await screen.findByRole("heading", { name: "General guidance" })).toBeInTheDocument();
 
-      await switchActivity(user, "Alpine", "Running");
+      await switchActivity(user, "Alpine Skiing", "Running");
 
       const notice = await screen.findByRole("region", { name: "Sign in for Running layers" });
       expect(within(notice).getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
       expect(screen.getByText(/wind 15 mph/i)).toBeInTheDocument();
       expect(screen.getByText("Current conditions")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Running" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Change weather location, date, or time" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Running, change activity" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Change place or time" })).toBeInTheDocument();
     });
 
     it.each([
@@ -634,7 +634,7 @@ describe("Home Page", () => {
       const guidance = await screen.findByRole("region", { name: "General guidance" });
       expect(within(guidance).getByRole("link", { name: action.name })).toHaveAttribute("href", action.href);
 
-      await switchActivity(user, "Alpine", "Running");
+      await switchActivity(user, "Alpine Skiing", "Running");
 
       const region = await screen.findByRole("region", { name: notice });
       expect(within(region).getByRole("link", { name: action.name })).toHaveAttribute("href", action.href);
@@ -654,17 +654,17 @@ describe("Home Page", () => {
       await gearUpHere(user);
       expect(await screen.findByText(/personalized layers couldn't load/i)).toBeInTheDocument();
 
-      await switchActivity(user, "Alpine", "Running");
+      await switchActivity(user, "Alpine Skiing", "Running");
 
       expect(finishRunning).toBeDefined();
-      expect(screen.getByRole("button", { name: "Alpine" })).toBeDisabled();
-      expect(screen.queryByRole("button", { name: "Running" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Alpine Skiing, change activity" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Running, change activity" })).not.toBeInTheDocument();
       expect(screen.getByText(/personalized layers couldn't load/i)).toBeInTheDocument();
 
       await answer(finishRunning!);
 
       expect((await screen.findAllByText("Running tights")).length).toBeGreaterThan(0);
-      expect(screen.getByRole("button", { name: "Running" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Running, change activity" })).toBeEnabled();
     });
 
     it("retries a failed request for the same outing", async () => {
@@ -682,7 +682,7 @@ describe("Home Page", () => {
       await gearUpHere(user);
       expect(await screen.findByText(/personalized layers couldn't load/i)).toBeInTheDocument();
 
-      await switchActivity(user, "Alpine", "Running");
+      await switchActivity(user, "Alpine Skiing", "Running");
       const notice = await screen.findByRole("region", { name: "Couldn't load Running layers" });
 
       await user.click(within(notice).getByRole("button", { name: "Try again" }));
@@ -809,7 +809,7 @@ describe("Home Page", () => {
       await chooseStartDate(user);
       await user.click(screen.getByRole("button", { name: "See my layers" }));
 
-      expect(await screen.findByText("Forecast · Thu, Oct 8, 12:00 PM EDT")).toBeInTheDocument();
+      expect(await screen.findByText("Forecast for Thu, Oct 8, 12:00 PM EDT")).toBeInTheDocument();
       expect(screen.getByText("Stowe, Vermont, United States")).toBeInTheDocument();
       expect(screen.getByText(/wind 12 mph/i)).toBeInTheDocument();
       expect(requests.weather).toEqual([`/api/weather?lat=44.47&lon=-72.69&datetime=${START_DATE}T12:00`]);
@@ -832,7 +832,7 @@ describe("Home Page", () => {
       fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "07:30" } });
       await user.click(screen.getByRole("button", { name: "See my layers" }));
 
-      expect(await screen.findByText("Forecast · Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+      expect(await screen.findByText("Forecast for Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
       expect(requests.weather).toEqual([`/api/weather?lat=44.47&lon=-72.69&datetime=${START_DATE}T07:30`]);
     });
 
@@ -881,7 +881,7 @@ describe("Home Page", () => {
       await chooseStowe(user);
       await chooseStartDate(user);
       await user.click(screen.getByRole("button", { name: "See my layers" }));
-      await user.click(await screen.findByRole("button", { name: "Change weather location, date, or time" }));
+      await user.click(await screen.findByRole("button", { name: "Change place or time" }));
 
       // The drawer's drag handling reads CSS transforms, which jsdom lacks, so
       // it's driven with plain click events instead of pointer events.
@@ -898,11 +898,11 @@ describe("Home Page", () => {
       );
       expect(drawer).toHaveAttribute("data-state", "open");
       expect(within(drawer).getByLabelText("Time")).toHaveValue("09:15");
-      expect(screen.getByText("Forecast · Thu, Oct 8, 12:00 PM EDT")).toBeInTheDocument();
+      expect(screen.getByText("Forecast for Thu, Oct 8, 12:00 PM EDT")).toBeInTheDocument();
 
       fireEvent.click(within(drawer).getByRole("button", { name: "Apply Weather" }));
 
-      expect(await screen.findByText("Forecast · Fri, Oct 2, 9:00 AM EDT")).toBeInTheDocument();
+      expect(await screen.findByText("Forecast for Fri, Oct 2, 9:00 AM EDT")).toBeInTheDocument();
       expect(screen.getByText(/wind 20 mph/i)).toBeInTheDocument();
       // jsdom never finishes the closing animation, so the closed drawer stays in the page.
       await waitFor(() => expect(drawer).toHaveAttribute("data-state", "closed"));
@@ -1194,7 +1194,7 @@ describe("Home Page", () => {
       render(<Home />);
 
       await seeOneDayLayers(user);
-      await user.click(screen.getByRole("button", { name: "Back" }));
+      await user.click(screen.getByRole("button", { name: "Edit outing" }));
 
       expect(screen.queryByText(/wind 12 mph/i)).not.toBeInTheDocument();
       expect(screen.getByRole("radio", { name: "Later" })).toBeChecked();
@@ -1269,8 +1269,8 @@ describe("Home Page", () => {
 
     it.each([
       {
-        way: "Back",
-        leave: (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "Back" })),
+        way: "Edit outing",
+        leave: (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "Edit outing" })),
         when: "Later",
       },
       {
@@ -1292,7 +1292,7 @@ describe("Home Page", () => {
       render(<Home />);
 
       await seeOneDayLayers(user);
-      await user.click(screen.getByRole("button", { name: "Alpine" }));
+      await user.click(screen.getByRole("button", { name: "Alpine Skiing, change activity" }));
       await user.click(await screen.findByRole("button", { name: "Running" }));
       expect(finishRefresh).toBeDefined();
       await leave(user);
@@ -1320,7 +1320,7 @@ describe("Home Page", () => {
       render(<Home />);
 
       await seeOneDayLayers(user);
-      await user.click(screen.getByRole("button", { name: "Change weather location, date, or time" }));
+      await user.click(screen.getByRole("button", { name: "Change place or time" }));
       // Plain click events, as in the drawer test above: jsdom lacks the CSS transforms its drag handling reads.
       const drawer = await screen.findByRole("dialog", { name: "Update Weather" });
       fireEvent.change(within(drawer).getByRole("combobox", { name: "Location" }), { target: { value: "Stowe" } });
