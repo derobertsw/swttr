@@ -11,5 +11,7 @@ export const STORAGE_KEYS = {
   HEIGHT_INCHES: "swttr-height-inches",
   WEIGHT_LBS: "swttr-weight-lbs",
   /** In sessionStorage: the Gear up form and last outing, for this tab only (src/lib/gearUpDraft.ts). */
+  /** In sessionStorage: account-bound trip creation, including uncertain submissions. */
+  TRIP_CREATION_DRAFT: "swttr-trip-creation",
   GEAR_UP_DRAFT: "swttr-gear-up",
 } as const;
