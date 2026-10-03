@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -366,5 +366,124 @@ describe("New trip wizard", () => {
     await act(async () => finishAdd());
     await waitFor(() => expect(screen.getByRole("button", { name: "Next" })).toBeEnabled());
     expect(nameInput).toHaveValue("Sam");
+  });
+
+  describe("the stop sheet", () => {
+    /** Opens step 2 of a trip with one stop, Stowe. */
+    async function openStops(routes: Parameters<typeof fakeTripApi>[0] = {}) {
+      setQuery("trip=trip-1&step=2");
+      const fetchMock = fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP] })),
+        ...routes,
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const user = userEvent.setup();
+      render(<NewTripPage />);
+      const edit = await screen.findByRole("button", { name: "Edit" });
+      return { user, edit, fetchMock };
+    }
+
+    it("takes focus, keeps it, and returns it to Edit when it closes", async () => {
+      const { user, edit } = await openStops();
+
+      await user.click(edit);
+      const sheet = await screen.findByRole("dialog", { name: "Edit stop Stowe, Vermont" });
+      expect(sheet).toContainElement(document.activeElement as HTMLElement);
+      expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
+      for (let i = 0; i < 20; i++) {
+        await user.tab();
+        expect(sheet).toContainElement(document.activeElement as HTMLElement);
+      }
+
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(edit).toHaveFocus();
+
+      // After tabbing to the close button, too.
+      await user.click(edit);
+      const close = within(await screen.findByRole("dialog")).getByRole("button", { name: "Close" });
+      // Loading saved assignments can enable date buttons ahead of the
+      // initially focused activity, so tab through them to reach Close.
+      for (let i = 0; i < 20 && document.activeElement !== close; i++) {
+        await user.tab({ shift: true });
+      }
+      expect(close).toHaveFocus();
+      await user.keyboard("{Enter}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(edit).toHaveFocus();
+
+      // A tap focuses nothing, so the Edit button is found by its id.
+      edit.blur();
+      fireEvent.click(edit);
+      await screen.findByRole("dialog");
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(edit).toHaveFocus();
+    });
+
+    it("doesn't hand focus back to a field a tap left it in", async () => {
+      const { user, edit } = await openStops();
+
+      // On iOS, tapping a button leaves focus in the field being typed in.
+      screen.getByRole("combobox").focus();
+      fireEvent.click(edit);
+      await screen.findByRole("dialog");
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(edit).toHaveFocus();
+    });
+
+    it("can't be closed while saving, and stays open with its picks when the save fails", async () => {
+      let finishSave = () => {};
+      const { user, edit } = await openStops({
+        // Hold the save open until the test finishes it.
+        "PATCH /api/v1/trips/trip-1/stops/stop-stowe": () =>
+          new Promise((resolve) => {
+            finishSave = () => resolve(reply(500, { error: "Database unavailable" }));
+          }),
+      });
+
+      await user.click(edit);
+      const sheet = await screen.findByRole("dialog");
+      await user.click(within(sheet).getByRole("button", { name: "Alpine" }));
+      const save = within(sheet).getByRole("button", { name: "Save stop" });
+      await user.click(save);
+
+      expect(within(sheet).getByRole("button", { name: "Close" })).toBeDisabled();
+      expect(save).toHaveFocus();
+      await user.keyboard("{Escape}");
+      fireEvent.pointerDown(document.body);
+      expect(screen.getByRole("dialog")).toBe(sheet);
+
+      await act(async () => finishSave());
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith("Couldn't save the stop", {
+          description: "Database unavailable",
+        })
+      );
+      expect(screen.getByRole("dialog")).toBe(sheet);
+      expect(within(sheet).getByRole("button", { name: "Alpine" })).toHaveAttribute("aria-pressed", "true");
+      expect(within(sheet).getByRole("button", { name: "Close" })).toBeEnabled();
+    });
+
+    it("closes once saved and returns focus to Edit", async () => {
+      const { user, edit, fetchMock } = await openStops({
+        "PATCH /api/v1/trips/trip-1/stops/stop-stowe": (body) =>
+          reply(200, { stop: { ...STOWE_STOP, ...(body as { activities: string[] }) } }),
+      });
+
+      await user.click(edit);
+      const sheet = await screen.findByRole("dialog");
+      await user.click(within(sheet).getByRole("button", { name: "Alpine" }));
+      await user.click(within(sheet).getByRole("button", { name: "Save stop" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(screen.getByText("Alpine")).toBeInTheDocument();
+      expect(edit).toHaveFocus();
+      expect(sentBodies(fetchMock, "PATCH /api/v1/trips/trip-1/stops/stop-stowe")).toEqual([
+        { activities: ["Alpine"], day_dates: [] },
+      ]);
+    });
   });
 });
