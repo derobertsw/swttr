@@ -1,24 +1,33 @@
 "use client";
 
-import { useState } from "react";
-import { Shirt, Footprints, Hand, HardHat, ChevronRight } from "lucide-react";
-import { BodyPart, LayerType, LayerSet, BODY_PART_LABELS, hasAnyLayers } from "@/lib/layers";
-import { cn } from "@/lib/utils";
+import { useId, useState } from "react";
+import { AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  BODY_PART_LABELS,
+  LAYER_LABELS,
+  applyItemMappings,
+  hasAnyLayers,
+  type BodyPart,
+  type LayerSet,
+  type LayerType,
+} from "@/lib/layers";
 import { LayerItems } from "./LayerItems";
 import type { BodyPartEvaluation } from "@/types/biophysics";
+
+const LAYER_TYPES: LayerType[] = ["base", "mid", "outer"];
 
 interface BodyPartSectionProps {
   bodyPart: BodyPart;
   layers: LayerSet;
-  biophysicsActive: boolean;
   currentClo: number | undefined;
   targetClo: number | undefined;
   /** Actual vs target, from the layer evaluation. */
   status?: BodyPartEvaluation["status"];
+  /** Wardrobe names for general guidance's standard items. */
   itemMappings?: Map<string, string>;
-  defaultCollapsed?: boolean;
-  colorScheme?: "climb" | "descent";
-  /** General guidance: no editing controls, and only the slots it fills. */
+  /** General guidance: nothing evaluates edits, so there's no Change. */
   readOnly?: boolean;
   otherPhaseLayers?: LayerSet;
   syncLabel?: string;
@@ -29,48 +38,17 @@ interface BodyPartSectionProps {
   onMoveItem?: (fromLayerType: LayerType, fromIndex: number, toLayerType: LayerType) => void;
 }
 
-function getEmptyStateMessage(bodyPart: BodyPart): string {
-  switch (bodyPart) {
-    case "torso":
-      return "Add torso layers for core warmth";
-    case "legs":
-      return "Your legs need protection in these conditions";
-    case "hands":
-      return "No hand insulation selected";
-    case "headNeck":
-      return "Head and neck are exposed to the elements";
-  }
-}
-
-function getBodyPartIcon(bodyPart: BodyPart): React.ReactNode {
-  const iconClass = "size-4 text-slate-500";
-  switch (bodyPart) {
-    case "torso":
-      return <Shirt className={iconClass} />;
-    case "legs":
-      return <Footprints className={iconClass} />;
-    case "hands":
-      return <Hand className={iconClass} />;
-    case "headNeck":
-      return <HardHat className={iconClass} />;
-  }
-}
-
-const CARD_STYLES = {
-  climb: "border-violet-300/60 bg-violet-50/45",
-  descent: "border-teal-300/60 bg-teal-50/45",
-} as const;
-
+/**
+ * One body area of the outfit: what's worn there, layer by layer. Change
+ * opens the area's editing controls, including its empty layers.
+ */
 export function BodyPartSection({
   bodyPart,
   layers,
-  biophysicsActive,
   currentClo,
   targetClo,
   status,
   itemMappings,
-  defaultCollapsed = false,
-  colorScheme,
   readOnly,
   otherPhaseLayers,
   syncLabel,
@@ -80,91 +58,95 @@ export function BodyPartSection({
   onSyncFromOtherPhase,
   onMoveItem,
 }: BodyPartSectionProps) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const headingId = useId();
+  const [editing, setEditing] = useState(false);
+  const label = BODY_PART_LABELS[bodyPart];
+  const isEditing = editing && !readOnly;
 
-  const hasContent = hasAnyLayers(layers);
-  const actualPillClass =
-    status === "under"
-      ? "border-sky-500 bg-sky-200 text-sky-950 font-bold"
-      : status === "over"
-        ? "border-amber-500 bg-amber-200 text-amber-950 font-bold"
-        : status === "in_range"
-          ? "border-emerald-500 bg-emerald-200 text-emerald-950 font-bold"
-          : "border-slate-300/70 bg-slate-100/70 text-slate-600";
+  const wornItems = LAYER_TYPES.flatMap((layerType) => {
+    const items = layers[layerType] ?? [];
+    const shown = readOnly && itemMappings ? applyItemMappings(items, bodyPart, layerType, itemMappings) : items;
+    return shown.map((item, index) => ({ item, layerType, key: `${layerType}:${item.sourceId || item.name}-${index}` }));
+  });
 
   return (
-    <div
-      className={cn(
-        "rounded-xl border p-3.5 backdrop-blur-[3px] sm:p-4",
-        CARD_STYLES[colorScheme ?? "climb"],
-        collapsed && "cursor-pointer"
+    <section aria-labelledby={headingId} className="py-4">
+      <div className="flex items-center justify-between gap-3">
+        <h4 id={headingId} className="text-base font-semibold text-foreground">
+          {label}
+        </h4>
+        {!readOnly && (
+          <Button
+            type="button"
+            variant={isEditing ? "secondary" : "outline"}
+            size="sm"
+            aria-expanded={isEditing}
+            aria-label={`${isEditing ? "Done changing" : "Change"} ${label.toLowerCase()}`}
+            onClick={() => setEditing((prev) => !prev)}
+          >
+            {isEditing ? "Done" : "Change"}
+          </Button>
+        )}
+      </div>
+
+      {status === "under" && (
+        <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-warning">
+          <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
+          Needs more warmth
+        </p>
       )}
-      onClick={collapsed ? () => setCollapsed(false) : undefined}
-    >
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          setCollapsed((prev) => !prev);
-        }}
-        className="flex w-full items-start justify-between gap-3 text-left"
-      >
-        <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-800">
-          {getBodyPartIcon(bodyPart)}
-          {BODY_PART_LABELS[bodyPart]}
-        </h3>
-        <div className="flex items-center gap-2">
+
+      {isEditing ? (
+        <div className="mt-3 flex flex-col gap-3">
           {targetClo !== undefined && currentClo !== undefined && (
-            <div className="flex items-center gap-1.5">
-              <span className="rounded-full border border-slate-300/70 bg-slate-100/70 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-slate-600">
+            <div className="flex flex-wrap gap-1.5">
+              <Badge size="sm" variant="neutral" className="tabular-nums">
                 Target {targetClo.toFixed(1)} clo
-              </span>
-              <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums", actualPillClass)}>
+              </Badge>
+              <Badge
+                size="sm"
+                variant={status === "in_range" ? "success" : status ? "warning" : "outline"}
+                className="tabular-nums"
+              >
                 Actual {currentClo.toFixed(1)} clo
-              </span>
+              </Badge>
             </div>
           )}
-          <ChevronRight
-            className={cn(
-              "size-4 text-slate-500 transition-transform duration-200",
-              !collapsed && "rotate-90"
-            )}
-          />
+          <ul className="flex flex-col gap-3">
+            <LayerItems
+              layers={layers}
+              bodyPart={bodyPart}
+              otherPhaseLayers={otherPhaseLayers}
+              syncLabel={syncLabel}
+              onItemTap={onItemTap}
+              onItemRemove={onItemRemove}
+              onAddLayer={onAddLayer}
+              onSyncFromOtherPhase={onSyncFromOtherPhase}
+              onMoveItem={onMoveItem}
+            />
+          </ul>
         </div>
-      </button>
-
-      <div
-        className={cn(
-          "grid transition-[grid-template-rows] duration-200 ease-out",
-          collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
-        )}
-      >
-        <div className="overflow-hidden">
-          <div className="pt-2.5">
-            {!hasContent && (
-              <p className={cn("text-sm text-slate-700", !readOnly && "mb-3")}>
-                {readOnly ? "Nothing needed here at this temperature." : getEmptyStateMessage(bodyPart)}
-              </p>
-            )}
-            <ul className="space-y-3" style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              <LayerItems
-                layers={layers}
-                bodyPart={bodyPart}
-                biophysicsActive={biophysicsActive}
-                itemMappings={itemMappings}
-                readOnly={readOnly}
-                otherPhaseLayers={otherPhaseLayers}
-                syncLabel={syncLabel}
-                onItemTap={onItemTap}
-                onItemRemove={onItemRemove}
-                onAddLayer={onAddLayer}
-                onSyncFromOtherPhase={onSyncFromOtherPhase}
-                onMoveItem={onMoveItem}
-              />
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
+      ) : hasAnyLayers(layers) ? (
+        <ul className="mt-2 flex flex-col gap-2">
+          {wornItems.map(({ item, layerType, key }) => (
+            <li key={key} className="flex items-baseline gap-3">
+              <span className="w-12 shrink-0 text-sm text-muted-foreground">{LAYER_LABELS[layerType]}</span>
+              <span className="min-w-0 text-base font-medium text-foreground">
+                {item.name}
+                {item.isRecommended && (
+                  <Badge size="sm" variant="outline" className="ml-2 align-middle font-medium">
+                    Not in your wardrobe
+                  </Badge>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1 text-sm text-muted-foreground">
+          {readOnly ? "Nothing needed here at this temperature." : "Nothing worn here."}
+        </p>
+      )}
+    </section>
   );
 }

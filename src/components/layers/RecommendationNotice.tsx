@@ -4,6 +4,7 @@ import { useId } from "react";
 import Link from "next/link";
 import { Info, Loader2, LogIn, RotateCw, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { ACTIVITIES } from "@/data/activities";
 import type { BiophysicsStatus } from "@/types/biophysics";
 
@@ -86,7 +87,7 @@ interface NoticeActionButtonProps {
 }
 
 function NoticeActionButton({ action, onRetry, retrying }: NoticeActionButtonProps) {
-  const className = "h-10 shrink-0 bg-white px-4 font-semibold text-slate-900 hover:bg-white/90";
+  const className = "shrink-0";
   switch (action) {
     case "sign_in":
       return (
@@ -149,27 +150,31 @@ export function RecommendationNotice({
 
   if (hasGeneralLayers) {
     return (
-      <section
-        aria-labelledby={titleId}
-        className="flex flex-col gap-3 rounded-xl border border-white/25 bg-white/10 p-4 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div className="flex gap-3">
-          <Info className="mt-0.5 size-4 shrink-0 text-white/70" aria-hidden="true" />
-          <div>
-            <h2 id={titleId} className="text-sm font-semibold text-white">{title}</h2>
-            <p className="mt-0.5 text-sm leading-relaxed text-white/75">{detail}</p>
+      <Card asChild variant="muted">
+        <section
+          aria-labelledby={titleId}
+          className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex gap-3">
+            <Info className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div>
+              <h3 id={titleId} className="text-base font-semibold text-foreground">{title}</h3>
+              <p className="mt-0.5 text-sm text-muted-foreground">{detail}</p>
+            </div>
           </div>
-        </div>
-        {actionButton && <div className="pl-7 sm:pl-0">{actionButton}</div>}
-      </section>
+          {actionButton && <div className="pl-8 sm:pl-0">{actionButton}</div>}
+        </section>
+      </Card>
     );
   }
 
   return (
-    <section aria-labelledby={titleId} className="rounded-2xl border border-white/25 bg-white/10 p-5">
-      <h2 id={titleId} className="text-lg font-semibold text-white">{title}</h2>
-      <p className="mt-1.5 text-sm leading-relaxed text-white/75">{detail}</p>
-      {actionButton && <div className="mt-4">{actionButton}</div>}
-    </section>
+    <Card asChild padding="lg">
+      <section aria-labelledby={titleId}>
+        <h3 id={titleId} className="text-xl font-semibold text-foreground">{title}</h3>
+        <p className="mt-1.5 text-base text-muted-foreground">{detail}</p>
+        {actionButton && <div className="mt-4">{actionButton}</div>}
+      </section>
+    </Card>
   );
 }

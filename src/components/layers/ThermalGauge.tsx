@@ -2,7 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import { HelpCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export interface CloBreakdownLine {
   label: string;
@@ -93,12 +94,7 @@ export function ThermalGauge({
       : surplus > 0
         ? `Over by ${surplus.toFixed(1)} clo`
         : "In target range";
-  const statusClass =
-    deficit > 0
-      ? "border-sky-500 bg-sky-200 text-sky-950"
-      : surplus > 0
-        ? "border-amber-500 bg-amber-200 text-amber-950"
-        : "border-emerald-500 bg-emerald-200 text-emerald-950";
+  const statusVariant = deficit > 0 || surplus > 0 ? "warning" : "success";
   const markerLabelClass =
     markerPercent < 10
       ? "translate-x-0"
@@ -114,13 +110,13 @@ export function ThermalGauge({
   return (
     <div className="w-full select-none">
       {showStatusPill && (
-        <div className={cn("mb-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold", statusClass)}>
+        <Badge size="sm" variant={statusVariant} className="mb-2">
           {statusText}
-        </div>
+        </Badge>
       )}
-      <div className="mb-1.5 flex justify-between text-xs text-white/70">
+      <div className="mb-1.5 flex justify-between text-xs text-muted-foreground">
         <span>Cold</span>
-        <span className="text-white/75">Comfortable</span>
+        <span>Comfortable</span>
         <span>Hot</span>
       </div>
 
@@ -137,7 +133,7 @@ export function ThermalGauge({
         onTouchCancel={hideMarkerLabel ? endPress : undefined}
       >
         <div
-          className="absolute inset-y-0 rounded-full border border-white/35 bg-white/22 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
+          className="absolute inset-y-0 rounded-full ring-2 ring-foreground"
           style={{
             left: `${comfortStart}%`,
             width: `${comfortEnd - comfortStart}%`,
@@ -152,53 +148,43 @@ export function ThermalGauge({
         >
           {showMarker && (
             <span
-              className={cn(
-                "absolute -top-7 left-0 whitespace-nowrap rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-medium text-white/95 transition-opacity duration-150",
+              className={[
+                "absolute -top-7 left-0 whitespace-nowrap rounded-full border border-border bg-popover px-2 py-0.5 text-xs font-medium text-popover-foreground",
                 markerLabelClass,
-                showClo && hideMarkerLabel ? "animate-in fade-in" : ""
-              )}
+                showClo && hideMarkerLabel ? "animate-in fade-in" : "",
+              ].join(" ")}
             >
               {markerText}
             </span>
           )}
-          <div
-            className="w-6 h-6 rounded-full bg-white border-[2.5px] border-slate-700"
-            style={{
-              outline: "2px solid white",
-              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15)",
-            }}
-          />
+          <div className="size-6 rounded-full border-[2.5px] border-foreground bg-card shadow-md" />
         </div>
       </div>
 
-      <div className="mt-1 flex items-center justify-center gap-1.5">
-        <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-white/80">
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-1.5">
+        <Badge size="sm" variant="neutral" className="tabular-nums">
           Target {targetMin.toFixed(1)}-{targetMax.toFixed(1)} clo
-        </span>
-        <span className={cn(
-          "rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums",
-          deficit > 0
-            ? "border-sky-400 bg-sky-500/40 text-sky-100"
-            : surplus > 0
-              ? "border-amber-400 bg-amber-500/40 text-amber-100"
-              : "border-emerald-400 bg-emerald-500/40 text-emerald-100"
-        )}>
+        </Badge>
+        <Badge size="sm" variant={statusVariant} className="tabular-nums">
           Actual {totalClo.toFixed(1)} clo
-        </span>
+        </Badge>
         {cloBreakdown && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={() => setShowBreakdown((prev) => !prev)}
-            className="flex items-center justify-center rounded-full text-white/50 hover:text-white/80 transition-colors"
+            className="text-muted-foreground"
             aria-label="Show insulation breakdown"
+            aria-expanded={showBreakdown}
           >
-            <HelpCircle className="size-3.5" />
-          </button>
+            <HelpCircle aria-hidden="true" />
+          </Button>
         )}
       </div>
 
       {showBreakdown && cloBreakdown && (
-        <div className="mt-2 rounded-lg bg-black/25 px-3 py-2 text-[10px] tabular-nums text-white/75">
+        <div className="mt-2 rounded-control bg-muted px-3 py-2 text-xs tabular-nums text-foreground">
           <div className="space-y-0.5 font-mono">
             {cloBreakdown.lines.map((line) => (
               <div key={line.label} className="flex justify-between">
@@ -206,7 +192,7 @@ export function ThermalGauge({
                 <span>{line.detail}</span>
               </div>
             ))}
-            <div className="mt-1 border-t border-white/15 pt-1 flex justify-between font-semibold text-white/90">
+            <div className="mt-1 flex justify-between border-t border-border pt-1 font-semibold">
               <span>Total</span>
               <span>{cloBreakdown.total.toFixed(2)} clo</span>
             </div>
