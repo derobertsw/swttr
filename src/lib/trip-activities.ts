@@ -16,9 +16,9 @@ export const TRIP_ACTIVITY_OPTIONS = [
 type TripActivity = (typeof TRIP_ACTIVITY_OPTIONS)[number];
 
 // Map the trip chip label to the activity key used by the biophysics
-// recommendation engine (src/data/activities.ts / layerRecommendations.json).
-// Null entries are sports the engine doesn't support yet — we surface those as
-// gaps in the auto-generated packing list rather than guessing.
+// activity identifiers. Individual callers must check their own engine's
+// capabilities: Trips uses the static table, which has no Run/Bike/Backcountry
+// guidance even though the biophysics routes support those sports.
 //
 // `satisfies` makes this object a compile error if a TripActivity key is
 // missing or misspelled, while still narrowing each value to string | null.
