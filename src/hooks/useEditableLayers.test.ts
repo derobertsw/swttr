@@ -105,4 +105,74 @@ describe("useEditableLayers", () => {
     act(() => result.current.setLayerItems("legs", "base", [{ name: "Tights" }]));
     expect(result.current.layers.legs.base).toEqual([{ name: "Tights" }]);
   });
+
+  it("undoes edits one at a time", () => {
+    const { result } = renderHook(() => useLayersFor(HANDWEAR_A, null));
+    expect(result.current.canUndo).toBe(false);
+    expect(result.current.edited).toBe(false);
+
+    act(() => result.current.addItem("hands", "base", { name: "Liner", rcl: 0.1 }));
+    act(() => result.current.replaceItem("hands", "outer", 0, { name: "Mitt", rcl: 0.9 }));
+    expect(result.current.edited).toBe(true);
+
+    act(() => result.current.undo());
+    expect(result.current.layers.hands.outer.map((i) => i.name)).toEqual(["Glove A"]);
+    expect(result.current.layers.hands.base.map((i) => i.name)).toEqual(["Liner"]);
+
+    act(() => result.current.undo());
+    expect(result.current.layers.hands.base).toEqual([]);
+    expect(result.current.canUndo).toBe(false);
+    expect(result.current.edited).toBe(false);
+  });
+
+  it("replaces an item with one for another layer as one edit", () => {
+    const { result } = renderHook(() => useLayersFor(HANDWEAR_A, null));
+
+    act(() => result.current.replaceItem("hands", "outer", 0, { name: "Liner", rcl: 0.1 }, "base"));
+    expect(result.current.layers.hands).toMatchObject({ base: [{ name: "Liner" }], outer: [] });
+
+    act(() => result.current.undo());
+    expect(result.current.layers.hands.base).toEqual([]);
+    expect(result.current.layers.hands.outer.map((i) => i.name)).toEqual(["Glove A"]);
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it("resets to the initial layers, and undo brings the edits back", () => {
+    const { result } = renderHook(() => useLayersFor(HANDWEAR_A, null));
+
+    act(() => result.current.addItem("hands", "base", { name: "Liner", rcl: 0.1 }));
+    act(() => result.current.reset());
+    expect(result.current.layers.hands.base).toEqual([]);
+    expect(result.current.edited).toBe(false);
+    expect(result.current.canUndo).toBe(true);
+
+    act(() => result.current.undo());
+    expect(result.current.layers.hands.base.map((i) => i.name)).toEqual(["Liner"]);
+  });
+
+  it("keeps an item owned through undo and reset", () => {
+    const { result } = renderHook(() => useLayersFor(null, null));
+    const catalogMitt = { name: "Catalog mitt", rcl: 0.9, sourceId: "mitt-1", isRecommended: true };
+
+    act(() => result.current.addItem("hands", "outer", catalogMitt));
+    act(() => result.current.addItem("hands", "base", { name: "Liner", rcl: 0.1 }));
+    act(() => result.current.markOwned("mitt-1"));
+    act(() => result.current.undo());
+
+    expect(result.current.layers.hands.base).toEqual([]);
+    expect(result.current.layers.hands.outer).toEqual([{ ...catalogMitt, isRecommended: false }]);
+  });
+
+  it("forgets the undo history when the recommendation changes", () => {
+    const { result, rerender } = renderHook(
+      ({ handwear }) => useLayersFor(handwear, null),
+      { initialProps: { handwear: HANDWEAR_A } }
+    );
+
+    act(() => result.current.addItem("hands", "base", { name: "Liner", rcl: 0.1 }));
+    rerender({ handwear: HANDWEAR_B });
+
+    expect(result.current.canUndo).toBe(false);
+    expect(result.current.edited).toBe(false);
+  });
 });
