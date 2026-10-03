@@ -36,13 +36,15 @@ import { BodyPartSection, WeatherEditDrawer } from "@/components/layers";
 import { CarryCard } from "@/components/layers/CarryCard";
 import { ComfortDecision } from "@/components/layers/ComfortDecision";
 import { ComfortOverview } from "@/components/layers/ComfortOverview";
+import { addLayerId, layerItemId } from "@/components/layers/LayerItems";
 import { LayerPickerDrawer } from "@/components/layers/LayerPickerDrawer";
 import { RecommendationNotice } from "@/components/layers/RecommendationNotice";
-import { ResultHeader } from "@/components/layers/ResultHeader";
+import { EDIT_WEATHER_ID, ResultHeader } from "@/components/layers/ResultHeader";
 import { RecommendedItemsCard, type RecommendedItem } from "@/components/layers/RecommendedItemsCard";
 import { useEditableLayers } from "@/hooks/useEditableLayers";
 import { useLayerEvaluation } from "@/hooks/useLayerEvaluation";
 import { useLayerPicker, type PickerItem } from "@/hooks/useLayerPicker";
+import { useReturnFocus } from "@/hooks/useReturnFocus";
 
 interface LayerDisplayProps {
   activity?: string;
@@ -155,6 +157,8 @@ const LayerDisplay = ({
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
   const [activePhase, setActivePhase] = useState<Phase>("climb");
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
+  const weatherFocus = useReturnFocus();
+  const pickerFocus = useReturnFocus();
   const wearHeadingId = useId();
 
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
@@ -262,6 +266,28 @@ const LayerDisplay = ({
     ? { targetClo: pickerBodyPart.target, currentClo: pickerBodyPart.clo, delta: pickerBodyPart.delta }
     : undefined;
 
+  const openWeatherDrawer = () => {
+    weatherFocus.remember(() => document.getElementById(EDIT_WEATHER_ID));
+    setWeatherDrawerOpen(true);
+  };
+
+  const openPicker = (target: PickerTarget) => {
+    const { bodyPart, layerType, replaceIndex } = target;
+    // Replacing or removing an item remounts it, so focus lands on the item now
+    // in its place, the one before it, or the layer's Add button.
+    const fallbackIds = replaceIndex === null
+      ? [addLayerId(bodyPart, layerType)]
+      : [
+          layerItemId(bodyPart, layerType, replaceIndex),
+          layerItemId(bodyPart, layerType, replaceIndex - 1),
+          addLayerId(bodyPart, layerType),
+        ];
+    pickerFocus.remember(
+      () => fallbackIds.map((id) => document.getElementById(id)).find((element) => element !== null) ?? null
+    );
+    setPickerTarget(target);
+  };
+
   const handlePickerSelect = (item: PickerItem) => {
     if (!pickerTarget) return;
     const { bodyPart, replaceIndex, phase } = pickerTarget;
@@ -323,9 +349,9 @@ const LayerDisplay = ({
               phaseLayers(otherPhase).layers[bodyPart][layerType] ?? []
             ),
         })}
-        onItemTap={(layerType, index) => setPickerTarget({ bodyPart, layerType, replaceIndex: index, phase })}
+        onItemTap={(layerType, index) => openPicker({ bodyPart, layerType, replaceIndex: index, phase })}
         onItemRemove={(layerType, index) => phaseLayers(phase).removeItem(bodyPart, layerType, index)}
-        onAddLayer={(layerType) => setPickerTarget({ bodyPart, layerType, replaceIndex: null, phase })}
+        onAddLayer={(layerType) => openPicker({ bodyPart, layerType, replaceIndex: null, phase })}
         onMoveItem={biophysicsActive
           ? (fromLayerType, fromIndex, toLayerType) =>
               phaseLayers(phase).moveItem(bodyPart, fromLayerType, fromIndex, toLayerType)
@@ -358,7 +384,7 @@ const LayerDisplay = ({
         context={weatherContext}
         onEditOuting={onReset}
         onActivityChange={onActivityChange}
-        onEditWeather={onWeatherChange ? () => setWeatherDrawerOpen(true) : undefined}
+        onEditWeather={onWeatherChange ? openWeatherDrawer : undefined}
         loading={weatherLoading}
       />
       {onWeatherChange && (
@@ -367,6 +393,7 @@ const LayerDisplay = ({
           onOpenChange={setWeatherDrawerOpen}
           onSubmit={onWeatherChange}
           loading={weatherLoading}
+          onCloseAutoFocus={weatherFocus.restore}
         />
       )}
 
@@ -503,6 +530,7 @@ const LayerDisplay = ({
             cloContext={pickerCloContext}
             onSelect={handlePickerSelect}
             onRemove={pickerTarget?.replaceIndex !== null ? handlePickerRemove : undefined}
+            onCloseAutoFocus={pickerFocus.restore}
           />
         )}
       </div>

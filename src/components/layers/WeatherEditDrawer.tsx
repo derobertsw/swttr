@@ -34,6 +34,8 @@ interface WeatherEditDrawerProps {
   /** Resolves true once the weather is updated; the drawer stays open otherwise. */
   onSubmit: (location: LocationSuggestion, localDateTime?: string) => Promise<boolean>;
   loading?: boolean;
+  /** Where focus goes on close; the drawer opens from code, not a trigger. */
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 /** A date picked on the calendar, or a shortcut's days from today at the place. */
@@ -44,6 +46,7 @@ export function WeatherEditDrawer({
   onOpenChange,
   onSubmit,
   loading = false,
+  onCloseAutoFocus,
 }: WeatherEditDrawerProps) {
   const locationSearch = useLocationSearch();
   const [day, setDay] = useState<ForecastDay | null>(null);
@@ -106,7 +109,7 @@ export function WeatherEditDrawer({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent>
+      <DrawerContent onCloseAutoFocus={onCloseAutoFocus}>
         <DrawerHeader className="pb-2">
           <DrawerTitle>Update Weather</DrawerTitle>
           <DrawerDescription>

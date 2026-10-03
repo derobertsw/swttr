@@ -60,6 +60,8 @@ interface PreferencesDrawerProps {
   onBodyMetricsChange: (metrics: { heightInches?: number; weightLbs?: number }) => void | Promise<void>;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Where focus goes on close, when the drawer opens from code rather than `children`. */
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 export function PreferencesDrawer({
@@ -73,6 +75,7 @@ export function PreferencesDrawer({
   onBodyMetricsChange,
   open,
   onOpenChange,
+  onCloseAutoFocus,
 }: PreferencesDrawerProps) {
   const selectedSensitivity = SENSITIVITY_OPTIONS.find((opt) => opt.value === sensitivity);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -110,7 +113,7 @@ export function PreferencesDrawer({
   return (
       <Drawer open={open} onOpenChange={onOpenChange}>
       {children && <DrawerTrigger asChild>{children}</DrawerTrigger>}
-      <DrawerContent>
+      <DrawerContent onCloseAutoFocus={onCloseAutoFocus}>
         <div className="mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col">
           <DrawerHeader className="border-b border-border pb-3">
             <div className="flex items-start justify-between gap-3">

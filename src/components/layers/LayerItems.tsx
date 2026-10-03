@@ -13,6 +13,16 @@ import {
 } from "@/lib/layers";
 import { cn } from "@/lib/utils";
 
+/** The id of a worn item, so focus can find the item in its place after the picker closes. */
+export function layerItemId(bodyPart: BodyPart, layerType: LayerType, index: number) {
+  return `layer-item-${bodyPart}-${layerType}-${index}`;
+}
+
+/** The id of a layer type's Add button. */
+export function addLayerId(bodyPart: BodyPart, layerType: LayerType) {
+  return `add-layer-${bodyPart}-${layerType}`;
+}
+
 interface LayerItemsProps {
   layers: LayerSet;
   bodyPart: BodyPart;
@@ -52,12 +62,14 @@ interface DragInfo {
 }
 
 function SwipeableLayerItem({
+  id,
   item,
   isDragSource,
   onTap,
   onRemove,
   onDragStart,
 }: {
+  id: string;
   item: LayerItem;
   isDragSource?: boolean;
   onTap: () => void;
@@ -129,6 +141,7 @@ function SwipeableLayerItem({
 
       {/* Main content */}
       <div
+        id={id}
         role="button"
         tabIndex={0}
         className="relative flex min-h-11 cursor-pointer touch-pan-y items-center gap-1.5 rounded-control border border-input bg-card px-2.5 py-2 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -188,6 +201,8 @@ function SwipeableLayerItem({
 function LayerGroup({
   elRef,
   label,
+  itemId,
+  addId,
   items,
   otherPhaseItems,
   syncLabel,
@@ -201,6 +216,8 @@ function LayerGroup({
 }: {
   elRef?: (el: HTMLLIElement | null) => void;
   label: string;
+  itemId: (index: number) => string;
+  addId: string;
   items: LayerItem[];
   otherPhaseItems?: LayerItem[];
   syncLabel?: string;
@@ -231,6 +248,7 @@ function LayerGroup({
         {items.map((item, index) => (
           <SwipeableLayerItem
             key={`${item.sourceId || item.name}-${index}`}
+            id={itemId(index)}
             item={item}
             isDragSource={dragSourceIndex === index}
             onTap={() => onItemTap(index)}
@@ -251,7 +269,7 @@ function LayerGroup({
             {syncLabel ? `${syncLabel} ${label.toLowerCase()}` : `Use ${label.toLowerCase()}`}
           </Button>
         )}
-        <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" onClick={onAddLayer}>
+        <Button id={addId} type="button" variant="ghost" size="sm" className="text-muted-foreground" onClick={onAddLayer}>
           <Plus aria-hidden="true" />
           Add {label.toLowerCase()}
         </Button>
@@ -374,6 +392,8 @@ export function LayerItems({
             key={`${bodyPart}:${layerType}`}
             elRef={(el) => { if (el) layerGroupRefs.current.set(layerType, el); }}
             label={LAYER_LABELS[layerType]}
+            itemId={(index) => layerItemId(bodyPart, layerType, index)}
+            addId={addLayerId(bodyPart, layerType)}
             items={items}
             otherPhaseItems={otherPhaseItemsForType}
             syncLabel={syncLabel}
