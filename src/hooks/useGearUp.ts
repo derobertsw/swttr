@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
-import { format } from "date-fns";
+import { useAuth } from "@clerk/nextjs";
+import { format, parse } from "date-fns";
 import { toast } from "sonner";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -11,6 +12,7 @@ import { useBiophysicsRecommendation } from "@/hooks/useBiophysicsRecommendation
 import { useActivitySelection } from "@/hooks/useActivitySelection";
 import { fetchWeatherAt } from "@/hooks/useCurrentWeather";
 import { useDeviceLocation, yourLocation } from "@/hooks/useDeviceLocation";
+import { useResultsHistoryEntry } from "@/hooks/useResultsHistoryEntry";
 import {
   buildLayersResult,
   createInitialState,
@@ -21,8 +23,9 @@ import {
   PlanAheadError,
   type InputMode,
 } from "@/lib/gearUp";
+import { readGearUpDraft, saveGearUpDraft } from "@/lib/gearUpDraft";
 import { logWarn } from "@/lib/logger";
-import type { LaterTime, Outing } from "@/types/outing";
+import type { LaterTime, Outing, OutingTime } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
 
@@ -40,6 +43,9 @@ function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boole
  * Each request reads its inputs from one Outing, and its result keeps that
  * outing (see docs/outing-contract.md). Changes made from the results start
  * from the shown result's outing, not from the form.
+ *
+ * The results have their own browser history entry, and what was entered is
+ * kept for the tab, so Back, Forward and a reload keep the outing.
  */
 export function useGearUp() {
   const searchParams = useSearchParams();
@@ -52,6 +58,9 @@ export function useGearUp() {
   } = usePreferences();
   const { activity, setActivity, exertion, setExertion, initializing, resetActivity } =
     useActivitySelection(defaultActivity, hasStoredDefaultActivity || !preferencesLoading);
+  // A personalized request needs to know who's signed in, and their preferences.
+  const { isLoaded: authLoaded } = useAuth();
+  const readyToRequest = authLoaded && !preferencesLoading;
 
   // /?mode=planAhead, which the iOS shell's Plan tab opens, starts on Later.
   const initialMode: InputMode = searchParams.get("mode") === "planAhead" ? "later" : "now";
@@ -61,6 +70,8 @@ export function useGearUp() {
   const { status: locationStatus, locate, cancel: cancelLocating } = useDeviceLocation();
   const formRef = useRef<HTMLFormElement>(null);
   const biophysics = useBiophysicsRecommendation();
+  const { isOnResultsEntry, navigationRef, leaveResultsEntry, forgetResultsEntry } =
+    useResultsHistoryEntry(state.result !== null);
 
   const setDate = useCallback((d: Date | undefined) => dispatch({ type: "SET_DATE", date: d }), []);
   const setTime = useCallback((t: string) => dispatch({ type: "SET_TIME", time: t }), []);
@@ -118,6 +129,37 @@ export function useGearUp() {
     return true;
   }, [layersFor]);
 
+  /**
+   * Shows a multi-day plan for a later outing. Resolves false, after saying
+   * why, when it can't be built: on the start date when that's what needs to
+   * change. Nothing changes once `isCurrent` says the request was retired.
+   */
+  const planFor = useCallback(async (isCurrent: () => boolean, outing: Outing & { when: LaterTime }) => {
+    try {
+      const result = await fetchPlanAhead(outing, sensitivity);
+      if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", result });
+      return true;
+    } catch (error) {
+      logWarn("useGearUp.planFor", error);
+      if (!isCurrent()) return false;
+      if (error instanceof PlanAheadError && error.field === "startDate") {
+        // Shown on the start date, which is what needs to change.
+        dispatch({ type: "START_DATE_INVALID", error: error.message, location: outing.place });
+      } else {
+        toast.error(error instanceof PlanAheadError ? error.message : "Couldn't build the plan. Try again.");
+        dispatch({ type: "SUBMIT_ERROR" });
+      }
+      return false;
+    }
+  }, [sensitivity]);
+
+  /** Shows an outing's layers, or its plan when it's several days. */
+  const showOuting = useCallback((isCurrent: () => boolean, outing: Outing) =>
+    outing.when.mode === "later" && outing.when.durationDays > 1
+      ? planFor(isCurrent, { ...outing, when: outing.when })
+      : recommendFor(isCurrent, outing),
+  [planFor, recommendFor]);
+
   /** Makes the device's position the outing's place, once it's found. */
   const handleUseMyLocation = useCallback(async () => {
     const coordinates = await locate();
@@ -142,40 +184,13 @@ export function useGearUp() {
       return;
     }
 
-    if (!later) {
-      // Current weather at the chosen place, never silently at the device's location.
-      await recommendFor(startRequest(), { activity, exertion, place, when: { mode: "now" } });
-      return;
-    }
-
-    const when: LaterTime = {
-      mode: "later",
-      date: format(state.date!, "yyyy-MM-dd"),
-      time: state.time,
-      durationDays: state.durationDays,
-    };
-    const outing = { activity, exertion, place, when };
-    const isCurrent = startRequest();
-    if (when.durationDays === 1) {
-      // Single day: layers for the forecast hour the outing starts, read on the place's clock.
-      await recommendFor(isCurrent, outing);
-      return;
-    }
-    try {
-      const result = await fetchPlanAhead(outing, sensitivity);
-      if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", result });
-    } catch (error) {
-      logWarn("useGearUp.handleSubmit", error);
-      if (!isCurrent()) return;
-      if (error instanceof PlanAheadError && error.field === "startDate") {
-        // Shown on the start date, which is what needs to change.
-        dispatch({ type: "START_DATE_INVALID", error: error.message, location: place });
-      } else {
-        toast.error(error instanceof PlanAheadError ? error.message : "Couldn't build the plan. Try again.");
-        dispatch({ type: "SUBMIT_ERROR" });
-      }
-    }
-  }, [activity, exertion, state, locationStatus, locationSearch, sensitivity, startRequest, recommendFor]);
+    // Now: current weather at the chosen place, never silently at the device's location.
+    // Later: the forecast hour the outing starts, read on the place's clock, or a plan for several days.
+    const when: OutingTime = later
+      ? { mode: "later", date: format(state.date!, "yyyy-MM-dd"), time: state.time, durationDays: state.durationDays }
+      : { mode: "now" };
+    await showOuting(startRequest(), { activity, exertion, place, when });
+  }, [activity, exertion, state, locationStatus, locationSearch, startRequest, showOuting]);
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches "gearUp"
   // from its native Gear Up tab while this page is open, and otherwise opens
@@ -234,6 +249,7 @@ export function useGearUp() {
     [recommendForShownWeather]
   );
 
+  /** Start over: clears what was entered, and the last outing with it. */
   const resetToInitialState = useCallback(() => {
     latestRequest.current += 1;
     resetActivity();
@@ -241,27 +257,129 @@ export function useGearUp() {
     dispatch({ type: "RESET" });
     locationSearch.reset();
     biophysics.reset();
-  }, [resetActivity, cancelLocating, locationSearch, biophysics]);
+    forgetResultsEntry();
+  }, [resetActivity, cancelLocating, locationSearch, biophysics, forgetResultsEntry]);
 
   const formShowing: InputMode | null = state.result === null ? state.inputMode : null;
   /**
-   * Back to the form in `mode`, keeping the activity, place, date, time and
-   * duration. A request made from the form in that mode carries on; one from
-   * the results, or from the form in the other mode, is retired.
+   * The form in `mode`, keeping the activity, place, date, time and duration.
+   * Unless told to `retire` it, a request made from the form in that mode
+   * carries on; one from the results, or from the form in the other mode, is
+   * retired.
    */
-  const showForm = useCallback((mode: InputMode) => {
-    if (formShowing !== mode) latestRequest.current += 1;
-    dispatch({ type: "SHOW_FORM", mode });
+  const showForm = useCallback((mode: InputMode, retire = formShowing !== mode) => {
+    if (retire) latestRequest.current += 1;
+    dispatch({ type: "SHOW_FORM", mode, keepLoading: !retire });
   }, [formShowing]);
+  /**
+   * Back to the form from the page itself, which also steps back over the
+   * results' history entry, so the browser's next Back leaves Gear up.
+   */
+  const backToForm = useCallback((mode: InputMode) => {
+    showForm(mode);
+    leaveResultsEntry();
+  }, [showForm, leaveResultsEntry]);
   /**
    * Now or Later on the form. A request still running was made for the other
    * mode, so it's retired: its result would otherwise come back to a form,
    * and an Edit outing, on the mode it wasn't asked for.
    */
-  const setInputMode = showForm;
-  const showPlanForm = useCallback(() => showForm("later"), [showForm]);
+  const setInputMode = backToForm;
+  const showPlanForm = useCallback(() => backToForm("later"), [backToForm]);
   /** Edit outing: back to the form as the results were requested from it, with what was entered. */
-  const editOuting = useCallback(() => showForm(state.inputMode), [showForm, state.inputMode]);
+  const editOuting = useCallback(() => backToForm(state.inputMode), [backToForm, state.inputMode]);
+
+  /**
+   * Asks again for the last result's outing, for a reload or Forward on the
+   * results. The form shows in the outing's mode while it loads. When nothing
+   * comes of it, the browser steps back off the results' entry.
+   */
+  const resume = useCallback(async (outing: Outing) => {
+    showForm(outing.when.mode, true);
+    const isCurrent = startRequest();
+    const shown = await showOuting(isCurrent, outing);
+    if (!shown && isCurrent()) leaveResultsEntry();
+  }, [showForm, startRequest, showOuting, leaveResultsEntry]);
+
+  // Set when the last outing should be asked for again once a request can be made.
+  const pendingResume = useRef<Outing | null>(null);
+
+  // What was entered in this tab comes back, like after a reload, or after
+  // going to another page and coming back. On the results' entry, the last
+  // outing is asked for again.
+  useEffect(() => {
+    const draft = readGearUpDraft();
+    if (draft) {
+      setActivity(draft.activity);
+      setExertion(draft.exertion);
+      if (draft.place) locationSearch.handleSelectLocation(draft.place);
+    }
+    dispatch({
+      type: "RESTORE",
+      kept: draft && {
+        inputMode: initialMode === "later" ? "later" : draft.inputMode,
+        date: draft.date ? parse(draft.date, "yyyy-MM-dd", new Date()) : undefined,
+        time: draft.time,
+        durationDays: draft.durationDays,
+        lastOuting: draft.lastOuting,
+      },
+    });
+    if (isOnResultsEntry()) {
+      if (draft?.lastOuting) pendingResume.current = draft.lastOuting;
+      else leaveResultsEntry();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const { restored } = state;
+  useEffect(() => {
+    if (!restored || !readyToRequest || !pendingResume.current) return;
+    const outing = pendingResume.current;
+    pendingResume.current = null;
+    void resume(outing);
+  }, [restored, readyToRequest, resume]);
+
+  useEffect(() => {
+    if (!restored) return;
+    saveGearUpDraft({
+      activity,
+      exertion,
+      place: locationSearch.selectedLocation,
+      inputMode: state.inputMode,
+      date: state.date ? format(state.date, "yyyy-MM-dd") : null,
+      time: state.time,
+      durationDays: state.durationDays,
+      lastOuting: state.lastOuting,
+    });
+  }, [
+    restored,
+    activity,
+    exertion,
+    locationSearch.selectedLocation,
+    state.inputMode,
+    state.date,
+    state.time,
+    state.durationDays,
+    state.lastOuting,
+  ]);
+
+  // The browser's Back from the results shows the form, as Edit outing does,
+  // and retires whatever was running for them. Forward asks again for the
+  // last outing, or steps back when there's none.
+  useEffect(() => {
+    navigationRef.current = {
+      onBack: () => showForm(state.inputMode, true),
+      onForward: () => {
+        if (state.result) return;
+        if (!state.lastOuting) {
+          leaveResultsEntry();
+        } else if (readyToRequest) {
+          void resume(state.lastOuting);
+        } else {
+          pendingResume.current = state.lastOuting;
+        }
+      },
+    };
+  });
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches
   // "navigatePlanAhead" when its Plan tab is tapped again on this page, and

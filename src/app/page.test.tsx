@@ -103,6 +103,9 @@ describe("Home Page", () => {
     mockUseAuth.mockReturnValue(SIGNED_IN);
     originalGeolocation = navigator.geolocation;
     localStorageMock.getItem.mockReturnValue(null);
+    // Each test starts in a new tab: nothing entered, and not on a results entry.
+    sessionStorage.clear();
+    window.history.replaceState(null, "");
     // Reset search params
     mockSearchParams.delete("mode");
     mockSearchParams.delete("gearUp");
@@ -527,6 +530,188 @@ describe("Home Page", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    describe("Back, Forward and reload", () => {
+      const activity = () => screen.getByRole("radiogroup", { name: "Activity" });
+      const onResultsEntry = () => window.history.state?.swttrGearUp === "results";
+
+      /** Goes back or forward in the browser, and waits until it's there. */
+      async function traverse(delta: -1 | 1) {
+        const arrived = new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true }));
+        await act(async () => {
+          window.history.go(delta);
+          await arrived;
+        });
+      }
+
+      /** XC skiing at Stowe, now. */
+      async function seeXcAtStowe(user: ReturnType<typeof userEvent.setup>) {
+        await user.click(within(await screen.findByRole("radiogroup", { name: "Activity" })).getByRole("radio", { name: /xc skiing/i }));
+        await chooseStowe(user);
+        await user.click(gearUpButton());
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+      }
+
+      it("leaves the results for the form with the browser's Back, and asks again on Forward", async () => {
+        const weatherRequests = mockOutingApis();
+        const user = userEvent.setup();
+        render(<Home />);
+
+        await seeXcAtStowe(user);
+        expect(onResultsEntry()).toBe(true);
+
+        await traverse(-1);
+
+        expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
+        expect(within(activity()).getByRole("radio", { name: /xc skiing/i })).toBeChecked();
+        expect(placeField()).toHaveValue("Stowe, Vermont, United States");
+
+        await traverse(1);
+
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+        expect(weatherRequests).toHaveLength(2);
+        expect(onResultsEntry()).toBe(true);
+      });
+
+      it("hears the browser's Back when the page re-renders before its own listener, as Next.js makes it", async () => {
+        mockOutingApis();
+        const user = userEvent.setup();
+        // Next.js's popstate listener is added before the page's, and re-renders the page.
+        let rerenderPage = () => {};
+        const nextJsListener = () => act(() => rerenderPage());
+        window.addEventListener("popstate", nextJsListener);
+        try {
+          const { rerender } = render(<Home />);
+          rerenderPage = () => rerender(<Home />);
+
+          await seeXcAtStowe(user);
+          // Outside act, so the re-render's effects run before the page's listener, as in the browser.
+          const arrived = new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true }));
+          window.history.go(-1);
+          await arrived;
+
+          await waitFor(() => expect(screen.queryByText("Current conditions")).not.toBeInTheDocument());
+          expect(placeField()).toHaveValue("Stowe, Vermont, United States");
+        } finally {
+          window.removeEventListener("popstate", nextJsListener);
+        }
+      });
+
+      it("steps back over the results' entry when Back on the page leaves them", async () => {
+        mockOutingApis();
+        const user = userEvent.setup();
+        render(<Home />);
+
+        await seeXcAtStowe(user);
+        await user.click(screen.getByRole("button", { name: "Back" }));
+        await waitFor(() => expect(onResultsEntry()).toBe(false));
+
+        // New results replace the ones left, so the browser's Back from them reaches the form.
+        await user.click(gearUpButton());
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+
+        await traverse(-1);
+
+        expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
+        expect(placeField()).toHaveValue("Stowe, Vermont, United States");
+      });
+
+      it("keeps what was entered on the form through a reload, without asking for anything", async () => {
+        const weatherRequests = mockOutingApis();
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+
+        await user.click(within(await screen.findByRole("radiogroup", { name: "Activity" })).getByRole("radio", { name: /xc skiing/i }));
+        await user.click(screen.getByRole("radio", { name: "Hard" }));
+        await chooseStowe(user);
+        unmount();
+        render(<Home />);
+
+        expect(within(activity()).getByRole("radio", { name: /xc skiing/i })).toBeChecked();
+        expect(screen.getByRole("radio", { name: "Hard" })).toBeChecked();
+        expect(placeField()).toHaveValue("Stowe, Vermont, United States");
+        expect(screen.getByRole("radio", { name: "Now" })).toBeChecked();
+        expect(weatherRequests).toEqual([]);
+      });
+
+      it("asks for the results' outing again after a reload on them, with fresh weather", async () => {
+        const weatherRequests = mockOutingApis();
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+
+        await seeXcAtStowe(user);
+        unmount();
+        mockOutingApis(() => {
+          weatherRequests.push("after reload");
+          return respond(200, { temperature: 10, windSpeed: 30 });
+        });
+        render(<Home />);
+
+        expect(await screen.findByText(/wind 30 mph/i)).toBeInTheDocument();
+        expect(weatherRequests).toEqual(["/api/weather?lat=44.47&lon=-72.69", "after reload"]);
+        expect(onResultsEntry()).toBe(true);
+
+        await user.click(screen.getByRole("button", { name: "Back" }));
+
+        expect(within(activity()).getByRole("radio", { name: /xc skiing/i })).toBeChecked();
+        expect(placeField()).toHaveValue("Stowe, Vermont, United States");
+      });
+
+      it("waits until sign-in has loaded before asking again after a reload", async () => {
+        const weatherRequests = mockOutingApis();
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+
+        await seeXcAtStowe(user);
+        unmount();
+        mockUseAuth.mockReturnValue({ userId: null, isLoaded: false, isSignedIn: false });
+        const { rerender } = render(<Home />);
+        await act(async () => {});
+
+        expect(weatherRequests).toHaveLength(1);
+
+        mockUseAuth.mockReturnValue(SIGNED_IN);
+        rerender(<Home />);
+
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+        expect(weatherRequests).toHaveLength(2);
+      });
+
+      it("says why when a reload on the results can't get the weather again, and steps back off them", async () => {
+        const { toast } = await import("sonner");
+        mockOutingApis();
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+
+        await seeXcAtStowe(user);
+        unmount();
+        mockOutingApis(() => respond(502, { error: "Bad gateway" }));
+        render(<Home />);
+
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not get weather for this location."));
+        await waitFor(() => expect(onResultsEntry()).toBe(false));
+        expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
+        expect(within(activity()).getByRole("radio", { name: /xc skiing/i })).toBeChecked();
+        expect(placeField()).toHaveValue("Stowe, Vermont, United States");
+        expect(gearUpButton()).toBeEnabled();
+      });
+
+      it("forgets the outing on Start over", async () => {
+        const weatherRequests = mockOutingApis();
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+
+        await seeXcAtStowe(user);
+        await user.click(screen.getByRole("link", { name: "SWTTR" }));
+        expect(onResultsEntry()).toBe(false);
+        unmount();
+        render(<Home />);
+
+        expect(within(activity()).getByRole("radio", { name: /alpine skiing/i })).toBeChecked();
+        expect(placeField()).toHaveValue("");
+        expect(weatherRequests).toHaveLength(1);
+      });
     });
   });
 
@@ -1228,6 +1413,56 @@ describe("Home Page", () => {
       expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
       expect(screen.getByText("4 days")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Build my plan" })).toBeEnabled();
+    });
+
+    it("keeps a multi-day plan's inputs through a reload, and builds the plan again on its results", async () => {
+      const { requests } = mockPlanAheadApis();
+      const user = userEvent.setup();
+      const { unmount } = render(<Home />);
+
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await chooseSeveralDays(user);
+      await changeDays(user, "More days", 1);
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
+      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      unmount();
+      render(<Home />);
+
+      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      expect(requests.planAhead).toHaveLength(2);
+      expect(requests.planAhead[1]).toEqual(requests.planAhead[0]);
+
+      await user.click(screen.getByRole("button", { name: "Plan Another Trip" }));
+
+      expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Several days" })).toBeChecked();
+      expect(screen.getByText("4 days")).toBeInTheDocument();
+    });
+
+    it("shows why on the start date when a reload can't build the plan again", async () => {
+      mockPlanAheadApis();
+      const user = userEvent.setup();
+      const { unmount } = render(<Home />);
+
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await chooseSeveralDays(user);
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
+      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      unmount();
+      const { requests } = mockPlanAheadApis({
+        planAhead: () => Promise.resolve(respond(400, { error: "Pick a start date in the forecast.", field: "startDate" })),
+      });
+      render(<Home />);
+
+      expect(await screen.findByText("Pick a start date in the forecast.")).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Multi-Day Layer Plan" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Build my plan" })).toBeEnabled();
+      expect(requests.planAhead).toHaveLength(1);
+      await waitFor(() => expect(window.history.state?.swttrGearUp).toBeUndefined());
     });
 
     it("returns to the plan when the iOS shell's Plan tab is tapped again", async () => {

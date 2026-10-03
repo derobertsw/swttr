@@ -44,7 +44,17 @@ interface GearUpState {
    * request leaves it in place while it loads, and when it fails.
    */
   result: OutingResult | null;
+  /** The outing of the last result shown, kept on the form so the results can be asked for again. */
+  lastOuting: Outing | null;
+  /**
+   * Whether what was kept for the tab has been read back (see useGearUp).
+   * Nothing is kept until it has, so a reload can't save over it.
+   */
+  restored: boolean;
 }
+
+/** What's kept for the tab besides the activity, effort and place. */
+type RestoredFields = Pick<GearUpState, "inputMode" | "date" | "time" | "durationDays" | "lastOuting">;
 
 type GearUpAction =
   | { type: "SET_INPUT_MODE"; mode: InputMode }
@@ -56,7 +66,10 @@ type GearUpAction =
   | { type: "SUBMIT_START" }
   | { type: "SUBMIT_SUCCESS"; result: OutingResult }
   | { type: "SUBMIT_ERROR" }
-  | { type: "SHOW_FORM"; mode: InputMode }
+  /** `keepLoading` when the running request was made from the form in this mode (see useGearUp). */
+  | { type: "SHOW_FORM"; mode: InputMode; keepLoading: boolean }
+  /** `kept` is null when nothing was kept. */
+  | { type: "RESTORE"; kept: RestoredFields | null }
   | { type: "RESET" };
 
 export function createInitialState(inputMode: InputMode): GearUpState {
@@ -69,12 +82,9 @@ export function createInitialState(inputMode: InputMode): GearUpState {
     startDateError: null,
     loading: false,
     result: null,
+    lastOuting: null,
+    restored: false,
   };
-}
-
-/** Whether the form is showing in `mode`, so that a request still running was made from it. */
-function showsForm(state: { inputMode: InputMode; result: OutingResult | null }, mode: InputMode): boolean {
-  return state.result === null && state.inputMode === mode;
 }
 
 export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpState {
@@ -94,19 +104,19 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
     case "SUBMIT_START":
       return { ...state, loading: true, startDateError: null };
     case "SUBMIT_SUCCESS":
-      return { ...state, loading: false, result: action.result };
+      return { ...state, loading: false, result: action.result, lastOuting: action.result.outing };
     case "SUBMIT_ERROR":
       return { ...state, loading: false };
     case "SHOW_FORM": {
-      // Keeps what was entered. A request made from the form in this mode
-      // keeps it busy; one from the results, or from the form in the other
-      // mode, is retired (see useGearUp).
-      const { date, time, durationDays } = state;
-      const loading = state.loading && showsForm(state, action.mode);
-      return { ...createInitialState(action.mode), date, time, durationDays, loading };
+      // Keeps what was entered, and the last outing.
+      const { date, time, durationDays, lastOuting, restored } = state;
+      const loading = state.loading && action.keepLoading;
+      return { ...createInitialState(action.mode), date, time, durationDays, lastOuting, restored, loading };
     }
+    case "RESTORE":
+      return { ...state, ...action.kept, restored: true };
     case "RESET":
-      return createInitialState("now");
+      return { ...createInitialState("now"), restored: state.restored };
     default:
       return state;
   }

@@ -60,9 +60,41 @@ The advice kind and the request status are separate:
 
 - **Back (Edit outing)** returns to the form on Now or Later, as the results were requested, with the activity, effort, place, date, time and duration as they were entered. An activity picked on the results reaches the form only once its layers arrive, so Back while they load, or after they fail, opens on the activity that was shown.
 - **Plan Another Trip** and the iOS Plan tab's `navigatePlanAhead` event do the same, on Later.
-- **The logo (Start over)** clears the inputs and returns to the form on Now with the default activity.
+- **The logo (Start over)** clears the inputs and the last outing, and returns to the form on Now with the default activity.
 
 Known gap: the form keeps what was typed into it. If the weather drawer moved the results to another place or time, Edit outing still shows the form's place. #126/#127 replace the drawer with Edit outing.
+
+## Back, Forward and reload
+
+The results have their own browser history entry, at the same URL. [`src/hooks/useResultsHistoryEntry.ts`](../src/hooks/useResultsHistoryEntry.ts) marks it in `history.state`.
+
+| What happens | Outcome |
+|---|---|
+| Results show from the form | One history entry is added. Changing the activity, place or time on the results replaces the result without adding entries. |
+| The browser's Back from the results | The form, as Edit outing shows it. Anything still loading for the results is dropped. |
+| Edit outing, Plan Another Trip, the iOS Plan tab, or Now/Later on the form while results load | The form, and the page steps back over the results' entry, so the browser's next Back leaves Gear up. |
+| The browser's Forward to the results | The last outing is asked for again, with fresh weather. With no last outing, the browser steps back. |
+| Reload on the form | The form comes back with what was entered. Nothing is requested. |
+| Reload on the results, or Back to them from another page | The last outing is asked for again, once sign-in and preferences have loaded. The form shows in the outing's mode with the request running. If it fails, the form says why and the browser steps back off the results' entry. |
+| Coming back to Gear up from a link, in the same tab | The form, with what was entered. |
+| The logo | The entry stops being a results entry. The browser's next Back may show the same form once. |
+
+Results aren't stored, so anything shown after a reload or Forward is a new request for whoever is signed in.
+
+Known gap: following a link to `/` while on the results, like Gear up in the sidebar, keeps the results on screen. Next.js then replaces the entry's state, so a reload afterwards shows the form instead of the results. Back still works.
+
+### What's kept for the tab
+
+[`src/lib/gearUpDraft.ts`](../src/lib/gearUpDraft.ts) keeps the form and the last outing in `sessionStorage`, under `swttr-gear-up`:
+- the activity, effort and picked place, which is "Your location" with the device's coordinates when it came from the device;
+- Now or Later, the start date and time, and the number of days;
+- the last result's outing.
+
+It's never put in the URL. It's gone when the tab closes, and a draft that doesn't validate is ignored. Weather, advice, body metrics and the wardrobe aren't kept.
+
+`/?mode=planAhead` still opens on Later. Before anything is kept, the hook reads back what's there, so a reload can't save over it.
+
+#168 decides what happens to the kept outing across sign-in, sign-out and account switches.
 
 ## What each activity gets
 
