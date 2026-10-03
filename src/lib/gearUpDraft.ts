@@ -4,6 +4,7 @@
  * docs/outing-contract.md). Only what the person entered is kept: no weather,
  * advice, body metrics or wardrobe.
  */
+import { format, isValid, parse } from "date-fns";
 import { ACTIVITIES } from "@/data/activities";
 import { EXERTION_LEVELS, type ExertionLevel } from "@/lib/biophysics/exertion";
 import { STORAGE_KEYS } from "@/lib/storage";
@@ -28,12 +29,18 @@ export interface GearUpDraft {
 type Fields = Record<string, unknown>;
 
 const isObject = (value: unknown): value is Fields => typeof value === "object" && value !== null;
-const isDate = (value: unknown): value is string => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
-const isTime = (value: unknown): value is string => typeof value === "string" && /^\d{2}:\d{2}$/.test(value);
+const isTime = (value: unknown): value is string => typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 const isDuration = (value: unknown): value is number => Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 7;
 const isActivity = (value: unknown): value is string => ACTIVITIES.some((activity) => activity.value === value);
 const isExertion = (value: unknown): value is ExertionLevel => EXERTION_LEVELS.some((level) => level === value);
 const isMode = (value: unknown): value is OutingTime["mode"] => value === "now" || value === "later";
+
+/** A real calendar date as "yyyy-MM-dd": "2026-02-31" has the shape, but isn't one. */
+function isDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = parse(value, "yyyy-MM-dd", new Date());
+  return isValid(date) && format(date, "yyyy-MM-dd") === value;
+}
 
 function isPlace(value: unknown): value is LocationSuggestion {
   return (

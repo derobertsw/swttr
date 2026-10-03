@@ -678,6 +678,33 @@ describe("Home Page", () => {
         expect(weatherRequests).toHaveLength(2);
       });
 
+      it.each([
+        { way: "the browser's Back", leave: () => traverse(-1) },
+        {
+          way: "Start over",
+          leave: (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("link", { name: "SWTTR" })),
+        },
+      ])("doesn't ask again after a reload when $way leaves the results while sign-in loads", async ({ leave }) => {
+        const weatherRequests = mockOutingApis();
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+
+        await seeXcAtStowe(user);
+        unmount();
+        mockUseAuth.mockReturnValue({ userId: null, isLoaded: false, isSignedIn: false });
+        const { rerender } = render(<Home />);
+        await act(async () => {});
+        await leave(user);
+
+        mockUseAuth.mockReturnValue(SIGNED_IN);
+        rerender(<Home />);
+        await act(async () => {});
+
+        expect(weatherRequests).toHaveLength(1);
+        expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
+        expect(onResultsEntry()).toBe(false);
+      });
+
       it("says why when a reload on the results can't get the weather again, and steps back off them", async () => {
         const { toast } = await import("sonner");
         mockOutingApis();

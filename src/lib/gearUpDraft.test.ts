@@ -45,7 +45,13 @@ describe("gearUpDraft", () => {
     ["an unknown effort", { ...DRAFT, exertion: "extreme" }],
     ["a place without coordinates", { ...DRAFT, place: { name: "Stowe", country: "United States" } }],
     ["a malformed date", { ...DRAFT, date: "Oct 8" }],
+    ["a date that isn't on the calendar", { ...DRAFT, date: "2026-02-31" }],
     ["a malformed time", { ...DRAFT, time: "7:30am" }],
+    ["a time that isn't on the clock", { ...DRAFT, time: "25:99" }],
+    [
+      "a last outing on a date that isn't on the calendar",
+      { ...DRAFT, lastOuting: { ...DRAFT.lastOuting, when: { ...DRAFT.lastOuting!.when, date: "2026-99-99" } } },
+    ],
     ["too many days", { ...DRAFT, durationDays: 8 }],
     ["a malformed last outing", { ...DRAFT, lastOuting: { ...DRAFT.lastOuting, when: { mode: "later" } } }],
   ])("ignores a draft with %s", (_, draft) => {

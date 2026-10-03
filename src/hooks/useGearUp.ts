@@ -335,8 +335,10 @@ export function useGearUp() {
     if (!restored || !readyToRequest || !pendingResume.current) return;
     const outing = pendingResume.current;
     pendingResume.current = null;
-    void resume(outing);
-  }, [restored, readyToRequest, resume]);
+    // Leaving the results while sign-in loads (Back, Start over, or the form
+    // from the page) leaves their entry, and drops the queued request with it.
+    if (isOnResultsEntry()) void resume(outing);
+  }, [restored, readyToRequest, resume, isOnResultsEntry]);
 
   useEffect(() => {
     if (!restored) return;

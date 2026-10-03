@@ -75,7 +75,7 @@ The results have their own browser history entry, at the same URL. [`src/hooks/u
 | Edit outing, Plan Another Trip, the iOS Plan tab, or Now/Later on the form while results load | The form, and the page steps back over the results' entry, so the browser's next Back leaves Gear up. |
 | The browser's Forward to the results | The last outing is asked for again, with fresh weather. With no last outing, the browser steps back. |
 | Reload on the form | The form comes back with what was entered. Nothing is requested. |
-| Reload on the results, or Back to them from another page | The last outing is asked for again, once sign-in and preferences have loaded. The form shows in the outing's mode with the request running. If it fails, the form says why and the browser steps back off the results' entry. |
+| Reload on the results, or Back to them from another page | The last outing is asked for again, once sign-in and preferences have loaded; leaving the results before then drops the request. The form shows in the outing's mode with the request running. If it fails, the form says why and the browser steps back off the results' entry. |
 | Coming back to Gear up from a link, in the same tab | The form, with what was entered. |
 | The logo | The entry stops being a results entry. The browser's next Back may show the same form once. |
 
@@ -90,7 +90,7 @@ Known gap: following a link to `/` while on the results, like Gear up in the sid
 - Now or Later, the start date and time, and the number of days;
 - the last result's outing.
 
-It's never put in the URL. It's gone when the tab closes, and a draft that doesn't validate is ignored. Weather, advice, body metrics and the wardrobe aren't kept.
+It's never put in the URL. It's gone when the tab closes. A draft that doesn't validate is ignored, including a date or time that isn't real, like `2026-02-31`. Weather, advice, body metrics and the wardrobe aren't kept.
 
 `/?mode=planAhead` still opens on Later. Before anything is kept, the hook reads back what's there, so a reload can't save over it.
 
