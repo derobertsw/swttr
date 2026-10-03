@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { useReturnFocus } from "./useReturnFocus";
 
 function DetailsDialog() {
@@ -64,16 +65,18 @@ describe("useReturnFocus", () => {
     await waitFor(() => expect(opener).toHaveFocus());
   });
 
-  it("falls back when a tap left nothing focused", async () => {
+  it("returns focus to a tapped control, not one that kept focus", async () => {
     const user = userEvent.setup();
     render(<DetailsDialog />);
+    screen.getByRole("button", { name: "Fallback" }).focus();
 
     // A tap on iOS doesn't focus the button it activates.
-    fireEvent.click(screen.getByRole("button", { name: "Show details" }));
+    const opener = screen.getByRole("button", { name: "Show details" });
+    fireEvent.click(opener);
     expect(await screen.findByRole("dialog", { name: "Details" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Fallback" })).toHaveFocus());
+    await waitFor(() => expect(opener).toHaveFocus());
   });
 
   it("falls back when the opener is gone", async () => {
@@ -109,5 +112,55 @@ describe("useReturnFocus", () => {
     await user.keyboard("{Escape}");
 
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  describe("in a drawer", () => {
+    // jsdom applies Vaul's exit animation but never ends it, so a closed drawer
+    // would stay mounted and never hand focus back. Without the animation,
+    // Radix unmounts it at once.
+    let noAnimation: HTMLStyleElement;
+    beforeEach(() => {
+      noAnimation = document.createElement("style");
+      noAnimation.textContent = "[data-vaul-drawer] { animation-name: none !important; }";
+      document.head.appendChild(noAnimation);
+    });
+    afterEach(() => noAnimation.remove());
+
+    it("returns focus to a tapped control that opened it from code", async () => {
+      function SettingsDrawer() {
+        const [open, setOpen] = useState(false);
+        const focus = useReturnFocus();
+        return (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                focus.remember(() => null);
+                setOpen(true);
+              }}
+            >
+              Settings
+            </button>
+            <Drawer open={open} onOpenChange={setOpen}>
+              <DrawerContent onCloseAutoFocus={focus.restore}>
+                <DrawerTitle>Settings</DrawerTitle>
+                <DrawerDescription>Changes save automatically.</DrawerDescription>
+              </DrawerContent>
+            </Drawer>
+          </>
+        );
+      }
+      const user = userEvent.setup();
+      render(<SettingsDrawer />);
+
+      const opener = screen.getByRole("button", { name: "Settings" });
+      fireEvent.click(opener);
+      const drawer = await screen.findByRole("dialog", { name: "Settings" });
+      await waitFor(() => expect(drawer).toHaveFocus());
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(opener).toHaveFocus();
+    });
   });
 });
