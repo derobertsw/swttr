@@ -44,10 +44,10 @@ const PLAN_RESULT: OutingResult = {
 };
 
 describe("gearUpReducer", () => {
-  it("shows a result with the outing it was requested for", () => {
+  it("shows a result with the outing it was requested for, and keeps that outing", () => {
     const loading = gearUpReducer(createInitialState("now"), { type: "SUBMIT_START" });
     const state = gearUpReducer(loading, { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
-    expect(state).toMatchObject({ loading: false, result: LAYERS_RESULT });
+    expect(state).toMatchObject({ loading: false, result: LAYERS_RESULT, lastOuting: ALPINE_OUTING });
   });
 
   it("keeps the shown result while a newer request loads, and when it fails", () => {
@@ -57,10 +57,10 @@ describe("gearUpReducer", () => {
     expect(gearUpReducer(loading, { type: "SUBMIT_ERROR" })).toMatchObject({ loading: false, result: LAYERS_RESULT });
   });
 
-  it("stops loading on error and starts over on Now", () => {
-    const planning = createInitialState("later");
+  it("stops loading on error, and starts over on Now without the last outing", () => {
+    const planning = { ...createInitialState("later"), lastOuting: ALPINE_OUTING };
     expect(gearUpReducer({ ...planning, loading: true }, { type: "SUBMIT_ERROR" }).loading).toBe(false);
-    expect(gearUpReducer(planning, { type: "RESET" }).inputMode).toBe("now");
+    expect(gearUpReducer(planning, { type: "RESET" })).toEqual(createInitialState("now"));
   });
 
   it("starts a later outing as one day, and switches between Now and Later keeping what was entered", () => {
@@ -75,10 +75,10 @@ describe("gearUpReducer", () => {
   it("marks empty fields once the form is submitted with them, until the form is shown again", () => {
     const missing = gearUpReducer(createInitialState("later"), { type: "FIELDS_MISSING" });
     expect(missing.showFieldErrors).toBe(true);
-    expect(gearUpReducer(missing, { type: "SHOW_FORM", mode: "later" }).showFieldErrors).toBe(false);
+    expect(gearUpReducer(missing, { type: "SHOW_FORM", mode: "later", keepLoading: false }).showFieldErrors).toBe(false);
   });
 
-  it("goes back to a form without its results, keeping what was entered", () => {
+  it("goes back to a form without its results, keeping what was entered and the last outing", () => {
     const entered = {
       ...createInitialState("later"),
       date: new Date("2026-10-08T00:00:00"),
@@ -86,25 +86,45 @@ describe("gearUpReducer", () => {
       durationDays: 5,
     };
     const shown = gearUpReducer(entered, { type: "SUBMIT_SUCCESS", result: PLAN_RESULT });
-    expect(gearUpReducer(shown, { type: "SHOW_FORM", mode: "later" })).toEqual(entered);
+    expect(gearUpReducer(shown, { type: "SHOW_FORM", mode: "later", keepLoading: false })).toEqual({
+      ...entered,
+      lastOuting: PLAN_RESULT.outing,
+    });
 
     const shownNow = gearUpReducer(createInitialState("now"), { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
-    expect(gearUpReducer(shownNow, { type: "SHOW_FORM", mode: "now" })).toEqual(createInitialState("now"));
+    expect(gearUpReducer(shownNow, { type: "SHOW_FORM", mode: "now", keepLoading: false })).toEqual({
+      ...createInitialState("now"),
+      lastOuting: ALPINE_OUTING,
+    });
     // From Now to Later, as when the iOS shell's Plan tab is tapped after the logo.
-    expect(gearUpReducer(createInitialState("now"), { type: "SHOW_FORM", mode: "later" })).toEqual(
+    expect(gearUpReducer(createInitialState("now"), { type: "SHOW_FORM", mode: "later", keepLoading: false })).toEqual(
       createInitialState("later")
     );
   });
 
-  it("keeps a request busy only when it was made from the form in the mode being shown", () => {
-    const busy = (state: ReturnType<typeof createInitialState>) => ({ ...state, loading: true });
-    const shown = gearUpReducer(createInitialState("later"), { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
-    const showPlan = { type: "SHOW_FORM", mode: "later" } as const;
+  it("keeps a request busy on the form only when it's kept", () => {
+    const busy = { ...createInitialState("later"), loading: true };
+    expect(gearUpReducer(busy, { type: "SHOW_FORM", mode: "later", keepLoading: true }).loading).toBe(true);
+    expect(gearUpReducer(busy, { type: "SHOW_FORM", mode: "later", keepLoading: false }).loading).toBe(false);
+  });
 
-    expect(gearUpReducer(busy(createInitialState("later")), showPlan).loading).toBe(true);
-    expect(gearUpReducer(busy(shown), showPlan).loading).toBe(false);
-    expect(gearUpReducer(busy(createInitialState("now")), showPlan).loading).toBe(false);
-    expect(gearUpReducer(busy(createInitialState("now")), { type: "SHOW_FORM", mode: "now" }).loading).toBe(true);
+  it("restores what was kept for the tab, and stays restored through Back and Start over", () => {
+    const kept = {
+      inputMode: "later",
+      date: new Date("2026-10-08T00:00:00"),
+      time: "07:30",
+      durationDays: 3,
+      lastOuting: ALPINE_OUTING,
+    } as const;
+    const restored = gearUpReducer(createInitialState("now"), { type: "RESTORE", kept });
+    expect(restored).toEqual({ ...createInitialState("later"), ...kept, restored: true });
+    expect(gearUpReducer(createInitialState("now"), { type: "RESTORE", kept: null })).toEqual({
+      ...createInitialState("now"),
+      restored: true,
+    });
+
+    expect(gearUpReducer(restored, { type: "SHOW_FORM", mode: "now", keepLoading: false }).restored).toBe(true);
+    expect(gearUpReducer(restored, { type: "RESET" })).toEqual({ ...createInitialState("now"), restored: true });
   });
 });
 

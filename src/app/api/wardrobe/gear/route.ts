@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { jsonError, readJson, requireUser } from "@/lib/api";
+import { toWardrobeItem } from "@/lib/wardrobeItems";
 
 type ItemType = "garment" | "handwear" | "headwear" | "custom";
 type Row = Record<string, unknown> & { id: string };
@@ -30,18 +31,6 @@ async function fetchDetails(
   if (ownedByUser) query = query.eq("user_id", userId);
   const { data } = await query;
   return new Map(((data ?? []) as unknown as Row[]).map((row) => [row.id, row]));
-}
-
-function customItemDetails(row: Row) {
-  return {
-    brand: "Custom",
-    model_name: row.custom_name,
-    rcl_clo: row.rcl_clo,
-    body_part: row.body_part,
-    layer_type: row.layer_type,
-    generic_option: row.generic_option,
-    custom_name: row.custom_name,
-  };
 }
 
 /**
@@ -76,22 +65,12 @@ export async function GET() {
       )
     );
 
-    const items = entries.map((entry) => {
-      const row = isItemType(entry.item_type)
-        ? detailsByType.get(entry.item_type)?.get(entry.item_id)
-        : undefined;
-      const details = row ? (entry.item_type === "custom" ? customItemDetails(row) : row) : null;
-
-      return {
-        id: entry.id,
-        item_type: entry.item_type,
-        item_id: entry.item_id,
-        nickname: entry.nickname,
-        disabled: entry.disabled ?? false,
-        created_at: entry.created_at,
-        details,
-      };
-    });
+    const items = entries.map((entry) =>
+      toWardrobeItem(
+        entry,
+        isItemType(entry.item_type) ? detailsByType.get(entry.item_type)?.get(entry.item_id) : undefined
+      )
+    );
 
     return NextResponse.json({ items });
   } catch (err) {
@@ -102,7 +81,8 @@ export async function GET() {
 
 /**
  * POST /api/wardrobe/gear
- * Add an item to user's wardrobe
+ * Add an item to user's wardrobe. Returns the new entry with its details,
+ * in the shape GET lists it.
  */
 export async function POST(request: NextRequest) {
   const auth = await requireUser();
@@ -147,7 +127,7 @@ export async function POST(request: NextRequest) {
       return jsonError("Failed to add item", 500);
     }
 
-    return NextResponse.json({ item: data }, { status: 201 });
+    return NextResponse.json({ item: toWardrobeItem(data, existing.get(item_id)) }, { status: 201 });
   } catch (err) {
     console.error("Error adding item:", err);
     return jsonError("Failed to add item", 500);

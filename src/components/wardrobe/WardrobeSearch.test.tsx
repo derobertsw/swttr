@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AvailableItem } from "@/types/wardrobe";
 import { WardrobeSearch } from "./WardrobeSearch";
@@ -10,16 +10,18 @@ const items: AvailableItem[] = [
 ];
 
 const props = {
+  status: "ready" as const,
+  onRetry: vi.fn(),
   search: "",
   onSearchChange: vi.fn(),
   filteredItems: items,
   totalMatches: items.length,
   shownMatches: items.length,
   groupedItems: { garment: items },
-  adding: null,
-  justAdded: null,
+  catalogStates: {},
   onAddItem: vi.fn(),
   onRemoveItem: vi.fn(),
+  onAddSimilar: vi.fn(),
   wardrobeItemIds: new Set<string>(),
   brandFilter: null,
   onBrandFilterChange: vi.fn(),
@@ -82,5 +84,62 @@ describe("WardrobeSearch layout", () => {
 
     expect(document.getElementById("wardrobe-filter-panel")).toHaveStyle({ maxHeight: "275px" });
     expect((catalogRoot().lastElementChild as HTMLElement).style.maxHeight).toBe("");
+  });
+});
+
+describe("WardrobeSearch catalog rows", () => {
+  it("adds an item it doesn't own and offers Remove for one it does", async () => {
+    const user = userEvent.setup();
+    const onAddItem = vi.fn();
+    const onRemoveItem = vi.fn();
+    render(
+      <WardrobeSearch {...props} wardrobeItemIds={new Set(["g2"])} onAddItem={onAddItem} onRemoveItem={onRemoveItem} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Add Patagonia Capilene Midweight Crew to wardrobe" }));
+    expect(onAddItem).toHaveBeenCalledWith(items[0]);
+
+    const owned = screen.getByText("Atom Hoody").closest("li")!;
+    expect(within(owned).getByText("In wardrobe")).toBeInTheDocument();
+    await user.click(within(owned).getByRole("button", { name: "Remove Arc'teryx Atom Hoody from wardrobe" }));
+    expect(onRemoveItem).toHaveBeenCalledWith("g2");
+  });
+
+  it("says when an add failed and keeps Add available to try again", () => {
+    render(<WardrobeSearch {...props} catalogStates={{ g1: { action: "add", failed: true } }} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't add this item. Try again.");
+    expect(screen.getByRole("button", { name: /^Add Patagonia/ })).toBeEnabled();
+  });
+
+  it("reports a catalog that failed to load instead of showing no items", async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    render(<WardrobeSearch {...props} status="error" onRetry={onRetry} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load the catalog");
+    expect(screen.queryByText("Atom Hoody")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
+  it("offers a similar custom item when nothing matches", async () => {
+    const user = userEvent.setup();
+    const onAddSimilar = vi.fn();
+    render(
+      <WardrobeSearch
+        {...props}
+        search="obscure shell"
+        filteredItems={[]}
+        groupedItems={{ garment: [] }}
+        totalMatches={0}
+        shownMatches={0}
+        onAddSimilar={onAddSimilar}
+      />
+    );
+
+    expect(screen.getByText("No catalog items match")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add a similar item" }));
+    expect(onAddSimilar).toHaveBeenCalled();
   });
 });
