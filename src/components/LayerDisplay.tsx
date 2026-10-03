@@ -1,7 +1,7 @@
 "use client";
 
-import { useId, useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, ChevronDown } from "lucide-react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { AlertTriangle, ChevronDown, Undo2 } from "lucide-react";
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
 import type { LocationSuggestion, Recommendation } from "@/types/recommendations";
 import type { PrecipitationType, WeatherContext } from "@/types/weather";
@@ -15,6 +15,7 @@ import type {
 } from "@/types/biophysics";
 import BiophysicsDetails from "@/components/BiophysicsDetails";
 import ScoreDisplay from "@/components/ScoreDisplay";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import {
@@ -36,6 +37,7 @@ import { BodyPartSection, WeatherEditDrawer } from "@/components/layers";
 import { CarryCard } from "@/components/layers/CarryCard";
 import { ComfortDecision } from "@/components/layers/ComfortDecision";
 import { ComfortOverview } from "@/components/layers/ComfortOverview";
+import { EvaluationStatus } from "@/components/layers/EvaluationStatus";
 import { LayerPickerDrawer } from "@/components/layers/LayerPickerDrawer";
 import { RecommendationNotice } from "@/components/layers/RecommendationNotice";
 import { ResultHeader } from "@/components/layers/ResultHeader";
@@ -156,6 +158,7 @@ const LayerDisplay = ({
   const [activePhase, setActivePhase] = useState<Phase>("climb");
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
   const wearHeadingId = useId();
+  const wearHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const biophysicsActive = biophysicsData !== null && biophysicsData !== undefined;
   const hasLayers = biophysicsActive || recommendation !== null;
@@ -224,9 +227,16 @@ const LayerDisplay = ({
       : undefined,
     targetRange: downhillTargetRange,
   };
-  const { evaluation } = useLayerEvaluation(
-    biophysicsActive ? (showDescent ? [climbInput, descentInput] : [climbInput]) : null
-  );
+  const {
+    evaluation: lastEvaluation,
+    pending: evaluationPending,
+    failed: evaluationFailed,
+    retrying: evaluationRetrying,
+    retry: retryEvaluation,
+  } = useLayerEvaluation(biophysicsActive ? (showDescent ? [climbInput, descentInput] : [climbInput]) : null);
+  // After a failed check the last evaluation is for earlier layers, so nothing
+  // but its labeled decision is shown for the current ones.
+  const evaluation = evaluationFailed ? null : lastEvaluation;
   const climbEvaluation = evaluation?.[0];
   const descentEvaluation = showDescent ? evaluation?.[1] : undefined;
   const phaseEvaluation = (phase: Phase) => (phase === "descent" ? descentEvaluation : climbEvaluation);
@@ -342,8 +352,21 @@ const LayerDisplay = ({
   const recommendedItems = recommendedCatalogItems([climb.layers, descent.layers]);
 
   const shownEvaluation = phaseEvaluation(shownPhase);
+  const shownDecision = evaluationFailed
+    ? lastEvaluation?.[showDescent && shownPhase === "descent" ? 1 : 0]?.decision
+    : shownEvaluation?.decision;
   const phaseLabel = showDescent ? (shownPhase === "climb" ? "Climb" : "Descent") : undefined;
   const guidance = biophysicsData?.guidance ?? [];
+
+  const shownLayers = phaseLayers(shownPhase);
+  /** Runs an undo or reset; if the control that had focus went away, focus moves to Wear. */
+  const changeOutfit = (change: () => void) => {
+    change();
+    requestAnimationFrame(() => {
+      if (!document.activeElement || document.activeElement === document.body) wearHeadingRef.current?.focus();
+    });
+  };
+  const phaseName = phaseLabel ? `${phaseLabel.toLowerCase()} ` : "";
 
   return (
     <div className="flex w-full flex-col gap-6 pb-24">
@@ -416,10 +439,61 @@ const LayerDisplay = ({
                 </div>
               )}
 
-              <ComfortDecision decision={shownEvaluation?.decision} phase={phaseLabel} />
+              {biophysicsActive && (
+                <EvaluationStatus
+                  pending={evaluationPending}
+                  failed={evaluationFailed}
+                  retrying={evaluationRetrying}
+                  hasPreviousCheck={lastEvaluation !== null}
+                  onRetry={retryEvaluation}
+                  onUndo={shownLayers.canUndo ? () => changeOutfit(shownLayers.undo) : undefined}
+                />
+              )}
 
-              <section aria-labelledby={wearHeadingId} className="flex flex-col gap-3">
-                <h3 id={wearHeadingId} className="text-xl font-semibold text-foreground">Wear</h3>
+              <ComfortDecision
+                decision={shownDecision}
+                phase={phaseLabel}
+                staleness={evaluationFailed ? "outdated" : evaluationPending ? "updating" : undefined}
+              />
+
+              <section aria-labelledby={wearHeadingId} aria-busy={evaluationPending || undefined} className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                  <h3
+                    id={wearHeadingId}
+                    ref={wearHeadingRef}
+                    tabIndex={-1}
+                    className="text-xl font-semibold text-foreground focus:outline-none"
+                  >
+                    Wear
+                  </h3>
+                  {biophysicsActive && (shownLayers.canUndo || shownLayers.edited) && (
+                    <div className="flex gap-1">
+                      {shownLayers.canUndo && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Undo last ${phaseName}change`}
+                          onClick={() => changeOutfit(shownLayers.undo)}
+                        >
+                          <Undo2 aria-hidden="true" />
+                          Undo
+                        </Button>
+                      )}
+                      {shownLayers.edited && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Reset ${phaseName}to the suggested layers`}
+                          onClick={() => changeOutfit(shownLayers.reset)}
+                        >
+                          Reset
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <Card padding="none" className="divide-y divide-border px-4">
                   {BODY_PARTS.map((bodyPart) => renderSection(bodyPart, shownPhase))}
                 </Card>

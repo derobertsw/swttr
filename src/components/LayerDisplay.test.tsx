@@ -1072,6 +1072,131 @@ describe("LayerDisplay", () => {
         expect(within(screen.getByRole("region", { name: "Upper body" })).queryByText("Needs more warmth")).not.toBeInTheDocument();
       });
     });
+
+    describe("changing the outfit", () => {
+      /** Keeps serving layer evaluation from the route, except while `failing` is set. */
+      function stubEvaluation() {
+        const evaluate = vi.mocked(fetch);
+        const control = { failing: false };
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+            control.failing ? Response.json({ error: "Unavailable" }, { status: 503 }) : evaluate(input, init)
+          )
+        );
+        return control;
+      }
+
+      /** Renders the result and waits for the suggested outfit's first check. */
+      async function renderChecked() {
+        render(
+          <LayerDisplay activity="alpine_skiing" recommendation={null} temperature={15} windspeed={10} biophysicsData={mockBiophysicsData} />
+        );
+        const legs = screen.getByRole("region", { name: "Legs" });
+        await within(legs).findByText("Needs more warmth");
+        return legs;
+      }
+
+      function addCatalogFleece(legs: HTMLElement) {
+        const change = within(legs).queryByRole("button", { name: "Change legs" });
+        if (change) fireEvent.click(change);
+        fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+      }
+
+      it("labels the comfort check as updating until the changed outfit is checked", async () => {
+        const legs = await renderChecked();
+
+        addCatalogFleece(legs);
+        expect(screen.getByText("Updating…")).toBeInTheDocument();
+        expect(screen.getByText("Updating comfort check…")).toBeInTheDocument();
+
+        expect(await screen.findByText("Comfort check updated.")).toBeInTheDocument();
+        expect(screen.queryByText("Updating…")).not.toBeInTheDocument();
+      });
+
+      it("keeps the earlier check labeled when checking a change fails, and tries again", async () => {
+        const evaluation = stubEvaluation();
+        const legs = await renderChecked();
+
+        evaluation.failing = true;
+        addCatalogFleece(legs);
+        const failure = await screen.findByRole("region", { name: "Couldn't check these layers" });
+        expect(failure).toHaveTextContent("for your layers before the last change");
+        expect(screen.getByText("Before your change")).toBeInTheDocument();
+        // Nothing else claims to describe the changed outfit.
+        expect(within(legs).queryByText("Needs more warmth")).not.toBeInTheDocument();
+        expect(within(legs).getByText("Catalog fleece")).toBeInTheDocument();
+
+        evaluation.failing = false;
+        fireEvent.click(within(failure).getByRole("button", { name: "Try again" }));
+        await waitFor(() =>
+          expect(screen.queryByRole("region", { name: "Couldn't check these layers" })).not.toBeInTheDocument()
+        );
+        expect(within(legs).getByText("Needs more warmth")).toBeInTheDocument();
+        expect(within(legs).getByText("Catalog fleece")).toBeInTheDocument();
+        expect(screen.queryByText("Before your change")).not.toBeInTheDocument();
+      });
+
+      it("undoes a change that couldn't be checked", async () => {
+        const evaluation = stubEvaluation();
+        const legs = await renderChecked();
+
+        evaluation.failing = true;
+        addCatalogFleece(legs);
+        const failure = await screen.findByRole("region", { name: "Couldn't check these layers" });
+        fireEvent.click(within(failure).getByRole("button", { name: "Undo change" }));
+
+        expect(within(legs).queryByText("Catalog fleece")).not.toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "Couldn't check these layers" })).not.toBeInTheDocument();
+        expect(within(legs).getByText("Needs more warmth")).toBeInTheDocument();
+      });
+
+      it("undoes and resets changes from beside Wear", async () => {
+        const legs = await renderChecked();
+        expect(screen.queryByRole("button", { name: "Undo last change" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Reset to the suggested layers" })).not.toBeInTheDocument();
+
+        addCatalogFleece(legs);
+        addCatalogFleece(legs);
+        expect(within(legs).getAllByText("Catalog fleece")).toHaveLength(2);
+
+        fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+        expect(within(legs).getAllByText("Catalog fleece")).toHaveLength(1);
+
+        const reset = screen.getByRole("button", { name: "Reset to the suggested layers" });
+        reset.focus();
+        fireEvent.click(reset);
+        expect(within(legs).queryByText("Catalog fleece")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Reset to the suggested layers" })).not.toBeInTheDocument();
+        // Focus doesn't drop to the page when the Reset button goes away.
+        await waitFor(() => expect(screen.getByRole("heading", { name: "Wear" })).toHaveFocus());
+
+        fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+        expect(within(legs).getAllByText("Catalog fleece")).toHaveLength(1);
+      });
+
+      it("keeps a change, and its undo, to the phase it was made in", () => {
+        const touringData = {
+          ...mockBiophysicsData,
+          ireq: { ...mockBiophysicsData.ireq, downhill_target_range: [1.0, 1.6] as [number, number] },
+        };
+        render(
+          <LayerDisplay activity="backcountry_skiing" recommendation={null} temperature={15} windspeed={10} biophysicsData={touringData} />
+        );
+        const descentTab = screen.getByRole("button", { name: /^Descent/ });
+
+        fireEvent.click(descentTab);
+        addCatalogFleece(screen.getByRole("region", { name: "Legs" }));
+        fireEvent.click(screen.getByRole("button", { name: /^Climb/ }));
+        expect(within(screen.getByRole("region", { name: "Legs" })).queryByText("Catalog fleece")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /^Undo last/ })).not.toBeInTheDocument();
+
+        fireEvent.click(descentTab);
+        fireEvent.click(screen.getByRole("button", { name: "Undo last descent change" }));
+        expect(within(screen.getByRole("region", { name: "Legs" })).queryByText("Catalog fleece")).not.toBeInTheDocument();
+      });
+    });
   });
 
   describe("without a personalized recommendation", () => {
