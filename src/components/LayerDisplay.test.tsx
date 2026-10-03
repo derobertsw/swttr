@@ -94,16 +94,19 @@ describe("LayerDisplay", () => {
 
       expect(screen.getByText("Wind 10 mph")).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Layers aren't available yet" })).toBeInTheDocument();
-      expect(screen.queryByText("Detailed Layer Breakdown")).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Wear" })).not.toBeInTheDocument();
     });
 
     it("should render all body part sections", () => {
       render(<LayerDisplay {...defaultProps} />);
 
-      expect(screen.getByText("Torso")).toBeInTheDocument();
-      expect(screen.getByText("Legs")).toBeInTheDocument();
-      expect(screen.getByText("Hands")).toBeInTheDocument();
-      expect(screen.getByText("Head/Neck")).toBeInTheDocument();
+      const wear = screen.getByRole("region", { name: "Wear" });
+      expect(within(wear).getAllByRole("heading", { level: 4 }).map((heading) => heading.textContent)).toEqual([
+        "Upper body",
+        "Legs",
+        "Head & neck",
+        "Hands",
+      ]);
     });
 
     it("should render layer labels correctly", () => {
@@ -235,7 +238,7 @@ describe("LayerDisplay", () => {
   });
 
   describe("clo value display", () => {
-    it("should display clo values on separate lines when present", () => {
+    it("names general layers without their clo numbers", () => {
       const recommendationWithClo = {
         torso: {
           base: [{ name: "Merino Base", rcl: 0.35 }],
@@ -248,9 +251,8 @@ describe("LayerDisplay", () => {
 
       render(<LayerDisplay recommendation={recommendationWithClo} temperature={25} windspeed={10} />);
       expect(screen.getByText("Merino Base")).toBeInTheDocument();
-      expect(screen.getByText("0.35 clo")).toBeInTheDocument();
       expect(screen.getByText("Shell Jacket")).toBeInTheDocument();
-      expect(screen.getByText("0.15 clo")).toBeInTheDocument();
+      expect(screen.queryByText(/clo$/)).not.toBeInTheDocument();
     });
 
     it("should not show clo line when rcl is undefined", () => {
@@ -273,7 +275,7 @@ describe("LayerDisplay", () => {
   describe("weather display", () => {
     it("should display temperature", () => {
       render(<LayerDisplay {...defaultProps} />);
-      expect(screen.getByText("25")).toBeInTheDocument();
+      expect(screen.getByText("25°F")).toBeInTheDocument();
     });
 
     it("should display wind speed", () => {
@@ -283,7 +285,7 @@ describe("LayerDisplay", () => {
 
     it("should display different temperature values", () => {
       render(<LayerDisplay {...defaultProps} temperature={-5} />);
-      expect(screen.getByText("-5")).toBeInTheDocument();
+      expect(screen.getByText("-5°F")).toBeInTheDocument();
     });
 
     it("should display different wind speed values", () => {
@@ -292,31 +294,9 @@ describe("LayerDisplay", () => {
     });
   });
 
-  describe("Be Bold, Start Cold message", () => {
-    it("should show message when temperature is below 32", () => {
-      render(<LayerDisplay {...defaultProps} temperature={25} />);
-      expect(screen.getByText("Be Bold, Start Cold")).toBeInTheDocument();
-    });
-
-    it("should show message when temperature is 31", () => {
-      render(<LayerDisplay {...defaultProps} temperature={31} />);
-      expect(screen.getByText("Be Bold, Start Cold")).toBeInTheDocument();
-    });
-
-    it("should not show message when temperature is 32", () => {
-      render(<LayerDisplay {...defaultProps} temperature={32} />);
-      expect(screen.queryByText("Be Bold, Start Cold")).not.toBeInTheDocument();
-    });
-
-    it("should not show message when temperature is above 32", () => {
-      render(<LayerDisplay {...defaultProps} temperature={50} />);
-      expect(screen.queryByText("Be Bold, Start Cold")).not.toBeInTheDocument();
-    });
-
-    it("should show message for very cold temperatures", () => {
-      render(<LayerDisplay {...defaultProps} temperature={-10} />);
-      expect(screen.getByText("Be Bold, Start Cold")).toBeInTheDocument();
-    });
+  it("doesn't give the same advice for every cold day", () => {
+    render(<LayerDisplay {...defaultProps} temperature={-10} />);
+    expect(screen.queryByText("Be Bold, Start Cold")).not.toBeInTheDocument();
   });
 
   describe("biophysics-only rendering", () => {
@@ -440,7 +420,8 @@ describe("LayerDisplay", () => {
 
       function renderAndPickCatalogFleeceForLegs() {
         render(<LayerDisplay recommendation={null} temperature={15} windspeed={10} biophysicsData={mockBiophysicsData} />);
-        const legs = screen.getByRole("button", { name: /legs/i }).parentElement!;
+        const legs = screen.getByRole("region", { name: "Legs" });
+        fireEvent.click(within(legs).getByRole("button", { name: "Change legs" }));
         fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
         fireEvent.click(screen.getByText("Pick catalog fleece"));
         return { legs, card: screen.getByRole("region", { name: "Not in your wardrobe" }) };
@@ -497,8 +478,9 @@ describe("LayerDisplay", () => {
           />
         );
 
-        fireEvent.click(screen.getByRole("button", { name: "Descent" }));
-        const legs = screen.getByRole("button", { name: /legs/i }).parentElement!;
+        fireEvent.click(screen.getByRole("button", { name: /^Descent/ }));
+        const legs = screen.getByRole("region", { name: "Legs" });
+        fireEvent.click(within(legs).getByRole("button", { name: "Change legs" }));
         fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
         fireEvent.click(screen.getByText("Pick catalog fleece"));
 
@@ -532,17 +514,18 @@ describe("LayerDisplay", () => {
       );
 
       // Should render body part sections
-      expect(screen.getByText("Torso")).toBeInTheDocument();
-      expect(screen.getByText("Legs")).toBeInTheDocument();
-      expect(screen.getByText("Hands")).toBeInTheDocument();
-      expect(screen.getByText("Head/Neck")).toBeInTheDocument();
+      for (const area of ["Upper body", "Legs", "Head & neck", "Hands"]) {
+        expect(screen.getByRole("heading", { name: area })).toBeInTheDocument();
+      }
 
       // Should render weather info
-      expect(screen.getByText("15")).toBeInTheDocument();
+      expect(screen.getByText("15°F")).toBeInTheDocument();
       expect(screen.getByText("Wind 10 mph")).toBeInTheDocument();
 
-      // Personalized layers aren't labeled as general guidance
+      // Personalized layers are labeled as such, not as general guidance
+      expect(screen.getByText("Personalized")).toBeInTheDocument();
       expect(screen.queryByText("General guidance")).not.toBeInTheDocument();
+      expect(screen.queryByText("General guide")).not.toBeInTheDocument();
     });
 
     it("should display biophysics garments with their thermal properties (clo values)", () => {
@@ -554,6 +537,11 @@ describe("LayerDisplay", () => {
           biophysicsData={mockBiophysicsData}
         />
       );
+      // Each item's clo shows while its body area is being changed.
+      expect(screen.queryByText("0.35 clo")).not.toBeInTheDocument();
+      for (const area of ["upper body", "legs", "head & neck"]) {
+        fireEvent.click(screen.getByRole("button", { name: `Change ${area}` }));
+      }
 
       // Torso garments
       expect(screen.getAllByText("Merino Base Layer").length).toBeGreaterThan(0);
@@ -581,6 +569,7 @@ describe("LayerDisplay", () => {
       );
 
       expect(screen.getByText("Hestra Insulated Gloves")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Change hands" }));
       expect(screen.getByText("0.65 clo")).toBeInTheDocument();
     });
 
@@ -682,8 +671,12 @@ describe("LayerDisplay", () => {
       // torso raw 1.7 × 0.836 = 1.42, legs raw 0.25 × 0.961 = 0.24, arms 1.2
       // weighted: 1.42×0.5 + 1.2×0.25 + 0.24×0.25 ≈ 1.1
       expect(await screen.findByText("Actual 1.1 clo")).toBeInTheDocument();
-      // Risk details are now behind a popover icon, check the icon is present
-      expect(screen.getByLabelText(/Cold Risk/)).toBeInTheDocument();
+      // The risk and what to do about it show above the outfit
+      const risk = screen.getByRole("region", { name: /^Cold risk/ });
+      expect(risk).toHaveTextContent(/Add a warmer base and an insulating mid-layer now/);
+      expect(
+        risk.compareDocumentPosition(screen.getByRole("heading", { name: "Wear" })) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
     });
 
     it("should show add buttons instead of generic layer suggestion when near target", () => {
@@ -858,7 +851,8 @@ describe("LayerDisplay", () => {
       );
 
       expect(await screen.findByText("Optimal")).toBeInTheDocument();
-      expect(screen.queryByLabelText(/Cold Risk/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: /cold risk/i })).not.toBeInTheDocument();
+      expect(screen.getByText("In the comfort range for these conditions.")).toBeInTheDocument();
       expect(screen.queryByText("Cold Stress")).not.toBeInTheDocument();
     });
 
@@ -912,20 +906,18 @@ describe("LayerDisplay", () => {
         />
       );
 
-      expect(screen.getAllByText("Climb").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("Descent").length).toBeGreaterThan(0);
-      // Old descent section removed — descent tab and "In the Pack" summary replace it
-      expect(screen.queryByText("Descent Layer Plan")).not.toBeInTheDocument();
-      // Pack item visible in climb tab via "In the Pack" summary
-      expect(screen.getByText("In the Pack")).toBeInTheDocument();
-      expect(screen.getByText("Patagonia Nano Puff")).toBeInTheDocument();
-      // Switch to descent tab — pack item now appears as a worn layer
-      const descentButtons = screen.getAllByText("Descent");
-      const descentTab = descentButtons.find((el) => el.tagName === "BUTTON");
-      if (descentTab) fireEvent.click(descentTab);
-      expect(screen.getByText("Patagonia Nano Puff")).toBeInTheDocument();
-      // Descent tab also always shows pack summary (empty in this case)
-      expect(screen.getByText("Nothing extra in the pack.")).toBeInTheDocument();
+      const climbTab = screen.getByRole("button", { name: /^Climb/ });
+      const descentTab = screen.getByRole("button", { name: /^Descent/ });
+      expect(climbTab).toHaveAttribute("aria-pressed", "true");
+      // The pack item is carried on the climb
+      const carry = screen.getByRole("region", { name: "Carry" });
+      expect(within(carry).getByText("Patagonia Nano Puff")).toBeInTheDocument();
+      expect(within(screen.getByRole("region", { name: "Wear" })).queryByText("Patagonia Nano Puff")).not.toBeInTheDocument();
+      // On the descent it's worn, and the pack is empty
+      fireEvent.click(descentTab);
+      expect(descentTab).toHaveAttribute("aria-pressed", "true");
+      expect(within(screen.getByRole("region", { name: "Wear" })).getByText("Patagonia Nano Puff")).toBeInTheDocument();
+      expect(within(screen.getByRole("region", { name: "Carry" })).getByText("Nothing extra to carry.")).toBeInTheDocument();
     });
 
     it("should show descent overheating risk card when descent clo exceeds target", async () => {
@@ -962,7 +954,10 @@ describe("LayerDisplay", () => {
 
       // Descent: torso raw (1.7+0.7)*0.836=2.01, arms 1.2, legs 0.25*0.961=0.24
       // Full body = 2.01*0.50 + 1.2*0.25 + 0.24*0.25 ≈ 1.37 vs 0.9 max → over by ~0.47
-      expect(await screen.findByLabelText(/Descent Overheating Risk/)).toBeInTheDocument();
+      // The climb view flags the descent's risk on its tab.
+      const descentTab = await screen.findByRole("button", { name: "Descent, overheating risk" });
+      fireEvent.click(descentTab);
+      expect(screen.getByRole("region", { name: /^Descent overheating risk/ })).toBeInTheDocument();
     });
 
     it("should show descent cold risk card when descent clo is below target", async () => {
@@ -998,9 +993,85 @@ describe("LayerDisplay", () => {
 
       // Descent: torso raw (1.7+0.2)*0.836=1.59, arms 1.2, legs 0.25*0.961=0.24
       // Full body = 1.59*0.50 + 1.2*0.25 + 0.24*0.25 ≈ 1.16 vs 3.0 min → short by ~1.84
-      expect(await screen.findByLabelText(/Descent Cold Risk/)).toBeInTheDocument();
+      fireEvent.click(await screen.findByRole("button", { name: "Descent, cold risk" }));
+      expect(screen.getByRole("region", { name: /^Descent cold risk/ })).toHaveTextContent(/high/);
     });
 
+    describe("outfit first", () => {
+      const renderPersonalized = (props: Partial<Parameters<typeof LayerDisplay>[0]> = {}) =>
+        render(
+          <LayerDisplay
+            activity="alpine_skiing"
+            exertion="hard"
+            recommendation={null}
+            temperature={15}
+            windspeed={10}
+            biophysicsData={mockBiophysicsData}
+            {...props}
+          />
+        );
+
+      it("names the outing and the kind of advice above the outfit", () => {
+        renderPersonalized();
+
+        expect(screen.getByRole("heading", { name: "Your layers" })).toBeInTheDocument();
+        expect(screen.getByText("Alpine Skiing")).toBeInTheDocument();
+        expect(screen.getByText("Hard effort")).toBeInTheDocument();
+        expect(screen.getByText("Personalized")).toBeInTheDocument();
+      });
+
+      it("puts the score and clo numbers under Technical details, after the outfit", async () => {
+        renderPersonalized();
+
+        const details = screen.getByText("Technical details").closest("details")!;
+        expect(details).not.toHaveAttribute("open");
+        expect(await within(details).findByText("Target 1.5-2.0 clo")).toBeInTheDocument();
+        expect(within(details).getByText("Merino Base Layer")).toBeInTheDocument();
+        expect(
+          screen.getByRole("heading", { name: "Wear" }).compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+      });
+
+      it("explains the layers with the recommendation's own guidance", () => {
+        renderPersonalized();
+
+        const why = screen.getByText("Why these layers?").closest("details")!;
+        expect(within(why).getByRole("listitem")).toHaveTextContent("Layer up for the chairlift");
+      });
+
+      it("shows empty layers and editing controls only after Change", () => {
+        renderPersonalized();
+        const legs = screen.getByRole("region", { name: "Legs" });
+
+        expect(within(legs).getByText("Thermal Tights")).toBeInTheDocument();
+        expect(within(legs).queryByRole("button", { name: "Add mid" })).not.toBeInTheDocument();
+
+        fireEvent.click(within(legs).getByRole("button", { name: "Change legs" }));
+        expect(within(legs).getByRole("button", { name: "Add mid" })).toBeInTheDocument();
+        expect(within(legs).getByRole("button", { name: "Done changing legs" })).toHaveAttribute("aria-expanded", "true");
+
+        fireEvent.click(within(legs).getByRole("button", { name: "Done changing legs" }));
+        expect(within(legs).queryByRole("button", { name: "Add mid" })).not.toBeInTheDocument();
+      });
+
+      it("opens the picker for a worn item from the keyboard", () => {
+        renderPersonalized();
+        const legs = screen.getByRole("region", { name: "Legs" });
+        fireEvent.click(within(legs).getByRole("button", { name: "Change legs" }));
+
+        fireEvent.keyDown(within(legs).getByRole("button", { name: /Thermal Tights/ }), { key: "Enter" });
+        expect(screen.getByText("Pick catalog fleece")).toBeInTheDocument();
+      });
+
+      it("says which body areas need more warmth", async () => {
+        renderPersonalized();
+
+        // Legs: 0.25 × 0.961 ≈ 0.24 clo, under their 0.9 minimum.
+        const legs = screen.getByRole("region", { name: "Legs" });
+        expect(await within(legs).findByText("Needs more warmth")).toBeInTheDocument();
+        expect(within(screen.getByRole("region", { name: "Upper body" })).queryByText("Needs more warmth")).not.toBeInTheDocument();
+      });
+    });
   });
 
   describe("without a personalized recommendation", () => {
@@ -1009,6 +1080,7 @@ describe("LayerDisplay", () => {
     it("labels static layers as general guidance with no comfort score", () => {
       render(<LayerDisplay {...defaultProps} activity="alpine_skiing" biophysicsStatus="auth_required" />);
 
+      expect(screen.getByText("General guide")).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "General guidance" })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
       expect(screen.getByText("Wool base layer")).toBeInTheDocument();
@@ -1082,10 +1154,12 @@ describe("LayerDisplay", () => {
         expect(screen.getByRole("heading", { name: "Sign in for Running layers" })).toBeInTheDocument();
         expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
         expect(screen.getByText("Wind 10 mph")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Change weather location, date, or time" })).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Running" })).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
-        expect(screen.queryByText("Detailed Layer Breakdown")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Change place or time" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Running, change activity" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Edit outing" })).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "Wear" })).not.toBeInTheDocument();
+        expect(screen.queryByText("Personalized")).not.toBeInTheDocument();
+        expect(screen.queryByText("General guide")).not.toBeInTheDocument();
       });
 
       it("offers a retry after a failed request and shows it's retrying", () => {

@@ -2,22 +2,20 @@
 
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
 import { ArrowDownToLine, GripVertical, Plus, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   LayerSet,
   LayerItem,
   BodyPart,
   LayerType,
   LAYER_LABELS,
-  applyItemMappings,
 } from "@/lib/layers";
 import { cn } from "@/lib/utils";
 
 interface LayerItemsProps {
   layers: LayerSet;
   bodyPart: BodyPart;
-  biophysicsActive: boolean;
-  itemMappings?: Map<string, string>;
-  readOnly?: boolean;
   otherPhaseLayers?: LayerSet;
   syncLabel?: string;
   onItemTap: (layerType: LayerType, index: number) => void;
@@ -112,24 +110,28 @@ function SwipeableLayerItem({
   }, [onRemove]);
 
   return (
-    <div ref={containerRef} className={cn("relative overflow-hidden rounded-md", isDragSource && "opacity-25")}>
+    <div ref={containerRef} className={cn("relative overflow-hidden rounded-control", isDragSource && "opacity-25")}>
       {/* Remove action behind */}
       <div
         className="absolute inset-y-0 right-0 flex items-stretch transition-opacity"
         style={{ width: ACTION_WIDTH, opacity: translateX < -10 ? 1 : 0 }}
       >
         <button
+          type="button"
+          tabIndex={translateX < -10 ? 0 : -1}
           onClick={handleRemove}
-          className="flex flex-col items-center justify-center bg-red-500/90 text-white rounded-r-md w-full"
+          className="flex w-full flex-col items-center justify-center rounded-r-control bg-destructive text-destructive-foreground"
         >
-          <Trash2 className="size-4" />
-          <span className="text-[10px] mt-0.5">Remove</span>
+          <Trash2 className="size-4" aria-hidden="true" />
+          <span className="mt-0.5 text-xs">Remove</span>
         </button>
       </div>
 
       {/* Main content */}
       <div
-        className="relative flex items-center gap-1.5 rounded-md border border-slate-200/80 bg-white/45 px-2.5 py-2 cursor-pointer touch-pan-y"
+        role="button"
+        tabIndex={0}
+        className="relative flex min-h-11 cursor-pointer touch-pan-y items-center gap-1.5 rounded-control border border-input bg-card px-2.5 py-2 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         style={{
           transform: `translateX(${translateX}px)`,
           transition: isDragging ? "none" : "transform 0.2s ease-out",
@@ -140,10 +142,18 @@ function SwipeableLayerItem({
         onClick={() => {
           if (translateX === 0) onTap();
         }}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onTap();
+          }
+        }}
       >
         {onDragStart && (
           <div
-            className="flex shrink-0 items-center self-stretch -ml-1 touch-none cursor-grab text-slate-300 active:text-slate-500"
+            aria-hidden="true"
+            className="-ml-1 flex shrink-0 cursor-grab touch-none items-center self-stretch text-muted-foreground"
             onTouchStart={(e) => {
               e.stopPropagation();
               onDragStart(e.touches[0].clientY);
@@ -157,35 +167,18 @@ function SwipeableLayerItem({
             <GripVertical className="size-3.5" />
           </div>
         )}
-        <span className="min-w-0 flex-1 text-slate-900 font-semibold leading-snug">
+        <span className="min-w-0 flex-1 font-medium leading-snug text-foreground">
           {item.name}
           {item.isRecommended && (
-            <span className="ml-2 inline-block whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+            <Badge size="sm" variant="outline" className="ml-2 align-middle font-medium">
               Not in your wardrobe
-            </span>
+            </Badge>
           )}
         </span>
         {item.rcl !== undefined && (
-          <span className="shrink-0 rounded-full border border-slate-300/80 bg-slate-50/90 px-2 py-0.5 text-[11px] font-medium tabular-nums text-slate-700">
+          <Badge size="sm" variant="neutral" className="font-medium tabular-nums">
             {item.rcl.toFixed(2)} clo
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ReadOnlyLayerItem({ item }: { item: LayerItem }) {
-  return (
-    <div className="relative overflow-hidden rounded-md">
-      <div className="relative flex items-start justify-between gap-3 rounded-md border border-slate-200/80 bg-white/45 px-2.5 py-2">
-        <span className="min-w-0 text-slate-900 font-semibold leading-snug">
-          {item.name}
-        </span>
-        {item.rcl !== undefined && (
-          <span className="shrink-0 rounded-full border border-slate-300/80 bg-slate-50/90 px-2 py-0.5 text-[11px] font-medium tabular-nums text-slate-700">
-            {item.rcl.toFixed(2)} clo
-          </span>
+          </Badge>
         )}
       </div>
     </div>
@@ -196,7 +189,6 @@ function LayerGroup({
   elRef,
   label,
   items,
-  readOnly,
   otherPhaseItems,
   syncLabel,
   isDropTarget,
@@ -210,7 +202,6 @@ function LayerGroup({
   elRef?: (el: HTMLLIElement | null) => void;
   label: string;
   items: LayerItem[];
-  readOnly?: boolean;
   otherPhaseItems?: LayerItem[];
   syncLabel?: string;
   isDropTarget?: boolean;
@@ -231,78 +222,53 @@ function LayerGroup({
     <li
       ref={elRef}
       className={cn(
-        "flex flex-col gap-1.5 rounded-lg p-1 -m-1 transition-colors",
-        isDropTarget && "bg-violet-100/60 ring-1 ring-violet-300/70"
+        "-m-1 flex flex-col gap-1.5 rounded-control p-1 transition-colors",
+        isDropTarget && "bg-primary-soft ring-1 ring-primary"
       )}
     >
-      <span className="text-xs uppercase text-slate-900/60 tracking-wide">{label}</span>
+      <span className="text-sm text-muted-foreground">{label}</span>
       <div className="flex flex-col gap-2">
-        {items.map((item, index) =>
-          readOnly ? (
-            <ReadOnlyLayerItem
-              key={`${item.sourceId || item.name}-${index}`}
-              item={item}
-            />
-          ) : (
-            <SwipeableLayerItem
-              key={`${item.sourceId || item.name}-${index}`}
-              item={item}
-              isDragSource={dragSourceIndex === index}
-              onTap={() => onItemTap(index)}
-              onRemove={() => onItemRemove(index)}
-              onDragStart={onDragStart ? (clientY) => onDragStart(index, item, clientY) : undefined}
-            />
-          )
-        )}
+        {items.map((item, index) => (
+          <SwipeableLayerItem
+            key={`${item.sourceId || item.name}-${index}`}
+            item={item}
+            isDragSource={dragSourceIndex === index}
+            onTap={() => onItemTap(index)}
+            onRemove={() => onItemRemove(index)}
+            onDragStart={onDragStart ? (clientY) => onDragStart(index, item, clientY) : undefined}
+          />
+        ))}
       </div>
       {isDropTarget && (
-        <div className="flex items-center justify-center rounded-md border border-dashed border-violet-300/70 bg-violet-50/40 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-violet-500">
+        <div className="flex items-center justify-center rounded-control border border-dashed border-primary py-1.5 text-xs font-semibold text-primary">
           Drop here
         </div>
       )}
-      {showSyncPrompt && (
-        <button
-          type="button"
-          onClick={onSyncFromOtherPhase}
-          className={cn(
-            "flex items-center gap-1.5 self-start rounded-md border border-violet-300/60 bg-violet-50/60 px-2 py-1 text-xs font-medium transition-colors",
-            "text-violet-600 hover:text-violet-800 hover:bg-violet-100/70"
-          )}
-        >
-          <ArrowDownToLine className="size-3" />
-          {syncLabel ? `${syncLabel} ${label.toLowerCase()}` : `Use ${label.toLowerCase()}`}
-        </button>
-      )}
-      {!readOnly && (
-        <button
-          type="button"
-          onClick={onAddLayer}
-          className={cn(
-            "flex items-center gap-1.5 self-start rounded-md px-2 py-1 text-xs font-medium transition-colors",
-            "text-slate-500 hover:text-slate-700 hover:bg-slate-100/60"
-          )}
-        >
-          <Plus className="size-3" />
+      <div className="flex flex-wrap gap-2">
+        {showSyncPrompt && (
+          <Button type="button" variant="outline" size="sm" onClick={onSyncFromOtherPhase}>
+            <ArrowDownToLine aria-hidden="true" />
+            {syncLabel ? `${syncLabel} ${label.toLowerCase()}` : `Use ${label.toLowerCase()}`}
+          </Button>
+        )}
+        <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" onClick={onAddLayer}>
+          <Plus aria-hidden="true" />
           Add {label.toLowerCase()}
-        </button>
-      )}
+        </Button>
+      </div>
     </li>
   );
 }
 
 /**
- * Displays garment layers (base, mid, outer) for a body part.
- * Each item is tappable (to open picker) and swipeable (to remove).
- * Items can be dragged between layer types via the grip handle.
- * Includes an "Add" button per layer type.
- * Read-only layers show just the filled layer types, with no controls.
+ * Editing controls for a body part's garment layers (base, mid, outer).
+ * Each item opens the picker when tapped or activated from the keyboard, and
+ * swipes to remove. Items can be dragged between layer types via the grip
+ * handle. Includes an "Add" button per layer type.
  */
 export function LayerItems({
   layers,
   bodyPart,
-  biophysicsActive,
-  itemMappings,
-  readOnly,
   otherPhaseLayers,
   syncLabel,
   onItemTap,
@@ -396,18 +362,10 @@ export function LayerItems({
     []
   );
 
-  const getDisplayItems = (items: LayerItem[], layerType: LayerType): LayerItem[] => {
-    if (biophysicsActive || !itemMappings) {
-      return items;
-    }
-    return applyItemMappings(items, bodyPart, layerType, itemMappings);
-  };
-
   return (
     <>
       {layerTypes.map((layerType) => {
-        const items = getDisplayItems(layers[layerType] ?? [], layerType);
-        if (readOnly && items.length === 0) return null;
+        const items = layers[layerType] ?? [];
         const otherPhaseItemsForType = otherPhaseLayers ? (otherPhaseLayers[layerType] ?? []) : undefined;
         const isDropTarget = drag?.active === true && drag.overLayerType === layerType && drag.layerType !== layerType;
 
@@ -417,7 +375,6 @@ export function LayerItems({
             elRef={(el) => { if (el) layerGroupRefs.current.set(layerType, el); }}
             label={LAYER_LABELS[layerType]}
             items={items}
-            readOnly={readOnly}
             otherPhaseItems={otherPhaseItemsForType}
             syncLabel={syncLabel}
             isDropTarget={isDropTarget}
@@ -432,12 +389,12 @@ export function LayerItems({
       })}
       {drag?.active && (
         <div
-          className="fixed left-4 right-4 z-50 flex items-center justify-between rounded-md border border-violet-300 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-sm pointer-events-none"
+          className="pointer-events-none fixed right-4 left-4 z-50 flex items-center justify-between rounded-control border border-primary bg-popover px-3 py-2 text-popover-foreground shadow-lg"
           style={{ top: drag.ghostY - 20 }}
         >
-          <span className="text-sm font-semibold text-slate-900">{drag.item.name}</span>
+          <span className="text-sm font-semibold">{drag.item.name}</span>
           {drag.item.rcl !== undefined && (
-            <span className="text-xs tabular-nums text-slate-500">{drag.item.rcl.toFixed(2)} clo</span>
+            <span className="text-xs tabular-nums text-muted-foreground">{drag.item.rcl.toFixed(2)} clo</span>
           )}
         </div>
       )}

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import type { BodyPart } from "@/lib/layers";
 
 export interface RecommendedItem {
@@ -63,49 +64,44 @@ export function RecommendedItemsCard({
   };
 
   return (
-    <section aria-labelledby="not-in-wardrobe-heading" className="rounded-lg border border-amber-300/60 bg-amber-50/90 px-4 py-3">
-      <h3 id="not-in-wardrobe-heading" className="text-[11px] font-bold uppercase tracking-wide text-amber-700">
-        Not in your wardrobe
-      </h3>
-      <p className="mb-2 mt-0.5 text-xs text-amber-900/80">
-        You picked these from the catalog for this outfit. If you own one, add it to your wardrobe so future
-        recommendations can use it.
-      </p>
-      <ul className="space-y-2">
-        {items.map((item) => {
-          const adding = addingIds.has(item.sourceId);
-          return (
-            <li key={item.sourceId} className="flex flex-wrap items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-amber-950">{item.name}</p>
-                <p className="text-[11px] text-amber-800/70">{item.brand}</p>
-              </div>
-              <a
-                href={`https://www.google.com/search?q=${encodeURIComponent(`${item.brand} ${item.name}`.trim())}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-400/60 bg-white/70 px-2.5 py-1 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100/80"
-              >
-                Search for this item
-                <span className="sr-only">: {item.name}, opens Google in a new tab</span>
-                <ExternalLink className="size-3" aria-hidden="true" />
-              </a>
-              <button
-                type="button"
-                disabled={adding}
-                onClick={() => void handleOwn(item)}
-                className={cn(
-                  "shrink-0 rounded-md border border-amber-400/60 bg-amber-100/70 px-2.5 py-1 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200/80",
-                  adding && "cursor-wait opacity-70"
-                )}
-              >
-                {adding ? "Adding..." : "I own this"}
-                <span className="sr-only">: {item.name}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <Card asChild>
+      <section aria-labelledby="not-in-wardrobe-heading">
+        <h3 id="not-in-wardrobe-heading" className="text-base font-semibold text-foreground">
+          Not in your wardrobe
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          You picked these from the catalog for this outfit. If you own one, add it to your wardrobe so future
+          recommendations can use it.
+        </p>
+        <ul className="mt-3 flex flex-col gap-3">
+          {items.map((item) => {
+            const adding = addingIds.has(item.sourceId);
+            return (
+              <li key={item.sourceId} className="flex flex-wrap items-center gap-2">
+                <div className="min-w-0 flex-1 basis-40">
+                  <p className="text-base font-semibold text-foreground">{item.name}</p>
+                  <p className="text-sm text-muted-foreground">{item.brand}</p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(`${item.brand} ${item.name}`.trim())}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Search for this item
+                    <span className="sr-only">: {item.name}, opens Google in a new tab</span>
+                    <ExternalLink aria-hidden="true" />
+                  </a>
+                </Button>
+                <Button type="button" variant="secondary" size="sm" disabled={adding} onClick={() => void handleOwn(item)}>
+                  {adding ? "Adding…" : "I own this"}
+                  <span className="sr-only">: {item.name}</span>
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    </Card>
   );
 }

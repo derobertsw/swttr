@@ -31,10 +31,10 @@ export const CATEGORY_TO_LAYER_TYPE: Record<string, LayerType> = {
  * Human-readable labels for body parts
  */
 export const BODY_PART_LABELS: Record<BodyPart, string> = {
-  torso: "Torso",
+  torso: "Upper body",
   legs: "Legs",
   hands: "Hands",
-  headNeck: "Head/Neck",
+  headNeck: "Head & neck",
 };
 
 /**
