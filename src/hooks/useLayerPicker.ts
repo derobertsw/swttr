@@ -57,8 +57,9 @@ function wardrobeLayerType(item: WardrobeItem): LayerType | null {
 }
 
 /**
- * Check if an item's native layer type is compatible with the target layer slot.
- * Items can be placed in their native layer or one step outward:
+ * Whether the picker for the target layer offers an item of this native layer.
+ * It offers items from the target layer and the layers next to it; a picked
+ * item is still worn under its native layer. Item layer → layers it's offered for:
  *   base → base, mid
  *   mid  → base, mid, outer
  *   outer → mid, outer
