@@ -8,7 +8,7 @@ vi.mock("@/lib/supabase", () => ({
 import { getSupabase } from "@/lib/supabase";
 const mockGetSupabase = vi.mocked(getSupabase);
 
-function makeOrderedQuery<T>(data: T[]) {
+function makeOrderedQuery<T>(data: T[] | null, error: { message: string } | null = null) {
   const builder = {
     select: vi.fn().mockReturnThis(),
     order: vi.fn(),
@@ -16,7 +16,7 @@ function makeOrderedQuery<T>(data: T[]) {
 
   builder.order
     .mockReturnValueOnce(builder)
-    .mockResolvedValueOnce({ data, error: null });
+    .mockResolvedValueOnce({ data, error });
 
   return builder;
 }
@@ -26,14 +26,30 @@ describe("Wardrobe Available API Route", () => {
     vi.clearAllMocks();
   });
 
-  it("returns empty items when database is not configured", async () => {
+  it("reports the catalog as unavailable when the database is not configured", async () => {
     mockGetSupabase.mockReturnValue(null);
 
     const response = await GET();
-    const payload = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(payload.items).toEqual([]);
+    expect(response.status).toBe(503);
+    expect((await response.json()).items).toBeUndefined();
+  });
+
+  it("fails instead of returning a partial catalog when a query errors", async () => {
+    const queries: Record<string, ReturnType<typeof makeOrderedQuery>> = {
+      garments: makeOrderedQuery([{ id: "g1", brand: "A", model_name: "Shell" }]),
+      handwear: makeOrderedQuery(null, { message: "timeout" }),
+      headwear: makeOrderedQuery([]),
+    };
+    mockGetSupabase.mockReturnValue({
+      from: vi.fn((table: string) => queries[table]),
+    } as unknown as ReturnType<typeof getSupabase>);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await GET();
+
+    expect(response.status).toBe(500);
+    expect((await response.json()).items).toBeUndefined();
   });
 
   it("normalizes garment rcl values from object and array relationship shapes", async () => {

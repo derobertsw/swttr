@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Plus } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Sparkles, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -15,294 +16,296 @@ import {
   DrawerBody,
   DrawerContent,
   DrawerDescription,
+  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { chipClassName } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { BodyPart, LayerType } from "@/types/wardrobe";
+import { SegmentedChoice, arrowKeyTarget } from "@/components/SegmentedChoice";
+import type { BodyPart, LayerType, WardrobeItem } from "@/types/wardrobe";
 import { getGenericOptions, getGenericLayerClo } from "@/data/genericLayerClo";
-import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { logError } from "@/lib/logger";
-import { cn } from "@/lib/utils";
+import { BODY_AREAS, LAYER_LABELS, formatBodyPartLabel } from "./wardrobe-utils";
+
+const NAME_LIMIT = 50;
+const LAYERS: LayerType[] = ["base", "mid", "outer"];
+const BODY_AREA_OPTIONS = BODY_AREAS.map((area) => ({ value: area, label: formatBodyPartLabel(area) }));
+
+interface Kind {
+  layer: LayerType;
+  option: string;
+}
 
 interface CreateCustomItemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  bodyPart?: BodyPart;
-  onItemCreated: () => void;
+  /** Starting body area and name, e.g. from a catalog search that found nothing. */
+  defaults?: { bodyPart?: BodyPart; name?: string };
+  onItemCreated: (item: WardrobeItem) => void;
+  /** Where focus goes when the form closes. */
+  onCloseAutoFocus?: (event: Event) => void;
 }
-
-const BODY_PART_OPTIONS: { value: BodyPart; label: string }[] = [
-  { value: "torso", label: "Torso" },
-  { value: "legs", label: "Legs" },
-  { value: "hands", label: "Hands" },
-  { value: "headNeck", label: "Head/Neck" },
-];
 
 export function CreateCustomItemDialog({
   open,
   onOpenChange,
-  bodyPart: initialBodyPart,
+  defaults,
   onItemCreated,
+  onCloseAutoFocus,
 }: CreateCustomItemDialogProps) {
   const isMobile = useIsMobile();
-  const [bodyPart, setBodyPart] = useState<BodyPart>(initialBodyPart || "torso");
-  const [layerType, setLayerType] = useState<LayerType>("base");
-  const [genericOption, setGenericOption] = useState<string>("");
-  const [customName, setCustomName] = useState("");
+  const formId = useId();
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Get available options for selected layer type
-  const options = getGenericOptions(bodyPart, layerType);
-
-  // Get CLO value for selected option
-  const cloValue = genericOption
-    ? getGenericLayerClo(bodyPart, layerType, genericOption)
-    : null;
-
-  // Set first option as default when layer type changes
-  const handleLayerTypeChange = (newLayerType: LayerType) => {
-    setLayerType(newLayerType);
-    const newOptions = getGenericOptions(bodyPart, newLayerType);
-    setGenericOption(newOptions[0] || "");
-    setError(null);
-  };
-
-  // Initialize first option when dialog opens
-  const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen && initialBodyPart) {
-      setBodyPart(initialBodyPart);
-      const newOptions = getGenericOptions(initialBodyPart, layerType);
-      if (newOptions.length > 0) {
-        setGenericOption(newOptions[0]);
-      }
-    } else if (newOpen && options.length > 0 && !genericOption) {
-      setGenericOption(options[0]);
-    }
-    if (!newOpen) {
-      // Reset form
-      setBodyPart(initialBodyPart || "torso");
-      setLayerType("base");
-      setGenericOption("");
-      setCustomName("");
-      setError(null);
-    }
-    onOpenChange(newOpen);
-  };
-
-  const handleBodyPartChange = (newBodyPart: BodyPart) => {
-    setBodyPart(newBodyPart);
-    // Reset layer-specific selections when changing body part
-    const newOptions = getGenericOptions(newBodyPart, layerType);
-    setGenericOption(newOptions[0] || "");
-    setError(null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!genericOption || !customName.trim()) {
-      setError("Please fill in all fields");
-      return;
-    }
-
-    setCreating(true);
-
-    try {
-      const res = await fetch("/api/wardrobe/custom", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          body_part: bodyPart,
-          layer_type: layerType,
-          generic_option: genericOption,
-          custom_name: customName.trim(),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "Failed to create custom item");
-        setCreating(false);
-        return;
-      }
-
-      // Success - close dialog and refresh wardrobe
-      onOpenChange(false);
-      onItemCreated();
-
-      // Reset form
-      setLayerType("base");
-      setGenericOption("");
-      setCustomName("");
-    } catch (err) {
-      logError("CreateCustomItemDialog.handleSubmit", err);
-      setError("Failed to create custom item");
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const content = (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Body Part Selection */}
-      <div className="space-y-2">
-        <p id="custom-item-body-part" className="text-sm font-medium text-foreground">
-          Body Part
-        </p>
-        <div
-          role="group"
-          aria-labelledby="custom-item-body-part"
-          className={cn(segmentedGroupClassName, "grid-cols-2 sm:grid-cols-4")}
-        >
-          {BODY_PART_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={bodyPart === option.value}
-              onClick={() => handleBodyPartChange(option.value)}
-              className={segmentedItemClassName}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <p id="custom-item-layer-type" className="text-sm font-medium text-foreground">
-          Layer Type
-        </p>
-        <Tabs value={layerType} onValueChange={(v) => handleLayerTypeChange(v as LayerType)}>
-          <TabsList aria-labelledby="custom-item-layer-type" className="grid w-full grid-cols-3">
-            <TabsTrigger value="base">Base</TabsTrigger>
-            <TabsTrigger value="mid">Mid</TabsTrigger>
-            <TabsTrigger value="outer">Outer</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value={layerType} className="mt-5 space-y-5">
-            <div className="space-y-2">
-              <label htmlFor="insulation-level" className="block text-sm font-medium text-foreground">
-                Insulation Level
-              </label>
-              <Select value={genericOption} onValueChange={setGenericOption}>
-                <SelectTrigger id="insulation-level" className="w-full">
-                  <SelectValue placeholder="Select insulation level" />
-                </SelectTrigger>
-                <SelectContent>
-                  {options.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {cloValue !== null && (
-              <div className="rounded-control bg-muted p-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-sm font-medium text-muted-foreground">Thermal Insulation</p>
-                  <p className="font-mono text-3xl font-bold text-foreground">
-                    {cloValue.toFixed(2)}
-                  </p>
-                </div>
-                <p className="mt-1.5 text-sm text-muted-foreground">
-                  CLO value for {genericOption.toLowerCase()} {layerType} layer
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <label htmlFor="custom-name" className="block text-sm font-medium text-foreground">
-                Custom Name
-              </label>
-              <Input
-                id="custom-name"
-                value={customName}
-                onChange={(e) => setCustomName(e.target.value)}
-                placeholder="e.g., My favorite merino base layer"
-                maxLength={50}
-                required
-              />
-              <p className="text-sm text-muted-foreground">
-                {customName.length}/50 characters
-              </p>
-            </div>
-
-            {error && (
-              <div role="alert" className="rounded-control bg-destructive-soft p-4">
-                <p className="text-sm font-medium text-destructive">{error}</p>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full"
-              loading={creating}
-              disabled={!creating && (!genericOption || !customName.trim())}
-            >
-              {creating ? (
-                "Adding..."
-              ) : (
-                <>
-                  <Plus className="size-5" />
-                  Add to Wardrobe
-                </>
-              )}
-            </Button>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </form>
+  const title = "Add a similar item";
+  const description = "For gear the catalog doesn't have. Pick what it's most like and SWTTR estimates its warmth.";
+  const form = (
+    <CustomItemForm
+      id={formId}
+      defaults={defaults}
+      creating={creating}
+      onCreatingChange={setCreating}
+      onItemCreated={onItemCreated}
+    />
+  );
+  const submit = (
+    <Button type="submit" form={formId} size="lg" loading={creating} className="w-full sm:w-auto">
+      <Plus />
+      Add to wardrobe
+    </Button>
   );
 
   if (isMobile) {
     return (
-      <Drawer open={open} onOpenChange={handleOpenChange}>
-        <DrawerContent showCloseButton className="h-[90dvh]">
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerContent showCloseButton className="h-[90dvh]" onCloseAutoFocus={onCloseAutoFocus}>
           <DrawerHeader className="pr-14 pb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="size-5 text-primary" />
-              <DrawerTitle>Add Custom Item</DrawerTitle>
-            </div>
-            <DrawerDescription>
-              Create a generic item with custom name and insulation level
-            </DrawerDescription>
+            <DrawerTitle>{title}</DrawerTitle>
+            <DrawerDescription>{description}</DrawerDescription>
           </DrawerHeader>
-          <DrawerBody className="pb-6">{content}</DrawerBody>
+          <DrawerBody className="pb-4">{form}</DrawerBody>
+          <DrawerFooter>{submit}</DrawerFooter>
         </DrawerContent>
       </Drawer>
     );
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="flex h-[85vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-xl" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader className="flex-none border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-5 text-primary" />
-            <DialogTitle>Add Custom Item</DialogTitle>
-          </div>
-          <DialogDescription>
-            Create a generic item with custom name and insulation level
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <div className="flex-1 overflow-y-auto px-6 py-4">{content}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{form}</div>
+        <DialogFooter className="flex-none border-t border-border px-6 py-4">{submit}</DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CustomItemForm({
+  id,
+  defaults,
+  creating,
+  onCreatingChange: setCreating,
+  onItemCreated,
+}: {
+  id: string;
+  defaults?: CreateCustomItemDialogProps["defaults"];
+  creating: boolean;
+  onCreatingChange: (creating: boolean) => void;
+  onItemCreated: (item: WardrobeItem) => void;
+}) {
+  const [bodyPart, setBodyPart] = useState<BodyPart>(defaults?.bodyPart ?? "torso");
+  const [kind, setKind] = useState<Kind | null>(null);
+  const [name, setName] = useState(defaults?.name?.slice(0, NAME_LIMIT) ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [showMissing, setShowMissing] = useState(false);
+  const kindRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const kinds: Kind[] = LAYERS.flatMap((layer) =>
+    getGenericOptions(bodyPart, layer).map((option) => ({ layer, option }))
+  );
+  const selectedIndex = kind ? kinds.findIndex((k) => k.layer === kind.layer && k.option === kind.option) : -1;
+  const clo = kind ? getGenericLayerClo(bodyPart, kind.layer, kind.option) : null;
+  const missingKind = showMissing && !kind;
+  const missingName = showMissing && !name.trim();
+
+  const handleBodyPartChange = (next: BodyPart) => {
+    setBodyPart(next);
+    setKind(null);
+    setError(null);
+  };
+
+  const handleKindKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const target = arrowKeyTarget(event.key, index, kinds.length);
+    if (target === null) return;
+    event.preventDefault();
+    kindRefs.current[target]?.focus();
+    setKind(kinds[target]);
+  };
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (creating) return;
+    setError(null);
+    if (!kind || !name.trim()) {
+      setShowMissing(true);
+      // Take the user to the first thing that's missing.
+      if (!kind) kindRefs.current[0]?.focus();
+      else document.getElementById(`${id}-name`)?.focus();
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const res = await fetch("/api/wardrobe/custom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body_part: bodyPart,
+          layer_type: kind.layer,
+          generic_option: kind.option,
+          custom_name: name.trim(),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { item?: WardrobeItem; error?: string };
+
+      if (!res.ok || !data.item) {
+        setError(
+          res.status === 409 && data.error
+            ? data.error
+            : "Couldn't add this item. Check your connection and try again."
+        );
+        return;
+      }
+      onItemCreated(data.item);
+    } catch (err) {
+      logError("CustomItemForm.handleSubmit", err);
+      setError("Couldn't add this item. Check your connection and try again.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <form id={id} onSubmit={handleSubmit} aria-busy={creating} noValidate className="flex flex-col gap-6">
+      <SegmentedChoice
+        label="Body area"
+        options={BODY_AREA_OPTIONS}
+        value={bodyPart}
+        onChange={handleBodyPartChange}
+        groupClassName="grid-flow-row grid-cols-2 sm:grid-cols-4"
+      />
+
+      <div className="flex flex-col gap-2">
+        <p id={`${id}-kind`} className="text-sm font-medium text-foreground">
+          What is it most like?
+        </p>
+        <div
+          role="radiogroup"
+          aria-labelledby={`${id}-kind`}
+          aria-required="true"
+          aria-invalid={missingKind || undefined}
+          aria-describedby={missingKind ? `${id}-kind-error` : undefined}
+          className="flex flex-col gap-3"
+        >
+          {LAYERS.map((layer) => {
+            const layerKinds = kinds.filter((k) => k.layer === layer);
+            if (layerKinds.length === 0) return null;
+            const layerLabelId = `${id}-${layer}`;
+            return (
+              <div key={layer}>
+                <p id={layerLabelId} className="mb-1.5 text-sm text-muted-foreground">
+                  {LAYER_LABELS[layer]}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {layerKinds.map((k) => {
+                    const index = kinds.indexOf(k);
+                    const checked = index === selectedIndex;
+                    // Tab reaches the chosen kind, or the first one before any is chosen.
+                    const tabbable = selectedIndex === -1 ? index === 0 : checked;
+                    return (
+                      <button
+                        key={k.option}
+                        ref={(element) => {
+                          kindRefs.current[index] = element;
+                        }}
+                        type="button"
+                        role="radio"
+                        aria-checked={checked}
+                        aria-describedby={layerLabelId}
+                        tabIndex={tabbable ? 0 : -1}
+                        onClick={() => {
+                          setKind(k);
+                          setError(null);
+                        }}
+                        onKeyDown={(event) => handleKindKeyDown(event, index)}
+                        className={chipClassName}
+                      >
+                        {k.option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {missingKind && (
+          <p id={`${id}-kind-error`} className="text-sm font-medium text-destructive">
+            Choose what it&apos;s most like.
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor={`${id}-name`} className="text-sm font-medium text-foreground">
+          Name
+        </label>
+        <Input
+          id={`${id}-name`}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="e.g. Old ski jacket"
+          maxLength={NAME_LIMIT}
+          required
+          aria-invalid={missingName || undefined}
+          aria-describedby={`${id}-name-hint`}
+        />
+        <p id={`${id}-name-hint`} className="text-sm text-muted-foreground">
+          {missingName ? (
+            <span className="font-medium text-destructive">Give it a name. </span>
+          ) : null}
+          How it shows in your wardrobe. {name.length}/{NAME_LIMIT} characters.
+        </p>
+      </div>
+
+      {kind && clo !== null && (
+        <section aria-labelledby={`${id}-estimate`} className="rounded-control bg-muted p-3 text-sm">
+          <h3 id={`${id}-estimate`} className="font-medium text-foreground">
+            Estimated properties
+          </h3>
+          <p className="mt-1 text-muted-foreground">
+            Recommendations treat it like a typical {kind.option.toLowerCase()}{" "}
+            {LAYER_LABELS[kind.layer].toLowerCase()}. You don&apos;t need exact numbers.
+          </p>
+          <details className="mt-2">
+            <summary className="cursor-pointer font-medium text-foreground">Technical details</summary>
+            <p className="mt-1 text-muted-foreground">
+              Estimated insulation: <span className="font-mono">{clo.toFixed(2)} clo</span>
+            </p>
+          </details>
+        </section>
+      )}
+
+      {error && (
+        <p role="alert" className="rounded-control bg-destructive-soft p-3 text-sm font-medium text-destructive">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Dialog,
@@ -16,52 +17,126 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { Trash2 } from "lucide-react";
+import { CircleCheck, CircleSlash, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WardrobeItem } from "@/types/wardrobe";
+import type { ActionState, RowAction } from "@/hooks/useWardrobe";
 import { ItemDetailContent } from "./item-detail/ItemDetailContent";
-import { getItemHeaderContext } from "./item-detail/detail-formatters";
+import { getItemBrandLabel, getItemCategoryLabel } from "./wardrobe-utils";
 
 interface ItemDetailCardProps {
   item: WardrobeItem | null;
+  /** The item's change in flight, or the one that failed. */
+  state?: ActionState<RowAction>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onRemove?: (wardrobeId: string) => void;
+  onSetExcluded: (excluded: boolean) => void;
+  onRemove: () => void;
+  onRetry: () => void;
+  /** Where focus goes on close; these details open from code, not a trigger. */
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
-export function ItemDetailCard({ item, open, onOpenChange, onRemove }: ItemDetailCardProps) {
+const FAILED_LABELS: Record<RowAction, string> = {
+  remove: "Couldn't remove this item.",
+  exclude: "Couldn't exclude this item.",
+  include: "Couldn't include this item.",
+};
+
+export function ItemDetailCard({
+  item,
+  state,
+  open,
+  onOpenChange,
+  onSetExcluded,
+  onRemove,
+  onRetry,
+  onCloseAutoFocus,
+}: ItemDetailCardProps) {
   const isMobile = useIsMobile();
+  const inclusionButtonRef = useRef<HTMLButtonElement>(null);
 
   if (!item) return null;
 
-  const title = `${item.details.brand} ${item.details.model_name}`;
-  const description = getItemHeaderContext(item);
+  const title = item.details.model_name;
+  const description = `${getItemCategoryLabel(item)} · ${getItemBrandLabel(item)}`;
+  const pending = state && !state.failed ? state.action : null;
+  const excluded = Boolean(item.disabled);
 
-  const removeButton = onRemove && (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={() => { onRemove(item.id); onOpenChange(false); }}
-      className="text-destructive hover:bg-destructive-soft hover:text-destructive"
-    >
-      <Trash2 />
-      Remove from wardrobe
-    </Button>
+  const actions = (
+    <div className="flex w-full flex-col gap-4">
+      <section aria-labelledby="item-inclusion" className="flex flex-col gap-2 rounded-control bg-muted p-3">
+        <h3 id="item-inclusion" className="text-sm font-semibold text-foreground">
+          {excluded ? "Excluded from recommendations" : "Included in recommendations"}
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          {excluded
+            ? "Recommendations won't suggest it. This applies everywhere on your account, not just one trip."
+            : "Recommendations can suggest it. Excluding it applies everywhere on your account, not just one trip."}
+        </p>
+        <Button
+          ref={inclusionButtonRef}
+          type="button"
+          variant="outline"
+          size="sm"
+          className="self-start"
+          loading={pending === "exclude" || pending === "include"}
+          disabled={pending === "remove"}
+          onClick={() => onSetExcluded(!excluded)}
+        >
+          {excluded ? <CircleCheck /> : <CircleSlash />}
+          {excluded ? "Include in recommendations" : "Exclude from recommendations"}
+        </Button>
+      </section>
+
+      {state?.failed && (
+        <div role="alert" className="flex items-center gap-2 rounded-control bg-destructive-soft py-1.5 pr-1.5 pl-3">
+          <p className="min-w-0 flex-1 text-sm font-medium text-destructive">{FAILED_LABELS[state.action]}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // The alert goes away on retry; keep focus on the change being retried.
+              inclusionButtonRef.current?.focus();
+              onRetry();
+            }}
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+
+      <div className="flex flex-col items-start gap-1">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          loading={pending === "remove"}
+          disabled={pending === "exclude" || pending === "include"}
+          onClick={onRemove}
+          className="text-destructive hover:bg-destructive-soft hover:text-destructive"
+        >
+          <Trash2 />
+          Remove from wardrobe
+        </Button>
+        <p className="text-sm text-muted-foreground">You can restore it until you leave this page.</p>
+      </div>
+    </div>
   );
 
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent showCloseButton>
+        <DrawerContent showCloseButton onCloseAutoFocus={onCloseAutoFocus}>
           <div className="mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col">
             <DrawerHeader className="pr-14 pb-2">
               <DrawerTitle>{title}</DrawerTitle>
-              <DrawerDescription className="sr-only">{description}</DrawerDescription>
+              <DrawerDescription>{description}</DrawerDescription>
             </DrawerHeader>
-            <DrawerBody className="flex flex-col items-start gap-4 pb-8">
+            <DrawerBody className="flex flex-col gap-4 pb-8">
               <ItemDetailContent item={item} />
-              {removeButton}
+              {actions}
             </DrawerBody>
           </div>
         </DrawerContent>
@@ -71,13 +146,13 @@ export function ItemDetailCard({ item, open, onOpenChange, onRemove }: ItemDetai
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className="sr-only">{description}</DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <ItemDetailContent item={item} />
-        {removeButton && <div>{removeButton}</div>}
+        {actions}
       </DialogContent>
     </Dialog>
   );

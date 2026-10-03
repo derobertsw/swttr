@@ -1,7 +1,8 @@
 /**
  * In-memory stand-in for the subset of the Supabase query builder used by the
  * API routes: from().select().eq().neq().in().gte().order().limit(), awaited
- * directly or via maybeSingle().
+ * directly or via maybeSingle(), from().insert().select().single(), and
+ * from().update().eq() or from().delete().eq() awaited directly.
  *
  * Embedded one-to-one relations (e.g. garment_thermal_properties) are stored on
  * each row, matching PostgREST's response shape. A gte() filter on an embedded
@@ -15,6 +16,8 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
   private readonly filters: Filter[] = [];
   private readonly sorts: Array<(a: Row, b: Row) => number> = [];
   private maxRows = Infinity;
+  private patch: Row | null = null;
+  private deleting = false;
 
   constructor(private readonly rows: Row[]) {}
 
@@ -60,6 +63,26 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
     return this;
   }
 
+  /** Applies `values` to every row matching the filters once awaited. */
+  update(values: Row) {
+    this.patch = values;
+    return this;
+  }
+
+  /** Removes every row matching the filters once awaited. */
+  delete() {
+    this.deleting = true;
+    return this;
+  }
+
+  /** Appends a row with a generated id and created_at, read back via select().single(). */
+  insert(values: Row) {
+    const row = { id: `row_${this.rows.length + 1}`, created_at: new Date().toISOString(), ...values };
+    this.rows.push(row);
+    const result = { data: structuredClone(row), error: null };
+    return { select: () => ({ single: () => Promise.resolve(result) }) };
+  }
+
   /** Resolves to the first matching row, or null. */
   maybeSingle() {
     return Promise.resolve({ data: this.matches()[0] ?? null, error: null });
@@ -67,6 +90,8 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
 
   private matches(): Row[] {
     const rows = this.rows.filter((row) => this.filters.every((f) => f(row)));
+    if (this.patch) for (const row of rows) Object.assign(row, this.patch);
+    if (this.deleting) for (const row of rows) this.rows.splice(this.rows.indexOf(row), 1);
     for (const compare of [...this.sorts].reverse()) rows.sort(compare);
     return structuredClone(rows.slice(0, this.maxRows));
   }
@@ -88,6 +113,6 @@ function readColumn(row: Row, column: string): unknown {
 
 export function createFakeSupabase(tables: Tables) {
   return {
-    from: (table: string) => new FakeQuery(tables[table] ?? []),
+    from: (table: string) => new FakeQuery((tables[table] ??= [])),
   };
 }
