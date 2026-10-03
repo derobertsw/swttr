@@ -27,7 +27,7 @@ export async function GET() {
   const supabase = getSupabase();
 
   if (!supabase) {
-    return NextResponse.json({ items: [] });
+    return NextResponse.json({ error: "Catalog unavailable" }, { status: 503 });
   }
 
   try {
@@ -49,6 +49,13 @@ export async function GET() {
         .order("brand")
         .order("model_name"),
     ]);
+
+    // A failed query would otherwise look like an empty catalog.
+    const queryError = garmentsResult.error || handwearResult.error || headwearResult.error;
+    if (queryError) {
+      console.error("Failed to load catalog:", queryError);
+      return NextResponse.json({ error: "Failed to load catalog" }, { status: 500 });
+    }
 
     const items = [
       ...(garmentsResult.data || []).map((g) => ({

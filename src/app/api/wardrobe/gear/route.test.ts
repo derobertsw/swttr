@@ -56,4 +56,16 @@ describe("POST /api/wardrobe/gear", () => {
   it("returns 404 for someone else's custom item", async () => {
     expect((await post(JSON.stringify({ item_type: "custom", item_id: "c2" }))).status).toBe(404);
   });
+
+  it("returns the new entry with its details, as GET lists it", async () => {
+    const res = await post(JSON.stringify({ item_type: "handwear", item_id: "h1" }));
+
+    expect(res.status).toBe(201);
+    expect((await res.json()).item).toMatchObject({
+      item_type: "handwear",
+      item_id: "h1",
+      disabled: false,
+      details: { brand: "Hestra", model_name: "Army Leather" },
+    });
+  });
 });

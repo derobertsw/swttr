@@ -1,30 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Plus, X, Minus, SlidersHorizontal, ChevronDown, ChevronUp, ExternalLink, Check } from "lucide-react";
+import { Search, Plus, X, SlidersHorizontal, ChevronDown, ChevronUp, Check, RotateCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { chipClassName } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { AvailableItem } from "@/types/wardrobe";
+import type { ActionState, BodyAreaFilter, CatalogAction, LoadStatus } from "@/hooks/useWardrobe";
 import { getCatalogHeights } from "./catalog-layout";
+import { BodyAreaChips } from "./BodyAreaChips";
 import { typeIcons, typeLabels, formatCategory } from "./wardrobe-utils";
 
 interface WardrobeSearchProps {
+  status: LoadStatus;
+  onRetry: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   filteredItems: AvailableItem[];
   totalMatches: number;
   shownMatches: number;
   groupedItems: Record<string, AvailableItem[]>;
-  adding: string | null;
-  justAdded: string | null;
+  catalogStates: Record<string, ActionState<CatalogAction>>;
   onAddItem: (item: AvailableItem) => void;
   onRemoveItem: (itemId: string) => void;
+  /** Opens the custom item form, for gear the catalog doesn't have. */
+  onAddSimilar: () => void;
   wardrobeItemIds: Set<string>;
   brandFilter: string | null;
   onBrandFilterChange: (brand: string | null) => void;
-  searchBodyPartFilter: "all" | "torso" | "legs" | "hands" | "headNeck";
-  onSearchBodyPartFilterChange: (value: "all" | "torso" | "legs" | "hands" | "headNeck") => void;
+  searchBodyPartFilter: BodyAreaFilter;
+  onSearchBodyPartFilterChange: (value: BodyAreaFilter) => void;
   searchLayerFilter: "all" | "base" | "mid" | "outer";
   onSearchLayerFilterChange: (value: "all" | "base" | "mid" | "outer") => void;
   searchSort: "bestMatch" | "alpha" | "clo";
@@ -33,13 +38,10 @@ interface WardrobeSearchProps {
   availableBrands: string[];
 }
 
-const BODY_AREA_OPTIONS: { value: WardrobeSearchProps["searchBodyPartFilter"]; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "torso", label: "Torso" },
-  { value: "legs", label: "Legs" },
-  { value: "hands", label: "Hands" },
-  { value: "headNeck", label: "Head/Neck" },
-];
+const FAILED_LABELS: Record<CatalogAction, string> = {
+  add: "Couldn't add this item. Try again.",
+  remove: "Couldn't remove this item. Try again.",
+};
 
 const LAYER_LABELS: Record<WardrobeSearchProps["searchLayerFilter"], string> = {
   all: "All layers",
@@ -56,16 +58,18 @@ const SORT_LABELS: Record<WardrobeSearchProps["searchSort"], string> = {
 
 
 export function WardrobeSearch({
+  status,
+  onRetry,
   search,
   onSearchChange,
   filteredItems,
   totalMatches,
   shownMatches,
   groupedItems,
-  adding,
-  justAdded,
+  catalogStates,
   onAddItem,
   onRemoveItem,
+  onAddSimilar,
   wardrobeItemIds,
   brandFilter,
   onBrandFilterChange,
@@ -80,8 +84,6 @@ export function WardrobeSearch({
 }: WardrobeSearchProps) {
   const hasSearch = search.trim().length > 0;
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const [popoverId, setPopoverId] = useState<string | null>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
 
   // ResizeObserver for Safari-safe scroll
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -112,19 +114,6 @@ export function WardrobeSearch({
 
     return () => observer.disconnect();
   }, []);
-
-
-  // Close popover on click outside
-  useEffect(() => {
-    if (!popoverId) return;
-    const handler = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setPopoverId(null);
-      }
-    };
-    document.addEventListener("pointerdown", handler);
-    return () => document.removeEventListener("pointerdown", handler);
-  }, [popoverId]);
 
   const hasActiveFilters =
     brandFilter !== null ||
@@ -184,8 +173,8 @@ export function WardrobeSearch({
         <div className="relative">
           <Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            aria-label="Search the catalog"
-            placeholder="Search by brand, model, or category..."
+            aria-label="Search catalog"
+            placeholder="Search catalog by brand, model or type"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-10 pr-11"
@@ -205,20 +194,7 @@ export function WardrobeSearch({
           )}
         </div>
 
-        {/* Body Part Pills */}
-        <div role="group" aria-label="Body area" className="mt-3 flex flex-wrap gap-2">
-          {BODY_AREA_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={searchBodyPartFilter === option.value}
-              onClick={() => onSearchBodyPartFilterChange(option.value)}
-              className={chipClassName}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <BodyAreaChips value={searchBodyPartFilter} onChange={onSearchBodyPartFilterChange} className="mt-3" />
 
         {/* Filter toggle bar */}
         <button
@@ -346,152 +322,149 @@ export function WardrobeSearch({
         className="mt-3 overflow-y-auto rounded-card border border-border bg-card"
         style={resultsMaxHeight !== null ? { maxHeight: resultsMaxHeight } : undefined}
       >
-        {filteredItems.length > 0 && (
-          <div className="sticky top-0 z-10 border-b border-border bg-card px-3 py-2.5">
-            <p className="text-sm font-medium text-foreground">
+        {status === "loading" ? (
+          <div aria-busy="true" aria-label="Loading the catalog" className="flex flex-col gap-2 p-3">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : status === "error" ? (
+          <div role="alert" className="flex flex-col items-center gap-3 p-8 text-center">
+            <div>
+              <p className="text-sm font-medium text-foreground">Couldn&apos;t load the catalog</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Check your connection and try again, or add a similar item yourself.
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+              <RotateCw />
+              Retry
+            </Button>
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 p-8 text-center">
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                {hasSearch ? "No catalog items match" : "No catalog items for these filters"}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Try other words or filters, or add a similar item with estimated warmth.
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={onAddSimilar}>
+              <Plus />
+              Add a similar item
+            </Button>
+          </div>
+        ) : (
+          <>
+            <p className="sticky top-0 z-10 border-b border-border bg-card px-3 py-2.5 text-sm font-medium text-foreground">
               {hasSearch ? (
                 <>{shownMatches}{totalMatches > shownMatches ? ` of ${totalMatches}` : ""} results</>
               ) : (
-                <>All available items ({shownMatches})</>
+                <>All catalog items ({shownMatches})</>
               )}
             </p>
-            <p className="text-xs text-muted-foreground">Tap an item for options</p>
-          </div>
-        )}
-        {filteredItems.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-sm font-medium text-foreground">
-              {hasSearch ? "No items found" : "No items available"}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {hasSearch
-                ? "Try adjusting your filters or search query"
-                : "Select a body part filter to browse by category"
-              }
-            </p>
-          </div>
-        ) : (
-          Object.entries(groupedItems).map(([type, items]) => {
+            {Object.entries(groupedItems).map(([type, items]) => {
               if (items.length === 0) return null;
               const Icon = typeIcons[type as keyof typeof typeIcons];
+              const headingId = `catalog-group-${type}`;
               return (
-                <div key={type}>
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                <div key={type} role="group" aria-labelledby={headingId}>
+                  <p id={headingId} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
                     <Icon aria-hidden="true" className="size-3.5" />
                     {typeLabels[type as keyof typeof typeLabels]}
-                  </div>
-                  {items.map((item) => {
-                    const isAdding = adding === item.id;
-                    const wasJustAdded = justAdded === item.id;
-                    const isInWardrobe = wardrobeItemIds.has(item.id);
-                    const isPopoverOpen = popoverId === item.id;
-                    const buyUrl = `https://www.google.com/search?q=${encodeURIComponent(`buy ${item.brand} ${item.model_name}`)}`;
-
-                    return (
-                      <div key={item.id} className="relative">
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          aria-expanded={isPopoverOpen}
-                          aria-haspopup="dialog"
-                          onClick={() => setPopoverId(isPopoverOpen ? null : item.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              setPopoverId(isPopoverOpen ? null : item.id);
-                            }
-                          }}
-                          className={cn(
-                            "flex w-full cursor-pointer items-center gap-2.5 py-2.5 text-left transition-colors",
-                            isPopoverOpen
-                              ? "border-l-[3px] border-l-primary bg-primary-soft pl-[9px] pr-3"
-                              : "px-3 hover:bg-accent"
-                          )}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="truncate text-sm font-semibold leading-tight text-foreground">
-                              {item.model_name}
-                            </div>
-                            <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                              {item.brand}
-                              {item.category && (
-                                <span className="ml-1.5">· {formatCategory(item.category)}</span>
-                              )}
-                              {typeof item.rcl_clo === "number" && (
-                                <span className="ml-1.5 font-medium">· {item.rcl_clo.toFixed(2)} clo</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {(isInWardrobe || wasJustAdded) && (
-                            <Badge size="sm" variant="success">
-                              <Check aria-hidden="true" />
-                              Added
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Popover */}
-                        {isPopoverOpen && (
-                          <div
-                            ref={popoverRef}
-                            className="absolute right-3 z-20 mt-[-4px] flex max-w-[calc(100%-1.5rem)] flex-wrap items-center justify-end gap-2 rounded-card border border-border bg-popover px-2 py-1.5 text-popover-foreground shadow-lg"
-                          >
-                            {isAdding ? (
-                              <span role="status" className="px-1 text-sm text-muted-foreground">Adding...</span>
-                            ) : isInWardrobe || wasJustAdded ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onRemoveItem(item.id);
-                                }}
-                                className="hover:border-destructive hover:bg-destructive-soft hover:text-destructive"
-                              >
-                                <Minus />
-                                Remove from wardrobe
-                              </Button>
-                            ) : (
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onAddItem(item);
-                                }}
-                              >
-                                <Plus />
-                                Add to wardrobe
-                              </Button>
-                            )}
-                            <Button asChild variant="outline" size="sm">
-                              <a
-                                href={buyUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <ExternalLink />
-                                Buy it
-                              </a>
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  </p>
+                  <ul>
+                    {items.map((item) => (
+                      <CatalogRow
+                        key={item.id}
+                        item={item}
+                        owned={wardrobeItemIds.has(item.id)}
+                        state={catalogStates[item.id]}
+                        onAdd={() => onAddItem(item)}
+                        onRemove={() => onRemoveItem(item.id)}
+                      />
+                    ))}
+                  </ul>
                 </div>
               );
-          })
-        )}
-        {hasSearch && totalMatches > shownMatches && (
-          <div className="border-t border-border bg-muted px-3 py-2.5 text-xs text-muted-foreground">
-            Showing the top {shownMatches} matches. Keep typing to narrow results.
-          </div>
+            })}
+            {hasSearch && totalMatches > shownMatches && (
+              <p className="border-t border-border bg-muted px-3 py-2.5 text-xs text-muted-foreground">
+                Showing the top {shownMatches} matches. Keep typing to narrow results.
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>
+  );
+}
+
+interface CatalogRowProps {
+  item: AvailableItem;
+  owned: boolean;
+  state?: ActionState<CatalogAction>;
+  onAdd: () => void;
+  onRemove: () => void;
+}
+
+/** One catalog item, with Add, or In wardrobe and Remove once it's owned. */
+function CatalogRow({ item, owned, state, onAdd, onRemove }: CatalogRowProps) {
+  const pending = state && !state.failed ? state.action : null;
+  const name = `${item.brand} ${item.model_name}`;
+
+  return (
+    <li className="flex items-center gap-2 py-2 pr-2 pl-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold leading-tight text-foreground">{item.model_name}</p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          {item.brand}
+          {item.category && <span className="ml-1.5">· {formatCategory(item.category)}</span>}
+          {typeof item.rcl_clo === "number" && (
+            <span className="ml-1.5 font-medium">· {item.rcl_clo.toFixed(2)} clo</span>
+          )}
+        </p>
+        {state?.failed && (
+          <p role="alert" className="mt-1 text-xs font-medium text-destructive">
+            {FAILED_LABELS[state.action]}
+          </p>
+        )}
+      </div>
+
+      {owned ? (
+        <>
+          <Badge size="sm" variant="success" className="shrink-0">
+            <Check aria-hidden="true" />
+            In wardrobe
+          </Badge>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            loading={pending === "remove"}
+            onClick={onRemove}
+            aria-label={`Remove ${name} from wardrobe`}
+            className="shrink-0"
+          >
+            Remove
+          </Button>
+        </>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          loading={pending === "add"}
+          onClick={onAdd}
+          aria-label={`Add ${name} to wardrobe`}
+          className="shrink-0"
+        >
+          <Plus />
+          Add
+        </Button>
+      )}
+    </li>
   );
 }

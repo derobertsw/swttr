@@ -1,129 +1,46 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
-import type { WardrobeItem } from "@/types/wardrobe";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { BodyPartIcon, formatBodyPartLabel } from "./wardrobe-utils";
-import { WardrobeItemCard } from "./WardrobeItemCard";
+import type { ReactNode } from "react";
+import { Plus } from "lucide-react";
+import type { BodyPart } from "@/types/wardrobe";
+import { Button } from "@/components/ui/button";
+import { formatBodyPartLabel } from "./wardrobe-utils";
 
-interface BodyPartSectionProps {
-  part: string;
-  items: WardrobeItem[];
-  disabledItems: WardrobeItem[];
-  sectionId?: string;
-  isFirst: boolean;
-  isCollapsed: boolean;
-  onToggleCollapsed: () => void;
-  onRemoveItem: (id: string) => void;
-  onToggleDisabled: (id: string, currentDisabled: boolean) => void;
-  onItemClick?: (item: WardrobeItem) => void;
+/** The id of a body area's heading, which takes focus when its last row goes. */
+export function sectionHeadingId(area: BodyPart) {
+  return `wardrobe-section-${area}`;
 }
 
-export function BodyPartSection({
-  part,
-  items,
-  disabledItems,
-  sectionId,
-  isFirst,
-  isCollapsed,
-  onToggleCollapsed,
-  onRemoveItem,
-  onToggleDisabled,
-  onItemClick,
-}: BodyPartSectionProps) {
-  const label = formatBodyPartLabel(part);
-  const sectionCount = items.length + disabledItems.length;
-  const pausedPanelId = `${sectionId ?? `paused-items-${part.replace(/[^a-z0-9]+/gi, "-")}`}-panel`;
+interface BodyPartSectionProps {
+  area: BodyPart;
+  itemCount: number;
+  /** Offers to add gear here when the section is empty. */
+  onAddGear: () => void;
+  /** One WardrobeItemRow per item. */
+  children: ReactNode;
+}
+
+export function BodyPartSection({ area, itemCount, onAddGear, children }: BodyPartSectionProps) {
+  const label = formatBodyPartLabel(area);
+  const headingId = sectionHeadingId(area);
 
   return (
-    <section id={sectionId} className="flex scroll-mt-24 flex-col gap-2">
-      <div className={cn("sticky top-0 z-10", !isFirst && "pt-1.5")}>
-        <div className="flex items-center justify-between gap-3 rounded-card border border-border bg-card px-3 py-2.5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
-              <BodyPartIcon part={part} className="size-4 text-muted-foreground" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="truncate text-xl font-semibold text-foreground">
-                {label}
-              </h2>
-              <p className="truncate text-sm text-muted-foreground">
-                {items.length > 0 ? `${items.length} active` : "No active gear"}
-                {disabledItems.length > 0 ? ` · ${disabledItems.length} paused` : ""}
-                {sectionCount === 0 ? " yet" : ""}
-              </p>
-            </div>
-          </div>
-          <Badge size="sm" className="tabular-nums" aria-hidden="true">
-            {sectionCount}
-          </Badge>
-        </div>
-      </div>
-      {items.length === 0 && disabledItems.length === 0 ? (
-        <div className="flex items-center gap-3 rounded-card border border-dashed border-border px-4 py-4">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-control bg-muted">
-            <BodyPartIcon part={part} className="size-5 text-muted-foreground" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-foreground">No {label.toLowerCase()} gear yet</div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              Add a piece here so recommendations can account for this zone.
-            </div>
-          </div>
+    <section aria-labelledby={headingId} className="flex flex-col gap-2">
+      <h2 id={headingId} tabIndex={-1} className="flex items-baseline gap-2 text-lg font-semibold text-foreground outline-none">
+        {label}
+        <span className="text-sm font-medium text-muted-foreground tabular-nums">
+          {itemCount}
+          <span className="sr-only"> {itemCount === 1 ? "item" : "items"}</span>
+        </span>
+      </h2>
+      {itemCount === 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-dashed border-border py-2 pr-2 pl-4">
+          <p className="text-sm text-muted-foreground">No {label.toLowerCase()} gear yet.</p>
+          <Button type="button" variant="ghost" size="sm" onClick={onAddGear}>
+            <Plus />
+            Add {label.toLowerCase()} gear
+          </Button>
         </div>
       ) : (
-        <>
-          {items.map((item) => (
-            <WardrobeItemCard
-              key={item.id}
-              item={item}
-              isDisabled={false}
-              onDelete={() => onRemoveItem(item.id)}
-              onToggleDisabled={() => onToggleDisabled(item.id, false)}
-              onClick={onItemClick ? () => onItemClick(item) : undefined}
-            />
-          ))}
-
-          {disabledItems.length > 0 && (
-            <div className="mt-2 rounded-card bg-muted p-2">
-              <button
-                type="button"
-                onClick={onToggleCollapsed}
-                aria-expanded={!isCollapsed}
-                aria-controls={pausedPanelId}
-                className="flex min-h-9 w-full items-center justify-between gap-2 rounded-control px-2 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground max-md:min-h-11 pointer-coarse:min-h-11"
-              >
-                <span className="flex items-center gap-1.5">
-                  {isCollapsed ? (
-                    <ChevronRight className="size-3.5" />
-                  ) : (
-                    <ChevronDown className="size-3.5" />
-                  )}
-                  <span className="text-sm font-medium">Paused for this trip</span>
-                </span>
-                <Badge size="sm" variant="outline" className="tabular-nums">
-                  {disabledItems.length}
-                </Badge>
-              </button>
-              <div
-                id={pausedPanelId}
-                hidden={isCollapsed}
-                className="mt-2 flex flex-col gap-2 border-l border-dashed border-border pl-2"
-              >
-                {!isCollapsed &&
-                  disabledItems.map((item) => (
-                    <WardrobeItemCard
-                      key={item.id}
-                      item={item}
-                      isDisabled={true}
-                      onDelete={() => onRemoveItem(item.id)}
-                      onToggleDisabled={() => onToggleDisabled(item.id, true)}
-                      onClick={onItemClick ? () => onItemClick(item) : undefined}
-                    />
-                  ))}
-              </div>
-            </div>
-          )}
-        </>
+        <ul className="flex flex-col gap-2">{children}</ul>
       )}
     </section>
   );

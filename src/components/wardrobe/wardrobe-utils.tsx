@@ -1,5 +1,5 @@
 import { Shirt, Hand, HardHat, Layers, Flame, Shield, Wind, CloudRain, Sparkles, LucideProps } from "lucide-react";
-import type { WardrobeItem, AvailableItem } from "@/types/wardrobe";
+import type { WardrobeItem, AvailableItem, BodyPart, LayerType } from "@/types/wardrobe";
 import type { EstimationMethod } from "@/types/garments";
 
 // Custom pants icon (ski pants style) since lucide-react doesn't have one
@@ -80,18 +80,24 @@ export const typeLabels = {
   custom: "Custom",
 };
 
-export const BODY_PART_ORDER = ["torso", "legs", "hands", "head & neck"];
-const BODY_PART_LABELS: Record<string, string> = {
-  torso: "Torso",
+/** Body areas in the order the wardrobe lists them. */
+export const BODY_AREAS: BodyPart[] = ["torso", "legs", "hands", "headNeck"];
+const BODY_AREA_LABELS: Record<BodyPart, string> = {
+  torso: "Upper body",
   legs: "Legs",
   hands: "Hands",
-  headNeck: "Head + Neck",
-  "head & neck": "Head + Neck",
+  headNeck: "Head & neck",
 };
 
-export function formatBodyPartLabel(part: string): string {
-  return BODY_PART_LABELS[part] ?? formatCategory(part);
+export function formatBodyPartLabel(part: BodyPart): string {
+  return BODY_AREA_LABELS[part];
 }
+
+export const LAYER_LABELS: Record<LayerType, string> = {
+  base: "Base layer",
+  mid: "Mid layer",
+  outer: "Outer layer",
+};
 
 function getItemIconKey(itemType: string, garmentType?: string, category?: string): string {
   if (itemType === "custom") return "custom";
@@ -145,6 +151,34 @@ export function getClo(item: WardrobeItem): number | undefined {
   return props?.rcl_whole_body;
 }
 
+/** The body area an owned item is listed under. */
+export function getItemBodyArea(item: WardrobeItem): BodyPart {
+  const part = getBodyPart(item);
+  return part === "head & neck" ? "headNeck" : (part as BodyPart);
+}
+
+/** What an item is: its catalog category, or a custom item's layer and type. */
+export function getItemCategoryLabel(item: WardrobeItem): string {
+  const { details } = item;
+  if (item.item_type === "custom") {
+    const layer = details.layer_type ? LAYER_LABELS[details.layer_type] : "Custom item";
+    return details.generic_option ? `${layer} · ${details.generic_option}` : layer;
+  }
+  const category = details.category || details.handwear_type || details.headwear_type;
+  return category ? formatCategory(category) : "Uncategorized";
+}
+
+/** Who makes an item, or that it's a custom stand-in. */
+export function getItemBrandLabel(item: WardrobeItem): string {
+  if (item.item_type === "custom") return "Custom item";
+  return item.details.brand || "Unknown brand";
+}
+
+/** The text "Search my gear" matches against. */
+export function getItemSearchText(item: WardrobeItem): string {
+  return `${getItemBrandLabel(item)} ${item.details.model_name} ${getItemCategoryLabel(item)}`;
+}
+
 export function getBodyPart(item: WardrobeItem): string {
   if (item.item_type === "custom") {
     const bp = item.details.body_part;
@@ -156,18 +190,6 @@ export function getBodyPart(item: WardrobeItem): string {
   return "torso";
 }
 
-const BODY_PART_ICONS: Record<string, React.ComponentType<LucideProps>> = {
-  torso: Shirt,
-  legs: PantsIcon,
-  hands: Hand,
-  "head & neck": HardHat,
-};
-
-/** Icon for a wardrobe body-part section. */
-export function BodyPartIcon({ part, ...props }: LucideProps & { part: string }) {
-  const Icon = BODY_PART_ICONS[part] ?? Shirt;
-  return <Icon {...props} />;
-}
 
 export function normalizeSearch(text: string) {
   return text

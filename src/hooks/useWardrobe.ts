@@ -3,20 +3,32 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useUserId } from "@/hooks/useUserId";
 import { logWarn } from "@/lib/logger";
-import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
+import type { AvailableItem, BodyPart, WardrobeItem } from "@/types/wardrobe";
 import {
   normalizeSearch,
-  getBodyPart,
-  BODY_PART_ORDER,
+  BODY_AREAS,
   inferAvailableBodyPart,
   getClo,
+  getItemBodyArea,
+  getItemSearchText,
 } from "@/components/wardrobe/wardrobe-utils";
 import { CATEGORY_TO_LAYER_TYPE } from "@/lib/layers";
 
 const SEARCH_RESULTS_LIMIT = 30;
-type SearchBodyPartFilter = "all" | "torso" | "legs" | "hands" | "headNeck";
+export type LoadStatus = "loading" | "ready" | "error";
+export type BodyAreaFilter = "all" | BodyPart;
 type SearchLayerFilter = "all" | "base" | "mid" | "outer";
 type SearchSort = "bestMatch" | "alpha" | "clo";
+
+/** A change to one owned item, keyed by wardrobe entry id. */
+export type RowAction = "remove" | "exclude" | "include";
+/** A change requested from the catalog or Recently removed, keyed by item id. */
+export type CatalogAction = "add" | "remove";
+/** A request in flight, or one that failed and can be retried. */
+export interface ActionState<A> {
+  action: A;
+  failed: boolean;
+}
 
 function inferAvailableLayer(item: AvailableItem): Exclude<SearchLayerFilter, "all"> {
   const category = (item.category ?? "").toLowerCase();
@@ -30,59 +42,139 @@ function inferAvailableLayer(item: AvailableItem): Exclude<SearchLayerFilter, "a
   return "mid";
 }
 
+/** The `items` an API route returns; throws when the request fails. */
+async function readItems<T>(url: string): Promise<T[]> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url} returned ${res.status}`);
+  const data = (await res.json()) as { items?: T[] };
+  return data.items ?? [];
+}
+
+/** Entries whose item no longer exists come back without details. */
+function withDetails(item: WardrobeItem): WardrobeItem {
+  return item.details ? item : { ...item, details: { brand: "", model_name: "Item no longer in the catalog" } };
+}
+
+function itemName(item: WardrobeItem): string {
+  return item.details.model_name;
+}
+
+function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
+
 export function useWardrobe() {
   const userId = useUserId();
   const [availableItems, setAvailableItems] = useState<AvailableItem[]>([]);
+  const [catalogStatus, setCatalogStatus] = useState<LoadStatus>("loading");
   const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [adding, setAdding] = useState<string | null>(null);
-  const [justAdded, setJustAdded] = useState<string | null>(null);
-  const [selectedItem, setSelectedItem] = useState<WardrobeItem | null>(null);
+  const [wardrobeStatus, setWardrobeStatus] = useState<LoadStatus>("loading");
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [recentlyRemoved, setRecentlyRemoved] = useState<WardrobeItem[]>([]);
-  const addTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [rowStates, setRowStates] = useState<Record<string, ActionState<RowAction>>>({});
+  const [catalogStates, setCatalogStates] = useState<Record<string, ActionState<CatalogAction>>>({});
+  // Read by a role="status" region so finished changes are announced.
+  const [announcement, setAnnouncement] = useState("");
+  // Locks each row or catalog item while its request runs, so repeated taps
+  // can't send duplicate requests before the pending state renders.
+  const inFlight = useRef(new Set<string>());
 
-  useEffect(() => {
-    return () => clearTimeout(addTimerRef.current);
-  }, []);
+  const [ownedSearch, setOwnedSearch] = useState("");
+  const [ownedBodyArea, setOwnedBodyArea] = useState<BodyAreaFilter>("all");
 
+  const [search, setSearch] = useState("");
   const [brandFilter, setBrandFilter] = useState<string | null>(null);
-  const [searchBodyPartFilter, setSearchBodyPartFilter] = useState<SearchBodyPartFilter>("all");
+  const [searchBodyPartFilter, setSearchBodyPartFilter] = useState<BodyAreaFilter>("all");
   const [searchLayerFilter, setSearchLayerFilter] = useState<SearchLayerFilter>("all");
   const [searchSort, setSearchSort] = useState<SearchSort>("bestMatch");
 
-  const [disabledCollapsed, setDisabledCollapsed] = useState<Record<string, boolean>>({
-    torso: true,
-    legs: true,
-    hands: true,
-    "head & neck": true,
-  });
+  // Bumped to load each list again; a cancelled load can't overwrite a newer one.
+  const [wardrobeLoad, setWardrobeLoad] = useState(0);
+  const [catalogLoad, setCatalogLoad] = useState(0);
 
   useEffect(() => {
     if (!userId) return;
-
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [availableRes, wardrobeRes] = await Promise.all([
-          fetch("/api/wardrobe/available"),
-          fetch("/api/wardrobe/gear"),
-        ]);
-
-        const availableData = await availableRes.json();
-        const wardrobeData = await wardrobeRes.json();
-
-        setAvailableItems(availableData.items || []);
-        setWardrobeItems(wardrobeData.items || []);
-      } catch (err) {
-        logWarn("useWardrobe.fetchData", err);
-      } finally {
-        setLoading(false);
+    let cancelled = false;
+    readItems<WardrobeItem>("/api/wardrobe/gear").then(
+      (items) => {
+        if (cancelled) return;
+        setWardrobeItems(items.map(withDetails));
+        setWardrobeStatus("ready");
+      },
+      (err) => {
+        if (cancelled) return;
+        logWarn("useWardrobe.loadWardrobe", err);
+        setWardrobeStatus("error");
       }
+    );
+    return () => {
+      cancelled = true;
     };
+  }, [userId, wardrobeLoad]);
 
-    fetchData();
-  }, [userId]);
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    readItems<AvailableItem>("/api/wardrobe/available").then(
+      (items) => {
+        if (cancelled) return;
+        setAvailableItems(items);
+        setCatalogStatus("ready");
+      },
+      (err) => {
+        if (cancelled) return;
+        logWarn("useWardrobe.loadCatalog", err);
+        setCatalogStatus("error");
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, catalogLoad]);
+
+  const retryWardrobe = () => {
+    setWardrobeStatus("loading");
+    setWardrobeLoad((count) => count + 1);
+  };
+
+  const retryCatalog = () => {
+    setCatalogStatus("loading");
+    setCatalogLoad((count) => count + 1);
+  };
+
+  // ---- Owned gear ----
+
+  const ownedMatches = useMemo(() => {
+    const query = normalizeSearch(ownedSearch).trim();
+    return wardrobeItems.filter((item) => {
+      if (ownedBodyArea !== "all" && getItemBodyArea(item) !== ownedBodyArea) return false;
+      return !query || normalizeSearch(getItemSearchText(item)).includes(query);
+    });
+  }, [wardrobeItems, ownedSearch, ownedBodyArea]);
+
+  // Each body area's items, warmest last. Excluded items keep their place so
+  // a row doesn't jump when it's excluded or included.
+  const ownedGroups = useMemo(
+    () =>
+      BODY_AREAS.map((area) => ({
+        area,
+        items: ownedMatches
+          .filter((item) => getItemBodyArea(item) === area)
+          .sort((a, b) => (getClo(a) ?? 0) - (getClo(b) ?? 0)),
+      })),
+    [ownedMatches]
+  );
+
+  const clearOwnedFilters = () => {
+    setOwnedSearch("");
+    setOwnedBodyArea("all");
+  };
+
+  const selectedItem = wardrobeItems.find((item) => item.id === selectedItemId) ?? null;
+
+  // ---- Catalog ----
 
   const wardrobeItemIds = useMemo(() => new Set(wardrobeItems.map((w) => w.item_id)), [wardrobeItems]);
 
@@ -195,178 +287,6 @@ export function useWardrobe() {
     return groups;
   }, [visibleSearchItems]);
 
-  const groupedWardrobeItems = useMemo(() => {
-    const groups: Record<string, WardrobeItem[]> = {};
-    for (const part of BODY_PART_ORDER) {
-      groups[part] = [];
-    }
-    wardrobeItems.forEach((item) => {
-      if (item.disabled) return;
-      const part = getBodyPart(item);
-      groups[part].push(item);
-    });
-    // Sort each group by clo value (lowest to highest)
-    for (const part of BODY_PART_ORDER) {
-      groups[part].sort((a, b) => {
-        const cloA = getClo(a) ?? 0;
-        const cloB = getClo(b) ?? 0;
-        return cloA - cloB;
-      });
-    }
-    return groups;
-  }, [wardrobeItems]);
-
-  const disabledItemsByPart = useMemo(() => {
-    const groups: Record<string, WardrobeItem[]> = {};
-    for (const part of BODY_PART_ORDER) {
-      groups[part] = [];
-    }
-    wardrobeItems.forEach((item) => {
-      if (!item.disabled) return;
-      const part = getBodyPart(item);
-      groups[part].push(item);
-    });
-    // Sort each group by clo value (lowest to highest)
-    for (const part of BODY_PART_ORDER) {
-      groups[part].sort((a, b) => {
-        const cloA = getClo(a) ?? 0;
-        const cloB = getClo(b) ?? 0;
-        return cloA - cloB;
-      });
-    }
-    return groups;
-  }, [wardrobeItems]);
-
-  const addItem = async (item: AvailableItem) => {
-    if (!userId || adding) return;
-
-    setAdding(item.id);
-    try {
-      const res = await fetch("/api/wardrobe/gear", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          item_type: item.type,
-          item_id: item.id,
-        }),
-      });
-
-      if (res.ok) {
-        setJustAdded(item.id);
-        setAdding(null);
-        // Refresh wardrobe list silently so wardrobeItemIds updates
-        fetch("/api/wardrobe/gear")
-          .then(r => r.json())
-          .then(data => {
-            setWardrobeItems(data.items || []);
-          })
-          .catch(err => logWarn("useWardrobe.addItem.refresh", err));
-        addTimerRef.current = setTimeout(() => {
-          setJustAdded(null);
-        }, 600);
-      } else {
-        setAdding(null);
-      }
-    } catch (err) {
-      logWarn("useWardrobe.addItem", err);
-      setAdding(null);
-    }
-  };
-
-  const removeItem = async (wardrobeId: string) => {
-    if (!userId) return;
-
-    const itemToRemove = wardrobeItems.find((w) => w.id === wardrobeId);
-
-    try {
-      const res = await fetch(`/api/wardrobe/gear?id=${wardrobeId}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        setWardrobeItems((prev) => prev.filter((w) => w.id !== wardrobeId));
-        if (itemToRemove) {
-          setRecentlyRemoved((prev) => [itemToRemove, ...prev]);
-        }
-      }
-    } catch (err) {
-      logWarn("useWardrobe.removeItem", err);
-    }
-  };
-
-  const restoreItem = async (item: WardrobeItem) => {
-    if (!userId || adding) return;
-
-    setAdding(item.item_id);
-    try {
-      const res = await fetch("/api/wardrobe/gear", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          item_type: item.item_type,
-          item_id: item.item_id,
-        }),
-      });
-
-      if (res.ok) {
-        const wardrobeRes = await fetch("/api/wardrobe/gear");
-        const wardrobeData = await wardrobeRes.json();
-        setWardrobeItems(wardrobeData.items || []);
-        setRecentlyRemoved((prev) => prev.filter((r) => r.item_id !== item.item_id));
-      }
-    } catch (err) {
-      logWarn("useWardrobe.restoreItem", err);
-    } finally {
-      setAdding(null);
-    }
-  };
-
-  const clearRecentlyRemoved = () => {
-    setRecentlyRemoved([]);
-  };
-
-  const toggleDisabled = async (wardrobeId: string, currentDisabled: boolean) => {
-    if (!userId) return;
-
-    try {
-      const res = await fetch("/api/wardrobe/gear", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: wardrobeId,
-          disabled: !currentDisabled,
-        }),
-      });
-
-      if (res.ok) {
-        setWardrobeItems((prev) =>
-          prev.map((w) =>
-            w.id === wardrobeId ? { ...w, disabled: !currentDisabled } : w
-          )
-        );
-      }
-    } catch (err) {
-      logWarn("useWardrobe.toggleDisabled", err);
-    }
-  };
-
-  const toggleDisabledCollapsed = (part: string) => {
-    setDisabledCollapsed(prev => ({ ...prev, [part]: !prev[part] }));
-  };
-
-  const removeItemByItemId = async (itemId: string) => {
-    const entry = wardrobeItems.find((w) => w.item_id === itemId);
-    if (entry) {
-      await removeItem(entry.id);
-    }
-  };
-
   const clearSearchFilters = () => {
     setBrandFilter(null);
     setSearchBodyPartFilter("all");
@@ -374,27 +294,186 @@ export function useWardrobe() {
     setSearchSort("bestMatch");
   };
 
+  // ---- Changes ----
+
+  const setRowState = (wardrobeId: string, state: ActionState<RowAction> | null) =>
+    setRowStates((prev) => (state ? { ...prev, [wardrobeId]: state } : withoutKey(prev, wardrobeId)));
+
+  const setCatalogState = (itemId: string, state: ActionState<CatalogAction> | null) =>
+    setCatalogStates((prev) => (state ? { ...prev, [itemId]: state } : withoutKey(prev, itemId)));
+
+  /** Puts a new or restored entry in the list. */
+  const insertItem = (item: WardrobeItem) => {
+    setWardrobeItems((prev) => [item, ...prev.filter((w) => w.id !== item.id)]);
+    // Adding the same item again restores it, so it's no longer removed.
+    setRecentlyRemoved((prev) => prev.filter((r) => r.item_id !== item.item_id));
+  };
+
+  /** Adds a catalog item, or restores a removed one. Resolves to the new entry. */
+  const addByItemId = async (itemType: WardrobeItem["item_type"], itemId: string): Promise<WardrobeItem | null> => {
+    const key = `item:${itemId}`;
+    if (!userId || inFlight.current.has(key)) return null;
+    inFlight.current.add(key);
+    setCatalogState(itemId, { action: "add", failed: false });
+
+    try {
+      const res = await fetch("/api/wardrobe/gear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_type: itemType, item_id: itemId }),
+      });
+      if (res.status === 409) {
+        // Already added elsewhere: reload so the list shows it.
+        setWardrobeLoad((count) => count + 1);
+        setRecentlyRemoved((prev) => prev.filter((r) => r.item_id !== itemId));
+        setCatalogState(itemId, null);
+        return null;
+      }
+      if (!res.ok) throw new Error(`POST /api/wardrobe/gear returned ${res.status}`);
+
+      const item = withDetails(((await res.json()) as { item: WardrobeItem }).item);
+      insertItem(item);
+      setCatalogState(itemId, null);
+      setAnnouncement(`Added ${itemName(item)} to your wardrobe.`);
+      return item;
+    } catch (err) {
+      logWarn("useWardrobe.addByItemId", err);
+      setCatalogState(itemId, { action: "add", failed: true });
+      return null;
+    } finally {
+      inFlight.current.delete(key);
+    }
+  };
+
+  const addItem = (item: AvailableItem) => addByItemId(item.type, item.id);
+
+  const restoreItem = (item: WardrobeItem) => addByItemId(item.item_type, item.item_id);
+
+  /** Lists an item the custom item form just created. */
+  const addCreatedItem = (item: WardrobeItem) => {
+    insertItem(withDetails(item));
+    setAnnouncement(`Added ${itemName(item)} to your wardrobe.`);
+  };
+
+  /** Removes an entry. The previous row stays, marked failed, if the request fails. */
+  const removeItem = async (wardrobeId: string): Promise<boolean> => {
+    const item = wardrobeItems.find((w) => w.id === wardrobeId);
+    const key = `row:${wardrobeId}`;
+    if (!userId || !item || inFlight.current.has(key)) return false;
+    inFlight.current.add(key);
+    setRowState(wardrobeId, { action: "remove", failed: false });
+
+    try {
+      const res = await fetch(`/api/wardrobe/gear?id=${encodeURIComponent(wardrobeId)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`DELETE /api/wardrobe/gear returned ${res.status}`);
+
+      setWardrobeItems((prev) => prev.filter((w) => w.id !== wardrobeId));
+      setRecentlyRemoved((prev) => [item, ...prev.filter((r) => r.item_id !== item.item_id)]);
+      setRowState(wardrobeId, null);
+      setAnnouncement(`Removed ${itemName(item)}. You can restore it until you leave this page.`);
+      return true;
+    } catch (err) {
+      logWarn("useWardrobe.removeItem", err);
+      setRowState(wardrobeId, { action: "remove", failed: true });
+      return false;
+    } finally {
+      inFlight.current.delete(key);
+    }
+  };
+
+  /** Removes the entry for a catalog item. */
+  const removeByItemId = async (itemId: string) => {
+    const entry = wardrobeItems.find((w) => w.item_id === itemId);
+    if (!entry) return;
+    setCatalogState(itemId, { action: "remove", failed: false });
+    const removed = await removeItem(entry.id);
+    setCatalogState(itemId, removed ? null : { action: "remove", failed: true });
+  };
+
+  /**
+   * Excludes an item from every recommendation, or includes it again. The
+   * row keeps its previous state, marked failed, if the request fails.
+   */
+  const setExcluded = async (wardrobeId: string, excluded: boolean) => {
+    const item = wardrobeItems.find((w) => w.id === wardrobeId);
+    const key = `row:${wardrobeId}`;
+    if (!userId || !item || inFlight.current.has(key)) return;
+    inFlight.current.add(key);
+    const action: RowAction = excluded ? "exclude" : "include";
+    setRowState(wardrobeId, { action, failed: false });
+
+    try {
+      const res = await fetch("/api/wardrobe/gear", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: wardrobeId, disabled: excluded }),
+      });
+      if (!res.ok) throw new Error(`PATCH /api/wardrobe/gear returned ${res.status}`);
+
+      setWardrobeItems((prev) => prev.map((w) => (w.id === wardrobeId ? { ...w, disabled: excluded } : w)));
+      setRowState(wardrobeId, null);
+      setAnnouncement(
+        `${itemName(item)} is ${excluded ? "excluded from" : "included in"} recommendations.`
+      );
+    } catch (err) {
+      logWarn("useWardrobe.setExcluded", err);
+      setRowState(wardrobeId, { action, failed: true });
+    } finally {
+      inFlight.current.delete(key);
+    }
+  };
+
+  /** Runs a row's failed change again. */
+  const retryRow = (wardrobeId: string) => {
+    const state = rowStates[wardrobeId];
+    if (!state) return;
+    if (state.action === "remove") void removeItem(wardrobeId);
+    else void setExcluded(wardrobeId, state.action === "exclude");
+  };
+
+  const dismissRowError = (wardrobeId: string) => {
+    if (rowStates[wardrobeId]?.failed) setRowState(wardrobeId, null);
+  };
+
+  const clearRecentlyRemoved = () => {
+    setRecentlyRemoved([]);
+  };
+
   return {
-    loading,
+    wardrobeStatus,
+    retryWardrobe,
+    wardrobeItems,
+    ownedSearch,
+    setOwnedSearch,
+    ownedBodyArea,
+    setOwnedBodyArea,
+    clearOwnedFilters,
+    ownedMatchCount: ownedMatches.length,
+    ownedGroups,
+    selectedItem,
+    setSelectedItemId,
+    rowStates,
+    retryRow,
+    dismissRowError,
+    removeItem,
+    setExcluded,
+    recentlyRemoved,
+    restoreItem,
+    clearRecentlyRemoved,
+    addCreatedItem,
+    announcement,
+
+    catalogStatus,
+    retryCatalog,
+    catalogStates,
+    totalAvailableCount: availableItems.length,
     search,
     setSearch,
-    adding,
-    justAdded,
-    wardrobeItems,
-    availableItems,
-    totalAvailableCount: availableItems.length,
     filteredItems,
-    visibleSearchItems,
-    wardrobeItemIds,
     totalMatches: filteredItems.length,
     shownMatches: visibleSearchItems.length,
     groupedItems,
-    groupedWardrobeItems,
-    disabledItemsByPart,
-    disabledCollapsed,
-    selectedItem,
-    setSelectedItem,
-    recentlyRemoved,
+    wardrobeItemIds,
     brandFilter,
     setBrandFilter,
     searchBodyPartFilter,
@@ -406,11 +485,6 @@ export function useWardrobe() {
     availableBrands,
     clearSearchFilters,
     addItem,
-    removeItem,
-    removeItemByItemId,
-    restoreItem,
-    clearRecentlyRemoved,
-    toggleDisabled,
-    toggleDisabledCollapsed,
+    removeByItemId,
   };
 }

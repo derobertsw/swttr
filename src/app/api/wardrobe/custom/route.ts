@@ -1,12 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { readJson, requireUser } from "@/lib/api";
 import type { BodyPart, LayerType } from "@/types/wardrobe";
 import { getGenericLayerClo } from "@/data/genericLayerClo";
 import { logError } from "@/lib/logger";
+import { toWardrobeItem } from "@/lib/wardrobeItems";
+
+/**
+ * The user's custom item of this type when it's no longer in their wardrobe.
+ * Removing a custom item from the wardrobe keeps its row so it can be
+ * restored, and a user has at most one custom item per type.
+ */
+async function findRemovedCustomItem(
+  supabase: SupabaseClient,
+  userId: string,
+  type: { body_part: BodyPart; layer_type: LayerType; generic_option: string }
+) {
+  const { data: existing } = await supabase
+    .from("user_custom_items")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("body_part", type.body_part)
+    .eq("layer_type", type.layer_type)
+    .eq("generic_option", type.generic_option)
+    .maybeSingle();
+  if (!existing) return null;
+
+  const { data: entry } = await supabase
+    .from("user_wardrobe")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("item_type", "custom")
+    .eq("item_id", existing.id)
+    .maybeSingle();
+  return entry ? null : existing;
+}
 
 /**
  * POST /api/wardrobe/custom
- * Create a new custom item and add it to the wardrobe
+ * Create a new custom item and add it to the wardrobe. Returns the wardrobe
+ * entry with its details, in the shape GET /api/wardrobe/gear lists it.
  */
 export async function POST(request: NextRequest) {
   const auth = await requireUser();
@@ -48,46 +81,68 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert into user_custom_items
-    const { data: customItem, error: insertError } = await supabase
+    const name = custom_name.trim();
+    const { data: inserted, error: insertError } = await supabase
       .from("user_custom_items")
       .insert({
         user_id: userId,
         body_part,
         layer_type,
         generic_option,
-        custom_name: custom_name.trim(),
+        custom_name: name,
         rcl_clo,
       })
       .select()
       .single();
 
+    let customItem = inserted;
     if (insertError) {
-      // Check for duplicate constraint violation
-      if (insertError.code === "23505") {
+      if (insertError.code !== "23505") {
+        logError("POST /api/wardrobe/custom - insert custom item", insertError);
+        return NextResponse.json(
+          { error: "Failed to create custom item" },
+          { status: 500 }
+        );
+      }
+
+      // The user already has this type. Reuse it if they removed it from
+      // their wardrobe; otherwise it's a real duplicate.
+      const removed = await findRemovedCustomItem(supabase, userId, { body_part, layer_type, generic_option });
+      if (!removed) {
         return NextResponse.json(
           {
-            error: `You already have a custom ${generic_option} ${layer_type} layer for ${body_part}`,
+            error: `Your wardrobe already has a custom ${generic_option.toLowerCase()} ${layer_type} layer for this body area. Remove it first, or choose a different type.`,
           },
           { status: 409 }
         );
       }
-      logError("POST /api/wardrobe/custom - insert custom item", insertError);
-      return NextResponse.json(
-        { error: "Failed to create custom item" },
-        { status: 500 }
-      );
+      const { error: renameError } = await supabase
+        .from("user_custom_items")
+        .update({ custom_name: name })
+        .eq("id", removed.id)
+        .eq("user_id", userId);
+      if (renameError) {
+        logError("POST /api/wardrobe/custom - rename removed custom item", renameError);
+        return NextResponse.json(
+          { error: "Failed to create custom item" },
+          { status: 500 }
+        );
+      }
+      customItem = { ...removed, custom_name: name };
     }
 
     // Add to user_wardrobe
-    const { error: wardrobeError } = await supabase
+    const { data: wardrobeEntry, error: wardrobeError } = await supabase
       .from("user_wardrobe")
       .insert({
         user_id: userId,
         item_type: "custom",
         item_id: customItem.id,
-      });
+      })
+      .select()
+      .single();
 
-    if (wardrobeError) {
+    if (wardrobeError || !wardrobeEntry) {
       // If wardrobe insert fails, clean up the custom item
       await supabase.from("user_custom_items").delete().eq("id", customItem.id);
       logError("POST /api/wardrobe/custom - insert wardrobe", wardrobeError);
@@ -97,7 +152,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ item: customItem }, { status: 201 });
+    return NextResponse.json({ item: toWardrobeItem(wardrobeEntry, customItem) }, { status: 201 });
   } catch (error) {
     logError("POST /api/wardrobe/custom", error);
     return NextResponse.json(

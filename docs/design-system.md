@@ -86,7 +86,7 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Input | `ui/input.tsx` | 44px, 16px text, `border-input`. Set `aria-invalid` and point `aria-describedby` at a `FieldError`. `fieldClassName` gives field-like triggers the same look. |
 | Select | `ui/select.tsx` | Trigger matches Input. Items are 44px on touch, and the chosen item gets a check mark. Pair the trigger with a `<label htmlFor>`. |
 | Segmented choice | `ui/segmented.tsx` | `segmentedGroupClassName` and `segmentedItemClassName`. The caller keeps its markup and keyboard handling. The selected look follows `aria-checked` or `aria-pressed`, so selection is always announced. |
-| Filter chips | `ui/chip.ts` | `chipClassName` for a wrapping row of `<button>` chips, such as Wardrobe's body area, layer, sort and brand filters. A toggle chip sets `aria-pressed` and gets the segmented selected look. 36px, 44px on phones and touch. Use segmented choices when the options fit one row. |
+| Filter chips | `ui/chip.ts` | `chipClassName` for a wrapping row of `<button>` chips, such as Wardrobe's body area, layer, sort and brand filters. A toggle chip sets `aria-pressed`, and a radio chip sets `aria-checked`; both get the segmented selected look. 36px, 44px on phones and touch. Use segmented choices when the options fit one row. |
 | Tabs | `ui/tabs.tsx` | Same selected look as segmented choices. The `line` variant underlines the active tab. |
 | Card | `ui/card.tsx` | `variant`: `default`, `muted`, `selected`. `padding`: `none`, `sm`, `default`, `lg`. Use `interactive` with `asChild` when the whole card is a link or button. `CardTitle` takes `asChild` to render a heading. |
 | Badge | `ui/badge.tsx` | Variants: `neutral`, `primary`, `success`, `warning`, `destructive`, `outline`, in two sizes. Give each status a word or an icon as well as its color. |
@@ -95,6 +95,7 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Drawer | `ui/drawer.tsx` | Vaul bottom sheet. Put long content in `DrawerBody` so it scrolls between a fixed header and `DrawerFooter`. The bottom edge pads past the home indicator. `showCloseButton` adds the 44px close button. On open, focus moves to the drawer itself rather than its first field, so the keyboard doesn't pop up and Tab stays inside. |
 | Sheet | `ui/sheet.tsx` | Side panels pad for the safe areas and use the shared close button. |
 | Popover, Tooltip | `ui/popover.tsx`, `ui/tooltip.tsx` | Popovers use the `popover` surface. Tooltips are inverted and 14px. |
+| Dropdown menu | `ui/dropdown-menu.tsx` | Radix menu on the `popover` surface for a row's secondary actions, such as a Wardrobe item's Exclude and Remove. Items match Select items (44px on touch); `variant="destructive"` marks Remove. Give the trigger an `aria-label` that names the row. Keep the trigger enabled while a change runs, so focus can return to it, and disable the items instead. |
 | Calendar | `ui/calendar.tsx` | Day cells are 40px on touch, not 44px, so a month fits a 320px screen. |
 
 ## Accessibility rules
@@ -131,10 +132,10 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 |---|---|
 | Tokens, components, focus, reduced motion | Done (#119 foundations) |
 | Navigation: sidebar, mobile tab bar, header, menu sheet | Uses tokens |
-| Overlays: Settings, Update Weather, layer picker, Add Custom Item, item details, popovers, location suggestions | Uses tokens |
+| Overlays: Settings, Update Weather, layer picker, Add a similar item, item details, popovers, menus, location suggestions | Uses tokens |
 | Gear up form (`src/app/page.tsx`, `GearUpForm`, `ActivitySelection`, `SegmentedChoice`, `DeviceLocationButton`) | Uses tokens (#126) |
 | Gear up results (`LayerDisplay`, `layers/*`, `MultiDayPlanDisplay`) | Still hardcoded white-on-dark glass. Next migration. |
-| Wardrobe (`src/app/wardrobe`, `wardrobe/*`, `SwipeableItem`), including Browse Catalog | Uses tokens |
+| Wardrobe (`src/app/wardrobe`, `wardrobe/*`), including Add gear and Add a similar item | Uses tokens |
 | Trips (`src/app/trips/**`, `trips/trip-primitives.tsx`) | Still hardcoded |
 
 Remaining exceptions, each with a reason:
