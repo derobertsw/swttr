@@ -128,17 +128,11 @@ export function Card({
   );
 }
 
+export const sectionLabelClassName =
+  "text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45";
+
 export function SectionLabel({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <p
-      className={cn(
-        "text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45",
-        className
-      )}
-    >
-      {children}
-    </p>
-  );
+  return <p className={cn(sectionLabelClassName, className)}>{children}</p>;
 }
 
 export function Spine({ color = "cyan" }: { color?: "cyan" | "emerald" | "amber" }) {
