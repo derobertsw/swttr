@@ -302,9 +302,9 @@ export function useWardrobe() {
   const setCatalogState = (itemId: string, state: ActionState<CatalogAction> | null) =>
     setCatalogStates((prev) => (state ? { ...prev, [itemId]: state } : withoutKey(prev, itemId)));
 
-  /** Puts a new or restored entry in the list. */
+  /** Puts a new or restored entry in the list, unless it's already there. */
   const insertItem = (item: WardrobeItem) => {
-    setWardrobeItems((prev) => [item, ...prev.filter((w) => w.id !== item.id)]);
+    setWardrobeItems((prev) => (prev.some((w) => w.id === item.id) ? prev : [item, ...prev]));
     // Adding the same item again restores it, so it's no longer removed.
     setRecentlyRemoved((prev) => prev.filter((r) => r.item_id !== item.item_id));
   };
@@ -327,11 +327,15 @@ export function useWardrobe() {
         body: JSON.stringify({ item_type: itemType, item_id: itemId }),
       });
       if (res.status === 409) {
-        // Already added elsewhere: reload so the list shows it.
-        setWardrobeLoad((count) => count + 1);
-        setRecentlyRemoved((prev) => prev.filter((r) => r.item_id !== itemId));
+        // Already added elsewhere, e.g. in another tab. Take only that entry
+        // from a fresh list, so it can't undo changes made here meanwhile.
+        const existing = (await readItems<WardrobeItem>("/api/wardrobe/gear")).find((w) => w.item_id === itemId);
+        if (!existing) throw new Error("POST /api/wardrobe/gear returned 409 for an item the wardrobe doesn't list");
+        const item = withDetails(existing);
+        insertItem(item);
         setCatalogState(itemId, null);
-        return null;
+        setAnnouncement(`${itemName(item)} is already in your wardrobe.`);
+        return item;
       }
       if (!res.ok) throw new Error(`POST /api/wardrobe/gear returned ${res.status}`);
 
@@ -374,6 +378,8 @@ export function useWardrobe() {
       setWardrobeItems((prev) => prev.filter((w) => w.id !== wardrobeId));
       setRecentlyRemoved((prev) => [item, ...prev.filter((r) => r.item_id !== item.item_id)]);
       setRowState(wardrobeId, null);
+      // A catalog Remove that failed earlier is settled too, whichever Retry worked.
+      setCatalogState(item.item_id, null);
       setAnnouncement(`Removed ${itemName(item)}. You can restore it until you leave this page.`);
       return true;
     } catch (err) {

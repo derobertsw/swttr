@@ -27,6 +27,17 @@ const gloves: WardrobeItem = {
 };
 
 const emptyCatalog = reply(200, { items: [] });
+const catalogItems = [
+  { id: "g1", type: "garment", brand: "Patagonia", model_name: "R1 Hoody", category: "mid_layer_light", garment_type: "jacket" },
+  { id: "g2", type: "garment", brand: "Arc'teryx", model_name: "Atom Hoody", category: "insulation_synthetic", garment_type: "jacket" },
+];
+const atom: WardrobeItem = {
+  id: "w3",
+  item_type: "garment",
+  item_id: "g2",
+  disabled: false,
+  details: { brand: "Arc'teryx", model_name: "Atom Hoody", category: "insulation_synthetic", garment_type: "jacket" },
+};
 
 /** Replies to each call in turn, repeating the last one. */
 function inTurn(...replies: Array<ReturnType<typeof reply>>) {
@@ -137,6 +148,89 @@ describe("Wardrobe page", () => {
 
     expect(screen.getByRole("button", { name: "Actions for R1 Hoody" })).toHaveFocus();
     expect(await screen.findByText("Excluded from recommendations")).toBeInTheDocument();
+  });
+
+  it("adds an item already added elsewhere without undoing changes made here", async () => {
+    stubApi({
+      "GET /api/wardrobe/available": reply(200, { items: catalogItems }),
+      // The second list is older than the exclusion made on this page.
+      "GET /api/wardrobe/gear": inTurn(reply(200, { items: [fleece] }), reply(200, { items: [atom, fleece] })),
+      "PATCH /api/wardrobe/gear": reply(200, { item: {} }),
+      "POST /api/wardrobe/gear": reply(409, { error: "Item already in wardrobe" }),
+    });
+    const user = userEvent.setup();
+    render(<Wardrobe />);
+
+    const menu = await openRowMenu(user, "R1 Hoody");
+    await user.click(within(menu).getByRole("menuitem", { name: "Exclude from recommendations" }));
+    expect(await screen.findByText("Excluded from recommendations")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add gear" }));
+    const catalog = await screen.findByRole("dialog", { name: "Add gear" });
+    await user.click(within(catalog).getByRole("button", { name: "Add Arc'teryx Atom Hoody to wardrobe" }));
+
+    expect(await within(catalog).findByRole("button", { name: "Remove Arc'teryx Atom Hoody from wardrobe" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    expect(screen.getByRole("status")).toHaveTextContent("Atom Hoody is already in your wardrobe.");
+    expect(screen.getByText("2 items · 1 excluded from recommendations")).toBeInTheDocument();
+    expect(screen.getByText("Excluded from recommendations")).toBeInTheDocument();
+  });
+
+  it("clears a failed catalog removal once Retry on the row succeeds", async () => {
+    stubApi({
+      "GET /api/wardrobe/available": reply(200, { items: catalogItems }),
+      "GET /api/wardrobe/gear": reply(200, { items: [fleece, atom] }),
+      "DELETE /api/wardrobe/gear": inTurn(reply(500, { error: "Failed" }), reply(200, { success: true })),
+    });
+    const user = userEvent.setup();
+    render(<Wardrobe />);
+
+    await user.click(await screen.findByRole("button", { name: "Add gear" }));
+    const catalog = await screen.findByRole("dialog", { name: "Add gear" });
+    await user.click(within(catalog).getByRole("button", { name: "Remove Arc'teryx Atom Hoody from wardrobe" }));
+    expect(await within(catalog).findByText("Couldn't remove this item. Try again.")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Actions for Atom Hoody" })).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Add gear" }));
+    const reopened = await screen.findByRole("dialog", { name: "Add gear" });
+    expect(within(reopened).getByRole("button", { name: "Add Arc'teryx Atom Hoody to wardrobe" })).toBeInTheDocument();
+    expect(within(reopened).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("moves focus to Add your first item when the last item is removed", async () => {
+    stubApi({
+      "GET /api/wardrobe/gear": reply(200, { items: [fleece] }),
+      "DELETE /api/wardrobe/gear": reply(200, { success: true }),
+    });
+    const user = userEvent.setup();
+    render(<Wardrobe />);
+
+    const menu = await openRowMenu(user, "R1 Hoody");
+    await user.click(within(menu).getByRole("menuitem", { name: "Remove from wardrobe" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add your first item" })).toHaveFocus());
+  });
+
+  it("returns focus to what opened Add gear when the custom item form is cancelled", async () => {
+    stubApi({ "GET /api/wardrobe/gear": reply(200, { items: [] }) });
+    const user = userEvent.setup();
+    render(<Wardrobe />);
+
+    const addFirst = await screen.findByRole("button", { name: "Add your first item" });
+    await user.click(addFirst);
+    const catalog = await screen.findByRole("dialog", { name: "Add gear" });
+    await user.click(within(catalog).getAllByRole("button", { name: "Add a similar item" })[0]);
+    expect(await screen.findByRole("dialog", { name: "Add a similar item" })).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(addFirst).toHaveFocus());
   });
 
   it("keeps the row when removing it fails", async () => {

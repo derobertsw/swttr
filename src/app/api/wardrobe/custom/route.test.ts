@@ -10,21 +10,29 @@ vi.mock("@/lib/auth", () => ({ getAuthUserId: async () => "user_1" }));
 
 type Row = Record<string, unknown>;
 
-/** The fake client, with user_custom_items' one-per-type unique constraint. */
-function fakeClient(tables: Record<string, Row[]>) {
+const failedInsert = (code: string) => ({
+  select: () => ({ single: async () => ({ data: null, error: { code } }) }),
+});
+
+/**
+ * The fake client, with user_custom_items' one-per-type unique constraint.
+ * `failWardrobeInsert` makes adding the wardrobe entry fail.
+ */
+function fakeClient(tables: Record<string, Row[]>, { failWardrobeInsert = false } = {}) {
   const client = createFakeSupabase(tables);
   const sameType = (a: Row, b: Row) =>
     ["user_id", "body_part", "layer_type", "generic_option"].every((key) => a[key] === b[key]);
   return {
     from(table: string) {
       const query = client.from(table);
-      if (table !== "user_custom_items") return query;
       const insert = query.insert.bind(query);
+      if (table === "user_wardrobe" && failWardrobeInsert) {
+        return Object.assign(query, { insert: () => failedInsert("08006") });
+      }
+      if (table !== "user_custom_items") return query;
       return Object.assign(query, {
         insert: (values: Row) =>
-          tables.user_custom_items.some((row) => sameType(row, values))
-            ? { select: () => ({ single: async () => ({ data: null, error: { code: "23505" } }) }) }
-            : insert(values),
+          tables.user_custom_items.some((row) => sameType(row, values)) ? failedInsert("23505") : insert(values),
       });
     },
   };
@@ -88,6 +96,27 @@ describe("POST /api/wardrobe/custom", () => {
     expect(res.status).toBe(409);
     expect((await res.json()).error).toMatch(/already has a custom snow shell outer layer/);
     expect(state.tables.user_custom_items[0].custom_name).toBe("Old shell");
+  });
+
+  it("deletes the item it created when the wardrobe entry can't be added", async () => {
+    state.client = fakeClient(state.tables, { failWardrobeInsert: true });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await post({ ...snowShell, custom_name: "New shell" });
+
+    expect(res.status).toBe(500);
+    expect(state.tables.user_custom_items).toEqual([]);
+  });
+
+  it("keeps a reused item, under its old name, when the wardrobe entry can't be added", async () => {
+    state.tables.user_custom_items.push({ id: "c1", ...snowShell, custom_name: "Old shell", rcl_clo: 0.25 });
+    state.client = fakeClient(state.tables, { failWardrobeInsert: true });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await post({ ...snowShell, custom_name: "New shell" });
+
+    expect(res.status).toBe(500);
+    expect(state.tables.user_custom_items).toEqual([expect.objectContaining({ id: "c1", custom_name: "Old shell" })]);
   });
 
   it("rejects an option that doesn't exist for the body area", async () => {

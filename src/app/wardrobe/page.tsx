@@ -41,6 +41,12 @@ import {
 import type { BodyPart, WardrobeItem } from "@/types/wardrobe";
 
 const ADD_GEAR_ID = "wardrobe-add-gear";
+const ADD_FIRST_ID = "wardrobe-add-first";
+
+/** The page's add action: Add gear, or Add your first item when the wardrobe is empty. */
+function addAction() {
+  return document.getElementById(ADD_GEAR_ID) ?? document.getElementById(ADD_FIRST_ID);
+}
 
 /** Focuses an element once the next render has settled, if it still exists. */
 function focusLater(getTarget: () => HTMLElement | null) {
@@ -53,13 +59,13 @@ function focusLater(getTarget: () => HTMLElement | null) {
  * or to a fallback when a tap didn't focus it.
  */
 function useReturnFocus() {
-  const opener = useRef<{ element: HTMLElement | null; fallbackId: string } | null>(null);
+  const opener = useRef<{ element: HTMLElement | null; fallback: () => HTMLElement | null } | null>(null);
 
-  const remember = (fallbackId: string) => {
+  const remember = (fallback: () => HTMLElement | null) => {
     const active = document.activeElement;
     opener.current = {
       element: active instanceof HTMLElement && active !== document.body ? active : null,
-      fallbackId,
+      fallback,
     };
   };
 
@@ -71,12 +77,17 @@ function useReturnFocus() {
     if (saved.element?.isConnected) {
       saved.element.focus();
     } else {
-      // A tap leaves nothing focused; don't scroll the list to the fallback.
-      document.getElementById(saved.fallbackId)?.focus({ preventScroll: true });
+      // A tap leaves nothing focused, or the opener went away; don't scroll
+      // the list to the fallback.
+      saved.fallback()?.focus({ preventScroll: true });
     }
   };
 
-  return { remember, restore };
+  const forget = () => {
+    opener.current = null;
+  };
+
+  return { remember, restore, forget };
 }
 
 export default function Wardrobe() {
@@ -131,7 +142,9 @@ export default function Wardrobe() {
   const [catalogOpen, setCatalogOpen] = useState(false);
   // The details keep their item while they close, so they can animate out.
   const [detailOpen, setDetailOpen] = useState(false);
-  const catalogFocus = useReturnFocus();
+  // Add gear and the custom item form it hands over to return focus to
+  // whatever opened Add gear.
+  const addFocus = useReturnFocus();
   const detailFocus = useReturnFocus();
   // Set while the catalog hands over to the custom item form, which then owns focus.
   const handingOffToCustomForm = useRef(false);
@@ -141,8 +154,8 @@ export default function Wardrobe() {
     key: number;
     defaults?: { bodyPart?: BodyPart; name?: string };
   }>({ open: false, key: 0 });
-  // Where focus goes when the custom item form closes: Add gear, or the new row.
-  const customReturnFocusId = useRef<string | null>(null);
+  // Set when the custom item form created a row, which then takes focus.
+  const createdRowId = useRef<string | null>(null);
 
   const overview = useMemo(() => buildWardrobeOverview(wardrobeItems), [wardrobeItems]);
   const isReady = wardrobeStatus === "ready";
@@ -151,7 +164,7 @@ export default function Wardrobe() {
   const isFiltering = ownedSearch.trim() !== "" || ownedBodyArea !== "all";
 
   const openCatalog = (options?: { bodyArea?: BodyPart; query?: string }) => {
-    catalogFocus.remember(ADD_GEAR_ID);
+    addFocus.remember(addAction);
     clearSearchFilters();
     setSearchBodyPartFilter(options?.bodyArea ?? "all");
     setSearch(options?.query ?? "");
@@ -161,10 +174,9 @@ export default function Wardrobe() {
   const openCustomForm = (defaults?: { bodyPart?: BodyPart; name?: string }) =>
     setCustomForm((prev) => ({ open: true, key: prev.key + 1, defaults }));
 
-  // The catalog closes, so focus returns to Add gear rather than its button.
+  // The catalog closes without returning focus; the form returns it later.
   const addSimilarFromCatalog = () => {
     handingOffToCustomForm.current = true;
-    customReturnFocusId.current = ADD_GEAR_ID;
     setCatalogOpen(false);
     openCustomForm({
       bodyPart: searchBodyPartFilter === "all" ? undefined : searchBodyPartFilter,
@@ -176,15 +188,20 @@ export default function Wardrobe() {
     addCreatedItem(item);
     // Show the whole wardrobe so the new row is there to take focus.
     clearOwnedFilters();
-    customReturnFocusId.current = rowButtonId(item.id);
+    createdRowId.current = rowButtonId(item.id);
     setCustomForm((prev) => ({ ...prev, open: false }));
   };
 
   const handleCustomCloseAutoFocus = (event: Event) => {
+    const rowId = createdRowId.current;
+    createdRowId.current = null;
+    if (!rowId) {
+      addFocus.restore(event);
+      return;
+    }
     event.preventDefault();
-    const targetId = customReturnFocusId.current ?? ADD_GEAR_ID;
-    customReturnFocusId.current = null;
-    document.getElementById(targetId)?.focus();
+    addFocus.forget();
+    (document.getElementById(rowId) ?? addAction())?.focus();
   };
 
   const handleCatalogCloseAutoFocus = (event: Event) => {
@@ -193,11 +210,11 @@ export default function Wardrobe() {
       event.preventDefault();
       return;
     }
-    catalogFocus.restore(event);
+    addFocus.restore(event);
   };
 
   const openDetails = (item: WardrobeItem) => {
-    detailFocus.remember(rowButtonId(item.id));
+    detailFocus.remember(() => document.getElementById(rowButtonId(item.id)));
     setSelectedItemId(item.id);
     setDetailOpen(true);
   };
@@ -217,7 +234,7 @@ export default function Wardrobe() {
       return (
         (neighborId ? document.getElementById(rowActionsId(neighborId)) : null) ??
         document.getElementById(sectionHeadingId(getItemBodyArea(item))) ??
-        document.getElementById(ADD_GEAR_ID)
+        addAction()
       );
     });
   };
@@ -226,7 +243,7 @@ export default function Wardrobe() {
     const restored = await restoreItem(item);
     if (!restored) return;
     focusLater(
-      () => document.getElementById(rowButtonId(restored.id)) ?? document.getElementById(ADD_GEAR_ID)
+      () => document.getElementById(rowButtonId(restored.id)) ?? addAction()
     );
   };
 
@@ -324,7 +341,7 @@ export default function Wardrobe() {
               Recommendations use the gear in your wardrobe, so start with the pieces you wear most. You can add more
               anytime.
             </p>
-            <Button type="button" className="mt-4" onClick={() => openCatalog()}>
+            <Button id={ADD_FIRST_ID} type="button" className="mt-4" onClick={() => openCatalog()}>
               <Plus />
               Add your first item
             </Button>

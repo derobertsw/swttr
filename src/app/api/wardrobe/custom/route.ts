@@ -96,6 +96,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     let customItem = inserted;
+    // Set when this request reused a removed item, so a failure can undo the rename.
+    let reusedName: string | null = null;
     if (insertError) {
       if (insertError.code !== "23505") {
         logError("POST /api/wardrobe/custom - insert custom item", insertError);
@@ -129,6 +131,7 @@ export async function POST(request: NextRequest) {
         );
       }
       customItem = { ...removed, custom_name: name };
+      reusedName = removed.custom_name;
     }
 
     // Add to user_wardrobe
@@ -143,8 +146,17 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (wardrobeError || !wardrobeEntry) {
-      // If wardrobe insert fails, clean up the custom item
-      await supabase.from("user_custom_items").delete().eq("id", customItem.id);
+      // Undo this request: delete the item it created, or give a reused item
+      // its old name back. A reused item was saved before, so it stays.
+      if (reusedName === null) {
+        await supabase.from("user_custom_items").delete().eq("id", customItem.id).eq("user_id", userId);
+      } else {
+        await supabase
+          .from("user_custom_items")
+          .update({ custom_name: reusedName })
+          .eq("id", customItem.id)
+          .eq("user_id", userId);
+      }
       logError("POST /api/wardrobe/custom - insert wardrobe", wardrobeError);
       return NextResponse.json(
         { error: "Failed to add item to wardrobe" },
