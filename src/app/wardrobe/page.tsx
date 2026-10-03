@@ -23,6 +23,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { useWardrobe } from "@/hooks/useWardrobe";
 import { WardrobeSearch } from "@/components/wardrobe/WardrobeSearch";
 import { BodyPartSection, sectionHeadingId } from "@/components/wardrobe/BodyPartSection";
@@ -51,43 +52,6 @@ function addAction() {
 /** Focuses an element once the next render has settled, if it still exists. */
 function focusLater(getTarget: () => HTMLElement | null) {
   requestAnimationFrame(() => getTarget()?.focus());
-}
-
-/**
- * Radix returns focus only to a DialogTrigger, and these overlays open from
- * code. Each remembers the control that opened it and returns focus there,
- * or to a fallback when a tap didn't focus it.
- */
-function useReturnFocus() {
-  const opener = useRef<{ element: HTMLElement | null; fallback: () => HTMLElement | null } | null>(null);
-
-  const remember = (fallback: () => HTMLElement | null) => {
-    const active = document.activeElement;
-    opener.current = {
-      element: active instanceof HTMLElement && active !== document.body ? active : null,
-      fallback,
-    };
-  };
-
-  const restore = (event: Event) => {
-    event.preventDefault();
-    const saved = opener.current;
-    opener.current = null;
-    if (!saved) return;
-    if (saved.element?.isConnected) {
-      saved.element.focus();
-    } else {
-      // A tap leaves nothing focused, or the opener went away; don't scroll
-      // the list to the fallback.
-      saved.fallback()?.focus({ preventScroll: true });
-    }
-  };
-
-  const forget = () => {
-    opener.current = null;
-  };
-
-  return { remember, restore, forget };
 }
 
 export default function Wardrobe() {
