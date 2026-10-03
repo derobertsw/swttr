@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Share2, HelpCircle, Menu, MessageSquare, Settings } from "lucide-react";
@@ -9,6 +9,7 @@ import { logWarn } from "@/lib/logger";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useNativeTabShell } from "@/hooks/useNativeTabShell";
+import { useReturnFocus } from "@/hooks/useReturnFocus";
 import {
   Sheet,
   SheetContent,
@@ -32,6 +33,8 @@ const MENU_ITEM_CLASS =
 const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const menuButtonId = useId();
+  const preferencesFocus = useReturnFocus();
   // The native shell has no web sidebar, so its menu and logo show at every width.
   const isNativeTabShell = useNativeTabShell();
   const mobileOnly = isNativeTabShell ? undefined : "md:hidden";
@@ -66,6 +69,8 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   };
 
   const openPreferencesFromMenu = () => {
+    // The menu, and its Settings item, close first, so focus returns to the menu button.
+    preferencesFocus.remember(() => document.getElementById(menuButtonId));
     setMobileMenuOpen(false);
     window.setTimeout(() => {
       setPreferencesOpen(true);
@@ -117,7 +122,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
         {/* Mobile: hamburger menu */}
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild className={mobileOnly}>
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <Button id={menuButtonId} variant="ghost" size="icon" className="rounded-full">
               <Menu className="size-5" />
               <span className="sr-only">Open menu</span>
             </Button>
@@ -191,6 +196,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
         onBodyMetricsChange={updateBodyMetrics}
         open={preferencesOpen}
         onOpenChange={setPreferencesOpen}
+        onCloseAutoFocus={preferencesFocus.restore}
       />
     </header>
   );

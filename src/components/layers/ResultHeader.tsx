@@ -11,6 +11,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import type { PrecipitationType, WeatherContext } from "@/types/weather";
 
+/** The button that opens the place and time drawer, which returns focus to it. */
+export const EDIT_WEATHER_ID = "result-edit-weather";
+
 /** What kind of layers the result shows. */
 type AdviceKind = "personalized" | "general";
 
@@ -224,7 +227,7 @@ export function ResultHeader({
       </div>
 
       {onEditWeather && (
-        <Button type="button" variant="outline" size="sm" className="self-start" onClick={onEditWeather} disabled={loading}>
+        <Button id={EDIT_WEATHER_ID} type="button" variant="outline" size="sm" className="self-start" onClick={onEditWeather} disabled={loading}>
           <Pencil aria-hidden="true" />
           Change place or time
         </Button>
