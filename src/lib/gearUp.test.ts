@@ -108,7 +108,7 @@ describe("gearUpReducer", () => {
     expect(gearUpReducer(busy, { type: "SHOW_FORM", mode: "later", keepLoading: false }).loading).toBe(false);
   });
 
-  it("restores what was kept for the tab, and stays restored through Back and Start over", () => {
+  it("restores what was kept for the tab, and keeps it restored for its owner through Back and Start over", () => {
     const kept = {
       inputMode: "later",
       date: new Date("2026-10-08T00:00:00"),
@@ -116,15 +116,23 @@ describe("gearUpReducer", () => {
       durationDays: 3,
       lastOuting: ALPINE_OUTING,
     } as const;
-    const restored = gearUpReducer(createInitialState("now"), { type: "RESTORE", kept });
-    expect(restored).toEqual({ ...createInitialState("later"), ...kept, restored: true });
-    expect(gearUpReducer(createInitialState("now"), { type: "RESTORE", kept: null })).toEqual({
+    const restored = gearUpReducer(createInitialState("now"), { type: "RESTORE", owner: "user_1", kept });
+    expect(restored).toEqual({ ...createInitialState("later"), ...kept, restored: true, owner: "user_1" });
+    expect(gearUpReducer(createInitialState("now"), { type: "RESTORE", owner: null, kept: null })).toEqual({
       ...createInitialState("now"),
       restored: true,
+      owner: null,
     });
 
-    expect(gearUpReducer(restored, { type: "SHOW_FORM", mode: "now", keepLoading: false }).restored).toBe(true);
-    expect(gearUpReducer(restored, { type: "RESET" })).toEqual({ ...createInitialState("now"), restored: true });
+    expect(gearUpReducer(restored, { type: "SHOW_FORM", mode: "now", keepLoading: false })).toMatchObject({
+      restored: true,
+      owner: "user_1",
+    });
+    expect(gearUpReducer(restored, { type: "RESET" })).toEqual({
+      ...createInitialState("now"),
+      restored: true,
+      owner: "user_1",
+    });
   });
 });
 

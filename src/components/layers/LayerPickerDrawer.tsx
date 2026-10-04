@@ -13,6 +13,7 @@ import {
   DrawerDescription,
 } from "@/components/ui/drawer";
 import { BodyPart, LayerType, BODY_PART_LABELS, LAYER_LABELS } from "@/lib/layers";
+import { WARDROBE_FROM_OUTING_PATH } from "@/lib/outingReturn";
 import { cn } from "@/lib/utils";
 import type { PickerItem } from "@/hooks/useLayerPicker";
 
@@ -99,7 +100,7 @@ function PickerSection({
           <p className="text-sm text-muted-foreground">{emptyMessage}</p>
           {!isRecommended && (
             <Link
-              href="/wardrobe"
+              href={WARDROBE_FROM_OUTING_PATH}
               className="inline-flex min-h-11 items-center rounded-control px-2 text-sm font-semibold text-primary underline-offset-4 hover:underline"
             >
               Go to Wardrobe

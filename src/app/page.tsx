@@ -46,9 +46,13 @@ const HomeContent = () => {
     showPlanForm,
     editOuting,
     resetToInitialState,
+    accountChanging,
   } = useGearUp();
 
   const { itemMappings } = useItemMappings();
+
+  // For the moment the page starts over for another account, nothing of the last one's shows.
+  if (accountChanging) return <HomeLoading />;
 
   return (
     <PageLayout onLogoClick={resetToInitialState} chromeVariant="compact">
