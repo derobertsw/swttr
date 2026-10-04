@@ -1,5 +1,8 @@
 "use client";
 
+import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
+import { formatTemperature } from "@/lib/temperature";
+import type { TemperatureUnit } from "@/types/preferences";
 import PageLayout from "@/components/PageLayout";
 import {
   Accordion,
@@ -8,11 +11,11 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-const faqs = [
+const getFaqs = (temperatureUnit: TemperatureUnit) => [
   {
     question: "How does SWTTR determine what to wear?",
     answer:
-      "SWTTR calculates how much insulation your body needs using the IREQ (Required Clothing Insulation) method from ISO 11079. It models your body's heat balance — metabolic heat production minus heat lost to cold air, wind, and radiation — then solves for the clothing insulation (in clo units) required to maintain a comfortable skin temperature of 33.7\u00b0C. The algorithm accounts for your specific activity's metabolic rate and exertion level, then applies CoWEDA validation-based safety buffers (from published skin-temperature MAE) before selecting garments from your wardrobe.",
+      `SWTTR calculates how much insulation your body needs using the IREQ (Required Clothing Insulation) method from ISO 11079. It models your body's heat balance — metabolic heat production minus heat lost to cold air, wind, and radiation — then solves for the clothing insulation (in clo units) required to maintain a comfortable skin temperature of ${formatTemperature(92.66, temperatureUnit, 1)}. The algorithm accounts for your specific activity's metabolic rate and exertion level, then applies CoWEDA validation-based safety buffers (from published skin-temperature MAE) before selecting garments from your wardrobe.`,
   },
   {
     question: "What goes into the calculation?",
@@ -32,7 +35,7 @@ const faqs = [
   {
     question: "Why do hands and head need special treatment?",
     answer:
-      "Extremities lose heat disproportionately fast due to their high surface-area-to-volume ratio and because your body restricts blood flow to them in cold conditions (vasoconstriction). The algorithm applies higher insulation multipliers for extremities \u2014 for alpine skiing, hands need about 1.45x the base insulation and head needs 1.15x. These targets increase further in extreme cold (+2% per degree below -10\u00b0C) and high wind (+3% per m/s), since extremities are more exposed.",
+      `Extremities lose heat disproportionately fast due to their high surface-area-to-volume ratio and because your body restricts blood flow to them in cold conditions (vasoconstriction). The algorithm applies higher insulation multipliers for extremities \u2014 for alpine skiing, hands need about 1.45x the base insulation and head needs 1.15x. These targets increase further in extreme cold (+2% per °C below ${formatTemperature(14, temperatureUnit)}) and high wind (+3% per m/s), since extremities are more exposed.`,
   },
   {
     question: "What is the thermal comfort score?",
@@ -42,12 +45,12 @@ const faqs = [
   {
     question: "What are clo values?",
     answer:
-      "Clo is a standard unit of thermal resistance for clothing (ISO 9920). 1 clo is the insulation that keeps a resting person comfortable at 21\u00b0C (70\u00b0F) \u2014 roughly a business suit. A thin base layer is about 0.25\u20130.35 clo, a midweight fleece is 0.6\u20131.0 clo, and a heavy insulated jacket can be 1.5+ clo. Importantly, individual garment clo values don't simply add up \u2014 SWTTR uses USARIEM regression equations to predict how layers interact (air gaps, compression), typically yielding 80\u201396% of the simple sum depending on body region.",
+      `Clo is a standard unit of thermal resistance for clothing (ISO 9920). 1 clo is the insulation that keeps a resting person comfortable at ${formatTemperature(69.8, temperatureUnit, 1)} \u2014 roughly a business suit. A thin base layer is about 0.25\u20130.35 clo, a midweight fleece is 0.6\u20131.0 clo, and a heavy insulated jacket can be 1.5+ clo. Importantly, individual garment clo values don't simply add up \u2014 SWTTR uses USARIEM regression equations to predict how layers interact (air gaps, compression), typically yielding 80\u201396% of the simple sum depending on body region.`,
   },
   {
     question: "What is the target clo range?",
     answer:
-      "The algorithm computes two baselines: the minimum insulation (for a skin temperature of 30\u00b0C \u2014 the cold-stress threshold) and the neutral insulation (for 33.7\u00b0C \u2014 full comfort). The target range is then adjusted based on environmental stress factors (temperature, wind, and exposure planning) and a CoWEDA validation uncertainty buffer derived from published skin-temperature prediction error. This yields a safer practical band, with additional extremity margin for hands/head.",
+      `The algorithm computes two baselines: the minimum insulation (for a skin temperature of ${formatTemperature(86, temperatureUnit)} \u2014 the cold-stress threshold) and the neutral insulation (for ${formatTemperature(92.66, temperatureUnit, 1)} \u2014 full comfort). The target range is then adjusted based on environmental stress factors (temperature, wind, and exposure planning) and a CoWEDA validation uncertainty buffer derived from published skin-temperature prediction error. This yields a safer practical band, with additional extremity margin for hands/head.`,
   },
   {
     question: "How does SWTTR pick garments from my wardrobe?",
@@ -92,11 +95,13 @@ const faqs = [
   {
     question: "What temperature unit does SWTTR use?",
     answer:
-      "SWTTR displays temperatures in Fahrenheit. Internally, all biophysics calculations use Celsius and m/s (as required by ISO 11079), with conversions handled automatically.",
+      "Choose Fahrenheit or Celsius in Settings. The choice is saved for your account on this device, with a separate choice when signed out. US locales default to Fahrenheit; other locales default to Celsius. Internally, all biophysics calculations use Celsius and m/s (as required by ISO 11079), with conversions handled automatically.",
   },
 ];
 
 export default function FAQ() {
+  const { temperatureUnit } = useTemperatureUnit();
+  const faqs = getFaqs(temperatureUnit);
   return (
     <PageLayout>
       <div className="flex flex-col gap-6 w-full max-w-2xl">

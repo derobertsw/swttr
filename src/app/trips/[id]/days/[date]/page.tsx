@@ -16,6 +16,8 @@ import {
   inferWeatherKind,
 } from "@/components/trips/trip-primitives";
 import { useTrip } from "@/hooks/useTrip";
+import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
+import { formatTemperature } from "@/lib/temperature";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
 import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -261,6 +263,7 @@ function WeatherCard({
   onRetry: () => void;
   onLocationSaved: () => void;
 }) {
+  const { temperatureUnit } = useTemperatureUnit();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const search = useLocationSearch();
@@ -320,7 +323,7 @@ function WeatherCard({
           {weather ? (
             <>
               <p className="text-base font-semibold text-white">
-                {weather.tempF}°F · {weather.wind} mph
+                {formatTemperature(weather.tempF, temperatureUnit)} · {weather.wind} mph
               </p>
               <p className="text-xs text-white/55">
                 {weather.precip > 0.6

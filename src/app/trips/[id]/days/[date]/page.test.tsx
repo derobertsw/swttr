@@ -14,6 +14,10 @@ import {
 } from "@/test/tripApi";
 import type { TripDay, TripMemberDayKit } from "@/types/trips";
 import DayDetailPage from "./page";
+import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
+import { STORAGE_KEYS } from "@/lib/storage";
+
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: null, isLoaded: true }) }));
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -34,13 +38,15 @@ const TRIP_ROUTE = reply(200, tripFull({ stops: [STOWE_STOP], days: [DAY] }));
 const NO_FORECAST = reply(500, { error: "Failed to fetch weather data" });
 
 /** The page suspends until its params resolve, so rendering is awaited. */
-async function renderPage(date = DAY.date) {
+async function renderPage(date = DAY.date, celsius = false) {
+  if (celsius) window.localStorage.setItem(`${STORAGE_KEYS.TEMPERATURE_UNIT}:guest`, "C");
   await act(async () => {
-    render(
+    const page = (
       <Suspense fallback={null}>
         <DayDetailPage params={Promise.resolve({ id: TRIP.id, date })} />
       </Suspense>
     );
+    render(celsius ? <TemperatureUnitProvider>{page}</TemperatureUnitProvider> : page);
   });
 }
 
@@ -50,6 +56,7 @@ describe("Trip day page", () => {
   });
 
   afterEach(() => {
+    window.localStorage.removeItem(`${STORAGE_KEYS.TEMPERATURE_UNIT}:guest`);
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
@@ -68,6 +75,20 @@ describe("Trip day page", () => {
     await renderPage();
 
     expect(await screen.findByText("46°F · 12 mph")).toBeInTheDocument();
+  });
+
+  it("shows trip weather in the saved Celsius preference", async () => {
+    const api = fakeTripApi({
+      "GET /api/v1/trips/trip-1": TRIP_ROUTE,
+      "GET /api/v1/trips/trip-1/days/2026-10-10/weather": reply(200, {
+        forecast: { status: "available", availableHours: 16, expectedHours: 16, message: "Full daytime forecast." },
+        weather: { tempF: 32, wind: 12, precip: 0.2 },
+      }),
+    });
+    vi.stubGlobal("fetch", api);
+    await renderPage(DAY.date, true);
+    expect(await screen.findByText("0°C · 12 mph")).toBeInTheDocument();
+    expect(screen.queryByText(/32°F/)).not.toBeInTheDocument();
   });
 
   it("offers retry after a forecast failure rather than loading forever", async () => {

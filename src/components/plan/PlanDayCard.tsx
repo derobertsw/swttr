@@ -5,6 +5,8 @@ import { BODY_PART_LABELS, BODY_PARTS, LAYER_LABELS } from "@/lib/layers";
 import type { BodyPart, LayerType } from "@/types/wardrobe";
 import type { DailyLayerPlan, LayerChanges, PlanLayerItem } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
+import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
+import { formatTemperatureRange } from "@/lib/temperature";
 
 const LAYER_TYPES: LayerType[] = ["base", "mid", "outer"];
 
@@ -105,6 +107,7 @@ function ChangeList({
  * changed since the day before, with the whole outfit a tap away.
  */
 export function PlanDayCard({ day, previousDay, itemMappings }: PlanDayCardProps) {
+  const { temperatureUnit } = useTemperatureUnit();
   const headingId = useId();
   const { baseline } = day;
   const recommendation = baseline.recommendation;
@@ -125,7 +128,7 @@ export function PlanDayCard({ day, previousDay, itemMappings }: PlanDayCardProps
               {day.label}
             </h3>
             <p className="text-base font-semibold tabular-nums text-foreground">
-              {baseline.minTemp}°–{baseline.maxTemp}°F
+              {formatTemperatureRange(baseline.minTemp, baseline.maxTemp, temperatureUnit)}
             </p>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -177,7 +180,7 @@ export function PlanDayCard({ day, previousDay, itemMappings }: PlanDayCardProps
                 <p className="text-sm">
                   <span className="font-semibold text-foreground">{daypart.label}</span>
                   <span className="text-muted-foreground">
-                    {" "}· {daypart.timeRangeLabel} · {daypart.minTemp}°–{daypart.maxTemp}°F
+                    {" "}· {daypart.timeRangeLabel} · {formatTemperatureRange(daypart.minTemp, daypart.maxTemp, temperatureUnit)}
                   </span>
                 </p>
                 <ChangeList changes={daypart.changes} addLabel="Put on" removeLabel="Take off" />

@@ -136,7 +136,7 @@ describe("MultiDayPlanDisplay", () => {
 
       expect(screen.getByText("No general layers for Running")).toBeInTheDocument();
       expect(screen.queryByText("General guide")).not.toBeInTheDocument();
-      expect(within(day("Thu, Jan 15")).getByText("30°–30°F")).toBeInTheDocument();
+      expect(within(day("Thu, Jan 15")).getByText("30°F – 30°F")).toBeInTheDocument();
       expect(within(day("Thu, Jan 15")).getByText("No general layers for these conditions.")).toBeInTheDocument();
     });
   });
@@ -172,7 +172,7 @@ describe("MultiDayPlanDisplay", () => {
 
       expect(screen.getByRole("tab", { name: "Daily plan" })).toHaveAttribute("aria-selected", "true");
       const thursday = day("Thu, Jan 15");
-      expect(within(thursday).getByText("20°–30°F")).toBeInTheDocument();
+      expect(within(thursday).getByText("20°F – 30°F")).toBeInTheDocument();
       expect(within(thursday).getByText("Wind up to 8 mph · 0% chance of precipitation")).toBeInTheDocument();
       expect(within(thursday).getByText("For the coldest part of the day.")).toBeInTheDocument();
       expect(within(thursday).getByText("Upper body").nextElementSibling).toHaveTextContent(
@@ -188,8 +188,8 @@ describe("MultiDayPlanDisplay", () => {
       const through = within(day("Thu, Jan 15")).getByRole("region", { name: "Through Thu, Jan 15" });
       // The morning is the day's coldest part, so it has nothing to change.
       expect(within(through).queryByText("Morning")).not.toBeInTheDocument();
-      expect(through).toHaveTextContent("Midday · 11am-3pm · 30°–30°F");
-      expect(through).toHaveTextContent("Evening · 4pm-9pm · 20°–20°F");
+      expect(through).toHaveTextContent("Midday · 11am-3pm · 30°F – 30°F");
+      expect(through).toHaveTextContent("Evening · 4pm-9pm · 20°F – 20°F");
       expect(within(through).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
         "Take off Down vest · Upper body mid",
         "Take off Neck gaiter · Head & neck base",

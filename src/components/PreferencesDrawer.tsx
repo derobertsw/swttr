@@ -30,6 +30,13 @@ import { Check, Settings2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { cn } from "@/lib/utils";
+import { SegmentedChoice } from "@/components/SegmentedChoice";
+import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
+
+const TEMPERATURE_UNIT_OPTIONS = [
+  { value: "F", label: "Fahrenheit (°F)" },
+  { value: "C", label: "Celsius (°C)" },
+] as const;
 
 const SENSITIVITY_OPTIONS: { value: TemperatureSensitivity; label: string; description: string }[] = [
   {
@@ -77,6 +84,8 @@ export function PreferencesDrawer({
   onOpenChange,
   onCloseAutoFocus,
 }: PreferencesDrawerProps) {
+  const { temperatureUnit, isReady, updateTemperatureUnit } = useTemperatureUnit();
+  const [unitSaveError, setUnitSaveError] = useState(false);
   const selectedSensitivity = SENSITIVITY_OPTIONS.find((opt) => opt.value === sensitivity);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
@@ -148,6 +157,31 @@ export function PreferencesDrawer({
           </DrawerHeader>
 
           <DrawerBody className="space-y-6 pt-5 pb-8">
+            <section aria-label="Display">
+              <SegmentedChoice
+                label="Temperature units"
+                options={TEMPERATURE_UNIT_OPTIONS}
+                value={temperatureUnit}
+                disabled={!isReady}
+                description={isReady ? "Saved for you on this device." : "Loading your temperature preference…"}
+                onChange={(unit) => {
+                  setUnitSaveError(false);
+                  void runWithSaveState(() => {
+                    try {
+                      updateTemperatureUnit(unit);
+                    } catch (error) {
+                      setUnitSaveError(true);
+                      throw error;
+                    }
+                  });
+                }}
+              />
+              {unitSaveError && (
+                <p role="alert" className="mt-2 text-sm text-destructive">
+                  Couldn’t save temperature units. Check that storage is allowed, then try again.
+                </p>
+              )}
+            </section>
             <section aria-labelledby="settings-recommendations" className="space-y-5">
               <h3
                 id="settings-recommendations"

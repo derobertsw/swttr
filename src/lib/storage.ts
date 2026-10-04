@@ -6,6 +6,8 @@ export const STORAGE_KEYS = {
   /** @deprecated Legacy key — only used by useMigrateUser for one-time migration. Auth now uses Clerk. */
   USER_ID: "swttr-user-id",
   SENSITIVITY: "swttr-temperature-sensitivity",
+  /** Account-scoped suffixes are added by TemperatureUnitProvider. */
+  TEMPERATURE_UNIT: "swttr-temperature-unit",
   DEFAULT_ACTIVITY: "swttr-default-activity",
   LAST_ACTIVITY: "swttr-last-activity",
   HEIGHT_INCHES: "swttr-height-inches",
