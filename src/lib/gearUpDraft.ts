@@ -121,6 +121,17 @@ export function readGearUpDraft(owner: string | null): GearUpDraft | null {
   return kept[owner] ?? guest;
 }
 
+/**
+ * Hands the guest's draft to `owner`, whichever page they signed in on, as
+ * Gear up does when it restores it, so no later account in the tab can read
+ * it. Nothing changes when there's no guest draft.
+ */
+export function claimGuestGearUpDraft(owner: string): void {
+  if (!readKept()[GUEST]) return;
+  const draft = readGearUpDraft(owner);
+  if (draft) saveGearUpDraft(owner, draft);
+}
+
 /** Keeps `owner`'s draft. An account's takes the place of the guest's, which it carries on. */
 export function saveGearUpDraft(owner: string | null, draft: GearUpDraft): void {
   const kept = readKept();

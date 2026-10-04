@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readGearUpDraft, saveGearUpDraft, type GearUpDraft } from "./gearUpDraft";
+import { claimGuestGearUpDraft, readGearUpDraft, saveGearUpDraft, type GearUpDraft } from "./gearUpDraft";
 import { STORAGE_KEYS } from "./storage";
 
 const STOWE = { id: 1, name: "Stowe", region: "Vermont", country: "United States", latitude: 44.47, longitude: -72.69 };
@@ -66,6 +66,23 @@ describe("gearUpDraft", () => {
     saveGearUpDraft("user_a", DRAFT);
     // The account has taken it over, so the next guest in the tab starts afresh.
     expect(readGearUpDraft(null)).toBeNull();
+  });
+
+  it("hands a guest's outing to the first account that signs in, wherever that is, and no later one", () => {
+    saveGearUpDraft(null, DRAFT);
+    claimGuestGearUpDraft("user_a");
+
+    expect(readGearUpDraft("user_a")).toEqual(DRAFT);
+    expect(readGearUpDraft("user_b")).toBeNull();
+    expect(readGearUpDraft(null)).toBeNull();
+  });
+
+  it("claims nothing when there's no guest draft", () => {
+    saveGearUpDraft("user_a", DRAFT);
+    claimGuestGearUpDraft("user_b");
+
+    expect(readGearUpDraft("user_b")).toBeNull();
+    expect(readGearUpDraft("user_a")).toEqual(DRAFT);
   });
 
   it("keeps an account's own draft over a guest's that has no place or result", () => {

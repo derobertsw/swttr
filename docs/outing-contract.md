@@ -101,7 +101,7 @@ The guest and each account signed in to in the tab keep their own draft (#168). 
 | Who's signed in | The draft they get |
 |---|---|
 | A guest | The guest's. |
-| An account, after a guest in this tab picked a place or got a result | The guest's, so the outing carries on after signing in. The account takes it over, and the guest's is removed. |
+| An account, after a guest in this tab picked a place or got a result | The guest's, so the outing carries on after signing in. The first account to sign in takes it over, on whichever page that happens (`useClaimGuestDraft` in `PageLayout`), and the guest's is removed. |
 | An account, otherwise | The account's own, or the guest's when it has none. |
 
 Another account's draft is never shown. A tab open from before each account kept its own has one draft, which stays the guest's.
