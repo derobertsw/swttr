@@ -1,7 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import PageLayout from "./PageLayout";
+import { Capacitor } from "@capacitor/core";
+import { StatusBar, Style } from "@capacitor/status-bar";
+
+vi.mock("@capacitor/core", () => ({
+  Capacitor: { isNativePlatform: vi.fn(), getPlatform: vi.fn() },
+}));
+
+vi.mock("@capacitor/status-bar", () => ({
+  StatusBar: { setStyle: vi.fn(), setOverlaysWebView: vi.fn() },
+  Style: { Default: "DEFAULT" },
+}));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/trips/abc-123",
@@ -60,6 +71,10 @@ const renderLayout = () =>
 
 describe("PageLayout", () => {
   beforeEach(() => {
+    vi.mocked(Capacitor.isNativePlatform).mockReturnValue(false);
+    vi.mocked(Capacitor.getPlatform).mockReturnValue("web");
+    vi.mocked(StatusBar.setStyle).mockReset().mockResolvedValue();
+    vi.mocked(StatusBar.setOverlaysWebView).mockReset().mockResolvedValue();
     mediaListeners = [];
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: false,
@@ -75,6 +90,22 @@ describe("PageLayout", () => {
   afterEach(() => {
     window.matchMedia = originalMatchMedia;
     setWidth(originalInnerWidth);
+  });
+
+  it("lets the iOS status bar follow system appearance", async () => {
+    vi.mocked(Capacitor.isNativePlatform).mockReturnValue(true);
+    vi.mocked(Capacitor.getPlatform).mockReturnValue("ios");
+    renderLayout();
+    await waitFor(() => expect(StatusBar.setOverlaysWebView).toHaveBeenCalledWith({ overlay: false }));
+    expect(StatusBar.setStyle).toHaveBeenCalledWith({ style: Style.Default });
+  });
+
+  it.each(["web", "android"])("leaves the %s status bar alone", (platform) => {
+    vi.mocked(Capacitor.isNativePlatform).mockReturnValue(platform !== "web");
+    vi.mocked(Capacitor.getPlatform).mockReturnValue(platform);
+    renderLayout();
+    expect(StatusBar.setStyle).not.toHaveBeenCalled();
+    expect(StatusBar.setOverlaysWebView).not.toHaveBeenCalled();
   });
 
   it("starts with a skip link to a single main landmark", () => {

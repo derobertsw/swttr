@@ -202,7 +202,13 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 0.118, green: 0.161, blue: 0.231, alpha: 1)
+        // Match the web canvas while the page loads, in either system appearance.
+        view.backgroundColor = UIColor { traits in
+            if traits.userInterfaceStyle == .dark {
+                return UIColor(red: 15.0 / 255, green: 29.0 / 255, blue: 42.0 / 255, alpha: 1)
+            }
+            return UIColor(red: 241.0 / 255, green: 240.0 / 255, blue: 234.0 / 255, alpha: 1)
+        }
 
         let contentController = WKUserContentController()
         contentController.addUserScript(WKUserScript(
@@ -876,5 +882,5 @@ class SWTTRViewController: UITabBarController, UITabBarControllerDelegate, SWTTR
     }
 
     override var prefersStatusBarHidden: Bool { false }
-    override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
+    override var preferredStatusBarStyle: UIStatusBarStyle { .default }
 }

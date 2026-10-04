@@ -59,7 +59,8 @@ const PageLayout = ({
       }
 
       try {
-        await StatusBar.setStyle({ style: Style.Light });
+        // Native default follows device appearance, including changes while open.
+        await StatusBar.setStyle({ style: Style.Default });
         await StatusBar.setOverlaysWebView({ overlay: false });
       } catch {
         // Safe no-op for browser and unsupported shells.

@@ -1,0 +1,866 @@
+[
+  {
+    "view": "faq",
+    "width": 320,
+    "scheme": "light",
+    "checked": 24,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "faq-focus",
+    "width": 320,
+    "scheme": "light",
+    "outline": "rgb(31, 95, 204) solid 2px",
+    "outlineOffset": "2px"
+  },
+  {
+    "view": "gear-up",
+    "width": 320,
+    "scheme": "light",
+    "checked": 24,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "faq",
+    "width": 390,
+    "scheme": "light",
+    "checked": 24,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "faq-focus",
+    "width": 390,
+    "scheme": "light",
+    "outline": "rgb(31, 95, 204) solid 2px",
+    "outlineOffset": "2px"
+  },
+  {
+    "view": "gear-up",
+    "width": 390,
+    "scheme": "light",
+    "checked": 24,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "faq",
+    "width": 1280,
+    "scheme": "light",
+    "checked": 29,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "faq-focus",
+    "width": 1280,
+    "scheme": "light",
+    "outline": "rgb(31, 95, 204) solid 2px",
+    "outlineOffset": "2px"
+  },
+  {
+    "view": "gear-up",
+    "width": 1280,
+    "scheme": "light",
+    "checked": 29,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "faq",
+    "width": 320,
+    "scheme": "dark",
+    "checked": 24,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "faq-focus",
+    "width": 320,
+    "scheme": "dark",
+    "outline": "rgb(150, 190, 255) solid 2px",
+    "outlineOffset": "2px"
+  },
+  {
+    "view": "gear-up",
+    "width": 320,
+    "scheme": "dark",
+    "checked": 24,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "faq",
+    "width": 390,
+    "scheme": "dark",
+    "checked": 24,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "faq-focus",
+    "width": 390,
+    "scheme": "dark",
+    "outline": "rgb(150, 190, 255) solid 2px",
+    "outlineOffset": "2px"
+  },
+  {
+    "view": "gear-up",
+    "width": 390,
+    "scheme": "dark",
+    "checked": 24,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "faq",
+    "width": 1280,
+    "scheme": "dark",
+    "checked": 29,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "faq-focus",
+    "width": 1280,
+    "scheme": "dark",
+    "outline": "rgb(150, 190, 255) solid 2px",
+    "outlineOffset": "2px"
+  },
+  {
+    "view": "gear-up",
+    "width": 1280,
+    "scheme": "dark",
+    "checked": 29,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "live-system-switch",
+    "checked": 23,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "menu",
+    "width": 320,
+    "scheme": "light",
+    "checked": 6,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings",
+    "width": 320,
+    "scheme": "light",
+    "checked": 23,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings-scroll",
+    "width": 320,
+    "scheme": "light",
+    "top": 43,
+    "bottom": 844,
+    "height": 844,
+    "scrollable": false,
+    "scrolled": false
+  },
+  {
+    "view": "settings-focus-restored",
+    "width": 320,
+    "scheme": "light",
+    "focus": "Open menu"
+  },
+  {
+    "view": "menu",
+    "width": 390,
+    "scheme": "light",
+    "checked": 6,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings",
+    "width": 390,
+    "scheme": "light",
+    "checked": 23,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings-scroll",
+    "width": 390,
+    "scheme": "light",
+    "top": 71,
+    "bottom": 844,
+    "height": 844,
+    "scrollable": false,
+    "scrolled": false
+  },
+  {
+    "view": "settings-focus-restored",
+    "width": 390,
+    "scheme": "light",
+    "focus": "Open menu"
+  },
+  {
+    "view": "settings",
+    "width": 1280,
+    "scheme": "light",
+    "checked": 23,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings-scroll",
+    "width": 1280,
+    "scheme": "light",
+    "top": 127,
+    "bottom": 900,
+    "height": 900,
+    "scrollable": false,
+    "scrolled": false
+  },
+  {
+    "view": "settings-focus-restored",
+    "width": 1280,
+    "scheme": "light",
+    "focus": "Settings"
+  },
+  {
+    "view": "menu",
+    "width": 320,
+    "scheme": "dark",
+    "checked": 6,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings",
+    "width": 320,
+    "scheme": "dark",
+    "checked": 23,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings-scroll",
+    "width": 320,
+    "scheme": "dark",
+    "top": 43,
+    "bottom": 844,
+    "height": 844,
+    "scrollable": false,
+    "scrolled": false
+  },
+  {
+    "view": "settings-focus-restored",
+    "width": 320,
+    "scheme": "dark",
+    "focus": "Open menu"
+  },
+  {
+    "view": "menu",
+    "width": 390,
+    "scheme": "dark",
+    "checked": 6,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings",
+    "width": 390,
+    "scheme": "dark",
+    "checked": 23,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings-scroll",
+    "width": 390,
+    "scheme": "dark",
+    "top": 71,
+    "bottom": 844,
+    "height": 844,
+    "scrollable": false,
+    "scrolled": false
+  },
+  {
+    "view": "settings-focus-restored",
+    "width": 390,
+    "scheme": "dark",
+    "focus": "Open menu"
+  },
+  {
+    "view": "settings",
+    "width": 1280,
+    "scheme": "dark",
+    "checked": 23,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings-scroll",
+    "width": 1280,
+    "scheme": "dark",
+    "top": 127,
+    "bottom": 900,
+    "height": 900,
+    "scrollable": false,
+    "scrolled": false
+  },
+  {
+    "view": "settings-focus-restored",
+    "width": 1280,
+    "scheme": "dark",
+    "focus": "Settings"
+  },
+  {
+    "view": "menu",
+    "width": 320,
+    "scheme": "light",
+    "checked": 6,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings",
+    "width": 320,
+    "scheme": "light",
+    "checked": 23,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings-scroll",
+    "width": 320,
+    "scheme": "light",
+    "top": 24,
+    "bottom": 568,
+    "height": 568,
+    "scrollable": true,
+    "scrolled": true
+  },
+  {
+    "view": "settings-focus-restored",
+    "width": 320,
+    "scheme": "light",
+    "focus": "Open menu"
+  },
+  {
+    "view": "menu",
+    "width": 320,
+    "scheme": "dark",
+    "checked": 6,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings",
+    "width": 320,
+    "scheme": "dark",
+    "checked": 23,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "settings-scroll",
+    "width": 320,
+    "scheme": "dark",
+    "top": 24,
+    "bottom": 568,
+    "height": 568,
+    "scrollable": true,
+    "scrolled": true
+  },
+  {
+    "view": "settings-focus-restored",
+    "width": 320,
+    "scheme": "dark",
+    "focus": "Open menu"
+  },
+  {
+    "view": "production-faq-without-javascript",
+    "width": 390,
+    "scheme": "light",
+    "checked": 23,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(241, 240, 234)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  },
+  {
+    "view": "production-faq-without-javascript",
+    "width": 390,
+    "scheme": "dark",
+    "checked": 23,
+    "failures": [],
+    "skipped": [],
+    "overflow": false,
+    "background": "rgb(15, 29, 42)",
+    "pin": null,
+    "viewport": [
+      "width=device-width, initial-scale=1, viewport-fit=cover"
+    ],
+    "themeColors": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#f1f0ea"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#0f1d2a"
+      }
+    ]
+  }
+]

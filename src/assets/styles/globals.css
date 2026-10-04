@@ -6,8 +6,8 @@
  *
  * The app follows the system appearance: light by default, dark when the
  * device prefers it. data-appearance="light" | "dark" on an element pins its
- * subtree to one palette. The root layout pins the app to dark until every
- * screen reads these tokens instead of hardcoded white-on-dark classes (#119).
+ * subtree to one palette for reference examples. The root stays unpinned,
+ * so the system setting applies immediately and updates without JavaScript.
  *
  * Components use the semantic colors below, never raw hex values or dark:
  * variants, so a pinned subtree always matches its palette.
