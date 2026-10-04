@@ -2,10 +2,13 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, Chip, SectionLabel } from "@/components/trips/trip-primitives";
+import { BackLink, SectionLabel, TripError, sentenceCase } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
 import type { TripDayCoverage, TripPackResponse } from "@/types/trip-coverage";
 
@@ -112,73 +115,60 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   return (
     <PageLayout chromeVariant="compact">
       <div className="flex w-full max-w-2xl flex-col gap-5">
-        <Link
-          href={`/trips/${id}`}
-          className="inline-flex items-center gap-1.5 text-sm text-white/70 hover:text-white"
-        >
-          <ArrowLeft className="size-4" />
-          Trip
-        </Link>
+        <BackLink href={`/trips/${id}`}>Trip</BackLink>
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1 basis-52">
             <SectionLabel>Your bag</SectionLabel>
-            <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
+            <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
               What to pack
             </h1>
             {data && (
-              <p className="mt-1 text-sm text-white/75">
+              <p className="mt-1 text-sm text-muted-foreground">
                 General clothing guidance for {data.coveredDays} of {data.totalDays}{" "}
                 {data.totalDays === 1 ? "day" : "days"} · activity + weather.
                 Saved manual kits are reviewed separately.
               </p>
             )}
           </div>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => {
               void refresh();
             }}
             disabled={loading || refreshing}
-            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-white/14 bg-white/[0.06] px-3 text-xs font-medium text-white/85 hover:bg-white/[0.10] disabled:opacity-50"
             aria-label="Regenerate pack list"
             aria-busy={refreshing}
           >
-            {refreshing ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="size-3.5" />
-            )}
+            {refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
             Regenerate
-          </button>
+          </Button>
         </header>
 
-        {loading && <Skeleton className="h-48 w-full rounded-2xl bg-white/12" />}
-        {error && (
-          <div role="alert" className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100">
-            {error}
-          </div>
-        )}
+        {loading && <Skeleton className="h-48 w-full rounded-card" />}
+        {error && <TripError>{error}</TripError>}
 
         {data && needsReview.length > 0 && (
           <Card>
-            <h2 className="text-base font-semibold text-white">Days to review</h2>
-            <p className="mt-1 text-sm text-white/65">
+            <h2 className="text-xl font-semibold text-foreground">Days to review</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
               Weather availability and clothing guidance are separate. Partial forecasts and manual kits need your review.
             </p>
-            <ul className="mt-3 divide-y divide-white/10">
+            <ul className="mt-3 divide-y divide-border">
               {needsReview.map((day) => (
                 <li key={day.date} className="py-3 text-sm">
-                  <p className="font-medium text-white/90">
+                  <p className="font-medium text-foreground">
                     {new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, {
                       weekday: "short", month: "short", day: "numeric",
                     })} · {day.activity ?? "Activity not set"}
                   </p>
-                  {day.stopName && <p className="break-words text-xs text-white/65">{day.stopName}</p>}
-                  <p className="mt-1 text-white/75">{day.message}</p>
-                  {day.message !== day.forecast.message && <p className="mt-1 text-xs text-white/65">{day.forecast.message}</p>}
-                  {day.approximation && <p className="mt-1 text-xs text-white/75">{day.approximation}</p>}
+                  {day.stopName && <p className="break-words text-muted-foreground">{day.stopName}</p>}
+                  <p className="mt-1 text-foreground">{day.message}</p>
+                  {day.message !== day.forecast.message && <p className="mt-1 text-muted-foreground">{day.forecast.message}</p>}
+                  {day.approximation && <p className="mt-1 text-muted-foreground">{day.approximation}</p>}
                   <Link href={`/trips/${id}/days/${day.date}`}
-                    className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-cyan-200 underline underline-offset-4"
+                    className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-4 hover:no-underline"
                     aria-label={`${coverageActionLabel(day)} for ${day.date}`}>
                     {coverageActionLabel(day)}
                   </Link>
@@ -190,7 +180,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
 
         {data && data.packingList.totalRequiredSlots === 0 && (
           <Card>
-            <p className="text-sm text-white/75">
+            <p className="text-sm text-foreground">
               No automatic clothing list is available. Review the days above for missing inputs,
               forecast availability or manual planning. Group gear is listed separately when assigned.
             </p>
@@ -199,24 +189,22 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
 
         {sections.map((s) => (
           <Card key={s.name}>
-            <h3 className="text-base font-semibold text-white">{s.name}</h3>
+            <h2 className="text-xl font-semibold text-foreground">{s.name}</h2>
             <ul className="mt-2 space-y-1.5">
               {s.items.map((it, i) => (
                 <li
                   key={`${s.name}-${i}`}
-                  className="flex items-start gap-2 text-sm text-white/85"
+                  className="flex items-start gap-2 text-sm text-foreground"
                 >
                   <ListMarker className="mt-2" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate">
                       {it.label}
                       {it.auto && (
-                        <span className="ml-2 text-[10px] uppercase tracking-wide text-cyan-300/85">
-                          from your closet
-                        </span>
+                        <span className="ml-2 text-xs font-medium text-primary">From your closet</span>
                       )}
                     </p>
-                    {it.sub && <p className="text-xs text-white/45">{it.sub}</p>}
+                    {it.sub && <p className="text-xs text-muted-foreground">{it.sub}</p>}
                   </div>
                 </li>
               ))}
@@ -227,23 +215,23 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
         {gaps.length > 0 && (
           <Card>
             <SectionLabel className="mb-1">Gaps you don&apos;t own yet</SectionLabel>
-            <p className="text-xs text-white/55">
+            <p className="text-sm text-muted-foreground">
               Clothing slots the general guidance called for that nothing in your wardrobe
               maps to. Add an item in the Wardrobe tab to fill these in.
             </p>
             <ul className="mt-2 space-y-1.5">
               {gaps.map((gap) => (
-                <li key={gap.mappingKey} className="flex items-center gap-2 text-sm text-white/85">
-                  <AlertTriangle className="size-3.5 text-orange-300" />
+                <li key={gap.mappingKey} className="flex items-center gap-2 text-sm text-foreground">
+                  <AlertTriangle className="size-3.5 shrink-0 text-warning" aria-hidden />
                   <span className="flex-1">
                     {gap.standardOption}{" "}
-                    <span className="text-xs text-white/50">
+                    <span className="text-xs text-muted-foreground">
                       · {BODY_PART_LABEL[gap.bodyPart] ?? gap.bodyPart} / {LAYER_LABEL[gap.layerType] ?? gap.layerType}
                     </span>
                   </span>
-                  <Chip variant={gap.priorityLabel === "high" ? "warn" : "outline"}>
-                    {gap.priorityLabel}
-                  </Chip>
+                  <Badge size="sm" variant={gap.priorityLabel === "high" ? "warning" : "outline"}>
+                    {sentenceCase(gap.priorityLabel)}
+                  </Badge>
                 </li>
               ))}
             </ul>
@@ -252,10 +240,10 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
 
         {extras.length > 0 && (
           <Card>
-            <h3 className="text-base font-semibold text-white">Carry items</h3>
+            <h2 className="text-xl font-semibold text-foreground">Carry items</h2>
             <ul className="mt-2 space-y-1.5">
               {extras.map((x) => (
-                <li key={x} className="flex items-center gap-2 text-sm text-white/85">
+                <li key={x} className="flex items-center gap-2 text-sm text-foreground">
                   <ListMarker />
                   {x}
                 </li>
@@ -266,10 +254,10 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
 
         {groupGear.length > 0 && (
           <Card>
-            <h3 className="text-base font-semibold text-white">Group gear (yours)</h3>
+            <h2 className="text-xl font-semibold text-foreground">Group gear (yours)</h2>
             <ul className="mt-2 space-y-1.5">
               {groupGear.map((g) => (
-                <li key={g} className="flex items-center gap-2 text-sm text-white/85">
+                <li key={g} className="flex items-center gap-2 text-sm text-foreground">
                   <ListMarker />
                   {g}
                 </li>
@@ -289,7 +277,7 @@ function ListMarker({ className }: { className?: string }) {
   return (
     <span
       aria-hidden
-      className={cn("inline-block size-1.5 shrink-0 rounded-full bg-white/45", className)}
+      className={cn("inline-block size-1.5 shrink-0 rounded-full bg-muted-foreground", className)}
     />
   );
 }

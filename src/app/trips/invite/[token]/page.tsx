@@ -7,7 +7,9 @@ import { SignedIn, SignedOut, SignInButton, SignUpButton, useAuth } from "@clerk
 import { CheckCircle2, Loader2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import PageLayout from "@/components/PageLayout";
-import { Card, SectionLabel, daysBetween, formatDateRange } from "@/components/trips/trip-primitives";
+import { SectionLabel, daysBetween, formatDateRange } from "@/components/trips/trip-primitives";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface InvitePreview {
@@ -69,11 +71,11 @@ export default function InviteLandingPage({ params }: { params: Promise<{ token:
       <div className="flex w-full max-w-md flex-col gap-5">
         <header>
           <SectionLabel>Trip invite</SectionLabel>
-          <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
+          <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
             You&apos;re invited
           </h1>
           {preview?.organizer_name && (
-            <p className="mt-1 text-sm text-white/62">
+            <p className="mt-1 text-sm text-muted-foreground">
               {preview.organizer_name} added you as &ldquo;{preview.invite.display_name}&rdquo;.
             </p>
           )}
@@ -81,30 +83,27 @@ export default function InviteLandingPage({ params }: { params: Promise<{ token:
 
         {error && (
           <Card>
-            <p className="text-sm text-orange-100">{error}</p>
-            <Link
-              href="/"
-              className="mt-3 inline-flex h-10 items-center justify-center rounded-xl border border-white/14 px-4 text-sm font-medium text-white/85 hover:bg-white/10"
-            >
-              Back home
-            </Link>
+            <p className="text-sm font-medium text-destructive">{error}</p>
+            <Button asChild variant="outline" className="mt-3">
+              <Link href="/">Back home</Link>
+            </Button>
           </Card>
         )}
 
-        {!preview && !error && <Skeleton className="h-32 w-full rounded-2xl bg-white/12" />}
+        {!preview && !error && <Skeleton className="h-32 w-full rounded-card" />}
 
         {preview && (
           <>
             <Card>
               <div className="flex items-center gap-3">
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-white/[0.06]">
-                  <MapPin className="size-5 text-white/72" />
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-control bg-muted">
+                  <MapPin className="size-5 text-muted-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold text-white/95">
+                  <p className="truncate text-base font-semibold text-foreground">
                     {preview.trip.name}
                   </p>
-                  <p className="mt-0.5 text-xs text-white/62">
+                  <p className="mt-0.5 text-sm text-muted-foreground">
                     {formatDateRange(preview.trip.start_date, preview.trip.end_date)} ·{" "}
                     {daysBetween(preview.trip.start_date, preview.trip.end_date)} days
                   </p>
@@ -113,44 +112,35 @@ export default function InviteLandingPage({ params }: { params: Promise<{ token:
             </Card>
 
             {!isLoaded ? (
-              <Skeleton className="h-11 w-full rounded-xl bg-white/12" />
+              <Skeleton className="h-12 w-full" />
             ) : (
               <>
                 <SignedIn>
-                  <button
+                  <Button
                     type="button"
+                    size="lg"
                     onClick={accept}
                     disabled={accepting}
-                    className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-gradient-to-b from-cyan-300/22 to-cyan-300/10 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(0,0,0,0.32)] disabled:opacity-60"
+                    className="w-full"
                   >
-                    {accepting ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="size-4" />
-                    )}
+                    {accepting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
                     Accept invitation
-                  </button>
-                  <p className="text-center text-xs text-white/55">
-                    Signed in as <span className="text-white/75">{userId?.slice(0, 6)}…</span>
+                  </Button>
+                  <p className="text-center text-xs text-muted-foreground">
+                    Signed in as <span className="text-foreground">{userId?.slice(0, 6)}…</span>
                   </p>
                 </SignedIn>
                 <SignedOut>
                   <div className="flex flex-col gap-2">
                     <SignInButton mode="modal" forceRedirectUrl={returnUrl}>
-                      <button
-                        type="button"
-                        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-gradient-to-b from-cyan-300/22 to-cyan-300/10 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(0,0,0,0.32)]"
-                      >
+                      <Button type="button" size="lg" className="w-full">
                         Sign in to accept
-                      </button>
+                      </Button>
                     </SignInButton>
                     <SignUpButton mode="modal" forceRedirectUrl={returnUrl}>
-                      <button
-                        type="button"
-                        className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-white/14 text-sm text-white/80 hover:bg-white/10"
-                      >
+                      <Button type="button" variant="outline" className="w-full">
                         Or create an account
-                      </button>
+                      </Button>
                     </SignUpButton>
                   </div>
                 </SignedOut>

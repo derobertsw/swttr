@@ -1,7 +1,9 @@
 "use client";
 
-import { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
+import Link from "next/link";
 import {
+  ArrowLeft,
   CloudRain,
   CloudSnow,
   Cloud,
@@ -15,6 +17,7 @@ import {
   Share2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const WEATHER_ICONS: Record<string, typeof Sun> = {
@@ -28,7 +31,7 @@ const WEATHER_ICONS: Record<string, typeof Sun> = {
 
 export function WeatherGlyph({ kind, className }: { kind: string; className?: string }) {
   const Icon = WEATHER_ICONS[kind] ?? Cloud;
-  return <Icon className={cn("size-5 text-white/80", className)} />;
+  return <Icon className={cn("size-5 text-muted-foreground", className)} />;
 }
 
 const GARMENT_ICONS: Record<string, typeof Shirt> = {
@@ -42,31 +45,28 @@ const GARMENT_ICONS: Record<string, typeof Shirt> = {
 
 export function GarmentGlyph({ kind, className }: { kind: string; className?: string }) {
   const Icon = GARMENT_ICONS[kind] ?? Shirt;
-  return <Icon className={cn("size-4 text-white/72", className)} />;
+  return <Icon className={cn("size-4 text-muted-foreground", className)} />;
 }
 
 export function MemberAvatar({
   name,
-  highlighted = false,
   size = 32,
   state = "default",
 }: {
   name: string;
-  highlighted?: boolean;
   size?: number;
   state?: "default" | "guest" | "invited" | "self";
 }) {
   const stateStyles = {
-    default: "border-white/45 bg-white/12 text-white",
-    guest: "border-white/30 bg-white/[0.06] text-white/70",
-    invited: "border-dashed border-white/35 bg-transparent text-white/70",
-    self: "border-cyan-300/60 bg-cyan-300/22 text-white",
+    default: "border-input bg-muted text-foreground",
+    guest: "border-border bg-muted text-muted-foreground",
+    invited: "border-dashed border-input bg-transparent text-muted-foreground",
+    self: "border-primary bg-primary-soft text-foreground",
   };
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full border font-semibold uppercase tracking-tight",
-        highlighted && "ring-2 ring-cyan-300/50",
+        "inline-flex shrink-0 items-center justify-center rounded-full border font-semibold uppercase",
         stateStyles[state]
       )}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
@@ -76,72 +76,64 @@ export function MemberAvatar({
   );
 }
 
-export function Chip({
-  children,
-  variant = "default",
-  className,
-}: {
-  children: ReactNode;
-  variant?: "default" | "accent" | "warn" | "outline";
-  className?: string;
-}) {
-  const styles = {
-    default: "border-white/22 bg-white/10 text-white/85",
-    accent: "border-cyan-300/50 bg-cyan-300/22 text-cyan-50",
-    warn: "border-orange-300/45 bg-orange-300/18 text-orange-50",
-    outline: "border-white/22 bg-transparent text-white/72",
-  };
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
-        styles[variant],
-        className
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-export function Card({
-  children,
-  className,
-  highlighted = false,
-}: {
-  children: ReactNode;
-  className?: string;
-  highlighted?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-2xl border bg-slate-950/22 px-4 py-3.5 backdrop-blur-sm transition-colors",
-        highlighted
-          ? "border-cyan-300/55 bg-cyan-300/[0.08]"
-          : "border-white/12 hover:border-white/20",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-export const sectionLabelClassName =
-  "text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45";
+export const sectionLabelClassName = "text-sm font-medium text-muted-foreground";
 
 export function SectionLabel({ children, className }: { children: ReactNode; className?: string }) {
   return <p className={cn(sectionLabelClassName, className)}>{children}</p>;
 }
 
-export function Spine({ color = "cyan" }: { color?: "cyan" | "emerald" | "amber" }) {
-  const cls = {
-    cyan: "bg-cyan-300/70",
-    emerald: "bg-emerald-300/70",
-    amber: "bg-amber-300/70",
-  }[color];
-  return <span className={cn("inline-block w-[3px] self-stretch rounded-full", cls)} />;
+export function BackLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex min-h-11 w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+    >
+      <ArrowLeft className="size-4" />
+      {children}
+    </Link>
+  );
+}
+
+/** A trip-level error, such as a trip that failed to load. It appears after the page does, so it's announced. */
+export function TripError({ className, ...props }: ComponentProps<"div">) {
+  return (
+    <div
+      role="alert"
+      className={cn(
+        "rounded-card bg-destructive-soft px-4 py-3 text-sm font-medium text-destructive",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+// Each stop keeps one color on the overview: the dot on its chip and its group
+// of days, and those days' spines. The stop's name always goes with the color,
+// so it borrows the primary, ring and warning hues, which stay apart in both
+// palettes, without implying a status.
+const STOP_COLORS = ["bg-primary", "bg-ring", "bg-warning"] as const;
+
+function stopColor(index: number) {
+  return STOP_COLORS[index % STOP_COLORS.length];
+}
+
+export function StopDot({ stopIndex }: { stopIndex: number }) {
+  return <span aria-hidden className={cn("inline-block size-2 shrink-0 rounded-full", stopColor(stopIndex))} />;
+}
+
+export function Spine({ stopIndex }: { stopIndex: number }) {
+  return (
+    <span
+      aria-hidden
+      className={cn("inline-block w-[3px] self-stretch rounded-full", stopColor(stopIndex))}
+    />
+  );
+}
+
+/** A stored lowercase value, such as an effort, a kit slot or a priority, as a label. */
+export function sentenceCase(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 export function inferWeatherKind(tempF: number, precipFraction: number): string {
@@ -216,20 +208,13 @@ export function InviteLinkButton({
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleShare}
-      className={cn(
-        "inline-flex items-center gap-1 rounded-md border border-cyan-300/45 bg-cyan-300/15 px-2.5 py-1.5 text-xs font-medium text-cyan-50 hover:bg-cyan-300/25",
-        className
-      )}
-    >
+    <Button type="button" variant="outline" size="sm" onClick={handleShare} className={className}>
       {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
-        <Share2 className="size-3.5" />
+        <Share2 />
       ) : (
-        <Copy className="size-3.5" />
+        <Copy />
       )}
       Send invite
-    </button>
+    </Button>
   );
 }

@@ -3,18 +3,25 @@
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronLeft, ChevronRight, CloudOff, Loader2, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, CloudOff, Loader2, MapPin } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { chipClassName } from "@/components/ui/chip";
+import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Card,
-  Chip,
+  BackLink,
   GarmentGlyph,
   MemberAvatar,
   SectionLabel,
+  TripError,
   WeatherGlyph,
   inferWeatherKind,
+  sentenceCase,
 } from "@/components/trips/trip-primitives";
+import { cn } from "@/lib/utils";
 import { useTrip } from "@/hooks/useTrip";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
@@ -27,6 +34,7 @@ import type { TripEffort, TripKitState, TripMember, TripMemberDayKit, TripStop }
 
 const KIT_SLOTS = ["shirt", "midlayer", "jacket", "shell", "pants", "gloves"] as const;
 const EFFORT_OPTIONS: TripEffort[] = ["easy", "steady", "hard"];
+const KIT_STATE_LABEL: Record<TripKitState, string> = { ok: "OK", warn: "Needs help", missing: "Missing" };
 
 export default function DayDetailPage({
   params,
@@ -119,39 +127,27 @@ export default function DayDetailPage({
     <PageLayout chromeVariant="compact">
       <div className="flex w-full max-w-3xl flex-col gap-5">
         <div className="flex items-center gap-3">
-          <Link
-            href={`/trips/${id}`}
-            className="inline-flex items-center gap-1.5 text-sm text-white/70 hover:text-white"
-          >
-            <ArrowLeft className="size-4" />
-            Trip
-          </Link>
+          <BackLink href={`/trips/${id}`}>Trip</BackLink>
           <div className="ml-auto flex items-center gap-1">
             {prevDay && (
-              <Link
-                href={`/trips/${id}/days/${prevDay.date}`}
-                className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white"
-              >
-                <ChevronLeft className="size-5" />
-              </Link>
+              <Button asChild variant="ghost" size="icon-sm">
+                <Link href={`/trips/${id}/days/${prevDay.date}`} aria-label="Previous day">
+                  <ChevronLeft className="size-5" />
+                </Link>
+              </Button>
             )}
             {nextDay && (
-              <Link
-                href={`/trips/${id}/days/${nextDay.date}`}
-                className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white"
-              >
-                <ChevronRight className="size-5" />
-              </Link>
+              <Button asChild variant="ghost" size="icon-sm">
+                <Link href={`/trips/${id}/days/${nextDay.date}`} aria-label="Next day">
+                  <ChevronRight className="size-5" />
+                </Link>
+              </Button>
             )}
           </div>
         </div>
 
-        {loading && <Skeleton className="h-32 w-full rounded-2xl bg-white/12" />}
-        {error && (
-          <div className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100">
-            {error}
-          </div>
-        )}
+        {loading && <Skeleton className="h-32 w-full rounded-card" />}
+        {error && <TripError>{error}</TripError>}
 
         {data && !day && (
           <MissingDayPlan tripId={id} date={date} dateLabel={dateLabel} canCreate={canCreateDay} onSaved={refresh} />
@@ -163,17 +159,13 @@ export default function DayDetailPage({
                 Day {dayIndex + 1} of {data.days.length} ·{" "}
                 {day.activity ?? effectiveStop?.activities[0] ?? "no activity"}
               </SectionLabel>
-              <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
+              <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
                 {dateLabel}
               </h1>
               {effectiveStop && (
-                <p className="mt-1 text-sm text-white/65">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {effectiveStop.name}
-                  {usingBaseFallback && (
-                    <span className="ml-1.5 text-[11px] uppercase tracking-wide text-white/45">
-                      · base location
-                    </span>
-                  )}
+                  {usingBaseFallback && <span className="ml-1.5">· base location</span>}
                 </p>
               )}
             </header>
@@ -237,15 +229,14 @@ function MissingDayPlan({ tripId, date, dateLabel, canCreate, onSaved }: {
   };
   return (
     <Card>
-      <h1 className="text-base font-semibold text-white">{dateLabel}</h1>
-      <p className="mt-2 text-sm text-white/75">{canCreate
+      <h1 className="text-xl font-semibold text-foreground">{dateLabel}</h1>
+      <p className="mt-2 text-sm text-foreground">{canCreate
         ? "This date has no saved day plan. Create one to choose an activity and plan your kit."
         : "This date is outside the trip. Return to the trip overview to review its dates."}</p>
-      {error && <p role="alert" className="mt-2 text-sm text-orange-100">Couldn&apos;t create the day plan: {error}</p>}
-      {canCreate && <button type="button" onClick={() => void create()} disabled={saving} aria-busy={saving}
-        className="mt-3 min-h-11 rounded-md border border-cyan-300/45 bg-cyan-300/15 px-3 text-sm font-medium text-cyan-50 hover:bg-cyan-300/25 disabled:opacity-50">
+      {error && <p role="alert" className="mt-2 text-sm font-medium text-destructive">Couldn&apos;t create the day plan: {error}</p>}
+      {canCreate && <Button type="button" onClick={() => void create()} disabled={saving} aria-busy={saving} className="mt-3">
         {saving ? "Creating day plan…" : "Create day plan"}
-      </button>}
+      </Button>}
     </Card>
   );
 }
@@ -313,33 +304,33 @@ function WeatherCard({
         {weather ? (
           <WeatherGlyph kind={inferWeatherKind(weather.tempF, weather.precip)} className="size-8 shrink-0" />
         ) : !hasCoords ? (
-          <MapPin className="size-8 shrink-0 text-white/55" aria-hidden />
+          <MapPin className="size-8 shrink-0 text-muted-foreground" aria-hidden />
         ) : result ? (
-          <CloudOff className="size-8 shrink-0 text-white/55" aria-hidden />
+          <CloudOff className="size-8 shrink-0 text-muted-foreground" aria-hidden />
         ) : (
-          <Loader2 className="size-8 shrink-0 animate-spin text-white/55" aria-hidden />
+          <Loader2 className="size-8 shrink-0 animate-spin text-muted-foreground" aria-hidden />
         )}
         <div className="min-w-0 flex-1" role="status" aria-live="polite">
           {weather ? (
             <>
-              <p className="text-base font-semibold text-white">
+              <p className="text-base font-semibold text-foreground">
                 {formatTemperature(weather.tempF, temperatureUnit)} · {weather.wind} mph
               </p>
-              <p className="text-xs text-white/55">
+              <p className="text-sm text-muted-foreground">
                 {weather.precip > 0.6
                   ? "wet day · plan a shell"
                   : weather.precip > 0.3
                   ? "showers possible"
                   : "dry"}
               </p>
-              <p className="mt-1 text-xs text-white/65">{result?.forecast.message}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{result?.forecast.message}</p>
             </>
           ) : hasCoords ? (
-            <p className="text-sm text-white/60">
+            <p className="text-sm text-muted-foreground">
               {result ? result.forecast.message : "Loading forecast…"}
             </p>
           ) : (
-            <p className="text-sm text-white/60">
+            <p className="text-sm text-muted-foreground">
               {stop
                 ? "This stop has no coordinates yet."
                 : "Set a base location to fetch the forecast."}
@@ -349,31 +340,22 @@ function WeatherCard({
       </div>
       <div className="mt-3 flex flex-wrap gap-2 pl-11">
         {hasCoords && canRetry && (
-          <button type="button" onClick={onRetry}
-            className="min-h-11 rounded-md border border-white/12 px-3 text-xs text-white/85 hover:bg-white/[0.08]">
+          <Button type="button" variant="outline" size="sm" onClick={onRetry}>
             Retry weather
-          </button>
+          </Button>
         )}
         {hasCoords ? (
-          <button
-            type="button"
-            onClick={() => setEditing((v) => !v)}
-            className="min-h-11 rounded-md border border-white/12 px-3 text-xs text-white/75 hover:bg-white/[0.08]"
-          >
+          <Button type="button" variant="outline" size="sm" onClick={() => setEditing((v) => !v)}>
             {editing ? "Cancel" : "Change"}
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="min-h-11 rounded-md border border-cyan-300/45 bg-cyan-300/15 px-3 text-xs font-medium text-cyan-50 hover:bg-cyan-300/25"
-          >
+          <Button type="button" size="sm" onClick={() => setEditing(true)}>
             Set location
-          </button>
+          </Button>
         )}
       </div>
       {editing && (
-        <div className="mt-3 border-t border-white/8 pt-3">
+        <div className="mt-3 border-t border-border pt-3">
           <LocationAutocomplete
             id="day-stop-location"
             placeholder="Search a city or place…"
@@ -391,16 +373,16 @@ function WeatherCard({
             onSelectLocation={search.handleSelectLocation}
             onDismiss={search.dismiss}
           />
-          <button
+          <Button
             type="button"
             onClick={save}
             disabled={!search.selectedLocation || saving}
-            className="mt-3 inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/14 bg-cyan-300/22 px-4 text-sm font-medium text-white disabled:opacity-50"
+            className="mt-3"
           >
-            {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+            {saving ? <Loader2 className="animate-spin" /> : null}
             Save location
-          </button>
-          <p className="mt-1.5 text-xs text-white/45">
+          </Button>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             {stop
               ? "Updates this stop for every day at it."
               : "Adds a base location to the trip."}
@@ -462,7 +444,7 @@ function ActivityPicker({
     <Card>
       <div className="flex items-center justify-between">
         <SectionLabel>Activity</SectionLabel>
-        {saving && <Loader2 className="size-3.5 animate-spin text-white/45" />}
+        {saving && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {merged.map((a) => {
@@ -475,23 +457,16 @@ function ActivityPicker({
               onClick={() => setActivity(on ? null : a)}
               disabled={saving}
               aria-pressed={on}
-              className={
-                "rounded-full border px-3 py-1 text-xs transition-colors disabled:opacity-60 " +
-                (on
-                  ? "border-cyan-300/55 bg-cyan-300/22 text-white"
-                  : fromStop
-                  ? "border-white/22 bg-white/[0.08] text-white/85"
-                  : "border-white/14 bg-white/[0.04] text-white/65 hover:bg-white/[0.08]")
-              }
+              className={chipClassName}
             >
               {a}
-              {fromStop && !on && <span className="ml-1 text-white/40">·</span>}
+              {fromStop && !on && <span className="text-muted-foreground">·</span>}
             </button>
           );
         })}
       </div>
       {value === null && (
-        <p className="mt-2 text-xs text-white/45">Tap a chip to set this day&apos;s activity.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Tap a chip to set this day&apos;s activity.</p>
       )}
     </Card>
   );
@@ -561,16 +536,16 @@ function MemberKitRow({
   };
 
   return (
-    <Card highlighted={state === "warn"}>
+    <Card className={cn(state === "warn" && "border-warning")}>
       <div className="flex flex-wrap items-center gap-3">
         <MemberAvatar
           name={member.display_name}
           size={28}
           state={member.role === "organizer" ? "self" : "default"}
         />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-white">{member.display_name}</p>
-          <p className="text-xs text-white/55">
+        <div className="min-w-32 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">{member.display_name}</p>
+          <p className="text-sm text-muted-foreground">
             {state === "warn"
               ? "thin — borrow a layer?"
               : items.length === 0
@@ -578,7 +553,11 @@ function MemberKitRow({
               : `${items.length} layers picked`}
           </p>
         </div>
-        <div className="flex items-center gap-1">
+        <div
+          role="group"
+          aria-label={`Effort for ${member.display_name}`}
+          className={cn(segmentedGroupClassName, "grid-cols-3")}
+        >
           {EFFORT_OPTIONS.map((opt) => (
             <button
               key={opt}
@@ -588,18 +567,14 @@ function MemberKitRow({
                 persist({ effort: opt });
               }}
               disabled={saving}
-              className={
-                "rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide disabled:opacity-60 " +
-                (effort === opt
-                  ? "border-cyan-300/55 bg-cyan-300/22 text-white"
-                  : "border-white/14 bg-white/[0.05] text-white/65")
-              }
+              aria-pressed={effort === opt}
+              className={segmentedItemClassName}
             >
-              {opt}
+              {sentenceCase(opt)}
             </button>
           ))}
         </div>
-        {saving && <Loader2 className="size-3.5 animate-spin text-white/45" />}
+        {saving && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
       </div>
       <div className="mt-2.5 flex flex-wrap gap-1">
         {KIT_SLOTS.map((slot) => {
@@ -610,37 +585,32 @@ function MemberKitRow({
               type="button"
               onClick={() => toggleItem(slot)}
               disabled={saving}
-              className={
-                "flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] uppercase tracking-wide disabled:opacity-60 " +
-                (on
-                  ? "border-cyan-300/55 bg-cyan-300/15 text-white"
-                  : "border-white/12 bg-transparent text-white/55")
-              }
+              aria-pressed={on}
+              className={chipClassName}
             >
-              <GarmentGlyph kind={slot} className="size-3.5" />
-              {slot}
+              <GarmentGlyph kind={slot} />
+              {sentenceCase(slot)}
             </button>
           );
         })}
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
-        {state === "warn" ? (
-          <Chip variant="warn">needs help</Chip>
-        ) : (
-          <Chip>{state}</Chip>
-        )}
-        <button
+        <Badge size="sm" variant={state === "ok" ? "neutral" : "warning"}>
+          {KIT_STATE_LABEL[state]}
+        </Badge>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => {
             const next: TripKitState = state === "warn" ? "ok" : "warn";
             setState(next);
             persist({ state: next });
           }}
           disabled={saving}
-          className="rounded-full border border-white/14 px-2.5 py-0.5 text-[10px] text-white/65 hover:text-white disabled:opacity-60"
         >
-          flag {state === "warn" ? "ok" : "warn"}
-        </button>
+          Flag {state === "warn" ? "ok" : "warn"}
+        </Button>
       </div>
     </Card>
   );

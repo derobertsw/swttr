@@ -21,4 +21,8 @@ describe("Saved trip next step", () => {
     expect(screen.getByRole("link", { name: "Group gear" })).toHaveAttribute("href", "/trips/trip-1/gear");
     expect(screen.getByRole("link", { name: "My pack list" })).toHaveAttribute("href", "/trips/trip-1/pack");
   });
+  it("announces a trip that fails to load", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": reply(500, { error: "Trip unavailable" }) })); await act(async () => { render(<TripOverviewPage params={params} />); });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Trip unavailable");
+  });
 });

@@ -180,7 +180,7 @@ describe("Trip day page", () => {
     const user = userEvent.setup();
     await renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "shell" }));
+    await user.click(await screen.findByRole("button", { name: "Shell" }));
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith("Couldn't save the kit change", {
@@ -243,17 +243,17 @@ describe("Trip day page", () => {
     const user = userEvent.setup();
     await renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "shell" }));
-    expect(screen.getByRole("button", { name: "gloves" })).toBeDisabled();
+    await user.click(await screen.findByRole("button", { name: "Shell" }));
+    expect(screen.getByRole("button", { name: "Gloves" })).toBeDisabled();
 
     await act(async () => finishFirstSave());
     await waitFor(() => expect(finishReload).not.toBeNull());
     // Saved, but the trip is still reloading.
-    expect(screen.getByRole("button", { name: "gloves" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Gloves" })).toBeDisabled();
 
     await act(async () => finishReload?.());
-    await waitFor(() => expect(screen.getByRole("button", { name: "gloves" })).toBeEnabled());
-    await user.click(screen.getByRole("button", { name: "gloves" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Gloves" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Gloves" }));
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith("Couldn't save the kit change", {
@@ -340,7 +340,7 @@ describe("Trip day page", () => {
     expect(await screen.findByText(/Forecast not available for this date/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retry weather" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Change" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "shell" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Shell" })).toBeInTheDocument();
   });
 
   it("offers retry for partial forecasts", async () => {
@@ -373,7 +373,7 @@ describe("Trip day page", () => {
     await act(async () => finishCreate());
     expect(await screen.findByRole("button", { name: "Hike" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Set location" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "shell" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Shell" })).toBeInTheDocument();
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Create day plan" })).not.toBeInTheDocument();
   });

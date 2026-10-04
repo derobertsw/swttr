@@ -2,22 +2,25 @@
 
 import { use } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronRight, Package, Settings, ShieldCheck, Users } from "lucide-react";
+import { ChevronRight, Package, Settings, ShieldCheck, Users } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Card,
+  BackLink,
   MemberAvatar,
   SectionLabel,
   Spine,
+  StopDot,
+  TripError,
   daysBetween,
   formatDateRange,
 } from "@/components/trips/trip-primitives";
 import { useUserId } from "@/hooks/useUserId";
 import { useTrip } from "@/hooks/useTrip";
 import type { TripDay, TripStop } from "@/types/trips";
-
-const STOP_COLOR_CYCLE = ["cyan", "emerald", "amber"] as const;
 
 export default function TripOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -30,36 +33,25 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
     <PageLayout chromeVariant="compact">
       <div className="flex w-full max-w-3xl flex-col gap-5">
         <div className="flex items-center justify-between">
-          <Link
-            href="/trips"
-            className="inline-flex items-center gap-1.5 text-sm text-white/70 hover:text-white"
-          >
-            <ArrowLeft className="size-4" />
-            All trips
-          </Link>
+          <BackLink href="/trips">All trips</BackLink>
           {data && (
-            <Link
-              href={`/trips/${id}/manage`}
-              className="inline-flex items-center gap-1 rounded-full border border-white/14 bg-white/[0.06] px-3 py-1 text-xs text-white/80 hover:bg-white/10"
-            >
-              <Settings className="size-3.5" />
-              Manage crew
-            </Link>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/trips/${id}/manage`}>
+                <Settings />
+                Manage crew
+              </Link>
+            </Button>
           )}
         </div>
 
         {loading && (
           <>
-            <Skeleton className="h-24 w-full rounded-2xl bg-white/12" />
-            <Skeleton className="h-16 w-full rounded-2xl bg-white/12" />
-            <Skeleton className="h-48 w-full rounded-2xl bg-white/12" />
+            <Skeleton className="h-24 w-full rounded-card" />
+            <Skeleton className="h-16 w-full rounded-card" />
+            <Skeleton className="h-48 w-full rounded-card" />
           </>
         )}
-        {error && (
-          <div className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100">
-            {error}
-          </div>
-        )}
+        {error && <TripError>{error}</TripError>}
 
         {data && (
           <>
@@ -68,10 +60,10 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
               <SectionLabel>
                 {data.stops[0]?.name ?? "no stop"} · {daysBetween(data.trip.start_date, data.trip.end_date)} days
               </SectionLabel>
-              <h1 className="mt-1 text-[2.25rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
+              <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
                 {data.trip.name}
               </h1>
-              <p className="mt-1 text-sm text-white/62">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {formatDateRange(data.trip.start_date, data.trip.end_date)}
               </p>
             </header>
@@ -79,7 +71,7 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
             {(data.stops.length === 0 || nextDay) && (
               <Card>
                 <SectionLabel>Next step</SectionLabel>
-                <p className="mt-2 text-sm text-white/80">{data.stops.length === 0 ? "Add a destination to start your daily plan." : !nextDay?.activity ? "Choose an activity for your next unplanned day." : "Plan your kit for your next unplanned day."}</p>
+                <p className="mt-2 text-sm text-foreground">{data.stops.length === 0 ? "Add a destination to start your daily plan." : !nextDay?.activity ? "Choose an activity for your next unplanned day." : "Plan your kit for your next unplanned day."}</p>
                 <Link className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary" href={data.stops.length === 0 ? `/trips/${id}/stops` : `/trips/${id}/days/${nextDay!.date}`}>
                   {data.stops.length === 0 ? "Add first destination" : "Plan this day"}<ChevronRight className="size-4" />
                 </Link>
@@ -98,20 +90,16 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
                       size={32}
                     />
                   ))}
-                <Link
-                  href={`/trips/${id}/manage`}
-                  className="inline-flex items-center gap-1 rounded-full border border-white/14 bg-white/[0.06] px-2.5 py-1 text-xs text-white/80 hover:bg-white/10"
-                >
-                  + add
-                </Link>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/trips/${id}/manage`}>+ add</Link>
+                </Button>
                 <div className="ml-auto flex items-center gap-2">
-                  <Link
-                    href={`/trips/${id}/rollcall`}
-                    className="inline-flex items-center gap-1 rounded-full border border-cyan-300/50 bg-cyan-300/22 px-2.5 py-1 text-xs text-white"
-                  >
-                    <ShieldCheck className="size-3.5" />
-                    Roll call
-                  </Link>
+                  <Button asChild variant="secondary" size="sm">
+                    <Link href={`/trips/${id}/rollcall`}>
+                      <ShieldCheck />
+                      Roll call
+                    </Link>
+                  </Button>
                 </div>
               </div>
             </Card>
@@ -124,21 +112,18 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
               <Link href={`/trips/${id}/stops`} className="inline-flex min-h-11 items-center text-sm font-semibold text-primary">Add or edit destinations</Link>
               </div>
               {data.stops.length === 0 ? (
-                <p className="mt-2 text-sm text-white/55">No stops yet.</p>
+                <p className="mt-2 text-sm text-muted-foreground">No stops yet.</p>
               ) : (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {data.stops.map((s, i) => (
-                    <span key={s.id} className="flex items-center gap-1.5">
-                      <span
-                        className={
-                          "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold " +
-                          stopChipClass(i)
-                        }
-                      >
+                    <span key={s.id} className="flex min-w-0 max-w-full items-center gap-1.5">
+                      {/* Stop names aren't length-bounded, so the badge wraps instead of overflowing. */}
+                      <Badge size="sm" variant="outline" className="min-w-0 shrink whitespace-normal wrap-anywhere">
+                        <StopDot stopIndex={i} />
                         {s.name}
-                      </span>
+                      </Badge>
                       {i < data.stops.length - 1 && (
-                        <span className="text-white/40">→</span>
+                        <span className="text-muted-foreground" aria-hidden>→</span>
                       )}
                     </span>
                   ))}
@@ -163,18 +148,6 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
       </div>
     </PageLayout>
   );
-}
-
-function stopChipClass(i: number) {
-  return [
-    "border-cyan-300/55 bg-cyan-300/15 text-cyan-50",
-    "border-emerald-300/55 bg-emerald-300/15 text-emerald-50",
-    "border-amber-300/55 bg-amber-300/15 text-amber-50",
-  ][i % 3];
-}
-
-function stopSpineColor(i: number): "cyan" | "emerald" | "amber" {
-  return STOP_COLOR_CYCLE[i % STOP_COLOR_CYCLE.length];
 }
 
 function DayList({
@@ -203,60 +176,47 @@ function DayList({
           <div key={d.id}>
             {stopChange && stopMeta && (
               <div className="mb-1.5 mt-2 flex items-center gap-2">
-                <span
-                  className={
-                    "inline-block size-1.5 rounded-full " +
-                    (colorIndex === 0
-                      ? "bg-cyan-300"
-                      : colorIndex === 1
-                      ? "bg-emerald-300"
-                      : "bg-amber-300")
-                  }
-                />
-                <SectionLabel className="!text-white/60">
+                <StopDot stopIndex={colorIndex} />
+                <SectionLabel>
                   {stopMeta.stop.name}
-                  {isBaseFallback && (
-                    <span className="ml-1.5 text-[10px] tracking-wide text-white/40">
-                      · base
-                    </span>
-                  )}
+                  {isBaseFallback && <span className="ml-1.5">· base</span>}
                 </SectionLabel>
-                <span className="h-px flex-1 bg-white/10" />
+                <span className="h-px flex-1 bg-border" />
               </div>
             )}
-            <Link href={`/trips/${trip.id}/days/${d.date}`}>
-              <Card>
+            <Card asChild interactive>
+              <Link href={`/trips/${trip.id}/days/${d.date}`}>
                 <div className="flex items-center gap-3">
-                  {colorIndex >= 0 && <Spine color={stopSpineColor(colorIndex)} />}
+                  {colorIndex >= 0 && <Spine stopIndex={colorIndex} />}
                   <div className="w-14 shrink-0">
-                    <p className="text-xs text-white/55">
+                    <p className="text-xs text-muted-foreground">
                       {new Date(`${d.date}T00:00:00`).toLocaleDateString(undefined, {
                         weekday: "short",
                       })}
                     </p>
-                    <p className="text-base font-semibold text-white">
+                    <p className="text-base font-semibold text-foreground">
                       {new Date(`${d.date}T00:00:00`).getDate()}
                     </p>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-white/85">
+                    <p className="text-sm text-foreground">
                       {d.activity ?? "no activity set"}
                     </p>
-                    <p className="text-xs text-white/55">
+                    <p className="text-xs text-muted-foreground">
                       {stopMeta
                         ? `${stopMeta.stop.name}${isBaseFallback ? " · base" : ""}`
                         : "Add a base location to enable forecasts"}
                     </p>
                   </div>
-                  <ChevronRight className="size-4 text-white/40" />
+                  <ChevronRight className="size-4 text-muted-foreground" />
                 </div>
-              </Card>
-            </Link>
+              </Link>
+            </Card>
           </div>
         );
       })}
       {days.length === 0 && (
-        <p className="text-sm text-white/55">No days configured.</p>
+        <p className="text-sm text-muted-foreground">No days configured.</p>
       )}
     </div>
   );
@@ -272,13 +232,12 @@ function ToolLink({
   label: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="flex items-center gap-2 rounded-xl border border-white/12 bg-white/[0.05] px-3 py-2.5 text-sm text-white/85 hover:bg-white/[0.10]"
-    >
-      <Icon className="size-4 text-white/65" />
-      {label}
-      <ChevronRight className="ml-auto size-4 text-white/40" />
-    </Link>
+    <Button asChild variant="outline" className="justify-start font-medium">
+      <Link href={href}>
+        <Icon className="text-muted-foreground" />
+        {label}
+        <ChevronRight className="ml-auto text-muted-foreground" />
+      </Link>
+    </Button>
   );
 }

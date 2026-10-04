@@ -17,8 +17,8 @@ SWTTR follows the device's light or dark setting. There is no in-app preference.
 `data-appearance="light"` or `data-appearance="dark"` on an element pins that subtree to one palette.
 
 **Current state (#119):**
-- The root layout sets `data-appearance="dark"` on `<html>`, because most screens still hardcode white-on-dark classes.
-- Once Gear up/results, Wardrobe and Trips use the tokens, the attribute comes off and the app follows the system setting.
+- The root layout sets `data-appearance="dark"` on `<html>`. Gear up/results, Wardrobe and Trips now use the tokens; the FAQ page still hardcodes white-on-dark classes.
+- Once the FAQ moves to the tokens, the attribute comes off and the app follows the system setting.
 - At that point, `viewport.themeColor` in `src/app/layout.tsx` and the iOS status bar style in `PageLayout` need to follow the appearance too.
 
 Components use the semantic colors below. Don't use raw hex values, Tailwind palette colors (`slate-500`, `white/70`) or `dark:` variants. Tokens follow a pinned subtree; `dark:` variants can't tell which palette a nested subtree uses.
@@ -135,11 +135,13 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Overlays: Settings, Update Weather, layer picker, Add a similar item, item details, popovers, menus, location suggestions | Uses tokens |
 | Gear up form (`src/app/page.tsx`, `GearUpForm`, `ActivitySelection`, `SegmentedChoice`, `DeviceLocationButton`) | Uses tokens (#126) |
 | One-day results (`LayerDisplay`, `layers/*`, `ScoreDisplay`, `BiophysicsDetails`) | Uses tokens (#127) |
-| Multi-day plan (`MultiDayPlanDisplay`) | Still hardcoded. Next migration (#127). |
+| Multi-day plan (`MultiDayPlanDisplay`, `plan/*`) | Uses tokens (#127) |
 | Wardrobe (`src/app/wardrobe`, `wardrobe/*`), including Add gear and Add a similar item | Uses tokens |
-| Trips (`src/app/trips/**`, `trips/trip-primitives.tsx`) | Still hardcoded |
+| Trips (`src/app/trips/**`, `trips/*`), including the trip sheets and the legacy wizard | Uses tokens |
+| FAQ | Still hardcoded. Moves with the root pin's removal. |
 
 Remaining exceptions, each with a reason:
 - **Product image wells** stay white in both appearances, because catalog photos have white backgrounds.
 - **Clerk's sign-in and account UI** keep Clerk's own styling.
+- **Trip stop colors** on the trip overview mark each stop with a dot and its days with a spine. They borrow the `primary`, `ring` and `warning` hues, which stay distinct in both palettes, rather than adding categorical tokens. The stop's name always goes with the color, so it never carries meaning alone and doesn't imply a status.
 - **The thermal gauge's cold-to-hot gradient** in `layers/ThermalGauge.tsx` keeps its fixed blue-to-amber hues. It's a scale, not a status, and its marker, band and labels use tokens.
