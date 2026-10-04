@@ -116,8 +116,9 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
               ) : (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {data.stops.map((s, i) => (
-                    <span key={s.id} className="flex items-center gap-1.5">
-                      <Badge size="sm" variant="outline">
+                    <span key={s.id} className="flex min-w-0 max-w-full items-center gap-1.5">
+                      {/* Stop names aren't length-bounded, so the badge wraps instead of overflowing. */}
+                      <Badge size="sm" variant="outline" className="min-w-0 shrink whitespace-normal wrap-anywhere">
                         <StopDot stopIndex={i} />
                         {s.name}
                       </Badge>
