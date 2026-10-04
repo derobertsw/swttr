@@ -148,6 +148,18 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     expect(data.packingList.extras).toEqual(["Removable mid-layer for daytime swings"]);
   });
 
+  it("packs without a wardrobe when it couldn't be read", async () => {
+    vi.mocked(fetchUserWardrobeItems).mockResolvedValueOnce(null);
+    mockTrip(["2026-10-08"]);
+    const forecast = forecastFixture("America/New_York", "2026-10-08T04:00Z", 24, () => -4);
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(forecast) });
+
+    const response = await getPack();
+
+    expect(response.status).toBe(200);
+    expect(vi.mocked(packingList.buildPackingListFromDays).mock.calls[0][2]).toEqual([]);
+  });
+
   it("leaves out hours with a missing value rather than pack for zero", async () => {
     mockTrip(["2026-10-08"]);
     // Near the end of its window Open-Meteo returns null for some hours.

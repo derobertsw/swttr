@@ -155,9 +155,18 @@ describe("temperature preference", () => {
       startDate: new Date("2026-01-15T00:00:00"), durationDays: 1,
       hourlyForecast: [
         { time: "2026-01-15T08:00", temperature: 14, windSpeed: 8, precipitationProbability: 0 },
-        { time: "2026-01-15T09:00", temperature: 32, windSpeed: 8, precipitationProbability: 0 },
+        { time: "2026-01-15T12:00", temperature: 32, windSpeed: 8, precipitationProbability: 0 },
       ],
-      getRecommendation: () => null,
+      getRecommendation: (temperature) => ({
+        torso: {
+          base: [{ name: "Merino crew" }],
+          mid: temperature < 20 ? [{ name: "Fleece" }] : [],
+          outer: [],
+        },
+        legs: { base: [], outer: [] },
+        hands: { base: [], outer: [] },
+        headNeck: { base: [], outer: [] },
+      }),
     });
     const original = JSON.stringify(plan);
     const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ error: "unavailable" }, { status: 503 }));
@@ -171,7 +180,7 @@ describe("temperature preference", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     await user.click(screen.getByRole("button", { name: "Use C" }));
     expect(screen.getByText("-10°C – 0°C")).toBeInTheDocument();
-    expect(screen.getByText("-10°C – 0°C, wind 8 mph")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Through Thu, Jan 15" })).toHaveTextContent("Midday · 11am-3pm · 0°C – 0°C");
     await user.click(screen.getByRole("button", { name: "Use F" }));
     expect(screen.getByText("14°F – 32°F")).toBeInTheDocument();
     expect(JSON.stringify(plan)).toBe(original);
