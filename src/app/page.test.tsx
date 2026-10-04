@@ -928,6 +928,7 @@ describe("Home Page", () => {
       durationDays: 3,
       dayStartHour: 6,
       dayEndHour: 21,
+      firstDayStartHour: 12,
       days: [],
       uncoveredDays: [],
     } satisfies MultiDayLayerPlan;
@@ -1134,7 +1135,7 @@ describe("Home Page", () => {
       await chooseSeveralDays(user);
       await user.click(screen.getByRole("button", { name: "Build my plan" }));
 
-      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
       expect(requests.planAhead).toEqual([
         expect.objectContaining({
           lat: 44.47,
@@ -1161,7 +1162,7 @@ describe("Home Page", () => {
       await chooseSeveralDays(user);
       await user.click(screen.getByRole("button", { name: "Build my plan" }));
 
-      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
       expect(requests.planAhead).toEqual([
         expect.objectContaining({ lat: 44.47, lon: -72.69, startDate: START_DATE, durationDays: 3 }),
       ]);
@@ -1208,7 +1209,7 @@ describe("Home Page", () => {
       expect(screen.queryByText(rangeError)).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Build my plan" }));
 
-      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
       expect(requests.planAhead).toEqual([
         expect.objectContaining({ startDate: START_DATE, durationDays: 7 }),
         expect.objectContaining({ startDate: START_DATE, durationDays: 5 }),
@@ -1423,7 +1424,7 @@ describe("Home Page", () => {
       ]);
     });
 
-    it("plans another trip from a multi-day plan, starting from the last one", async () => {
+    it("edits the outing from a multi-day plan, starting from the last one", async () => {
       mockPlanAheadApis();
       const user = userEvent.setup();
       render(<Home />);
@@ -1433,9 +1434,9 @@ describe("Home Page", () => {
       await chooseSeveralDays(user);
       await changeDays(user, "More days", 1);
       await user.click(screen.getByRole("button", { name: "Build my plan" }));
-      await user.click(await screen.findByRole("button", { name: "Plan Another Trip" }));
+      await user.click(await screen.findByRole("button", { name: "Edit outing" }));
 
-      expect(screen.queryByRole("heading", { name: "Multi-Day Layer Plan" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Multi-day layer plan" })).not.toBeInTheDocument();
       expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
       expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
       expect(screen.getByText("4 days")).toBeInTheDocument();
@@ -1452,15 +1453,15 @@ describe("Home Page", () => {
       await chooseSeveralDays(user);
       await changeDays(user, "More days", 1);
       await user.click(screen.getByRole("button", { name: "Build my plan" }));
-      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
       unmount();
       render(<Home />);
 
-      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
       expect(requests.planAhead).toHaveLength(2);
       expect(requests.planAhead[1]).toEqual(requests.planAhead[0]);
 
-      await user.click(screen.getByRole("button", { name: "Plan Another Trip" }));
+      await user.click(screen.getByRole("button", { name: "Edit outing" }));
 
       expect(screen.getByRole("combobox", { name: "Where?" })).toHaveValue("Stowe, Vermont, United States");
       expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
@@ -1477,7 +1478,7 @@ describe("Home Page", () => {
       await chooseStartDate(user);
       await chooseSeveralDays(user);
       await user.click(screen.getByRole("button", { name: "Build my plan" }));
-      expect(await screen.findByRole("heading", { name: "Multi-Day Layer Plan" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
       unmount();
       const { requests } = mockPlanAheadApis({
         planAhead: () => Promise.resolve(respond(400, { error: "Pick a start date in the forecast.", field: "startDate" })),
@@ -1485,7 +1486,7 @@ describe("Home Page", () => {
       render(<Home />);
 
       expect(await screen.findByText("Pick a start date in the forecast.")).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Multi-Day Layer Plan" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Multi-day layer plan" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Build my plan" })).toBeEnabled();
       expect(requests.planAhead).toHaveLength(1);
