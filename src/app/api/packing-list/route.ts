@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 import { getAuthUserId } from "@/lib/auth";
-import { buildPackingListFromDays } from "@/lib/packingList";
+import { buildPackingListFromDays, type PackingListWardrobe } from "@/lib/packingList";
 import { fetchUserWardrobeItems } from "@/lib/userWardrobe";
 import type { DailyLayerPlan } from "@/types/plan";
 import type { WardrobeItem } from "@/types/wardrobe";
@@ -33,13 +33,20 @@ export async function POST(request: NextRequest) {
 
   const itemMappings = new Map(Object.entries(rawMappings ?? {}));
 
-  // Fetch wardrobe if user is authenticated
+  // Match against the wardrobe if the user is signed in
   let wardrobeItems: WardrobeItem[] = [];
+  let wardrobe: PackingListWardrobe = "unavailable";
   try {
     const userId = await getAuthUserId();
     const supabase = getSupabase();
-    if (userId && supabase) {
-      wardrobeItems = await fetchUserWardrobeItems(supabase, userId);
+    if (!userId) {
+      wardrobe = "signedOut";
+    } else if (supabase) {
+      const items = await fetchUserWardrobeItems(supabase, userId);
+      if (items) {
+        wardrobeItems = items;
+        wardrobe = "matched";
+      }
     }
   } catch {
     // Continue without wardrobe data
@@ -51,5 +58,5 @@ export async function POST(request: NextRequest) {
     packing: buildPackingListFromDays([day], itemMappings, wardrobeItems),
   }));
 
-  return NextResponse.json({ packingList, dailyPackingLists });
+  return NextResponse.json({ packingList, dailyPackingLists, wardrobe });
 }

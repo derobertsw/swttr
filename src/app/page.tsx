@@ -6,6 +6,7 @@ import LayerDisplay from "@/components/LayerDisplay";
 import { GearUpForm } from "@/components/GearUpForm";
 import MultiDayPlanDisplay from "@/components/MultiDayPlanDisplay";
 import { useItemMappings } from "@/hooks/useItemMappings";
+import { formatLocationName } from "@/hooks/useLocationSearch";
 import { useGearUp } from "@/hooks/useGearUp";
 import { layerDisplayAdvice } from "@/lib/gearUp";
 import { useUserId } from "@/hooks/useUserId";
@@ -104,6 +105,8 @@ const HomeContent = () => {
         ) : result.kind === "plan" ? (
           <MultiDayPlanDisplay
             plan={result.plan}
+            activity={result.outing.activity}
+            place={formatLocationName(result.outing.place)}
             itemMappings={itemMappings}
             onReset={showPlanForm}
           />

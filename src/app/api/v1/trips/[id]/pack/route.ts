@@ -143,7 +143,8 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     );
   }
 
-  const packingList = buildPackingListFromDays(dailyPlans, itemMappings, wardrobeItems);
+  // A wardrobe that couldn't be read leaves every slot unmatched, as before.
+  const packingList = buildPackingListFromDays(dailyPlans, itemMappings, wardrobeItems ?? []);
 
   // Find the requesting user's TripMember row and any group gear assigned to them.
   const myGear = myMember
