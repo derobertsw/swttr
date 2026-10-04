@@ -8,7 +8,7 @@ import { ArrowLeft, ArrowRight, Calendar as CalIcon, CheckCircle2, GripVertical,
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
-import { useReturnFocus } from "@/components/trips/useReturnFocus";
+import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -377,11 +377,7 @@ export function TripStopsEditor({
   const search = useLocationSearch();
   const editFocus = useReturnFocus();
 
-  const openEditor = (stop: TripStop, opener: HTMLElement) => {
-    // On iOS a tap leaves focus where it was, e.g. in the stop search, and
-    // that field shouldn't get focus back when the sheet closes.
-    const active = document.activeElement;
-    if (active instanceof HTMLElement && active !== opener) active.blur();
+  const openEditor = (stop: TripStop) => {
     editFocus.remember(() => document.getElementById(editStopButtonId(stop.id)));
     setEditing((prev) => ({ stop, open: true, key: (prev?.key ?? 0) + 1 }));
   };
@@ -485,7 +481,7 @@ export function TripStopsEditor({
                 <button
                   type="button"
                   id={editStopButtonId(stop.id)}
-                  onClick={(event) => openEditor(stop, event.currentTarget)}
+                  onClick={() => openEditor(stop)}
                   className="min-h-11 min-w-11 rounded-md border border-white/14 px-2 py-1 text-xs text-white/75 hover:bg-white/10"
                 >
                   Edit
