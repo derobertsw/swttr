@@ -13,6 +13,7 @@ import {
   daysBetween,
   formatDateRange,
 } from "@/components/trips/trip-primitives";
+import { useUserId } from "@/hooks/useUserId";
 import { useTrip } from "@/hooks/useTrip";
 import type { TripDay, TripStop } from "@/types/trips";
 
@@ -21,6 +22,9 @@ const STOP_COLOR_CYCLE = ["cyan", "emerald", "amber"] as const;
 export default function TripOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data, loading, error } = useTrip(id);
+  const userId = useUserId();
+  const member = data?.members.find((m) => m.user_id === userId && m.status !== "left");
+  const nextDay = data?.days.find((day) => !day.activity || !data.kits.some((kit) => kit.trip_day_id === day.id && kit.trip_member_id === member?.id));
 
   return (
     <PageLayout chromeVariant="compact">
@@ -39,7 +43,7 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
               className="inline-flex items-center gap-1 rounded-full border border-white/14 bg-white/[0.06] px-3 py-1 text-xs text-white/80 hover:bg-white/10"
             >
               <Settings className="size-3.5" />
-              Edit
+              Manage crew
             </Link>
           )}
         </div>
@@ -60,6 +64,7 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
         {data && (
           <>
             <header>
+              <p role="status" className="mb-2 text-sm text-success">Saved trip</p>
               <SectionLabel>
                 {data.stops[0]?.name ?? "no stop"} · {daysBetween(data.trip.start_date, data.trip.end_date)} days
               </SectionLabel>
@@ -70,6 +75,16 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
                 {formatDateRange(data.trip.start_date, data.trip.end_date)}
               </p>
             </header>
+
+            {(data.stops.length === 0 || nextDay) && (
+              <Card>
+                <SectionLabel>Next step</SectionLabel>
+                <p className="mt-2 text-sm text-white/80">{data.stops.length === 0 ? "Add a destination to start your daily plan." : !nextDay?.activity ? "Choose an activity for your next unplanned day." : "Plan your kit for your next unplanned day."}</p>
+                <Link className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary" href={data.stops.length === 0 ? `/trips/${id}/stops` : `/trips/${id}/days/${nextDay!.date}`}>
+                  {data.stops.length === 0 ? "Add first destination" : "Plan this day"}<ChevronRight className="size-4" />
+                </Link>
+              </Card>
+            )}
 
             <Card>
               <div className="flex flex-wrap items-center gap-2">
@@ -102,9 +117,12 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
             </Card>
 
             <Card>
+              <div className="flex flex-wrap items-center justify-between gap-2">
               <SectionLabel>
                 {data.stops.length} {data.stops.length === 1 ? "stop" : "stops"}
               </SectionLabel>
+              <Link href={`/trips/${id}/stops`} className="inline-flex min-h-11 items-center text-sm font-semibold text-primary">Add or edit destinations</Link>
+              </div>
               {data.stops.length === 0 ? (
                 <p className="mt-2 text-sm text-white/55">No stops yet.</p>
               ) : (
