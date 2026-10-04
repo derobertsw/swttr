@@ -37,7 +37,8 @@ export function OutingReturnCard() {
             {outingSummary(outing)}. Add what you&apos;d wear, then get layers worked out again with your gear.
           </p>
         </div>
-        <Button asChild className="shrink-0 self-start sm:self-auto">
+        {/* Outline: adding gear is the page's main action, and this is the way back after it. */}
+        <Button asChild variant="outline" className="shrink-0 self-start sm:self-auto">
           <Link href={RESUME_OUTING_PATH}>Get my layers</Link>
         </Button>
       </section>
