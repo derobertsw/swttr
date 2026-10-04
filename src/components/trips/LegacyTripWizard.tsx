@@ -306,20 +306,22 @@ function Step1Dates({
           placeholder="Whistler Powder"
         />
       </Card>
-      <Card>
-        <SectionLabel className="mb-2">Dates</SectionLabel>
-        <p className="mb-3 text-sm text-muted-foreground">Drag across days to pick a range.</p>
-        <div className="rounded-control bg-muted p-2">
+      <Card padding="none" className="pb-4">
+        <div className="p-4">
+          <SectionLabel className="mb-2">Dates</SectionLabel>
+          <p className="text-sm text-muted-foreground">Pick the first and last day of your trip.</p>
+        </div>
+        <div className="flex justify-center">
           <Calendar
             mode="range"
             selected={range}
             onSelect={onRangeChange}
             numberOfMonths={1}
-            className="bg-transparent"
+            className="bg-transparent p-0"
           />
         </div>
         {range?.from && range?.to && (
-          <div className="mt-3 flex items-center justify-between rounded-control bg-muted px-3.5 py-2.5">
+          <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control bg-muted px-3.5 py-2.5">
             <div>
               <SectionLabel>Start</SectionLabel>
               <p className="text-sm font-semibold text-foreground">
@@ -974,13 +976,14 @@ function NavBar({
   nextLoading?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       <Button type="button" variant="outline" onClick={onBack} disabled={backDisabled}>
         <ArrowLeft />
         {backLabel}
       </Button>
       <Button
         type="button"
+        size="lg"
         onClick={onNext}
         disabled={nextDisabled}
         className="ml-auto min-w-32"

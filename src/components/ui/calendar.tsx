@@ -58,16 +58,16 @@ function Calendar({
         ),
         button_previous: cn(
           buttonVariants({ variant: buttonVariant }),
-          "size-(--cell-size) aria-disabled:opacity-50 p-0 select-none",
+          "size-(--cell-size) max-md:size-11 pointer-coarse:size-11 aria-disabled:opacity-50 p-0 select-none",
           defaultClassNames.button_previous
         ),
         button_next: cn(
           buttonVariants({ variant: buttonVariant }),
-          "size-(--cell-size) aria-disabled:opacity-50 p-0 select-none",
+          "size-(--cell-size) max-md:size-11 pointer-coarse:size-11 aria-disabled:opacity-50 p-0 select-none",
           defaultClassNames.button_next
         ),
         month_caption: cn(
-          "flex items-center justify-center h-(--cell-size) w-full px-(--cell-size)",
+          "flex items-center justify-center h-(--cell-size) max-md:h-11 pointer-coarse:h-11 w-full px-(--cell-size) max-md:px-11 pointer-coarse:px-11",
           defaultClassNames.month_caption
         ),
         dropdowns: cn(

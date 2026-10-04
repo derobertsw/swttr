@@ -1,0 +1,488 @@
+[
+  {
+    "calendar": {
+      "height": 319.1953125,
+      "left": 20,
+      "right": 300,
+      "width": 280
+    },
+    "firstDay": {
+      "height": 40,
+      "left": 20,
+      "right": 60,
+      "width": 40
+    },
+    "focus": {
+      "contrast": 7.696168895041192,
+      "label": "Thursday, October 8th, 2026, selected",
+      "outlineColor": "rgb(150, 190, 255)",
+      "outlineOffset": "2px",
+      "outlineWidth": "2px"
+    },
+    "height": 844,
+    "measuredTextElements": 55,
+    "nav": [
+      {
+        "contrast": 13.619483215918814,
+        "height": 44,
+        "label": "Go to the Previous Month",
+        "left": 20,
+        "right": 64,
+        "width": 44
+      },
+      {
+        "contrast": 13.619483215918814,
+        "height": 44,
+        "label": "Go to the Next Month",
+        "left": 256,
+        "right": 300,
+        "width": 44
+      }
+    ],
+    "palette": "rgb(244, 248, 250)",
+    "primary": {
+      "disabled": false,
+      "height": 48,
+      "left": 157.4765625,
+      "right": 304,
+      "width": 146.5234375
+    },
+    "scrollWidth": 320,
+    "selected": [
+      {
+        "background": [
+          116,
+          224,
+          207
+        ],
+        "height": 40,
+        "label": "Thursday, October 8th, 2026, selected",
+        "left": 180,
+        "right": 220,
+        "textContrast": 10.26784544040114,
+        "width": 40
+      },
+      {
+        "background": [
+          116,
+          224,
+          207
+        ],
+        "height": 40,
+        "label": "Friday, October 9th, 2026, selected",
+        "left": 220,
+        "right": 260,
+        "textContrast": 10.26784544040114,
+        "width": 40
+      }
+    ],
+    "textContrastFailures": [],
+    "width": 320,
+    "appearance": "dark"
+  },
+  {
+    "calendar": {
+      "height": 319.1953125,
+      "left": 55,
+      "right": 335,
+      "width": 280
+    },
+    "firstDay": {
+      "height": 40,
+      "left": 55,
+      "right": 95,
+      "width": 40
+    },
+    "focus": {
+      "contrast": 7.696168895041192,
+      "label": "Thursday, October 8th, 2026, selected",
+      "outlineColor": "rgb(150, 190, 255)",
+      "outlineOffset": "2px",
+      "outlineWidth": "2px"
+    },
+    "height": 844,
+    "measuredTextElements": 55,
+    "nav": [
+      {
+        "contrast": 13.619483215918814,
+        "height": 44,
+        "label": "Go to the Previous Month",
+        "left": 55,
+        "right": 99,
+        "width": 44
+      },
+      {
+        "contrast": 13.619483215918814,
+        "height": 44,
+        "label": "Go to the Next Month",
+        "left": 291,
+        "right": 335,
+        "width": 44
+      }
+    ],
+    "palette": "rgb(244, 248, 250)",
+    "primary": {
+      "disabled": false,
+      "height": 48,
+      "left": 227.4765625,
+      "right": 374,
+      "width": 146.5234375
+    },
+    "scrollWidth": 390,
+    "selected": [
+      {
+        "background": [
+          116,
+          224,
+          207
+        ],
+        "height": 40,
+        "label": "Thursday, October 8th, 2026, selected",
+        "left": 215,
+        "right": 255,
+        "textContrast": 10.26784544040114,
+        "width": 40
+      },
+      {
+        "background": [
+          116,
+          224,
+          207
+        ],
+        "height": 40,
+        "label": "Friday, October 9th, 2026, selected",
+        "left": 255,
+        "right": 295,
+        "textContrast": 10.26784544040114,
+        "width": 40
+      }
+    ],
+    "textContrastFailures": [],
+    "width": 390,
+    "appearance": "dark"
+  },
+  {
+    "calendar": {
+      "height": 267.1953125,
+      "left": 578,
+      "right": 802,
+      "width": 224
+    },
+    "firstDay": {
+      "height": 32,
+      "left": 578,
+      "right": 610,
+      "width": 32
+    },
+    "focus": {
+      "contrast": 7.696168895041192,
+      "label": "Thursday, October 8th, 2026, selected",
+      "outlineColor": "rgb(150, 190, 255)",
+      "outlineOffset": "2px",
+      "outlineWidth": "2px"
+    },
+    "height": 844,
+    "measuredTextElements": 55,
+    "nav": [
+      {
+        "contrast": 13.619483215918814,
+        "height": 32,
+        "label": "Go to the Previous Month",
+        "left": 578,
+        "right": 610,
+        "width": 32
+      },
+      {
+        "contrast": 13.619483215918814,
+        "height": 32,
+        "label": "Go to the Next Month",
+        "left": 770,
+        "right": 802,
+        "width": 32
+      }
+    ],
+    "palette": "rgb(244, 248, 250)",
+    "primary": {
+      "disabled": false,
+      "height": 48,
+      "left": 879.4765625,
+      "right": 1026,
+      "width": 146.5234375
+    },
+    "scrollWidth": 1280,
+    "selected": [
+      {
+        "background": [
+          116,
+          224,
+          207
+        ],
+        "height": 32,
+        "label": "Thursday, October 8th, 2026, selected",
+        "left": 706,
+        "right": 738,
+        "textContrast": 10.26784544040114,
+        "width": 32
+      },
+      {
+        "background": [
+          116,
+          224,
+          207
+        ],
+        "height": 32,
+        "label": "Friday, October 9th, 2026, selected",
+        "left": 738,
+        "right": 770,
+        "textContrast": 10.26784544040114,
+        "width": 32
+      }
+    ],
+    "textContrastFailures": [],
+    "width": 1280,
+    "appearance": "dark"
+  },
+  {
+    "calendar": {
+      "height": 319.1953125,
+      "left": 20,
+      "right": 300,
+      "width": 280
+    },
+    "firstDay": {
+      "height": 40,
+      "left": 20,
+      "right": 60,
+      "width": 40
+    },
+    "focus": {
+      "contrast": 5.640248233974221,
+      "label": "Thursday, October 8th, 2026, selected",
+      "outlineColor": "rgb(31, 95, 204)",
+      "outlineOffset": "2px",
+      "outlineWidth": "2px"
+    },
+    "height": 844,
+    "measuredTextElements": 55,
+    "nav": [
+      {
+        "contrast": 15.505534428061244,
+        "height": 44,
+        "label": "Go to the Previous Month",
+        "left": 20,
+        "right": 64,
+        "width": 44
+      },
+      {
+        "contrast": 15.505534428061244,
+        "height": 44,
+        "label": "Go to the Next Month",
+        "left": 256,
+        "right": 300,
+        "width": 44
+      }
+    ],
+    "palette": "rgb(19, 34, 47)",
+    "primary": {
+      "disabled": false,
+      "height": 48,
+      "left": 157.4765625,
+      "right": 304,
+      "width": 146.5234375
+    },
+    "scrollWidth": 320,
+    "selected": [
+      {
+        "background": [
+          11,
+          107,
+          99
+        ],
+        "height": 40,
+        "label": "Thursday, October 8th, 2026, selected",
+        "left": 180,
+        "right": 220,
+        "textContrast": 6.368503454561582,
+        "width": 40
+      },
+      {
+        "background": [
+          11,
+          107,
+          99
+        ],
+        "height": 40,
+        "label": "Friday, October 9th, 2026, selected",
+        "left": 220,
+        "right": 260,
+        "textContrast": 6.368503454561582,
+        "width": 40
+      }
+    ],
+    "textContrastFailures": [],
+    "width": 320,
+    "appearance": "light"
+  },
+  {
+    "calendar": {
+      "height": 319.1953125,
+      "left": 55,
+      "right": 335,
+      "width": 280
+    },
+    "firstDay": {
+      "height": 40,
+      "left": 55,
+      "right": 95,
+      "width": 40
+    },
+    "focus": {
+      "contrast": 5.640248233974221,
+      "label": "Thursday, October 8th, 2026, selected",
+      "outlineColor": "rgb(31, 95, 204)",
+      "outlineOffset": "2px",
+      "outlineWidth": "2px"
+    },
+    "height": 844,
+    "measuredTextElements": 55,
+    "nav": [
+      {
+        "contrast": 15.505534428061244,
+        "height": 44,
+        "label": "Go to the Previous Month",
+        "left": 55,
+        "right": 99,
+        "width": 44
+      },
+      {
+        "contrast": 15.505534428061244,
+        "height": 44,
+        "label": "Go to the Next Month",
+        "left": 291,
+        "right": 335,
+        "width": 44
+      }
+    ],
+    "palette": "rgb(19, 34, 47)",
+    "primary": {
+      "disabled": false,
+      "height": 48,
+      "left": 227.4765625,
+      "right": 374,
+      "width": 146.5234375
+    },
+    "scrollWidth": 390,
+    "selected": [
+      {
+        "background": [
+          11,
+          107,
+          99
+        ],
+        "height": 40,
+        "label": "Thursday, October 8th, 2026, selected",
+        "left": 215,
+        "right": 255,
+        "textContrast": 6.368503454561582,
+        "width": 40
+      },
+      {
+        "background": [
+          11,
+          107,
+          99
+        ],
+        "height": 40,
+        "label": "Friday, October 9th, 2026, selected",
+        "left": 255,
+        "right": 295,
+        "textContrast": 6.368503454561582,
+        "width": 40
+      }
+    ],
+    "textContrastFailures": [],
+    "width": 390,
+    "appearance": "light"
+  },
+  {
+    "calendar": {
+      "height": 267.1953125,
+      "left": 573.75,
+      "right": 797.75,
+      "width": 224
+    },
+    "firstDay": {
+      "height": 32,
+      "left": 573.75,
+      "right": 605.75,
+      "width": 32
+    },
+    "focus": {
+      "contrast": 5.640248233974221,
+      "label": "Thursday, October 8th, 2026, selected",
+      "outlineColor": "rgb(31, 95, 204)",
+      "outlineOffset": "2px",
+      "outlineWidth": "2px"
+    },
+    "height": 844,
+    "measuredTextElements": 55,
+    "nav": [
+      {
+        "contrast": 15.505534428061244,
+        "height": 32,
+        "label": "Go to the Previous Month",
+        "left": 573.75,
+        "right": 605.75,
+        "width": 32
+      },
+      {
+        "contrast": 15.505534428061244,
+        "height": 32,
+        "label": "Go to the Next Month",
+        "left": 765.75,
+        "right": 797.75,
+        "width": 32
+      }
+    ],
+    "palette": "rgb(19, 34, 47)",
+    "primary": {
+      "disabled": false,
+      "height": 48,
+      "left": 875.2265625,
+      "right": 1021.75,
+      "width": 146.5234375
+    },
+    "scrollWidth": 1280,
+    "selected": [
+      {
+        "background": [
+          11,
+          107,
+          99
+        ],
+        "height": 32,
+        "label": "Thursday, October 8th, 2026, selected",
+        "left": 701.75,
+        "right": 733.75,
+        "textContrast": 6.368503454561582,
+        "width": 32
+      },
+      {
+        "background": [
+          11,
+          107,
+          99
+        ],
+        "height": 32,
+        "label": "Friday, October 9th, 2026, selected",
+        "left": 733.75,
+        "right": 765.75,
+        "textContrast": 6.368503454561582,
+        "width": 32
+      }
+    ],
+    "textContrastFailures": [],
+    "width": 1280,
+    "appearance": "light"
+  }
+]

@@ -98,7 +98,7 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Sheet | `ui/sheet.tsx` | Side panels pad for the safe areas and use the shared close button. |
 | Popover, Tooltip | `ui/popover.tsx`, `ui/tooltip.tsx` | Popovers use the `popover` surface. Tooltips are inverted and 14px. |
 | Dropdown menu | `ui/dropdown-menu.tsx` | Radix menu on the `popover` surface for a row's secondary actions, such as a Wardrobe item's Exclude and Remove. Items match Select items (44px on touch); `variant="destructive"` marks Remove. Give the trigger an `aria-label` that names the row. Keep the trigger enabled while a change runs, so focus can return to it, and disable the items instead. |
-| Calendar | `ui/calendar.tsx` | Day cells are 40px on touch, not 44px, so a month fits a 320px screen. |
+| Calendar | `ui/calendar.tsx` | Month arrows are 44px on phones and touch. Day cells remain 40px so a month fits a 320px screen. Inside a card, use `padding="none"` on the card and `p-0` on the calendar, with separate padded labels; nested padding can clip the last column. |
 
 ## Accessibility rules
 
@@ -143,6 +143,7 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | FAQ | Uses tokens, the shared Accordion and the type scale |
 
 Remaining exceptions, each with a reason:
+- **Calendar day cells** are 40 × 40px on phones and touch so seven columns fit at 320px. Month navigation still meets 44 × 44px. This is an exception to #119's universal 44px target criterion; the calendar does not satisfy that criterion as written. The legacy date editor's layout and keyboard checks are recorded in [the calendar report](qa/119-calendar/README.md).
 - **Product image wells** stay white in both appearances, because catalog photos have white backgrounds.
 - **Clerk's sign-in and account UI** keep Clerk's own styling.
 - **The custom UIKit shell's native chrome** in `ios/App/App/SWTTRViewController.swift` keeps its fixed dark tab bar and action button. Its web content, loading canvas and status text follow the device appearance. Tab/action chrome migration belongs to #130/#146; the Capacitor status-bar setting does not control this standalone UIKit shell.
