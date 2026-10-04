@@ -1,5 +1,9 @@
 import type { TripFull } from "@/types/trips";
 
+export class TripRequestError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
+
 type TripRequestMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 /**
@@ -10,12 +14,14 @@ type TripRequestMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 export async function tripRequest<T>(
   url: string,
   method: TripRequestMethod = "GET",
-  body?: unknown
+  body?: unknown,
+  options: { signal?: AbortSignal } = {}
 ): Promise<T> {
   let res: Response;
   try {
     res = await fetch(url, {
       method,
+      ...(options.signal ? { signal: options.signal } : {}),
       ...(body === undefined
         ? {}
         : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
@@ -27,8 +33,8 @@ export async function tripRequest<T>(
   const data: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     const reason = (data as { error?: unknown } | null)?.error;
-    throw new Error(
-      typeof reason === "string" && reason ? reason : `Request failed (${res.status})`
+    throw new TripRequestError(
+      typeof reason === "string" && reason ? reason : `Request failed (${res.status})`, res.status
     );
   }
   return data as T;

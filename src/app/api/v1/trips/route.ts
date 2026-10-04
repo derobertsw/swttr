@@ -1,8 +1,9 @@
+import { randomUUID } from "crypto";
+import { parseTripCreation } from "@/lib/trip-creation";
 import { NextRequest, NextResponse } from "next/server";
 import { readJson, requireUser } from "@/lib/api";
 import {
   classifyTripStatus,
-  enumerateDates,
   listTripsForUser,
 } from "@/lib/trips";
 
@@ -19,64 +20,24 @@ export async function POST(request: NextRequest) {
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
   const { supabase, userId } = auth;
+  const input = parseTripCreation(await readJson(request));
+  if (typeof input === "string") return NextResponse.json({ error: input }, { status: 400 });
 
-  const body = await readJson(request);
-  const { name, start_date, end_date } = (body ?? {}) as {
-    name?: string;
-    start_date?: string;
-    end_date?: string;
-  };
-
-  if (!name || !start_date || !end_date) {
-    return NextResponse.json(
-      { error: "name, start_date, end_date required" },
-      { status: 400 }
-    );
-  }
-  if (start_date > end_date) {
-    return NextResponse.json(
-      { error: "start_date must be on or before end_date" },
-      { status: 400 }
-    );
-  }
-
-  const status = classifyTripStatus(start_date, end_date);
-
-  const { data: trip, error } = await supabase
-    .from("trips")
-    .insert({
-      owner_user_id: userId,
-      name,
-      start_date,
-      end_date,
-      status,
-    })
-    .select("*")
-    .single();
-
-  if (error || !trip) {
-    return NextResponse.json(
-      { error: error?.message ?? "Failed to create trip" },
-      { status: 500 }
-    );
-  }
-
-  // Seed the day rows up front so day-detail joins are simple.
-  const dates = enumerateDates(start_date, end_date);
-  if (dates.length > 0) {
-    await supabase
-      .from("trip_days")
-      .insert(dates.map((d) => ({ trip_id: trip.id, date: d })));
-  }
-
-  // Organizer is the first member.
-  await supabase.from("trip_members").insert({
-    trip_id: trip.id,
-    user_id: userId,
-    display_name: "You",
-    role: "organizer",
-    status: "joined",
+  const { data, error } = await supabase.rpc("create_trip_draft", {
+    p_trip_id: input.creation_id ?? randomUUID(),
+    p_owner_user_id: userId,
+    p_name: input.name,
+    p_start_date: input.start_date,
+    p_end_date: input.end_date,
+    p_status: classifyTripStatus(input.start_date, input.end_date),
+    p_destination: input.destination ?? null,
+    p_activity: input.activity ?? null,
   });
-
-  return NextResponse.json({ trip }, { status: 201 });
+  if (error || !data?.trip) {
+    return NextResponse.json(
+      { error: error?.code === "42501" ? "Draft identity unavailable. Start a new draft." : "Couldn't save the trip. Retry with the same draft." },
+      { status: error?.code === "42501" ? 409 : 500 }
+    );
+  }
+  return NextResponse.json(data, { status: data.created ? 201 : 200 });
 }
