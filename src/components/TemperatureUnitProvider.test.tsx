@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderToString } from "react-dom/server";
 import { hydrateRoot } from "react-dom/client";
@@ -11,7 +11,8 @@ import { STORAGE_KEYS } from "@/lib/storage";
 import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 
 let userId: string | null = null;
-vi.mock("@/hooks/useUserId", () => ({ useUserId: () => userId }));
+let authLoaded = true;
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId, isLoaded: authLoaded }) }));
 
 const guestKey = `${STORAGE_KEYS.TEMPERATURE_UNIT}:guest`;
 const settingsProps = {
@@ -36,6 +37,7 @@ function UnitControl() {
 describe("temperature preference", () => {
   beforeEach(() => {
     userId = null;
+    authLoaded = true;
     window.localStorage.clear();
     vi.spyOn(navigator, "language", "get").mockReturnValue("en-US");
   });
@@ -44,6 +46,72 @@ describe("temperature preference", () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     window.localStorage.clear();
+  });
+
+  it.each([
+    ["signed-in account", "account-a"],
+    ["guest", null],
+  ] as const)("waits for identity before saving a %s choice", async (_, resolvedUserId) => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(guestKey, "C");
+    authLoaded = false;
+    const setItem = vi.spyOn(window.Storage.prototype, "setItem");
+    const tree = () => (
+      <TemperatureUnitProvider>
+        <UnitControl />
+        <PreferencesDrawer {...settingsProps} open />
+      </TemperatureUnitProvider>
+    );
+    const view = render(tree());
+    expect(screen.getByLabelText("Selected unit")).toHaveTextContent("F");
+    expect(screen.getByText("Loading your temperature preference…")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Fahrenheit (°F)" })).toBeDisabled();
+    const celsius = screen.getByRole("radio", { name: "Celsius (°C)" });
+    expect(celsius).toBeDisabled();
+    fireEvent.click(celsius);
+    expect(setItem).not.toHaveBeenCalled();
+    expect(screen.queryByText("Saved")).not.toBeInTheDocument();
+
+    userId = resolvedUserId;
+    authLoaded = true;
+    view.rerender(tree());
+    expect(screen.getByRole("radio", { name: "Fahrenheit (°F)" })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: "Celsius (°C)" })).toBeEnabled();
+    expect(screen.getByText("Saved for you on this device.")).toBeInTheDocument();
+    if (resolvedUserId) {
+      expect(screen.getByLabelText("Selected unit")).toHaveTextContent("F");
+      screen.getByRole("radio", { name: "Celsius (°C)" }).focus();
+      await user.keyboard("{Enter}");
+      expect(setItem).toHaveBeenCalledWith(`${STORAGE_KEYS.TEMPERATURE_UNIT}:user:${resolvedUserId}`, "C");
+      expect(window.localStorage.getItem(guestKey)).toBe("C");
+    } else {
+      expect(screen.getByLabelText("Selected unit")).toHaveTextContent("C");
+      screen.getByRole("radio", { name: "Fahrenheit (°F)" }).focus();
+      await user.keyboard("{Enter}");
+      expect(setItem).toHaveBeenCalledWith(guestKey, "F");
+    }
+    expect(screen.getByText("Saved")).toBeInTheDocument();
+  });
+
+  it("rejects direct writes while identity is unresolved, including during account switches", () => {
+    userId = "account-a";
+    const view = renderHook(() => useTemperatureUnit(), { wrapper: TemperatureUnitProvider });
+    act(() => view.result.current.updateTemperatureUnit("C"));
+    const setItem = vi.spyOn(window.Storage.prototype, "setItem");
+    userId = null;
+    authLoaded = false;
+    view.rerender();
+    expect(view.result.current.isReady).toBe(false);
+    expect(() => view.result.current.updateTemperatureUnit("C")).toThrow("Temperature preference is not ready");
+    expect(setItem).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem(guestKey)).toBeNull();
+    expect(window.localStorage.getItem(`${STORAGE_KEYS.TEMPERATURE_UNIT}:user:account-a`)).toBe("C");
+
+    userId = "account-b";
+    authLoaded = true;
+    view.rerender();
+    act(() => view.result.current.updateTemperatureUnit("F"));
+    expect(setItem).toHaveBeenCalledWith(`${STORAGE_KEYS.TEMPERATURE_UNIT}:user:account-b`, "F");
   });
 
   it("restores a saved choice on remount and keeps accounts and guests independent", async () => {

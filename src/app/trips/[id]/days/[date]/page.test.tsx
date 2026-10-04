@@ -17,7 +17,7 @@ import DayDetailPage from "./page";
 import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
 import { STORAGE_KEYS } from "@/lib/storage";
 
-vi.mock("@/hooks/useUserId", () => ({ useUserId: () => null }));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: null, isLoaded: true }) }));
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 

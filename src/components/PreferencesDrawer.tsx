@@ -84,7 +84,7 @@ export function PreferencesDrawer({
   onOpenChange,
   onCloseAutoFocus,
 }: PreferencesDrawerProps) {
-  const { temperatureUnit, updateTemperatureUnit } = useTemperatureUnit();
+  const { temperatureUnit, isReady, updateTemperatureUnit } = useTemperatureUnit();
   const [unitSaveError, setUnitSaveError] = useState(false);
   const selectedSensitivity = SENSITIVITY_OPTIONS.find((opt) => opt.value === sensitivity);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -162,7 +162,8 @@ export function PreferencesDrawer({
                 label="Temperature units"
                 options={TEMPERATURE_UNIT_OPTIONS}
                 value={temperatureUnit}
-                description="Saved for you on this device."
+                disabled={!isReady}
+                description={isReady ? "Saved for you on this device." : "Loading your temperature preference…"}
                 onChange={(unit) => {
                   setUnitSaveError(false);
                   void runWithSaveState(() => {

@@ -22,6 +22,7 @@ interface SegmentedChoiceProps<T extends string> {
   onChange: (value: T) => void;
   /** Shown under the choices and read with the group. */
   description?: ReactNode;
+  disabled?: boolean;
   className?: string;
   /** Classes for the row of choices, e.g. to wrap them into a grid on phones. */
   groupClassName?: string;
@@ -38,6 +39,7 @@ export function SegmentedChoice<T extends string>({
   value,
   onChange,
   description,
+  disabled = false,
   className,
   groupClassName,
 }: SegmentedChoiceProps<T>) {
@@ -47,6 +49,7 @@ export function SegmentedChoice<T extends string>({
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (disabled) return;
     const target = arrowKeyTarget(event.key, index, options.length);
     if (target === null) return;
     event.preventDefault();
@@ -76,6 +79,7 @@ export function SegmentedChoice<T extends string>({
               type="button"
               role="radio"
               aria-checked={isSelected}
+              disabled={disabled}
               tabIndex={isSelected ? 0 : -1}
               onClick={() => {
                 if (!isSelected) onChange(option.value);

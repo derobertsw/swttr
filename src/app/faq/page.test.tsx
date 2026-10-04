@@ -5,7 +5,7 @@ import FAQ from "./page";
 import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
 import { STORAGE_KEYS } from "@/lib/storage";
 
-vi.mock("@/hooks/useUserId", () => ({ useUserId: () => null }));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: null, isLoaded: true }) }));
 vi.mock("@/components/PageLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
