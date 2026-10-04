@@ -1,7 +1,7 @@
 import type { TripFull } from "@/types/trips";
 
 export class TripRequestError extends Error {
-  constructor(message: string, readonly status: number) { super(message); }
+  constructor(message: string, readonly status: number, readonly details?: Record<string, unknown>) { super(message); }
 }
 
 type TripRequestMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -34,7 +34,8 @@ export async function tripRequest<T>(
   if (!res.ok) {
     const reason = (data as { error?: unknown } | null)?.error;
     throw new TripRequestError(
-      typeof reason === "string" && reason ? reason : `Request failed (${res.status})`, res.status
+      typeof reason === "string" && reason ? reason : `Request failed (${res.status})`, res.status,
+      data && typeof data === "object" ? data as Record<string, unknown> : undefined
     );
   }
   return data as T;
