@@ -51,6 +51,8 @@ interface GearUpState {
    * Nothing is kept until it has, so a reload can't save over it.
    */
   restored: boolean;
+  /** Whose outing the page holds once restored: a Clerk user ID, or null for a guest. */
+  owner: string | null;
 }
 
 /** What's kept for the tab besides the activity, effort and place. */
@@ -68,8 +70,8 @@ type GearUpAction =
   | { type: "SUBMIT_ERROR" }
   /** `keepLoading` when the running request was made from the form in this mode (see useGearUp). */
   | { type: "SHOW_FORM"; mode: InputMode; keepLoading: boolean }
-  /** `kept` is null when nothing was kept. */
-  | { type: "RESTORE"; kept: RestoredFields | null }
+  /** `kept` is null when nothing was kept for `owner`. */
+  | { type: "RESTORE"; owner: string | null; kept: RestoredFields | null }
   | { type: "RESET" };
 
 export function createInitialState(inputMode: InputMode): GearUpState {
@@ -84,6 +86,7 @@ export function createInitialState(inputMode: InputMode): GearUpState {
     result: null,
     lastOuting: null,
     restored: false,
+    owner: null,
   };
 }
 
@@ -109,14 +112,14 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
       return { ...state, loading: false };
     case "SHOW_FORM": {
       // Keeps what was entered, and the last outing.
-      const { date, time, durationDays, lastOuting, restored } = state;
+      const { date, time, durationDays, lastOuting, restored, owner } = state;
       const loading = state.loading && action.keepLoading;
-      return { ...createInitialState(action.mode), date, time, durationDays, lastOuting, restored, loading };
+      return { ...createInitialState(action.mode), date, time, durationDays, lastOuting, restored, owner, loading };
     }
     case "RESTORE":
-      return { ...state, ...action.kept, restored: true };
+      return { ...state, ...action.kept, restored: true, owner: action.owner };
     case "RESET":
-      return { ...createInitialState("now"), restored: state.restored };
+      return { ...createInitialState("now"), restored: state.restored, owner: state.owner };
     default:
       return state;
   }

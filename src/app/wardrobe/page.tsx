@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -32,6 +32,7 @@ import { ItemDetailCard } from "@/components/wardrobe";
 import { ItemThumbnail } from "@/components/wardrobe/ItemThumbnail";
 import { WardrobeItemRow, rowActionsId, rowButtonId } from "@/components/wardrobe/WardrobeItemRow";
 import { CreateCustomItemDialog } from "@/components/wardrobe/CreateCustomItemDialog";
+import { OutingReturnCard } from "@/components/wardrobe/OutingReturnCard";
 import { buildWardrobeOverview } from "@/components/wardrobe/wardrobe-overview";
 import {
   BODY_AREAS,
@@ -267,6 +268,10 @@ export default function Wardrobe() {
             </Button>
           )}
         </header>
+
+        <Suspense fallback={null}>
+          <OutingReturnCard />
+        </Suspense>
 
         <p role="status" className="sr-only">
           {announcement}

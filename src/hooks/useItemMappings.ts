@@ -30,26 +30,29 @@ async function fetchItemMappings(): Promise<Map<string, string>> {
   }
 }
 
+const NO_MAPPINGS = new Map<string, string>();
+
 export function useItemMappings() {
   const userId = useUserId();
-  const [itemMappings, setItemMappings] = useState<Map<string, string>>(new Map());
+  // Kept with the account they were loaded for, so another account's names
+  // never show after signing out or switching.
+  const [loaded, setLoaded] = useState<{ userId: string; mappings: Map<string, string> } | null>(null);
 
   useEffect(() => {
-    if (userId) {
-      fetchItemMappings().then(setItemMappings);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    const handleFocus = () => {
-      if (userId) {
-        fetchItemMappings().then(setItemMappings);
-      }
+    if (!userId) return;
+    let current = true;
+    const load = () =>
+      fetchItemMappings().then((mappings) => {
+        if (current) setLoaded({ userId, mappings });
+      });
+    void load();
+    window.addEventListener("focus", load);
+    return () => {
+      current = false;
+      window.removeEventListener("focus", load);
     };
-
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
   }, [userId]);
 
+  const itemMappings = loaded && loaded.userId === userId ? loaded.mappings : NO_MAPPINGS;
   return { userId, itemMappings };
 }

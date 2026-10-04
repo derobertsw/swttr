@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { WardrobeItem } from "@/types/wardrobe";
 import { fakeTripApi as fakeApi, reply, sentBodies } from "@/test/tripApi";
+import { saveGearUpDraft, type GearUpDraft } from "@/lib/gearUpDraft";
 import Wardrobe from "./page";
 
 // These tests cover the page, not the app chrome around it.
@@ -10,6 +11,8 @@ vi.mock("@/components/PageLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/hooks/useUserId", () => ({ useUserId: () => "user_1" }));
+const mockSearchParams = new URLSearchParams();
+vi.mock("next/navigation", () => ({ useSearchParams: () => mockSearchParams }));
 
 const fleece: WardrobeItem = {
   id: "w1",
@@ -58,6 +61,48 @@ async function openRowMenu(user: ReturnType<typeof userEvent.setup>, name: strin
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  mockSearchParams.delete("from");
+  sessionStorage.clear();
+});
+
+const STOWE = { id: 1, name: "Stowe", region: "Vermont", country: "United States", latitude: 44.47, longitude: -72.69 };
+/** Gear up's kept draft after Running at Stowe, now. */
+const RUNNING_DRAFT: GearUpDraft = {
+  activity: "running",
+  exertion: "moderate",
+  place: STOWE,
+  inputMode: "now",
+  date: null,
+  time: "12:00",
+  durationDays: 1,
+  lastOuting: { activity: "running", exertion: "moderate", place: STOWE, when: { mode: "now" } },
+};
+
+describe("Wardrobe opened from an outing", () => {
+  it("offers the way back to the outing, to get its layers again with the gear added", async () => {
+    saveGearUpDraft("user_1", RUNNING_DRAFT);
+    mockSearchParams.set("from", "outing");
+    stubApi({ "GET /api/wardrobe/gear": reply(200, { items: [] }) });
+    render(<Wardrobe />);
+
+    const back = await screen.findByRole("region", { name: "Back to your outing" });
+    expect(back).toHaveTextContent("Running at Stowe, now.");
+    expect(within(back).getByRole("link", { name: "Get my layers" })).toHaveAttribute("href", "/?resume=outing");
+  });
+
+  it.each([
+    { when: "opened some other way", fromOuting: false, owner: "user_1", draft: RUNNING_DRAFT },
+    { when: "the outing is another account's", fromOuting: true, owner: "user_2", draft: RUNNING_DRAFT },
+    { when: "no outing was kept", fromOuting: true, owner: "user_1", draft: { ...RUNNING_DRAFT, lastOuting: null } },
+  ])("has no way back when $when", async ({ fromOuting, owner, draft }) => {
+    saveGearUpDraft(owner, draft);
+    if (fromOuting) mockSearchParams.set("from", "outing");
+    stubApi({ "GET /api/wardrobe/gear": reply(200, { items: [] }) });
+    render(<Wardrobe />);
+
+    expect(await screen.findByRole("heading", { name: "Add the gear you own" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Back to your outing" })).not.toBeInTheDocument();
+  });
 });
 
 describe("Wardrobe page", () => {

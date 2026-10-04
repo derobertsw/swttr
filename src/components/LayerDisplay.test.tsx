@@ -1335,7 +1335,7 @@ describe("LayerDisplay", () => {
 
       expect(screen.getByText("General guide")).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "General guidance" })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
+      expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in?redirect_url=%2F%3Fresume%3Douting");
       expect(screen.getByText("Wool base layer")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: scoreLabel })).not.toBeInTheDocument();
     });
@@ -1351,7 +1351,7 @@ describe("LayerDisplay", () => {
 
     it("points to the wardrobe when there's no usable gear", () => {
       render(<LayerDisplay {...defaultProps} biophysicsStatus="no_gear" />);
-      expect(screen.getByRole("link", { name: /add gear/i })).toHaveAttribute("href", "/wardrobe");
+      expect(screen.getByRole("link", { name: /add gear/i })).toHaveAttribute("href", "/wardrobe?from=outing");
     });
 
     it("offers no action when the activity has no personalized model", () => {
@@ -1386,7 +1386,7 @@ describe("LayerDisplay", () => {
         );
 
         expect(screen.getByText("Wind 10 mph")).toBeInTheDocument();
-        expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
+        expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in?redirect_url=%2F%3Fresume%3Douting");
       }
     );
 
@@ -1405,7 +1405,7 @@ describe("LayerDisplay", () => {
         );
 
         expect(screen.getByRole("heading", { name: "Sign in for Running layers" })).toBeInTheDocument();
-        expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
+        expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in?redirect_url=%2F%3Fresume%3Douting");
         expect(screen.getByText("Wind 10 mph")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Change place or time" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Running, change activity" })).toBeInTheDocument();
@@ -1433,7 +1433,7 @@ describe("LayerDisplay", () => {
         render(<LayerDisplay {...noLayers} biophysicsStatus="no_gear" />);
 
         expect(screen.getByRole("heading", { name: "Add gear for Running layers" })).toBeInTheDocument();
-        expect(screen.getByRole("link", { name: /add gear/i })).toHaveAttribute("href", "/wardrobe");
+        expect(screen.getByRole("link", { name: /add gear/i })).toHaveAttribute("href", "/wardrobe?from=outing");
       });
     });
   });

@@ -19,6 +19,7 @@ vi.mock("@clerk/nextjs", () => ({
 }));
 
 vi.mock("@/hooks/useMigrateUser", () => ({ useMigrateUser: () => {} }));
+vi.mock("@/hooks/useClaimGuestDraft", () => ({ useClaimGuestDraft: () => {} }));
 
 vi.mock("@/hooks/usePreferences", () => ({
   usePreferences: () => ({

@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import { AppSidebar } from "@/components/AppSidebar";
 import { MobileTabBar } from "@/components/AppNavigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { useClaimGuestDraft } from "@/hooks/useClaimGuestDraft";
 import { useMigrateUser } from "@/hooks/useMigrateUser";
 import { useNativeTabShell } from "@/hooks/useNativeTabShell";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ const PageLayout = ({
   chromeVariant = "default",
 }: PageLayoutProps) => {
   useMigrateUser();
+  useClaimGuestDraft();
   const isNativeTabShell = useNativeTabShell();
   const isCompactChrome = chromeVariant === "compact";
   const isSidebarWide = useIsSidebarWide();
