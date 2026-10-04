@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 import { jsonError, requireUser, type AuthedContext } from "@/lib/api";
+import { loadLodging } from "@/lib/trip-lodging";
 import type {
   Trip,
   TripDay,
@@ -178,6 +179,7 @@ export async function loadTripFull(
     days,
     kits,
     gear: (gearRes.data ?? []) as TripGroupGear[],
+    lodging: await loadLodging(supabase, trip as Trip),
   };
 }
 

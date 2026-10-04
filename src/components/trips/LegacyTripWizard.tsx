@@ -28,9 +28,9 @@ import {
   sectionLabelClassName,
 } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
-import { errorMessage, fetchTripFull, tripRequest } from "@/lib/trip-requests";
+import { errorMessage, fetchTripFull, tripRequest, TripRequestError } from "@/lib/trip-requests";
 import type { DateRange } from "react-day-picker";
-import type { Trip, TripMember, TripStop } from "@/types/trips";
+import type { Trip, TripLodging, TripMember, TripStop } from "@/types/trips";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
 
 type Step = 1 | 2 | 3 | 4;
@@ -109,6 +109,8 @@ function NewTripWizard() {
   const [reopening, setReopening] = useState(resume.tripId !== null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lodgingReview, setLodgingReview] = useState<TripLodging | null>(null);
+  const lodgingFocus = useReturnFocus();
 
   useEffect(() => {
     if (!resume.tripId) return;
@@ -142,7 +144,7 @@ function NewTripWizard() {
   const draft = draftBasics(name, range);
   const hasUnsavedBasics = !trip || !draft || Object.keys(changedBasics(trip, draft)).length > 0;
 
-  const saveBasics = async () => {
+  const saveBasics = async (lodgingRevision?: number) => {
     if (!draft) {
       setError("Add a trip name and pick a date range.");
       return;
@@ -160,9 +162,10 @@ function NewTripWizard() {
         const { trip: updated } = await tripRequest<{ trip: Trip }>(
           `/api/v1/trips/${trip.id}`,
           "PATCH",
-          changedBasics(trip, draft)
+          { ...changedBasics(trip, draft), ...(typeof lodgingRevision === "number" ? { lodging_revision: lodgingRevision } : {}) }
         );
         setTrip(updated);
+        setLodgingReview(null);
       } else {
         const { trip: created } = await tripRequest<{ trip: Trip }>("/api/v1/trips", "POST", draft);
         setTrip(created);
@@ -173,6 +176,11 @@ function NewTripWizard() {
       }
       setStep(2);
     } catch (err) {
+      if (err instanceof TripRequestError && err.status === 409 && err.details?.lodging_after) {
+        lodgingFocus.remember(() => document.querySelector<HTMLInputElement>('input[placeholder="Whistler Powder"]'));
+        setLodgingReview(err.details.lodging_after as TripLodging);
+        return;
+      }
       setError(
         `${trip ? "Couldn't save your changes" : "Couldn't create the trip"}: ${errorMessage(err)}`
       );
@@ -201,11 +209,21 @@ function NewTripWizard() {
           onRangeChange={setRange}
           submitting={submitting}
           nextLabel={!trip ? "Create trip" : hasUnsavedBasics ? "Save changes" : "Next"}
-          onNext={saveBasics}
+          onNext={() => void saveBasics()}
           backLabel={trip ? "Exit" : "Cancel"}
           onBack={() => router.push(trip ? `/trips/${trip.id}` : "/trips")}
         />
       )}
+      {lodgingReview && <TripSheet open busy={submitting} onClose={() => setLodgingReview(null)} onCloseAutoFocus={lodgingFocus.restore}
+        header={<><TripSheetTitle>Review stays before changing dates</TripSheetTitle><TripSheetDescription>Stay dates, assigned nights and bookings will be kept. Review nights outside the new itinerary and the resulting morning origins.</TripSheetDescription></>}
+        footer={<><Button type="button" loading={submitting} onClick={() => void saveBasics(lodgingReview.revision)}>Keep stays and change trip dates</Button><Button type="button" variant="ghost" disabled={submitting} onClick={() => setLodgingReview(null)}>Keep editing dates</Button></>}
+      >
+        <div className="space-y-3 text-base text-foreground">
+          {lodgingReview.stays.map((stay) => <div key={stay.id} className="break-words"><p>{stay.name} · {stay.date_label} · {stay.booking_status === "booked" ? "Booked" : "Not booked"}</p>{stay.review_dates.length > 0 && <p className="text-warning">Review nights outside the new itinerary: {stay.review_dates.join(", ")}</p>}</div>)}
+          <p className="font-semibold">Morning origins and tonight’s stays after the change</p>
+          {lodgingReview.days.map((day) => <p key={day.date} className="break-words">{day.date} · Starting from {day.starting_from} · Staying tonight {day.staying_tonight}</p>)}
+        </div>
+      </TripSheet>}
       {step === 2 && trip && (
         <TripStopsEditor
           trip={trip}

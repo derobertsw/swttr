@@ -15,6 +15,7 @@ import {
   tripFull,
 } from "@/test/tripApi";
 import NewTripPage from "./LegacyTripWizard";
+import { buildLodging } from "@/lib/trip-lodging";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -157,6 +158,30 @@ describe("New trip wizard", () => {
     expect(await screen.findByRole("heading", { name: "Where?" })).toBeInTheDocument();
     // Only the request that reopened the trip: nothing was created or changed.
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reviews preserved stays and morning origins before confirming changed trip dates", async () => {
+    setQuery("trip=trip-1&step=1");
+    const lodging = buildLodging({ ...TRIP, lodging_revision: 2 }, [], []);
+    let attempts = 0;
+    const api = fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull({ lodging })),
+      "PATCH /api/v1/trips/trip-1": (body) => ++attempts === 1
+        ? reply(409, { error: "Review stay dates", lodging_after: lodging, lodging_revision: 2 })
+        : reply(200, { trip: { ...TRIP, ...(body as object) } }),
+    });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    render(<NewTripPage />);
+    await screen.findByRole("heading", { name: "When?" });
+    await pickDays(user, 9, 11);
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    const dialog = await screen.findByRole("dialog", { name: "Review stays before changing dates" });
+    expect(within(dialog).getAllByText(/Starting from Not set/).length).toBeGreaterThan(0);
+    expect(attempts).toBe(1);
+    await user.click(within(dialog).getByRole("button", { name: "Keep stays and change trip dates" }));
+    expect(await screen.findByRole("heading", { name: "Where?" })).toBeInTheDocument();
+    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")[1]).toMatchObject({ lodging_revision: 2 });
   });
 
   it("says so when the saved trip can't be reopened", async () => {
