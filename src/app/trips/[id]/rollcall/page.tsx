@@ -1,17 +1,18 @@
 "use client";
 
 import { use, useMemo } from "react";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Card,
-  Chip,
+  BackLink,
   GarmentGlyph,
   MemberAvatar,
   SectionLabel,
+  TripError,
 } from "@/components/trips/trip-primitives";
+import { cn } from "@/lib/utils";
 import { useTrip } from "@/hooks/useTrip";
 
 const REQUIRED_SLOTS = ["shirt", "midlayer", "shell", "pants", "gloves"];
@@ -40,65 +41,55 @@ export default function RollCallPage({ params }: { params: Promise<{ id: string 
   return (
     <PageLayout chromeVariant="compact">
       <div className="flex w-full max-w-2xl flex-col gap-5">
-        <Link
-          href={`/trips/${id}`}
-          className="inline-flex items-center gap-1.5 text-sm text-white/70 hover:text-white"
-        >
-          <ArrowLeft className="size-4" />
-          Trip
-        </Link>
+        <BackLink href={`/trips/${id}`}>Trip</BackLink>
         <header>
           <SectionLabel>Departure day</SectionLabel>
-          <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
+          <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
             Roll call
           </h1>
-          <p className="mt-1 text-sm text-white/62">Are we leaving? Visual readiness check.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Are we leaving? Visual readiness check.</p>
         </header>
 
-        {loading && <Skeleton className="h-32 w-full rounded-2xl bg-white/12" />}
-        {error && (
-          <div className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100">
-            {error}
-          </div>
-        )}
+        {loading && <Skeleton className="h-32 w-full rounded-card" />}
+        {error && <TripError>{error}</TripError>}
 
         {data && rollCall.length === 0 && (
           <Card>
-            <p className="text-sm text-white/65">No crew on this trip yet.</p>
+            <p className="text-sm text-muted-foreground">No crew on this trip yet.</p>
           </Card>
         )}
 
         {rollCall.map((row) => (
-          <Card key={row.member.id} highlighted={!row.ready}>
+          <Card key={row.member.id} className={cn(!row.ready && "border-warning")}>
             <div className="flex flex-wrap items-center gap-3">
               <span
-                className={
-                  "inline-block size-2.5 shrink-0 rounded-full " +
-                  (row.ready ? "bg-emerald-300" : "bg-orange-300")
-                }
+                className={cn(
+                  "inline-block size-2.5 shrink-0 rounded-full",
+                  row.ready ? "bg-success" : "bg-warning"
+                )}
                 aria-hidden
               />
               <MemberAvatar name={row.member.display_name} size={32} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-white">
+                <p className="truncate text-sm font-medium text-foreground">
                   {row.member.display_name}
                 </p>
-                <p className="text-xs text-white/55">
+                <p className="text-xs text-muted-foreground">
                   {row.ready ? "ready" : "kit incomplete"}
                 </p>
               </div>
               <div className="flex items-center gap-1">
                 {row.items.length === 0 ? (
-                  <span className="text-xs text-white/45">no kit</span>
+                  <span className="text-xs text-muted-foreground">no kit</span>
                 ) : (
                   row.items.slice(0, 6).map((slot) => (
                     <GarmentGlyph key={slot} kind={slot} />
                   ))
                 )}
               </div>
-              <Chip variant={row.ready ? "default" : "warn"}>
-                {row.ready ? "ready" : "missing"}
-              </Chip>
+              <Badge size="sm" variant={row.ready ? "success" : "warning"}>
+                {row.ready ? "Ready" : "Missing"}
+              </Badge>
             </div>
           </Card>
         ))}

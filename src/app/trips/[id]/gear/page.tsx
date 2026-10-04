@@ -1,12 +1,20 @@
 "use client";
 
 import { use, useState } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowLeft, Loader2, Plus, X } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, X } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input, fieldClassName } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, SectionLabel } from "@/components/trips/trip-primitives";
+import {
+  BackLink,
+  SectionLabel,
+  TripError,
+  sectionLabelClassName,
+} from "@/components/trips/trip-primitives";
+import { cn } from "@/lib/utils";
 import { useTrip } from "@/hooks/useTrip";
 import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import type { TripGroupGear } from "@/types/trips";
@@ -74,33 +82,23 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
   return (
     <PageLayout chromeVariant="compact">
       <div className="flex w-full max-w-2xl flex-col gap-5">
-        <Link
-          href={`/trips/${id}`}
-          className="inline-flex items-center gap-1.5 text-sm text-white/70 hover:text-white"
-        >
-          <ArrowLeft className="size-4" />
-          Trip
-        </Link>
+        <BackLink href={`/trips/${id}`}>Trip</BackLink>
         <header>
           <SectionLabel>Shared gear</SectionLabel>
-          <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
+          <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
             Who&apos;s bringing what?
           </h1>
         </header>
 
-        {loading && <Skeleton className="h-32 w-full rounded-2xl bg-white/12" />}
-        {error && (
-          <div className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100">
-            {error}
-          </div>
-        )}
+        {loading && <Skeleton className="h-32 w-full rounded-card" />}
+        {error && <TripError>{error}</TripError>}
 
         {data && (
           <>
             <div className="flex flex-col gap-2">
               {data.gear.length === 0 && (
                 <Card>
-                  <p className="text-sm text-white/65">No group gear yet.</p>
+                  <p className="text-sm text-muted-foreground">No group gear yet.</p>
                 </Card>
               )}
               {data.gear.map((g) => {
@@ -109,40 +107,43 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                   : null;
                 const saving = savingId === g.id;
                 return (
-                  <Card key={g.id} highlighted={!assigned}>
-                    <div className="flex items-center gap-3">
-                      <p className="flex-1 truncate text-sm text-white/90">{g.description}</p>
-                      {saving && <Loader2 className="size-3.5 animate-spin text-white/45" />}
-                      <select
-                        value={g.assignee_member_id ?? ""}
-                        onChange={(e) =>
-                          updateAssignee(g, e.target.value === "" ? null : e.target.value)
-                        }
-                        disabled={savingId !== null}
-                        aria-label={`Who's bringing ${g.description}`}
-                        className="rounded-md border border-white/14 bg-white/[0.06] px-2 py-1 text-xs text-white disabled:opacity-50"
-                      >
-                        <option value="">unassigned</option>
-                        {members
-                          .filter((m) => m.status !== "left")
-                          .map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.display_name}
-                            </option>
-                          ))}
-                      </select>
-                      {!assigned && (
-                        <AlertTriangle className="size-4 text-orange-300" aria-label="Unassigned" />
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => remove(g)}
-                        disabled={savingId !== null}
-                        aria-label={`Remove ${g.description}`}
-                        className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
-                      >
-                        <X className="size-4" />
-                      </button>
+                  <Card key={g.id} className={cn(!assigned && "border-warning")}>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                      <p className="min-w-32 flex-1 break-words text-sm text-foreground">{g.description}</p>
+                      <div className="ml-auto flex items-center gap-2">
+                        {saving && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+                        <select
+                          value={g.assignee_member_id ?? ""}
+                          onChange={(e) =>
+                            updateAssignee(g, e.target.value === "" ? null : e.target.value)
+                          }
+                          disabled={savingId !== null}
+                          aria-label={`Who's bringing ${g.description}`}
+                          className={cn(fieldClassName, "h-9 w-auto max-w-40 px-2 max-md:h-11 pointer-coarse:h-11")}
+                        >
+                          <option value="">unassigned</option>
+                          {members
+                            .filter((m) => m.status !== "left")
+                            .map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.display_name}
+                              </option>
+                            ))}
+                        </select>
+                        {!assigned && (
+                          <AlertTriangle className="size-4 shrink-0 text-warning" aria-label="Unassigned" />
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => remove(g)}
+                          disabled={savingId !== null}
+                          aria-label={`Remove ${g.description}`}
+                        >
+                          <X />
+                        </Button>
+                      </div>
                     </div>
                   </Card>
                 );
@@ -150,20 +151,23 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
             </div>
 
             <Card>
-              <SectionLabel className="mb-2">Add gear</SectionLabel>
+              <label htmlFor="add-gear-description" className={cn(sectionLabelClassName, "mb-2 block")}>
+                Add gear
+              </label>
               <div className="flex flex-col gap-2 sm:flex-row">
-                <input
+                <Input
+                  id="add-gear-description"
                   type="text"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Tent, stove, first aid…"
-                  className="h-10 flex-1 rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-white placeholder:text-white/40 focus:border-white/30 focus:outline-none"
+                  className="sm:flex-1"
                 />
                 <select
                   value={assignee}
                   onChange={(e) => setAssignee(e.target.value)}
                   aria-label="Who's bringing it"
-                  className="h-10 rounded-lg border border-white/12 bg-white/[0.06] px-2 text-sm text-white"
+                  className={cn(fieldClassName, "sm:w-auto")}
                 >
                   <option value="">unassigned</option>
                   {members
@@ -174,15 +178,15 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                       </option>
                     ))}
                 </select>
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
                   onClick={addGear}
                   disabled={!description.trim() || adding}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-white/14 bg-white/[0.08] px-3 text-sm font-medium text-white disabled:opacity-50"
                 >
-                  {adding ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                  {adding ? <Loader2 className="animate-spin" /> : <Plus />}
                   Add
-                </button>
+                </Button>
               </div>
             </Card>
 

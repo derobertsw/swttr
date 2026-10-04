@@ -6,7 +6,12 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Calendar as CalIcon, CheckCircle2, GripVertical, Loader2, MapPin, Plus, UserPlus, X } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { chipClassName } from "@/components/ui/chip";
+import { Input } from "@/components/ui/input";
+import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { Calendar } from "@/components/ui/calendar";
@@ -14,14 +19,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import {
-  Card,
-  Chip,
   InviteLinkButton,
   MemberAvatar,
   SectionLabel,
+  TripError,
   daysBetween,
   formatDateRange,
+  sectionLabelClassName,
 } from "@/components/trips/trip-primitives";
+import { cn } from "@/lib/utils";
 import { errorMessage, fetchTripFull, tripRequest } from "@/lib/trip-requests";
 import type { DateRange } from "react-day-picker";
 import type { Trip, TripMember, TripStop } from "@/types/trips";
@@ -79,8 +85,8 @@ export default function LegacyTripWizard() {
 function WizardSkeleton() {
   return (
     <div className="flex w-full max-w-2xl flex-col gap-5">
-      <Skeleton className="h-20 w-full rounded-2xl bg-white/12" />
-      <Skeleton className="h-64 w-full rounded-2xl bg-white/12" />
+      <Skeleton className="h-20 w-full rounded-card" />
+      <Skeleton className="h-64 w-full rounded-card" />
     </div>
   );
 }
@@ -181,19 +187,12 @@ function NewTripWizard() {
     <div className="flex w-full max-w-2xl flex-col gap-5">
       <StepHeader step={step} />
       {trip && (
-        <p role="status" className="flex items-center gap-1.5 text-xs text-white/62">
-          <CheckCircle2 className="size-3.5 shrink-0 text-emerald-300" />
+        <p role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <CheckCircle2 className="size-4 shrink-0 text-success" />
           Saved to your trips. Stops and crew save as you add them.
         </p>
       )}
-      {error && (
-        <div
-          role="alert"
-          className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100"
-        >
-          {error}
-        </div>
-      )}
+      {error && <TripError role="alert">{error}</TripError>}
       {step === 1 && (
         <Step1Dates
           name={name}
@@ -255,17 +254,14 @@ function StepHeader({ step }: { step: Step }) {
   return (
     <header>
       <SectionLabel>{labels[step]}</SectionLabel>
-      <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
+      <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
         {titles[step]}
       </h1>
-      <div className="mt-3 flex items-center gap-1.5">
+      <div className="mt-3 flex items-center gap-1.5" aria-hidden>
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className={
-              "h-1 flex-1 rounded-full " +
-              (i <= step ? "bg-cyan-300/70" : "bg-white/10")
-            }
+            className={cn("h-1 flex-1 rounded-full", i <= step ? "bg-primary" : "bg-muted")}
           />
         ))}
       </div>
@@ -299,43 +295,45 @@ function Step1Dates({
   return (
     <div className="flex flex-col gap-4">
       <Card>
-        <SectionLabel className="mb-2">Trip name</SectionLabel>
-        <input
+        <label htmlFor="trip-name" className={cn(sectionLabelClassName, "mb-2 block")}>
+          Trip name
+        </label>
+        <Input
+          id="trip-name"
           type="text"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
           placeholder="Whistler Powder"
-          className="w-full rounded-lg border border-white/12 bg-white/[0.06] px-3 py-2.5 text-base text-white placeholder:text-white/40 focus:border-white/30 focus:outline-none"
         />
       </Card>
       <Card>
         <SectionLabel className="mb-2">Dates</SectionLabel>
-        <p className="mb-3 text-sm text-white/62">Drag across days to pick a range.</p>
-        <div className="rounded-xl border border-white/10 bg-slate-950/30 p-2">
+        <p className="mb-3 text-sm text-muted-foreground">Drag across days to pick a range.</p>
+        <div className="rounded-control bg-muted p-2">
           <Calendar
             mode="range"
             selected={range}
             onSelect={onRangeChange}
             numberOfMonths={1}
-            className="bg-transparent text-white"
+            className="bg-transparent"
           />
         </div>
         {range?.from && range?.to && (
-          <div className="mt-3 flex items-center justify-between rounded-lg border border-white/12 bg-white/[0.05] px-3.5 py-2.5">
+          <div className="mt-3 flex items-center justify-between rounded-control bg-muted px-3.5 py-2.5">
             <div>
               <SectionLabel>Start</SectionLabel>
-              <p className="text-sm font-semibold text-white">
+              <p className="text-sm font-semibold text-foreground">
                 {range.from.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
               </p>
             </div>
-            <ArrowRight className="size-4 text-white/55" />
+            <ArrowRight className="size-4 text-muted-foreground" />
             <div>
               <SectionLabel>End</SectionLabel>
-              <p className="text-sm font-semibold text-white">
+              <p className="text-sm font-semibold text-foreground">
                 {range.to.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
               </p>
             </div>
-            <Chip variant="accent">{days} day{days === 1 ? "" : "s"}</Chip>
+            <Badge size="sm" variant="primary">{days} day{days === 1 ? "" : "s"}</Badge>
           </div>
         )}
       </Card>
@@ -445,60 +443,56 @@ export function TripStopsEditor({
           onSelectLocation={search.handleSelectLocation}
           onDismiss={search.dismiss}
         />
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={addStop}
           disabled={!search.selectedLocation || adding}
-          className="mt-3 inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/14 bg-white/[0.08] px-4 text-sm font-medium text-white disabled:opacity-50"
+          className="mt-3"
         >
-          {adding ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+          {adding ? <Loader2 className="animate-spin" /> : <Plus />}
           Add stop
-        </button>
+        </Button>
       </Card>
 
       {stops.length > 0 && (
         <Card>
           <SectionLabel className="mb-2">Trip stops</SectionLabel>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col divide-y divide-border">
             {stops.map((stop, i) => (
-              <div
-                key={stop.id}
-                className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2.5"
-              >
-                <GripVertical className="size-4 text-white/40" />
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-white/22 text-[11px] font-semibold text-white">
+              <div key={stop.id} className="flex items-center gap-2 py-2">
+                <GripVertical className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-input text-xs font-semibold text-foreground">
                   {i + 1}
                 </span>
-                <MapPin className="size-4 text-white/65" />
+                <MapPin className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white">{stop.name}</p>
-                  <p className="text-xs text-white/55">
+                  <p className="truncate text-sm font-medium text-foreground">{stop.name}</p>
+                  <p className="text-xs text-muted-foreground">
                     {stop.activities.length === 0
                       ? "no activities yet"
                       : stop.activities.join(", ")}
                   </p>
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   id={editStopButtonId(stop.id)}
                   onClick={() => openEditor(stop)}
-                  className="min-h-11 min-w-11 rounded-md border border-white/14 px-2 py-1 text-xs text-white/75 hover:bg-white/10"
                 >
                   Edit
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => removeStop(stop.id)}
                   disabled={removingId !== null}
                   aria-label={`Remove ${stop.name}`}
-                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
                 >
-                  {removingId === stop.id ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <X className="size-4" />
-                  )}
-                </button>
+                  {removingId === stop.id ? <Loader2 className="animate-spin" /> : <X />}
+                </Button>
               </div>
             ))}
           </div>
@@ -640,7 +634,7 @@ function StopDetailSheet({
           onClick={save}
           loading={saving}
           disabled={assignedDates === null}
-          className="w-full rounded-xl border border-white/12 bg-cyan-300/22 text-white hover:bg-cyan-300/30"
+          className="w-full"
         >
           Save stop
         </Button>
@@ -649,15 +643,15 @@ function StopDetailSheet({
       <div className="mt-4">
         <SectionLabel>Assign days to this stop</SectionLabel>
         {assignmentLoadError ? (
-          <div role="alert" className="mt-2 text-sm text-orange-100">
+          <div role="alert" className="mt-2 text-sm font-medium text-destructive">
             <p>Couldn&apos;t load saved day assignments: {assignmentLoadError}</p>
-            <button type="button" className="mt-2 min-h-11 underline" onClick={() => { setAssignmentLoadError(null); setAssignmentLoadAttempt((attempt) => attempt + 1); }}>Retry loading days</button>
+            <Button type="button" variant="outline" className="mt-2" onClick={() => { setAssignmentLoadError(null); setAssignmentLoadAttempt((attempt) => attempt + 1); }}>Retry loading days</Button>
           </div>
-        ) : assignedDates === null ? <p role="status" className="mt-2 text-sm text-white/75">Loading saved day assignments…</p> : null}
+        ) : assignedDates === null ? <p role="status" className="mt-2 text-sm text-muted-foreground">Loading saved day assignments…</p> : null}
         {assignedDates && assignedDates.length > 0 && (
-          <p className="mt-2 text-sm text-white/75">Already assigned to {stop.name}: {assignedDates.slice().sort().join(", ")}. To move these days, select them when editing another stop.</p>
+          <p className="mt-2 text-sm text-foreground">Already assigned to {stop.name}: {assignedDates.slice().sort().join(", ")}. To move these days, select them when editing another stop.</p>
         )}
-        <p className="mt-2 text-sm text-white/75">
+        <p className="mt-2 text-sm text-foreground">
           {selectedDates.length === 0
             ? "No day assignments will change."
             : `These days will use ${stop.name}: ${selectedDates.slice().sort().join(", ")}. Other days stay unchanged.`}
@@ -677,14 +671,9 @@ function StopDetailSheet({
                 disabled={assignedDates === null || alreadyAssigned || saving}
                 aria-pressed={on}
                 aria-label={date.toLocaleDateString(undefined, { dateStyle: "full" })}
-                className={
-                  "flex w-14 flex-col items-center rounded-lg border px-2 py-1.5 text-center text-xs transition-colors disabled:cursor-default " +
-                  (on
-                    ? "border-cyan-300/55 bg-cyan-300/15 text-white"
-                    : "border-white/14 bg-white/[0.05] text-white/72")
-                }
+                className="flex w-14 flex-col items-center rounded-control border border-input bg-card px-2 py-1.5 text-center text-xs text-foreground transition-colors hover:bg-accent disabled:pointer-events-none aria-pressed:border-primary aria-pressed:bg-primary-soft aria-pressed:font-semibold"
               >
-                <span className="text-[10px] uppercase tracking-wide text-white/55">{dow}</span>
+                <span className="text-xs text-muted-foreground">{dow}</span>
                 <span className="text-base font-semibold leading-none">{day}</span>
               </button>
             );
@@ -704,12 +693,7 @@ function StopDetailSheet({
                 onClick={() => toggleActivity(a)}
                 disabled={saving}
                 aria-pressed={on}
-                className={
-                  "min-h-11 rounded-full border px-3 py-1 text-xs " +
-                  (on
-                    ? "border-cyan-300/55 bg-cyan-300/22 text-white"
-                    : "border-white/16 bg-white/[0.05] text-white/72")
-                }
+                className={chipClassName}
               >
                 {a}
               </button>
@@ -775,8 +759,8 @@ function Step3Members({
     <div className="flex flex-col gap-4">
       <Card>
         <SectionLabel className="mb-2">On the trip</SectionLabel>
-        <p className="text-xs text-white/55">Solo? You can skip this step.</p>
-        <div className="mt-3 flex flex-col gap-2">
+        <p className="text-sm text-muted-foreground">Solo? You can skip this step.</p>
+        <div className="mt-3 flex flex-col divide-y divide-border">
           {members.map((m) => (
             <MemberRow
               key={m.id}
@@ -791,47 +775,46 @@ function Step3Members({
       </Card>
 
       <Card>
-        <SectionLabel className="mb-2">Add someone</SectionLabel>
+        <label htmlFor="add-someone-name" className={cn(sectionLabelClassName, "mb-2 block")}>
+          Add someone
+        </label>
         <div className="flex gap-2">
-          <input
+          <Input
+            id="add-someone-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Display name"
-            className="h-10 flex-1 rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-white placeholder:text-white/40 focus:border-white/30 focus:outline-none"
+            className="flex-1"
           />
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={add}
             disabled={!name.trim() || adding}
-            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-white/14 bg-white/[0.08] px-3 text-sm font-medium text-white disabled:opacity-50"
           >
-            {adding ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+            {adding ? <Loader2 className="animate-spin" /> : <UserPlus />}
             Add
-          </button>
+          </Button>
         </div>
-        <div className="mt-3 flex gap-2">
+        <div
+          role="group"
+          aria-label="How they join"
+          className={cn(segmentedGroupClassName, "mt-3 grid-cols-2")}
+        >
           <button
             type="button"
             onClick={() => setKind("invite")}
-            className={
-              "flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-colors " +
-              (kind === "invite"
-                ? "border-cyan-300/55 bg-cyan-300/15 text-white"
-                : "border-white/14 bg-white/[0.05] text-white/72")
-            }
+            aria-pressed={kind === "invite"}
+            className={segmentedItemClassName}
           >
             Share link · they make an account
           </button>
           <button
             type="button"
             onClick={() => setKind("guest")}
-            className={
-              "flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-colors " +
-              (kind === "guest"
-                ? "border-cyan-300/55 bg-cyan-300/15 text-white"
-                : "border-white/14 bg-white/[0.05] text-white/72")
-            }
+            aria-pressed={kind === "guest"}
+            className={segmentedItemClassName}
           >
             Guest · no signup, uses generics
           </button>
@@ -881,11 +864,11 @@ function MemberRow({
       : "joined";
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5">
+    <div className="flex items-center gap-3 py-2">
       <MemberAvatar name={member.display_name} state={state} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-white">{member.display_name}</p>
-        <p className="text-xs text-white/55">{sub}</p>
+        <p className="truncate text-sm font-medium text-foreground">{member.display_name}</p>
+        <p className="text-xs text-muted-foreground">{sub}</p>
       </div>
       {member.status === "invited" && member.invite_token && (
         <InviteLinkButton
@@ -895,15 +878,16 @@ function MemberRow({
         />
       )}
       {onRemove && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={onRemove}
           disabled={removeDisabled}
-          className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
           aria-label={`Remove ${member.display_name}`}
         >
-          {removing ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" />}
-        </button>
+          {removing ? <Loader2 className="animate-spin" /> : <X />}
+        </Button>
       )}
     </div>
   );
@@ -926,8 +910,8 @@ function Step4Review({
     <div className="flex flex-col gap-4">
       <Card>
         <SectionLabel>Trip</SectionLabel>
-        <p className="mt-1 text-base font-semibold text-white">{trip.name}</p>
-        <p className="mt-0.5 text-sm text-white/65">
+        <p className="mt-1 text-base font-semibold text-foreground">{trip.name}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">
           <CalIcon className="mr-1 inline size-3.5" />
           {formatDateRange(trip.start_date, trip.end_date)} ·{" "}
           {daysBetween(trip.start_date, trip.end_date)} days
@@ -936,16 +920,16 @@ function Step4Review({
       <Card>
         <SectionLabel>Stops ({stops.length})</SectionLabel>
         {stops.length === 0 ? (
-          <p className="mt-2 text-sm text-white/55">No stops yet.</p>
+          <p className="mt-2 text-sm text-muted-foreground">No stops yet.</p>
         ) : (
           <ul className="mt-2 flex flex-col gap-1.5">
             {stops.map((s, i) => (
-              <li key={s.id} className="flex items-center gap-2 text-sm text-white/85">
-                <span className="text-xs text-white/45">{i + 1}.</span>
-                <MapPin className="size-3.5 text-white/55" />
+              <li key={s.id} className="flex items-center gap-2 text-sm text-foreground">
+                <span className="text-xs text-muted-foreground">{i + 1}.</span>
+                <MapPin className="size-3.5 text-muted-foreground" />
                 {s.name}
                 {s.activities.length > 0 && (
-                  <span className="text-xs text-white/55">· {s.activities.join(", ")}</span>
+                  <span className="text-xs text-muted-foreground">· {s.activities.join(", ")}</span>
                 )}
               </li>
             ))}
@@ -962,7 +946,7 @@ function Step4Review({
                 state={m.role === "organizer" ? "self" : "default"}
                 size={28}
               />
-              <span className="text-sm text-white/80">{m.display_name}</span>
+              <span className="text-sm text-foreground">{m.display_name}</span>
             </div>
           ))}
         </div>
@@ -991,25 +975,20 @@ function NavBar({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={onBack}
-        disabled={backDisabled}
-        className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-white/14 px-4 text-sm font-medium text-white/85 hover:bg-white/10 disabled:opacity-50"
-      >
-        <ArrowLeft className="size-4" />
+      <Button type="button" variant="outline" onClick={onBack} disabled={backDisabled}>
+        <ArrowLeft />
         {backLabel}
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         onClick={onNext}
         disabled={nextDisabled}
-        className="ml-auto inline-flex h-11 min-w-32 items-center justify-center gap-1.5 rounded-xl border border-white/14 bg-gradient-to-b from-cyan-300/22 to-cyan-300/10 px-4 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(0,0,0,0.32)] disabled:opacity-50"
+        className="ml-auto min-w-32"
       >
-        {nextLoading ? <Loader2 className="size-4 animate-spin" /> : null}
+        {nextLoading ? <Loader2 className="animate-spin" /> : null}
         {nextLabel}
-        <ArrowRight className="size-4" />
-      </button>
+        <ArrowRight />
+      </Button>
     </div>
   );
 }

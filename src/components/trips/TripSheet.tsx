@@ -26,11 +26,7 @@ import { cn } from "@/lib/utils";
 // Whether the sheet is a drawer, so its title and description use the drawer's primitives.
 const InDrawer = createContext(false);
 
-const glassClassName = "border-white/14 bg-slate-950/95 text-white";
-const closeClassName = cn(
-  dialogCloseClassName,
-  "text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
-);
+const closeClassName = cn(dialogCloseClassName, "disabled:opacity-50");
 
 interface TripSheetProps {
   open: boolean;
@@ -52,9 +48,8 @@ interface TripSheetProps {
 }
 
 /**
- * A trip overlay in the trips' dark-glass look: a dialog on wider screens and
- * a bottom drawer on phones. Focus moves into it and stays there until it
- * closes.
+ * A trip overlay: a dialog on wider screens and a bottom drawer on phones.
+ * Focus moves into it and stays there until it closes.
  */
 export function TripSheet({
   open,
@@ -80,14 +75,13 @@ export function TripSheet({
       <InDrawer.Provider value={true}>
         <Drawer open={open} onOpenChange={onOpenChange} dismissible={!busy}>
           <DrawerContent
-            className={cn(glassClassName, "shadow-[0_-12px_40px_rgba(0,0,0,0.5)]")}
             onOpenAutoFocus={onOpenAutoFocus}
             onCloseAutoFocus={onCloseAutoFocus}
             {...describedBy}
           >
             <DrawerHeader className="pr-14">{header}</DrawerHeader>
             <DrawerBody className="pb-4">{children}</DrawerBody>
-            <DrawerFooter className="border-white/10">{footer}</DrawerFooter>
+            <DrawerFooter>{footer}</DrawerFooter>
             <DrawerClose disabled={busy} className={closeClassName}>
               <XIcon />
               <span className="sr-only">Close</span>
@@ -102,7 +96,7 @@ export function TripSheet({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className={cn(glassClassName, "p-5", className)}
+        className={className}
         onOpenAutoFocus={onOpenAutoFocus}
         onCloseAutoFocus={onCloseAutoFocus}
         {...describedBy}
@@ -121,10 +115,10 @@ export function TripSheet({
 
 export function TripSheetTitle({ className, ...props }: ComponentProps<typeof DialogTitle>) {
   const Title = useContext(InDrawer) ? DrawerTitle : DialogTitle;
-  return <Title className={cn("text-base font-semibold text-white", className)} {...props} />;
+  return <Title className={className} {...props} />;
 }
 
 export function TripSheetDescription({ className, ...props }: ComponentProps<typeof DialogDescription>) {
   const Description = useContext(InDrawer) ? DrawerDescription : DialogDescription;
-  return <Description className={cn("text-white/85", className)} {...props} />;
+  return <Description className={className} {...props} />;
 }

@@ -4,9 +4,10 @@ import { Suspense, useEffect, useReducer, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import LegacyTripWizard from "@/components/trips/LegacyTripWizard";
+import { BackLink, SectionLabel } from "@/components/trips/trip-primitives";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -156,10 +157,10 @@ function TripDraftForm({ userId }: { userId: string }) {
   return (
     <PageLayout chromeVariant="compact">
       <div className="flex w-full max-w-2xl flex-col gap-6 pb-24">
-        <Link href="/trips" className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="size-4" />All trips</Link>
+        <BackLink href="/trips">All trips</BackLink>
         <header>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plan a trip</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Dates and a destination</h1>
+          <SectionLabel>Plan a trip</SectionLabel>
+          <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">Dates and a destination</h1>
           <p className="mt-2 text-sm text-muted-foreground">Start with one place. Add stops, crew and shared gear from your saved trip.</p>
         </header>
         {draft.savedId ? (

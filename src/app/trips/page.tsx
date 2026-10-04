@@ -2,23 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2, MapPin, Plus, Users } from "lucide-react";
+import { MapPin, Plus, Users } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Card,
-  Chip,
   SectionLabel,
+  TripError,
   formatDateRange,
   daysBetween,
 } from "@/components/trips/trip-primitives";
 import type { TripSummary } from "@/types/trips";
 
 const STATUS_LABEL: Record<TripSummary["status"], string> = {
-  planning: "planning",
-  next_up: "next up",
-  live: "live",
-  past: "past",
+  planning: "Planning",
+  next_up: "Next up",
+  live: "Live",
+  past: "Past",
 };
 
 export default function TripsHomePage() {
@@ -56,49 +58,42 @@ export default function TripsHomePage() {
       <div className="flex w-full max-w-3xl flex-col gap-5">
         <header>
           <SectionLabel>Your trips</SectionLabel>
-          <h1 className="mt-1 text-[2.25rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
-            Trips
-          </h1>
-          <p className="mt-1 text-sm text-white/62">
+          <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">Trips</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Pick a trip to plan kits, manage your crew, and pack faster.
           </p>
         </header>
 
-        <Link
-          href="/trips/new"
-          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-gradient-to-b from-cyan-300/22 to-cyan-300/10 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(0,0,0,0.32)] transition-colors hover:bg-cyan-300/16"
-        >
-          <Plus className="size-4" />
-          New trip
-        </Link>
+        <Button asChild size="lg" className="w-full">
+          <Link href="/trips/new">
+            <Plus />
+            New trip
+          </Link>
+        </Button>
 
-        {error && (
-          <div className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100">
-            {error}
-          </div>
-        )}
+        {error && <TripError>{error}</TripError>}
 
         {trips === null && !error ? (
           <div className="flex flex-col gap-3">
-            <Skeleton className="h-24 w-full rounded-2xl bg-white/12" />
-            <Skeleton className="h-24 w-full rounded-2xl bg-white/12" />
-            <Skeleton className="h-24 w-full rounded-2xl bg-white/12" />
+            <Skeleton className="h-24 w-full rounded-card" />
+            <Skeleton className="h-24 w-full rounded-card" />
+            <Skeleton className="h-24 w-full rounded-card" />
           </div>
         ) : trips && trips.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-white/22 bg-white/[0.04] px-5 py-10 text-center">
-            <Loader2 className="mx-auto mb-3 size-8 text-white/35" />
-            <p className="text-base font-medium text-white/85">No trips yet</p>
-            <p className="mt-1 text-sm text-white/60">
+          <Card variant="muted" padding="lg" className="py-10 text-center">
+            <MapPin className="mx-auto mb-3 size-8 text-muted-foreground" aria-hidden />
+            <p className="text-base font-semibold text-foreground">No trips yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">
               A trip can be solo or shared. Tap “New trip” to get started.
             </p>
-          </div>
+          </Card>
         ) : (
           <>
             {grouped.upcoming.length > 0 && (
               <section className="flex flex-col gap-2.5">
                 <SectionLabel>Upcoming</SectionLabel>
                 {grouped.upcoming.map((trip, i) => (
-                  <TripRow key={trip.id} trip={trip} highlighted={i === 0} />
+                  <TripRow key={trip.id} trip={trip} next={i === 0} />
                 ))}
               </section>
             )}
@@ -120,34 +115,36 @@ export default function TripsHomePage() {
   );
 }
 
-function TripRow({ trip, highlighted = false }: { trip: TripSummary; highlighted?: boolean }) {
+function TripRow({ trip, next = false }: { trip: TripSummary; next?: boolean }) {
   const total = daysBetween(trip.start_date, trip.end_date);
   return (
-    <Link href={`/trips/${trip.id}`} className="block">
-      <Card highlighted={highlighted}>
+    <Card asChild interactive>
+      <Link href={`/trips/${trip.id}`}>
         <div className="flex items-center gap-3">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-white/[0.06]">
-            <MapPin className="size-5 text-white/72" />
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-control bg-muted">
+            <MapPin className="size-5 text-muted-foreground" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-semibold text-white/95">{trip.name}</p>
-            <p className="mt-0.5 text-xs text-white/62">
+            <p className="truncate text-base font-semibold text-foreground">{trip.name}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
               {formatDateRange(trip.start_date, trip.end_date)} · {total}{" "}
               {total === 1 ? "day" : "days"} · {trip.member_count}{" "}
               {trip.member_count === 1 ? "person" : "people"}
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <Chip variant={highlighted ? "accent" : "outline"}>{STATUS_LABEL[trip.status]}</Chip>
+              <Badge size="sm" variant={next ? "primary" : "outline"}>
+                {STATUS_LABEL[trip.status]}
+              </Badge>
               {trip.stop_count > 0 && (
-                <Chip variant="outline">
-                  <Users className="size-3" /> {trip.stop_count} stop
+                <Badge size="sm" variant="outline">
+                  <Users /> {trip.stop_count} stop
                   {trip.stop_count === 1 ? "" : "s"}
-                </Chip>
+                </Badge>
               )}
             </div>
           </div>
         </div>
-      </Card>
-    </Link>
+      </Link>
+    </Card>
   );
 }
