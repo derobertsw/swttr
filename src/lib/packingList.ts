@@ -38,6 +38,12 @@ export interface PackingListData {
   totalRequiredSlots: number;
 }
 
+/**
+ * Whether a packing list was matched against the user's wardrobe. Signed out,
+ * there's no wardrobe; "unavailable" means it couldn't be read.
+ */
+export type PackingListWardrobe = "matched" | "signedOut" | "unavailable";
+
 interface WardrobeCandidate {
   label: string;
   searchText: string;
@@ -155,6 +161,8 @@ function scoreCandidate(standardOption: string, candidate: WardrobeCandidate): n
     }
   });
 
+  // Nothing in common: not a match, enabled or not.
+  if (score === 0) return 0;
   if (!candidate.disabled) score += 2;
   return score;
 }
@@ -194,16 +202,16 @@ function suggestOwnedItemsForGap(
   gap: { bodyPart: BodyPartKey; layerType: LayerType; standardOption: string },
   candidateIndex: Record<BodyPartKey, Record<LayerType, WardrobeCandidate[]>>
 ): SuggestedCandidate[] {
-  const candidates = candidateIndex[gap.bodyPart][gap.layerType];
-  if (candidates.length === 0) return [];
-
-  const enabledCandidates = candidates.filter((candidate) => !candidate.disabled);
-  const pool = enabledCandidates.length > 0 ? enabledCandidates : candidates;
-  const scored = pool
+  // Only items with something in common with the slot; enabled ones first,
+  // falling back to disabled ones when no enabled item matches.
+  const matches = candidateIndex[gap.bodyPart][gap.layerType]
     .map((candidate) => ({
       ...candidate,
       score: scoreCandidate(gap.standardOption, candidate),
     }))
+    .filter((candidate) => candidate.score > 0);
+  const enabledMatches = matches.filter((candidate) => !candidate.disabled);
+  const scored = (enabledMatches.length > 0 ? enabledMatches : matches)
     .sort((a, b) => {
       if (a.score !== b.score) return b.score - a.score;
       return a.label.localeCompare(b.label);
@@ -219,11 +227,7 @@ function suggestOwnedItemsForGap(
     });
   });
 
-  const deduped = Array.from(bestByLabel.values());
-  if (deduped.length === 0) return [];
-
-  const topPositive = deduped.filter((candidate) => candidate.score > 0);
-  return (topPositive.length > 0 ? topPositive : deduped).slice(0, 2);
+  return Array.from(bestByLabel.values()).slice(0, 2);
 }
 
 function createEmptyLayerBuckets(): Record<BodyPartKey, Record<LayerType, Set<string>>> {

@@ -1,11 +1,14 @@
 import { addDays, format } from "date-fns";
 import { Recommendation } from "@/types/recommendations";
+import type { BodyPart, LayerType } from "@/types/wardrobe";
 import {
   DaypartId,
   DaypartLayerPlan,
   DailyLayerPlan,
   ForecastHour,
+  LayerChanges,
   MultiDayLayerPlan,
+  PlanLayerItem,
   UncoveredPlanDay,
 } from "@/types/plan";
 
@@ -90,56 +93,32 @@ function summarizeWeather(hours: ForecastHour[]): WeatherSummary {
   };
 }
 
-function scoreRecommendation(recommendation: Recommendation | null): number {
-  if (!recommendation) return 0;
+const BODY_PART_ORDER: BodyPart[] = ["torso", "legs", "hands", "headNeck"];
+const LAYER_TYPE_ORDER: LayerType[] = ["base", "mid", "outer"];
 
-  const scoreLayerSet = (base: number, mid: number, outer: number) => {
-    return base * 1 + mid * 1.35 + outer * 1.15;
+function listItems(recommendation: Recommendation): PlanLayerItem[] {
+  return BODY_PART_ORDER.flatMap((bodyPart) =>
+    LAYER_TYPE_ORDER.flatMap((layerType) =>
+      (recommendation[bodyPart][layerType] ?? []).map((item) => ({ bodyPart, layerType, name: item.name }))
+    )
+  );
+}
+
+/** What to put on and take off to go from `from` to `to`; null when either is missing. */
+function diffRecommendations(
+  from: Recommendation | null,
+  to: Recommendation | null
+): LayerChanges | null {
+  if (!from || !to) return null;
+  const keyOf = (item: PlanLayerItem) => `${item.bodyPart}:${item.layerType}:${item.name}`;
+  const fromItems = listItems(from);
+  const toItems = listItems(to);
+  const fromKeys = new Set(fromItems.map(keyOf));
+  const toKeys = new Set(toItems.map(keyOf));
+  return {
+    add: toItems.filter((item) => !fromKeys.has(keyOf(item))),
+    remove: fromItems.filter((item) => !toKeys.has(keyOf(item))),
   };
-
-  const torsoScore = scoreLayerSet(
-    recommendation.torso.base.length,
-    recommendation.torso.mid?.length ?? 0,
-    recommendation.torso.outer.length
-  );
-  const legsScore = scoreLayerSet(
-    recommendation.legs.base.length,
-    recommendation.legs.mid?.length ?? 0,
-    recommendation.legs.outer.length
-  );
-  const handsScore = scoreLayerSet(
-    recommendation.hands.base.length,
-    recommendation.hands.mid?.length ?? 0,
-    recommendation.hands.outer.length
-  );
-  const headScore = scoreLayerSet(
-    recommendation.headNeck.base.length,
-    recommendation.headNeck.mid?.length ?? 0,
-    recommendation.headNeck.outer.length
-  );
-
-  return torsoScore + legsScore * 0.9 + handsScore * 0.5 + headScore * 0.5;
-}
-
-function getAdjustmentLabel(deltaScore: number): string {
-  if (deltaScore >= 1.25) return "Add one warm layer vs baseline.";
-  if (deltaScore >= 0.5) return "Slightly warmer setup than baseline.";
-  if (deltaScore <= -1.25) return "Drop a layer or open vents vs baseline.";
-  if (deltaScore <= -0.5) return "Slightly lighter than baseline.";
-  return "Keep baseline layers.";
-}
-
-function getBaselineSummary(recommendation: Recommendation | null): string {
-  if (!recommendation) return "No layer recommendation available";
-
-  const countLayers = (section: { base: unknown[]; mid?: unknown[]; outer: unknown[] }) =>
-    section.base.length + (section.mid?.length ?? 0) + section.outer.length;
-
-  const torso = countLayers(recommendation.torso);
-  const legs = countLayers(recommendation.legs);
-  const hands = countLayers(recommendation.hands);
-  const head = countLayers(recommendation.headNeck);
-  return `${torso} torso / ${legs} legs / ${hands} hands / ${head} head-neck`;
 }
 
 function getCarryItems(
@@ -172,8 +151,9 @@ function buildDayparts(
   baselineRecommendation: Recommendation | null,
   getRecommendation: (effectiveTemperature: number) => Recommendation | null
 ): DaypartLayerPlan[] {
-  const baselineScore = scoreRecommendation(baselineRecommendation);
-
+  // The day starts in the day's layers; each daypart changes what the one
+  // before it had on, so layers taken off at midday go back on for a cold evening.
+  let wearing = baselineRecommendation;
   return DAYPARTS.flatMap((definition) => {
     const hours = dayHours.filter((hour) => {
       const hourValue = parseHour(hour.time);
@@ -184,7 +164,8 @@ function buildDayparts(
 
     const summary = summarizeWeather(hours);
     const recommendation = getRecommendation(summary.effectiveTemperature);
-    const scoreDelta = scoreRecommendation(recommendation) - baselineScore;
+    const changes = diffRecommendations(wearing, recommendation);
+    if (recommendation) wearing = recommendation;
 
     return [{
       id: definition.id,
@@ -196,7 +177,7 @@ function buildDayparts(
       maxPrecipProbability: summary.maxPrecipProbability,
       effectiveTemperature: summary.effectiveTemperature,
       recommendation,
-      adjustment: getAdjustmentLabel(scoreDelta),
+      changes,
     }];
   });
 }
@@ -255,6 +236,7 @@ export function buildMultiDayLayerPlan({
     const baselineRecommendation = getRecommendation(baselineSummary.effectiveTemperature);
     const dayparts = buildDayparts(dayHours, baselineRecommendation, getRecommendation);
     const carryItems = getCarryItems(baselineSummary, dayparts);
+    const previousDay = days.at(-1);
 
     days.push({
       date: dayKey,
@@ -266,8 +248,10 @@ export function buildMultiDayLayerPlan({
         maxPrecipProbability: baselineSummary.maxPrecipProbability,
         effectiveTemperature: baselineSummary.effectiveTemperature,
         recommendation: baselineRecommendation,
-        summary: getBaselineSummary(baselineRecommendation),
       },
+      changesFromPreviousDay: previousDay
+        ? diffRecommendations(previousDay.baseline.recommendation, baselineRecommendation)
+        : null,
       dayparts,
       carryItems,
     });
@@ -279,6 +263,7 @@ export function buildMultiDayLayerPlan({
     durationDays: clampedDuration,
     dayStartHour: RELEVANT_DAY_START_HOUR,
     dayEndHour: RELEVANT_DAY_END_HOUR,
+    firstDayStartHour,
     days,
     uncoveredDays,
   };
