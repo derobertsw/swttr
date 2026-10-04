@@ -93,6 +93,9 @@ function readKept(): Record<string, GearUpDraft> {
   try {
     const stored = sessionStorage.getItem(STORAGE_KEYS.GEAR_UP_DRAFT);
     const kept: unknown = stored ? JSON.parse(stored) : null;
+    // Before each account kept its own, a tab kept one draft, shown to whoever
+    // was there. It stays the guest's, so a tab open across the change keeps it.
+    if (isDraft(kept)) return { [GUEST]: kept };
     if (!isObject(kept)) return {};
     return Object.fromEntries(Object.entries(kept).filter(([, draft]) => isDraft(draft))) as Record<string, GearUpDraft>;
   } catch {

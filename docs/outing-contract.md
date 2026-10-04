@@ -104,9 +104,10 @@ The guest and each account signed in to in the tab keep their own draft (#168). 
 | An account, after a guest in this tab picked a place or got a result | The guest's, so the outing carries on after signing in. The account takes it over, and the guest's is removed. |
 | An account, otherwise | The account's own, or the guest's when it has none. |
 
-Another account's draft is never shown.
+Another account's draft is never shown. A tab open from before each account kept its own has one draft, which stays the guest's.
 
 When the account changes while Gear up is open (signing out, signing in to another account, or a session that ends), the page starts over, like the logo:
+- from the first render with the new account, the page shows its loading outline until it has started over, so nothing of the last account's shows;
 - the result goes, and any request still loading is dropped;
 - the form is filled from the new account's draft.
 

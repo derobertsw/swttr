@@ -38,8 +38,14 @@ describe("gearUpDraft", () => {
     expect(readGearUpDraft(null)).toBeNull();
     sessionStorage.setItem(STORAGE_KEYS.GEAR_UP_DRAFT, "{not json");
     expect(readGearUpDraft(null)).toBeNull();
-    // How a draft was kept before each account had its own.
+  });
+
+  it("keeps a draft from before each account had its own as the guest's, for whoever signs in", () => {
     store(DRAFT);
+
+    expect(readGearUpDraft(null)).toEqual(DRAFT);
+    expect(readGearUpDraft("user_a")).toEqual(DRAFT);
+    saveGearUpDraft("user_a", DRAFT);
     expect(readGearUpDraft(null)).toBeNull();
   });
 

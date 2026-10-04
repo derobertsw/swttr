@@ -1,3 +1,4 @@
+import { useLayoutEffect } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -872,6 +873,47 @@ describe("Home Page", () => {
         await waitFor(() => expect(placeField()).toHaveValue("Stowe, Vermont, United States"));
         expect(within(activity()).getByRole("radio", { name: /running/i })).toBeChecked();
         expect(weatherRequests).toHaveLength(1);
+      });
+
+      /**
+       * Gear up with a probe that notes, in each commit the test causes, who was
+       * signed in whenever results were on screen. A layout effect sees the
+       * commit before the page's own effects start it over.
+       */
+      function renderProbed() {
+        const shownTo: Array<string | null> = [];
+        function Probe() {
+          useLayoutEffect(() => {
+            if (screen.queryByText("Current conditions")) shownTo.push(mockUseAuth().userId);
+          });
+          return null;
+        }
+        const page = () => (
+          <>
+            <Home />
+            <Probe />
+          </>
+        );
+        const { rerender } = render(page());
+        return { shownTo, rerender: () => rerender(page()) };
+      }
+
+      it.each([
+        { change: "signs out", next: GUEST },
+        { change: "switches to another account", next: OTHER_ACCOUNT },
+      ])("never shows an account's results once it $change", async ({ next }) => {
+        mockAccountApis();
+        const user = userEvent.setup();
+        const { shownTo, rerender } = renderProbed();
+
+        await seeRunningAtStowe(user);
+        rerender();
+        mockUseAuth.mockReturnValue(next);
+        rerender();
+
+        await waitFor(() => expect(screen.queryByText("Current conditions")).not.toBeInTheDocument());
+        expect(shownTo).toEqual([SIGNED_IN.userId]);
+        expect(placeField()).toHaveValue("");
       });
 
       it("starts over when the account signs out on the page, and takes the outing back when it signs in again", async () => {

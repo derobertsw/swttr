@@ -360,6 +360,13 @@ export function useGearUp() {
   }, [owner]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { restored } = state;
+  /**
+   * From the render where the signed-in account changes until the page has
+   * started over for the new one, which happens in an effect. Nothing the
+   * last account entered or got should show meanwhile.
+   */
+  const accountChanging = restored && owner !== undefined && owner !== state.owner;
+
   useEffect(() => {
     if (!restored || !readyToRequest || !pendingResume.current) return;
     const { outing, onResultsEntry } = pendingResume.current;
@@ -430,7 +437,8 @@ export function useGearUp() {
     activityInitializing: initializing,
     exertion,
     setExertion,
-    result: state.result,
+    result: accountChanging ? null : state.result,
+    accountChanging,
     inputMode: state.inputMode,
     setInputMode,
     date: state.date,
