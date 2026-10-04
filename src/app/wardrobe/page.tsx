@@ -262,7 +262,7 @@ export default function Wardrobe() {
             {isReady && !isEmpty && <p className="mt-1 text-sm text-muted-foreground">{overview.countLine}</p>}
           </div>
           {!isEmpty && (
-            <Button id={ADD_GEAR_ID} type="button" disabled={!isReady} onClick={() => openCatalog()}>
+            <Button id={ADD_GEAR_ID} type="button" size="lg" disabled={!isReady} onClick={() => openCatalog()}>
               <Plus />
               Add gear
             </Button>
@@ -310,7 +310,7 @@ export default function Wardrobe() {
               Recommendations use the gear in your wardrobe, so start with the pieces you wear most. You can add more
               anytime.
             </p>
-            <Button id={ADD_FIRST_ID} type="button" className="mt-4" onClick={() => openCatalog()}>
+            <Button id={ADD_FIRST_ID} type="button" size="lg" className="mt-4" onClick={() => openCatalog()}>
               <Plus />
               Add your first item
             </Button>

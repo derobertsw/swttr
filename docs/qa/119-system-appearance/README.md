@@ -1,6 +1,6 @@
 # System appearance verification — #119
 
-Checked October 4, 2026, against the Trips migration on `origin/main` (`53f6ce9`). This follow-up moves FAQ to the shared tokens and removes the app-wide dark pin. Screenshots use the same local development configuration, signed out, with no account data or database changes.
+Checked October 4, 2026, against the Trips migration on `origin/main` (`53f6ce9`). This follow-up moves FAQ to the shared tokens, removes the app-wide dark pin and closes two measured touch-size gaps in Wardrobe. Screenshots use the same local development configuration, signed out, with no account data or database changes.
 
 ## Before and after
 
@@ -28,16 +28,34 @@ Headless Chrome, controlled through the DevTools protocol, with actual `prefers-
 
 The raw results are in [rendered-checks.json](rendered-checks.json).
 
+## Integrated screen checks with synthetic fixtures
+
+The Codex in-app Chromium browser rendered the real Wardrobe, Trips list, trip overview, day detail, packing list, crew management, shared gear and personalized-result components at 320 × 844, 390 × 844 and 1280 × 900 in light and dark. A temporary local route supplied synthetic identity and API responses. All mutations were rejected; the result's ensemble evaluation was static synthetic data. The temporary route and identity override were removed before lint, typecheck, tests and build.
+
+These checks use explicit fixture palette controls, so the system-media checks above remain the evidence for automatic appearance. The fixture toolbar is visible in screenshots and the temporary route keeps Trips selected in the bottom navigation, including on Wardrobe and result fixtures.
+
+- No text-contrast failures, unmeasured backgrounds or horizontal overflow in the recorded checks.
+- No enabled mobile targets below 44 × 44px after the fixes. Wardrobe's “All” chip previously measured 43.78px wide; shared chips now have a 44px minimum width on phones and coarse pointers. Wardrobe's Add gear and Add your first item actions now measure 48px tall.
+- Wardrobe: populated, empty, error, loading and all-excluded states checked in both palettes at 390px. Catalog and custom-item drawers checked at 320 × 568 in both palettes, including radio targets. Escape restored focus to Add gear.
+- Trips list: populated, empty, error and loading states checked in both palettes at 390px. Packing-list coverage warnings, missing-input guidance, crew states and unassigned shared gear were included in the populated fixtures.
+- Personalized result: cold-risk guidance, wear sections, technical details and evaluation-error state checked. Disclosure triggers measure 48px tall. At 320 × 568, eight consecutive Tab presses stayed inside the layer picker; Escape restored focus to the invoking garment. The picker had no contrast or touch-target failures.
+
+| Wardrobe, light | Trip overview, dark | Personalized result, dark |
+|---|---|---|
+| ![Synthetic Wardrobe](wardrobe-light-390.jpg) | ![Synthetic trip overview](overview-dark-390.jpg) | ![Synthetic result](result-dark-390.jpg) |
+
+Additional captures: [dark Wardrobe](wardrobe-dark-390.jpg), [light trip overview](overview-light-390.jpg), [light result](result-light-390.jpg), [compact layer picker](result-picker-dark-320.jpg), and [compact custom gear form](wardrobe-custom-dark-320.jpg). Raw fixture measurements are in [integrated-checks.json](integrated-checks.json). The 87 records include repeated observations while screens settled; they are not 87 distinct scenarios.
+
 ## Automated checks
 
 - `npm run lint` — passed.
 - `npm run typecheck` — passed.
-- `NODE_OPTIONS=--no-experimental-webstorage npx vitest run` — 94 files, 1,169 tests passed. Node 26 needs this flag because its native localStorage otherwise shadows jsdom's.
+- Full suite on the initial appearance change: `NODE_OPTIONS=--no-experimental-webstorage npx vitest run` — 94 files, 1,169 tests passed. After the touch-size fixes, the focused Wardrobe, UI, layers, PageLayout and LayerDisplay suite passed again: seven files, 122 tests. Node 26 needs this flag because its native localStorage otherwise shadows jsdom's.
 - `npm run build` — passed.
 - `xcrun swiftc -frontend -parse ios/App/App/SWTTRViewController.swift` — passed (syntax only). `xcode-select -p` points to Command Line Tools and `xcrun --find xcodebuild` fails, so an iOS compile was unavailable.
 
 ## Remaining release coverage
 
-This follow-up did not repeat authenticated Trips, Wardrobe or personalized-result visual checks. Their migrations were checked separately; see PRs [#237](https://github.com/derobertsw/swttr/pull/237), [#216](https://github.com/derobertsw/swttr/pull/216), [#219](https://github.com/derobertsw/swttr/pull/219) and [#228](https://github.com/derobertsw/swttr/pull/228). Those reports do not substitute for an integrated signed-in release walkthrough.
+The integrated fixture checks above do not verify real Clerk sessions or Supabase RLS. A signed-in release walkthrough remains outstanding. Earlier migration coverage is recorded in PRs [#237](https://github.com/derobertsw/swttr/pull/237), [#216](https://github.com/derobertsw/swttr/pull/216), [#219](https://github.com/derobertsw/swttr/pull/219) and [#228](https://github.com/derobertsw/swttr/pull/228). Those reports do not substitute for an integrated signed-in release walkthrough.
 
 Real iPhone/Capacitor checks, VoiceOver, outdoor readability, virtual-keyboard behavior and real safe-area insets remain unverified. Chrome mobile emulation cannot verify them. The custom UIKit shell now requests the system status-text style and uses dynamic loading canvas colors, but these Swift changes need an Xcode build and device verification. It retains its fixed dark tab bar and action button, and it does not initialize the Capacitor status-bar plugin. This exception is recorded in [the design-system guide](../../design-system.md) and belongs to the native work in #130/#146. No native appearance claim is based on the mocked Capacitor unit test.
