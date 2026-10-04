@@ -147,7 +147,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
         </header>
 
         {loading && <Skeleton className="h-48 w-full rounded-card" />}
-        {error && <TripError role="alert">{error}</TripError>}
+        {error && <TripError>{error}</TripError>}
 
         {data && needsReview.length > 0 && (
           <Card>

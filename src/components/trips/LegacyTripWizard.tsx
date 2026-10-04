@@ -192,7 +192,7 @@ function NewTripWizard() {
           Saved to your trips. Stops and crew save as you add them.
         </p>
       )}
-      {error && <TripError role="alert">{error}</TripError>}
+      {error && <TripError>{error}</TripError>}
       {step === 1 && (
         <Step1Dates
           name={name}

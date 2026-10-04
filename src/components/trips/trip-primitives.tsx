@@ -94,10 +94,11 @@ export function BackLink({ href, children }: { href: string; children: ReactNode
   );
 }
 
-/** A trip-level error, such as a trip that failed to load. */
+/** A trip-level error, such as a trip that failed to load. It appears after the page does, so it's announced. */
 export function TripError({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
+      role="alert"
       className={cn(
         "rounded-card bg-destructive-soft px-4 py-3 text-sm font-medium text-destructive",
         className
