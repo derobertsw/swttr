@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import type { PrecipitationType, WeatherContext } from "@/types/weather";
+import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
+import { formatTemperature } from "@/lib/temperature";
 
 /** The button that opens the place and time drawer, which returns focus to it. */
 export const EDIT_WEATHER_ID = "result-edit-weather";
@@ -168,6 +170,7 @@ export function ResultHeader({
   onEditWeather,
   loading,
 }: ResultHeaderProps) {
+  const { temperatureUnit } = useTemperatureUnit();
   const feelsLike = calculateFeelsLike(temperature, windspeed);
   const isForecast = context?.source === "forecast";
   const precipitationState = precipitation ? precipitationLabel(precipitationType, isForecast) : null;
@@ -210,8 +213,8 @@ export function ResultHeader({
           </p>
         )}
         <p className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{temperature}°F</span>
-          {feelsLike !== temperature && <> · Feels like {feelsLike}°</>}
+          <span className="font-semibold text-foreground">{formatTemperature(temperature, temperatureUnit)}</span>
+          {feelsLike !== temperature && <> · Feels like {formatTemperature(feelsLike, temperatureUnit)}</>}
           {" · "}
           <span>Wind {windspeed} mph</span>
         </p>

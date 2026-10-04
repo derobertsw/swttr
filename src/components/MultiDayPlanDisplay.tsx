@@ -8,6 +8,8 @@ import type { MultiDayLayerPlan, UncoveredPlanDay } from "@/types/plan";
 import { BODY_PART_LABELS, LAYER_LABELS } from "@/lib/layers";
 import type { PackingListData } from "@/lib/packingList";
 import { BODY_PART_ORDER, LAYER_TYPE_ORDER } from "@/lib/packingList";
+import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
+import { formatTemperatureRange } from "@/lib/temperature";
 
 interface MultiDayPlanDisplayProps {
   plan: MultiDayLayerPlan;
@@ -33,6 +35,7 @@ export default function MultiDayPlanDisplay({
   itemMappings,
   onReset,
 }: MultiDayPlanDisplayProps) {
+  const { temperatureUnit } = useTemperatureUnit();
   // `list` is null when the request failed.
   const [packingResult, setPackingResult] = useState<{
     days: MultiDayLayerPlan["days"];
@@ -302,7 +305,7 @@ export default function MultiDayPlanDisplay({
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-700">
               <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1">
                 <Thermometer className="size-3.5" />
-                {day.baseline.minTemp}°-{day.baseline.maxTemp}°F
+                {formatTemperatureRange(day.baseline.minTemp, day.baseline.maxTemp, temperatureUnit)}
               </span>
               <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1">
                 <Wind className="size-3.5" />
@@ -325,7 +328,7 @@ export default function MultiDayPlanDisplay({
                       {daypart.label} <span className="text-xs text-slate-500">({daypart.timeRangeLabel})</span>
                     </p>
                     <p className="text-xs text-slate-600">
-                      {daypart.minTemp}°-{daypart.maxTemp}°F, wind {daypart.maxWindSpeed} mph
+                      {formatTemperatureRange(daypart.minTemp, daypart.maxTemp, temperatureUnit)}, wind {daypart.maxWindSpeed} mph
                     </p>
                   </div>
                   <p className="mt-1 text-xs text-slate-700">{daypart.adjustment}</p>

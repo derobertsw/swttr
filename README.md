@@ -7,6 +7,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - **Biophysics-based recommendations** for supported winter sports using IREQ (ISO 11079)
 - **Activity-based recommendations** across multiple sports and intensity profiles
 - **Manual or forecast mode** for quick input or location/time-based planning
+- **Fahrenheit or Celsius** in Settings, remembered per account on this device (with a separate guest choice)
 - **Wardrobe management** with calibrated gear data (clo, breathability, wind/water protection)
 - **Body-part guidance** (torso, legs, hands, head/neck) with target clo insights
 - **Plan ahead** with multi-day forecasts and a packing list

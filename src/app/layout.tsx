@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "@/assets/styles/globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ClerkProvider } from "@clerk/nextjs";
+import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
 
 import React from "react";
 
@@ -60,7 +61,7 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
           />
         </head>
         <body className="antialiased">
-          {children}
+          <TemperatureUnitProvider>{children}</TemperatureUnitProvider>
           <Toaster />
         </body>
       </html>
