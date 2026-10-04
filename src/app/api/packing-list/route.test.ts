@@ -65,9 +65,12 @@ describe("POST /api/packing-list", () => {
     expect(fetchUserWardrobeItems).toHaveBeenCalledWith(expect.anything(), "user_1");
   });
 
-  it("says when a signed-in user's wardrobe couldn't be read", async () => {
+  it.each([
+    ["there's no database client", () => vi.mocked(getSupabase).mockReturnValueOnce(null)],
+    ["the wardrobe query fails", () => vi.mocked(fetchUserWardrobeItems).mockResolvedValueOnce(null)],
+  ])("says a signed-in user's wardrobe couldn't be read when %s", async (_case, fail) => {
     vi.mocked(getAuthUserId).mockResolvedValueOnce("user_1");
-    vi.mocked(getSupabase).mockReturnValueOnce(null);
+    fail();
     const response = await POST(
       new NextRequest("http://localhost:3000/api/packing-list", {
         method: "POST",

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextRequest } from "next/server";
 import { POST as buildPackingList } from "@/app/api/packing-list/route";
@@ -37,12 +37,14 @@ function hour(time: string, temperature: number): ForecastHour {
 const STEADY_HOURS = [hour("2026-01-15T12:00", 30), hour("2026-01-16T09:00", 28)];
 
 /**
- * Thu: a cold morning and a milder midday. Fri: as cold as Thu. Sat: milder.
- * Below 20°F after the wind, the guide adds a down vest and a neck gaiter.
+ * Thu: a cold morning, a milder midday and a cold evening. Fri: as cold as
+ * Thu. Sat: milder. Below 20°F after the wind, the guide adds a down vest
+ * and a neck gaiter.
  */
 const CHANGING_HOURS = [
   hour("2026-01-15T07:00", 20),
   hour("2026-01-15T12:00", 30),
+  hour("2026-01-15T18:00", 20),
   hour("2026-01-16T09:00", 21),
   hour("2026-01-17T09:00", 32),
 ];
@@ -179,7 +181,7 @@ describe("MultiDayPlanDisplay", () => {
       expect(within(thursday).getByText("Hands").nextElementSibling).toHaveTextContent("Insulated gloves");
     });
 
-    it("lists only what changes through the day", () => {
+    it("lists only what changes through the day, from one daypart to the next", () => {
       stubPackingList();
       render(<MultiDayPlanDisplay plan={makePlan({ hours: CHANGING_HOURS, durationDays: 3 })} />);
 
@@ -187,10 +189,39 @@ describe("MultiDayPlanDisplay", () => {
       // The morning is the day's coldest part, so it has nothing to change.
       expect(within(through).queryByText("Morning")).not.toBeInTheDocument();
       expect(through).toHaveTextContent("Midday · 11am-3pm · 30°–30°F");
+      expect(through).toHaveTextContent("Evening · 4pm-9pm · 20°–20°F");
       expect(within(through).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
         "Take off Down vest · Upper body mid",
         "Take off Neck gaiter · Head & neck base",
+        // What came off at midday goes back on for the evening.
+        "Put on Down vest · Upper body mid",
+        "Put on Neck gaiter · Head & neck base",
       ]);
+    });
+
+    it("doesn't swap between two of the guide's items mapped to the same wardrobe item", () => {
+      stubPackingList();
+      const withShell = (name: string): Recommendation => ({ ...MILD, torso: { ...MILD.torso, outer: [{ name }] } });
+      render(
+        <MultiDayPlanDisplay
+          plan={makePlan({
+            hours: [hour("2026-01-15T07:00", 20), hour("2026-01-15T12:00", 30)],
+            durationDays: 1,
+            layers: (temperature) => withShell(temperature < 20 ? "Snow Shell" : "Soft Shell"),
+          })}
+          itemMappings={new Map([
+            ["torso:outer:Snow Shell", "Beta jacket"],
+            ["torso:outer:Soft Shell", "Beta jacket"],
+          ])}
+        />
+      );
+
+      const thursday = day("Thu, Jan 15");
+      expect(within(thursday).queryByRole("region", { name: "Through Thu, Jan 15" })).not.toBeInTheDocument();
+      expect(within(thursday).getByText("Same layers all day.")).toBeInTheDocument();
+      expect(within(thursday).getByText("Upper body").nextElementSibling).toHaveTextContent(
+        "Merino base layer, Fleece jacket, Beta jacket"
+      );
     });
 
     it("leads later days with what changed since the day before, with the whole outfit a tap away", async () => {
@@ -320,6 +351,28 @@ describe("MultiDayPlanDisplay", () => {
         await screen.findByText("Your wardrobe couldn't be checked, so these aren't matched to your items.")
       ).toBeInTheDocument();
       expect(screen.queryByText("Not matched to your wardrobe")).not.toBeInTheDocument();
+    });
+
+    it("says it's updating while a new list loads over the one shown", async () => {
+      const fetchMock = stubPackingList();
+      const { rerender } = render(<MultiDayPlanDisplay plan={makePlan()} itemMappings={new Map()} />);
+      await openPacking();
+      await screen.findByRole("region", { name: "Upper body" });
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      const serve = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementationOnce(async (...args) => {
+        await held;
+        return serve(...args);
+      });
+
+      // Wardrobe mappings reload, e.g. when the window regains focus.
+      rerender(<MultiDayPlanDisplay plan={makePlan()} itemMappings={new Map()} />);
+
+      expect(await screen.findByRole("status")).toHaveTextContent("Updating packing list…");
+      expect(screen.getByRole("region", { name: "Upper body" })).toBeInTheDocument();
+      release();
+      await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
     });
 
     it("says the packing list is unavailable when the server fails, and tries again", async () => {

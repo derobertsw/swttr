@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Backpack, RotateCw } from "lucide-react";
+import { AlertTriangle, Backpack, Loader2, RotateCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -47,7 +47,17 @@ function rowsFor(list: PackingListData, bodyPart: (typeof BODY_PART_ORDER)[numbe
   });
 }
 
-function WardrobeNote({ list, wardrobe, onRetry }: { list: PackingListData; wardrobe: PackingListWardrobe; onRetry: () => void }) {
+function WardrobeNote({
+  list,
+  wardrobe,
+  onRetry,
+  retrying,
+}: {
+  list: PackingListData;
+  wardrobe: PackingListWardrobe;
+  onRetry: () => void;
+  retrying?: boolean;
+}) {
   if (wardrobe === "signedOut") {
     return (
       <p className="text-sm text-muted-foreground">
@@ -60,8 +70,8 @@ function WardrobeNote({ list, wardrobe, onRetry }: { list: PackingListData; ward
     return (
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <p className="text-sm text-muted-foreground">Your wardrobe couldn&apos;t be checked, so these aren&apos;t matched to your items.</p>
-        <Button type="button" size="sm" variant="ghost" onClick={onRetry}>
-          <RotateCw aria-hidden="true" />
+        <Button type="button" size="sm" variant="ghost" onClick={onRetry} loading={retrying}>
+          {!retrying && <RotateCw aria-hidden="true" />}
           Try again
         </Button>
       </div>
@@ -118,9 +128,15 @@ export function PlanPacking({ state, onRetry, retrying }: PlanPackingProps) {
 
   return (
     <div aria-busy={retrying || undefined} className="flex flex-col gap-4">
+      {retrying && (
+        <p role="status" className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          Updating packing list…
+        </p>
+      )}
       {list.totalRequiredSlots > 0 ? (
         <>
-          <WardrobeNote list={list} wardrobe={wardrobe} onRetry={onRetry} />
+          <WardrobeNote list={list} wardrobe={wardrobe} onRetry={onRetry} retrying={retrying} />
           <Card padding="none" className="divide-y divide-border px-4">
             {sections.map(({ bodyPart, rows }) => (
               <section key={bodyPart} aria-label={BODY_PART_LABELS[bodyPart]} className="py-4">

@@ -3,7 +3,7 @@ import { Backpack, ChevronDown, Minus, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { BODY_PART_LABELS, BODY_PARTS, LAYER_LABELS } from "@/lib/layers";
 import type { BodyPart, LayerType } from "@/types/wardrobe";
-import type { DailyLayerPlan, LayerChanges } from "@/types/plan";
+import type { DailyLayerPlan, LayerChanges, PlanLayerItem } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
 
 const LAYER_TYPES: LayerType[] = ["base", "mid", "outer"];
@@ -20,6 +20,25 @@ function itemName(bodyPart: BodyPart, layerType: LayerType, name: string, itemMa
   return itemMappings?.get(`${bodyPart}:${layerType}:${name}`) ?? name;
 }
 
+/**
+ * Changes named as the wardrobe items they map to. Putting on and taking off
+ * what maps to the same item cancels out, so a swap between two of the
+ * guide's items the user covers with one jacket isn't a change.
+ */
+function mapChanges(changes: LayerChanges | null, itemMappings?: Map<string, string>): LayerChanges | null {
+  if (!changes) return null;
+  const named = (item: PlanLayerItem) => ({ ...item, name: itemName(item.bodyPart, item.layerType, item.name, itemMappings) });
+  const keyOf = (item: PlanLayerItem) => `${item.bodyPart}:${item.layerType}:${item.name}`;
+  const add = changes.add.map(named);
+  const remove = changes.remove.map(named);
+  const addKeys = new Set(add.map(keyOf));
+  const removeKeys = new Set(remove.map(keyOf));
+  return {
+    add: add.filter((item) => !removeKeys.has(keyOf(item))),
+    remove: remove.filter((item) => !addKeys.has(keyOf(item))),
+  };
+}
+
 function hasChanges(changes: LayerChanges | null): changes is LayerChanges {
   return changes !== null && (changes.add.length > 0 || changes.remove.length > 0);
 }
@@ -29,9 +48,9 @@ function Outfit({ recommendation, itemMappings }: { recommendation: Recommendati
   return (
     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
       {BODY_PARTS.map((bodyPart) => {
-        const names = LAYER_TYPES.flatMap((layerType) =>
+        const names = [...new Set(LAYER_TYPES.flatMap((layerType) =>
           (recommendation[bodyPart][layerType] ?? []).map((item) => itemName(bodyPart, layerType, item.name, itemMappings))
-        );
+        ))];
         return (
           <div key={bodyPart} className="contents">
             <dt className="text-muted-foreground">{BODY_PART_LABELS[bodyPart]}</dt>
@@ -54,12 +73,10 @@ function ChangeList({
   changes,
   addLabel,
   removeLabel,
-  itemMappings,
 }: {
   changes: LayerChanges;
   addLabel: string;
   removeLabel: string;
-  itemMappings?: Map<string, string>;
 }) {
   const rows = [
     ...changes.add.map((item) => ({ item, verb: addLabel, Icon: Plus })),
@@ -71,7 +88,7 @@ function ChangeList({
         <li key={`${verb}:${item.bodyPart}:${item.layerType}:${item.name}`} className="flex items-start gap-2 text-sm">
           <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className="min-w-0">
-            {verb} <span className="font-medium text-foreground">{itemName(item.bodyPart, item.layerType, item.name, itemMappings)}</span>
+            {verb} <span className="font-medium text-foreground">{item.name}</span>
             <span className="text-muted-foreground">
               {" "}· {BODY_PART_LABELS[item.bodyPart]} {LAYER_LABELS[item.layerType].toLowerCase()}
             </span>
@@ -91,11 +108,12 @@ export function PlanDayCard({ day, previousDay, itemMappings }: PlanDayCardProps
   const headingId = useId();
   const { baseline } = day;
   const recommendation = baseline.recommendation;
-  const dayChanges = previousDay ? day.changesFromPreviousDay : null;
+  const dayChanges = previousDay ? mapChanges(day.changesFromPreviousDay, itemMappings) : null;
   const leadWithChanges = previousDay !== undefined && dayChanges !== null;
-  const changingDayparts = day.dayparts.flatMap((daypart) =>
-    hasChanges(daypart.changes) ? [{ ...daypart, changes: daypart.changes }] : []
-  );
+  const changingDayparts = day.dayparts.flatMap((daypart) => {
+    const changes = mapChanges(daypart.changes, itemMappings);
+    return hasChanges(changes) ? [{ ...daypart, changes }] : [];
+  });
   const sameAllDay = day.dayparts.length > 1 && changingDayparts.length === 0;
 
   return (
@@ -122,7 +140,7 @@ export function PlanDayCard({ day, previousDay, itemMappings }: PlanDayCardProps
                 {hasChanges(dayChanges) ? (
                   <>
                     <p className="text-sm font-semibold text-foreground">Changes from {previousDay.label}</p>
-                    <ChangeList changes={dayChanges} addLabel="Add" removeLabel="Leave out" itemMappings={itemMappings} />
+                    <ChangeList changes={dayChanges} addLabel="Add" removeLabel="Leave out" />
                   </>
                 ) : (
                   <p className="text-sm text-foreground">Same layers as {previousDay.label}.</p>
@@ -162,7 +180,7 @@ export function PlanDayCard({ day, previousDay, itemMappings }: PlanDayCardProps
                     {" "}· {daypart.timeRangeLabel} · {daypart.minTemp}°–{daypart.maxTemp}°F
                   </span>
                 </p>
-                <ChangeList changes={daypart.changes} addLabel="Put on" removeLabel="Take off" itemMappings={itemMappings} />
+                <ChangeList changes={daypart.changes} addLabel="Put on" removeLabel="Take off" />
               </div>
             ))}
           </section>

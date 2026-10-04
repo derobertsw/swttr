@@ -7,16 +7,19 @@ import type { WardrobeItem } from "@/types/wardrobe";
 //
 // Detail rows are fetched in three batched queries (one per item_type) rather
 // than per-entry to avoid N+1 fan-out on large wardrobes.
+//
+// Returns null when the wardrobe couldn't be read, so callers can tell a
+// failed read from an empty wardrobe.
 export async function fetchUserWardrobeItems(
   supabase: SupabaseClient,
   userId: string
-): Promise<WardrobeItem[]> {
+): Promise<WardrobeItem[] | null> {
   const { data: entries, error } = await supabase
     .from("user_wardrobe")
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
-  if (error || !entries) return [];
+  if (error || !entries) return null;
 
   type DetailType = "garment" | "handwear" | "headwear";
   const idsByType: Record<DetailType, string[]> = {
@@ -49,7 +52,7 @@ export async function fetchUserWardrobeItems(
   // wardrobe with missing details — that would surface false "gap" rows in
   // the packing list and look like the user doesn't own the gear they do.
   if (garmentsRes.error || handwearRes.error || headwearRes.error) {
-    return [];
+    return null;
   }
 
   const indexById = <T extends { id: string }>(rows: T[] | null) =>

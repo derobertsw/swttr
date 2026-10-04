@@ -42,8 +42,11 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       wardrobe = "signedOut";
     } else if (supabase) {
-      wardrobeItems = await fetchUserWardrobeItems(supabase, userId);
-      wardrobe = "matched";
+      const items = await fetchUserWardrobeItems(supabase, userId);
+      if (items) {
+        wardrobeItems = items;
+        wardrobe = "matched";
+      }
     }
   } catch {
     // Continue without wardrobe data

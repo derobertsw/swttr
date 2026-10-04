@@ -33,7 +33,10 @@ export interface DaypartLayerPlan {
   maxPrecipProbability: number;
   effectiveTemperature: number;
   recommendation: Recommendation | null;
-  /** From the day's layers to this daypart's; null when either has none. */
+  /**
+   * From the previous daypart's layers (the day's, for the first) to this
+   * one's; null when either has none.
+   */
   changes: LayerChanges | null;
 }
 

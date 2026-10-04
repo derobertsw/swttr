@@ -151,6 +151,9 @@ function buildDayparts(
   baselineRecommendation: Recommendation | null,
   getRecommendation: (effectiveTemperature: number) => Recommendation | null
 ): DaypartLayerPlan[] {
+  // The day starts in the day's layers; each daypart changes what the one
+  // before it had on, so layers taken off at midday go back on for a cold evening.
+  let wearing = baselineRecommendation;
   return DAYPARTS.flatMap((definition) => {
     const hours = dayHours.filter((hour) => {
       const hourValue = parseHour(hour.time);
@@ -161,6 +164,8 @@ function buildDayparts(
 
     const summary = summarizeWeather(hours);
     const recommendation = getRecommendation(summary.effectiveTemperature);
+    const changes = diffRecommendations(wearing, recommendation);
+    if (recommendation) wearing = recommendation;
 
     return [{
       id: definition.id,
@@ -172,7 +177,7 @@ function buildDayparts(
       maxPrecipProbability: summary.maxPrecipProbability,
       effectiveTemperature: summary.effectiveTemperature,
       recommendation,
-      changes: diffRecommendations(baselineRecommendation, recommendation),
+      changes,
     }];
   });
 }

@@ -172,9 +172,10 @@ describe("buildMultiDayLayerPlan", () => {
       };
     };
     const hours: ForecastHour[] = [
-      // Thu: a cold morning, then a warmer midday.
+      // Thu: a cold morning, a warmer midday, then a cold evening.
       { time: "2026-01-15T07:00", temperature: 20, windSpeed: 0, precipitationProbability: 0 },
       { time: "2026-01-15T12:00", temperature: 30, windSpeed: 0, precipitationProbability: 0 },
+      { time: "2026-01-15T18:00", temperature: 20, windSpeed: 0, precipitationProbability: 0 },
       // Fri: as cold as Thu.
       { time: "2026-01-16T09:00", temperature: 20, windSpeed: 0, precipitationProbability: 0 },
       // Sat: warmer.
@@ -187,18 +188,19 @@ describe("buildMultiDayLayerPlan", () => {
       getRecommendation,
     });
 
-    it("lists what each daypart takes off or puts on, from the day's layers", () => {
+    it("lists what each daypart takes off or puts back on, from the daypart before", () => {
       const [thursday] = plan().days;
+      const extras = [
+        { bodyPart: "torso", layerType: "mid", name: "Down vest" },
+        { bodyPart: "headNeck", layerType: "base", name: "Neck gaiter" },
+      ];
 
       expect(thursday.dayparts.map((part) => [part.id, part.changes])).toEqual([
+        // The morning starts in the day's layers.
         ["morning", { add: [], remove: [] }],
-        ["midday", {
-          add: [],
-          remove: [
-            { bodyPart: "torso", layerType: "mid", name: "Down vest" },
-            { bodyPart: "headNeck", layerType: "base", name: "Neck gaiter" },
-          ],
-        }],
+        ["midday", { add: [], remove: extras }],
+        // Back on for the cold evening.
+        ["evening", { add: extras, remove: [] }],
       ]);
     });
 
@@ -220,7 +222,7 @@ describe("buildMultiDayLayerPlan", () => {
       const [, friday] = buildMultiDayLayerPlan({
         startDate: new Date("2026-01-15T00:00:00"),
         durationDays: 2,
-        hourlyForecast: [hours[1], hours[2]],
+        hourlyForecast: [hours[1], hours[3]],
         getRecommendation,
       }).days;
 
@@ -242,7 +244,7 @@ describe("buildMultiDayLayerPlan", () => {
       });
       const [thursday, friday, saturday] = result.days;
 
-      expect(thursday.dayparts.map((part) => part.changes)).toEqual([null, null]);
+      expect(thursday.dayparts.map((part) => part.changes)).toEqual([null, null, null]);
       expect(friday.changesFromPreviousDay).toBeNull();
       expect(saturday.changesFromPreviousDay).toBeNull();
     });
