@@ -1,964 +1,209 @@
 "use client";
 
-import { Suspense, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { Suspense, useEffect, useReducer, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { format } from "date-fns";
-import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Calendar as CalIcon, CheckCircle2, GripVertical, Loader2, MapPin, Plus, UserPlus, X } from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Skeleton } from "@/components/ui/skeleton";
+import LegacyTripWizard from "@/components/trips/LegacyTripWizard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
-import {
-  Card,
-  Chip,
-  InviteLinkButton,
-  MemberAvatar,
-  SectionLabel,
-  daysBetween,
-  formatDateRange,
-} from "@/components/trips/trip-primitives";
-import { TripSheet, TripSheetTitle } from "@/components/trips/TripSheet";
-import { useReturnFocus } from "@/hooks/useReturnFocus";
-import { errorMessage, fetchTripFull, tripRequest } from "@/lib/trip-requests";
-import type { DateRange } from "react-day-picker";
-import type { Trip, TripMember, TripStop } from "@/types/trips";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
+import { errorMessage, TripRequestError, tripRequest } from "@/lib/trip-requests";
+import { STORAGE_KEYS } from "@/lib/storage";
+import type { TripCreationInput } from "@/lib/trip-creation";
+import type { LocationSuggestion } from "@/types/recommendations";
+import type { Trip } from "@/types/trips";
 
-type Step = 1 | 2 | 3 | 4;
-
-type TripBasics = Pick<Trip, "name" | "start_date" | "end_date">;
-
-/** A picked calendar day as a trip date. The calendar picks local days, so this doesn't go through UTC. */
-function toTripDate(day: Date): string {
-  return format(day, "yyyy-MM-dd");
+interface Draft {
+  id: string;
+  name: string;
+  nameEdited: boolean;
+  start: string;
+  end: string;
+  activity: string;
+  place: LocationSuggestion | null;
+  submitted?: TripCreationInput;
+  savedId?: string;
 }
 
-/** A trip date as the local day the calendar shows. */
-function fromTripDate(isoDate: string): Date {
-  return new Date(`${isoDate}T00:00:00`);
-}
+const emptyDraft = (): Draft => ({ id: crypto.randomUUID(), name: "", nameEdited: false, start: "", end: "", activity: "", place: null });
 
-/** The step in a reopened trip's URL. A trip is created on step 1, so it defaults to step 2. */
-function parseStep(value: string | null): Step {
-  const step = Number(value);
-  return step === 1 || step === 3 || step === 4 ? step : 2;
-}
-
-function draftBasics(name: string, range: DateRange | undefined): TripBasics | null {
-  if (!name.trim() || !range?.from || !range?.to) return null;
-  return { name: name.trim(), start_date: toTripDate(range.from), end_date: toTripDate(range.to) };
-}
-
-/** The id of a stop's Edit button, which takes focus back from the stop sheet. */
-function editStopButtonId(stopId: string) {
-  return `edit-stop-${stopId}`;
-}
-
-function changedBasics(trip: Trip, basics: TripBasics): Partial<TripBasics> {
-  const changes: Partial<TripBasics> = {};
-  for (const key of ["name", "start_date", "end_date"] as const) {
-    if (basics[key] !== trip[key]) changes[key] = basics[key];
-  }
-  return changes;
+function CreationSkeleton() {
+  return <PageLayout chromeVariant="compact"><Skeleton className="h-96 w-full max-w-2xl" /></PageLayout>;
 }
 
 export default function NewTripPage() {
+  return <Suspense fallback={<CreationSkeleton />}><TripEntry /></Suspense>;
+}
+
+function TripEntry() {
+  const params = useSearchParams();
+  // These URLs point at already-saved trips from the former wizard.
+  return params.has("trip") ? <LegacyTripWizard /> : <TripCreator />;
+}
+
+function TripCreator() {
+  const { userId, isLoaded } = useAuth();
+  if (!isLoaded) return <CreationSkeleton />;
+  if (!userId) return <PageLayout chromeVariant="compact"><p>Sign in to save a trip.</p></PageLayout>;
+  // Account changes remount the form, hiding private input immediately and
+  // retiring any earlier request, including an A → B → A account change.
+  return <TripDraftForm key={userId} userId={userId} />;
+}
+
+type CreationState = { draft: Draft | null; storageError: boolean };
+
+function TripDraftForm({ userId }: { userId: string }) {
+  const router = useRouter();
+  const [{ draft, storageError }, dispatch] = useReducer(
+    (state: CreationState, update: Partial<CreationState>) => ({ ...state, ...update }),
+    { draft: null, storageError: false }
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  const account = useRef(0);
+  const request = useRef<AbortController | null>(null);
+  const search = useLocationSearch();
+
+  useEffect(() => {
+    let draft = emptyDraft();
+    let storageError = false;
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEYS.TRIP_CREATION_DRAFT);
+      let stored = null;
+      try { stored = raw ? JSON.parse(raw) : null; } catch { sessionStorage.removeItem(STORAGE_KEYS.TRIP_CREATION_DRAFT); }
+      if (stored?.owner === userId && stored.draft && typeof stored.draft.id === "string" && typeof stored.draft.name === "string" && typeof stored.draft.start === "string" && typeof stored.draft.end === "string") {
+        draft = stored.draft;
+      } else {
+        sessionStorage.removeItem(STORAGE_KEYS.TRIP_CREATION_DRAFT);
+      }
+    } catch {
+      storageError = true;
+    }
+    dispatch({ draft, storageError });
+    return () => { account.current += 1; request.current?.abort(); };
+  }, [userId]);
+
+  const persist = (next: Draft): boolean => {
+    if (!userId) return false;
+    dispatch({ draft: next });
+    try {
+      sessionStorage.setItem(STORAGE_KEYS.TRIP_CREATION_DRAFT, JSON.stringify({ owner: userId, draft: next }));
+      dispatch({ storageError: false });
+      return true;
+    } catch {
+      dispatch({ storageError: true });
+      return false;
+    }
+  };
+  const edit = (update: Partial<Draft>) => { if (draft) persist({ ...draft, ...update }); };
+
+  const create = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!draft || inFlight.current) return;
+    const place = draft.place;
+    if (!draft.submitted && (!place || !draft.name.trim() || !draft.start || !draft.end || draft.start > draft.end)) {
+      setError("Pick a destination, add a trip name and choose a valid date range.");
+      return;
+    }
+    const input = draft.submitted ?? {
+      creation_id: draft.id, name: draft.name.trim(), start_date: draft.start, end_date: draft.end,
+      destination: { name: [place!.name, place!.region || place!.country].filter(Boolean).join(", "), latitude: place!.latitude, longitude: place!.longitude },
+      activity: draft.activity || null,
+    };
+    const submittedDraft = { ...draft, submitted: input };
+    // Record the identity and exact submitted fields BEFORE the request. An
+    // uncertain response can then be retried across a reload without new work.
+    if (!persist(submittedDraft)) return;
+    const generation = account.current;
+    inFlight.current = true;
+    setSaving(true);
+    setError(null);
+    const controller = new AbortController();
+    request.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 20_000);
+    try {
+      const { trip } = await tripRequest<{ trip: Trip }>("/api/v1/trips", "POST", input, { signal: controller.signal });
+      if (account.current !== generation) return;
+      persist({ ...submittedDraft, savedId: trip.id });
+      router.replace(`/trips/${encodeURIComponent(trip.id)}`);
+    } catch (err) {
+      if (account.current === generation) {
+        const status = err instanceof TripRequestError ? err.status : undefined;
+        // Validation runs before creation. A collision cannot succeed for this
+        // account, so retire that identity while keeping the editable input.
+        if (status === 400) persist({ ...draft, submitted: undefined });
+        else if (status === 409) persist({ ...draft, id: crypto.randomUUID(), submitted: undefined });
+        const hint = status === 400 ? " Edit the details and try again." : status === 409 ? " A fresh draft is ready. Try creating the trip again." : " Retry checks the same draft.";
+        setError(`Couldn't create the trip: ${errorMessage(err)}${hint}`);
+      }
+    } finally {
+      window.clearTimeout(timeout);
+      if (request.current === controller) request.current = null;
+      if (account.current === generation) { inFlight.current = false; setSaving(false); }
+    }
+  };
+
+  if (!draft) return <CreationSkeleton />;
+
   return (
     <PageLayout chromeVariant="compact">
-      {/* useSearchParams needs a Suspense boundary for the page to prerender. */}
-      <Suspense fallback={<WizardSkeleton />}>
-        <NewTripWizard />
-      </Suspense>
-    </PageLayout>
-  );
-}
-
-function WizardSkeleton() {
-  return (
-    <div className="flex w-full max-w-2xl flex-col gap-5">
-      <Skeleton className="h-20 w-full rounded-2xl bg-white/12" />
-      <Skeleton className="h-64 w-full rounded-2xl bg-white/12" />
-    </div>
-  );
-}
-
-function NewTripWizard() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  // Once the trip is created, its id and the current step go in the URL, so a
-  // refresh reopens that trip instead of starting a second one.
-  const [resume] = useState(() => ({
-    tripId: searchParams.get("trip"),
-    step: parseStep(searchParams.get("step")),
-  }));
-  const [step, setStep] = useState<Step>(1);
-  const [name, setName] = useState("");
-  const [range, setRange] = useState<DateRange | undefined>(undefined);
-  const [trip, setTrip] = useState<Trip | null>(null);
-  const [stops, setStops] = useState<TripStop[]>([]);
-  const [members, setMembers] = useState<TripMember[]>([]);
-  const [reopening, setReopening] = useState(resume.tripId !== null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!resume.tripId) return;
-    let cancelled = false;
-    fetchTripFull(resume.tripId)
-      .then((full) => {
-        if (cancelled) return;
-        setTrip(full.trip);
-        setName(full.trip.name);
-        setRange({ from: fromTripDate(full.trip.start_date), to: fromTripDate(full.trip.end_date) });
-        setStops(full.stops);
-        setMembers(full.members);
-        setStep(resume.step);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(`Couldn't reopen your trip: ${errorMessage(err)}`);
-      })
-      .finally(() => {
-        if (!cancelled) setReopening(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [resume]);
-
-  const tripId = trip?.id;
-  useEffect(() => {
-    if (tripId) window.history.replaceState(null, "", `/trips/new?trip=${tripId}&step=${step}`);
-  }, [tripId, step]);
-
-  const draft = draftBasics(name, range);
-  const hasUnsavedBasics = !trip || !draft || Object.keys(changedBasics(trip, draft)).length > 0;
-
-  const saveBasics = async () => {
-    if (!draft) {
-      setError("Add a trip name and pick a date range.");
-      return;
-    }
-    if (!hasUnsavedBasics) {
-      setError(null);
-      setStep(2);
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      if (trip) {
-        // Coming back to step 1 edits the trip that's already saved.
-        const { trip: updated } = await tripRequest<{ trip: Trip }>(
-          `/api/v1/trips/${trip.id}`,
-          "PATCH",
-          changedBasics(trip, draft)
-        );
-        setTrip(updated);
-      } else {
-        const { trip: created } = await tripRequest<{ trip: Trip }>("/api/v1/trips", "POST", draft);
-        setTrip(created);
-        // Creating a trip adds its organizer to the crew. The trip is saved
-        // even if loading them fails, so that doesn't stop the flow.
-        const full = await fetchTripFull(created.id).catch(() => null);
-        if (full) setMembers(full.members);
-      }
-      setStep(2);
-    } catch (err) {
-      setError(
-        `${trip ? "Couldn't save your changes" : "Couldn't create the trip"}: ${errorMessage(err)}`
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (reopening) return <WizardSkeleton />;
-
-  return (
-    <div className="flex w-full max-w-2xl flex-col gap-5">
-      <StepHeader step={step} />
-      {trip && (
-        <p role="status" className="flex items-center gap-1.5 text-xs text-white/62">
-          <CheckCircle2 className="size-3.5 shrink-0 text-emerald-300" />
-          Saved to your trips. Stops and crew save as you add them.
-        </p>
-      )}
-      {error && (
-        <div
-          role="alert"
-          className="rounded-xl border border-orange-400/35 bg-orange-300/10 px-4 py-3 text-sm text-orange-100"
-        >
-          {error}
-        </div>
-      )}
-      {step === 1 && (
-        <Step1Dates
-          name={name}
-          onNameChange={setName}
-          range={range}
-          onRangeChange={setRange}
-          submitting={submitting}
-          nextLabel={!trip ? "Create trip" : hasUnsavedBasics ? "Save changes" : "Next"}
-          onNext={saveBasics}
-          backLabel={trip ? "Exit" : "Cancel"}
-          onBack={() => router.push(trip ? `/trips/${trip.id}` : "/trips")}
-        />
-      )}
-      {step === 2 && trip && (
-        <Step2Stops
-          trip={trip}
-          stops={stops}
-          onStopsChange={setStops}
-          onNext={() => setStep(3)}
-          onBack={() => setStep(1)}
-        />
-      )}
-      {step === 3 && trip && (
-        <Step3Members
-          trip={trip}
-          members={members}
-          onMembersChange={setMembers}
-          onNext={() => setStep(4)}
-          onBack={() => setStep(2)}
-        />
-      )}
-      {step === 4 && trip && (
-        <Step4Review
-          trip={trip}
-          stops={stops}
-          members={members}
-          onBack={() => setStep(3)}
-          onDone={() => router.push(`/trips/${trip.id}`)}
-        />
-      )}
-      <div className="h-24" />
-    </div>
-  );
-}
-
-function StepHeader({ step }: { step: Step }) {
-  const labels: Record<Step, string> = {
-    1: "Step 1 of 4 · pick dates",
-    2: "Step 2 of 4 · add stops",
-    3: "Step 3 of 4 · invite crew",
-    4: "Step 4 of 4 · review",
-  };
-  const titles: Record<Step, string> = {
-    1: "When?",
-    2: "Where?",
-    3: "Your crew",
-    4: "All set?",
-  };
-  return (
-    <header>
-      <SectionLabel>{labels[step]}</SectionLabel>
-      <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-white/94">
-        {titles[step]}
-      </h1>
-      <div className="mt-3 flex items-center gap-1.5">
-        {[1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className={
-              "h-1 flex-1 rounded-full " +
-              (i <= step ? "bg-cyan-300/70" : "bg-white/10")
-            }
-          />
-        ))}
-      </div>
-    </header>
-  );
-}
-
-function Step1Dates({
-  name,
-  onNameChange,
-  range,
-  onRangeChange,
-  submitting,
-  nextLabel,
-  onNext,
-  backLabel,
-  onBack,
-}: {
-  name: string;
-  onNameChange: (v: string) => void;
-  range: DateRange | undefined;
-  onRangeChange: (r: DateRange | undefined) => void;
-  submitting: boolean;
-  nextLabel: string;
-  onNext: () => void;
-  backLabel: string;
-  onBack: () => void;
-}) {
-  const days =
-    range?.from && range?.to ? daysBetween(toTripDate(range.from), toTripDate(range.to)) : 0;
-  return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <SectionLabel className="mb-2">Trip name</SectionLabel>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => onNameChange(e.target.value)}
-          placeholder="Whistler Powder"
-          className="w-full rounded-lg border border-white/12 bg-white/[0.06] px-3 py-2.5 text-base text-white placeholder:text-white/40 focus:border-white/30 focus:outline-none"
-        />
-      </Card>
-      <Card>
-        <SectionLabel className="mb-2">Dates</SectionLabel>
-        <p className="mb-3 text-sm text-white/62">Drag across days to pick a range.</p>
-        <div className="rounded-xl border border-white/10 bg-slate-950/30 p-2">
-          <Calendar
-            mode="range"
-            selected={range}
-            onSelect={onRangeChange}
-            numberOfMonths={1}
-            className="bg-transparent text-white"
-          />
-        </div>
-        {range?.from && range?.to && (
-          <div className="mt-3 flex items-center justify-between rounded-lg border border-white/12 bg-white/[0.05] px-3.5 py-2.5">
-            <div>
-              <SectionLabel>Start</SectionLabel>
-              <p className="text-sm font-semibold text-white">
-                {range.from.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-              </p>
-            </div>
-            <ArrowRight className="size-4 text-white/55" />
-            <div>
-              <SectionLabel>End</SectionLabel>
-              <p className="text-sm font-semibold text-white">
-                {range.to.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-              </p>
-            </div>
-            <Chip variant="accent">{days} day{days === 1 ? "" : "s"}</Chip>
-          </div>
-        )}
-      </Card>
-      <NavBar
-        onBack={onBack}
-        backLabel={backLabel}
-        onNext={onNext}
-        nextLabel={submitting ? "Saving…" : nextLabel}
-        nextDisabled={submitting || !name.trim() || !range?.from || !range?.to}
-        nextLoading={submitting}
-      />
-    </div>
-  );
-}
-
-function Step2Stops({
-  trip,
-  stops,
-  onStopsChange,
-  onNext,
-  onBack,
-}: {
-  trip: Trip;
-  stops: TripStop[];
-  onStopsChange: Dispatch<SetStateAction<TripStop[]>>;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  // The sheet keeps its stop while it closes, so it can animate out. A new
-  // key per opening starts it fresh.
-  const [editing, setEditing] = useState<{ stop: TripStop; open: boolean; key: number } | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
-  const search = useLocationSearch();
-  const editFocus = useReturnFocus();
-
-  const openEditor = (stop: TripStop) => {
-    editFocus.remember(() => document.getElementById(editStopButtonId(stop.id)));
-    setEditing((prev) => ({ stop, open: true, key: (prev?.key ?? 0) + 1 }));
-  };
-
-  const closeEditor = () => setEditing((prev) => prev && { ...prev, open: false });
-
-  const addStop = async () => {
-    const selected = search.selectedLocation;
-    if (!selected) return;
-    setAdding(true);
-    try {
-      const { stop } = await tripRequest<{ stop: TripStop }>(
-        `/api/v1/trips/${trip.id}/stops`,
-        "POST",
-        {
-          name: selected.region
-            ? `${selected.name}, ${selected.region}`
-            : `${selected.name}, ${selected.country}`,
-          latitude: selected.latitude,
-          longitude: selected.longitude,
-          activities: [],
-        }
-      );
-      onStopsChange((current) => [...current, stop]);
-      search.reset();
-    } catch (err) {
-      // The chosen place stays in the field, so Add stop can be tried again.
-      toast.error("Couldn't add the stop", { description: errorMessage(err) });
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const removeStop = async (stopId: string) => {
-    setRemovingId(stopId);
-    try {
-      await tripRequest(`/api/v1/trips/${trip.id}/stops/${stopId}`, "DELETE");
-      onStopsChange((current) => current.filter((s) => s.id !== stopId));
-    } catch (err) {
-      toast.error("Couldn't remove the stop", { description: errorMessage(err) });
-    } finally {
-      setRemovingId(null);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <SectionLabel className="mb-2">Add a stop</SectionLabel>
-        <LocationAutocomplete
-          id="trip-stop-search"
-          placeholder="Search a city or place…"
-          location={search.location}
-          locationQuery={search.locationQuery}
-          suggestions={search.suggestions}
-          showSuggestions={search.showSuggestions}
-          selectedLocation={search.selectedLocation}
-          isSearching={search.isSearching}
-          suggestionRef={search.suggestionRef}
-          onLocationInputChange={search.handleLocationInputChange}
-          onLocationFocus={() =>
-            search.suggestions.length > 0 && search.setShowSuggestions(true)
-          }
-          onSelectLocation={search.handleSelectLocation}
-          onDismiss={search.dismiss}
-        />
-        <button
-          type="button"
-          onClick={addStop}
-          disabled={!search.selectedLocation || adding}
-          className="mt-3 inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/14 bg-white/[0.08] px-4 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {adding ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-          Add stop
-        </button>
-      </Card>
-
-      {stops.length > 0 && (
-        <Card>
-          <SectionLabel className="mb-2">Trip stops</SectionLabel>
-          <div className="flex flex-col gap-2">
-            {stops.map((stop, i) => (
-              <div
-                key={stop.id}
-                className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2.5"
-              >
-                <GripVertical className="size-4 text-white/40" />
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-white/22 text-[11px] font-semibold text-white">
-                  {i + 1}
-                </span>
-                <MapPin className="size-4 text-white/65" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white">{stop.name}</p>
-                  <p className="text-xs text-white/55">
-                    {stop.activities.length === 0
-                      ? "no activities yet"
-                      : stop.activities.join(", ")}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  id={editStopButtonId(stop.id)}
-                  onClick={() => openEditor(stop)}
-                  className="rounded-md border border-white/14 px-2 py-1 text-xs text-white/75 hover:bg-white/10"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeStop(stop.id)}
-                  disabled={removingId !== null}
-                  aria-label={`Remove ${stop.name}`}
-                  className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
-                >
-                  {removingId === stop.id ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <X className="size-4" />
-                  )}
-                </button>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* Leaving mid-save would lose the chosen place if that save failed. */}
-      <NavBar
-        onBack={onBack}
-        backDisabled={adding || removingId !== null}
-        onNext={onNext}
-        nextLabel="Next"
-        nextDisabled={adding || removingId !== null || stops.length === 0}
-      />
-
-      {editing && (
-        <StopDetailSheet
-          key={editing.key}
-          open={editing.open}
-          tripId={trip.id}
-          stop={editing.stop}
-          tripStart={trip.start_date}
-          tripEnd={trip.end_date}
-          onClose={closeEditor}
-          onSaved={(updated) => {
-            onStopsChange((current) => current.map((s) => (s.id === updated.id ? updated : s)));
-            closeEditor();
-          }}
-          onCloseAutoFocus={editFocus.restore}
-        />
-      )}
-    </div>
-  );
-}
-
-function StopDetailSheet({
-  open,
-  tripId,
-  stop,
-  tripStart,
-  tripEnd,
-  onClose,
-  onSaved,
-  onCloseAutoFocus,
-}: {
-  open: boolean;
-  tripId: string;
-  stop: TripStop;
-  tripStart: string;
-  tripEnd: string;
-  onClose: () => void;
-  onSaved: (s: TripStop) => void;
-  onCloseAutoFocus: (event: Event) => void;
-}) {
-  const [activities, setActivities] = useState<string[]>(stop.activities);
-  const [selectedDates, setSelectedDates] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-
-  // Enumerate dates inline (avoids importing server lib into client bundle).
-  const tripDates: string[] = (() => {
-    const out: string[] = [];
-    for (
-      let d = new Date(`${tripStart}T00:00:00Z`);
-      d <= new Date(`${tripEnd}T00:00:00Z`);
-      d = new Date(d.getTime() + 86400000)
-    ) {
-      out.push(d.toISOString().slice(0, 10));
-    }
-    return out;
-  })();
-
-  const toggleActivity = (a: string) =>
-    setActivities((curr) =>
-      curr.includes(a) ? curr.filter((x) => x !== a) : [...curr, a]
-    );
-  const toggleDate = (iso: string) =>
-    setSelectedDates((curr) =>
-      curr.includes(iso) ? curr.filter((d) => d !== iso) : [...curr, iso]
-    );
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const { stop: updated } = await tripRequest<{ stop: TripStop }>(
-        `/api/v1/trips/${tripId}/stops/${stop.id}`,
-        "PATCH",
-        { activities, day_dates: selectedDates }
-      );
-      onSaved(updated);
-    } catch (err) {
-      // The sheet stays open with its picks, so Save stop can be tried again.
-      toast.error("Couldn't save the stop", { description: errorMessage(err) });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <TripSheet
-      open={open}
-      onClose={onClose}
-      busy={saving}
-      described={false}
-      className="sm:max-w-2xl"
-      onCloseAutoFocus={onCloseAutoFocus}
-      header={
-        <>
-          <SectionLabel>Stop detail</SectionLabel>
-          <TripSheetTitle>
-            <span className="sr-only">Edit stop </span>
-            {stop.name}
-          </TripSheetTitle>
-        </>
-      }
-      footer={
-        <Button
-          type="button"
-          onClick={save}
-          loading={saving}
-          className="w-full rounded-xl border border-white/12 bg-cyan-300/22 text-white hover:bg-cyan-300/30"
-        >
-          Save stop
-        </Button>
-      }
-    >
-      <SectionLabel>Which days at this stop?</SectionLabel>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {tripDates.map((iso) => {
-          const date = new Date(`${iso}T00:00:00`);
-          const dow = date.toLocaleDateString(undefined, { weekday: "short" });
-          const day = date.getDate();
-          const on = selectedDates.includes(iso);
-          return (
-            <button
-              key={iso}
-              type="button"
-              onClick={() => toggleDate(iso)}
-              aria-pressed={on}
-              className={
-                "flex w-14 flex-col items-center rounded-lg border px-2 py-1.5 text-center text-xs transition-colors " +
-                (on
-                  ? "border-cyan-300/55 bg-cyan-300/15 text-white"
-                  : "border-white/14 bg-white/[0.05] text-white/72")
-              }
-            >
-              <span className="text-[10px] uppercase tracking-wide text-white/55">{dow}</span>
-              <span className="text-base font-semibold leading-none">{day}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <SectionLabel className="mt-4">Activities at this stop</SectionLabel>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {TRIP_ACTIVITY_OPTIONS.map((a) => {
-          const on = activities.includes(a);
-          return (
-            <button
-              key={a}
-              type="button"
-              onClick={() => toggleActivity(a)}
-              aria-pressed={on}
-              className={
-                "rounded-full border px-3 py-1 text-xs " +
-                (on
-                  ? "border-cyan-300/55 bg-cyan-300/22 text-white"
-                  : "border-white/16 bg-white/[0.05] text-white/72")
-              }
-            >
-              {a}
-            </button>
-          );
-        })}
-      </div>
-    </TripSheet>
-  );
-}
-
-function Step3Members({
-  trip,
-  members,
-  onMembersChange,
-  onNext,
-  onBack,
-}: {
-  trip: Trip;
-  members: TripMember[];
-  onMembersChange: Dispatch<SetStateAction<TripMember[]>>;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [kind, setKind] = useState<"invite" | "guest">("invite");
-  const [adding, setAdding] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
-
-  const add = async () => {
-    const displayName = name.trim();
-    if (!displayName) return;
-    setAdding(true);
-    try {
-      const { member } = await tripRequest<{ member: TripMember }>(
-        `/api/v1/trips/${trip.id}/members`,
-        "POST",
-        { display_name: displayName, kind }
-      );
-      onMembersChange((current) => [...current, member]);
-      setName("");
-    } catch (err) {
-      toast.error(`Couldn't add ${displayName}`, { description: errorMessage(err) });
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const remove = async (member: TripMember) => {
-    setRemovingId(member.id);
-    try {
-      await tripRequest(`/api/v1/trips/${trip.id}/members/${member.id}`, "DELETE");
-      onMembersChange((current) => current.filter((m) => m.id !== member.id));
-    } catch (err) {
-      toast.error(`Couldn't remove ${member.display_name}`, { description: errorMessage(err) });
-    } finally {
-      setRemovingId(null);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <SectionLabel className="mb-2">On the trip</SectionLabel>
-        <p className="text-xs text-white/55">Solo? You can skip this step.</p>
-        <div className="mt-3 flex flex-col gap-2">
-          {members.map((m) => (
-            <MemberRow
-              key={m.id}
-              member={m}
-              tripName={trip.name}
-              onRemove={m.role === "organizer" ? undefined : () => remove(m)}
-              removeDisabled={removingId !== null}
-              removing={removingId === m.id}
-            />
-          ))}
-        </div>
-      </Card>
-
-      <Card>
-        <SectionLabel className="mb-2">Add someone</SectionLabel>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Display name"
-            className="h-10 flex-1 rounded-lg border border-white/12 bg-white/[0.06] px-3 text-sm text-white placeholder:text-white/40 focus:border-white/30 focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={add}
-            disabled={!name.trim() || adding}
-            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-white/14 bg-white/[0.08] px-3 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {adding ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
-            Add
-          </button>
-        </div>
-        <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            onClick={() => setKind("invite")}
-            className={
-              "flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-colors " +
-              (kind === "invite"
-                ? "border-cyan-300/55 bg-cyan-300/15 text-white"
-                : "border-white/14 bg-white/[0.05] text-white/72")
-            }
-          >
-            Share link · they make an account
-          </button>
-          <button
-            type="button"
-            onClick={() => setKind("guest")}
-            className={
-              "flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-colors " +
-              (kind === "guest"
-                ? "border-cyan-300/55 bg-cyan-300/15 text-white"
-                : "border-white/14 bg-white/[0.05] text-white/72")
-            }
-          >
-            Guest · no signup, uses generics
-          </button>
-        </div>
-      </Card>
-
-      {/* Leaving mid-save would lose the typed name if that save failed. */}
-      <NavBar
-        onBack={onBack}
-        backDisabled={adding || removingId !== null}
-        onNext={onNext}
-        nextLabel="Next"
-        nextDisabled={adding || removingId !== null}
-      />
-    </div>
-  );
-}
-
-function MemberRow({
-  member,
-  onRemove,
-  removeDisabled = false,
-  removing = false,
-  tripName,
-}: {
-  member: TripMember;
-  onRemove?: () => void;
-  removeDisabled?: boolean;
-  removing?: boolean;
-  tripName?: string;
-}) {
-  const state: "default" | "guest" | "invited" | "self" =
-    member.role === "organizer"
-      ? "self"
-      : member.status === "guest"
-      ? "guest"
-      : member.status === "invited"
-      ? "invited"
-      : "default";
-  const sub =
-    member.role === "organizer"
-      ? "organizer"
-      : member.status === "guest"
-      ? "guest · using generics"
-      : member.status === "invited"
-      ? "invited · pending"
-      : "joined";
-
-  return (
-    <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5">
-      <MemberAvatar name={member.display_name} state={state} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-white">{member.display_name}</p>
-        <p className="text-xs text-white/55">{sub}</p>
-      </div>
-      {member.status === "invited" && member.invite_token && (
-        <InviteLinkButton
-          token={member.invite_token}
-          recipientName={member.display_name}
-          tripName={tripName}
-        />
-      )}
-      {onRemove && (
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={removeDisabled}
-          className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
-          aria-label={`Remove ${member.display_name}`}
-        >
-          {removing ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" />}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function Step4Review({
-  trip,
-  stops,
-  members,
-  onBack,
-  onDone,
-}: {
-  trip: Trip;
-  stops: TripStop[];
-  members: TripMember[];
-  onBack: () => void;
-  onDone: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <SectionLabel>Trip</SectionLabel>
-        <p className="mt-1 text-base font-semibold text-white">{trip.name}</p>
-        <p className="mt-0.5 text-sm text-white/65">
-          <CalIcon className="mr-1 inline size-3.5" />
-          {formatDateRange(trip.start_date, trip.end_date)} ·{" "}
-          {daysBetween(trip.start_date, trip.end_date)} days
-        </p>
-      </Card>
-      <Card>
-        <SectionLabel>Stops ({stops.length})</SectionLabel>
-        {stops.length === 0 ? (
-          <p className="mt-2 text-sm text-white/55">No stops yet.</p>
+      <div className="flex w-full max-w-2xl flex-col gap-6 pb-24">
+        <Link href="/trips" className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="size-4" />All trips</Link>
+        <header>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plan a trip</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Dates and a destination</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Start with one place. Add stops, crew and shared gear from your saved trip.</p>
+        </header>
+        {draft.savedId ? (
+          <Card className="flex flex-col gap-4">
+            <p role="status" className="flex items-center gap-2"><CheckCircle2 className="size-5 text-success" />Your trip is saved.</p>
+            <p className="break-words font-semibold">{draft.name}</p>
+            <Button asChild><Link href={`/trips/${encodeURIComponent(draft.savedId)}`}>Open saved trip</Link></Button>
+            <Button variant="outline" onClick={() => { search.reset(); persist(emptyDraft()); setError(null); }}>Start another trip</Button>
+          </Card>
         ) : (
-          <ul className="mt-2 flex flex-col gap-1.5">
-            {stops.map((s, i) => (
-              <li key={s.id} className="flex items-center gap-2 text-sm text-white/85">
-                <span className="text-xs text-white/45">{i + 1}.</span>
-                <MapPin className="size-3.5 text-white/55" />
-                {s.name}
-                {s.activities.length > 0 && (
-                  <span className="text-xs text-white/55">· {s.activities.join(", ")}</span>
-                )}
-              </li>
-            ))}
-          </ul>
+          <form onSubmit={create} className="flex flex-col gap-5">
+            <Card>
+              <fieldset disabled={saving || !!draft.submitted} className="flex min-w-0 flex-col gap-5">
+                <LocationAutocomplete id="trip-destination" label="First destination" placeholder="Search a city or place…"
+                  location={draft.place ? [draft.place.name, draft.place.region, draft.place.country].filter(Boolean).join(", ") : search.location}
+                  locationQuery={search.locationQuery} selectedLocation={draft.place} suggestions={search.suggestions}
+                  showSuggestions={search.showSuggestions} isSearching={search.isSearching} suggestionRef={search.suggestionRef}
+                  onLocationInputChange={(value) => { search.handleLocationInputChange(value); edit({ place: null }); }}
+                  onLocationFocus={() => search.suggestions.length > 0 && search.setShowSuggestions(true)}
+                  onSelectLocation={(place) => { search.handleSelectLocation(place); edit({ place, ...(!draft.nameEdited ? { name: `${place.name} trip`.slice(0, 200) } : {}) }); }} onDismiss={search.dismiss} />
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">Start date<Input className="min-w-0" type="date" required value={draft.start} onChange={(event) => edit({ start: event.target.value })} /></label>
+                  <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">End date<Input className="min-w-0" type="date" required min={draft.start || undefined} value={draft.end} onChange={(event) => edit({ end: event.target.value })} /></label>
+                </div>
+                <label className="flex flex-col gap-2 text-sm font-medium">Trip name<Input required maxLength={200} value={draft.name} placeholder="Your trip name" onChange={(event) => edit({ name: event.target.value, nameEdited: true })} /></label>
+                <label className="flex flex-col gap-2 text-sm font-medium">Default activity (optional)
+                  <select value={draft.activity} onChange={(event) => edit({ activity: event.target.value })} className="h-12 w-full rounded-control border border-input bg-card px-3 text-base">
+                    <option value="">Choose later</option>{TRIP_ACTIVITY_OPTIONS.map((activity) => <option key={activity}>{activity}</option>)}
+                  </select>
+                </label>
+                <p className="text-sm text-muted-foreground">The first destination is assigned to every trip day. You can choose different stops later.</p>
+              </fieldset>
+            </Card>
+            {storageError && <p role="alert" className="text-sm text-destructive">Browser storage is unavailable. Enable session storage to keep this draft safe across retries and reloads.</p>}
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+            {!!draft.submitted && !saving && <div className="flex flex-col gap-3 text-sm text-muted-foreground">
+              <p>Retry to open the saved trip or finish creating it. An earlier attempt may already have saved a trip. <Link href="/trips" className="underline">Check your trips</Link> before discarding this draft.</p>
+              <Button type="button" variant="outline" onClick={() => { search.reset(); persist(emptyDraft()); setError(null); }}>Discard and start over</Button>
+            </div>}
+            <p role="status" className="sr-only">{saving ? "Saving your trip…" : ""}</p>
+            <Button type="submit" size="lg" loading={saving} disabled={storageError || (!draft.submitted && (!draft.place || !draft.name.trim() || !draft.start || !draft.end))}>{saving ? "Creating trip…" : draft.submitted ? "Retry create trip" : "Create trip"}</Button>
+          </form>
         )}
-      </Card>
-      <Card>
-        <SectionLabel>Crew ({members.length})</SectionLabel>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {members.map((m) => (
-            <div key={m.id} className="flex items-center gap-1.5">
-              <MemberAvatar
-                name={m.display_name}
-                state={m.role === "organizer" ? "self" : "default"}
-                size={28}
-              />
-              <span className="text-sm text-white/80">{m.display_name}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
-      <NavBar onBack={onBack} onNext={onDone} nextLabel="Open trip" />
-    </div>
-  );
-}
-
-function NavBar({
-  onBack,
-  backLabel = "Back",
-  backDisabled = false,
-  onNext,
-  nextLabel,
-  nextDisabled = false,
-  nextLoading = false,
-}: {
-  onBack: () => void;
-  backLabel?: string;
-  backDisabled?: boolean;
-  onNext: () => void;
-  nextLabel: string;
-  nextDisabled?: boolean;
-  nextLoading?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={onBack}
-        disabled={backDisabled}
-        className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-white/14 px-4 text-sm font-medium text-white/85 hover:bg-white/10 disabled:opacity-50"
-      >
-        <ArrowLeft className="size-4" />
-        {backLabel}
-      </button>
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={nextDisabled}
-        className="ml-auto inline-flex h-11 min-w-32 items-center justify-center gap-1.5 rounded-xl border border-white/14 bg-gradient-to-b from-cyan-300/22 to-cyan-300/10 px-4 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(0,0,0,0.32)] disabled:opacity-50"
-      >
-        {nextLoading ? <Loader2 className="size-4 animate-spin" /> : null}
-        {nextLabel}
-        <ArrowRight className="size-4" />
-      </button>
-    </div>
+      </div>
+    </PageLayout>
   );
 }
