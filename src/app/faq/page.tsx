@@ -106,21 +106,21 @@ export default function FAQ() {
     <PageLayout>
       <div className="flex flex-col gap-6 w-full max-w-2xl">
         <header>
-          <h1 className="text-2xl font-semibold text-white/90 tracking-wide">
+          <h1 className="text-title font-semibold text-foreground md:text-title-lg">
             Frequently Asked Questions
           </h1>
-          <p className="text-[13px] text-white/55 mt-1">
+          <p className="mt-1 text-sm text-muted-foreground">
             How SWTTR works and how to get the most out of it.
           </p>
         </header>
 
         <Accordion type="single" collapsible className="w-full">
           {faqs.map((faq, index) => (
-            <AccordionItem key={index} value={`item-${index}`} className="border-white/20">
-              <AccordionTrigger className="text-white/90 text-[15px] leading-snug hover:no-underline hover:text-white">
+            <AccordionItem key={index} value={`item-${index}`}>
+              <AccordionTrigger className="text-foreground hover:no-underline hover:text-primary">
                 {faq.question}
               </AccordionTrigger>
-              <AccordionContent className="text-white/70 text-[13px] leading-relaxed">
+              <AccordionContent className="text-muted-foreground leading-relaxed">
                 {faq.answer}
               </AccordionContent>
             </AccordionItem>

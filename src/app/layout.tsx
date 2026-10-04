@@ -39,27 +39,25 @@ export const metadata: Metadata = {
   },
 };
 
-// Matches the pinned dark canvas in globals.css.
+// Match the system palettes in globals.css, including browser chrome.
 export const viewport: Viewport = {
-  themeColor: "#0f1d2a",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f1f0ea" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f1d2a" },
+  ],
 };
 
 const RootLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <ClerkProvider>
-      {/* Pinned to dark until every screen reads the design tokens (#119);
-          then the app follows the system appearance. */}
       <html
         lang="en"
-        data-appearance="dark"
         className={`${geistSans.variable} ${geistMono.variable}`}
       >
-        <head>
-          <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1, viewport-fit=cover"
-          />
-        </head>
         <body className="antialiased">
           <TemperatureUnitProvider>{children}</TemperatureUnitProvider>
           <Toaster />

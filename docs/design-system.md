@@ -16,10 +16,12 @@ SWTTR follows the device's light or dark setting. There is no in-app preference.
 
 `data-appearance="light"` or `data-appearance="dark"` on an element pins that subtree to one palette.
 
-**Current state (#119):**
-- The root layout sets `data-appearance="dark"` on `<html>`. Gear up/results, Wardrobe and Trips now use the tokens; the FAQ page still hardcodes white-on-dark classes.
-- Once the FAQ moves to the tokens, the attribute comes off and the app follows the system setting.
-- At that point, `viewport.themeColor` in `src/app/layout.tsx` and the iOS status bar style in `PageLayout` need to follow the appearance too.
+**Release appearance (#119):**
+- The root stays unpinned: CSS follows `prefers-color-scheme` from the first paint and updates when the device setting changes. No stored theme or client-side theme switch is needed.
+- `viewport.themeColor` in `src/app/layout.tsx` supplies each canvas color with its matching media query. The generated viewport retains `viewport-fit=cover` for safe areas and allows zoom.
+- `PageLayout` uses the Capacitor status bar's `Style.Default`, which follows the device appearance. The custom UIKit tab shell uses `UIStatusBarStyle.default` directly and a dynamic loading canvas matching the web palettes. It does not initialize the Capacitor bridge.
+
+Browser verification and before/after screenshots are recorded in [the #119 appearance report](qa/119-system-appearance/README.md).
 
 Components use the semantic colors below. Don't use raw hex values, Tailwind palette colors (`slate-500`, `white/70`) or `dark:` variants. Tokens follow a pinned subtree; `dark:` variants can't tell which palette a nested subtree uses.
 
@@ -86,7 +88,7 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Input | `ui/input.tsx` | 44px, 16px text, `border-input`. Set `aria-invalid` and point `aria-describedby` at a `FieldError`. `fieldClassName` gives field-like triggers the same look. |
 | Select | `ui/select.tsx` | Trigger matches Input. Items are 44px on touch, and the chosen item gets a check mark. Pair the trigger with a `<label htmlFor>`. |
 | Segmented choice | `ui/segmented.tsx` | `segmentedGroupClassName` and `segmentedItemClassName`. The caller keeps its markup and keyboard handling. The selected look follows `aria-checked` or `aria-pressed`, so selection is always announced. |
-| Filter chips | `ui/chip.ts` | `chipClassName` for a wrapping row of `<button>` chips, such as Wardrobe's body area, layer, sort and brand filters. A toggle chip sets `aria-pressed`, and a radio chip sets `aria-checked`; both get the segmented selected look. 36px, 44px on phones and touch. Use segmented choices when the options fit one row. |
+| Filter chips | `ui/chip.ts` | `chipClassName` for a wrapping row of `<button>` chips, such as Wardrobe's body area, layer, sort and brand filters. A toggle chip sets `aria-pressed`, and a radio chip sets `aria-checked`; both get the segmented selected look. 36px tall, with a 44 × 44px minimum on phones and touch. Use segmented choices when the options fit one row. |
 | Tabs | `ui/tabs.tsx` | Same selected look as segmented choices. The `line` variant underlines the active tab. |
 | Card | `ui/card.tsx` | `variant`: `default`, `muted`, `selected`. `padding`: `none`, `sm`, `default`, `lg`. Use `interactive` with `asChild` when the whole card is a link or button. `CardTitle` takes `asChild` to render a heading. |
 | Badge | `ui/badge.tsx` | Variants: `neutral`, `primary`, `success`, `warning`, `destructive`, `outline`, in two sizes. Give each status a word or an icon as well as its color. |
@@ -138,10 +140,11 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Multi-day plan (`MultiDayPlanDisplay`, `plan/*`) | Uses tokens (#127) |
 | Wardrobe (`src/app/wardrobe`, `wardrobe/*`), including Add gear and Add a similar item | Uses tokens |
 | Trips (`src/app/trips/**`, `trips/*`), including the trip sheets and the legacy wizard | Uses tokens |
-| FAQ | Still hardcoded. Moves with the root pin's removal. |
+| FAQ | Uses tokens, the shared Accordion and the type scale |
 
 Remaining exceptions, each with a reason:
 - **Product image wells** stay white in both appearances, because catalog photos have white backgrounds.
 - **Clerk's sign-in and account UI** keep Clerk's own styling.
+- **The custom UIKit shell's native chrome** in `ios/App/App/SWTTRViewController.swift` keeps its fixed dark tab bar and action button. Its web content, loading canvas and status text follow the device appearance. Tab/action chrome migration belongs to #130/#146; the Capacitor status-bar setting does not control this standalone UIKit shell.
 - **Trip stop colors** on the trip overview mark each stop with a dot and its days with a spine. They borrow the `primary`, `ring` and `warning` hues, which stay distinct in both palettes, rather than adding categorical tokens. The stop's name always goes with the color, so it never carries meaning alone and doesn't imply a status.
 - **The thermal gauge's cold-to-hot gradient** in `layers/ThermalGauge.tsx` keeps its fixed blue-to-amber hues. It's a scale, not a status, and its marker, band and labels use tokens.
