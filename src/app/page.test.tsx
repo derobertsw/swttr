@@ -52,6 +52,9 @@ const respond = (status: number, body: unknown): MockResponse => ({
   json: () => Promise.resolve(body),
 });
 
+/** Sign-in that comes back to Gear up and asks for the last outing again. */
+const SIGN_IN_AND_RESUME = "/sign-in?redirect_url=%2F%3Fresume%3Douting";
+
 const STOWE = {
   id: 1,
   name: "Stowe",
@@ -60,6 +63,26 @@ const STOWE = {
   latitude: 44.47,
   longitude: -72.69,
   timeZone: "America/New_York",
+};
+
+/** Personalized Running layers, as the recommendation API answers. */
+const RUNNING_RECOMMENDATION = {
+  ireq: { target_range: [0.4, 0.8] },
+  recommendation: {
+    garments: [
+      { id: "tights", name: "Running tights", category: "base_layer", rcl: 0.3, covers_torso: false, covers_legs: true },
+    ],
+    ensemble_properties: {
+      total_clo: 0.3,
+      regional_clo: { torso: 0, arms: 0, legs: 0.3 },
+      evap_potential: 0.5,
+      permeability_index: 0.4,
+    },
+    score: 80,
+    component_scores: {},
+  },
+  warnings: [],
+  guidance: [],
 };
 
 /** Searches for Stowe in the form's place field, and picks it. */
@@ -163,6 +186,8 @@ describe("Home Page", () => {
     const placeField = () => screen.getByRole("combobox", { name: "Where?" });
     const gearUpButton = () => screen.getByRole("button", { name: "See my layers" });
     const useMyLocationButton = () => screen.getByRole("button", { name: "Use my location" });
+    const activity = () => screen.getByRole("radiogroup", { name: "Activity" });
+    const onResultsEntry = () => window.history.state?.swttrGearUp === "results";
 
     /** Geocoding finds Stowe; weather requests get `weather`. Returns the weather requests made. */
     function mockOutingApis(
@@ -533,9 +558,6 @@ describe("Home Page", () => {
     });
 
     describe("Back, Forward and reload", () => {
-      const activity = () => screen.getByRole("radiogroup", { name: "Activity" });
-      const onResultsEntry = () => window.history.state?.swttrGearUp === "results";
-
       /** Goes back or forward in the browser, and waits until it's there. */
       async function traverse(delta: -1 | 1) {
         const arrived = new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true }));
@@ -740,27 +762,160 @@ describe("Home Page", () => {
         expect(weatherRequests).toHaveLength(1);
       });
     });
+
+    describe("signing in and out", () => {
+      const GUEST = { userId: null, isLoaded: true, isSignedIn: false };
+      const OTHER_ACCOUNT = { userId: "other-user-id", isLoaded: true, isSignedIn: true };
+
+      afterEach(() => {
+        mockSearchParams.delete("resume");
+        window.history.replaceState(null, "", "/");
+      });
+
+      /**
+       * Like mockOutingApis, with Running layers for whoever is signed in and a
+       * 401 for a guest. Recommendation requests wait for `hold` when it's given.
+       */
+      function mockAccountApis(hold?: Promise<void>) {
+        const weatherRequests = mockOutingApis();
+        const recommendationRequests: string[] = [];
+        const outingApis = mockFetch.getMockImplementation()!;
+        mockFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+          if (!url.includes("/api/v1/recommendations/")) return outingApis(url, init);
+          recommendationRequests.push(url);
+          const signedIn = mockUseAuth().userId !== null;
+          await hold;
+          return signedIn ? respond(200, RUNNING_RECOMMENDATION) : respond(401, { error: "Authentication required" });
+        });
+        return { weatherRequests, recommendationRequests };
+      }
+
+      /** Running at Stowe, now. */
+      async function seeRunningAtStowe(user: ReturnType<typeof userEvent.setup>) {
+        await user.click(within(await screen.findByRole("radiogroup", { name: "Activity" })).getByRole("radio", { name: /running/i }));
+        await chooseStowe(user);
+        await user.click(gearUpButton());
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+      }
+
+      /** Another page, like sign-in, comes back to Gear up at `url`. */
+      function comeBackTo(url: string) {
+        window.history.pushState(null, "", url);
+        new URL(url, window.location.href).searchParams.forEach((value, key) => mockSearchParams.set(key, value));
+        return render(<Home />);
+      }
+
+      it("brings a guest back to their outing after signing in, and asks for their own layers", async () => {
+        mockUseAuth.mockReturnValue(GUEST);
+        const { weatherRequests, recommendationRequests } = mockAccountApis();
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+
+        await seeRunningAtStowe(user);
+        const notice = screen.getByRole("region", { name: "Sign in for Running layers" });
+        expect(within(notice).getByRole("link", { name: /sign in/i })).toHaveAttribute("href", SIGN_IN_AND_RESUME);
+        unmount();
+        mockUseAuth.mockReturnValue(SIGNED_IN);
+        comeBackTo("/?resume=outing");
+
+        expect(await screen.findByText("Personalized")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Running, change activity" })).toBeInTheDocument();
+        expect(weatherRequests).toHaveLength(2);
+        expect(weatherRequests[1]).toBe(weatherRequests[0]);
+        expect(recommendationRequests).toHaveLength(2);
+        // The address no longer asks, so a reload or Edit outing doesn't ask again.
+        expect(window.location.search).toBe("");
+        expect(onResultsEntry()).toBe(true);
+
+        await user.click(screen.getByRole("button", { name: "Edit outing" }));
+        expect(within(activity()).getByRole("radio", { name: /running/i })).toBeChecked();
+        expect(placeField()).toHaveValue("Stowe, Vermont, United States");
+      });
+
+      it("shows the form with what was entered when sign-in comes back without a last outing", async () => {
+        mockUseAuth.mockReturnValue(GUEST);
+        const { weatherRequests } = mockAccountApis();
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+
+        await user.click(within(activity()).getByRole("radio", { name: /xc skiing/i }));
+        await chooseStowe(user);
+        unmount();
+        mockUseAuth.mockReturnValue(SIGNED_IN);
+        comeBackTo("/?resume=outing");
+
+        await waitFor(() => expect(placeField()).toHaveValue("Stowe, Vermont, United States"));
+        expect(within(activity()).getByRole("radio", { name: /xc skiing/i })).toBeChecked();
+        expect(gearUpButton()).toBeEnabled();
+        expect(weatherRequests).toHaveLength(0);
+        expect(window.location.search).toBe("");
+      });
+
+      it("keeps an account's outing from other accounts and guests, and gives it back on signing in again", async () => {
+        const { weatherRequests } = mockAccountApis();
+        const user = userEvent.setup();
+        const first = render(<Home />);
+
+        await seeRunningAtStowe(user);
+        first.unmount();
+        for (const next of [OTHER_ACCOUNT, GUEST]) {
+          mockUseAuth.mockReturnValue(next);
+          const { unmount } = comeBackTo("/");
+          await act(async () => {});
+          expect(within(activity()).getByRole("radio", { name: /alpine skiing/i })).toBeChecked();
+          expect(placeField()).toHaveValue("");
+          unmount();
+        }
+        mockUseAuth.mockReturnValue(SIGNED_IN);
+        comeBackTo("/");
+
+        await waitFor(() => expect(placeField()).toHaveValue("Stowe, Vermont, United States"));
+        expect(within(activity()).getByRole("radio", { name: /running/i })).toBeChecked();
+        expect(weatherRequests).toHaveLength(1);
+      });
+
+      it("starts over when the account signs out on the page, and takes the outing back when it signs in again", async () => {
+        mockAccountApis();
+        const user = userEvent.setup();
+        const { rerender } = render(<Home />);
+
+        await seeRunningAtStowe(user);
+        mockUseAuth.mockReturnValue(GUEST);
+        rerender(<Home />);
+
+        await waitFor(() => expect(screen.queryByText("Current conditions")).not.toBeInTheDocument());
+        expect(within(activity()).getByRole("radio", { name: /alpine skiing/i })).toBeChecked();
+        expect(placeField()).toHaveValue("");
+        expect(onResultsEntry()).toBe(false);
+
+        mockUseAuth.mockReturnValue(SIGNED_IN);
+        rerender(<Home />);
+
+        await waitFor(() => expect(placeField()).toHaveValue("Stowe, Vermont, United States"));
+        expect(within(activity()).getByRole("radio", { name: /running/i })).toBeChecked();
+      });
+
+      it("drops layers still loading for an account that signs out", async () => {
+        let release = () => {};
+        mockAccountApis(new Promise((resolve) => (release = resolve)));
+        const user = userEvent.setup();
+        const { rerender } = render(<Home />);
+
+        await user.click(within(activity()).getByRole("radio", { name: /running/i }));
+        await chooseStowe(user);
+        await user.click(gearUpButton());
+        expect(await screen.findByRole("button", { name: "Getting your layers…" })).toBeInTheDocument();
+        mockUseAuth.mockReturnValue(GUEST);
+        rerender(<Home />);
+        await answer(release);
+
+        expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
+        expect(placeField()).toHaveValue("");
+      });
+    });
   });
 
   describe("results without personalized layers", () => {
-    const RUNNING_RECOMMENDATION = {
-      ireq: { target_range: [0.4, 0.8] },
-      recommendation: {
-        garments: [
-          { id: "tights", name: "Running tights", category: "base_layer", rcl: 0.3, covers_torso: false, covers_legs: true },
-        ],
-        ensemble_properties: {
-          total_clo: 0.3,
-          regional_clo: { torso: 0, arms: 0, legs: 0.3 },
-          evap_potential: 0.5,
-          permeability_index: 0.4,
-        },
-        score: 80,
-        component_scores: {},
-      },
-      warnings: [],
-      guidance: [],
-    };
 
     /** Located at 32°F with 15 mph wind; recommendation requests get the given response. */
     function mockOuting(recommendationResponse: (url: string) => MockResponse | Promise<MockResponse>) {
@@ -817,7 +972,7 @@ describe("Home Page", () => {
       await switchActivity(user, "Alpine Skiing", "Running");
 
       const notice = await screen.findByRole("region", { name: "Sign in for Running layers" });
-      expect(within(notice).getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/sign-in");
+      expect(within(notice).getByRole("link", { name: /sign in/i })).toHaveAttribute("href", SIGN_IN_AND_RESUME);
       expect(screen.getByText(/wind 15 mph/i)).toBeInTheDocument();
       expect(screen.getByText("Current conditions")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Running, change activity" })).toBeInTheDocument();
@@ -829,13 +984,13 @@ describe("Home Page", () => {
         failure: "an expired session",
         response: respond(401, { error: "Authentication required" }),
         notice: "Sign in for Running layers",
-        action: { name: /sign in/i, href: "/sign-in" },
+        action: { name: /sign in/i, href: SIGN_IN_AND_RESUME },
       },
       {
         failure: "targets without usable gear",
         response: respond(200, { message: "No suitable garments found in database", ireq: { min: 1, neutral: 1.4 } }),
         notice: "Add gear for Running layers",
-        action: { name: /add gear/i, href: "/wardrobe" },
+        action: { name: /add gear/i, href: "/wardrobe?from=outing" },
       },
     ])("tells a signed-in user what personalized layers need after $failure", async ({ response, notice, action }) => {
       mockOuting(() => response);

@@ -94,7 +94,47 @@ It's never put in the URL. It's gone when the tab closes. A draft that doesn't v
 
 `/?mode=planAhead` still opens on Later. Before anything is kept, the hook reads back what's there, so a reload can't save over it.
 
-#168 decides what happens to the kept outing across sign-in, sign-out and account switches.
+### Accounts
+
+The guest and each account signed in to in the tab keep their own draft (#168). The page reads one back only once Clerk says who's signed in.
+
+| Who's signed in | The draft they get |
+|---|---|
+| A guest | The guest's. |
+| An account, after a guest in this tab picked a place or got a result | The guest's, so the outing carries on after signing in. The account takes it over, and the guest's is removed. |
+| An account, otherwise | The account's own, or the guest's when it has none. |
+
+Another account's draft is never shown.
+
+When the account changes while Gear up is open (signing out, signing in to another account, or a session that ends), the page starts over, like the logo:
+- the result goes, and any request still loading is dropped;
+- the form is filled from the new account's draft.
+
+The old account's draft stays in the tab, so signing back in to it brings it back. Clerk doesn't say whether a session was ended on purpose, so an expired session is treated the same way: the outing comes back after signing in again.
+
+`useItemMappings` keeps an account's custom gear names with the account they were loaded for, so another account's never show.
+
+## Sign-in and Wardrobe return
+
+A return path names a page and what to do there, never the outing itself. The outing stays in the tab's draft. The paths are in [`src/lib/outingReturn.ts`](../src/lib/outingReturn.ts).
+
+| From | Goes to | Comes back to |
+|---|---|---|
+| Sign in, on the results of a guest or an expired session | `/sign-in?redirect_url=%2F%3Fresume%3Douting` | `/?resume=outing` |
+| Add gear, on results without usable gear | `/wardrobe?from=outing` | "Get my layers" on Wardrobe's "Back to your outing" card, which links to `/?resume=outing` |
+| Go to Wardrobe, in the layer picker | `/wardrobe?from=outing` | The same |
+
+**`/?resume=outing`** takes `resume` out of the address with `history.replaceState`, then asks for the draft's last outing again, once sign-in and preferences have loaded. The form shows in the outing's mode with the request running, then the results show on a new history entry. A signed-in account gets advice built from its body and gear, labeled Personalized. Advice that still isn't personalized says why: no usable gear, or a failed request with Try again. With no last outing in the tab, as in a new tab, the form shows what was entered, and nothing is asked for. Start over while it loads drops the request.
+
+**Cancelling sign-in.** The browser's Back returns to the results' entry, which asks for the outing again as before. Any other way back to Gear up shows the form with what was entered.
+
+**Wardrobe's card** shows only on `/wardrobe?from=outing`, and only for a last outing in the signed-in account's draft. Coming back is a link. It changes no gear, so nothing is added twice.
+
+**Sign-in and sign-up** go to their validated `redirect_url` afterwards, and so does switching between them. Clerk sends a full URL when a protected page asks for sign-in. `safeReturnPath` accepts:
+- a path, or a full URL on the request's own host;
+- only `/`, `/wardrobe`, `/faq` and `/trips` pages.
+
+Anything else goes to Gear up: another site, an API route, or sign-in itself.
 
 ## What each activity gets
 

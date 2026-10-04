@@ -25,12 +25,22 @@ import {
 } from "@/lib/gearUp";
 import { readGearUpDraft, saveGearUpDraft } from "@/lib/gearUpDraft";
 import { logWarn } from "@/lib/logger";
+import { RESUME_PARAM } from "@/lib/outingReturn";
 import type { LaterTime, Outing, OutingTime } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
 
 function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boolean {
   return b !== null && a.latitude === b.latitude && a.longitude === b.longitude;
+}
+
+/** Takes /?resume=outing out of the address, so a reload or Edit outing doesn't ask again. */
+function removeResumeParam() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete(RESUME_PARAM);
+  // Without Next.js's own state (`__NA`), Next.js takes the new URL as the
+  // router's too. With it, the next refresh puts the old URL back.
+  window.history.replaceState(null, "", url.pathname + url.search + url.hash);
 }
 
 /**
@@ -45,7 +55,8 @@ function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boole
  * from the shown result's outing, not from the form.
  *
  * The results have their own browser history entry, and what was entered is
- * kept for the tab, so Back, Forward and a reload keep the outing.
+ * kept for the tab, so Back, Forward and a reload keep the outing. Sign-in
+ * and Wardrobe come back to /?resume=outing, which asks for it again.
  */
 export function useGearUp() {
   const searchParams = useSearchParams();
@@ -59,8 +70,10 @@ export function useGearUp() {
   const { activity, setActivity, exertion, setExertion, initializing, resetActivity } =
     useActivitySelection(defaultActivity, hasStoredDefaultActivity || !preferencesLoading);
   // A personalized request needs to know who's signed in, and their preferences.
-  const { isLoaded: authLoaded } = useAuth();
+  const { isLoaded: authLoaded, userId } = useAuth();
   const readyToRequest = authLoaded && !preferencesLoading;
+  /** Who's signed in: a Clerk user ID, null for a guest, or undefined until that's known. */
+  const owner = authLoaded ? (userId ?? null) : undefined;
 
   // /?mode=planAhead, which the iOS shell's Plan tab opens, starts on Later.
   const initialMode: InputMode = searchParams.get("mode") === "planAhead" ? "later" : "now";
@@ -249,9 +262,17 @@ export function useGearUp() {
     [recommendForShownWeather]
   );
 
+  /**
+   * Set when an outing should be asked for again once a request can be made:
+   * the last one, on its results' entry after a reload or Forward, or on
+   * coming back from sign-in or Wardrobe.
+   */
+  const pendingResume = useRef<{ outing: Outing; onResultsEntry: boolean } | null>(null);
+
   /** Start over: clears what was entered, and the last outing with it. */
   const resetToInitialState = useCallback(() => {
     latestRequest.current += 1;
+    pendingResume.current = null;
     resetActivity();
     cancelLocating();
     dispatch({ type: "RESET" });
@@ -301,14 +322,17 @@ export function useGearUp() {
     if (!shown && isCurrent()) leaveResultsEntry();
   }, [showForm, startRequest, showOuting, leaveResultsEntry]);
 
-  // Set when the last outing should be asked for again once a request can be made.
-  const pendingResume = useRef<Outing | null>(null);
-
-  // What was entered in this tab comes back, like after a reload, or after
-  // going to another page and coming back. On the results' entry, the last
-  // outing is asked for again.
+  // What was entered in this tab comes back once it's known who's signed in,
+  // like after a reload, or after going to another page and coming back. On
+  // the results' entry, or back from sign-in or Wardrobe, the last outing is
+  // asked for again.
+  // When the account changes while the page is open (signing out, or into
+  // another account), the page starts over with what that account kept, so
+  // one account's outing and gear never show for another.
   useEffect(() => {
-    const draft = readGearUpDraft();
+    if (owner === undefined || (state.restored && owner === state.owner)) return;
+    if (state.restored) resetToInitialState();
+    const draft = readGearUpDraft(owner);
     if (draft) {
       setActivity(draft.activity);
       setExertion(draft.exertion);
@@ -316,6 +340,7 @@ export function useGearUp() {
     }
     dispatch({
       type: "RESTORE",
+      owner,
       kept: draft && {
         inputMode: initialMode === "later" ? "later" : draft.inputMode,
         date: draft.date ? parse(draft.date, "yyyy-MM-dd", new Date()) : undefined,
@@ -324,25 +349,31 @@ export function useGearUp() {
         lastOuting: draft.lastOuting,
       },
     });
-    if (isOnResultsEntry()) {
-      if (draft?.lastOuting) pendingResume.current = draft.lastOuting;
+    const returning = searchParams.get(RESUME_PARAM) === "outing";
+    if (returning) removeResumeParam();
+    if (returning && draft?.lastOuting) {
+      pendingResume.current = { outing: draft.lastOuting, onResultsEntry: false };
+    } else if (isOnResultsEntry()) {
+      if (draft?.lastOuting) pendingResume.current = { outing: draft.lastOuting, onResultsEntry: true };
       else leaveResultsEntry();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [owner]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { restored } = state;
   useEffect(() => {
     if (!restored || !readyToRequest || !pendingResume.current) return;
-    const outing = pendingResume.current;
+    const { outing, onResultsEntry } = pendingResume.current;
     pendingResume.current = null;
     // Leaving the results while sign-in loads (Back, Start over, or the form
     // from the page) leaves their entry, and drops the queued request with it.
-    if (isOnResultsEntry()) void resume(outing);
+    if (!onResultsEntry || isOnResultsEntry()) void resume(outing);
   }, [restored, readyToRequest, resume, isOnResultsEntry]);
 
   useEffect(() => {
-    if (!restored) return;
-    saveGearUpDraft({
+    // Only into the draft of the account the page's outing belongs to, which
+    // differs for a moment when the account changes.
+    if (!restored || owner !== state.owner) return;
+    saveGearUpDraft(owner, {
       activity,
       exertion,
       place: locationSearch.selectedLocation,
@@ -354,6 +385,8 @@ export function useGearUp() {
     });
   }, [
     restored,
+    owner,
+    state.owner,
     activity,
     exertion,
     locationSearch.selectedLocation,
@@ -377,7 +410,7 @@ export function useGearUp() {
         } else if (readyToRequest) {
           void resume(state.lastOuting);
         } else {
-          pendingResume.current = state.lastOuting;
+          pendingResume.current = { outing: state.lastOuting, onResultsEntry: true };
         }
       },
     };

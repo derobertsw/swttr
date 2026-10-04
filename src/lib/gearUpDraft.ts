@@ -3,6 +3,9 @@
  * reload, or coming back to Gear up in the same tab, starts from them (see
  * docs/outing-contract.md). Only what the person entered is kept: no weather,
  * advice, body metrics or wardrobe.
+ *
+ * Each account signed in to in the tab keeps its own draft, and so does the
+ * guest, so one account's outing never shows for another.
  */
 import { format, isValid, parse } from "date-fns";
 import { ACTIVITIES } from "@/data/activities";
@@ -82,21 +85,46 @@ function isDraft(value: unknown): value is GearUpDraft {
   );
 }
 
-/** The kept draft, or null when there's none or it can't be read. */
-export function readGearUpDraft(): GearUpDraft | null {
+/** Where a guest's draft is kept, beside each account's under its Clerk user ID. */
+const GUEST = "guest";
+
+/** Every draft kept in the tab, by owner. Any that don't validate are dropped. */
+function readKept(): Record<string, GearUpDraft> {
   try {
     const stored = sessionStorage.getItem(STORAGE_KEYS.GEAR_UP_DRAFT);
-    const draft: unknown = stored ? JSON.parse(stored) : null;
-    return isDraft(draft) ? draft : null;
+    const kept: unknown = stored ? JSON.parse(stored) : null;
+    if (!isObject(kept)) return {};
+    return Object.fromEntries(Object.entries(kept).filter(([, draft]) => isDraft(draft))) as Record<string, GearUpDraft>;
   } catch {
     // Storage can be unavailable (some private modes), or hold something unreadable.
-    return null;
+    return {};
   }
 }
 
-export function saveGearUpDraft(draft: GearUpDraft): void {
+/** Whether a guest picked a place or got a result: an outing to carry into the account they sign in to. */
+const hasOuting = (draft: GearUpDraft) => draft.place !== null || draft.lastOuting !== null;
+
+/**
+ * The draft kept for `owner`, a Clerk user ID or null for a guest, or null
+ * when there's none. Another account's draft is never returned. An outing a
+ * guest started in this tab comes ahead of the account's own draft, so it
+ * carries on after signing in.
+ */
+export function readGearUpDraft(owner: string | null): GearUpDraft | null {
+  const kept = readKept();
+  const guest = kept[GUEST] ?? null;
+  if (owner === null) return guest;
+  if (guest && hasOuting(guest)) return guest;
+  return kept[owner] ?? guest;
+}
+
+/** Keeps `owner`'s draft. An account's takes the place of the guest's, which it carries on. */
+export function saveGearUpDraft(owner: string | null, draft: GearUpDraft): void {
+  const kept = readKept();
+  if (owner !== null) delete kept[GUEST];
+  kept[owner ?? GUEST] = draft;
   try {
-    sessionStorage.setItem(STORAGE_KEYS.GEAR_UP_DRAFT, JSON.stringify(draft));
+    sessionStorage.setItem(STORAGE_KEYS.GEAR_UP_DRAFT, JSON.stringify(kept));
   } catch {
     // Without storage, a reload starts from an empty form, as before.
   }

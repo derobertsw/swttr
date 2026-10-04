@@ -6,6 +6,7 @@ import { Info, Loader2, LogIn, RotateCw, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ACTIVITIES } from "@/data/activities";
+import { RESUME_OUTING_PATH, WARDROBE_FROM_OUTING_PATH, signInHref } from "@/lib/outingReturn";
 import type { BiophysicsStatus } from "@/types/biophysics";
 
 type NoticeAction = "sign_in" | "add_gear" | "retry";
@@ -23,7 +24,8 @@ function generalGuidanceCopy(status: BiophysicsStatus | null | undefined): Notic
     case "auth_required":
       return {
         title,
-        detail: "Standard layers for this temperature. Sign in to get layers matched to your body and gear.",
+        detail:
+          "Standard layers for this temperature. Sign in to get layers matched to your body and gear. You'll come back to this outing.",
         action: "sign_in",
       };
     case "no_gear":
@@ -57,7 +59,7 @@ function noLayersCopy(status: BiophysicsStatus | null | undefined, activity?: st
       return {
         title: `Sign in for ${layers}`,
         detail:
-          "Layers for this activity are built from your body and your own gear, so they need an account. There's no general guide for it yet.",
+          "Layers for this activity are built from your body and your own gear, so they need an account. There's no general guide for it yet. You'll come back to this outing.",
         action: "sign_in",
       };
     case "no_gear":
@@ -92,7 +94,8 @@ function NoticeActionButton({ action, onRetry, retrying }: NoticeActionButtonPro
     case "sign_in":
       return (
         <Button asChild className={className}>
-          <Link href="/sign-in">
+          {/* Back to this outing afterwards, asked for again with the account's body and gear. */}
+          <Link href={signInHref(RESUME_OUTING_PATH)}>
             <LogIn aria-hidden="true" />
             Sign in
           </Link>
@@ -101,7 +104,7 @@ function NoticeActionButton({ action, onRetry, retrying }: NoticeActionButtonPro
     case "add_gear":
       return (
         <Button asChild className={className}>
-          <Link href="/wardrobe">
+          <Link href={WARDROBE_FROM_OUTING_PATH}>
             <Shirt aria-hidden="true" />
             Add gear
           </Link>

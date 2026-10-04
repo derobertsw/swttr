@@ -26,18 +26,50 @@ describe("gearUpDraft", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("reads back what was saved", () => {
-    saveGearUpDraft(DRAFT);
-    expect(readGearUpDraft()).toEqual(DRAFT);
+    saveGearUpDraft(null, DRAFT);
+    expect(readGearUpDraft(null)).toEqual(DRAFT);
 
     const empty = { ...DRAFT, place: null, inputMode: "now", date: null, lastOuting: null } as const;
-    saveGearUpDraft(empty);
-    expect(readGearUpDraft()).toEqual(empty);
+    saveGearUpDraft(null, empty);
+    expect(readGearUpDraft(null)).toEqual(empty);
   });
 
   it("has nothing when nothing was saved, or what was saved can't be read", () => {
-    expect(readGearUpDraft()).toBeNull();
+    expect(readGearUpDraft(null)).toBeNull();
     sessionStorage.setItem(STORAGE_KEYS.GEAR_UP_DRAFT, "{not json");
-    expect(readGearUpDraft()).toBeNull();
+    expect(readGearUpDraft(null)).toBeNull();
+    // How a draft was kept before each account had its own.
+    store(DRAFT);
+    expect(readGearUpDraft(null)).toBeNull();
+  });
+
+  it("keeps each account's draft from every other account, and from guests", () => {
+    saveGearUpDraft("user_a", DRAFT);
+
+    expect(readGearUpDraft("user_a")).toEqual(DRAFT);
+    expect(readGearUpDraft("user_b")).toBeNull();
+    expect(readGearUpDraft(null)).toBeNull();
+  });
+
+  it("carries a guest's outing into the account they sign in to, ahead of its own draft", () => {
+    const own = { ...DRAFT, activity: "running" };
+    saveGearUpDraft("user_a", own);
+    saveGearUpDraft(null, DRAFT);
+
+    expect(readGearUpDraft("user_a")).toEqual(DRAFT);
+    saveGearUpDraft("user_a", DRAFT);
+    // The account has taken it over, so the next guest in the tab starts afresh.
+    expect(readGearUpDraft(null)).toBeNull();
+  });
+
+  it("keeps an account's own draft over a guest's that has no place or result", () => {
+    const own = { ...DRAFT, activity: "running" };
+    saveGearUpDraft("user_a", own);
+    // After signing out, the page starts over as a guest.
+    saveGearUpDraft(null, { ...DRAFT, place: null, lastOuting: null });
+
+    expect(readGearUpDraft("user_a")).toEqual(own);
+    expect(readGearUpDraft("user_b")).toEqual({ ...DRAFT, place: null, lastOuting: null });
   });
 
   it.each([
@@ -55,8 +87,8 @@ describe("gearUpDraft", () => {
     ["too many days", { ...DRAFT, durationDays: 8 }],
     ["a malformed last outing", { ...DRAFT, lastOuting: { ...DRAFT.lastOuting, when: { mode: "later" } } }],
   ])("ignores a draft with %s", (_, draft) => {
-    store(draft);
-    expect(readGearUpDraft()).toBeNull();
+    store({ guest: draft });
+    expect(readGearUpDraft(null)).toBeNull();
   });
 
   it("does without storage when the browser won't allow it", () => {
@@ -69,7 +101,7 @@ describe("gearUpDraft", () => {
       },
     });
 
-    expect(() => saveGearUpDraft(DRAFT)).not.toThrow();
-    expect(readGearUpDraft()).toBeNull();
+    expect(() => saveGearUpDraft(null, DRAFT)).not.toThrow();
+    expect(readGearUpDraft(null)).toBeNull();
   });
 });
