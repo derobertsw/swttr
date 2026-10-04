@@ -11,7 +11,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - **Wardrobe management** with calibrated gear data (clo, breathability, wind/water protection)
 - **Body-part guidance** (torso, legs, hands, head/neck) with target clo insights
 - **Plan ahead** with multi-day forecasts and a packing list
-- **Trips** for crews: stops, per-day kits, shared group gear, and an auto-generated pack list
+- **Trips** start with dates and one destination; add crew, stops, daily kits and shared gear afterward ([creation and recovery](docs/trip-creation.md))
 - **Paid agent API** for machine callers, metered per request over HTTP 402 ([docs](docs/paid-agent-api-mpp.md))
 - **Mobile-first UX**, also shipped as an iOS app via Capacitor
 
