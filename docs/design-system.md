@@ -21,7 +21,7 @@ SWTTR follows the device's light or dark setting. There is no in-app preference.
 - `viewport.themeColor` in `src/app/layout.tsx` supplies each canvas color with its matching media query. The generated viewport retains `viewport-fit=cover` for safe areas and allows zoom.
 - `PageLayout` uses the Capacitor status bar's `Style.Default`, which follows the device appearance. The custom UIKit tab shell uses `UIStatusBarStyle.default` directly and a dynamic loading canvas matching the web palettes. It does not initialize the Capacitor bridge.
 
-Browser verification and before/after screenshots are recorded in [the #119 appearance report](qa/119-system-appearance/README.md).
+Browser verification and before/after screenshots are recorded in [the #119 appearance report](qa/119-system-appearance/README.md). Short-screen popover scrolling and calendar checks are in [the popover report](qa/119-popover-overflow/README.md).
 
 Components use the semantic colors below. Don't use raw hex values, Tailwind palette colors (`slate-500`, `white/70`) or `dark:` variants. Tokens follow a pinned subtree; `dark:` variants can't tell which palette a nested subtree uses.
 
@@ -96,7 +96,7 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Dialog | `ui/dialog.tsx` | Surface `card`, radius `sheet`. The close button is a 44px target. Long content scrolls inside the dialog, clear of the safe areas. |
 | Drawer | `ui/drawer.tsx` | Vaul bottom sheet. Put long content in `DrawerBody` so it scrolls between a fixed header and `DrawerFooter`. The bottom edge pads past the home indicator. `showCloseButton` adds the 44px close button. On open, focus moves to the drawer itself rather than its first field, so the keyboard doesn't pop up and Tab stays inside. |
 | Sheet | `ui/sheet.tsx` | Side panels pad for the safe areas and use the shared close button. |
-| Popover, Tooltip | `ui/popover.tsx`, `ui/tooltip.tsx` | Popovers use the `popover` surface. Tooltips are inverted and 14px. |
+| Popover, Tooltip | `ui/popover.tsx`, `ui/tooltip.tsx` | Popovers use the `popover` surface, stay within Radix’s available width/height with a 4px viewport gutter, and scroll long content. Keep these constraints when customizing size or padding. Tooltips are inverted and 14px. |
 | Dropdown menu | `ui/dropdown-menu.tsx` | Radix menu on the `popover` surface for a row's secondary actions, such as a Wardrobe item's Exclude and Remove. Items match Select items (44px on touch); `variant="destructive"` marks Remove. Give the trigger an `aria-label` that names the row. Keep the trigger enabled while a change runs, so focus can return to it, and disable the items instead. |
 | Calendar | `ui/calendar.tsx` | Month arrows are 44px on phones and touch. Equal-width day columns shrink within the available container width, capped at 40px wide with 40px height (32px on desktop). The shared component fits padded cards, drawers and sheets with smaller mobile padding. Narrow months place the caption below the arrows; callers can keep their normal padding. |
 

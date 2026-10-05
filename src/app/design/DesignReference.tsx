@@ -39,6 +39,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -50,6 +52,7 @@ import {
 import { chipClassName } from "@/components/ui/chip";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ScoreDisplay from "@/components/ScoreDisplay";
 import { FieldError } from "@/components/FieldError";
 import { cn } from "@/lib/utils";
 
@@ -322,14 +325,26 @@ function PalettePanel({ appearance }: { appearance: Appearance }) {
 }
 
 function OverlayExamples() {
+  const [date, setDate] = useState<Date>();
+
   return (
     <section id="overlays" className="space-y-3 rounded-sheet border border-border bg-card p-4 sm:p-6">
       <h2 className="text-2xl font-semibold">Overlays</h2>
       <p className="text-sm text-muted-foreground">
         Dialogs, drawers, menus and popovers render outside the panels above, so they use the
         app&apos;s appearance. Long drawer content scrolls between a fixed header and footer.
+        Popovers scroll within the available space around their trigger.
       </p>
       <div className="flex flex-wrap gap-2">
+        <ScoreDisplay score={90} totalClo={1} targetRange={[0.8, 1.2]} />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline">Select date</Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar mode="single" selected={date} onSelect={setDate} />
+          </PopoverContent>
+        </Popover>
         <Dialog>
           <DialogTrigger asChild>
             <Button variant="outline">Open dialog</Button>
@@ -421,8 +436,8 @@ export function DesignReference() {
       <header className="space-y-2">
         <h1 className="text-title font-semibold md:text-title-lg">SWTTR design system</h1>
         <p className="max-w-2xl text-muted-foreground">
-          Tokens and shared components in both appearances. The app stays on the dark
-          palette until every screen uses these tokens, then follows the system setting.
+          Tokens and shared components in both appearances. The app follows the device&apos;s
+          light or dark setting.
           See docs/design-system.md for the rules behind these examples.
         </p>
       </header>

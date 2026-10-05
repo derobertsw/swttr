@@ -1,0 +1,475 @@
+{
+  "baseCommit": "c7a8d7d7721c01cc6e0989560daf8fb85dfe74bf",
+  "checkedOn": "2026-10-04",
+  "environment": "local Next.js development server; isolated headless Chrome; system color scheme emulation; signed out; /design temporarily excluded from Clerk middleware for local component measurements; original proxy restored before production build",
+  "before": {
+    "width": 320,
+    "height": 568,
+    "top": -222,
+    "bottom": 351,
+    "popoverHeight": 573,
+    "scrollHeight": 571,
+    "clientHeight": 571,
+    "overflowY": "visible",
+    "availableHeight": "351px",
+    "pageScrollWidth": 320
+  },
+  "after": [
+    {
+      "palette": "light",
+      "width": 320,
+      "height": 568,
+      "thermal": {
+        "viewport": {
+          "width": 320,
+          "height": 568
+        },
+        "bounds": {
+          "left": 4,
+          "right": 260,
+          "top": 4,
+          "bottom": 351,
+          "width": 256,
+          "height": 347
+        },
+        "scrollHeight": 571,
+        "clientHeight": 345,
+        "scrollWidth": 254,
+        "clientWidth": 254,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "347px",
+        "availableWidth": "312px",
+        "pageScrollWidth": 320,
+        "contrastTextCount": 9,
+        "minimumTextContrast": 7.019983920757036,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Thermal comfort statusThermal ",
+          "outlineWidth": "3px",
+          "outlineOffset": "0px",
+          "outlineContrast": 5.156132200414064
+        },
+        "keyboardScrollTop": 226,
+        "lastParagraphVisible": true,
+        "pageStaysStillAtScrollEnd": true,
+        "escapeRestoresTrigger": true
+      },
+      "calendar": {
+        "viewport": {
+          "width": 320,
+          "height": 568
+        },
+        "bounds": {
+          "left": 10,
+          "right": 316,
+          "top": 10,
+          "bottom": 351.1875,
+          "width": 306,
+          "height": 341.1875
+        },
+        "scrollHeight": 339,
+        "clientHeight": 339,
+        "scrollWidth": 304,
+        "clientWidth": 304,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "347px",
+        "availableWidth": "312px",
+        "pageScrollWidth": 320,
+        "contrastTextCount": 43,
+        "minimumTextContrast": 7.019983920757036,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Today, Sunday, October 4th, 2026, selected",
+          "outlineWidth": "2px",
+          "outlineOffset": "2px",
+          "outlineContrast": 4.3613124403588275
+        },
+        "keyboardSelectsDay": true,
+        "nextMonthWorks": true,
+        "escapeRestoresTrigger": true
+      }
+    },
+    {
+      "palette": "light",
+      "width": 390,
+      "height": 844,
+      "thermal": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "bounds": {
+          "left": 4,
+          "right": 260,
+          "top": 54,
+          "bottom": 627,
+          "width": 256,
+          "height": 573
+        },
+        "scrollHeight": 571,
+        "clientHeight": 571,
+        "scrollWidth": 254,
+        "clientWidth": 254,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "623px",
+        "availableWidth": "382px",
+        "pageScrollWidth": 390,
+        "contrastTextCount": 9,
+        "minimumTextContrast": 7.019983920757036,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Thermal comfort statusThermal ",
+          "outlineWidth": "3px",
+          "outlineOffset": "0px",
+          "outlineContrast": 5.156132200414064
+        },
+        "keyboardScrollTop": 0,
+        "lastParagraphVisible": true,
+        "pageStaysStillAtScrollEnd": true,
+        "escapeRestoresTrigger": true
+      },
+      "calendar": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "bounds": {
+          "left": 41,
+          "right": 347,
+          "top": 286,
+          "bottom": 627.1875,
+          "width": 306,
+          "height": 341.1875
+        },
+        "scrollHeight": 339,
+        "clientHeight": 339,
+        "scrollWidth": 304,
+        "clientWidth": 304,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "623px",
+        "availableWidth": "382px",
+        "pageScrollWidth": 390,
+        "contrastTextCount": 43,
+        "minimumTextContrast": 7.019983920757036,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Today, Sunday, October 4th, 2026, selected",
+          "outlineWidth": "2px",
+          "outlineOffset": "2px",
+          "outlineContrast": 4.3613124403588275
+        },
+        "keyboardSelectsDay": true,
+        "nextMonthWorks": true,
+        "escapeRestoresTrigger": true
+      }
+    },
+    {
+      "palette": "light",
+      "width": 1280,
+      "height": 900,
+      "thermal": {
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "bounds": {
+          "left": 42,
+          "right": 298,
+          "top": 206,
+          "bottom": 779,
+          "width": 256,
+          "height": 573
+        },
+        "scrollHeight": 571,
+        "clientHeight": 571,
+        "scrollWidth": 254,
+        "clientWidth": 254,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "775px",
+        "availableWidth": "1272px",
+        "pageScrollWidth": 1280,
+        "contrastTextCount": 9,
+        "minimumTextContrast": 7.019983920757036,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Thermal comfort statusThermal ",
+          "outlineWidth": "3px",
+          "outlineOffset": "0px",
+          "outlineContrast": 5.156132200414064
+        },
+        "keyboardScrollTop": 0,
+        "lastParagraphVisible": true,
+        "pageStaysStillAtScrollEnd": true,
+        "escapeRestoresTrigger": true
+      },
+      "calendar": {
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "bounds": {
+          "left": 157,
+          "right": 407,
+          "top": 486,
+          "bottom": 779.1875,
+          "width": 250,
+          "height": 293.1875
+        },
+        "scrollHeight": 291,
+        "clientHeight": 291,
+        "scrollWidth": 248,
+        "clientWidth": 248,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "775px",
+        "availableWidth": "1272px",
+        "pageScrollWidth": 1280,
+        "contrastTextCount": 43,
+        "minimumTextContrast": 7.019983920757036,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Today, Sunday, October 4th, 2026, selected",
+          "outlineWidth": "2px",
+          "outlineOffset": "2px",
+          "outlineContrast": 4.3613124403588275
+        },
+        "keyboardSelectsDay": true,
+        "nextMonthWorks": true,
+        "escapeRestoresTrigger": true
+      }
+    },
+    {
+      "palette": "dark",
+      "width": 320,
+      "height": 568,
+      "thermal": {
+        "viewport": {
+          "width": 320,
+          "height": 568
+        },
+        "bounds": {
+          "left": 4,
+          "right": 260,
+          "top": 4,
+          "bottom": 351,
+          "width": 256,
+          "height": 347
+        },
+        "scrollHeight": 571,
+        "clientHeight": 345,
+        "scrollWidth": 254,
+        "clientWidth": 254,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "347px",
+        "availableWidth": "312px",
+        "pageScrollWidth": 320,
+        "contrastTextCount": 9,
+        "minimumTextContrast": 6.9141498000869595,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Thermal comfort statusThermal ",
+          "outlineWidth": "3px",
+          "outlineOffset": "0px",
+          "outlineContrast": 9.033159557348407
+        },
+        "keyboardScrollTop": 226,
+        "lastParagraphVisible": true,
+        "pageStaysStillAtScrollEnd": true,
+        "escapeRestoresTrigger": true
+      },
+      "calendar": {
+        "viewport": {
+          "width": 320,
+          "height": 568
+        },
+        "bounds": {
+          "left": 10,
+          "right": 316,
+          "top": 10,
+          "bottom": 351.1875,
+          "width": 306,
+          "height": 341.1875
+        },
+        "scrollHeight": 339,
+        "clientHeight": 339,
+        "scrollWidth": 304,
+        "clientWidth": 304,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "347px",
+        "availableWidth": "312px",
+        "pageScrollWidth": 320,
+        "contrastTextCount": 43,
+        "minimumTextContrast": 6.9141498000869595,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Today, Sunday, October 4th, 2026, selected",
+          "outlineWidth": "2px",
+          "outlineOffset": "2px",
+          "outlineContrast": 4.959026855474732
+        },
+        "keyboardSelectsDay": true,
+        "nextMonthWorks": true,
+        "escapeRestoresTrigger": true
+      }
+    },
+    {
+      "palette": "dark",
+      "width": 390,
+      "height": 844,
+      "thermal": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "bounds": {
+          "left": 4,
+          "right": 260,
+          "top": 54,
+          "bottom": 627,
+          "width": 256,
+          "height": 573
+        },
+        "scrollHeight": 571,
+        "clientHeight": 571,
+        "scrollWidth": 254,
+        "clientWidth": 254,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "623px",
+        "availableWidth": "382px",
+        "pageScrollWidth": 390,
+        "contrastTextCount": 9,
+        "minimumTextContrast": 6.9141498000869595,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Thermal comfort statusThermal ",
+          "outlineWidth": "3px",
+          "outlineOffset": "0px",
+          "outlineContrast": 9.033159557348407
+        },
+        "keyboardScrollTop": 0,
+        "lastParagraphVisible": true,
+        "pageStaysStillAtScrollEnd": true,
+        "escapeRestoresTrigger": true
+      },
+      "calendar": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "bounds": {
+          "left": 41,
+          "right": 347,
+          "top": 286,
+          "bottom": 627.1875,
+          "width": 306,
+          "height": 341.1875
+        },
+        "scrollHeight": 339,
+        "clientHeight": 339,
+        "scrollWidth": 304,
+        "clientWidth": 304,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "623px",
+        "availableWidth": "382px",
+        "pageScrollWidth": 390,
+        "contrastTextCount": 43,
+        "minimumTextContrast": 6.9141498000869595,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Today, Sunday, October 4th, 2026, selected",
+          "outlineWidth": "2px",
+          "outlineOffset": "2px",
+          "outlineContrast": 4.959026855474732
+        },
+        "keyboardSelectsDay": true,
+        "nextMonthWorks": true,
+        "escapeRestoresTrigger": true
+      }
+    },
+    {
+      "palette": "dark",
+      "width": 1280,
+      "height": 900,
+      "thermal": {
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "bounds": {
+          "left": 42,
+          "right": 298,
+          "top": 206,
+          "bottom": 779,
+          "width": 256,
+          "height": 573
+        },
+        "scrollHeight": 571,
+        "clientHeight": 571,
+        "scrollWidth": 254,
+        "clientWidth": 254,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "775px",
+        "availableWidth": "1272px",
+        "pageScrollWidth": 1280,
+        "contrastTextCount": 9,
+        "minimumTextContrast": 6.9141498000869595,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Thermal comfort statusThermal ",
+          "outlineWidth": "3px",
+          "outlineOffset": "0px",
+          "outlineContrast": 9.033159557348407
+        },
+        "keyboardScrollTop": 0,
+        "lastParagraphVisible": true,
+        "pageStaysStillAtScrollEnd": true,
+        "escapeRestoresTrigger": true
+      },
+      "calendar": {
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "bounds": {
+          "left": 157,
+          "right": 407,
+          "top": 486,
+          "bottom": 779.1875,
+          "width": 250,
+          "height": 293.1875
+        },
+        "scrollHeight": 291,
+        "clientHeight": 291,
+        "scrollWidth": 248,
+        "clientWidth": 248,
+        "scrollTop": 0,
+        "overflowY": "auto",
+        "availableHeight": "775px",
+        "availableWidth": "1272px",
+        "pageScrollWidth": 1280,
+        "contrastTextCount": 43,
+        "minimumTextContrast": 6.9141498000869595,
+        "contrastFailures": [],
+        "focus": {
+          "label": "Today, Sunday, October 4th, 2026, selected",
+          "outlineWidth": "2px",
+          "outlineOffset": "2px",
+          "outlineContrast": 4.959026855474732
+        },
+        "keyboardSelectsDay": true,
+        "nextMonthWorks": true,
+        "escapeRestoresTrigger": true
+      }
+    }
+  ]
+}
