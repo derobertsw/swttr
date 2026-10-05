@@ -62,21 +62,21 @@ describe("gearUpReducer", () => {
   });
 
   it("shows a result with the outing it was requested for, and keeps that outing", () => {
-    const loading = gearUpReducer(createInitialState("now"), { type: "SUBMIT_START" });
+    const loading = gearUpReducer(createInitialState("now"), { type: "SUBMIT_START", outing: ALPINE_OUTING });
     const state = gearUpReducer(loading, { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
-    expect(state).toMatchObject({ loading: false, result: LAYERS_RESULT, lastOuting: ALPINE_OUTING });
+    expect(state).toMatchObject({ request: { status: "idle" }, result: LAYERS_RESULT, lastOuting: ALPINE_OUTING });
   });
 
   it("keeps the shown result while a newer request loads, and when it fails", () => {
     const shown = gearUpReducer(createInitialState("now"), { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });
-    const loading = gearUpReducer(shown, { type: "SUBMIT_START" });
-    expect(loading).toMatchObject({ loading: true, result: LAYERS_RESULT });
-    expect(gearUpReducer(loading, { type: "SUBMIT_ERROR" })).toMatchObject({ loading: false, result: LAYERS_RESULT });
+    const loading = gearUpReducer(shown, { type: "SUBMIT_START", outing: ALPINE_OUTING });
+    expect(loading).toMatchObject({ request: { status: "loading", outing: ALPINE_OUTING }, result: LAYERS_RESULT });
+    expect(gearUpReducer(loading, { type: "SUBMIT_ERROR", message: "Weather unavailable" })).toMatchObject({ request: { status: "error", outing: ALPINE_OUTING, message: "Weather unavailable" }, result: LAYERS_RESULT });
   });
 
   it("stops loading on error, and starts over on Now without the last outing", () => {
     const planning = { ...createInitialState("later"), lastOuting: ALPINE_OUTING };
-    expect(gearUpReducer({ ...planning, loading: true }, { type: "SUBMIT_ERROR" }).loading).toBe(false);
+    expect(gearUpReducer(gearUpReducer(planning, { type: "SUBMIT_START", outing: ALPINE_OUTING }), { type: "SUBMIT_ERROR", message: "Weather unavailable" }).request.status).toBe("error");
     expect(gearUpReducer(planning, { type: "RESET" })).toEqual(createInitialState("now"));
   });
 
@@ -120,9 +120,9 @@ describe("gearUpReducer", () => {
   });
 
   it("keeps a request busy on the form only when it's kept", () => {
-    const busy = { ...createInitialState("later"), loading: true };
-    expect(gearUpReducer(busy, { type: "SHOW_FORM", mode: "later", keepLoading: true }).loading).toBe(true);
-    expect(gearUpReducer(busy, { type: "SHOW_FORM", mode: "later", keepLoading: false }).loading).toBe(false);
+    const busy = gearUpReducer(createInitialState("later"), { type: "SUBMIT_START", outing: ALPINE_OUTING });
+    expect(gearUpReducer(busy, { type: "SHOW_FORM", mode: "later", keepLoading: true }).request.status).toBe("loading");
+    expect(gearUpReducer(busy, { type: "SHOW_FORM", mode: "later", keepLoading: false }).request.status).toBe("idle");
   });
 
   it("restores what was kept for the tab, and keeps it restored for its owner through Back and Start over", () => {

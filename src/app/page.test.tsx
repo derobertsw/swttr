@@ -1072,11 +1072,16 @@ describe("Home Page", () => {
       expect(screen.getByRole("button", { name: "Alpine Skiing, change activity" })).toBeDisabled();
       expect(screen.queryByRole("button", { name: "Running, change activity" })).not.toBeInTheDocument();
       expect(screen.getByText(/personalized layers couldn't load/i)).toBeInTheDocument();
+      const updating = screen.getByRole("status");
+      expect(updating).toHaveTextContent("Updating outing…");
+      expect(updating).toHaveTextContent("Running · Moderate effort · Your location · Now");
+      expect(updating).toHaveTextContent("Still showing the previous result: Alpine Skiing");
 
       await answer(finishRunning!);
 
       expect((await screen.findAllByText("Running tights")).length).toBeGreaterThan(0);
       expect(screen.getByRole("button", { name: "Running, change activity" })).toBeEnabled();
+      expect(screen.queryByText("Updating outing…")).not.toBeInTheDocument();
     });
 
     it("retries a failed request for the same outing", async () => {
@@ -1095,12 +1100,15 @@ describe("Home Page", () => {
       expect(await screen.findByText(/personalized layers couldn't load/i)).toBeInTheDocument();
 
       await switchActivity(user, "Alpine Skiing", "Running");
-      const notice = await screen.findByRole("region", { name: "Couldn't load Running layers" });
+      const notice = await screen.findByRole("alert");
+      expect(notice).toHaveTextContent("Running");
+      expect(notice).toHaveTextContent("Still showing the previous result: Alpine Skiing");
 
-      await user.click(within(notice).getByRole("button", { name: "Try again" }));
+      await user.click(screen.getByRole("button", { name: "Try update again" }));
 
       expect((await screen.findAllByText("Running tights")).length).toBeGreaterThan(0);
-      expect(screen.queryByRole("region", { name: "Couldn't load Running layers" })).not.toBeInTheDocument();
+      expect(screen.queryByText("Outing update failed")).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Gear up", level: 1 })).toHaveFocus();
       expect(screen.getByText(/wind 15 mph/i)).toBeInTheDocument();
       expect(runningRequests).toBe(2);
     });
@@ -1166,8 +1174,8 @@ describe("Home Page", () => {
           requests.weather.push(url);
           return weather?.() ?? Promise.resolve(respond(200, NOON_FORECAST));
         }
-        if (url.includes("/api/v1/recommendations/") && recommendations) {
-          return recommendations(url);
+        if (url.includes("/api/v1/recommendations/")) {
+          return recommendations?.(url) ?? Promise.resolve(respond(401, { error: "Authentication required" }));
         }
         if (url.includes("/api/plan-ahead")) {
           requests.planAhead.push(JSON.parse(String(init?.body)));

@@ -12,8 +12,12 @@ import { PlanPacking, type PackingState } from "@/components/plan/PlanPacking";
 import { ACTIVITIES } from "@/data/activities";
 import type { MultiDayLayerPlan, UncoveredPlanDay } from "@/types/plan";
 import type { PackingListData, PackingListWardrobe } from "@/lib/packingList";
+import { OutingTimeSummary } from "@/components/OutingTimeSummary";
+import { WeatherSourceDetails } from "@/components/WeatherSourceDetails";
+import type { Outing } from "@/types/outing";
 
 interface MultiDayPlanDisplayProps {
+  outing?: Outing;
   plan: MultiDayLayerPlan;
   /** An activity ID from src/data/activities.ts. */
   activity?: string;
@@ -50,6 +54,7 @@ function describeUncoveredDay(day: UncoveredPlanDay, dayEndHour: number): string
  * or the packing list for the whole plan.
  */
 export default function MultiDayPlanDisplay({
+  outing,
   plan,
   activity,
   place,
@@ -154,7 +159,9 @@ export default function MultiDayPlanDisplay({
             Layers for {formatHour(plan.dayStartHour)} to {formatHour(plan.dayEndHour)} each day, local time.
             {startsLate && ` The first day starts at ${formatHour(plan.firstDayStartHour)}.`}
           </p>
+          {outing && <OutingTimeSummary when={outing.when} />}
         </div>
+        <WeatherSourceDetails provenance={plan.provenance} />
       </header>
 
       {plan.uncoveredDays.length > 0 && (

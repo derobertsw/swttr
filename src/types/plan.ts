@@ -1,5 +1,6 @@
 import { Recommendation } from "@/types/recommendations";
 import type { BodyPart, LayerType } from "@/types/wardrobe";
+import type { WeatherProvenance } from "@/types/weather";
 
 export type DaypartId = "morning" | "midday" | "evening";
 
@@ -75,6 +76,8 @@ export interface UncoveredPlanDay {
 }
 
 export interface MultiDayLayerPlan {
+  /** Source facts supplied by the forecast adapter; absent for older saved plans. */
+  provenance?: WeatherProvenance;
   startDate: string;
   endDate: string;
   durationDays: number;

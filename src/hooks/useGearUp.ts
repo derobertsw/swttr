@@ -26,7 +26,7 @@ import {
 import { readGearUpDraft, saveGearUpDraft } from "@/lib/gearUpDraft";
 import { logWarn } from "@/lib/logger";
 import { RESUME_PARAM } from "@/lib/outingReturn";
-import type { LaterTime, Outing, OutingTime } from "@/types/outing";
+import type { LaterTime, LayersResult, Outing, OutingTime } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
 
@@ -116,9 +116,9 @@ export function useGearUp() {
   // report an error for an outing that's gone.
   const latestRequest = useRef(0);
   /** Starts loading, and returns a check for whether this request is still the latest. */
-  const startRequest = useCallback(() => {
+  const startRequest = useCallback((outing: Outing) => {
     const request = ++latestRequest.current;
-    dispatch({ type: "SUBMIT_START" });
+    dispatch({ type: "SUBMIT_START", outing });
     return () => latestRequest.current === request;
   }, []);
 
@@ -131,6 +131,17 @@ export function useGearUp() {
     dispatch({ type: "APPLY_OUTING_TIME", when: outing.when });
   }, [setActivity, setExertion, cancelLocating, locationSearch]);
 
+  const showLayers = useCallback((result: LayersResult) => {
+    // A failed update must not replace useful advice (or a manually edited
+    // outfit) with a fallback. Initial requests still explain unavailable advice.
+    if (state.result && result.advice.kind !== "personalized" && result.advice.reason === "unavailable") {
+      dispatch({ type: "SUBMIT_ERROR", message: "Couldn't load layers for this outing. Try again." });
+      return false;
+    }
+    dispatch({ type: "SUBMIT_SUCCESS", result });
+    return true;
+  }, [state.result]);
+
   /**
    * Shows layers for a one-day outing, from its place's current weather or its
    * forecast at the outing's local date-time there. Resolves false, after
@@ -142,14 +153,19 @@ export function useGearUp() {
     if (!isCurrent()) return false;
     if (!data) {
       toast.error(error);
-      dispatch({ type: "SUBMIT_ERROR" });
+      dispatch({ type: "SUBMIT_ERROR", message: error });
       return false;
     }
-    const result = await layersFor(outing, data);
-    if (!isCurrent()) return false;
-    dispatch({ type: "SUBMIT_SUCCESS", result });
-    return true;
-  }, [layersFor]);
+    try {
+      const result = await layersFor(outing, data);
+      if (!isCurrent()) return false;
+      return showLayers(result);
+    } catch (error) {
+      logWarn("useGearUp.recommendFor", error);
+      if (isCurrent()) dispatch({ type: "SUBMIT_ERROR", message: "Couldn't load layers for this outing. Try again." });
+      return false;
+    }
+  }, [layersFor, showLayers]);
 
   /**
    * Shows a multi-day plan for a later outing. Resolves false, after saying
@@ -169,8 +185,9 @@ export function useGearUp() {
         // Shown on the start date, which is what needs to change.
         dispatch({ type: "START_DATE_INVALID", error: error.message, location: outing.place });
       } else {
-        toast.error(error instanceof PlanAheadError ? error.message : "Couldn't build the plan. Try again.");
-        dispatch({ type: "SUBMIT_ERROR" });
+        const message = error instanceof PlanAheadError ? error.message : "Couldn't build the plan. Try again.";
+        toast.error(message);
+        dispatch({ type: "SUBMIT_ERROR", message });
       }
       return false;
     }
@@ -192,7 +209,7 @@ export function useGearUp() {
   const handleSubmit = useCallback(async () => {
     // The iOS shell's Gear Up action can fire again while a request is running,
     // or before a requested location arrives.
-    if (state.loading || locationStatus === "locating") return;
+    if (state.request.status === "loading" || locationStatus === "locating") return;
     if (!activity) {
       toast.error("Please select an activity");
       return;
@@ -212,7 +229,8 @@ export function useGearUp() {
     const when: OutingTime = later
       ? { mode: "later", date: format(state.date!, "yyyy-MM-dd"), time: state.time, durationDays: state.durationDays }
       : { mode: "now" };
-    await showOuting(startRequest(), { activity, exertion, place, when });
+    const outing = { activity, exertion, place, when };
+    await showOuting(startRequest(outing), outing);
   }, [activity, exertion, state, locationStatus, locationSearch, startRequest, showOuting]);
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches "gearUp"
@@ -233,7 +251,7 @@ export function useGearUp() {
     async (place: LocationSuggestion, localDateTime?: string) => {
       if (shownResult?.kind !== "layers") return false;
       const outing = { ...shownResult.outing, place, when: outingTimeAt(localDateTime) };
-      const isCurrent = startRequest();
+      const isCurrent = startRequest(outing);
       if (!await recommendFor(isCurrent, outing) || !isCurrent()) return false;
       applyOutingInputs(outing);
       return true;
@@ -247,21 +265,21 @@ export function useGearUp() {
    */
   const recommendForShownWeather = useCallback(async (changes: Partial<Outing>, failureMessage: string) => {
     if (shownResult?.kind !== "layers") return false;
-    const isCurrent = startRequest();
+    const outing = { ...shownResult.outing, ...changes };
+    const isCurrent = startRequest(outing);
     try {
-      const result = await layersFor({ ...shownResult.outing, ...changes }, shownResult.weather);
+      const result = await layersFor(outing, shownResult.weather);
       if (!isCurrent()) return false;
-      dispatch({ type: "SUBMIT_SUCCESS", result });
-      return true;
+      return showLayers(result);
     } catch (error) {
       logWarn("useGearUp.recommendForShownWeather", error);
       if (isCurrent()) {
         toast.error(failureMessage);
-        dispatch({ type: "SUBMIT_ERROR" });
+        dispatch({ type: "SUBMIT_ERROR", message: failureMessage });
       }
       return false;
     }
-  }, [shownResult, startRequest, layersFor]);
+  }, [shownResult, startRequest, layersFor, showLayers]);
 
   // The form takes the new activity only with its layers, so Edit outing
   // while they load, or after they fail, opens on the activity still shown.
@@ -275,6 +293,16 @@ export function useGearUp() {
     () => recommendForShownWeather({}, "Failed to load layers"),
     [recommendForShownWeather]
   );
+
+  /** Retry the failed update's snapshot, not the older outing still on screen. */
+  const handleRetryUpdate = useCallback(async () => {
+    if (state.request.status !== "error") return false;
+    const { outing } = state.request;
+    const isCurrent = startRequest(outing);
+    if (!await showOuting(isCurrent, outing) || !isCurrent()) return false;
+    applyOutingInputs(outing);
+    return true;
+  }, [state.request, startRequest, showOuting, applyOutingInputs]);
 
   /**
    * Set when an outing should be asked for again once a request can be made:
@@ -333,7 +361,7 @@ export function useGearUp() {
   const resume = useCallback(async (outing: Outing) => {
     showForm(outing.when.mode, true);
     applyOutingInputs(outing);
-    const isCurrent = startRequest();
+    const isCurrent = startRequest(outing);
     const shown = await showOuting(isCurrent, outing);
     if (!shown && isCurrent()) leaveResultsEntry();
   }, [showForm, applyOutingInputs, startRequest, showOuting, leaveResultsEntry]);
@@ -463,7 +491,8 @@ export function useGearUp() {
     setTime,
     durationDays: state.durationDays,
     setDurationDays,
-    loading: state.loading,
+    loading: state.request.status === "loading",
+    request: state.request,
     showFieldErrors: state.showFieldErrors,
     // Only for the place it was found at: another place's forecast may cover the dates.
     startDateError: state.startDateError && isSamePlace(state.startDateError.location, locationSearch.selectedLocation)
@@ -490,6 +519,7 @@ export function useGearUp() {
     handleWeatherChange,
     handleActivityChange,
     handleRetry,
+    handleRetryUpdate,
     showPlanForm,
     editOuting,
     resetToInitialState,

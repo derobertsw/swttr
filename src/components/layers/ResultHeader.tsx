@@ -12,6 +12,9 @@ import { cn } from "@/lib/utils";
 import type { PrecipitationType, WeatherContext } from "@/types/weather";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
+import { OutingTimeSummary } from "@/components/OutingTimeSummary";
+import { WeatherSourceDetails } from "@/components/WeatherSourceDetails";
+import type { Outing } from "@/types/outing";
 
 /** The button that opens the place and time drawer, which returns focus to it. */
 export const EDIT_WEATHER_ID = "result-edit-weather";
@@ -20,6 +23,7 @@ export const EDIT_WEATHER_ID = "result-edit-weather";
 type AdviceKind = "personalized" | "general";
 
 interface ResultHeaderProps {
+  outing?: Outing;
   activity?: string;
   exertion?: ExertionLevel;
   /** Omitted when there are no layers. */
@@ -157,6 +161,7 @@ function ActivityControl({
  * conditions they were built for, with ways to change each.
  */
 export function ResultHeader({
+  outing,
   activity,
   exertion,
   adviceKind,
@@ -212,6 +217,7 @@ export function ResultHeader({
             </span>
           </p>
         )}
+        {outing && <OutingTimeSummary when={outing.when} />}
         <p className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{formatTemperature(temperature, temperatureUnit)}</span>
           {feelsLike !== temperature && <> · Feels like {formatTemperature(feelsLike, temperatureUnit)}</>}
@@ -228,6 +234,8 @@ export function ResultHeader({
           </p>
         )}
       </div>
+
+      <WeatherSourceDetails provenance={context?.provenance} />
 
       {onEditWeather && (
         <Button id={EDIT_WEATHER_ID} type="button" variant="outline" size="sm" className="self-start" onClick={onEditWeather} disabled={loading}>

@@ -5,6 +5,7 @@ import { AlertTriangle, ChevronDown, Undo2 } from "lucide-react";
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
 import type { LocationSuggestion, Recommendation } from "@/types/recommendations";
 import type { PrecipitationType, WeatherContext } from "@/types/weather";
+import type { Outing } from "@/types/outing";
 import type {
   BiophysicsRecommendation,
   BiophysicsStatus,
@@ -49,6 +50,7 @@ import { useLayerPicker, type PickerItem } from "@/hooks/useLayerPicker";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 
 interface LayerDisplayProps {
+  outing?: Outing;
   activity?: string;
   exertion?: ExertionLevel;
   recommendation: Recommendation | null;
@@ -139,6 +141,7 @@ function ResultDisclosure({ title, children }: { title: string; children: ReactN
  * layers instead.
  */
 const LayerDisplay = ({
+  outing,
   activity,
   exertion,
   recommendation,
@@ -415,6 +418,7 @@ const LayerDisplay = ({
   return (
     <div className="flex w-full flex-col gap-6 pb-24">
       <ResultHeader
+        outing={outing}
         activity={activity}
         exertion={exertion}
         adviceKind={biophysicsActive ? "personalized" : recommendation ? "general" : undefined}
