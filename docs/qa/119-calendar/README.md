@@ -6,7 +6,7 @@ Checked October 4, 2026. The original pass used `main` after PR #238 (`2145e4a`)
 
 The shared Calendar now caps its width to its container and divides the available grid width into equal columns. Day cells keep their height while shrinking horizontally. Mobile padding is smaller, and a container query moves the caption below the navigation arrows when a month is narrower than 12rem. Padded cards, drawers and sheets can use the component without a caller-specific padding rule. The grid uses DayPicker 9.13's `month_grid` class key; fixed table layout and shrinkable weekday/week-number columns also prevent intrinsic table width from overflowing at enlarged text sizes.
 
-A completed multi-day range starts over on the next chosen day. Reopening a saved trip, or returning from step 2, opens the saved start month. Start, arrow and End stay in one group while the duration badge can wrap. The date step alone selects the 48px primary Button size; other wizard steps and the standalone stops editor retain their default size. Saving uses Button's `loading` behavior to keep keyboard focus and ignore repeated activation.
+A completed multi-day range starts over on the next chosen day. An initial saved one-day range also starts over on a different day; after that first interaction, the next click can complete a fresh multi-day range. Reopening a saved trip, or returning from step 2, opens the saved start month. Start, arrow and End stay in one group while the duration badge can wrap. The date step alone selects the 48px primary Button size; other wizard steps and the standalone stops editor retain their default size. Saving uses Button's `loading` behavior to keep keyboard focus and ignore repeated activation.
 
 | Reviewed, light 320px | Reviewed, dark 320px |
 |---|---|
@@ -36,13 +36,19 @@ At 320 × 844, nested card, well and calendar padding made the original 304px ca
 
 The original pass checked 320, 390 and 1280px in both palettes, and Gear up's real single-date popover at 320px (304px wide within x=8–312, 44px arrows, Next/Previous month navigation). Historical measurements are in [rendered-checks.json](rendered-checks.json); captures are [light 390px](after-light-390.jpg), [dark 390px](after-dark-390.jpg), [light desktop](after-light-1280.jpg) and [dark desktop](after-dark-1280.jpg).
 
+## One-day selection follow-up — October 5, 2026
+
+The new review found that a saved one-day range was indistinguishable from the first day of a fresh selection. Four request-payload regressions reproduced the failure before the fix: replacing October 10 with October 14 or October 14–16, both on direct reopen and Back from step 2. Step1Dates now tracks whether its initial range came from the saved trip and consumes that state on the first calendar interaction. The existing new-trip creation tests continue to assert exact multi-day POST dates, so starting a fresh range still allows its next click to select the end.
+
+This follow-up changes selection behavior only. The layout measurements and screenshots above remain the October 4 captures; they were not repeated for this change.
+
 ## Automated checks
 
-The focused suite covers the date wizard, standalone stops page, Gear up, weather drawer, Button and global styles. Date regressions assert the actual initial and lodging-confirmation PATCH payloads for replacing 10–12 with 14–16, saved-month navigation on reopen and Back, and focus/duplicate-request behavior during and after a failed save.
+The focused suite covers the date wizard, standalone stops page, Gear up, weather drawer, Button and global styles. Date regressions cover saved one-day replacement and assert the actual initial and lodging-confirmation PATCH payloads for replacing 10–12 with 14–16, saved-month navigation on reopen and Back, and focus/duplicate-request behavior during and after a failed save.
 
 - `npm run lint` — passed.
 - `npm run typecheck` — passed.
-- `NODE_OPTIONS=--no-experimental-webstorage npx vitest run src/components/trips/LegacyTripWizard.test.tsx src/components/GearUpForm.test.tsx src/components/layers/WeatherEditDrawer.test.tsx src/assets/styles/globals.test.ts src/components/ui/button.test.tsx 'src/app/trips/[id]/stops/page.test.tsx'` — six files, 76 tests passed.
+- `NODE_OPTIONS=--no-experimental-webstorage npx vitest run src/components/trips/LegacyTripWizard.test.tsx src/components/GearUpForm.test.tsx src/components/layers/WeatherEditDrawer.test.tsx src/assets/styles/globals.test.ts src/components/ui/button.test.tsx 'src/app/trips/[id]/stops/page.test.tsx'` — six files, 80 tests passed.
 - `npm run build` — passed.
 
 ## Remaining coverage and exception

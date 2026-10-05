@@ -308,6 +308,8 @@ function Step1Dates({
   backLabel: string;
   onBack: () => void;
 }) {
+  // A populated range at mount belongs to the saved trip, even when it is one day.
+  const [isSavedRange, setIsSavedRange] = useState(Boolean(range?.from && range.to));
   const days =
     range?.from && range?.to ? daysBetween(toTripDate(range.from), toTripDate(range.to)) : 0;
   return (
@@ -335,11 +337,12 @@ function Step1Dates({
             selected={range}
             defaultMonth={range?.from}
             onSelect={(next, day) => {
-              // A completed multi-day range starts over at the next chosen day.
-              // A single day stays complete so one-day trips can still be saved.
-              onRangeChange(range?.from && range.to && !isSameDay(range.from, range.to)
-                ? { from: day, to: day }
-                : next);
+              // Restart saved one-day trips once; a fresh first click can still take an end.
+              const restart = range?.from && range.to && (
+                !isSameDay(range.from, range.to) || (isSavedRange && !isSameDay(range.from, day))
+              );
+              setIsSavedRange(false);
+              onRangeChange(restart ? { from: day, to: day } : next);
             }}
             numberOfMonths={1}
             className="p-0"

@@ -216,6 +216,35 @@ describe("New trip wizard", () => {
     ]);
   });
 
+  it.each([
+    { step: 1, last: 14 },
+    { step: 1, last: 16 },
+    { step: 2, last: 14 },
+    { step: 2, last: 16 },
+  ])("replaces a saved one-day trip from step $step with days 14–$last", async ({ step, last }) => {
+    const trip = { ...TRIP, end_date: TRIP.start_date };
+    const month = new Date(`${trip.start_date}T00:00:00`);
+    const firstDay = new Date(month.getFullYear(), month.getMonth(), 14);
+    const lastDay = new Date(month.getFullYear(), month.getMonth(), last);
+    setQuery(`trip=trip-1&step=${step}`);
+    const api = fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull({ trip })),
+      "PATCH /api/v1/trips/trip-1": (body) => reply(200, { trip: { ...trip, ...(body as object) } }),
+    });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    render(<NewTripPage />);
+    await screen.findByRole("heading", { name: step === 1 ? "When?" : "Where?" });
+    if (step === 2) await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByRole("button", { name: new RegExp(format(firstDay, "PPPP")) }));
+    if (last !== 14) await user.click(screen.getByRole("button", { name: new RegExp(format(lastDay, "PPPP")) }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await screen.findByRole("heading", { name: "Where?" });
+    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([
+      { start_date: format(firstDay, "yyyy-MM-dd"), end_date: format(lastDay, "yyyy-MM-dd") },
+    ]);
+  });
+
   it("says so when the saved trip can't be reopened", async () => {
     setQuery("trip=trip-gone&step=2");
     vi.stubGlobal(
