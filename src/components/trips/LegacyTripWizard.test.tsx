@@ -38,9 +38,8 @@ function setQuery(query: string) {
 }
 
 /** Picks two days of the month the calendar opens on, and returns them as trip dates. */
-async function pickDays(user: ReturnType<typeof userEvent.setup>, first: number, last: number) {
-  const today = new Date();
-  const days = [first, last].map((day) => new Date(today.getFullYear(), today.getMonth(), day));
+async function pickDays(user: ReturnType<typeof userEvent.setup>, first: number, last: number, month = new Date()) {
+  const days = [first, last].map((day) => new Date(month.getFullYear(), month.getMonth(), day));
   for (const day of days) {
     await user.click(screen.getByRole("button", { name: new RegExp(format(day, "PPPP")) }));
   }
@@ -174,14 +173,76 @@ describe("New trip wizard", () => {
     const user = userEvent.setup();
     render(<NewTripPage />);
     await screen.findByRole("heading", { name: "When?" });
-    await pickDays(user, 9, 11);
+    const [start, end] = await pickDays(user, 14, 16, new Date(`${TRIP.start_date}T00:00:00`));
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     const dialog = await screen.findByRole("dialog", { name: "Review stays before changing dates" });
     expect(within(dialog).getAllByText(/Starting from Not set/).length).toBeGreaterThan(0);
     expect(attempts).toBe(1);
+    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([
+      { start_date: start, end_date: end },
+    ]);
     await user.click(within(dialog).getByRole("button", { name: "Keep stays and change trip dates" }));
     expect(await screen.findByRole("heading", { name: "Where?" })).toBeInTheDocument();
-    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")[1]).toMatchObject({ lodging_revision: 2 });
+    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([
+      { start_date: start, end_date: end },
+      { start_date: start, end_date: end, lodging_revision: 2 },
+    ]);
+  });
+
+  it.each([1, 2])("shows the saved month when opening step %s and replacing the range", async (step) => {
+    const today = new Date();
+    const month = new Date(today.getFullYear(), today.getMonth() + 2, 1);
+    const trip = {
+      ...TRIP,
+      start_date: format(new Date(month.getFullYear(), month.getMonth(), 10), "yyyy-MM-dd"),
+      end_date: format(new Date(month.getFullYear(), month.getMonth(), 12), "yyyy-MM-dd"),
+    };
+    setQuery(`trip=trip-1&step=${step}`);
+    const api = fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull({ trip })),
+      "PATCH /api/v1/trips/trip-1": (body) => reply(200, { trip: { ...trip, ...(body as object) } }),
+    });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    render(<NewTripPage />);
+    await screen.findByRole("heading", { name: step === 1 ? "When?" : "Where?" });
+    if (step === 2) await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("grid", { name: format(month, "LLLL yyyy") })).toBeInTheDocument();
+    const [start, end] = await pickDays(user, 14, 16, month);
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await screen.findByRole("heading", { name: "Where?" });
+    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([
+      { start_date: start, end_date: end },
+    ]);
+  });
+
+  it.each([
+    { step: 1, last: 14 },
+    { step: 1, last: 16 },
+    { step: 2, last: 14 },
+    { step: 2, last: 16 },
+  ])("replaces a saved one-day trip from step $step with days 14–$last", async ({ step, last }) => {
+    const trip = { ...TRIP, end_date: TRIP.start_date };
+    const month = new Date(`${trip.start_date}T00:00:00`);
+    const firstDay = new Date(month.getFullYear(), month.getMonth(), 14);
+    const lastDay = new Date(month.getFullYear(), month.getMonth(), last);
+    setQuery(`trip=trip-1&step=${step}`);
+    const api = fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull({ trip })),
+      "PATCH /api/v1/trips/trip-1": (body) => reply(200, { trip: { ...trip, ...(body as object) } }),
+    });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    render(<NewTripPage />);
+    await screen.findByRole("heading", { name: step === 1 ? "When?" : "Where?" });
+    if (step === 2) await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByRole("button", { name: new RegExp(format(firstDay, "PPPP")) }));
+    if (last !== 14) await user.click(screen.getByRole("button", { name: new RegExp(format(lastDay, "PPPP")) }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await screen.findByRole("heading", { name: "Where?" });
+    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([
+      { start_date: format(firstDay, "yyyy-MM-dd"), end_date: format(lastDay, "yyyy-MM-dd") },
+    ]);
   });
 
   it("says so when the saved trip can't be reopened", async () => {
@@ -228,23 +289,30 @@ describe("New trip wizard", () => {
     let finish = () => {};
     const pending = () => new Promise<ReturnType<typeof reply>>((resolve) => { finish = () => resolve(reply(500, { error: "Unavailable" })); });
     if (existing) setQuery("trip=trip-1&step=1");
-    vi.stubGlobal("fetch", fakeTripApi({
+    const api = fakeTripApi({
       "GET /api/v1/trips/trip-1": reply(200, tripFull()),
       "POST /api/v1/trips": pending,
       "PATCH /api/v1/trips/trip-1": pending,
-    }));
+    });
+    vi.stubGlobal("fetch", api);
     const user = userEvent.setup(); render(<NewTripPage />);
     if (existing) {
       await user.type(await screen.findByPlaceholderText("Whistler Powder"), " Powder");
       await user.click(screen.getByRole("button", { name: "Save changes" }));
     } else { await createTrip(user); }
     const back = screen.getByRole("button", { name: existing ? "Exit" : "Cancel" });
+    const saving = screen.getByRole("button", { name: "Saving…" });
+    expect(saving).toHaveFocus();
+    expect(saving).not.toBeDisabled();
+    expect(saving).toHaveAttribute("aria-busy", "true");
+    await user.keyboard("{Enter}{Enter}");
+    expect(sentBodies(api, existing ? "PATCH /api/v1/trips/trip-1" : "POST /api/v1/trips")).toHaveLength(1);
     expect(back).toBeDisabled();
-    await user.click(back);
     expect(mockPush).not.toHaveBeenCalled();
     await act(async () => finish());
     expect(await screen.findByRole("alert")).toHaveTextContent("Unavailable");
     expect(back).toBeEnabled();
+    expect(screen.getByRole("button", { name: existing ? "Save changes" : "Create trip" })).toHaveFocus();
     expect(screen.getByPlaceholderText("Whistler Powder")).toHaveValue(existing ? "Whistler Powder" : "Whistler");
   });
 
