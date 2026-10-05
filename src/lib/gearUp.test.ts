@@ -13,6 +13,7 @@ import type { BiophysicsOutcome, BiophysicsRecommendation } from "@/types/biophy
 import type { LaterTime, Outing, OutingResult } from "@/types/outing";
 import type { MultiDayLayerPlan } from "@/types/plan";
 import type { WeatherContext } from "@/types/weather";
+import { format } from "date-fns";
 
 const STOWE = { id: 1, name: "Stowe", region: "Vermont", country: "United States", latitude: 44.47, longitude: -72.69 };
 const FORECAST_CONTEXT: WeatherContext = {
@@ -44,6 +45,22 @@ const PLAN_RESULT: OutingResult = {
 };
 
 describe("gearUpReducer", () => {
+  it("restores the outing's destination-local time and duration, and can return it to Now", () => {
+    const later = gearUpReducer(createInitialState("now"), {
+      type: "APPLY_OUTING_TIME",
+      when: { ...LATER, time: "09:15", durationDays: 4 },
+    });
+    expect(later).toMatchObject({ inputMode: "later", time: "09:15", durationDays: 4 });
+    expect(format(later.date!, "yyyy-MM-dd")).toBe(LATER.date);
+    expect(gearUpReducer(later, { type: "APPLY_OUTING_TIME", when: { mode: "now" } })).toMatchObject({
+      inputMode: "now",
+      // A hidden Later choice remains available when switching the form's mode.
+      date: later.date,
+      time: "09:15",
+      durationDays: 4,
+    });
+  });
+
   it("shows a result with the outing it was requested for, and keeps that outing", () => {
     const loading = gearUpReducer(createInitialState("now"), { type: "SUBMIT_START" });
     const state = gearUpReducer(loading, { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT });

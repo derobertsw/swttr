@@ -98,7 +98,7 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | Sheet | `ui/sheet.tsx` | Side panels pad for the safe areas and use the shared close button. |
 | Popover, Tooltip | `ui/popover.tsx`, `ui/tooltip.tsx` | Popovers use the `popover` surface, stay within Radix’s available width/height with a 4px viewport gutter, and scroll long content. Keep these constraints when customizing size or padding. Tooltips are inverted and 14px. |
 | Dropdown menu | `ui/dropdown-menu.tsx` | Radix menu on the `popover` surface for a row's secondary actions, such as a Wardrobe item's Exclude and Remove. Items match Select items (44px on touch); `variant="destructive"` marks Remove. Give the trigger an `aria-label` that names the row. Keep the trigger enabled while a change runs, so focus can return to it, and disable the items instead. |
-| Calendar | `ui/calendar.tsx` | Day cells are 40px on touch, not 44px, so a month fits a 320px screen. |
+| Calendar | `ui/calendar.tsx` | Month arrows are 44px on phones and touch. Equal-width day columns shrink within the available container width, capped at 40px wide with 40px height (32px on desktop). The shared component fits padded cards, drawers and sheets with smaller mobile padding. Narrow months place the caption below the arrows; callers can keep their normal padding. |
 
 ## Accessibility rules
 
@@ -143,6 +143,7 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 | FAQ | Uses tokens, the shared Accordion and the type scale |
 
 Remaining exceptions, each with a reason:
+- **Calendar day cells** are up to 40px wide and 40px high on phones and touch. Columns shrink further inside narrow or padded containers, including when week numbers are shown. Month navigation still meets 44 × 44px. This is an exception to #119's universal 44px target criterion; the calendar does not satisfy that criterion as written. The legacy date editor's layout and keyboard checks are recorded in [the calendar report](qa/119-calendar/README.md).
 - **Product image wells** stay white in both appearances, because catalog photos have white backgrounds.
 - **Clerk's sign-in and account UI** keep Clerk's own styling.
 - **The custom UIKit shell's native chrome** in `ios/App/App/SWTTRViewController.swift` keeps its fixed dark tab bar and action button. Its web content, loading canvas and status text follow the device appearance. Tab/action chrome migration belongs to #130/#146; the Capacitor status-bar setting does not control this standalone UIKit shell.
