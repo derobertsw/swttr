@@ -53,16 +53,16 @@ The advice kind and the request status are separate:
   - switching the activity;
   - changing the weather's place or time;
   - Try again.
-- **Only the latest request lands.** Each request gets a number, and only the latest one may change the page. Starting over, Edit outing, or switching the form between Now and Later (on the form, or with the iOS Plan tab) retires the running request, so a late answer can't replace a newer outing. A request made from the form being shown otherwise stays current.
+- **Only the latest request lands.** Each request gets a number, and only the latest one may change the page or resolve as successfully shown. Starting over, Edit outing, or switching the form between Now and Later (on the form, or with the iOS Plan tab) retires the running request, so a late answer can't replace a newer outing. A retired weather request never starts a recommendation request. A request made from the form being shown otherwise stays current.
 - **The shown result stays put.** While a newer request loads, and when it fails, the page keeps showing the last result with its own activity, place and time. The results header shows the result's activity until the new advice arrives.
 
 ## Edit outing and Start over
 
-- **Back (Edit outing)** returns to the form on Now or Later, as the results were requested, with the activity, effort, place, date, time and duration as they were entered. An activity picked on the results reaches the form only once its layers arrive, so Back while they load, or after they fail, opens on the activity that was shown.
+- **Back (Edit outing)** returns to the form with the shown result's activity, effort, place, Now/Later mode, date, time and duration. Changes made on results reach the form and tab draft only once they succeed. Back while a change loads, or after it fails, opens on the outing still shown.
 - **Plan Another Trip** and the iOS Plan tab's `navigatePlanAhead` event do the same, on Later.
 - **The logo (Start over)** clears the inputs and the last outing, and returns to the form on Now with the default activity.
 
-Known gap: the form keeps what was typed into it. If the weather drawer moved the results to another place or time, Edit outing still shows the form's place. #126/#127 replace the drawer with Edit outing.
+**Change place or time** keeps the submitted destination-local date and time, including minutes, rather than reconstructing it from the provider's forecast hour. A successful change updates the edit form and tab draft together with the result, including when it switches between Now and Later. A failed or retired change keeps the previous outing. Browser Back and the native Plan event use the same form restoration; the native event intentionally opens Later. Resuming a saved result or returning from sign-in/Wardrobe restores the last submitted outing, repairing older drafts whose form fields still describe the original place or time. Switching a Now form to Later can still recover its last hidden date/time choices.
 
 ## Back, Forward and reload
 
