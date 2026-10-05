@@ -4,7 +4,7 @@ This report completes the contract acceptance review after #215 (foundation) and
 
 ## Automated verification
 
-- Full Vitest suite: final result recorded below after verification. Recommendation golden snapshots are unchanged.
+- Full Vitest suite: **101 files, 1,275 tests pass** on the rebased branch (`NODE_OPTIONS=--no-experimental-webstorage caffeinate -i npx vitest run --maxWorkers=2`). Recommendation golden snapshots are unchanged. The focused contract/page/weather/header suite also passes: eight files, 185 tests. An earlier default-concurrency run timed out in several unrelated UI/database/ensemble suites; reducing workers and preventing idle sleep completed the full suite without changing tests or timeouts.
 - Additional focused coverage includes failed-outing retry, retained recommendation identity, old failures arriving during a newer request, weather/recommendation retirement, malformed current/forecast responses, unknown precipitation, provider timestamps, local coverage and missing metadata.
 - Existing tests retain coverage for auth expiry, account changes, targets-only/no usable gear, static/unsupported guidance, exact requested minutes, destination/device time-zone differences, daylight saving, partial forecasts, Edit outing, Start over, Back/reload and the native Plan compatibility event.
 - Lint, typecheck and knip pass.
