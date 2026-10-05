@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { Suspense, useEffect, useState, type ComponentProps, type Dispatch, type SetStateAction } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { format } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Calendar as CalIcon, CheckCircle2, GripVertical, Loader2, MapPin, Plus, UserPlus, X } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
@@ -333,25 +333,34 @@ function Step1Dates({
           <Calendar
             mode="range"
             selected={range}
-            onSelect={onRangeChange}
+            defaultMonth={range?.from}
+            onSelect={(next, day) => {
+              // A completed multi-day range starts over at the next chosen day.
+              // A single day stays complete so one-day trips can still be saved.
+              onRangeChange(range?.from && range.to && !isSameDay(range.from, range.to)
+                ? { from: day, to: day }
+                : next);
+            }}
             numberOfMonths={1}
-            className="bg-transparent p-0"
+            className="p-0"
           />
         </div>
         {range?.from && range?.to && (
           <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control bg-muted px-3.5 py-2.5">
-            <div>
-              <SectionLabel>Start</SectionLabel>
-              <p className="text-sm font-semibold text-foreground">
-                {range.from.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-              </p>
-            </div>
-            <ArrowRight className="size-4 text-muted-foreground" />
-            <div>
-              <SectionLabel>End</SectionLabel>
-              <p className="text-sm font-semibold text-foreground">
-                {range.to.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-              </p>
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="min-w-0">
+                <SectionLabel>Start</SectionLabel>
+                <p className="break-words text-sm font-semibold text-foreground">
+                  {range.from.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                </p>
+              </div>
+              <ArrowRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0">
+                <SectionLabel>End</SectionLabel>
+                <p className="break-words text-sm font-semibold text-foreground">
+                  {range.to.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                </p>
+              </div>
             </div>
             <Badge size="sm" variant="primary">{days} day{days === 1 ? "" : "s"}</Badge>
           </div>
@@ -363,8 +372,9 @@ function Step1Dates({
         backLabel={backLabel}
         onNext={onNext}
         nextLabel={submitting ? "Saving…" : nextLabel}
-        nextDisabled={submitting || !name.trim() || !range?.from || !range?.to}
+        nextDisabled={!name.trim() || !range?.from || !range?.to}
         nextLoading={submitting}
+        nextSize="lg"
       />
     </div>
   );
@@ -984,6 +994,7 @@ function NavBar({
   nextLabel,
   nextDisabled = false,
   nextLoading = false,
+  nextSize = "default",
 }: {
   onBack: () => void;
   backLabel?: string;
@@ -992,6 +1003,7 @@ function NavBar({
   nextLabel: string;
   nextDisabled?: boolean;
   nextLoading?: boolean;
+  nextSize?: ComponentProps<typeof Button>["size"];
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -1001,12 +1013,12 @@ function NavBar({
       </Button>
       <Button
         type="button"
-        size="lg"
+        size={nextSize}
         onClick={onNext}
         disabled={nextDisabled}
+        loading={nextLoading}
         className="ml-auto min-w-32"
       >
-        {nextLoading ? <Loader2 className="animate-spin" /> : null}
         {nextLabel}
         <ArrowRight />
       </Button>
