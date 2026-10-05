@@ -2,6 +2,7 @@
  * State and request helpers for the home page's Gear Up flow (see useGearUp).
  */
 import layerRecommendations from "@/data/layerRecommendations.json";
+import { parse } from "date-fns";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
 import type { Recommendation, LocationSuggestion } from "@/types/recommendations";
@@ -63,6 +64,8 @@ type GearUpAction =
   | { type: "SET_DATE"; date: Date | undefined }
   | { type: "SET_TIME"; time: string }
   | { type: "SET_DURATION_DAYS"; durationDays: number }
+  /** Restore the submitted time without converting it to the device's time zone. */
+  | { type: "APPLY_OUTING_TIME"; when: OutingTime }
   | { type: "FIELDS_MISSING" }
   | { type: "START_DATE_INVALID"; error: string; location: LocationSuggestion }
   | { type: "SUBMIT_START" }
@@ -100,6 +103,17 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
       return { ...state, time: action.time };
     case "SET_DURATION_DAYS":
       return { ...state, durationDays: action.durationDays, startDateError: null };
+    case "APPLY_OUTING_TIME":
+      return {
+        ...state,
+        inputMode: action.when.mode,
+        ...(action.when.mode === "later" && {
+          date: parse(action.when.date, "yyyy-MM-dd", new Date()),
+          time: action.when.time,
+          durationDays: action.when.durationDays,
+        }),
+        startDateError: null,
+      };
     case "FIELDS_MISSING":
       return { ...state, showFieldErrors: true };
     case "START_DATE_INVALID":

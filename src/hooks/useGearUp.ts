@@ -122,6 +122,15 @@ export function useGearUp() {
     return () => latestRequest.current === request;
   }, []);
 
+  /** Results and their edit form/draft share the same submitted inputs. */
+  const applyOutingInputs = useCallback((outing: Outing) => {
+    setActivity(outing.activity);
+    setExertion(outing.exertion);
+    cancelLocating();
+    locationSearch.handleSelectLocation(outing.place);
+    dispatch({ type: "APPLY_OUTING_TIME", when: outing.when });
+  }, [setActivity, setExertion, cancelLocating, locationSearch]);
+
   /**
    * Shows layers for a one-day outing, from its place's current weather or its
    * forecast at the outing's local date-time there. Resolves false, after
@@ -130,15 +139,15 @@ export function useGearUp() {
    */
   const recommendFor = useCallback(async (isCurrent: () => boolean, outing: Outing) => {
     const { data, error } = await fetchWeatherAt(outing.place, forecastDateTime(outing.when));
+    if (!isCurrent()) return false;
     if (!data) {
-      if (isCurrent()) {
-        toast.error(error);
-        dispatch({ type: "SUBMIT_ERROR" });
-      }
+      toast.error(error);
+      dispatch({ type: "SUBMIT_ERROR" });
       return false;
     }
     const result = await layersFor(outing, data);
-    if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", result });
+    if (!isCurrent()) return false;
+    dispatch({ type: "SUBMIT_SUCCESS", result });
     return true;
   }, [layersFor]);
 
@@ -150,7 +159,8 @@ export function useGearUp() {
   const planFor = useCallback(async (isCurrent: () => boolean, outing: Outing & { when: LaterTime }) => {
     try {
       const result = await fetchPlanAhead(outing, sensitivity);
-      if (isCurrent()) dispatch({ type: "SUBMIT_SUCCESS", result });
+      if (!isCurrent()) return false;
+      dispatch({ type: "SUBMIT_SUCCESS", result });
       return true;
     } catch (error) {
       logWarn("useGearUp.planFor", error);
@@ -222,9 +232,13 @@ export function useGearUp() {
   const handleWeatherChange = useCallback(
     async (place: LocationSuggestion, localDateTime?: string) => {
       if (shownResult?.kind !== "layers") return false;
-      return recommendFor(startRequest(), { ...shownResult.outing, place, when: outingTimeAt(localDateTime) });
+      const outing = { ...shownResult.outing, place, when: outingTimeAt(localDateTime) };
+      const isCurrent = startRequest();
+      if (!await recommendFor(isCurrent, outing) || !isCurrent()) return false;
+      applyOutingInputs(outing);
+      return true;
     },
-    [shownResult, startRequest, recommendFor]
+    [shownResult, startRequest, recommendFor, applyOutingInputs]
   );
 
   /**
@@ -290,8 +304,9 @@ export function useGearUp() {
    */
   const showForm = useCallback((mode: InputMode, retire = formShowing !== mode) => {
     if (retire) latestRequest.current += 1;
+    if (state.result) applyOutingInputs(state.result.outing);
     dispatch({ type: "SHOW_FORM", mode, keepLoading: !retire });
-  }, [formShowing]);
+  }, [formShowing, state.result, applyOutingInputs]);
   /**
    * Back to the form from the page itself, which also steps back over the
    * results' history entry, so the browser's next Back leaves Gear up.
@@ -307,8 +322,8 @@ export function useGearUp() {
    */
   const setInputMode = backToForm;
   const showPlanForm = useCallback(() => backToForm("later"), [backToForm]);
-  /** Edit outing: back to the form as the results were requested from it, with what was entered. */
-  const editOuting = useCallback(() => backToForm(state.inputMode), [backToForm, state.inputMode]);
+  /** Edit outing starts from the shown result, including changes to its place or time. */
+  const editOuting = useCallback(() => backToForm(state.result?.outing.when.mode ?? state.inputMode), [backToForm, state.result, state.inputMode]);
 
   /**
    * Asks again for the last result's outing, for a reload or Forward on the
@@ -317,10 +332,11 @@ export function useGearUp() {
    */
   const resume = useCallback(async (outing: Outing) => {
     showForm(outing.when.mode, true);
+    applyOutingInputs(outing);
     const isCurrent = startRequest();
     const shown = await showOuting(isCurrent, outing);
     if (!shown && isCurrent()) leaveResultsEntry();
-  }, [showForm, startRequest, showOuting, leaveResultsEntry]);
+  }, [showForm, applyOutingInputs, startRequest, showOuting, leaveResultsEntry]);
 
   // What was entered in this tab comes back once it's known who's signed in,
   // like after a reload, or after going to another page and coming back. On
