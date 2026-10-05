@@ -13,6 +13,7 @@ export interface Trip {
   status: TripStatus;
   created_at: string;
   updated_at: string;
+  lodging_revision?: number;
 }
 
 export interface TripStop {
@@ -77,4 +78,67 @@ export interface TripFull {
   days: TripDay[];
   kits: TripMemberDayKit[];
   gear: TripGroupGear[];
+  /** Optional for older cached trip responses; the API always supplies it. */
+  lodging?: TripLodging;
+}
+
+export type TripStayType = "hotel" | "rental" | "hut" | "campground" | "other";
+
+export interface TripStayInput {
+  id: string;
+  name: string;
+  check_in: string | null;
+  check_out: string | null;
+  type: TripStayType | null;
+  address: string | null;
+  property_url: string | null;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  notes: string | null;
+  booking_status: "not_booked" | "booked";
+}
+
+export interface TripStay extends TripStayInput {
+  trip_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TripLodgingNight {
+  trip_id: string;
+  date: string;
+  stay_id: string | null;
+  status: "assigned" | "no_stay";
+}
+
+export interface TripStaySummary extends TripStay {
+  date_label: string;
+  night_count: number;
+  assigned_nights: string[];
+  review_dates: string[];
+}
+
+export interface TripLodgingContext {
+  date: string;
+  starting_from: string;
+  starting_stay_id: string | null;
+  staying_tonight: string;
+  tonight_stay_id: string | null;
+}
+
+export interface TripLodging {
+  revision: number;
+  stays: TripStaySummary[];
+  assignments: TripLodgingNight[];
+  nights: Array<{ date: string; date_label: string; pre_trip: boolean; label: string; stay_id: string | null; status: "assigned" | "no_stay" | "unplanned" }>;
+  days: TripLodgingContext[];
+}
+
+export type TripLodgingAction = "save" | "remove" | "night";
+export interface TripLodgingPreview {
+  revision: number;
+  nights: Array<{ date: string; date_label: string; before: string; after: string; morning: string | null; morning_origin: string }>;
+  conflicts: string[];
+  review_dates: string[];
+  date_label: string;
 }

@@ -20,11 +20,12 @@ import {
 } from "@/components/trips/trip-primitives";
 import { useUserId } from "@/hooks/useUserId";
 import { useTrip } from "@/hooks/useTrip";
+import { TripStays } from "@/components/trips/TripStays";
 import type { TripDay, TripStop } from "@/types/trips";
 
 export default function TripOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data, loading, error } = useTrip(id);
+  const { data, loading, error, refresh } = useTrip(id);
   const userId = useUserId();
   const member = data?.members.find((m) => m.user_id === userId && m.status !== "left");
   const nextDay = data?.days.find((day) => !day.activity || !data.kits.some((kit) => kit.trip_day_id === day.id && kit.trip_member_id === member?.id));
@@ -130,6 +131,8 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
                 </div>
               )}
             </Card>
+
+            <TripStays data={data} canEdit={data.trip.owner_user_id === userId} onSaved={refresh} />
 
             <DayList trip={data.trip} days={data.days} stops={data.stops} />
 

@@ -23,6 +23,7 @@ import {
 } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
 import { useTrip } from "@/hooks/useTrip";
+import { DayLodging } from "@/components/trips/TripStays";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
@@ -169,6 +170,8 @@ export default function DayDetailPage({
                 </p>
               )}
             </header>
+
+            <DayLodging data={data} date={date} />
 
             <ActivityPicker
               tripId={id}
