@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { addDaysToDateString, describeForecastCoverage, FORECAST_DAYS } from "@/lib/forecastRange";
 import { formatZonedIsoTime, formatZonedTime, isLocalDateTime, isTimeZone, zonedTimeToInstant } from "@/lib/timeZones";
 import { parseOpenMeteoHourly } from "@/lib/openMeteoHourly";
+import { openMeteoProvenance } from "@/lib/weatherProvenance";
 import type { PrecipitationType } from "@/types/weather";
 
 const HOUR_SECONDS = 3600;
 
 function isValidDateString(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  return !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+  return isLocalDateTime(`${value}T00:00`);
 }
 
 function decodePrecipitation(weatherCode: number): { precipitation: boolean; precipitationType?: PrecipitationType } {
@@ -81,8 +81,10 @@ async function getHourlyForecast(lat: string, lon: string, localDateTime: string
     const temperature: unknown = data.hourly.temperature_2m?.[index];
     const windSpeed: unknown = data.hourly.wind_speed_10m?.[index];
     const weatherCode: unknown = data.hourly.weather_code?.[index];
-    return typeof start === "number" && typeof temperature === "number" && typeof windSpeed === "number"
-      ? [{ start, temperature, windSpeed, weatherCode: typeof weatherCode === "number" ? weatherCode : undefined }]
+    return typeof start === "number" && Number.isFinite(start)
+      && typeof temperature === "number" && Number.isFinite(temperature)
+      && typeof windSpeed === "number" && Number.isFinite(windSpeed)
+      ? [{ start, temperature, windSpeed, weatherCode: typeof weatherCode === "number" && Number.isFinite(weatherCode) ? weatherCode : undefined }]
       : [];
   });
 
@@ -106,7 +108,7 @@ async function getHourlyForecast(lat: string, lon: string, localDateTime: string
 
   const { weatherCode } = hour;
   const precipInfo = weatherCode === undefined
-    ? { precipitation: false }
+    ? { precipitation: undefined, precipitationType: undefined }
     : decodePrecipitation(weatherCode);
   return NextResponse.json({
     temperature: Math.round(hour.temperature),
@@ -118,6 +120,7 @@ async function getHourlyForecast(lat: string, lon: string, localDateTime: string
     // When the forecast hour starts, with the place's UTC offset at that time.
     forecastTime: formatZonedIsoTime(hour.start * 1000, timeZone),
     timeZone,
+    provenance: openMeteoProvenance(timeZone, hours.map(({ start }) => formatZonedIsoTime(start * 1000, timeZone))),
   });
 }
 
@@ -171,6 +174,7 @@ export async function GET(request: NextRequest) {
         hourly,
         isForecast: true,
         isMultiDay: true,
+        provenance: openMeteoProvenance(timeZone, hourly.map(({ time }) => time)),
       });
     }
 
@@ -185,7 +189,7 @@ export async function GET(request: NextRequest) {
       return await getHourlyForecast(lat, lon, dateTime);
     } else {
       // Current weather
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&timeformat=unixtime`;
 
       const response = await fetch(url);
 
@@ -195,17 +199,26 @@ export async function GET(request: NextRequest) {
 
       const data = await response.json();
 
-      const currentWeatherCode = Number(data.current.weather_code);
-      const precipInfo = Number.isFinite(currentWeatherCode)
+      const { temperature_2m: temperature, wind_speed_10m: windSpeed, weather_code: currentWeatherCode, time } = data?.current ?? {};
+      if (typeof temperature !== "number" || !Number.isFinite(temperature)
+        || typeof windSpeed !== "number" || !Number.isFinite(windSpeed)) {
+        throw new Error("Current conditions have no usable temperature or wind speed");
+      }
+      const hasWeatherCode = typeof currentWeatherCode === "number" && Number.isFinite(currentWeatherCode);
+      const precipInfo = hasWeatherCode
         ? decodePrecipitation(currentWeatherCode)
-        : { precipitation: false };
+        : { precipitation: undefined, precipitationType: undefined };
+      const timeZone = isTimeZone(data?.timezone) ? data.timezone : undefined;
+      const observedTime = typeof time === "number" && Number.isFinite(time) && timeZone
+        ? formatZonedIsoTime(time * 1000, timeZone) : undefined;
       return NextResponse.json({
-        temperature: Math.round(data.current.temperature_2m),
-        windSpeed: Math.round(data.current.wind_speed_10m),
-        weatherCode: Number.isFinite(currentWeatherCode) ? currentWeatherCode : undefined,
+        temperature: Math.round(temperature),
+        windSpeed: Math.round(windSpeed),
+        weatherCode: hasWeatherCode ? currentWeatherCode : undefined,
         precipitation: precipInfo.precipitation,
         precipitationType: precipInfo.precipitationType,
         isForecast: false,
+        provenance: openMeteoProvenance(timeZone, [], observedTime),
       });
     }
   } catch (error) {

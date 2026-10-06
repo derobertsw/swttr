@@ -10,12 +10,14 @@ import type { WeatherData } from "@/types/weather";
 import type { BiophysicsOutcome, BiophysicsRecommendation, BiophysicsStatus } from "@/types/biophysics";
 import type { MultiDayLayerPlan } from "@/types/plan";
 import type { TemperatureSensitivity } from "@/types/preferences";
+import { readWeatherProvenance } from "@/lib/weatherProvenance";
 import type {
   Advice,
   LaterTime,
   LayersResult,
   Outing,
   OutingResult,
+  OutingRequestState,
   OutingTime,
   PlanResult,
 } from "@/types/outing";
@@ -39,7 +41,7 @@ interface GearUpState {
    * of its forecast. Coverage differs by place, so it applies only to that one.
    */
   startDateError: { message: string; location: LocationSuggestion } | null;
-  loading: boolean;
+  request: OutingRequestState;
   /**
    * The result on screen, with the outing it was requested for. A newer
    * request leaves it in place while it loads, and when it fails.
@@ -68,9 +70,9 @@ type GearUpAction =
   | { type: "APPLY_OUTING_TIME"; when: OutingTime }
   | { type: "FIELDS_MISSING" }
   | { type: "START_DATE_INVALID"; error: string; location: LocationSuggestion }
-  | { type: "SUBMIT_START" }
+  | { type: "SUBMIT_START"; outing: Outing }
   | { type: "SUBMIT_SUCCESS"; result: OutingResult }
-  | { type: "SUBMIT_ERROR" }
+  | { type: "SUBMIT_ERROR"; message: string }
   /** `keepLoading` when the running request was made from the form in this mode (see useGearUp). */
   | { type: "SHOW_FORM"; mode: InputMode; keepLoading: boolean }
   /** `kept` is null when nothing was kept for `owner`. */
@@ -85,7 +87,7 @@ export function createInitialState(inputMode: InputMode): GearUpState {
     durationDays: 1,
     showFieldErrors: false,
     startDateError: null,
-    loading: false,
+    request: { status: "idle" },
     result: null,
     lastOuting: null,
     restored: false,
@@ -98,11 +100,11 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
     case "SET_INPUT_MODE":
       return { ...state, inputMode: action.mode };
     case "SET_DATE":
-      return { ...state, date: action.date, startDateError: null };
+      return { ...state, date: action.date, startDateError: null, request: state.request.status === "error" ? { status: "idle" } : state.request };
     case "SET_TIME":
       return { ...state, time: action.time };
     case "SET_DURATION_DAYS":
-      return { ...state, durationDays: action.durationDays, startDateError: null };
+      return { ...state, durationDays: action.durationDays, startDateError: null, request: state.request.status === "error" ? { status: "idle" } : state.request };
     case "APPLY_OUTING_TIME":
       return {
         ...state,
@@ -117,18 +119,27 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
     case "FIELDS_MISSING":
       return { ...state, showFieldErrors: true };
     case "START_DATE_INVALID":
-      return { ...state, loading: false, startDateError: { message: action.error, location: action.location } };
+      return {
+        ...state,
+        request: state.request.status === "loading"
+          ? { status: "error", outing: state.request.outing, message: action.error, field: "startDate" }
+          : state.request,
+        startDateError: { message: action.error, location: action.location },
+      };
     case "SUBMIT_START":
-      return { ...state, loading: true, startDateError: null };
+      return { ...state, request: { status: "loading", outing: action.outing }, startDateError: null };
     case "SUBMIT_SUCCESS":
-      return { ...state, loading: false, result: action.result, lastOuting: action.result.outing };
+      return { ...state, request: { status: "idle" }, result: action.result, lastOuting: action.result.outing };
     case "SUBMIT_ERROR":
-      return { ...state, loading: false };
+      return state.request.status === "loading"
+        ? { ...state, request: { status: "error", outing: state.request.outing, message: action.message } }
+        : state;
     case "SHOW_FORM": {
       // Keeps what was entered, and the last outing.
       const { date, time, durationDays, lastOuting, restored, owner } = state;
-      const loading = state.loading && action.keepLoading;
-      return { ...createInitialState(action.mode), date, time, durationDays, lastOuting, restored, owner, loading };
+      const request: OutingRequestState = state.request.status === "loading" && action.keepLoading
+        ? state.request : { status: "idle" };
+      return { ...createInitialState(action.mode), date, time, durationDays, lastOuting, restored, owner, request };
     }
     case "RESTORE":
       return { ...state, ...action.kept, restored: true, owner: action.owner };
@@ -268,5 +279,5 @@ export async function fetchPlanAhead(
     throw new PlanAheadError(fixableError, data?.field === "startDate" ? "startDate" : undefined);
   }
 
-  return { kind: "plan", outing, plan: data.plan };
+  return { kind: "plan", outing, plan: { ...data.plan, provenance: readWeatherProvenance(data.plan.provenance) } };
 }

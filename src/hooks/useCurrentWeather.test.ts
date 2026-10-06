@@ -70,4 +70,41 @@ describe("fetchWeatherAt", () => {
       error: "Couldn't get the forecast for this place. Try again.",
     });
   });
+
+  it.each([
+    {}, { temperature: null, windSpeed: 7 }, { temperature: 30, windSpeed: null },
+    { temperature: "30", windSpeed: 7 }, { temperature: 30 },
+  ])("rejects incomplete weather instead of showing zero or invalid advice: %j", async (body) => {
+    mockFetch(Response.json(body));
+    expect((await fetchWeatherAt(STOWE)).data).toBeNull();
+  });
+
+  it.each([
+    { temperature: 30, windSpeed: 7 },
+    { temperature: 30, windSpeed: 7, isForecast: false },
+    { temperature: 30, windSpeed: 7, forecastTime: "2026-10-08T14:00-04:00", timeZone: "missing" },
+    { temperature: 30, windSpeed: 7, forecastTime: "missing", timeZone: "America/New_York" },
+  ])("never labels an unusable forecast response as current conditions: %j", async (body) => {
+    mockFetch(Response.json(body));
+    expect((await fetchWeatherAt(STOWE, "2026-10-08T14:30")).data).toBeNull();
+  });
+
+  it.each(["", "2026-02-31T12:00", "2026-10-08T25:00"])("rejects invalid requested time %s without fetching current weather", async (datetime) => {
+    const fetch = mockFetch(Response.json({ temperature: 30, windSpeed: 7 }));
+    expect((await fetchWeatherAt(STOWE, datetime)).data).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps available source facts and leaves absent freshness and precipitation unknown", async () => {
+    const provenance = {
+      provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" },
+      timeZone: "America/New_York", observedTime: "2026-10-05T08:15-04:00",
+    };
+    mockFetch(Response.json({ temperature: 0, windSpeed: 0, provenance }));
+    const { data } = await fetchWeatherAt(STOWE);
+    expect(data).toMatchObject({ temperature: 0, windSpeed: 0, context: { source: "current", provenance } });
+    expect(data?.precipitation).toBeUndefined();
+    mockFetch(Response.json({ temperature: 30, windSpeed: 7 }));
+    expect((await fetchWeatherAt(STOWE)).data?.context?.provenance).toBeUndefined();
+  });
 });

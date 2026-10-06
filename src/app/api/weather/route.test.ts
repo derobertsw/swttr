@@ -50,6 +50,32 @@ describe("Weather API Route", () => {
   });
 
   describe("current weather", () => {
+    it.each([
+      {}, { temperature_2m: null, wind_speed_10m: 7 },
+      { temperature_2m: 30, wind_speed_10m: null },
+      { temperature_2m: "30", wind_speed_10m: 7 },
+      { temperature_2m: Infinity, wind_speed_10m: 7 },
+    ])("fails on unusable current conditions instead of rounding missing values to zero: %j", async (current) => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ current }) });
+      const response = await GET(new NextRequest("http://localhost:3000/api/weather?lat=44.47&lon=-72.69"));
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ error: "Failed to fetch weather data" });
+    });
+
+    it("carries the provider timestamp and units, without inventing clear weather", async () => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+        timezone: "America/New_York",
+        current: { time: Date.parse("2026-10-05T12:15Z") / 1000, temperature_2m: 0, wind_speed_10m: 0, weather_code: null },
+      }) });
+      const response = await GET(new NextRequest("http://localhost:3000/api/weather?lat=44.47&lon=-72.69"));
+      const data = await response.json();
+      expect(data).toMatchObject({ temperature: 0, windSpeed: 0, provenance: {
+        provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" },
+        timeZone: "America/New_York", observedTime: "2026-10-05T08:15-04:00",
+      } });
+      expect(data.precipitation).toBeUndefined();
+      expect(data.weatherCode).toBeUndefined();
+    });
     it("should fetch current weather when no datetime provided", async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -77,6 +103,7 @@ describe("Weather API Route", () => {
       expect(data.precipitation).toBe(false);
       expect(data.precipitationType).toBeUndefined();
       expect(data.isForecast).toBe(false);
+      expect(data.provenance).toEqual({ provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" } });
     });
 
     it("should call Open-Meteo API with correct parameters for current weather", async () => {
@@ -163,7 +190,7 @@ describe("Weather API Route", () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({
+      expect(data).toMatchObject({
         temperature: hourAt(fixture, "2026-10-08T18:00Z"),
         windSpeed: 10,
         weatherCode: 71,
@@ -172,6 +199,11 @@ describe("Weather API Route", () => {
         isForecast: true,
         forecastTime: "2026-10-08T14:00-04:00",
         timeZone: "America/New_York",
+      });
+      expect(data.provenance).toEqual({
+        provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" },
+        timeZone: "America/New_York",
+        coverage: { firstHour: "2026-09-27T00:00-04:00", lastHour: "2026-10-12T23:00-04:00", availableHours: 384 },
       });
     });
 
@@ -236,7 +268,7 @@ describe("Weather API Route", () => {
       const data = await (await getForecast("2026-10-08T14:00")).json();
 
       expect(data.weatherCode).toBeUndefined();
-      expect(data.precipitation).toBe(false);
+      expect(data.precipitation).toBeUndefined();
       expect(data.forecastTime).toBe("2026-10-08T14:00-04:00");
     });
 

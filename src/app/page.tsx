@@ -12,6 +12,7 @@ import { layerDisplayAdvice } from "@/lib/gearUp";
 import { useUserId } from "@/hooks/useUserId";
 import { useWebMCPTools } from "@/hooks/useWebMCPTools";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OutingRequestNotice } from "@/components/OutingRequestNotice";
 
 const HomeContent = () => {
   // #185/#186 supply the real tools once the shared outing action is ready.
@@ -32,6 +33,7 @@ const HomeContent = () => {
     durationDays,
     setDurationDays,
     loading,
+    request,
     showFieldErrors,
     startDateError,
     locationStatus,
@@ -43,6 +45,7 @@ const HomeContent = () => {
     handleWeatherChange,
     handleActivityChange,
     handleRetry,
+    handleRetryUpdate,
     showPlanForm,
     editOuting,
     resetToInitialState,
@@ -60,7 +63,10 @@ const HomeContent = () => {
         key={result ? "results" : "form"}
         className="flex w-full flex-col items-center gap-6 animate-in fade-in duration-300 sm:gap-7"
       >
-        {result && <h1 className="sr-only">Gear up</h1>}
+        {result && <h1 id="outing-result-heading" tabIndex={-1} className="sr-only">Gear up</h1>}
+        {(result || (request.status === "error" && !request.field)) && (
+          <OutingRequestNotice request={request} shownOuting={result?.outing} onRetry={handleRetryUpdate} />
+        )}
         {!result ? (
           <>
             <div className="flex w-full max-w-md flex-col gap-1">
@@ -105,6 +111,7 @@ const HomeContent = () => {
         ) : result.kind === "plan" ? (
           <MultiDayPlanDisplay
             plan={result.plan}
+            outing={result.outing}
             activity={result.outing.activity}
             place={formatLocationName(result.outing.place)}
             itemMappings={itemMappings}
@@ -114,6 +121,7 @@ const HomeContent = () => {
           // Everything shown comes from the result, so it stays tied to the
           // outing it was requested for while a change loads or fails.
           <LayerDisplay
+            outing={result.outing}
             activity={result.outing.activity}
             exertion={result.outing.exertion}
             {...layerDisplayAdvice(result.advice)}

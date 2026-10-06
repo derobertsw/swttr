@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
-import { isTimeZone } from "@/lib/timeZones";
+import { isLocalDateTime, isTimeZone } from "@/lib/timeZones";
 import { parseOpenMeteoHourly } from "@/lib/openMeteoHourly";
+import { openMeteoProvenance } from "@/lib/weatherProvenance";
 import { FORECAST_DAYS, planOutsideForecast } from "@/lib/forecastRange";
 import { Recommendation } from "@/types/recommendations";
 import { TemperatureSensitivity } from "@/types/preferences";
 import layerRecommendations from "@/data/layerRecommendations.json";
 
 function isValidDateString(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  return !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+  return isLocalDateTime(`${value}T00:00`);
 }
 
 const VALID_SENSITIVITIES = new Set(["hot", "neutral", "cold"]);
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     const firstDay = plan.days[0];
     return NextResponse.json({
-      plan,
+      plan: { ...plan, provenance: openMeteoProvenance(timeZone, hourly.map(({ time }) => time)) },
       baseline: {
         recommendation: firstDay.baseline.recommendation,
         effectiveTemperature: firstDay.baseline.effectiveTemperature,

@@ -1,0 +1,32 @@
+{
+  "fixture": true,
+  "checks": [
+    "Requested exact minutes visible separately from forecast hour",
+    "Source disclosure shows destination zone and available forecast facts",
+    "Pending activity is separate from retained Alpine result",
+    "Pending update fits 320px light",
+    "Pending update fits 390px light",
+    "Pending update fits 1280px light",
+    "Pending update fits 320px dark",
+    "Pending update fits 390px dark",
+    "Pending update fits 1280px dark",
+    "Failed update fits 320px light",
+    "Failed update fits 390px light",
+    "Failed update fits 1280px light",
+    "Failed update fits 320px dark",
+    "Failed update fits 390px dark",
+    "Failed update fits 1280px dark",
+    "Failure notice has no internal overflow at 320px and 200% root text size",
+    "Retry requests the failed Running outing exactly once",
+    "Successful keyboard retry restores focus into the result",
+    "Successful retry clears the failure notice",
+    "Edit outing retains exact submitted minutes after retry",
+    "Edit outing uses successfully retried activity",
+    "No browser runtime errors"
+  ],
+  "weatherRequests": [
+    "/api/weather?lat=44.47&lon=-72.69&datetime=2026-10-08T09:15",
+    "/api/weather?lat=44.47&lon=-72.69&datetime=2026-10-08T09:15"
+  ],
+  "errors": []
+}

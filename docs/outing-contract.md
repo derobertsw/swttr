@@ -43,9 +43,30 @@ The reasons:
 | `no_gear` | The API returned clo targets only. The wardrobe has no usable items. |
 | `unavailable` | The recommendation request failed or its response was unusable. |
 
-The advice kind and the request status are separate:
-- A failed recommendation is a result with `unavailable` advice. The weather is shown, with Try again.
-- A failed weather or plan request isn't a result. It's a toast, or an inline error on the start date. The inputs stay as entered, and any result already on screen stays.
+The advice kind and the request status are separate. `OutingRequestState` is `idle`, `loading` with the submitted outing, or `error` with that outing, a recoverable message and an optional `startDate` field. `loading` is derived from this state, rather than kept separately.
+
+- An initial failed recommendation still produces `unavailable` general/missing advice with weather and Try again.
+- When a result is already shown, a failed recommendation **update** keeps that exact result and its edited outfit. A persistent notice names the failed activity/place/time and the previous outing. The previous weather is not relabeled with the attempted inputs.
+- Weather and plan failures produce no new result. Generic failures remain visible, with the attempted inputs; date-range errors stay attached to the appropriate start-date field. Toasts are supplementary.
+- **Try update again** uses the failed outing snapshot, including exact local minutes, and requests weather again. Only a successful, current attempt replaces the result and synchronizes the form/tab draft. The retry button stays focused while busy; success moves keyboard focus into the result. Initial failures on the form use the normal submit action, so edits are honored.
+- Auth-required, no-gear and unsupported outcomes are explicit results, not transport failures. They can replace an earlier result and explain what personalization needs.
+
+### Weather provenance
+
+The one-day adapter keeps the API's source facts on `weather.context.provenance`; multi-day plans keep them on `plan.provenance`. Both use `WeatherProvenance` from `src/types/weather.ts`. The APIs add source facts, without changing either recommendation engine:
+
+| Fact | Source / limitation |
+|---|---|
+| Provider and units | Open-Meteo; our requests specify Fahrenheit and mph. Display conversion is separate. |
+| Time zone | The provider's valid IANA zone, when available. The chosen place may also carry its geocoding zone. Neither is inferred from the device. |
+| Current conditions timestamp | `current.time`, requested as Unix time and displayed with the provider zone's offset. It is omitted when absent. It is not a forecast issuance time or a client fetch timestamp. |
+| Effective one-day forecast time | `WeatherContext.forecastTime`, the hour selected by the API, including its offset. The result separately displays the exact requested local date/time from `Outing.when`. |
+| Available forecast coverage | First and last usable hour plus usable-hour count. Hours with missing required values are excluded; the bounds do not imply gap-free coverage. Multi-day `days`/`uncoveredDays`, dayparts and start/end-hour fields remain the authority for which parts of the requested window received advice. |
+| Freshness / model issuance | Not supplied by these adapters. No generation timestamp, age badge or freshness guarantee is invented. Open-Meteo's computation duration is not a forecast issuance time. |
+
+`Weather source and coverage` discloses the available facts on both result screens. Older plans without provenance still render without fabricated details. Malformed optional metadata is omitted. Missing/non-finite required temperature or wind values fail the request, while an actual numeric zero is valid. Unknown precipitation remains unknown. A Later response without a valid forecast timestamp and zone fails instead of being labeled as current weather; impossible dates fail before any current-weather fallback.
+
+One-day advice uses the start hour. Multi-day guidance uses destination-local daytime windows and rounds the requested start down to its hour as before. The requested exact time remains in the outing; no duration-in-hours or common engine capability is invented.
 
 ## Requests
 
@@ -54,7 +75,7 @@ The advice kind and the request status are separate:
   - changing the weather's place or time;
   - Try again.
 - **Only the latest request lands.** Each request gets a number, and only the latest one may change the page or resolve as successfully shown. Starting over, Edit outing, or switching the form between Now and Later (on the form, or with the iOS Plan tab) retires the running request, so a late answer can't replace a newer outing. A retired weather request never starts a recommendation request. A request made from the form being shown otherwise stays current.
-- **The shown result stays put.** While a newer request loads, and when it fails, the page keeps showing the last result with its own activity, place and time. The results header shows the result's activity until the new advice arrives.
+- **The shown result stays put.** While a newer request loads, and when it fails, the page keeps showing the last result with its own activity, place and time. The results header shows the result's activity until the new advice arrives. A live status notice separately identifies the pending outing and the retained result; stale success and failure responses cannot replace this notice.
 
 ## Edit outing and Start over
 
@@ -154,3 +175,20 @@ Multi-day outings (2–7 days) are the same for guests and signed-in users:
 - The packing list reads the wardrobe only for a signed-in user. Its `wardrobe` field says how it was matched: `matched`, `signedOut`, or `unavailable` when a signed-in user's wardrobe couldn't be read.
 
 The auth boundary is set in [`src/proxy.ts`](../src/proxy.ts). `/api/v1/recommendations/*` needs a signed-in user; `/api/weather`, `/api/plan-ahead` and `/api/packing-list` are public. #130 checks this matrix on the device.
+
+
+## #166 acceptance review — October 5, 2026
+
+This completes the shared outing/result work begun in #215 and continued in #241. Evidence and browser screenshots are in [`docs/qa/166-outing-contract/README.md`](qa/166-outing-contract/README.md).
+
+| Acceptance | Implementation / evidence |
+|---|---|
+| Entry and results consume the same context | `Outing`, `OutingResult`, `useGearUp` and the page adapters; both result screens receive the submitted outing and distinguish its requested time from effective weather time. |
+| Loading/failure keeps previous advice under previous context | `OutingRequestState`, `OutingRequestNotice`, reducer/hook/page regression tests and browser pending/failure captures. Recommendation-update failures preserve the same result object, so manual edits remain in its mounted layer display. |
+| Edit outing preserves inputs; Start over clears them | Existing #241 page tests cover changed destination/minutes, Now/Later, Back/reload and the native Plan compatibility event; Start over retires requests and clears the outing. Intentional navigation back to the form dismisses the result, as documented above. |
+| Out-of-order, auth expiry, targets-only, no usable wardrobe, static guidance | `useGearUp.test.ts`, `page.test.tsx`, `gearUp.test.ts` and `useBiophysicsRecommendation.test.ts`; added old-failure/new-request and failed-snapshot retry checks. Account changes clear results and retire requests. |
+| #123 forecast/date and #124 recovery remain intact | One-day route/client tests cover destination time, DST, missing hours and malformed responses; multi-day route/plan tests cover local windows, missing values and coverage. Existing guest, auth-required and retry flows pass. |
+| Activity × auth × duration matrix | The matrix above remains authoritative; no activity IDs, protected endpoints or thermal thresholds changed. |
+| Tests, lint and typecheck | Full and focused results are recorded in the QA report, together with the production-build environment limitation. |
+
+#185 owns the programmatic `submitOuting` interface, caller cancellation, domain error codes and edited Wear/Carry readback. This change exposes no browser tool and adds no second store. #168 owns auth return, #170 owns durable saved snapshots, and #130 retains real-account browser/native/device/accessibility and participant validation. The synthetic browser and jsdom checks here are not represented as that release coverage.

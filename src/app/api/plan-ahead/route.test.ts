@@ -64,6 +64,11 @@ describe("POST /api/plan-ahead", () => {
       ["evening", 56],
     ]);
     expect(plan.days[1].dayparts[0]).toMatchObject({ id: "morning", minTemp: 46 });
+    expect(plan.provenance).toEqual({
+      provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" },
+      timeZone: "America/New_York",
+      coverage: { firstHour: "2026-10-08T00:00", lastHour: "2026-10-09T23:00", availableHours: 48 },
+    });
   });
 
   it("leaves out hours with a missing value rather than read them as zero", async () => {
@@ -79,6 +84,8 @@ describe("POST /api/plan-ahead", () => {
 
     // The morning's coldest complete hour is 9am (49°F), not a 0°F placeholder.
     expect(plan.days[1].dayparts[0]).toMatchObject({ id: "morning", minTemp: 49 });
+    expect(plan.provenance.coverage.availableHours).toBe(45);
+    expect(plan.provenance.observedTime).toBeUndefined();
   });
 
   it("fails rather than use UTC hours when the forecast has no time zone", async () => {
@@ -144,5 +151,12 @@ describe("POST /api/plan-ahead", () => {
 
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({ error: "Failed to fetch weather data" });
+  });
+
+  it("rejects an impossible calendar date before requesting a forecast", async () => {
+    global.fetch = vi.fn();
+    const response = await planAhead({ startDate: "2026-02-31", durationDays: 2 });
+    expect(response.status).toBe(400);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

@@ -46,3 +46,9 @@ export type OutingResult =
 
 export type LayersResult = Extract<OutingResult, { kind: "layers" }>;
 export type PlanResult = Extract<OutingResult, { kind: "plan" }>;
+
+/** Work in flight or a failed attempt, separate from the result still shown. */
+export type OutingRequestState =
+  | { status: "idle" }
+  | { status: "loading"; outing: Outing }
+  | { status: "error"; outing: Outing; message: string; field?: "startDate" };
