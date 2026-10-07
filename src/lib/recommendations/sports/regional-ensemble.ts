@@ -30,7 +30,6 @@ interface GarmentFeatures extends OutfitTotals {
 }
 
 interface OutfitRankInput {
-  regionalClo: PhaseTargets['regional']['min'];
   missingBase: number;
   missingOuter: number;
   missingWaterproof: number;
@@ -60,7 +59,7 @@ function layer(garment: GarmentRow): Layer {
   return 'mid';
 }
 
-function features(garment: GarmentRow, options: SearchOptions): GarmentFeatures {
+function features(garment: GarmentRow, options: Pick<SearchOptions, 'puffyFitsUnder' | 'breathableFrom'>): GarmentFeatures {
   const slot = layer(garment);
   // Bibs insulate the torso but sit underneath its jacket, occupying only leg slots.
   const occupancy = (garment.covers_torso && !(garment.covers_legs && !garment.covers_arms) ? TORSO : 0) |
@@ -84,6 +83,109 @@ function features(garment: GarmentRow, options: SearchOptions): GarmentFeatures 
     puffy: garment.category === 'insulation_down' || garment.category === 'insulation_synthetic',
     acceptsPuffy: slot === 'outer' && options.puffyFitsUnder(garment),
   };
+}
+
+function garmentPools(
+  categorized: CategorizedGarments,
+  options: Pick<SearchOptions, 'puffyFitsUnder' | 'breathableFrom'>
+): Record<Layer, GarmentFeatures[]> {
+  return {
+    base: categorized.baseLayers.map((g) => features(g, options)),
+    mid: [...categorized.midLayers, ...categorized.insulation.filter((g) => g.category !== 'outer_insulated')]
+      .map((g) => features(g, options)),
+    outer: [...categorized.shells, ...categorized.insulation.filter((g) => g.category === 'outer_insulated')]
+      .map((g) => features(g, options)),
+  };
+}
+
+interface CapacityState {
+  baseMask: number;
+  midMask: number;
+  outerMask: number;
+  waterproofMask: number;
+  puffyMask: number;
+  blockingOuterMask: number;
+  torsoClo: number;
+  armsClo: number;
+  legsClo: number;
+}
+
+function capacityKey(state: CapacityState): number {
+  // Six three-bit region masks describe all future compatibility constraints.
+  return state.baseMask | (state.midMask << 3) | (state.outerMask << 6) |
+    (state.waterproofMask << 9) | (state.puffyMask << 12) | (state.blockingOuterMask << 15);
+}
+
+/**
+ * Find each region's maximum across all wearable outfits, retaining the
+ * selected outfit's base/outer coverage and, when wet, waterproof coverage.
+ * Keep separate regional maxima for each compatibility state: the maximum
+ * torso, arms and legs values can come from different valid outfits.
+ * Process all alternatives for a garment ID together so it cannot be reused.
+ */
+export function findRegionalInsulationCapacity(
+  categorized: CategorizedGarments,
+  selected: GarmentRow[],
+  precipitation: boolean,
+  puffyFitsUnder: SearchOptions['puffyFitsUnder']
+): PhaseTargets['regional']['min'] {
+  const options = { puffyFitsUnder };
+  const pools = garmentPools(categorized, options);
+  const groups = new Map<string, GarmentFeatures[]>();
+  for (const item of [...pools.base, ...pools.mid, ...pools.outer]) {
+    if (!item.occupancy) continue;
+    const group = groups.get(item.garment.id) ?? [];
+    group.push(item);
+    groups.set(item.garment.id, group);
+  }
+  let states = new Map<number, CapacityState>([[0, {
+    baseMask: 0, midMask: 0, outerMask: 0, waterproofMask: 0,
+    puffyMask: 0, blockingOuterMask: 0, torsoClo: 0, armsClo: 0, legsClo: 0,
+  }]]);
+
+  for (const group of groups.values()) {
+    const next = new Map(states); // Also allow leaving this garment off.
+    for (const state of states.values()) {
+      for (const item of group) {
+        const occupied = item.layer === 'base' ? state.baseMask : item.layer === 'mid' ? state.midMask : state.outerMask;
+        if (occupied & item.occupancy) continue;
+        if (item.puffy && (state.blockingOuterMask & item.occupancy)) continue;
+        if (item.layer === 'outer' && !item.acceptsPuffy && (state.puffyMask & item.occupancy)) continue;
+        const candidate: CapacityState = {
+          baseMask: state.baseMask | item.baseMask,
+          midMask: state.midMask | (item.layer === 'mid' ? item.occupancy : 0),
+          outerMask: state.outerMask | item.outerMask,
+          waterproofMask: state.waterproofMask | item.waterproofMask,
+          puffyMask: state.puffyMask | (item.puffy ? item.occupancy : 0),
+          blockingOuterMask: state.blockingOuterMask | (item.layer === 'outer' && !item.acceptsPuffy ? item.occupancy : 0),
+          torsoClo: state.torsoClo + item.torsoClo,
+          armsClo: state.armsClo + item.armsClo,
+          legsClo: state.legsClo + item.legsClo,
+        };
+        const key = capacityKey(candidate);
+        const existing = next.get(key);
+        next.set(key, existing ? {
+          ...candidate,
+          torsoClo: Math.max(existing.torsoClo, candidate.torsoClo),
+          armsClo: Math.max(existing.armsClo, candidate.armsClo),
+          legsClo: Math.max(existing.legsClo, candidate.legsClo),
+        } : candidate);
+      }
+    }
+    states = next;
+  }
+
+  const required = selected.map((g) => features(g, options)).reduce(extend, EMPTY);
+  const capacity = { torso: 0, arms: 0, legs: 0 };
+  for (const state of states.values()) {
+    if ((state.baseMask & required.baseMask) !== required.baseMask ||
+      (state.outerMask & required.outerMask) !== required.outerMask ||
+      (precipitation && (state.waterproofMask & required.waterproofMask) !== required.waterproofMask)) continue;
+    capacity.torso = Math.max(capacity.torso, state.torsoClo * ENSEMBLE_REGRESSION.thermal.torso.coef);
+    capacity.arms = Math.max(capacity.arms, state.armsClo * ENSEMBLE_REGRESSION.thermal.arm.coef);
+    capacity.legs = Math.max(capacity.legs, state.legsClo * ENSEMBLE_REGRESSION.thermal.leg.coef);
+  }
+  return capacity;
 }
 
 /** The slot, identity and puffy-pairing rules are all pairwise. */
@@ -134,13 +236,7 @@ export function buildRegionalEnsemble(
   targets: PhaseTargets['regional'],
   options: SearchOptions
 ): GarmentRow[] {
-  const pools: Record<Layer, GarmentFeatures[]> = {
-    base: categorized.baseLayers.map((g) => features(g, options)),
-    mid: [...categorized.midLayers, ...categorized.insulation.filter((g) => g.category !== 'outer_insulated')]
-      .map((g) => features(g, options)),
-    outer: [...categorized.shells, ...categorized.insulation.filter((g) => g.category === 'outer_insulated')]
-      .map((g) => features(g, options)),
-  };
+  const pools = garmentPools(categorized, options);
   let ensemble: GarmentFeatures[] = [];
 
   for (const region of [TORSO, LEGS]) {
@@ -166,7 +262,6 @@ export function buildRegionalEnsemble(
           const arms = (partial.armsClo + (outer?.armsClo ?? 0)) * ENSEMBLE_REGRESSION.thermal.arm.coef;
           const legs = (partial.legsClo + (outer?.legsClo ?? 0)) * ENSEMBLE_REGRESSION.thermal.leg.coef;
           const candidateRank = options.rank({
-            regionalClo: { torso, arms, legs },
             missingBase: missing(partial.baseMask | (outer?.baseMask ?? 0), region),
             missingOuter: missing(partial.outerMask | (outer?.outerMask ?? 0), region),
             missingWaterproof: missing(partial.waterproofMask | (outer?.waterproofMask ?? 0), region),

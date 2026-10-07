@@ -135,7 +135,7 @@ graph TD
     COMB --> CAP[One item per slot per covered region<br/>Insulated outer replaces shell<br/>Bibs fill leg slots under a jacket]
     CAP --> RANK{Sport}
     RANK -->|Alpine| REG[Preserve coverage and rain protection<br/>Minimize combined shortfall and excess, then layers]
-    REG --> WARM[Find warmer wearable alternatives per region<br/>Preserve coverage and rain protection]
+    REG --> WARM[Search all compatible outfit combinations for regional maxima<br/>Keep selected coverage and rain protection]
     WARM --> WARN[Warn only when a regional shortfall<br/>can be reduced by more than 0.12 clo]
     RANK -->|XC| XREG[Outer on torso and legs when freezing, windy, or wet<br/>Minimize combined shortfall and excess<br/>Then breathable and fewer layers]
     SPORT -->|No| SORT[Sort Pool by Sport Strategy]

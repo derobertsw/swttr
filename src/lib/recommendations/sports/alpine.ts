@@ -10,7 +10,7 @@ import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import type { IreqResult } from '@/types/garments';
 import type { SportRecommender } from '../handler';
 import { metabolicRateFor, phaseIreq, phaseTargets, type PhaseTargets } from '../thermal-targets';
-import { buildAlpineEnsemble } from './alpine-ensemble';
+import { buildAlpineEnsemble, alpineRegionalCapacity } from './alpine-ensemble';
 import { selectHandwear, selectHeadwearByCategory } from '../extremities';
 import { buildScoredRecommendation } from '../response-builder';
 import {
@@ -124,13 +124,13 @@ export const alpine: SportRecommender<AlpineTargets> = {
     // available wearable layers could meaningfully reduce, respecting
     // coverage and rain protection; layer limits can make targets unreachable.
     const regionalClo = predictEnsembleThermal(ensembleToThermalGarments(ensemble)).rcl;
+    let capacity: PhaseTargets['regional']['min'] | undefined;
     for (const [region, key] of [['torso', 'torso'], ['arms', 'arm'], ['legs', 'leg']] as const) {
       const minimum = targets.regional.min[region];
       const actual = regionalClo[key];
       if (minimum - actual > REGIONAL_WARNING_CLO) {
-        const warmest = buildAlpineEnsemble(pool.categorized, targets.regional, request.precipitation, region);
-        const capacity = predictEnsembleThermal(ensembleToThermalGarments(warmest)).rcl;
-        const attainableMinimum = Math.min(minimum, capacity[key]);
+        capacity ??= alpineRegionalCapacity(pool.categorized, ensemble, request.precipitation);
+        const attainableMinimum = Math.min(minimum, capacity[region]);
         if (attainableMinimum - actual > REGIONAL_WARNING_CLO) {
           warnings.push(`Insufficient ${region} insulation: ${actual.toFixed(1)} clo vs ${minimum.toFixed(1)} clo required for alpine conditions`);
         }

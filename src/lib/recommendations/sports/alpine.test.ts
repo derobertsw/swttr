@@ -34,6 +34,18 @@ const regionalWarnings = (response: ReturnType<typeof recommend>) =>
   response.warnings.filter((warning) => /^Insufficient (torso|arms|legs) insulation:/.test(warning));
 
 describe('alpine regional warnings', () => {
+  it('finds warmer separate tops and bottoms even when the chosen full-body base blocks them', () => {
+    const fullBodyBase = garment('full-body-base', 'base_layer', 0.5);
+    const top = { ...garment('base-top', 'base_layer', 0.5), covers_legs: false };
+    const bottoms = {
+      ...garment('warm-bottoms', 'base_layer', 1.5), covers_torso: false, covers_arms: false,
+    };
+    const result = recommend([fullBodyBase, top, bottoms, garment('shell', 'hard_shell', 0.2)], MILD);
+
+    expect(result.recommendation.garments.map((g) => g.id)).toEqual(['full-body-base', 'shell']);
+    expect(regionalWarnings(result)).toContainEqual(expect.stringMatching(/^Insufficient legs insulation:/));
+  });
+
   it('does not repeat unreachable regional targets when the wardrobe is already at its wearable maximum', () => {
     const result = recommend([
       garment('base', 'base_layer', 0.5),
