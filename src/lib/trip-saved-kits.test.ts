@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { kitChanges, outfitDate, parseSaveKitRequest, readSavedOutfit, tripDestination, tripEffort } from "@/lib/trip-saved-kits";
+import { destinationToday, kitChanges, outfitDate, parseSaveKitRequest, readSavedOutfit, tripDestination, tripEffort } from "@/lib/trip-saved-kits";
 import { savedOutfit, STOWE, WEAR } from "@/test/savedKit";
 import type { SavedOutfit } from "@/types/savedKit";
 
@@ -101,6 +101,26 @@ describe("outfitDate", () => {
   });
 });
 
+describe("destinationToday", () => {
+  const now = Date.parse("2026-10-07T02:30:00Z"); // 10:30pm on Oct 6 in Vermont.
+
+  it("is today on the destination's calendar, not the server's", () => {
+    expect(destinationToday(savedOutfit(), now)).toBe("2026-10-06");
+    const tokyo = savedOutfit({ outing: { ...savedOutfit().outing, place: { ...STOWE, timeZone: "Asia/Tokyo" } }, weather: { temperature: 30, windSpeed: 5 } });
+    expect(destinationToday(tokyo, now)).toBe("2026-10-07");
+  });
+
+  it("is the outing's own date for now, and unknown without a time zone", () => {
+    const current = savedOutfit({
+      outing: { ...savedOutfit().outing, when: { mode: "now" } },
+      weather: { temperature: 30, windSpeed: 5, context: { source: "current", provenance: { provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" }, observedTime: "2026-10-06T22:15-04:00" } } },
+    });
+    expect(destinationToday(current, now)).toBe("2026-10-06");
+    const unknown = savedOutfit({ outing: { ...savedOutfit().outing, place: { ...STOWE, timeZone: undefined } }, weather: { temperature: 30, windSpeed: 5 } });
+    expect(destinationToday(unknown, now)).toBeUndefined();
+  });
+});
+
 describe("trip details from the outing", () => {
   it("maps the effort and names the destination", () => {
     expect([tripEffort("easy"), tripEffort("moderate"), tripEffort("hard")]).toEqual(["easy", "steady", "hard"]);
@@ -113,10 +133,30 @@ describe("trip details from the outing", () => {
     const warmer = savedOutfit({
       phases: [{ id: "outing", wear: { ...WEAR, headNeck: { base: [], outer: [{ name: "Beanie" }] }, hands: { base: [], outer: [] } }, carry: [], decision: null }],
     });
-    expect(kitChanges({ outfit: savedOutfit() }, warmer)).toEqual({
+    expect(kitChanges({ outfit: savedOutfit() }, warmer)).toEqual([{
+      phase: "outing",
       add: [{ bodyPart: "headNeck", layerType: "outer", name: "Beanie" }],
       remove: [{ bodyPart: "hands", layerType: "outer", name: "Insulated gloves" }],
-    });
+    }]);
     expect(kitChanges({ outfit: null }, warmer)).toBeNull();
+  });
+
+  it("lists a ski tour's changes for the climb and the descent", () => {
+    const tour = (descentHands: SavedOutfit["phases"][number]["wear"]["hands"]) => savedOutfit({
+      outing: { ...savedOutfit().outing, activity: "backcountry_skiing" },
+      phases: [
+        { id: "climb", wear: WEAR, carry: [], decision: null },
+        { id: "descent", wear: { ...WEAR, hands: descentHands }, carry: [], decision: null },
+      ],
+    });
+    const mittens = { base: [], outer: [{ name: "Mittens" }] };
+    expect(kitChanges({ outfit: tour(WEAR.hands) }, tour(mittens))).toEqual([
+      { phase: "climb", add: [], remove: [] },
+      {
+        phase: "descent",
+        add: [{ bodyPart: "hands", layerType: "outer", name: "Mittens" }],
+        remove: [{ bodyPart: "hands", layerType: "outer", name: "Insulated gloves" }],
+      },
+    ]);
   });
 });

@@ -22,7 +22,7 @@ import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
 import { cn } from "@/lib/utils";
 import type { LayerChanges } from "@/types/plan";
-import type { SavedOutfit, SaveKitConflict, SaveKitOptions, SaveKitRequest, SaveKitResponse } from "@/types/savedKit";
+import type { SavedOutfit, SaveKitConflict, SaveKitOptions, SaveKitPhaseChanges, SaveKitRequest, SaveKitResponse } from "@/types/savedKit";
 import type { Trip } from "@/types/trips";
 
 const NEW_TRIP = "new";
@@ -457,9 +457,14 @@ function describeItems(items: LayerChanges["add"]): string {
   return items.map((item) => `${item.name} (${BODY_PART_LABELS[item.bodyPart].toLowerCase()})`).join(", ");
 }
 
+/** "Adds:" for one outfit, "Climb adds:" or "Descent removes:" for a ski tour's phases. */
+function changeLabel(phase: SaveKitPhaseChanges["phase"], change: "adds" | "removes"): string {
+  return phase === "outing" ? `${change[0].toUpperCase()}${change.slice(1)}: ` : `${phase === "climb" ? "Climb" : "Descent"} ${change}: `;
+}
+
 /** What replacing the saved kit changes: the conditions, and the layers as worked out by the server. */
-function ChangeSummary({ changes, outfit }: { changes: LayerChanges | null; outfit: SavedOutfit }) {
-  const same = changes && changes.add.length === 0 && changes.remove.length === 0;
+function ChangeSummary({ changes, outfit }: { changes: SaveKitPhaseChanges[] | null; outfit: SavedOutfit }) {
+  const same = changes?.every((phase) => phase.add.length === 0 && phase.remove.length === 0);
   return (
     <div className="flex flex-col gap-1 text-sm">
       <p className="text-muted-foreground">These layers are for <Conditions weather={outfit.weather} />.</p>
@@ -469,12 +474,20 @@ function ChangeSummary({ changes, outfit }: { changes: LayerChanges | null; outf
         <p className="text-muted-foreground">The layers are the same. Replacing it updates the outing and forecast they were saved for.</p>
       ) : (
         <dl className="flex flex-col gap-1">
-          {changes.add.length > 0 && (
-            <div><dt className="inline font-semibold text-foreground">Adds: </dt><dd className="inline text-foreground">{describeItems(changes.add)}</dd></div>
-          )}
-          {changes.remove.length > 0 && (
-            <div><dt className="inline font-semibold text-foreground">Removes: </dt><dd className="inline text-foreground">{describeItems(changes.remove)}</dd></div>
-          )}
+          {changes.flatMap((phase) => [
+            phase.add.length > 0 && (
+              <div key={`${phase.phase}-add`}>
+                <dt className="inline font-semibold text-foreground">{changeLabel(phase.phase, "adds")}</dt>
+                <dd className="inline text-foreground">{describeItems(phase.add)}</dd>
+              </div>
+            ),
+            phase.remove.length > 0 && (
+              <div key={`${phase.phase}-remove`}>
+                <dt className="inline font-semibold text-foreground">{changeLabel(phase.phase, "removes")}</dt>
+                <dd className="inline text-foreground">{describeItems(phase.remove)}</dd>
+              </div>
+            ),
+          ])}
         </dl>
       )}
     </div>

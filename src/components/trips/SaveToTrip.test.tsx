@@ -125,6 +125,21 @@ describe("Save to trip", () => {
     expect(second).toEqual({ ...first, replace: { "2026-10-10": KIT.updated_at } });
   });
 
+  it("names the ski tour phase each change is in", async () => {
+    const changes = [
+      { phase: "climb", add: [], remove: [] },
+      { phase: "descent", add: [{ bodyPart: "hands", layerType: "outer", name: "Mittens" }], remove: [] },
+    ];
+    setup({ "POST /api/v1/trips/kits": reply(409, { ...CONFLICT, conflicts: [{ ...CONFLICT.conflicts[0], kit: { ...KIT, items: [], outfit: savedOutfit() }, changes }] }) });
+    const { user, dialog } = await openSheet();
+    await user.click(await within(dialog).findByRole("radio", { name: /Whistler/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+    expect(await within(dialog).findByText("Descent adds:")).toBeInTheDocument();
+    expect(within(dialog).getByText("Mittens (hands)")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Climb/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/The layers are the same/)).not.toBeInTheDocument();
+  });
+
   it("keeps the saved kit when asked to", async () => {
     setup({ "POST /api/v1/trips/kits": reply(409, CONFLICT) });
     const { user, dialog } = await openSheet();

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError, requireUser } from "@/lib/api";
 import { tripActivityFromRecommendationKey } from "@/lib/trip-activities";
-import { kitChanges, outfitDate, parseSaveKitRequest, tripDestination, tripEffort } from "@/lib/trip-saved-kits";
+import { destinationToday, kitChanges, outfitDate, parseSaveKitRequest, tripDestination, tripEffort } from "@/lib/trip-saved-kits";
 import { classifyTripStatus } from "@/lib/trips";
 import type { SaveKitConflict, SaveKitResponse } from "@/types/savedKit";
 
@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
     name: input.newTripName,
     start_date: date,
     end_date: date,
-    status: classifyTripStatus(date, date),
+    // Today where the trip is, not on the server's clock.
+    status: classifyTripStatus(date, date, destinationToday(outfit)),
     destination: tripDestination(outfit.outing.place),
     activity,
   };

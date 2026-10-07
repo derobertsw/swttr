@@ -57,13 +57,18 @@ export interface SaveKitRequest {
   replace?: Record<string, string>;
 }
 
+/** What changes in one phase of the outfit when a saved kit is replaced. */
+export interface SaveKitPhaseChanges extends LayerChanges {
+  phase: SavedKitPhaseId;
+}
+
 /** A trip day that already has a kit, so saving stops for a decision. */
 export interface SaveKitConflict {
   date: string;
   /** The kit saved there now. */
   kit: TripMemberDayKit;
-  /** From that kit's outfit to the new one; null when it's a category checklist. */
-  changes: LayerChanges | null;
+  /** From that kit's outfit to the new one, per phase; null when it's a category checklist. */
+  changes: SaveKitPhaseChanges[] | null;
 }
 
 export type SaveKitResponse =

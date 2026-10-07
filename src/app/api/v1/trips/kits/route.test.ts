@@ -55,6 +55,23 @@ describe("Save an outing's kit to a trip", () => {
     }));
   });
 
+  it("classifies a new trip by today at the destination, not on the server's clock", async () => {
+    // 10:30pm on Oct 6 in Vermont is already Oct 7 in UTC.
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.parse("2026-10-07T02:30:00Z") });
+    try {
+      const outfit = savedOutfit({
+        outing: { ...savedOutfit().outing, when: { mode: "now" } },
+        weather: { temperature: 30, windSpeed: 5, context: { source: "current", provenance: { provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" }, timeZone: "America/New_York", observedTime: "2026-10-06T22:15-04:00" } } },
+      });
+      await save(request({ outfit, target: { new_trip: { id: NEW_ID, name: "Stowe trip" } } }));
+      expect(rpc).toHaveBeenCalledWith("save_trip_kits", expect.objectContaining({
+        p_new_trip: expect.objectContaining({ start_date: "2026-10-06", end_date: "2026-10-06", status: "live" }),
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("returns a replayed save without reporting a new trip", async () => {
     rpc.mockResolvedValue({ data: { status: "saved", trip: TRIP, created: true, kits: [], replayed: true }, error: null });
     expect((await save(request({ target: { new_trip: { id: NEW_ID, name: "Stowe trip" } } }))).status).toBe(200);
@@ -70,7 +87,7 @@ describe("Save an outing's kit to a trip", () => {
       status: "conflict",
       trip: TRIP,
       conflicts: [
-        { date: "2026-10-10", kit: KIT, changes: { add: [], remove: [{ bodyPart: "hands", layerType: "outer", name: "Insulated gloves" }] } },
+        { date: "2026-10-10", kit: KIT, changes: [{ phase: "outing", add: [], remove: [{ bodyPart: "hands", layerType: "outer", name: "Insulated gloves" }] }] },
         { date: "2026-10-11", kit: { ...KIT, outfit: null, items: ["shell"] }, changes: null },
       ],
     });

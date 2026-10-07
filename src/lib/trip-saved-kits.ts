@@ -9,9 +9,8 @@ import { tripActivityFromRecommendationKey } from "@/lib/trip-activities";
 import { readWeatherProvenance } from "@/lib/weatherProvenance";
 import type { ThermalDecision } from "@/types/biophysics";
 import type { Outing, OutingTime, PersonalizationGap } from "@/types/outing";
-import type { LayerChanges } from "@/types/plan";
 import type { LayerItem, LayerSet, LocationSuggestion, Recommendation } from "@/types/recommendations";
-import type { SavedKitAdvice, SavedKitPhase, SavedKitPhaseId, SavedOutfit } from "@/types/savedKit";
+import type { SaveKitPhaseChanges, SavedKitAdvice, SavedKitPhase, SavedKitPhaseId, SavedOutfit } from "@/types/savedKit";
 import type { TripEffort, TripMemberDayKit } from "@/types/trips";
 import type { WeatherContext, WeatherData } from "@/types/weather";
 import { BODY_PARTS } from "@/types/wardrobe";
@@ -246,6 +245,19 @@ export function outfitDate(outfit: SavedOutfit, now = Date.now()): string | null
   return zone ? formatZonedTime(now, zone).slice(0, 10) : null;
 }
 
+/**
+ * Today on the destination's calendar, so a trip made by the save is
+ * classified (planning, live, past) by the same calendar as its date.
+ * Undefined when the place's time zone isn't known.
+ */
+export function destinationToday(outfit: SavedOutfit, now = Date.now()): string | undefined {
+  if (outfit.outing.when.mode === "now") return outfitDate(outfit, now) ?? undefined;
+  const context = outfit.weather.context;
+  const zone = (context?.source === "forecast" ? context.timeZone : undefined)
+    ?? context?.provenance?.timeZone ?? outfit.outing.place.timeZone;
+  return zone ? formatZonedTime(now, zone).slice(0, 10) : undefined;
+}
+
 const EFFORT: Record<ExertionLevel, TripEffort> = { easy: "easy", moderate: "steady", hard: "hard" };
 
 /** The trip effort for a Gear up effort. */
@@ -262,9 +274,16 @@ export function tripDestination(place: LocationSuggestion): { name: string; lati
   return { name: name.slice(0, 200), latitude: place.latitude, longitude: place.longitude };
 }
 
-/** What changes from a saved kit's outfit to a new one; null when the saved kit is a checklist. */
-export function kitChanges(kit: Pick<TripMemberDayKit, "outfit">, next: SavedOutfit): LayerChanges | null {
+/**
+ * What changes from a saved kit's outfit to a new one, phase by phase (a ski
+ * tour's climb and descent); null when the saved kit is a checklist. A phase
+ * the saved outfit doesn't have is compared with its first.
+ */
+export function kitChanges(kit: Pick<TripMemberDayKit, "outfit">, next: SavedOutfit): SaveKitPhaseChanges[] | null {
   const saved = kit.outfit;
   if (!saved?.phases?.length) return null;
-  return diffRecommendations(saved.phases[0].wear, next.phases[0].wear);
+  return next.phases.map((phase) => {
+    const before = saved.phases.find((candidate) => candidate.id === phase.id) ?? saved.phases[0];
+    return { phase: phase.id, ...(diffRecommendations(before.wear, phase.wear) ?? { add: [], remove: [] }) };
+  });
 }

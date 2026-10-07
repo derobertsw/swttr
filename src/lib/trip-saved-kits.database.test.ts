@@ -42,6 +42,7 @@ describe("Saving outing kits to a trip in Postgres", () => {
     await db.exec(await readFile("supabase/migrations/012_trips.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/016_atomic_trip_creation.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/018_trip_saved_kits.sql", "utf8"));
+    await db.exec(await readFile("supabase/migrations/019_trip_kit_save_tombstones.sql", "utf8"));
   }, 20_000);
   beforeEach(async () => {
     await db.exec("TRUNCATE trips CASCADE;");
@@ -69,6 +70,15 @@ describe("Saving outing kits to a trip in Postgres", () => {
     expect(replay).toEqual({ ...first, replayed: true });
     expect(await counts()).toEqual({ trips: 2, days: 3, kits: 1, saves: 1 });
     expect((await kits())[0].note).toBe("Bring spare gloves");
+  });
+
+  it("reports a deleted trip on retry instead of making it again, and keeps no copy of its kits", async () => {
+    const saveId = randomUUID();
+    await save({ saveId, newTrip: NEW_TRIP });
+    await db.query("DELETE FROM trips WHERE id = $1", [tripId]);
+    await expect(save({ saveId, newTrip: NEW_TRIP })).rejects.toMatchObject({ code: "P0002" });
+    expect(await counts()).toEqual({ trips: 1, days: 2, kits: 0, saves: 1 });
+    expect((await db.query("SELECT trip_id, result FROM trip_kit_saves")).rows).toEqual([{ trip_id: null, result: null }]);
   });
 
   it("refuses a save identity reused with other input or by another account", async () => {
@@ -154,5 +164,7 @@ describe("Saving outing kits to a trip in Postgres", () => {
     expect(fn.rows[0]).toEqual({ anon: false, authenticated: false, service: true });
     const table = await db.query("SELECT has_table_privilege('anon', 'public.trip_kit_saves', 'SELECT') AS anon, has_table_privilege('authenticated', 'public.trip_kit_saves', 'SELECT') AS authenticated");
     expect(table.rows[0]).toEqual({ anon: false, authenticated: false });
+    const trigger = await db.query("SELECT has_function_privilege('anon', 'public.forget_trip_kit_save_results()', 'EXECUTE') AS anon, has_function_privilege('authenticated', 'public.forget_trip_kit_save_results()', 'EXECUTE') AS authenticated");
+    expect(trigger.rows[0]).toEqual({ anon: false, authenticated: false });
   });
 });
