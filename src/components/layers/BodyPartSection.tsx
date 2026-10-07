@@ -71,7 +71,7 @@ export function BodyPartSection({
 
   return (
     <section aria-labelledby={headingId} className="py-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h4 id={headingId} className="text-base font-semibold text-foreground">
           {label}
         </h4>
@@ -129,9 +129,9 @@ export function BodyPartSection({
       ) : hasAnyLayers(layers) ? (
         <ul className="mt-2 flex flex-col gap-2">
           {wornItems.map(({ item, layerType, key }) => (
-            <li key={key} className="flex items-baseline gap-3">
+            <li key={key} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="w-12 shrink-0 text-sm text-muted-foreground">{LAYER_LABELS[layerType]}</span>
-              <span className="min-w-0 text-base font-medium text-foreground">
+              <span className="min-w-0 flex-1 basis-40 text-base font-medium text-foreground [overflow-wrap:anywhere]">
                 {item.name}
                 {item.isRecommended && (
                   <Badge size="sm" variant="outline" className="ml-2 align-middle font-medium">

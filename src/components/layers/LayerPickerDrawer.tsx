@@ -28,6 +28,8 @@ interface LayerPickerDrawerProps {
   onOpenChange: (open: boolean) => void;
   bodyPart: BodyPart;
   layerType: LayerType;
+  /** The phase whose outfit this selection changes. */
+  phase?: "Climb" | "Descent";
   wardrobeItems: PickerItem[];
   recommendedItems: PickerItem[];
   currentItemName?: string;
@@ -151,6 +153,7 @@ export function LayerPickerDrawer({
   onOpenChange,
   bodyPart,
   layerType,
+  phase,
   wardrobeItems,
   recommendedItems,
   currentItemName,
@@ -165,7 +168,7 @@ export function LayerPickerDrawer({
       <DrawerContent onCloseAutoFocus={onCloseAutoFocus}>
         <DrawerHeader className="pb-1">
           <DrawerTitle>{LAYER_LABELS[layerType]} Layer</DrawerTitle>
-          <DrawerDescription>{BODY_PART_LABELS[bodyPart]}</DrawerDescription>
+          <DrawerDescription>{BODY_PART_LABELS[bodyPart]}{phase && ` · ${phase}`}</DrawerDescription>
         </DrawerHeader>
 
         <DrawerBody className="flex flex-col pb-6">
