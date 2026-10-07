@@ -380,6 +380,25 @@ describe("MultiDayPlanDisplay", () => {
       expect(await screen.findByRole("region", { name: "Upper body" })).toBeInTheDocument();
     });
 
+    it("keeps the shown plan's tab while another loads, and opens the next plan on its own tab", async () => {
+      stubPackingList();
+      const shown = makePlan();
+      const { rerender } = render(<MultiDayPlanDisplay plan={shown} initialTab="packing" />);
+      await screen.findByRole("region", { name: "Upper body" });
+
+      // Another request starts while this plan stays on screen, like the iOS shell's Gear Up action.
+      rerender(<MultiDayPlanDisplay plan={shown} initialTab="days" />);
+      expect(screen.getByRole("tab", { name: "Packing" })).toHaveAttribute("aria-selected", "true");
+
+      // Its plan replaces this one without leaving the results.
+      rerender(<MultiDayPlanDisplay plan={makePlan({ hours: CHANGING_HOURS, durationDays: 3 })} initialTab="days" />);
+      expect(screen.getByRole("tab", { name: "Daily plan" })).toHaveAttribute("aria-selected", "true");
+
+      // A tab picked on a plan stays with it.
+      await openPacking();
+      expect(screen.getByRole("tab", { name: "Packing" })).toHaveAttribute("aria-selected", "true");
+    });
+
     it("says when a signed-in user's wardrobe couldn't be checked", async () => {
       vi.mocked(getAuthUserId).mockResolvedValueOnce("user_1");
       vi.mocked(getSupabase).mockReturnValueOnce(null);
@@ -395,7 +414,8 @@ describe("MultiDayPlanDisplay", () => {
 
     it("says it's updating while a new list loads over the one shown", async () => {
       const fetchMock = stubPackingList();
-      const { rerender } = render(<MultiDayPlanDisplay plan={makePlan()} itemMappings={new Map()} />);
+      const plan = makePlan();
+      const { rerender } = render(<MultiDayPlanDisplay plan={plan} itemMappings={new Map()} />);
       await openPacking();
       await screen.findByRole("region", { name: "Upper body" });
       let release!: () => void;
@@ -406,8 +426,8 @@ describe("MultiDayPlanDisplay", () => {
         return serve(...args);
       });
 
-      // Wardrobe mappings reload, e.g. when the window regains focus.
-      rerender(<MultiDayPlanDisplay plan={makePlan()} itemMappings={new Map()} />);
+      // Wardrobe mappings reload, e.g. when the window regains focus. The plan is the same.
+      rerender(<MultiDayPlanDisplay plan={plan} itemMappings={new Map()} />);
 
       expect(await screen.findByRole("status")).toHaveTextContent("Updating packing list…");
       expect(screen.getByRole("region", { name: "Upper body" })).toBeInTheDocument();
