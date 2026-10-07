@@ -42,6 +42,7 @@ import { EvaluationStatus } from "@/components/layers/EvaluationStatus";
 import { addLayerId, layerItemId } from "@/components/layers/LayerItems";
 import { LayerPickerDrawer } from "@/components/layers/LayerPickerDrawer";
 import { RecommendationNotice } from "@/components/layers/RecommendationNotice";
+import { RecommendationWarnings } from "@/components/layers/RecommendationWarnings";
 import { EDIT_WEATHER_ID, ResultHeader } from "@/components/layers/ResultHeader";
 import { RecommendedItemsCard, type RecommendedItem } from "@/components/layers/RecommendedItemsCard";
 import { useEditableLayers } from "@/hooks/useEditableLayers";
@@ -210,6 +211,7 @@ const LayerDisplay = ({
     && biophysicsActive
     && totalClo !== undefined
     && downhillTargetRange !== undefined;
+  const shownPhase: Phase = showDescent ? activePhase : "climb";
 
   // Thermal evaluation of the worn layers (including edits) runs on the server.
   const climbInput: PhaseEvaluationInput = {
@@ -264,18 +266,21 @@ const LayerDisplay = ({
     : undefined;
 
   // --- Layer picker ---
+  // An item worn on the other phase is available here: the same garment can
+  // be worn on both the climb and descent, but only once in this phase.
+  const pickerPhase = pickerTarget?.phase ?? shownPhase;
   const inUseItemIds = useMemo(() => {
-    const ids = collectInUseIds(climb.layers);
-    for (const id of collectInUseIds(descent.layers)) ids.add(id);
-    return ids;
-  }, [climb.layers, descent.layers]);
+    return collectInUseIds(pickerPhase === "descent" ? descent.layers : climb.layers);
+  }, [pickerPhase, climb.layers, descent.layers]);
   const { getItems: getPickerItems, reload: reloadPickerWardrobe } = useLayerPicker(inUseItemIds);
 
-  const pickerItems = useMemo(() => {
-    if (!pickerTarget) return { wardrobeItems: [], recommendedItems: [] };
-    const targetClo = bodyPartTargets(ireq?.regional, ireq?.extremity)[pickerTarget.bodyPart];
-    return getPickerItems(pickerTarget.bodyPart, pickerTarget.layerType, targetClo);
-  }, [pickerTarget, getPickerItems, ireq?.regional, ireq?.extremity]);
+  const pickerItems = pickerTarget
+    ? getPickerItems(
+        pickerTarget.bodyPart,
+        pickerTarget.layerType,
+        (pickerTarget.phase === "descent" ? descentInput : climbInput).targets[pickerTarget.bodyPart]
+      )
+    : { wardrobeItems: [], recommendedItems: [] };
 
   const pickerCurrentItem = pickerTarget && pickerTarget.replaceIndex !== null
     ? phaseLayers(pickerTarget.phase).layers[pickerTarget.bodyPart][pickerTarget.layerType]?.[pickerTarget.replaceIndex]
@@ -384,7 +389,6 @@ const LayerDisplay = ({
     );
   };
 
-  const shownPhase: Phase = showDescent ? activePhase : "climb";
   // "In the pack": carried during this phase, worn during the other.
   const packedItems = showDescent
     ? itemNamesMissingFrom(phaseLayers(shownPhase === "climb" ? "descent" : "climb").layers, phaseLayers(shownPhase).layers)
@@ -556,6 +560,14 @@ const LayerDisplay = ({
 
               <RecommendedItemsCard items={recommendedItems} onOwned={handleItemOwned} />
 
+              {biophysicsData && (
+                <RecommendationWarnings
+                  warnings={biophysicsData.warnings}
+                  transition={showDescent ? biophysicsData.transition_protocol : undefined}
+                  edited={climb.edited || (showDescent && descent.edited)}
+                />
+              )}
+
               {guidance.length > 0 && (
                 <ResultDisclosure title="Why these layers?">
                   <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-foreground">
@@ -607,7 +619,16 @@ const LayerDisplay = ({
                         </dl>
                       </div>
                     )}
-                    <BiophysicsDetails data={biophysicsData} />
+                    <section aria-label="Original recommendation">
+                      <h4 className="text-sm font-semibold text-foreground">Original recommendation</h4>
+                      <p className="mt-1 mb-4 text-sm text-muted-foreground">
+                        These properties describe the suggested {showDescent ? "climb " : ""}outfit.
+                        {climb.edited || (showDescent && descent.edited)
+                          ? " They do not include your layer changes."
+                          : showDescent ? " Descent comfort is checked separately above." : ""}
+                      </p>
+                      <BiophysicsDetails data={biophysicsData} />
+                    </section>
                   </div>
                 </ResultDisclosure>
               )}
@@ -621,6 +642,7 @@ const LayerDisplay = ({
             onOpenChange={(open) => { if (!open) setPickerTarget(null); }}
             bodyPart={pickerTarget?.bodyPart ?? "torso"}
             layerType={pickerTarget?.layerType ?? "base"}
+            phase={showDescent ? (pickerPhase === "descent" ? "Descent" : "Climb") : undefined}
             wardrobeItems={pickerItems.wardrobeItems}
             recommendedItems={pickerItems.recommendedItems}
             currentItemName={pickerCurrentItem?.name}
