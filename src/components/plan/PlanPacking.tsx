@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BODY_PART_LABELS, LAYER_LABELS } from "@/lib/layers";
+import { RESUME_OUTING_PATH, signInHref } from "@/lib/outingReturn";
 import { BODY_PART_ORDER, LAYER_TYPE_ORDER, type PackingListData, type PackingListWardrobe } from "@/lib/packingList";
 
 /** A packing list request: loading, failed, or the list and how it was matched. */
@@ -60,10 +61,15 @@ function WardrobeNote({
 }) {
   if (wardrobe === "signedOut") {
     return (
-      <p className="text-sm text-muted-foreground">
-        <Link href="/sign-in" className="font-medium text-primary underline underline-offset-4">Sign in</Link>{" "}
-        to match these to your wardrobe.
-      </p>
+      <div className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+        <Link
+          href={signInHref(RESUME_OUTING_PATH)}
+          className="inline-flex min-h-11 items-center rounded-control font-medium text-primary underline underline-offset-4"
+        >
+          Sign in
+        </Link>
+        <span>to match these to your wardrobe. You&apos;ll come back to this outing.</span>
+      </div>
     );
   }
   if (wardrobe === "unavailable") {

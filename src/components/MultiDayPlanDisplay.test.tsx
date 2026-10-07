@@ -316,7 +316,8 @@ describe("MultiDayPlanDisplay", () => {
       await openPacking();
 
       await screen.findByRole("region", { name: "Upper body" });
-      expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/sign-in");
+      expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/sign-in?redirect_url=%2F%3Fresume%3Douting");
+      expect(screen.getByText(/You'll come back to this outing/)).toBeInTheDocument();
       expect(screen.queryByText("Not matched to your wardrobe")).not.toBeInTheDocument();
     });
 
