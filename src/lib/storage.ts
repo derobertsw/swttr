@@ -16,4 +16,6 @@ export const STORAGE_KEYS = {
   TRIP_CREATION_DRAFT: "swttr-trip-creation",
   /** In sessionStorage: the Gear up form and last outing of the guest and each account, for this tab only (src/lib/gearUpDraft.ts). */
   GEAR_UP_DRAFT: "swttr-gear-up",
+  /** In sessionStorage: the latest Save to trip in this tab, so a retry after a reload repeats it rather than saving twice (src/lib/tripKitSave.ts). */
+  TRIP_KIT_SAVE: "swttr-trip-kit-save",
 } as const;

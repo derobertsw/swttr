@@ -1,3 +1,5 @@
+import type { SavedOutfit } from "@/types/savedKit";
+
 export type TripStatus = "planning" | "next_up" | "live" | "past";
 export type TripMemberRole = "organizer" | "member" | "guest";
 export type TripMemberStatus = "joined" | "invited" | "guest" | "left";
@@ -51,10 +53,15 @@ export interface TripMemberDayKit {
   trip_day_id: string;
   trip_member_id: string;
   effort: TripEffort;
+  /** Category checklist slots, from before saved outfits. */
   items: string[];
   note: string | null;
   state: TripKitState;
   updated_at: string;
+  /** The outing outfit saved to this day (#170); null or missing when there's none. */
+  outfit?: SavedOutfit | null;
+  /** When the outfit was saved. */
+  outfit_saved_at?: string | null;
 }
 
 export interface TripGroupGear {

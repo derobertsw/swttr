@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { POST as evaluateLayers } from "@/app/api/v1/ensembles/evaluate/route";
 import type { PickerItem } from "@/hooks/useLayerPicker";
 import { buildLayersResult, layerDisplayAdvice } from "@/lib/gearUp";
+import type { SavedOutfit } from "@/types/savedKit";
 import LayerDisplay from "./LayerDisplay";
 
 // Layer evaluation runs on the server; serve it from the real route handler.
@@ -413,6 +414,88 @@ describe("LayerDisplay", () => {
       warnings: [],
       guidance: ["Layer up for the chairlift"],
     };
+
+    describe("the outfit Save to trip keeps", () => {
+      const outing = {
+        activity: "alpine_skiing",
+        exertion: "moderate" as const,
+        place: { id: 1, name: "Stowe", region: "Vermont", country: "United States", latitude: 44.47, longitude: -72.69 },
+        when: { mode: "later" as const, date: "2026-10-10", time: "09:00", durationDays: 1 },
+      };
+      const context = { source: "forecast" as const, place: "Stowe, Vermont, United States", forecastTime: "2026-10-10T09:00-04:00", timeZone: "America/New_York" };
+
+      function renderWithSave(props: Partial<Parameters<typeof LayerDisplay>[0]> = {}) {
+        const saveToTrip = vi.fn((outfit: SavedOutfit | null) => (outfit ? <p>Save slot</p> : null));
+        render(
+          <LayerDisplay
+            outing={outing}
+            activity="alpine_skiing"
+            recommendation={null}
+            temperature={15}
+            windspeed={10}
+            precipitation={false}
+            weatherContext={context}
+            biophysicsData={mockBiophysicsData}
+            saveToTrip={saveToTrip}
+            {...props}
+          />
+        );
+        return () => saveToTrip.mock.lastCall?.[0] ?? null;
+      }
+
+      it("is the personalized outfit as shown, with the outing, conditions and comfort check", async () => {
+        const latest = renderWithSave();
+        await waitFor(() => expect(latest()?.phases[0].decision).not.toBeNull());
+        const outfit = latest()!;
+        expect(outfit).toMatchObject({
+          version: 1,
+          outing,
+          weather: { temperature: 15, windSpeed: 10, precipitation: false, context },
+          advice: { kind: "personalized" },
+          edited: false,
+        });
+        expect(outfit.phases).toHaveLength(1);
+        expect(outfit.phases[0].wear.torso.base.map((item) => item.name)).toEqual(["Merino Base Layer"]);
+        expect(outfit.phases[0].wear.hands.outer.map((item) => item.name)).toEqual(["Hestra Insulated Gloves"]);
+        expect(screen.getByText("Save slot")).toBeInTheDocument();
+      });
+
+      it("includes edits, without a comfort check of the layers before them", async () => {
+        const latest = renderWithSave();
+        await waitFor(() => expect(latest()?.phases[0].decision).not.toBeNull());
+        const legs = screen.getByRole("region", { name: "Legs" });
+        fireEvent.click(within(legs).getByRole("button", { name: "Change legs" }));
+        fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+        expect(latest()!.edited).toBe(true);
+        expect(latest()!.phases[0].wear.legs.mid).toEqual([
+          { name: "Catalog fleece", rcl: 0.3, sourceId: "catalog-fleece", isRecommended: true, brand: "Test Brand" },
+        ]);
+        expect(latest()!.phases[0].decision).toBeNull();
+        await waitFor(() => expect(latest()!.phases[0].decision).not.toBeNull());
+      });
+
+      it("keeps general guidance with the wardrobe names shown and why it isn't personalized", () => {
+        const latest = renderWithSave({
+          activity: "hiking_snowshoeing",
+          outing: { ...outing, activity: "hiking_snowshoeing" },
+          biophysicsData: null,
+          biophysicsStatus: "unsupported",
+          recommendation: mockRecommendation,
+          itemMappings: new Map([["torso:base:Wool base layer", "My merino top"]]),
+        });
+        expect(latest()).toMatchObject({ advice: { kind: "general", reason: "unsupported" }, edited: false });
+        expect(latest()!.phases[0].wear.torso.base).toEqual([{ name: "My merino top" }]);
+        expect(latest()!.phases[0].decision).toBeNull();
+      });
+
+      it("is nothing without layers", () => {
+        const latest = renderWithSave({ biophysicsData: null, biophysicsStatus: "no_gear" });
+        expect(latest()).toBeNull();
+        expect(screen.queryByText("Save slot")).not.toBeInTheDocument();
+      });
+    });
 
     describe("items not in the wardrobe", () => {
       beforeEach(() => {

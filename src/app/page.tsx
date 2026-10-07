@@ -13,6 +13,7 @@ import { useUserId } from "@/hooks/useUserId";
 import { useWebMCPTools } from "@/hooks/useWebMCPTools";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OutingRequestNotice } from "@/components/OutingRequestNotice";
+import { SaveToTrip } from "@/components/trips/SaveToTrip";
 
 const HomeContent = () => {
   // #185/#186 supply the real tools once the shared outing action is ready.
@@ -50,6 +51,7 @@ const HomeContent = () => {
     editOuting,
     resetToInitialState,
     accountChanging,
+    opensSave,
   } = useGearUp();
 
   const { itemMappings } = useItemMappings();
@@ -136,6 +138,8 @@ const HomeContent = () => {
             onWeatherChange={handleWeatherChange}
             onActivityChange={handleActivityChange}
             weatherLoading={loading}
+            // Back from signing in to save, the resumed outing's results open it as they appear.
+            saveToTrip={(outfit) => <SaveToTrip outfit={outfit} defaultOpen={opensSave} />}
           />
         )}
       </div>

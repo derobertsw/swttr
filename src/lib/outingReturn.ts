@@ -9,6 +9,8 @@
 export const RESUME_PARAM = "resume";
 /** Gear up, asking again for the last outing: where sign-in and Wardrobe return to. */
 export const RESUME_OUTING_PATH = `/?${RESUME_PARAM}=outing`;
+/** Gear up, asking again for the last outing and then offering Save to trip (#170). */
+export const RESUME_SAVE_PATH = `/?${RESUME_PARAM}=save`;
 
 /** Wardrobe's search param for the outing it was opened from. */
 export const FROM_PARAM = "from";

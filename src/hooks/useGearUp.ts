@@ -34,7 +34,7 @@ function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boole
   return b !== null && a.latitude === b.latitude && a.longitude === b.longitude;
 }
 
-/** Takes /?resume=outing out of the address, so a reload or Edit outing doesn't ask again. */
+/** Takes /?resume=outing (or =save) out of the address, so a reload or Edit outing doesn't ask again. */
 function removeResumeParam() {
   const url = new URL(window.location.href);
   url.searchParams.delete(RESUME_PARAM);
@@ -382,6 +382,8 @@ export function useGearUp() {
       setExertion(draft.exertion);
       if (draft.place) locationSearch.handleSelectLocation(draft.place);
     }
+    const resumeAction = searchParams.get(RESUME_PARAM);
+    const returning = resumeAction === "outing" || resumeAction === "save";
     dispatch({
       type: "RESTORE",
       owner,
@@ -392,8 +394,8 @@ export function useGearUp() {
         durationDays: draft.durationDays,
         lastOuting: draft.lastOuting,
       },
+      saveOnReturn: resumeAction === "save" ? draft?.lastOuting : null,
     });
-    const returning = searchParams.get(RESUME_PARAM) === "outing";
     if (returning) removeResumeParam();
     if (returning && draft?.lastOuting) {
       pendingResume.current = { outing: draft.lastOuting, onResultsEntry: false };
@@ -523,5 +525,6 @@ export function useGearUp() {
     showPlanForm,
     editOuting,
     resetToInitialState,
+    opensSave: !accountChanging && state.opensSave,
   };
 }
