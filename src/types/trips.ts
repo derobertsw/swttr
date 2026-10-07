@@ -1,4 +1,4 @@
-import type { SavedOutfit } from "@/types/savedKit";
+import type { SavedKit } from "@/types/savedKit";
 
 export type TripStatus = "planning" | "next_up" | "live" | "past";
 export type TripMemberRole = "organizer" | "member" | "guest";
@@ -58,8 +58,8 @@ export interface TripMemberDayKit {
   note: string | null;
   state: TripKitState;
   updated_at: string;
-  /** The outing outfit saved to this day (#170); null or missing when there's none. */
-  outfit?: SavedOutfit | null;
+  /** The outing outfit or plan day saved to this day (#170); null or missing when there's none. */
+  outfit?: SavedKit | null;
   /** When the outfit was saved. */
   outfit_saved_at?: string | null;
 }

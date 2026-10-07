@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { destinationToday, kitChanges, outfitDate, parseSaveKitRequest, readSavedOutfit, tripDestination, tripEffort } from "@/lib/trip-saved-kits";
-import { savedOutfit, STOWE, WEAR } from "@/test/savedKit";
+import {
+  destinationToday,
+  kitAdvice,
+  kitChanges,
+  kitsToSave,
+  outfitDate,
+  outingToUpdate,
+  parseSaveKitRequest,
+  planDayKits,
+  readSavedOutfit,
+  readSavedPlan,
+  tripDestination,
+  tripEffort,
+} from "@/lib/trip-saved-kits";
+import { planDay, savedOutfit, savedPlan, STOWE, WEAR } from "@/test/savedKit";
 import type { SavedOutfit } from "@/types/savedKit";
 
 const SAVE_ID = "6f1f0a52-8d43-4c55-9a39-1b2c3d4e5f60";
@@ -55,7 +68,7 @@ describe("parseSaveKitRequest", () => {
   const request = (overrides: object = {}) => ({ save_id: SAVE_ID, target: { trip_id: TRIP_ID }, outfit: savedOutfit(), ...overrides });
 
   it("reads a save to an existing trip, or to a new one with a name", () => {
-    expect(parseSaveKitRequest(request())).toEqual({ saveId: SAVE_ID, tripId: TRIP_ID, outfit: savedOutfit(), replace: {} });
+    expect(parseSaveKitRequest(request())).toEqual({ saveId: SAVE_ID, tripId: TRIP_ID, source: savedOutfit(), replace: {} });
     expect(parseSaveKitRequest(request({ target: { new_trip: { id: TRIP_ID, name: "  Stowe trip " } } })))
       .toMatchObject({ tripId: TRIP_ID, newTripName: "Stowe trip" });
   });
@@ -73,6 +86,100 @@ describe("parseSaveKitRequest", () => {
     expect(parseSaveKitRequest(request({ target: {} }))).toBe("Choose a trip to save to.");
     expect(parseSaveKitRequest(request({ target: { new_trip: { id: TRIP_ID, name: " " } } }))).toBe("Trip name must be 1–200 characters.");
     expect(parseSaveKitRequest(request({ outfit: {} }))).toBe("This outing's layers can't be saved. Get layers again and retry.");
+    // An outfit or a plan, not both or neither.
+    expect(parseSaveKitRequest(request({ plan: savedPlan() }))).toBe("This outing's layers can't be saved. Get layers again and retry.");
+    expect(parseSaveKitRequest(request({ outfit: undefined }))).toBe("This outing's layers can't be saved. Get layers again and retry.");
+  });
+
+  it("reads a multi-day plan in place of an outfit", () => {
+    expect(parseSaveKitRequest(request({ outfit: undefined, plan: savedPlan() }))).toMatchObject({ source: savedPlan() });
+  });
+});
+
+describe("readSavedPlan", () => {
+  it("keeps a valid plan as it was shown, without each day's changes from the day before", () => {
+    expect(readSavedPlan(savedPlan())).toEqual(savedPlan());
+    const withPrevious = savedPlan({ days: [planDay("2026-10-10"), planDay("2026-10-11", { changesFromPreviousDay: { add: [], remove: [] } })] });
+    expect(readSavedPlan(withPrevious)?.days[1].changesFromPreviousDay).toBeNull();
+    const extra = { ...savedPlan(), uncoveredDays: [], days: [{ ...planDay("2026-10-10"), secret: "x" }] };
+    expect(readSavedPlan(extra)).toEqual(savedPlan({ days: [planDay("2026-10-10")] }));
+  });
+
+  it("refuses days without layers, out of order or outside the outing's dates", () => {
+    const day = planDay("2026-10-10");
+    expect(readSavedPlan(savedPlan({ days: [] }))).toBeNull();
+    expect(readSavedPlan(savedPlan({ days: [{ ...day, baseline: { ...day.baseline, recommendation: null } }] }))).toBeNull();
+    expect(readSavedPlan(savedPlan({ days: [planDay("2026-10-11"), planDay("2026-10-10")] }))).toBeNull();
+    expect(readSavedPlan(savedPlan({ days: [day, day] }))).toBeNull();
+    expect(readSavedPlan(savedPlan({ days: [planDay("2026-10-13")] }))).toBeNull();
+    expect(readSavedPlan(savedPlan({ days: [planDay("2026-10-09")] }))).toBeNull();
+  });
+
+  it("refuses a one-day outing, malformed conditions and malformed changes", () => {
+    const day = planDay("2026-10-10");
+    const oneDay = savedPlan().outing;
+    expect(readSavedPlan(savedPlan({ outing: { ...oneDay, when: { ...oneDay.when, durationDays: 1 } } }))).toBeNull();
+    expect(readSavedPlan({ ...savedPlan(), outing: { ...oneDay, when: { mode: "now" } } })).toBeNull();
+    expect(readSavedPlan(savedPlan({ days: [{ ...day, baseline: { ...day.baseline, minTemp: 40 } }] }))).toBeNull();
+    expect(readSavedPlan(savedPlan({ days: [{ ...day, dayparts: [{ ...day.dayparts[0], changes: { add: [{ bodyPart: "feet", layerType: "outer", name: "Boots" }], remove: [] } }] }] } as never))).toBeNull();
+    expect(readSavedPlan(savedPlan({ dayStartHour: 24 }))).toBeNull();
+  });
+});
+
+describe("plan days as kits", () => {
+  it("saves each day with layers to its date, the first with the plan's start time", () => {
+    expect(planDayKits(savedPlan())).toEqual([
+      { date: "2026-10-10", kit: { version: 1, kind: "plan_day", outing: savedPlan().outing, provenance: savedPlan().provenance, startHour: 9, endHour: 21, day: planDay("2026-10-10") } },
+      { date: "2026-10-11", kit: expect.objectContaining({ kind: "plan_day", startHour: 6, endHour: 21, day: savedPlan().days[1] }) },
+    ]);
+  });
+
+  it("spans a new trip over the whole outing, including days without layers", () => {
+    const planned = kitsToSave(savedPlan())!;
+    expect(planned.kits.map((kit) => kit.date)).toEqual(["2026-10-10", "2026-10-11"]);
+    expect(planned).toMatchObject({ startDate: "2026-10-10", endDate: "2026-10-12" });
+    expect(kitsToSave(savedOutfit())).toEqual({ kits: [{ date: "2026-10-10", kit: savedOutfit() }], startDate: "2026-10-10", endDate: "2026-10-10" });
+  });
+
+  it("classifies a plan's new trip by today at the destination", () => {
+    expect(destinationToday(savedPlan(), Date.parse("2026-10-07T02:30:00Z"))).toBe("2026-10-06");
+  });
+
+  it("is general guidance for each day", () => {
+    expect(kitAdvice(planDayKits(savedPlan())[0].kit)).toEqual({ kind: "general", reason: "multi_day" });
+    expect(kitAdvice(savedOutfit())).toEqual({ kind: "personalized" });
+  });
+
+  it("compares a plan day's layers with a saved outfit, and with another plan day", () => {
+    const [saturday] = planDayKits(savedPlan({ days: [planDay("2026-10-10", { baseline: { ...planDay("2026-10-10").baseline, recommendation: { ...WEAR, hands: { base: [], outer: [] } } } })] }));
+    expect(kitChanges({ outfit: savedOutfit() }, saturday.kit)).toEqual([
+      { phase: "outing", add: [], remove: [{ bodyPart: "hands", layerType: "outer", name: "Insulated gloves" }] },
+    ]);
+    expect(kitChanges({ outfit: planDayKits(savedPlan())[0].kit }, saturday.kit)).toEqual(kitChanges({ outfit: savedOutfit() }, saturday.kit));
+  });
+});
+
+describe("outingToUpdate", () => {
+  const at = (iso: string) => Date.parse(iso);
+
+  it("asks again for a later outing until its day has passed at the destination", () => {
+    expect(outingToUpdate(savedOutfit(), "2026-10-10", at("2026-10-07T12:00:00Z"))).toEqual(savedOutfit().outing);
+    expect(outingToUpdate(savedOutfit(), "2026-10-10", at("2026-10-11T03:30:00Z"))).toEqual(savedOutfit().outing);
+    expect(outingToUpdate(savedOutfit(), "2026-10-10", at("2026-10-11T04:30:00Z"))).toBeNull();
+  });
+
+  it("asks again for an outing for now only on its own day", () => {
+    const now = savedOutfit({ outing: { ...savedOutfit().outing, when: { mode: "now" } } });
+    expect(outingToUpdate(now, "2026-10-06", at("2026-10-06T20:00:00Z"))).toEqual(now.outing);
+    expect(outingToUpdate(now, "2026-10-06", at("2026-10-07T12:00:00Z"))).toBeNull();
+  });
+
+  it("asks again for a plan from today on, once it has started", () => {
+    const [, sunday] = planDayKits(savedPlan());
+    expect(outingToUpdate(sunday.kit, "2026-10-11", at("2026-10-09T12:00:00Z"))).toEqual(savedPlan().outing);
+    expect(outingToUpdate(sunday.kit, "2026-10-11", at("2026-10-11T12:00:00Z"))?.when)
+      .toEqual({ mode: "later", date: "2026-10-11", time: "09:00", durationDays: 2 });
+    expect(outingToUpdate(sunday.kit, "2026-10-11", at("2026-10-12T12:00:00Z"))).toBeNull();
   });
 });
 

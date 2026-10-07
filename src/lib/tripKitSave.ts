@@ -12,7 +12,10 @@ import type { SaveKitRequest } from "@/types/savedKit";
 export interface KitSaveOutcome {
   tripId: string;
   tripName: string;
+  /** The first, or only, day saved. */
   date: string;
+  /** Every day saved, when a plan saved several. */
+  dates?: string[];
 }
 
 interface KeptKitSave {

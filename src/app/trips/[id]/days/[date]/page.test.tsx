@@ -14,8 +14,9 @@ import {
   tripFull,
 } from "@/test/tripApi";
 import { previewItinerary } from "@/lib/trip-itinerary";
+import { planDayKits } from "@/lib/trip-saved-kits";
 import type { TripDay, TripFull, TripItineraryRequest, TripMember, TripMemberDayKit } from "@/types/trips";
-import { savedOutfit } from "@/test/savedKit";
+import { savedOutfit, savedPlan } from "@/test/savedKit";
 import DayDetailPage from "./page";
 import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
 import { STORAGE_KEYS } from "@/lib/storage";
@@ -24,6 +25,9 @@ const mockAuth = vi.hoisted(() => ({ userId: "user-1" as string | null }));
 vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: mockAuth.userId, isLoaded: true }) }));
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+
+const push = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 // These tests cover the page, not the app chrome around it.
 vi.mock("@/components/PageLayout", () => ({
@@ -497,6 +501,12 @@ describe("Trip day page", () => {
       "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
     });
 
+    // Before the saved outing's day at Stowe.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"], now: Date.parse("2026-10-07T12:00:00Z") });
+      sessionStorage.clear();
+    });
+
     it("leads with my saved outfit, as saved, with the outing and forecast it was for", async () => {
       vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit({ edited: true }), outfit_saved_at: "2026-10-06T20:01:02Z" })]));
       await renderPage();
@@ -511,7 +521,54 @@ describe("Trip day page", () => {
       expect(within(myKit).getByText("Fleece").parentElement).toHaveTextContent("Not in your wardrobe");
       expect(within(myKit).getByText(/In the comfort range/)).toBeInTheDocument();
       expect(within(myKit).queryByRole("button", { name: /Change/ })).not.toBeInTheDocument();
-      expect(within(myKit).getByRole("link", { name: "get layers in Gear up" })).toHaveAttribute("href", "/");
+      expect(within(myKit).getByRole("button", { name: "Update in Gear up" })).toBeInTheDocument();
+    });
+
+    it("updates my kit in Gear up: asks again for its outing, then saving picks this trip", async () => {
+      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit() })]));
+      await renderPage();
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      expect(within(myKit).getByText(/Saving them to this day shows what changes before anything is replaced\./)).toBeInTheDocument();
+      await userEvent.click(within(myKit).getByRole("button", { name: "Update in Gear up" }));
+
+      expect(push).toHaveBeenCalledExactlyOnceWith("/?resume=update&trip=trip-1");
+      const draft = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.GEAR_UP_DRAFT)!)["user-1"];
+      expect(draft).toMatchObject({ lastOuting: savedOutfit().outing, activity: "alpine_skiing", date: "2026-10-10", time: "09:00", inputMode: "later" });
+    });
+
+    it("doesn't offer an update once the day has passed at the destination", async () => {
+      vi.setSystemTime(Date.parse("2026-10-11T12:00:00Z"));
+      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit() })]));
+      await renderPage();
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      expect(within(myKit).queryByRole("button", { name: "Update in Gear up" })).not.toBeInTheDocument();
+    });
+
+    it("shows a saved plan day as the plan showed it, and updates the whole plan", async () => {
+      const [saturday] = planDayKits(savedPlan());
+      vi.stubGlobal("fetch", crewTrip([
+        kit(ORGANIZER, { outfit: saturday.kit, outfit_saved_at: "2026-10-06T20:01:02Z" }),
+        kit(ANA, { outfit: saturday.kit }),
+      ]));
+      await renderPage();
+
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      expect(within(myKit).getByText("General guide")).toBeInTheDocument();
+      expect(within(myKit).getByText("Backcountry Skiing")).toBeInTheDocument();
+      expect(within(myKit).getByText("Day 1 of a 3-day plan")).toBeInTheDocument();
+      expect(within(myKit).getByText("Layers for 9am to 9pm, local time.")).toBeInTheDocument();
+      expect(within(myKit).getByText(/from a 3-day plan in Gear up\. It stays as saved when the forecast changes\./)).toBeInTheDocument();
+      expect(within(myKit).getByText("General guide for each day's conditions: multi-day plans aren't personalized yet.")).toBeInTheDocument();
+      const day = within(myKit).getByRole("article", { name: "Sat, Oct 10" });
+      expect(within(day).getByText("Upper body").nextElementSibling).toHaveTextContent("Merino crew, Fleece, Ski shell");
+      expect(within(day).getByText("Warm gloves and head insulation")).toBeInTheDocument();
+      expect(within(day).getByText("Ski shell", { selector: "span" })).toBeInTheDocument();
+      expect(screen.getByText("Outfit saved · General guide · 6 items")).toBeInTheDocument();
+
+      expect(within(myKit).getByText(/Saving it to this trip shows what changes on each day/)).toBeInTheDocument();
+      await userEvent.click(within(myKit).getByRole("button", { name: "Update in Gear up" }));
+      const draft = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.GEAR_UP_DRAFT)!)["user-1"];
+      expect(draft).toMatchObject({ lastOuting: savedPlan().outing, durationDays: 3 });
     });
 
     it("says when general guidance or another place was saved", async () => {

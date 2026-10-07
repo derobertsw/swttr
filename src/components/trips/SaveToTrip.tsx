@@ -12,20 +12,36 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { ACTIVITIES } from "@/data/activities";
 import { EXERTION_LABELS } from "@/lib/biophysics/exertion";
+import { addDaysToDateString } from "@/lib/forecastRange";
 import { BODY_PART_LABELS } from "@/lib/layers";
 import { RESUME_SAVE_PATH, signInHref } from "@/lib/outingReturn";
 import { errorMessage, TripRequestError, tripRequest } from "@/lib/trip-requests";
+import { kitAdvice } from "@/lib/trip-saved-kits";
 import { forgetKitSave, keepKitSave, readKitSave, type KitSaveOutcome } from "@/lib/tripKitSave";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
+import { formatLocationName } from "@/hooks/useLocationSearch";
 import { formatForecastTime } from "@/components/layers/ResultHeader";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
-import { formatTemperature } from "@/lib/temperature";
+import { formatTemperature, formatTemperatureRange } from "@/lib/temperature";
 import { cn } from "@/lib/utils";
-import type { LayerChanges } from "@/types/plan";
-import type { SavedOutfit, SaveKitConflict, SaveKitOptions, SaveKitPhaseChanges, SaveKitRequest, SaveKitResponse } from "@/types/savedKit";
+import type { DailyLayerPlan, LayerChanges } from "@/types/plan";
+import type {
+  SavedKit,
+  SavedKitAdvice,
+  SavedOutfit,
+  SavedPlan,
+  SaveKitConflict,
+  SaveKitOptions,
+  SaveKitPhaseChanges,
+  SaveKitRequest,
+  SaveKitResponse,
+} from "@/types/savedKit";
 import type { Trip } from "@/types/trips";
 
 const NEW_TRIP = "new";
+
+/** What's saved: a one-day outing's outfit, or a multi-day plan's days. */
+type SaveSource = SavedOutfit | SavedPlan;
 
 /** "Sat, Oct 10" for a "yyyy-MM-dd" date. */
 function formatKitDate(date: string): string {
@@ -36,39 +52,65 @@ function formatRange(start: string, end: string): string {
   return start === end ? formatKitDate(start) : `${formatKitDate(start)} – ${formatKitDate(end)}`;
 }
 
+/** The dates from `start` to `end`, both included. */
+function datesBetween(start: string, end: string): string[] {
+  const dates: string[] = [];
+  for (let date = start; date <= end; date = addDaysToDateString(date, 1)) dates.push(date);
+  return dates;
+}
+
+/** "Sun, Oct 11", "Sun, Oct 11 and Mon, Oct 12", or "Sat, Oct 10, Sun, Oct 11 and Mon, Oct 12". */
+function listDates(dates: string[]): string {
+  const labels = dates.map(formatKitDate);
+  return labels.length > 1 ? `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}` : labels.join("");
+}
+
 /** Why general guidance isn't personalized, for someone deciding whether to save it. */
-export function generalAdviceReason(outfit: SavedOutfit): string | null {
-  if (outfit.advice.kind !== "general") return null;
-  const activity = ACTIVITIES.find((option) => option.value === outfit.outing.activity)?.name ?? "This activity";
-  switch (outfit.advice.reason) {
+export function generalAdviceReason(activityId: string, advice: SavedKitAdvice): string | null {
+  if (advice.kind !== "general") return null;
+  const activity = ACTIVITIES.find((option) => option.value === activityId)?.name ?? "This activity";
+  switch (advice.reason) {
     case "unsupported": return `General guide for the temperature: ${activity} has no personalized model yet.`;
     case "no_gear": return "General guide for the temperature: your wardrobe had no usable gear for it.";
     case "auth_required": return "General guide for the temperature, not matched to your gear.";
     case "unavailable": return "General guide for the temperature: personalized layers weren't available.";
+    case "multi_day": return "General guide for each day's conditions: multi-day plans aren't personalized yet.";
   }
 }
 
+const sourceAdvice = (source: SaveSource): SavedKitAdvice =>
+  source.kind === "plan" ? { kind: "general", reason: "multi_day" } : source.advice;
+
+/** The body naming what's saved, for the options and the save. */
+const sourceBody = (source: SaveSource) => (source.kind === "plan" ? { plan: source } : { outfit: source });
+
 interface SaveToTripProps {
-  /** The outfit as shown, or null when there are no layers to save. */
-  outfit: SavedOutfit | null;
+  /** A one-day outing's outfit as shown, or null when there are no layers to save. */
+  outfit?: SavedOutfit | null;
+  /** A multi-day plan's days with layers, as shown, or null when none have any. */
+  plan?: SavedPlan | null;
   /** Opens as it appears, as after signing in to save. */
   defaultOpen?: boolean;
+  /** The trip to pick, when it includes the dates: the one whose kit is being updated. */
+  defaultTripId?: string | null;
 }
 
 /**
  * Save to trip (#170): keeps the outfit as shown, with the outing and
  * forecast it was for, as the signed-in member's kit for that trip day, on a
- * trip they pick or a new one made from the outing. Guests sign in first and
- * come back to the outing. See docs/trip-saved-kits.md.
+ * trip they pick or a new one made from the outing. A multi-day plan saves
+ * each day it has layers for. Guests sign in first and come back to the
+ * outing. See docs/trip-saved-kits.md.
  */
-export function SaveToTrip({ outfit, defaultOpen = false }: SaveToTripProps) {
-  const [open, setOpen] = useState(defaultOpen && outfit !== null);
+export function SaveToTrip({ outfit = null, plan = null, defaultOpen = false, defaultTripId = null }: SaveToTripProps) {
+  const source = plan ?? outfit;
+  const [open, setOpen] = useState(defaultOpen && source !== null);
   // Each opening starts from the outfit shown then.
   const [opening, setOpening] = useState(0);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const focus = useReturnFocus();
 
-  if (!outfit) return null;
+  if (!source) return null;
 
   return (
     <>
@@ -89,7 +131,8 @@ export function SaveToTrip({ outfit, defaultOpen = false }: SaveToTripProps) {
       <SaveToTripSheet
         key={opening}
         open={open}
-        outfit={outfit}
+        source={source}
+        defaultTripId={defaultTripId}
         onClose={() => setOpen(false)}
         onCloseAutoFocus={(event) => {
           if (opening === 0) {
@@ -115,9 +158,10 @@ type Step =
 
 type OptionsState = { status: "loading" } | { status: "ready"; options: SaveKitOptions } | { status: "failed"; message: string };
 
-function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
+function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocus }: {
   open: boolean;
-  outfit: SavedOutfit;
+  source: SaveSource;
+  defaultTripId: string | null;
   onClose: () => void;
   onCloseAutoFocus: (event: Event) => void;
 }) {
@@ -125,7 +169,7 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
   // Where it can be saved depends only on the outing, which stays the same
   // while the sheet is open. The outfit itself is read when it's saved, so a
   // comfort check that finishes meanwhile is kept with it.
-  const [optionsFor] = useState(outfit);
+  const [optionsFor] = useState(source);
   const [optionsAttempt, setOptionsAttempt] = useState(0);
   const [optionsState, setOptionsState] = useState<OptionsState>({ status: "loading" });
   const [target, setTarget] = useState<string | null>(null);
@@ -139,7 +183,7 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
   const [restored, setRestored] = useState<string | null>(null);
   if (signedIn && restored !== userId) {
     setRestored(userId);
-    const kept = readKitSave(userId, outfit.outing);
+    const kept = readKitSave(userId, source.outing);
     if (kept?.saved) setStep({ kind: "saved", outcome: kept.saved });
     else if (kept?.request) setStep({ kind: "failed", request: kept.request, message: "An earlier save may not have finished. Retry checks it without saving twice." });
   }
@@ -147,35 +191,44 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
   useEffect(() => {
     if (!open || !signedIn) return;
     const controller = new AbortController();
-    tripRequest<SaveKitOptions>("/api/v1/trips/kits/options", "POST", { outfit: optionsFor }, { signal: controller.signal })
+    tripRequest<SaveKitOptions>("/api/v1/trips/kits/options", "POST", sourceBody(optionsFor), { signal: controller.signal })
       .then((options) => {
         setOptionsState({ status: "ready", options });
-        // An existing trip is picked on purpose; with none that fit, a new one is the choice.
-        setTarget((current) => current ?? (options.trips.some((trip) => trip.day_number !== null) ? null : NEW_TRIP));
+        // An existing trip is picked on purpose, or is the one whose kit is
+        // being updated; with none that fit, a new one is the choice.
+        const fitting = options.trips.filter((trip) => trip.day_number !== null);
+        setTarget((current) => current
+          ?? (fitting.some((trip) => trip.id === defaultTripId) ? defaultTripId : fitting.length > 0 ? null : NEW_TRIP));
       })
       .catch((err) => {
         if (!controller.signal.aborted) setOptionsState({ status: "failed", message: errorMessage(err) });
       });
     return () => controller.abort();
-  }, [open, signedIn, optionsFor, optionsAttempt]);
+  }, [open, signedIn, optionsFor, optionsAttempt, defaultTripId]);
 
   const send = useCallback(async (request: SaveKitRequest) => {
     if (!userId || inFlight.current) return;
     inFlight.current = true;
     // Kept before it's sent, so a reload or lost answer retries this same save.
-    keepKitSave(userId, outfit.outing, { request });
+    keepKitSave(userId, source.outing, { request });
     setStep({ kind: "saving", request });
     try {
       const result = await tripRequest<Extract<SaveKitResponse, { status: "saved" }>>("/api/v1/trips/kits", "POST", request);
-      const outcome = { tripId: result.trip.id, tripName: result.trip.name, date: result.kits[0]?.date ?? "" };
-      keepKitSave(userId, outfit.outing, { saved: outcome });
+      const dates = result.kits.map((kit) => kit.date);
+      const outcome: KitSaveOutcome = {
+        tripId: result.trip.id,
+        tripName: result.trip.name,
+        date: dates[0] ?? "",
+        ...(dates.length > 1 && { dates }),
+      };
+      keepKitSave(userId, source.outing, { saved: outcome });
       setStep({ kind: "saved", outcome });
     } catch (err) {
       const details = err instanceof TripRequestError ? err.details : undefined;
       const status = err instanceof TripRequestError ? err.status : undefined;
       if (status === 409 && details?.status === "conflict") {
         // Nothing was saved; the same save can go ahead once a replacement is confirmed.
-        keepKitSave(userId, outfit.outing, {});
+        keepKitSave(userId, source.outing, {});
         setStep({ kind: "conflict", trip: details.trip as Trip, conflicts: details.conflicts as SaveKitConflict[], request });
       } else if (status !== undefined && status >= 400 && status < 500) {
         // Repeating it won't help: choose again, as a new save.
@@ -187,9 +240,10 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
     } finally {
       inFlight.current = false;
     }
-  }, [userId, outfit]);
+  }, [userId, source]);
 
   const options = optionsState.status === "ready" ? optionsState.options : null;
+  const severalDays = (options?.dates.length ?? 0) > 1;
   const fittingTrips = options?.trips.filter((trip) => trip.day_number !== null) ?? [];
   const otherTrips = (options?.trips.length ?? 0) - fittingTrips.length;
   const tripName = name ?? options?.suggested_name ?? "";
@@ -202,7 +256,7 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
       target: target === NEW_TRIP
         ? { new_trip: { id: crypto.randomUUID(), name: tripName.trim() } }
         : { trip_id: target },
-      outfit,
+      ...sourceBody(source),
     });
   };
 
@@ -212,7 +266,9 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
   };
 
   const busy = step.kind === "saving";
-  const dateLabel = options ? formatKitDate(options.date) : null;
+  // The dates kits are saved for: one, or the first to the last of a plan's.
+  const dateLabel = options && options.dates.length > 0 ? formatRange(options.dates[0], options.dates[options.dates.length - 1]) : null;
+  const daySpan = options && options.dates.length > 0 ? datesBetween(options.dates[0], options.dates[options.dates.length - 1]).length : 1;
 
   let title = "Save to trip";
   let body: React.ReactNode;
@@ -235,35 +291,51 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
     );
   } else if (step.kind === "saved") {
     title = "Saved to trip";
+    const { outcome } = step;
+    const tripHref = `/trips/${encodeURIComponent(outcome.tripId)}`;
     body = (
       <div className="flex flex-col gap-2" role="status">
         <p className="flex items-center gap-2 text-base font-semibold text-foreground">
           <CheckCircle2 className="size-5 shrink-0 text-success" aria-hidden="true" />
-          {step.outcome.tripName}
+          {outcome.tripName}
         </p>
         <TripSheetDescription>
-          Your kit for {step.outcome.date ? formatKitDate(step.outcome.date) : "this day"} is saved as shown, with the forecast it was for. It changes only if you replace it.
+          {outcome.dates
+            ? `Your kits for ${formatRange(outcome.dates[0], outcome.dates[outcome.dates.length - 1])} are saved as shown, with the forecast they were for. They change only if you replace them.`
+            : `Your kit for ${outcome.date ? formatKitDate(outcome.date) : "this day"} is saved as shown, with the forecast it was for. It changes only if you replace it.`}
         </TripSheetDescription>
       </div>
     );
     footer = (
       <>
         <Button asChild>
-          <Link href={`/trips/${encodeURIComponent(step.outcome.tripId)}/days/${step.outcome.date}`}>Open trip day</Link>
+          {outcome.dates
+            ? <Link href={tripHref}>Open trip</Link>
+            : <Link href={`${tripHref}/days/${outcome.date}`}>Open trip day</Link>}
         </Button>
         <Button type="button" variant="outline" onClick={chooseAgain}>Save again</Button>
       </>
     );
   } else if (step.kind === "conflict") {
-    const conflict = step.conflicts[0];
-    title = `Replace your kit for ${formatKitDate(conflict.date)}?`;
+    const { conflicts } = step;
+    const several = conflicts.length > 1;
+    title = several ? `Replace your kits for ${conflicts.length} days?` : `Replace your kit for ${formatKitDate(conflicts[0].date)}?`;
     body = (
       <div className="flex flex-col gap-3">
         <TripSheetDescription>
-          {step.trip.name} already has your kit for this day. Nothing changes unless you replace it.
+          {several
+            ? `${step.trip.name} already has your kits for these days. Nothing is saved unless you replace them.`
+            : source.kind === "plan"
+              ? `${step.trip.name} already has your kit for ${formatKitDate(conflicts[0].date)}. Nothing is saved unless you replace it.`
+              : `${step.trip.name} already has your kit for this day. Nothing changes unless you replace it.`}
         </TripSheetDescription>
-        <SavedKitSummary conflict={conflict} />
-        <ChangeSummary changes={conflict.changes} outfit={outfit} />
+        {conflicts.map((conflict) => (
+          <div key={conflict.date} className="flex flex-col gap-3">
+            {several && <h3 className="text-sm font-semibold text-foreground">{formatKitDate(conflict.date)}</h3>}
+            <SavedKitSummary conflict={conflict} />
+            <ChangeSummary changes={conflict.changes} conditions={<SourceConditions source={source} date={conflict.date} />} />
+          </div>
+        ))}
       </div>
     );
     footer = (
@@ -272,18 +344,20 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
           type="button"
           onClick={() => void send({
             ...step.request,
-            replace: Object.fromEntries(step.conflicts.map((c) => [c.date, c.kit.updated_at])),
+            replace: Object.fromEntries(conflicts.map((c) => [c.date, c.kit.updated_at])),
           })}
         >
-          Replace kit
+          {several ? "Replace kits" : "Replace kit"}
         </Button>
-        <Button type="button" variant="outline" onClick={() => { forgetKitSave(); onClose(); }}>Keep saved kit</Button>
+        <Button type="button" variant="outline" onClick={() => { forgetKitSave(); onClose(); }}>
+          {several ? "Keep saved kits" : "Keep saved kit"}
+        </Button>
       </>
     );
   } else if (step.kind === "saving") {
     body = (
       <div className="flex flex-col gap-3">
-        <OutfitSummary outfit={outfit} dateLabel={dateLabel} />
+        <SourceSummary source={source} options={options} dateLabel={dateLabel} />
         <p role="status" className="text-sm text-muted-foreground">Saving to the trip…</p>
       </div>
     );
@@ -291,7 +365,7 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
   } else if (step.kind === "failed") {
     body = (
       <div className="flex flex-col gap-3">
-        <OutfitSummary outfit={outfit} dateLabel={dateLabel} />
+        <SourceSummary source={source} options={options} dateLabel={dateLabel} />
         <p role="alert" className="text-sm font-medium text-destructive">{step.message}</p>
       </div>
     );
@@ -310,7 +384,7 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
   } else {
     body = (
       <div className="flex flex-col gap-4">
-        <OutfitSummary outfit={outfit} dateLabel={dateLabel} />
+        <SourceSummary source={source} options={options} dateLabel={dateLabel} />
         {optionsState.status === "loading" && <Skeleton className="h-28 w-full rounded-card" />}
         {optionsState.status === "failed" && (
           <div className="flex flex-col items-start gap-2">
@@ -327,14 +401,15 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
               <TargetOption key={trip.id} value={trip.id} checked={target === trip.id} onChange={setTarget}>
                 <span className="block break-words font-semibold">{trip.name}</span>
                 <span className="block text-sm text-muted-foreground">
-                  Day {trip.day_number} · {formatRange(trip.start_date, trip.end_date)}
+                  {daySpan > 1 ? `Days ${trip.day_number}–${(trip.day_number ?? 0) + daySpan - 1}` : `Day ${trip.day_number}`}
+                  {" "}· {formatRange(trip.start_date, trip.end_date)}
                   {trip.member_count > 1 && ` · ${trip.member_count} people`}
                 </span>
               </TargetOption>
             ))}
             <TargetOption value={NEW_TRIP} checked={target === NEW_TRIP} onChange={setTarget}>
               <span className="block font-semibold">New trip</span>
-              <span className="block text-sm text-muted-foreground">{dateLabel} at {options.destination}</span>
+              <span className="block text-sm text-muted-foreground">{formatRange(options.start_date, options.end_date)} at {options.destination}</span>
             </TargetOption>
             {target === NEW_TRIP && (
               <label htmlFor={nameId} className="mt-1 flex flex-col gap-2 text-sm font-medium">
@@ -344,7 +419,7 @@ function SaveToTripSheet({ open, outfit, onClose, onCloseAutoFocus }: {
             )}
             {otherTrips > 0 && (
               <p className="text-sm text-muted-foreground">
-                {otherTrips === 1 ? "1 of your trips doesn't" : `${otherTrips} of your trips don't`} include {dateLabel}.
+                {otherTrips === 1 ? "1 of your trips doesn't" : `${otherTrips} of your trips don't`} include {severalDays && "all of "}{dateLabel}.
               </p>
             )}
           </fieldset>
@@ -392,28 +467,68 @@ function TargetOption({ value, checked, onChange, children }: {
   );
 }
 
-/** The outing being saved: what, where, when, and how personal the advice is. */
-function OutfitSummary({ outfit, dateLabel }: { outfit: SavedOutfit; dateLabel: string | null }) {
-  const activity = ACTIVITIES.find((option) => option.value === outfit.outing.activity)?.name;
-  const reason = generalAdviceReason(outfit);
+/**
+ * The outing being saved: what, where, when, and how personal the advice is.
+ * For a plan, how many days are saved, and which of its days aren't.
+ */
+function SourceSummary({ source, options, dateLabel }: { source: SaveSource; options: SaveKitOptions | null; dateLabel: string | null }) {
+  const activity = ACTIVITIES.find((option) => option.value === source.outing.activity)?.name;
+  const advice = sourceAdvice(source);
+  const reason = generalAdviceReason(source.outing.activity, advice);
+  const left = source.kind === "plan" && options
+    ? datesBetween(options.start_date, options.end_date).filter((date) => !options.dates.includes(date))
+    : [];
   return (
     <div className="flex flex-col gap-1.5 rounded-control bg-muted p-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-base font-semibold text-foreground">
-          {activity} · {EXERTION_LABELS[outfit.outing.exertion]} effort
+          {activity} · {EXERTION_LABELS[source.outing.exertion]} effort
         </p>
-        <Badge size="sm" variant={outfit.advice.kind === "personalized" ? "primary" : "neutral"}>
-          {outfit.advice.kind === "personalized" ? "Personalized" : "General guide"}
+        <Badge size="sm" variant={advice.kind === "personalized" ? "primary" : "neutral"}>
+          {advice.kind === "personalized" ? "Personalized" : "General guide"}
         </Badge>
       </div>
       <p className="text-sm text-foreground">
-        {outfit.weather.context?.place ?? outfit.outing.place.name}
+        {source.kind === "plan" ? formatLocationName(source.outing.place) : source.weather.context?.place ?? source.outing.place.name}
         {dateLabel && <> · {dateLabel}</>}
       </p>
-      {outfit.edited && <p className="text-sm text-muted-foreground">Includes your changes to the layers.</p>}
+      {source.kind === "plan" && (
+        <p className="text-sm text-foreground">
+          A kit for each of {source.days.length} {source.days.length === 1 ? "day" : "days"}, with that day&apos;s forecast.
+        </p>
+      )}
+      {left.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {listDates(left)} {left.length === 1 ? "has" : "have"} no layers in this plan, so {left.length === 1 ? "it isn't" : "they aren't"} saved.
+        </p>
+      )}
+      {source.kind !== "plan" && source.edited && <p className="text-sm text-muted-foreground">Includes your changes to the layers.</p>}
       {reason && <p className="text-sm text-muted-foreground">{reason}</p>}
     </div>
   );
+}
+
+/** The conditions a plan day's layers were for: "18°F – 31°F, wind up to 12 mph · forecast for Sat, Oct 10". */
+function DayConditions({ day }: { day: DailyLayerPlan }) {
+  const { temperatureUnit } = useTemperatureUnit();
+  return (
+    <>
+      {formatTemperatureRange(day.baseline.minTemp, day.baseline.maxTemp, temperatureUnit)}, wind up to {day.baseline.maxWindSpeed} mph
+      {` · forecast for ${formatKitDate(day.date)}`}
+    </>
+  );
+}
+
+/** The conditions a saved kit was for. */
+function KitConditions({ kit }: { kit: SavedKit }) {
+  return kit.kind === "plan_day" ? <DayConditions day={kit.day} /> : <Conditions weather={kit.weather} />;
+}
+
+/** The conditions the layers being saved for `date` are for. */
+function SourceConditions({ source, date }: { source: SaveSource; date: string }) {
+  if (source.kind !== "plan") return <Conditions weather={source.weather} />;
+  const day = source.days.find((candidate) => candidate.date === date);
+  return day ? <DayConditions day={day} /> : null;
 }
 
 /** The conditions an outfit was for: "18°F, wind 12 mph · forecast for Sat, Oct 10, 9:00 AM EDT". */
@@ -442,13 +557,16 @@ function SavedKitSummary({ conflict }: { conflict: SaveKitConflict }) {
     );
   }
   const activity = ACTIVITIES.find((option) => option.value === kit.outfit?.outing.activity)?.name;
+  const advice = kitAdvice(kit.outfit);
   return (
     <div className="rounded-control bg-muted p-3 text-sm text-foreground">
-      <p className="font-semibold">Saved kit{activity && ` · ${activity}`}</p>
+      <p className="font-semibold">
+        Saved kit{activity && ` · ${activity}`}{advice.kind === "general" && " · General guide"}
+      </p>
       {kit.outfit_saved_at && (
         <p className="mt-0.5 text-muted-foreground">Saved {format(new Date(kit.outfit_saved_at), "MMM d, h:mm a")}</p>
       )}
-      <p className="mt-0.5 text-muted-foreground">For <Conditions weather={kit.outfit.weather} /></p>
+      <p className="mt-0.5 text-muted-foreground">For <KitConditions kit={kit.outfit} /></p>
     </div>
   );
 }
@@ -463,11 +581,11 @@ function changeLabel(phase: SaveKitPhaseChanges["phase"], change: "adds" | "remo
 }
 
 /** What replacing the saved kit changes: the conditions, and the layers as worked out by the server. */
-function ChangeSummary({ changes, outfit }: { changes: SaveKitPhaseChanges[] | null; outfit: SavedOutfit }) {
+function ChangeSummary({ changes, conditions }: { changes: SaveKitPhaseChanges[] | null; conditions: React.ReactNode }) {
   const same = changes?.every((phase) => phase.add.length === 0 && phase.remove.length === 0);
   return (
     <div className="flex flex-col gap-1 text-sm">
-      <p className="text-muted-foreground">These layers are for <Conditions weather={outfit.weather} />.</p>
+      <p className="text-muted-foreground">These layers are for {conditions}.</p>
       {!changes ? (
         <p className="text-muted-foreground">Replacing it swaps the checklist for these layers.</p>
       ) : same ? (
