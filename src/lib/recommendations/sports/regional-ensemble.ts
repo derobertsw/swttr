@@ -30,6 +30,7 @@ interface GarmentFeatures extends OutfitTotals {
 }
 
 interface OutfitRankInput {
+  regionalClo: PhaseTargets['regional']['min'];
   missingBase: number;
   missingOuter: number;
   missingWaterproof: number;
@@ -165,6 +166,7 @@ export function buildRegionalEnsemble(
           const arms = (partial.armsClo + (outer?.armsClo ?? 0)) * ENSEMBLE_REGRESSION.thermal.arm.coef;
           const legs = (partial.legsClo + (outer?.legsClo ?? 0)) * ENSEMBLE_REGRESSION.thermal.leg.coef;
           const candidateRank = options.rank({
+            regionalClo: { torso, arms, legs },
             missingBase: missing(partial.baseMask | (outer?.baseMask ?? 0), region),
             missingOuter: missing(partial.outerMask | (outer?.outerMask ?? 0), region),
             missingWaterproof: missing(partial.waterproofMask | (outer?.waterproofMask ?? 0), region),
