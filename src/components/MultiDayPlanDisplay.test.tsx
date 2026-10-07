@@ -316,8 +316,14 @@ describe("MultiDayPlanDisplay", () => {
       await openPacking();
 
       await screen.findByRole("region", { name: "Upper body" });
-      expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/sign-in");
+      // Back to this plan's packing list afterwards: the address names the view, never the outing.
+      expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+        "href",
+        "/sign-in?redirect_url=%2F%3Fresume%3Dpacking"
+      );
+      expect(screen.getByText(/You'll come back to this plan\./)).toBeInTheDocument();
       expect(screen.queryByText("Not matched to your wardrobe")).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Add gear" })).not.toBeInTheDocument();
     });
 
     it("marks what isn't matched to a signed-in user's wardrobe", async () => {
@@ -333,11 +339,45 @@ describe("MultiDayPlanDisplay", () => {
 
       const upperBody = await screen.findByRole("region", { name: "Upper body" });
       expect(screen.getByText("6 of 7 not matched to your wardrobe.")).toBeInTheDocument();
+      // Wardrobe offers the way back to this packing list.
+      expect(screen.getByRole("link", { name: "Add gear" })).toHaveAttribute("href", "/wardrobe?from=outing");
       const hoody = within(upperBody).getByText("R1 Hoody").closest("li")!;
       expect(hoody).toHaveTextContent("Mid · Your item for Fleece jacket");
       expect(within(hoody).queryByText("Not matched to your wardrobe")).not.toBeInTheDocument();
       const shell = within(upperBody).getByText("Shell jacket").closest("li")!;
       expect(within(shell).getByText("Not matched to your wardrobe")).toBeInTheDocument();
+    });
+
+    it("offers no gear to add once everything is matched", async () => {
+      vi.mocked(getAuthUserId).mockResolvedValueOnce("user_1");
+      stubPackingList();
+      const everything = [
+        "torso:base:Merino base layer",
+        "torso:mid:Fleece jacket",
+        "torso:outer:Shell jacket",
+        "legs:base:Long underwear",
+        "legs:outer:Ski pants",
+        "hands:outer:Insulated gloves",
+        "headNeck:base:Beanie",
+      ];
+      render(
+        <MultiDayPlanDisplay
+          plan={makePlan()}
+          itemMappings={new Map(everything.map((key) => [key, `My ${key.split(":")[2]}`]))}
+        />
+      );
+      await openPacking();
+
+      expect(await screen.findByText("Everything is matched to your wardrobe.")).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Add gear" })).not.toBeInTheDocument();
+    });
+
+    it("opens on the packing list when coming back to match it to a wardrobe", async () => {
+      stubPackingList();
+      render(<MultiDayPlanDisplay plan={makePlan()} initialTab="packing" />);
+
+      expect(screen.getByRole("tab", { name: "Packing" })).toHaveAttribute("aria-selected", "true");
+      expect(await screen.findByRole("region", { name: "Upper body" })).toBeInTheDocument();
     });
 
     it("says when a signed-in user's wardrobe couldn't be checked", async () => {

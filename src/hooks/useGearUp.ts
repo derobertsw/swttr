@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
@@ -25,7 +25,7 @@ import {
 } from "@/lib/gearUp";
 import { readGearUpDraft, saveGearUpDraft } from "@/lib/gearUpDraft";
 import { logWarn } from "@/lib/logger";
-import { RESUME_PARAM } from "@/lib/outingReturn";
+import { RESUME_PARAM, resumeView, type ResumeView } from "@/lib/outingReturn";
 import type { LaterTime, LayersResult, Outing, OutingTime } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
@@ -34,7 +34,7 @@ function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boole
   return b !== null && a.latitude === b.latitude && a.longitude === b.longitude;
 }
 
-/** Takes /?resume=outing out of the address, so a reload or Edit outing doesn't ask again. */
+/** Takes /?resume=… out of the address, so a reload or Edit outing doesn't ask again. */
 function removeResumeParam() {
   const url = new URL(window.location.href);
   url.searchParams.delete(RESUME_PARAM);
@@ -56,7 +56,8 @@ function removeResumeParam() {
  *
  * The results have their own browser history entry, and what was entered is
  * kept for the tab, so Back, Forward and a reload keep the outing. Sign-in
- * and Wardrobe come back to /?resume=outing, which asks for it again.
+ * and Wardrobe come back to /?resume=outing, which asks for it again, or to
+ * /?resume=packing, which also opens the plan on its packing list.
  */
 export function useGearUp() {
   const searchParams = useSearchParams();
@@ -115,10 +116,17 @@ export function useGearUp() {
   // retires the running request, so a late answer can't show results or
   // report an error for an outing that's gone.
   const latestRequest = useRef(0);
+  /**
+   * The tab the next plan shown opens on: Packing when coming back to match
+   * its packing list to the wardrobe, otherwise the daily plan. Any other
+   * request puts it back.
+   */
+  const [planTab, setPlanTab] = useState<"days" | "packing">("days");
   /** Starts loading, and returns a check for whether this request is still the latest. */
   const startRequest = useCallback((outing: Outing) => {
     const request = ++latestRequest.current;
     dispatch({ type: "SUBMIT_START", outing });
+    setPlanTab("days");
     return () => latestRequest.current === request;
   }, []);
 
@@ -309,7 +317,7 @@ export function useGearUp() {
    * the last one, on its results' entry after a reload or Forward, or on
    * coming back from sign-in or Wardrobe.
    */
-  const pendingResume = useRef<{ outing: Outing; onResultsEntry: boolean } | null>(null);
+  const pendingResume = useRef<{ outing: Outing; onResultsEntry: boolean; view?: ResumeView } | null>(null);
 
   /** Start over: clears what was entered, and the last outing with it. */
   const resetToInitialState = useCallback(() => {
@@ -358,10 +366,11 @@ export function useGearUp() {
    * results. The form shows in the outing's mode while it loads. When nothing
    * comes of it, the browser steps back off the results' entry.
    */
-  const resume = useCallback(async (outing: Outing) => {
+  const resume = useCallback(async (outing: Outing, view: ResumeView = "outing") => {
     showForm(outing.when.mode, true);
     applyOutingInputs(outing);
     const isCurrent = startRequest(outing);
+    if (view === "packing") setPlanTab("packing");
     const shown = await showOuting(isCurrent, outing);
     if (!shown && isCurrent()) leaveResultsEntry();
   }, [showForm, applyOutingInputs, startRequest, showOuting, leaveResultsEntry]);
@@ -393,10 +402,10 @@ export function useGearUp() {
         lastOuting: draft.lastOuting,
       },
     });
-    const returning = searchParams.get(RESUME_PARAM) === "outing";
+    const returning = resumeView(searchParams.get(RESUME_PARAM));
     if (returning) removeResumeParam();
     if (returning && draft?.lastOuting) {
-      pendingResume.current = { outing: draft.lastOuting, onResultsEntry: false };
+      pendingResume.current = { outing: draft.lastOuting, onResultsEntry: false, view: returning };
     } else if (isOnResultsEntry()) {
       if (draft?.lastOuting) pendingResume.current = { outing: draft.lastOuting, onResultsEntry: true };
       else leaveResultsEntry();
@@ -413,11 +422,11 @@ export function useGearUp() {
 
   useEffect(() => {
     if (!restored || !readyToRequest || !pendingResume.current) return;
-    const { outing, onResultsEntry } = pendingResume.current;
+    const { outing, onResultsEntry, view } = pendingResume.current;
     pendingResume.current = null;
     // Leaving the results while sign-in loads (Back, Start over, or the form
     // from the page) leaves their entry, and drops the queued request with it.
-    if (!onResultsEntry || isOnResultsEntry()) void resume(outing);
+    if (!onResultsEntry || isOnResultsEntry()) void resume(outing, view);
   }, [restored, readyToRequest, resume, isOnResultsEntry]);
 
   useEffect(() => {
@@ -482,6 +491,7 @@ export function useGearUp() {
     exertion,
     setExertion,
     result: accountChanging ? null : state.result,
+    planTab,
     accountChanging,
     inputMode: state.inputMode,
     setInputMode,

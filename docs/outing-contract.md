@@ -145,12 +145,14 @@ A return path names a page and what to do there, never the outing itself. The ou
 | Sign in, on the results of a guest or an expired session | `/sign-in?redirect_url=%2F%3Fresume%3Douting` | `/?resume=outing` |
 | Add gear, on results without usable gear | `/wardrobe?from=outing` | "Get my layers" on Wardrobe's "Back to your outing" card, which links to `/?resume=outing` |
 | Go to Wardrobe, in the layer picker | `/wardrobe?from=outing` | The same |
+| Sign in, on a guest's multi-day packing list | `/sign-in?redirect_url=%2F%3Fresume%3Dpacking` | `/?resume=packing` |
+| Add gear, on a signed-in packing list with items not matched | `/wardrobe?from=outing` | "Get my packing list" on Wardrobe's card, which links to `/?resume=packing` |
 
-**`/?resume=outing`** takes `resume` out of the address with `history.replaceState`, then asks for the draft's last outing again, once sign-in and preferences have loaded. The form shows in the outing's mode with the request running, then the results show on a new history entry. A signed-in account gets advice built from its body and gear, labeled Personalized. Advice that still isn't personalized says why: no usable gear, or a failed request with Try again. With no last outing in the tab, as in a new tab, the form shows what was entered, and nothing is asked for. Start over while it loads drops the request.
+**`/?resume=outing`** takes `resume` out of the address with `history.replaceState`, then asks for the draft's last outing again, once sign-in and preferences have loaded. **`/?resume=packing`** does the same, and a multi-day plan then opens on its Packing tab, matched to the account's wardrobe. Plans after it open on the daily plan again. The form shows in the outing's mode with the request running, then the results show on a new history entry. A signed-in account gets advice built from its body and gear, labeled Personalized. Advice that still isn't personalized says why: no usable gear, or a failed request with Try again. With no last outing in the tab, as in a new tab, the form shows what was entered, and nothing is asked for. Start over while it loads drops the request.
 
 **Cancelling sign-in.** The browser's Back returns to the results' entry, which asks for the outing again as before. Any other way back to Gear up shows the form with what was entered.
 
-**Wardrobe's card** shows only on `/wardrobe?from=outing`, and only for a last outing in the signed-in account's draft. Coming back is a link. It changes no gear, so nothing is added twice.
+**Wardrobe's card** shows only on `/wardrobe?from=outing`, and only for a last outing in the signed-in account's draft. For a multi-day outing it offers "Get my packing list" instead of "Get my layers". Coming back is a link. It changes no gear, so nothing is added twice.
 
 **Sign-in and sign-up** go to their validated `redirect_url` afterwards, and so does switching between them. Clerk sends a full URL when a protected page asks for sign-in. `safeReturnPath` accepts:
 - a path, or a full URL on the request's own host;
@@ -192,3 +194,22 @@ This completes the shared outing/result work begun in #215 and continued in #241
 | Tests, lint and typecheck | Full and focused results are recorded in the QA report, together with the production-build environment limitation. |
 
 #185 owns the programmatic `submitOuting` interface, caller cancellation, domain error codes and edited Wear/Carry readback. This change exposes no browser tool and adds no second store. #168 owns auth return, #170 owns durable saved snapshots, and #130 retains real-account browser/native/device/accessibility and participant validation. The synthetic browser and jsdom checks here are not represented as that release coverage.
+
+## #168 acceptance review — October 6, 2026
+
+PR #231 added the sign-in and Wardrobe return, validated redirects and per-account drafts. This review adds the multi-day packing return and records real-account checks. Evidence is in [`docs/qa/168-pending-outing/README.md`](qa/168-pending-outing/README.md).
+
+| Acceptance | Implementation / evidence |
+|---|---|
+| Guest → sign in → return restores activity, effort, place, Now/Later, destination date/time and duration | Return paths name only `resume=outing` or `resume=packing`; the outing comes from the tab draft. Page tests cover Running now and a 3-day plan, which is asked for again with an identical request. Checked with a real account for both. |
+| The account CTA explains the benefit and requires no full wardrobe or body metrics | Results: "Sign in to get layers matched to your body and gear. You'll come back to this outing." Packing: "Sign in to match these to your wardrobe. You'll come back to this plan." The FAQ says what an account adds and that nothing has to be set up first. Signing in returns straight to the outing, with no onboarding. Add gear appears only when there's no usable gear or a packing item isn't matched. |
+| Adding gear returns to the outing without duplicate ownership changes | Wardrobe's card is a link that changes no gear. Adds and 409s are #128's (`useWardrobe`). One-day and plan returns checked with a real account. |
+| Prior advice isn't relabeled; recalculation and errors are explicit | Coming back always asks again. Only the API's answer is labeled Personalized. A failed return shows the failed-update notice with the outing named and inputs kept; a real Open-Meteo 502 was seen and handled this way. |
+| Cancel, expiry and failed saves keep recoverable input | Back from sign-in returns to the results' entry. A 401 gives `auth_required` with Sign in. Failed Wardrobe changes keep their row with Retry (#128). Edit outing and Build my plan keep the inputs. |
+| Sign-out and account switching don't hand one account's draft or gear to another | Per-account drafts, `accountChanging` and `useItemMappings` ownership (#231), with page tests. A real sign-out cleared the results and showed a fresh guest draft. Body metrics and sensitivity are still device-wide: **#256**. |
+| Browser tests of auth and Wardrobe return; native return with #130/#146 | jsdom page tests plus real-account checks in a browser. The iOS shell and deep links remain with #130/#146. |
+
+Known limits:
+- Sign-out at phone widths fails: Clerk's popover inside the modal ☰ sheet can't be clicked. **#253** moves the avatar out of the sheet.
+- Email verification that opens a new tab starts with an empty form, because the draft is per tab.
+- Coming back with `resume=packing` opens Packing only for the plan it asks for. A failed return, then Build my plan, opens on the daily plan.

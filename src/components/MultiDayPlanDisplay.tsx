@@ -24,6 +24,8 @@ interface MultiDayPlanDisplayProps {
   /** Where the plan is for, e.g. "Stowe, Vermont, United States". */
   place?: string;
   itemMappings?: Map<string, string>;
+  /** The tab it opens on: the daily plan, unless coming back to match the packing list to a wardrobe. */
+  initialTab?: "days" | "packing";
   /** Back to the form with the outing as entered. */
   onReset?: () => void;
 }
@@ -59,6 +61,7 @@ export default function MultiDayPlanDisplay({
   activity,
   place,
   itemMappings,
+  initialTab = "days",
   onReset,
 }: MultiDayPlanDisplayProps) {
   // `list` is null when the request failed.
@@ -198,7 +201,7 @@ export default function MultiDayPlanDisplay({
         </Card>
       )}
 
-      <Tabs defaultValue="days" className="gap-4">
+      <Tabs defaultValue={initialTab} className="gap-4">
         <TabsList className="grid w-full grid-cols-2 sm:max-w-sm">
           <TabsTrigger value="days">Daily plan</TabsTrigger>
           <TabsTrigger value="packing">Packing</TabsTrigger>

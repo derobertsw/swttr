@@ -90,6 +90,32 @@ describe("Wardrobe opened from an outing", () => {
     expect(within(back).getByRole("link", { name: "Get my layers" })).toHaveAttribute("href", "/?resume=outing");
   });
 
+  it("goes back to a multi-day plan's packing list, to match it again with the gear added", async () => {
+    saveGearUpDraft("user_1", {
+      ...RUNNING_DRAFT,
+      activity: "alpine_skiing",
+      inputMode: "later",
+      date: "2026-10-10",
+      time: "09:00",
+      durationDays: 3,
+      lastOuting: {
+        activity: "alpine_skiing",
+        exertion: "moderate",
+        place: STOWE,
+        when: { mode: "later", date: "2026-10-10", time: "09:00", durationDays: 3 },
+      },
+    });
+    mockSearchParams.set("from", "outing");
+    stubApi({ "GET /api/wardrobe/gear": reply(200, { items: [] }) });
+    render(<Wardrobe />);
+
+    const back = await screen.findByRole("region", { name: "Back to your outing" });
+    expect(back).toHaveTextContent("Alpine Skiing at Stowe, 3 days from Sat, Oct 10.");
+    expect(back).toHaveTextContent("match the packing list to your gear again");
+    expect(within(back).getByRole("link", { name: "Get my packing list" })).toHaveAttribute("href", "/?resume=packing");
+    expect(within(back).queryByRole("link", { name: "Get my layers" })).not.toBeInTheDocument();
+  });
+
   it.each([
     { when: "opened some other way", fromOuting: false, owner: "user_1", draft: RUNNING_DRAFT },
     { when: "the outing is another account's", fromOuting: true, owner: "user_2", draft: RUNNING_DRAFT },
