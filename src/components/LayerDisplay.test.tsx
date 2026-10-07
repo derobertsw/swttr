@@ -1070,6 +1070,64 @@ describe("LayerDisplay", () => {
     });
 
     describe("outfit first", () => {
+      it("keeps server warnings outside collapsed technical details", () => {
+        const warning = "Limited breathability may cause moisture buildup";
+        render(
+          <LayerDisplay {...defaultProps} biophysicsData={{ ...mockBiophysicsData, warnings: [warning, warning] }} />
+        );
+
+        const warnings = screen.getByRole("region", { name: "Recommendation warnings" });
+        expect(within(warnings).getAllByText(warning)).toHaveLength(1);
+        expect(warnings.closest("details")).toBeNull();
+        expect(screen.getByText("Technical details").closest("details")).not.toHaveAttribute("open");
+      });
+
+      it("shows transition warnings, steps and server timing in either phase", () => {
+        render(
+          <LayerDisplay
+            {...defaultProps}
+            activity="backcountry_skiing"
+            biophysicsData={{
+              ...mockBiophysicsData,
+              ireq: { ...mockBiophysicsData.ireq, downhill_target_range: [1.0, 1.6] },
+              transition_protocol: {
+                priority: "urgent",
+                time_limit_minutes: 5,
+                warnings: ["High wind - minimize exposed time"],
+                steps: ["Find wind shelter if possible", "Add insulation layer first"],
+              },
+            }}
+          />
+        );
+
+        const warnings = screen.getByRole("region", { name: "Recommendation warnings" });
+        expect(warnings).toHaveTextContent("High wind - minimize exposed time");
+        expect(warnings).toHaveTextContent("Urgent transition · Suggested time: within 5 minutes");
+        expect(within(warnings).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+          "High wind - minimize exposed time", "Find wind shelter if possible", "Add insulation layer first",
+        ]);
+        fireEvent.click(screen.getByRole("button", { name: /^Descent/ }));
+        expect(warnings).toBeInTheDocument();
+        expect(screen.getByRole("region", { name: "Original recommendation" })).toHaveTextContent("suggested climb outfit");
+      });
+
+      it("labels original warnings and technical properties after edits, including after undo", () => {
+        render(
+          <LayerDisplay {...defaultProps} biophysicsData={{ ...mockBiophysicsData, warnings: ["Review wind protection"] }} />
+        );
+        const legs = screen.getByRole("region", { name: "Legs" });
+        fireEvent.click(within(legs).getByRole("button", { name: "Change legs" }));
+        fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+        expect(screen.getByRole("region", { name: "Recommendation warnings" })).toHaveTextContent("Your layer changes have not been checked");
+        expect(screen.getByRole("region", { name: "Original recommendation" })).toHaveTextContent("They do not include your layer changes");
+
+        fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+        expect(screen.getByRole("region", { name: "Recommendation warnings" })).toHaveTextContent("For the suggested outfit and conditions");
+        expect(screen.getByRole("region", { name: "Original recommendation" })).not.toHaveTextContent("They do not include your layer changes");
+      });
+
       const renderPersonalized = (props: Partial<Parameters<typeof LayerDisplay>[0]> = {}) =>
         render(
           <LayerDisplay
