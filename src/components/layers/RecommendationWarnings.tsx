@@ -19,7 +19,7 @@ export function RecommendationWarnings({ warnings, transition, edited }: Recomme
     <Card asChild variant="muted">
       <section aria-labelledby={headingId} className="flex gap-3">
         <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" />
-        <div className="min-w-0">
+        <div className="min-w-0 [overflow-wrap:anywhere]">
           <h3 id={headingId} className="text-base font-semibold text-foreground">Recommendation warnings</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             {edited
