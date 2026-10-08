@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { AlertTriangle, Backpack, Loader2, RotateCw } from "lucide-react";
+import { AlertTriangle, Backpack, Loader2, RotateCw, Shirt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BODY_PART_LABELS, LAYER_LABELS } from "@/lib/layers";
-import { RESUME_OUTING_PATH, signInHref } from "@/lib/outingReturn";
+import { RESUME_PACKING_PATH, WARDROBE_FROM_OUTING_PATH, signInHref } from "@/lib/outingReturn";
 import { BODY_PART_ORDER, LAYER_TYPE_ORDER, type PackingListData, type PackingListWardrobe } from "@/lib/packingList";
 
 /** A packing list request: loading, failed, or the list and how it was matched. */
@@ -62,13 +62,14 @@ function WardrobeNote({
   if (wardrobe === "signedOut") {
     return (
       <div className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+        {/* Back to this plan's packing list afterwards, matched to the account's wardrobe. */}
         <Link
-          href={signInHref(RESUME_OUTING_PATH)}
+          href={signInHref(RESUME_PACKING_PATH)}
           className="inline-flex min-h-11 items-center rounded-control font-medium text-primary underline underline-offset-4"
         >
           Sign in
         </Link>
-        <span>to match these to your wardrobe. You&apos;ll come back to this outing.</span>
+        <span>to match these to your wardrobe. You&apos;ll come back to this plan.</span>
       </div>
     );
   }
@@ -83,12 +84,22 @@ function WardrobeNote({
       </div>
     );
   }
+  if (list.gaps.length === 0) {
+    return <p className="text-sm text-muted-foreground">Everything is matched to your wardrobe.</p>;
+  }
   return (
-    <p className="text-sm text-muted-foreground">
-      {list.gaps.length === 0
-        ? "Everything is matched to your wardrobe."
-        : `${list.gaps.length} of ${list.totalRequiredSlots} not matched to your wardrobe.`}
-    </p>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <p className="text-sm text-muted-foreground">
+        {`${list.gaps.length} of ${list.totalRequiredSlots} not matched to your wardrobe.`}
+      </p>
+      {/* Wardrobe offers the way back to this plan's packing list. */}
+      <Button asChild size="sm" variant="ghost">
+        <Link href={WARDROBE_FROM_OUTING_PATH}>
+          <Shirt aria-hidden="true" />
+          Add gear
+        </Link>
+      </Button>
+    </div>
   );
 }
 

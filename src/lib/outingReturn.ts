@@ -9,6 +9,16 @@
 export const RESUME_PARAM = "resume";
 /** Gear up, asking again for the last outing: where sign-in and Wardrobe return to. */
 export const RESUME_OUTING_PATH = `/?${RESUME_PARAM}=outing`;
+/** The same, for a multi-day plan, opening on its packing list: what matching it to a wardrobe was for. */
+export const RESUME_PACKING_PATH = `/?${RESUME_PARAM}=packing`;
+
+/** What Gear up comes back to: the last outing, or its plan's packing list. */
+export type ResumeView = "outing" | "packing";
+
+/** The `resume` param's view, or null when it doesn't name one. */
+export function resumeView(value: string | null): ResumeView | null {
+  return value === "outing" || value === "packing" ? value : null;
+}
 
 /** Wardrobe's search param for the outing it was opened from. */
 export const FROM_PARAM = "from";

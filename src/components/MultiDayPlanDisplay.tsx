@@ -16,6 +16,8 @@ import { OutingTimeSummary } from "@/components/OutingTimeSummary";
 import { WeatherSourceDetails } from "@/components/WeatherSourceDetails";
 import type { Outing } from "@/types/outing";
 
+type PlanTab = "days" | "packing";
+
 interface MultiDayPlanDisplayProps {
   outing?: Outing;
   plan: MultiDayLayerPlan;
@@ -24,6 +26,12 @@ interface MultiDayPlanDisplayProps {
   /** Where the plan is for, e.g. "Stowe, Vermont, United States". */
   place?: string;
   itemMappings?: Map<string, string>;
+  /**
+   * The tab each plan opens on: the daily plan, unless coming back to match
+   * the packing list to a wardrobe. A plan that replaces the shown one opens
+   * on it too.
+   */
+  initialTab?: PlanTab;
   /** Back to the form with the outing as entered. */
   onReset?: () => void;
 }
@@ -59,6 +67,7 @@ export default function MultiDayPlanDisplay({
   activity,
   place,
   itemMappings,
+  initialTab = "days",
   onReset,
 }: MultiDayPlanDisplayProps) {
   // `list` is null when the request failed.
@@ -70,6 +79,10 @@ export default function MultiDayPlanDisplay({
     wardrobe: PackingListWardrobe;
   } | null>(null);
   const [packingAttempt, setPackingAttempt] = useState(0);
+  // The tab picked stays with the plan it was picked on. Another plan, like
+  // one requested while this one shows, opens on `initialTab`.
+  const [pickedTab, setPickedTab] = useState<{ plan: MultiDayLayerPlan; tab: PlanTab }>({ plan, tab: initialTab });
+  const tab = pickedTab.plan === plan ? pickedTab.tab : initialTab;
 
   useEffect(() => {
     let isCancelled = false;
@@ -198,7 +211,7 @@ export default function MultiDayPlanDisplay({
         </Card>
       )}
 
-      <Tabs defaultValue="days" className="gap-4">
+      <Tabs value={tab} onValueChange={(value) => setPickedTab({ plan, tab: value as PlanTab })} className="gap-4">
         <TabsList className="grid w-full grid-cols-2 sm:max-w-sm">
           <TabsTrigger value="days">Daily plan</TabsTrigger>
           <TabsTrigger value="packing">Packing</TabsTrigger>

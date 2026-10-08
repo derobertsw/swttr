@@ -49,6 +49,7 @@ const HomeContent = () => {
     showPlanForm,
     editOuting,
     resetToInitialState,
+    planTab,
     accountChanging,
   } = useGearUp();
 
@@ -115,6 +116,7 @@ const HomeContent = () => {
             activity={result.outing.activity}
             place={formatLocationName(result.outing.place)}
             itemMappings={itemMappings}
+            initialTab={planTab}
             onReset={showPlanForm}
           />
         ) : (
