@@ -190,6 +190,18 @@ describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST, s
 });
 
 describe("POST /api/v1/recommendations/alpine (golden, comfort)", () => {
+  it.each(MODES)("does not warn about regional insulation at 45°F with $name gear", async (mode) => {
+    useDatabase(mode.userId, mode.wardrobe);
+    const { body } = await callRoute(alpine, { ...CONDITIONS[0].body, ...mode.extraBody });
+
+    expect(body.recommendation.garments).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "outer_insulated", covers_legs: true }),
+    ]));
+    expect(body.warnings).not.toEqual(expect.arrayContaining([
+      expect.stringMatching(/^Insufficient (torso|arms|legs) insulation:/),
+    ]));
+  });
+
   it("scores an outfit inside the target range as comfortable", async () => {
     useDatabase(null, []);
     const { body } = await callRoute(alpine, CONDITIONS[0].body);
