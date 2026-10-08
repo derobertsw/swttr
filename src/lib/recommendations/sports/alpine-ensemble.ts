@@ -1,6 +1,6 @@
 import type { PhaseTargets } from '../thermal-targets';
 import type { CategorizedGarments, GarmentRow } from '../types';
-import { buildRegionalEnsemble } from './regional-ensemble';
+import { buildRegionalEnsemble, findRegionalInsulationCapacity } from './regional-ensemble';
 
 // Without garment fit measurements, use a conservative pairing: puffies can
 // sit under a hard shell, but not another insulated or fitted outer.
@@ -32,4 +32,13 @@ export function buildAlpineEnsemble(
       return [missingCoverage, wetExposure, targetDistance, count, surplus, -breathability];
     },
   });
+}
+
+/** Check attainable warmth independently of the builder's regional choices. */
+export function alpineRegionalCapacity(
+  categorized: CategorizedGarments,
+  selected: GarmentRow[],
+  precipitation: boolean
+): PhaseTargets['regional']['min'] {
+  return findRegionalInsulationCapacity(categorized, selected, precipitation, puffyFitsUnder);
 }

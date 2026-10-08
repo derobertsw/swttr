@@ -34,6 +34,35 @@ These timings vary by machine and load. They are benchmark evidence, not CI time
 limits. The previous 5x search has a noisy five-sample baseline; the cached search
 averaged 17 samples with 0.40% relative margin of error in this run.
 
+## Regional warning capacity
+
+Alpine's warning check searches all compatible outfit combinations independently
+of the builder's torso-first choices. A full-body layer therefore cannot hide a
+warmer outfit made from separate tops and bottoms. The check retains each
+region's selected base and outer coverage, plus its waterproof outer coverage
+when wet.
+
+The search groups alternatives by garment ID and tracks layer occupancy,
+puffy/outer compatibility and waterproof coverage with six three-bit masks.
+For each state it retains the maximum torso, arms and legs warmth independently;
+those maxima can come from different wearable outfits. Future compatibility
+depends only on the masks, and IDs are processed once, so equivalent states
+can be merged without losing any regional maximum. This avoids enumerating
+every outfit as a separate array. Capacity is calculated once per recommendation
+and only when a regional shortfall exceeds the warning tolerance.
+
+Run the capacity benchmark alone, without other checks:
+
+```sh
+npx vitest bench --run src/lib/recommendations/sports/alpine-ensemble.bench.ts --maxWorkers=1 -t 'complete capacity search'
+```
+
+An isolated Node.js 26.10.0/macOS run measured 0.786 ms for the 73-garment catalog
+and 4.370 ms for the 365-garment pool (637 and 115 samples, respectively).
+`regional-capacity.test.ts` compares the search against exhaustive subset
+enumeration of a small wardrobe, including duplicate IDs, bibs, incompatible
+puffy/outer combinations, rain protection and reversed input order.
+
 ## Behavioral validation
 
 `src/test/referenceRegionalEnsemble.ts` freezes the search and sport ranking
