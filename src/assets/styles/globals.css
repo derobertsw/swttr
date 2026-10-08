@@ -234,6 +234,14 @@
     outline-offset: 2px;
   }
 
+  /* iOS draws date and time fields as buttons, with its own padding and a
+     content-box width, so a full-width field runs about 18px past its column
+     and over the next field. Plain fields keep our padding and width, and a
+     tap still opens the native picker. */
+  input:is([type="date"], [type="time"]) {
+    appearance: none;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     ::before,
