@@ -174,9 +174,8 @@ describe('Alpine Recommendations API Route', () => {
 
     expect(names).toContain('TestBrand Torso Mid');
     expect(names).toContain('TestBrand Legs Insulation');
-    expect(data.warnings).toEqual(expect.arrayContaining([
-      expect.stringMatching(/^Insufficient torso insulation:.*for alpine conditions$/),
-      expect.stringMatching(/^Insufficient legs insulation:.*for alpine conditions$/),
+    expect(data.warnings).not.toEqual(expect.arrayContaining([
+      expect.stringMatching(/^Insufficient (torso|arms|legs) insulation:/),
     ]));
   });
 

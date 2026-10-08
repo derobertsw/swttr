@@ -136,6 +136,7 @@ describe("Home Page", () => {
     mockSearchParams.delete("mode");
     mockSearchParams.delete("gearUp");
     mockSearchParams.delete("geoDenied");
+    mockSearchParams.delete("resume");
 
     // Default mock for item mappings and preferences APIs
     mockFetch.mockImplementation((url: string) => {
@@ -1804,6 +1805,39 @@ describe("Home Page", () => {
       expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: "Several days" })).toBeChecked();
       expect(screen.getByText("4 days")).toBeInTheDocument();
+    });
+
+    it("brings a guest back to their plan's packing list after signing in, and opens later plans on the daily plan", async () => {
+      mockUseAuth.mockReturnValue({ userId: null, isLoaded: true, isSignedIn: false });
+      const { requests } = mockPlanAheadApis();
+      const user = userEvent.setup();
+      const { unmount } = render(<Home />);
+
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await chooseSeveralDays(user);
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Daily plan" })).toHaveAttribute("aria-selected", "true");
+      unmount();
+      // Sign-in from the packing list comes back here (see PlanPacking).
+      mockUseAuth.mockReturnValue(SIGNED_IN);
+      window.history.pushState(null, "", "/?mode=planAhead&resume=packing");
+      mockSearchParams.set("resume", "packing");
+      render(<Home />);
+
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Packing" })).toHaveAttribute("aria-selected", "true");
+      expect(requests.planAhead).toHaveLength(2);
+      expect(requests.planAhead[1]).toEqual(requests.planAhead[0]);
+      expect(window.location.search).toBe("?mode=planAhead");
+
+      await user.click(screen.getByRole("button", { name: "Edit outing" }));
+      await user.click(screen.getByRole("button", { name: "Build my plan" }));
+
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Daily plan" })).toHaveAttribute("aria-selected", "true");
+      expect(requests.planAhead).toHaveLength(3);
     });
 
     it("shows why on the start date when a reload can't build the plan again", async () => {

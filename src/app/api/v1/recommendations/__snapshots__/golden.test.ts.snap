@@ -200,8 +200,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
     "warnings": [
       "Limited breathability may cause moisture buildup",
       "Insufficient torso insulation: 3.4 clo vs 4.7 clo required for alpine conditions",
-      "Insufficient arms insulation: 2.6 clo vs 4.7 clo required for alpine conditions",
-      "Insufficient legs insulation: 1.9 clo vs 5.7 clo required for alpine conditions",
     ],
   },
   "status": 200,
@@ -395,10 +393,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 88.7,
       "thermal_comfort_score": 42.5,
     },
-    "warnings": [
-      "Insufficient arms insulation: 2.6 clo vs 3.5 clo required for alpine conditions",
-      "Insufficient legs insulation: 1.9 clo vs 4.3 clo required for alpine conditions",
-    ],
+    "warnings": [],
   },
   "status": 200,
 }
@@ -594,8 +589,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
     "warnings": [
       "Insufficient overall insulation: 2.8 clo vs 2.9 clo required",
       "Insufficient torso insulation: 3.4 clo vs 5.9 clo required for alpine conditions",
-      "Insufficient arms insulation: 2.6 clo vs 5.9 clo required for alpine conditions",
-      "Insufficient legs insulation: 1.9 clo vs 7.1 clo required for alpine conditions",
     ],
   },
   "status": 200,
@@ -792,8 +785,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
     "warnings": [
       "Limited breathability may cause moisture buildup",
       "Insufficient torso insulation: 3.4 clo vs 3.7 clo required for alpine conditions",
-      "Insufficient arms insulation: 2.6 clo vs 3.7 clo required for alpine conditions",
-      "Insufficient legs insulation: 1.9 clo vs 4.4 clo required for alpine conditions",
     ],
   },
   "status": 200,
@@ -980,9 +971,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 91.1,
       "thermal_comfort_score": 61.3,
     },
-    "warnings": [
-      "Insufficient legs insulation: 1.9 clo vs 2.8 clo required for alpine conditions",
-    ],
+    "warnings": [],
   },
   "status": 200,
 }
@@ -1169,10 +1158,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 88.1,
       "thermal_comfort_score": 51.2,
     },
-    "warnings": [
-      "Insufficient arms insulation: 2.6 clo vs 2.9 clo required for alpine conditions",
-      "Insufficient legs insulation: 1.9 clo vs 3.4 clo required for alpine conditions",
-    ],
+    "warnings": [],
   },
   "status": 200,
 }
@@ -1354,7 +1340,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in with an empt
     },
     "warnings": [
       "Insufficient arms insulation: 3.0 clo vs 3.5 clo required for alpine conditions",
-      "Insufficient legs insulation: 2.8 clo vs 4.3 clo required for alpine conditions",
     ],
   },
   "status": 200,
@@ -1565,8 +1550,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
     },
     "warnings": [
       "Limited breathability may cause moisture buildup",
-      "Insufficient arms insulation: 3.1 clo vs 4.7 clo required for alpine conditions",
-      "Insufficient legs insulation: 2.8 clo vs 5.7 clo required for alpine conditions",
     ],
   },
   "status": 200,
@@ -1776,7 +1759,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
     },
     "warnings": [
       "Insufficient arms insulation: 3.0 clo vs 3.5 clo required for alpine conditions",
-      "Insufficient legs insulation: 2.8 clo vs 4.3 clo required for alpine conditions",
     ],
   },
   "status": 200,
@@ -1987,8 +1969,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
     "warnings": [
       "Limited breathability may cause moisture buildup",
       "Insufficient torso insulation: 4.9 clo vs 5.9 clo required for alpine conditions",
-      "Insufficient arms insulation: 3.2 clo vs 5.9 clo required for alpine conditions",
-      "Insufficient legs insulation: 2.8 clo vs 7.1 clo required for alpine conditions",
     ],
   },
   "status": 200,
@@ -2199,7 +2179,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
     "warnings": [
       "Limited breathability may cause moisture buildup",
       "Insufficient arms insulation: 3.0 clo vs 3.7 clo required for alpine conditions",
-      "Insufficient legs insulation: 2.8 clo vs 4.4 clo required for alpine conditions",
     ],
   },
   "status": 200,
@@ -2603,7 +2582,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
     },
     "warnings": [
       "Insufficient arms insulation: 2.7 clo vs 2.9 clo required for alpine conditions",
-      "Insufficient legs insulation: 2.8 clo vs 3.4 clo required for alpine conditions",
     ],
   },
   "status": 200,

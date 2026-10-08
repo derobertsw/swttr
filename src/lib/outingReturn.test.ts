@@ -1,13 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { RESUME_OUTING_PATH, safeReturnPath, signInHref } from "./outingReturn";
+import { RESUME_OUTING_PATH, RESUME_PACKING_PATH, resumeView, safeReturnPath, signInHref } from "./outingReturn";
 
 describe("outingReturn", () => {
   it("signs in and comes back to the outing, without the outing in the address", () => {
     expect(signInHref(RESUME_OUTING_PATH)).toBe("/sign-in?redirect_url=%2F%3Fresume%3Douting");
+    expect(signInHref(RESUME_PACKING_PATH)).toBe("/sign-in?redirect_url=%2F%3Fresume%3Dpacking");
+  });
+
+  it("reads which view to come back to, and nothing else", () => {
+    expect(resumeView("outing")).toBe("outing");
+    expect(resumeView("packing")).toBe("packing");
+    expect(resumeView("save")).toBe("save");
+    expect(resumeView(null)).toBeNull();
+    expect(resumeView("layers")).toBeNull();
   });
 
   it.each([
     ["Gear up, asking for the outing again", "/?resume=outing", "/?resume=outing"],
+    ["Gear up, asking for a plan's packing list again", "/?resume=packing", "/?resume=packing"],
     ["Wardrobe, opened from an outing", "/wardrobe?from=outing", "/wardrobe?from=outing"],
     ["a trip", "/trips/3f1c2b7e-1a2b-4c3d-8e9f-0a1b2c3d4e5f", "/trips/3f1c2b7e-1a2b-4c3d-8e9f-0a1b2c3d4e5f"],
     ["the FAQ", "/faq", "/faq"],

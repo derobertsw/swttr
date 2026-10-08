@@ -85,7 +85,7 @@ const getFaqs = (temperatureUnit: TemperatureUnit) => [
   {
     question: "Do I need an account to use SWTTR?",
     answer:
-      "No account is required to get clothing recommendations. Your wardrobe is stored locally in your browser. Signing in allows you to sync your wardrobe across devices.",
+      "No. Without one, Gear up gives general layers for the temperature for Alpine Skiing, XC Skiing and Hiking / Snowshoeing, including multi-day plans and packing lists. Signing in adds one-day layers worked out from your body and the gear you own, including for Running, Biking and Backcountry Skiing, plus your wardrobe, packing lists matched to it, and trips. Nothing has to be set up first: add gear when you want layers built from it, and height and weight in Settings are optional. If you sign in from an outing's results, you come back to that outing.",
   },
   {
     question: "Why might recommendations differ from what I'd normally wear?",
