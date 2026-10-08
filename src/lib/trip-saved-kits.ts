@@ -232,17 +232,15 @@ function isOffsetTimestamp(value: unknown): value is string {
 /**
  * The trip date the outfit is for, on the destination's calendar: a later
  * outing's date, or for now, the date there when the conditions were read.
- * Null when the place's calendar can't be told.
+ * Null when that can't be told. It never comes from the server's clock, so a
+ * retried save asks for the same date.
  */
-export function outfitDate(outfit: SavedOutfit, now = Date.now()): string | null {
-  const { when, place } = outfit.outing;
+export function outfitDate(outfit: SavedOutfit): string | null {
+  const { when } = outfit.outing;
   if (when.mode === "later") return when.date;
   const context = outfit.weather.context;
   if (context?.source === "forecast") return context.forecastTime.slice(0, 10);
-  const observed = context?.provenance?.observedTime;
-  if (observed) return observed.slice(0, 10);
-  const zone = context?.provenance?.timeZone ?? place.timeZone;
-  return zone ? formatZonedTime(now, zone).slice(0, 10) : null;
+  return context?.provenance?.observedTime?.slice(0, 10) ?? null;
 }
 
 /**
@@ -251,7 +249,7 @@ export function outfitDate(outfit: SavedOutfit, now = Date.now()): string | null
  * Undefined when the place's time zone isn't known.
  */
 export function destinationToday(outfit: SavedOutfit, now = Date.now()): string | undefined {
-  if (outfit.outing.when.mode === "now") return outfitDate(outfit, now) ?? undefined;
+  if (outfit.outing.when.mode === "now") return outfitDate(outfit) ?? undefined;
   const context = outfit.weather.context;
   const zone = (context?.source === "forecast" ? context.timeZone : undefined)
     ?? context?.provenance?.timeZone ?? outfit.outing.place.timeZone;

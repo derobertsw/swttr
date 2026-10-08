@@ -77,10 +77,8 @@ describe("parseSaveKitRequest", () => {
 });
 
 describe("outfitDate", () => {
-  const now = Date.parse("2026-10-07T02:30:00Z"); // 10:30pm on Oct 6 in Vermont.
-
   it("uses a later outing's date on the destination's calendar", () => {
-    expect(outfitDate(savedOutfit(), now)).toBe("2026-10-10");
+    expect(outfitDate(savedOutfit())).toBe("2026-10-10");
   });
 
   it("uses the date there when the conditions were read, for now", () => {
@@ -89,15 +87,15 @@ describe("outfitDate", () => {
       outing,
       weather: { temperature: 30, windSpeed: 5, context: { source: "current", provenance: { provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" }, ...provenance } } },
     });
-    expect(outfitDate(current({ observedTime: "2026-10-06T22:15-04:00" }), now)).toBe("2026-10-06");
-    // Without the reading's time, today there; the device's clock says Oct 7 in UTC.
-    expect(outfitDate(current({ timeZone: "America/New_York" }), now)).toBe("2026-10-06");
-    expect(outfitDate(current({ timeZone: "Asia/Tokyo" }), now)).toBe("2026-10-07");
+    expect(outfitDate(current({ observedTime: "2026-10-06T22:15-04:00" }))).toBe("2026-10-06");
+    // Without the reading's time it isn't taken from the server's clock, which
+    // would change at midnight between a save and its retry.
+    expect(outfitDate(current({ timeZone: "America/New_York" }))).toBeNull();
   });
 
   it("is null when the place's calendar can't be told", () => {
     const outing = { ...savedOutfit().outing, place: { ...STOWE, timeZone: undefined }, when: { mode: "now" as const } };
-    expect(outfitDate(savedOutfit({ outing, weather: { temperature: 30, windSpeed: 5 } }), now)).toBeNull();
+    expect(outfitDate(savedOutfit({ outing, weather: { temperature: 30, windSpeed: 5 } }))).toBeNull();
   });
 });
 

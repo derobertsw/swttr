@@ -43,6 +43,7 @@ describe("Saving outing kits to a trip in Postgres", () => {
     await db.exec(await readFile("supabase/migrations/016_atomic_trip_creation.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/018_trip_saved_kits.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/019_trip_kit_save_tombstones.sql", "utf8"));
+    await db.exec(await readFile("supabase/migrations/020_trip_kit_save_stable_hash.sql", "utf8"));
   }, 20_000);
   beforeEach(async () => {
     await db.exec("TRUNCATE trips CASCADE;");
@@ -70,6 +71,16 @@ describe("Saving outing kits to a trip in Postgres", () => {
     expect(replay).toEqual({ ...first, replayed: true });
     expect(await counts()).toEqual({ trips: 2, days: 3, kits: 1, saves: 1 });
     expect((await kits())[0].note).toBe("Bring spare gloves");
+  });
+
+  it("replays a retry whose new trip status changed with the clock, keeping the first answer", async () => {
+    const saveId = randomUUID();
+    const first = await save({ saveId, newTrip: NEW_TRIP }) as Saved;
+    const retry = await save({ saveId, newTrip: { ...NEW_TRIP, status: "live" } }) as Saved;
+    expect(retry).toEqual({ ...first, replayed: true });
+    expect(retry.trip.status).toBe("planning");
+    // Anything the person sent still has to match.
+    await expect(save({ saveId, newTrip: { ...NEW_TRIP, name: "Other name" } })).rejects.toMatchObject({ code: "22023" });
   });
 
   it("reports a deleted trip on retry instead of making it again, and keeps no copy of its kits", async () => {

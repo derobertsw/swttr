@@ -15,7 +15,7 @@ Save to trip keeps an outing's outfit on a trip day as **My kit** (#170). This p
 ## Rules
 
 - **No re-entry.** The server takes the date, destination, activity and effort from the outing. The person picks only the trip, or a name for a new one.
-- **Destination-local dates.** A later outing is saved to its date on the destination's calendar. An outing for now is saved to the date there when the conditions were read: the observed time, or else today in the place's time zone. If that date can't be told, the save is refused rather than guessed. A new trip is classified (planning, live, past) against today on the same calendar, not the server's.
+- **Destination-local dates.** A later outing is saved to its date on the destination's calendar. An outing for now is saved to the date there when the conditions were read (their observed time). If that date can't be told, the save is refused rather than guessed. It's never taken from the server's clock, so a retry after midnight asks for the same date. A new trip is classified (planning, live, past) against today on the same calendar, not the server's.
 - **Honest advice.** A personalized outfit is labeled Personalized. General guidance is labeled General guide, with the reason it isn't personalized, everywhere it shows. Results with no layers can't be saved. Suggested items that aren't in the wardrobe keep their "Not in your wardrobe" label.
 - **Edits are kept as made.** The saved outfit is what was on screen, including picked, removed and moved items. A comfort check is saved only when it was current for those layers, so a running or failed check is never kept as the verdict.
 - **No silent replacement.** Saving to a day with a kit reports a conflict and writes nothing. A replacement names each day and the `updated_at` of the kit that was shown. If the kit changed since, the save asks again.
@@ -44,11 +44,11 @@ Save to trip keeps an outing's outfit on a trip day as **My kit** (#170). This p
 | `POST /api/v1/trips/kits` | Saves. `200`/`201` when saved (`replayed: true` for a repeat), `409` with `status: "conflict"`, the kits there now and server-computed `changes`, or `409` with `code: "identity"` when the save identity can't be reused. |
 | `PUT /api/v1/trips/:id/days/:date/kits/:memberId` | The category checklist, now limited to the member or the organizer for a guest, with validated fields. It leaves a saved outfit alone. |
 
-### Database (`supabase/migrations/018_trip_saved_kits.sql`, `019_trip_kit_save_tombstones.sql`)
+### Database (`supabase/migrations/018_trip_saved_kits.sql`, `019_trip_kit_save_tombstones.sql`, `020_trip_kit_save_stable_hash.sql`)
 
 - `trip_member_day_kits.outfit` (jsonb) and `outfit_saved_at` hold the snapshot. Saving replaces checklist items and keeps the note.
 - `trip_kit_saves` records each completed save: the identity, the input hash and the answer. A receipt outlives its trip as a tombstone. Deleting the trip clears the receipt's `trip_id` and `result`, so no copy of the kits stays behind.
-- `save_trip_kits(...)` runs in one transaction. It takes a lock on the save identity and looks up the receipt first: a repeat returns its first answer, or not found if the trip was deleted since. Otherwise it creates the trip with `create_trip_draft` when asked, locks the trip, and checks membership. It reports conflicts without writing, restores a missing trip day, and fills an empty day activity with the outing's. Only `service_role` may run it.
+- `save_trip_kits(...)` runs in one transaction. It takes a lock on the save identity and looks up the receipt first: a repeat returns its first answer, or not found if the trip was deleted since. A repeat must send the same input. The new trip's status is the one exception, because the server derives it from its clock. Otherwise it creates the trip with `create_trip_draft` when asked, locks the trip, and checks membership. It reports conflicts without writing, restores a missing trip day, and fills an empty day activity with the outing's. Only `service_role` may run it.
 - The `409` conflict's `changes` lists each phase of the outfit (a ski tour's climb and descent).
 
 ### Trip day
