@@ -23,6 +23,9 @@ import {
 } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
 import { useTrip } from "@/hooks/useTrip";
+import { useUserId } from "@/hooks/useUserId";
+import { SavedKitView } from "@/components/trips/SavedKitView";
+import { canEditMemberKit } from "@/lib/trip-permissions";
 import { DayLodging } from "@/components/trips/TripStays";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
@@ -44,6 +47,7 @@ export default function DayDetailPage({
 }) {
   const { id, date } = use(params);
   const { data, loading, error, refresh } = useTrip(id);
+  const userId = useUserId();
   const [weatherAttempt, setWeatherAttempt] = useState(0);
   const [weatherResult, setWeatherResult] = useState<{
     key: string;
@@ -117,6 +121,10 @@ export default function DayDetailPage({
     () => data?.members.filter((m) => m.status !== "left") ?? [],
     [data?.members]
   );
+  const me = activeMembers.find((m) => m.user_id !== null && m.user_id === userId);
+  const crew = activeMembers.filter((m) => m !== me);
+  const kitFor = (member: TripMember) => data?.kits.find((k) => k.trip_member_id === member.id && k.trip_day_id === day?.id);
+  const myKit = me ? kitFor(me) : undefined;
 
   // Find prev/next day for arrows.
   const dayIndex = data?.days.findIndex((d) => d.date === date) ?? -1;
@@ -189,21 +197,36 @@ export default function DayDetailPage({
               onLocationSaved={() => refresh()}
             />
 
-            <section className="flex flex-col gap-2.5">
-              <SectionLabel>Crew kits</SectionLabel>
-              {activeMembers.map((m) => (
-                <MemberKitRow
-                  key={m.id}
-                  tripId={id}
-                  date={date}
-                  member={m}
-                  kit={data.kits.find(
-                    (k) => k.trip_member_id === m.id && data.days.find((d) => d.id === k.trip_day_id)?.date === date
-                  )}
-                  onSaved={refresh}
-                />
-              ))}
-            </section>
+            {me && (myKit?.outfit ? (
+              <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} stop={effectiveStop ?? null} />
+            ) : (
+              <section aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
+                <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
+                <p className="text-sm text-muted-foreground">
+                  No outfit saved for this day.{" "}
+                  <Link href="/" className="font-medium text-foreground underline underline-offset-2">Get layers in Gear up</Link>
+                  {" "}and use Save to trip, or mark what you&apos;ll bring below.
+                </p>
+                <MemberKitRow tripId={id} date={date} member={me} kit={myKit} editable onSaved={refresh} />
+              </section>
+            ))}
+
+            {crew.length > 0 && (
+              <section className="flex flex-col gap-2.5">
+                <SectionLabel>{me ? "Crew kits" : "Kits"}</SectionLabel>
+                {crew.map((m) => (
+                  <MemberKitRow
+                    key={m.id}
+                    tripId={id}
+                    date={date}
+                    member={m}
+                    kit={kitFor(m)}
+                    editable={canEditMemberKit(data.trip, m, userId)}
+                    onSaved={refresh}
+                  />
+                ))}
+              </section>
+            )}
 
             <div className="h-24" />
           </>
@@ -475,7 +498,59 @@ function ActivityPicker({
   );
 }
 
+/**
+ * One person's kit for the day. Its controls show only to whoever may change
+ * it, as the kit API allows: the member, or the organizer for a guest.
+ */
 function MemberKitRow({
+  tripId,
+  date,
+  member,
+  kit,
+  editable,
+  onSaved,
+}: {
+  tripId: string;
+  date: string;
+  member: TripMember;
+  kit: TripMemberDayKit | undefined;
+  editable: boolean;
+  /** Reloads the trip; the row's controls stay disabled until it finishes. */
+  onSaved: () => Promise<void>;
+}) {
+  if (kit?.outfit || !editable) return <MemberKitSummary member={member} kit={kit} />;
+  return <EditableMemberKitRow tripId={tripId} date={date} member={member} kit={kit} onSaved={onSaved} />;
+}
+
+/** Someone else's kit, read-only: their saved outfit, or their checklist. */
+function MemberKitSummary({ member, kit }: { member: TripMember; kit: TripMemberDayKit | undefined }) {
+  const outfit = kit?.outfit;
+  const worn = outfit
+    ? Object.values(outfit.phases[0].wear).reduce((count, layers) => count + layers.base.length + (layers.mid?.length ?? 0) + layers.outer.length, 0)
+    : 0;
+  return (
+    <Card className={cn(kit?.state === "warn" && !outfit && "border-warning")}>
+      <div className="flex flex-wrap items-center gap-3">
+        <MemberAvatar name={member.display_name} size={28} state={member.role === "organizer" ? "self" : "default"} />
+        <div className="min-w-32 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">{member.display_name}</p>
+          <p className="text-sm text-muted-foreground">
+            {outfit
+              ? `Outfit saved · ${outfit.advice.kind === "personalized" ? "Personalized" : "General guide"} · ${worn} ${worn === 1 ? "item" : "items"}`
+              : !kit || kit.items.length === 0
+              ? "no kit set"
+              : `${sentenceCase(kit.effort)} · ${kit.items.map(sentenceCase).join(", ")}`}
+          </p>
+        </div>
+        {kit && !outfit && kit.state !== "ok" && (
+          <Badge size="sm" variant="warning">{KIT_STATE_LABEL[kit.state]}</Badge>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function EditableMemberKitRow({
   tripId,
   date,
   member,
@@ -486,7 +561,6 @@ function MemberKitRow({
   date: string;
   member: TripMember;
   kit: TripMemberDayKit | undefined;
-  /** Reloads the trip; the row's controls stay disabled until it finishes. */
   onSaved: () => Promise<void>;
 }) {
   const [effort, setEffort] = useState<TripEffort>(kit?.effort ?? "steady");

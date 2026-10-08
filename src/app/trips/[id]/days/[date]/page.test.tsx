@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import {
   ORGANIZER,
+  SAM,
   STOWE_PLACE,
   STOWE_STOP,
   TRIP,
@@ -12,12 +13,14 @@ import {
   reply,
   tripFull,
 } from "@/test/tripApi";
-import type { TripDay, TripMemberDayKit } from "@/types/trips";
+import type { TripDay, TripMember, TripMemberDayKit } from "@/types/trips";
+import { savedOutfit } from "@/test/savedKit";
 import DayDetailPage from "./page";
 import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
 import { STORAGE_KEYS } from "@/lib/storage";
 
-vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: null, isLoaded: true }) }));
+const mockAuth = vi.hoisted(() => ({ userId: "user-1" as string | null }));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: mockAuth.userId, isLoaded: true }) }));
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -39,7 +42,7 @@ const NO_FORECAST = reply(500, { error: "Failed to fetch weather data" });
 
 /** The page suspends until its params resolve, so rendering is awaited. */
 async function renderPage(date = DAY.date, celsius = false) {
-  if (celsius) window.localStorage.setItem(`${STORAGE_KEYS.TEMPERATURE_UNIT}:guest`, "C");
+  if (celsius) window.localStorage.setItem(`${STORAGE_KEYS.TEMPERATURE_UNIT}:user:user-1`, "C");
   await act(async () => {
     const page = (
       <Suspense fallback={null}>
@@ -56,7 +59,8 @@ describe("Trip day page", () => {
   });
 
   afterEach(() => {
-    window.localStorage.removeItem(`${STORAGE_KEYS.TEMPERATURE_UNIT}:guest`);
+    mockAuth.userId = "user-1";
+    window.localStorage.removeItem(`${STORAGE_KEYS.TEMPERATURE_UNIT}:user:user-1`);
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
@@ -428,4 +432,73 @@ describe("Trip day page", () => {
     expect(screen.queryByText("Loading forecast…")).not.toBeInTheDocument();
   });
 
+  describe("My kit and crew kits", () => {
+    const ANA: TripMember = { ...ORGANIZER, id: "member-ana", user_id: "user-2", display_name: "Ana", role: "member" };
+    const kit = (member: TripMember, extra: Partial<TripMemberDayKit> = {}): TripMemberDayKit => ({
+      id: `kit-${member.id}`, trip_day_id: DAY.id, trip_member_id: member.id, effort: "steady", items: [], note: null,
+      state: "ok", updated_at: "2026-10-06T20:01:02Z", outfit: null, outfit_saved_at: null, ...extra,
+    });
+    const crewTrip = (kits: TripMemberDayKit[]) => fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP], days: [DAY], members: [ORGANIZER, ANA, SAM], kits })),
+      "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+    });
+
+    it("leads with my saved outfit, as saved, with the outing and forecast it was for", async () => {
+      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit({ edited: true }), outfit_saved_at: "2026-10-06T20:01:02Z" })]));
+      await renderPage();
+
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      expect(within(myKit).getByRole("heading", { name: "My kit" })).toBeInTheDocument();
+      expect(within(myKit).getByText("Personalized")).toBeInTheDocument();
+      expect(within(myKit).getByText(/from Gear up, with your changes\. It stays as saved when the forecast changes\./)).toBeInTheDocument();
+      expect(within(myKit).getByText(/Forecast for Sat, Oct 10, 9:00 AM EDT/)).toBeInTheDocument();
+      expect(within(myKit).getByText("Merino crew")).toBeInTheDocument();
+      // Suggested items stay distinct from gear the person owns.
+      expect(within(myKit).getByText("Fleece").parentElement).toHaveTextContent("Not in your wardrobe");
+      expect(within(myKit).getByText(/In the comfort range/)).toBeInTheDocument();
+      expect(within(myKit).queryByRole("button", { name: /Change/ })).not.toBeInTheDocument();
+      expect(within(myKit).getByRole("link", { name: "get layers in Gear up" })).toHaveAttribute("href", "/");
+    });
+
+    it("says when general guidance or another place was saved", async () => {
+      const general = savedOutfit({
+        advice: { kind: "general", reason: "unsupported" },
+        outing: { ...savedOutfit().outing, activity: "hiking_snowshoeing", place: { ...savedOutfit().outing.place, latitude: 45.0 } },
+      });
+      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: general })]));
+      await renderPage();
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      expect(within(myKit).getByText("General guide")).toBeInTheDocument();
+      expect(within(myKit).getByText(/Hiking \/ Snowshoeing has no personalized model yet/)).toBeInTheDocument();
+      expect(within(myKit).getByText("Saved for Stowe, Vermont, United States, not this day's stop (Stowe, Vermont).")).toBeInTheDocument();
+    });
+
+    it("offers Gear up and my checklist when I have no saved outfit", async () => {
+      vi.stubGlobal("fetch", crewTrip([]));
+      await renderPage();
+      expect(await screen.findByRole("heading", { name: "My kit" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Get layers in Gear up" })).toHaveAttribute("href", "/");
+      expect(screen.getByRole("group", { name: "Effort for You" })).toBeInTheDocument();
+    });
+
+    it("lets the organizer change a guest's kit but only see another member's", async () => {
+      vi.stubGlobal("fetch", crewTrip([kit(ANA, { items: ["shell"], state: "warn" })]));
+      await renderPage();
+      await screen.findByText("Crew kits");
+      expect(screen.getByRole("group", { name: "Effort for Sam" })).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Effort for Ana" })).not.toBeInTheDocument();
+      expect(screen.getByText("Steady · Shell")).toBeInTheDocument();
+      expect(screen.getByText("Needs help")).toBeInTheDocument();
+    });
+
+    it("shows a member only their own kit to change", async () => {
+      mockAuth.userId = "user-2";
+      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit() })]));
+      await renderPage();
+      expect(await screen.findByRole("group", { name: "Effort for Ana" })).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Effort for You" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Effort for Sam" })).not.toBeInTheDocument();
+      expect(screen.getByText("Outfit saved · Personalized · 6 items")).toBeInTheDocument();
+    });
+  });
 });

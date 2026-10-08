@@ -837,6 +837,30 @@ describe("Home Page", () => {
         expect(placeField()).toHaveValue("Stowe, Vermont, United States");
       });
 
+      it("opens Save to trip on the resumed results after signing in to save, once", async () => {
+        mockUseAuth.mockReturnValue(GUEST);
+        mockAccountApis();
+        const outingApis = mockFetch.getMockImplementation()!;
+        mockFetch.mockImplementation(async (url: string, init?: RequestInit) => url === "/api/v1/trips/kits/options"
+          ? respond(200, { date: "2026-10-06", suggested_name: "Stowe trip", destination: "Stowe, Vermont", trips: [] })
+          : outingApis(url, init));
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+
+        await seeRunningAtStowe(user);
+        unmount();
+        mockUseAuth.mockReturnValue(SIGNED_IN);
+        comeBackTo("/?resume=save");
+
+        const dialog = await screen.findByRole("dialog", { name: "Save to trip" });
+        expect(within(dialog).getByText("Running · Moderate effort")).toBeInTheDocument();
+        expect(within(dialog).getByText("Personalized")).toBeInTheDocument();
+        expect(window.location.search).toBe("");
+        await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+        expect(screen.getByRole("button", { name: "Save to trip" })).toHaveFocus();
+      });
+
       it("shows the form with what was entered when sign-in comes back without a last outing", async () => {
         mockUseAuth.mockReturnValue(GUEST);
         const { weatherRequests } = mockAccountApis();

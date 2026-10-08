@@ -105,7 +105,7 @@ function listItems(recommendation: Recommendation): PlanLayerItem[] {
 }
 
 /** What to put on and take off to go from `from` to `to`; null when either is missing. */
-function diffRecommendations(
+export function diffRecommendations(
   from: Recommendation | null,
   to: Recommendation | null
 ): LayerChanges | null {

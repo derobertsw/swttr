@@ -23,6 +23,8 @@ export const EDIT_WEATHER_ID = "result-edit-weather";
 type AdviceKind = "personalized" | "general";
 
 interface ResultHeaderProps {
+  /** The heading; "Your layers" unless it's a saved kit. */
+  title?: string;
   outing?: Outing;
   activity?: string;
   exertion?: ExertionLevel;
@@ -79,7 +81,7 @@ function precipitationLabel(
  * The forecast hour on the place's clock, e.g. "Thu, Oct 15, 2:00 PM EDT",
  * whatever time zone the device is in.
  */
-function formatForecastTime(forecastTime: string, timeZone: string): string {
+export function formatForecastTime(forecastTime: string, timeZone: string): string {
   try {
     return new Intl.DateTimeFormat("en-US", {
       timeZone,
@@ -161,6 +163,7 @@ function ActivityControl({
  * conditions they were built for, with ways to change each.
  */
 export function ResultHeader({
+  title = "Your layers",
   outing,
   activity,
   exertion,
@@ -195,7 +198,7 @@ export function ResultHeader({
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <h2 className="text-title font-semibold text-foreground md:text-title-lg">Your layers</h2>
+        <h2 className="text-title font-semibold text-foreground md:text-title-lg">{title}</h2>
         {adviceKind === "personalized" && <Badge variant="primary">Personalized</Badge>}
         {adviceKind === "general" && <Badge variant="neutral">General guide</Badge>}
       </div>

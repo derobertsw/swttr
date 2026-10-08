@@ -56,6 +56,10 @@ interface GearUpState {
   restored: boolean;
   /** Whose outing the page holds once restored: a Clerk user ID, or null for a guest. */
   owner: string | null;
+  /** The outing asked for again after signing in to save it (#170); its results open Save to trip. */
+  saveOnReturn: Outing | null;
+  /** Whether the result on screen is that outing's, so Save to trip opens as it appears. */
+  opensSave: boolean;
 }
 
 /** What's kept for the tab besides the activity, effort and place. */
@@ -76,7 +80,7 @@ type GearUpAction =
   /** `keepLoading` when the running request was made from the form in this mode (see useGearUp). */
   | { type: "SHOW_FORM"; mode: InputMode; keepLoading: boolean }
   /** `kept` is null when nothing was kept for `owner`. */
-  | { type: "RESTORE"; owner: string | null; kept: RestoredFields | null }
+  | { type: "RESTORE"; owner: string | null; kept: RestoredFields | null; saveOnReturn?: Outing | null }
   | { type: "RESET" };
 
 export function createInitialState(inputMode: InputMode): GearUpState {
@@ -92,6 +96,8 @@ export function createInitialState(inputMode: InputMode): GearUpState {
     lastOuting: null,
     restored: false,
     owner: null,
+    saveOnReturn: null,
+    opensSave: false,
   };
 }
 
@@ -129,20 +135,28 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
     case "SUBMIT_START":
       return { ...state, request: { status: "loading", outing: action.outing }, startDateError: null };
     case "SUBMIT_SUCCESS":
-      return { ...state, request: { status: "idle" }, result: action.result, lastOuting: action.result.outing };
+      return {
+        ...state,
+        request: { status: "idle" },
+        result: action.result,
+        lastOuting: action.result.outing,
+        saveOnReturn: null,
+        opensSave: state.saveOnReturn !== null && JSON.stringify(state.saveOnReturn) === JSON.stringify(action.result.outing),
+      };
     case "SUBMIT_ERROR":
       return state.request.status === "loading"
         ? { ...state, request: { status: "error", outing: state.request.outing, message: action.message } }
         : state;
     case "SHOW_FORM": {
-      // Keeps what was entered, and the last outing.
-      const { date, time, durationDays, lastOuting, restored, owner } = state;
+      // Keeps what was entered, and the last outing. Asking again for an
+      // outing after signing in to save it starts here too.
+      const { date, time, durationDays, lastOuting, restored, owner, saveOnReturn } = state;
       const request: OutingRequestState = state.request.status === "loading" && action.keepLoading
         ? state.request : { status: "idle" };
-      return { ...createInitialState(action.mode), date, time, durationDays, lastOuting, restored, owner, request };
+      return { ...createInitialState(action.mode), date, time, durationDays, lastOuting, restored, owner, saveOnReturn, request };
     }
     case "RESTORE":
-      return { ...state, ...action.kept, restored: true, owner: action.owner };
+      return { ...state, ...action.kept, restored: true, owner: action.owner, saveOnReturn: action.saveOnReturn ?? null };
     case "RESET":
       return { ...createInitialState("now"), restored: state.restored, owner: state.owner };
     default:
