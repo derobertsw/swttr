@@ -6,6 +6,7 @@ import type { ExertionLevel } from "@/lib/biophysics/exertion";
 import type { LocationSuggestion, Recommendation } from "@/types/recommendations";
 import type { PrecipitationType, WeatherContext } from "@/types/weather";
 import type { Outing } from "@/types/outing";
+import type { SavedKitPhase, SavedOutfit } from "@/types/savedKit";
 import type {
   BiophysicsRecommendation,
   BiophysicsStatus,
@@ -22,6 +23,7 @@ import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui
 import {
   BODY_PARTS,
   BODY_PART_LABELS,
+  applyItemMappings,
   buildDescentLayers,
   buildRecommendedLayers,
   collectInUseIds,
@@ -73,6 +75,11 @@ interface LayerDisplayProps {
   onWeatherChange?: (location: LocationSuggestion, localDateTime?: string) => Promise<boolean>;
   onActivityChange?: (activity: string) => Promise<void>;
   weatherLoading?: boolean;
+  /**
+   * Renders Save to trip below the outfit (#170), given the outfit as shown,
+   * edits included, or null when there's nothing to save.
+   */
+  saveToTrip?: (outfit: SavedOutfit | null) => ReactNode;
 }
 
 type Phase = "climb" | "descent";
@@ -119,6 +126,21 @@ function recommendedCatalogItems(phases: BodyPartLayers[]): RecommendedItem[] {
   return items;
 }
 
+/** General guidance's layers with the wardrobe names they're shown with. */
+function mappedRecommendation(recommendation: Recommendation, itemMappings: Map<string, string> | undefined): Recommendation {
+  if (!itemMappings) return recommendation;
+  const mapped = { ...recommendation };
+  for (const bodyPart of BODY_PARTS) {
+    const layers = recommendation[bodyPart];
+    mapped[bodyPart] = {
+      base: applyItemMappings(layers.base, bodyPart, "base", itemMappings),
+      outer: applyItemMappings(layers.outer, bodyPart, "outer", itemMappings),
+      ...(layers.mid && { mid: applyItemMappings(layers.mid, bodyPart, "mid", itemMappings) }),
+    };
+  }
+  return mapped;
+}
+
 /** A collapsed section of supporting detail below the outfit. */
 function ResultDisclosure({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -159,6 +181,7 @@ const LayerDisplay = ({
   onWeatherChange,
   onActivityChange,
   weatherLoading,
+  saveToTrip,
 }: LayerDisplayProps) => {
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
   const [activePhase, setActivePhase] = useState<Phase>("climb");
@@ -419,6 +442,40 @@ const LayerDisplay = ({
     failedEditLayers.undo();
   };
 
+  // The outfit as shown, for Save to trip. A comfort check still running or
+  // failed is for other layers, so it isn't kept with these.
+  const savedDecision = (phase: Phase) =>
+    evaluationPending || evaluationFailed ? null : phaseEvaluation(phase)?.decision ?? null;
+  const savedPhases: SavedKitPhase[] = showDescent
+    ? [
+        { id: "climb", wear: climb.layers, carry: itemNamesMissingFrom(descent.layers, climb.layers), decision: savedDecision("climb") },
+        { id: "descent", wear: descent.layers, carry: itemNamesMissingFrom(climb.layers, descent.layers), decision: savedDecision("descent") },
+      ]
+    : [{
+        id: "outing",
+        wear: !biophysicsActive && recommendation ? mappedRecommendation(recommendation, itemMappings) : climb.layers,
+        carry: [],
+        decision: biophysicsActive ? savedDecision("climb") : null,
+      }];
+  const savedOutfit: SavedOutfit | null = outing && hasLayers
+    ? {
+        version: 1,
+        outing,
+        weather: {
+          temperature,
+          windSpeed: windspeed,
+          ...(precipitation !== undefined && { precipitation }),
+          ...(precipitationType && { precipitationType }),
+          ...(weatherContext && { context: weatherContext }),
+        },
+        advice: biophysicsActive
+          ? { kind: "personalized" }
+          : { kind: "general", reason: biophysicsStatus && biophysicsStatus !== "ok" ? biophysicsStatus : "unsupported" },
+        phases: savedPhases,
+        edited: climb.edited || descent.edited,
+      }
+    : null;
+
   return (
     <div className="flex w-full flex-col gap-6 pb-24">
       <ResultHeader
@@ -553,6 +610,8 @@ const LayerDisplay = ({
                   {BODY_PARTS.map((bodyPart) => renderSection(bodyPart, shownPhase))}
                 </Card>
               </section>
+
+              {saveToTrip?.(savedOutfit)}
             </div>
 
             <div className="flex min-w-0 flex-col gap-6">

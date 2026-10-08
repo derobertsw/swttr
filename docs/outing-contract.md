@@ -147,8 +147,9 @@ A return path names a page and what to do there, never the outing itself. The ou
 | Go to Wardrobe, in the layer picker | `/wardrobe?from=outing` | The same |
 | Sign in, on a guest's multi-day packing list | `/sign-in?redirect_url=%2F%3Fresume%3Dpacking` | `/?resume=packing` |
 | Add gear, on a signed-in packing list with items not matched | `/wardrobe?from=outing` | "Get my packing list" on Wardrobe's card, which links to `/?resume=packing` |
+| Save to trip, on the results of a guest (#170) | `/sign-in?redirect_url=%2F%3Fresume%3Dsave` | `/?resume=save`, which then opens Save to trip once ([trip-saved-kits.md](trip-saved-kits.md)) |
 
-**`/?resume=outing`** takes `resume` out of the address with `history.replaceState`, then asks for the draft's last outing again, once sign-in and preferences have loaded. **`/?resume=packing`** does the same, and a multi-day plan then opens on its Packing tab, matched to the account's wardrobe. Plans after it open on the daily plan again. The form shows in the outing's mode with the request running, then the results show on a new history entry. A signed-in account gets advice built from its body and gear, labeled Personalized. Advice that still isn't personalized says why: no usable gear, or a failed request with Try again. With no last outing in the tab, as in a new tab, the form shows what was entered, and nothing is asked for. Start over while it loads drops the request.
+**`/?resume=outing`** takes `resume` out of the address with `history.replaceState`, then asks for the draft's last outing again, once sign-in and preferences have loaded. **`/?resume=packing`** does the same, and a multi-day plan then opens on its Packing tab, matched to the account's wardrobe. Plans after it open on the daily plan again. **`/?resume=save`** does the same, then opens Save to trip once on that outing's one-day result (#170). The form shows in the outing's mode with the request running, then the results show on a new history entry. A signed-in account gets advice built from its body and gear, labeled Personalized. Advice that still isn't personalized says why: no usable gear, or a failed request with Try again. With no last outing in the tab, as in a new tab, the form shows what was entered, and nothing is asked for. Start over while it loads drops the request.
 
 **Cancelling sign-in.** The browser's Back returns to the results' entry, which asks for the outing again as before. Any other way back to Gear up shows the form with what was entered.
 
@@ -192,6 +193,8 @@ This completes the shared outing/result work begun in #215 and continued in #241
 | #123 forecast/date and #124 recovery remain intact | One-day route/client tests cover destination time, DST, missing hours and malformed responses; multi-day route/plan tests cover local windows, missing values and coverage. Existing guest, auth-required and retry flows pass. |
 | Activity × auth × duration matrix | The matrix above remains authoritative; no activity IDs, protected endpoints or thermal thresholds changed. |
 | Tests, lint and typecheck | Full and focused results are recorded in the QA report, together with the production-build environment limitation. |
+
+Saving a result's outfit to a trip is described in [trip-saved-kits.md](trip-saved-kits.md).
 
 #185 owns the programmatic `submitOuting` interface, caller cancellation, domain error codes and edited Wear/Carry readback. This change exposes no browser tool and adds no second store. #168 owns auth return, #170 owns durable saved snapshots, and #130 retains real-account browser/native/device/accessibility and participant validation. The synthetic browser and jsdom checks here are not represented as that release coverage.
 

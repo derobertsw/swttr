@@ -43,3 +43,21 @@ export function tripActivityToRecommendationKey(activity: string | null): string
   }
   return TRIP_ACTIVITY_TO_RECOMMENDATION_KEY[activity as TripActivity];
 }
+
+// The trip chip for each Gear up activity ID, for saving an outing to a trip.
+// Climb also maps to hiking_snowshoeing, but a hike is what Gear up plans for.
+const RECOMMENDATION_KEY_TO_TRIP_ACTIVITY: Record<string, TripActivity> = {
+  alpine_skiing: "Alpine",
+  backcountry_skiing: "Backcountry",
+  xc_skiing: "XC",
+  hiking_snowshoeing: "Hike",
+  running: "Run",
+  biking: "Bike",
+};
+
+/** The trip activity for a Gear up activity ID, or null when trips have none. */
+export function tripActivityFromRecommendationKey(activity: string): TripActivity | null {
+  return Object.hasOwn(RECOMMENDATION_KEY_TO_TRIP_ACTIVITY, activity)
+    ? RECOMMENDATION_KEY_TO_TRIP_ACTIVITY[activity]
+    : null;
+}

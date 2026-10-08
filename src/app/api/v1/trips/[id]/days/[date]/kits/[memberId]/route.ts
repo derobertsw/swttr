@@ -1,23 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readJson } from "@/lib/api";
+import { jsonError, readJson } from "@/lib/api";
+import { canEditMemberKit } from "@/lib/trip-permissions";
 import { requireTripAccess } from "@/lib/trips";
-import type { TripEffort, TripKitState } from "@/types/trips";
+import type { TripEffort, TripKitState, TripMember } from "@/types/trips";
 
 type RouteContext = { params: Promise<{ id: string; date: string; memberId: string }> };
 
+const EFFORTS: TripEffort[] = ["easy", "steady", "hard"];
+const STATES: TripKitState[] = ["ok", "warn", "missing"];
+
+/**
+ * Saves a member's day checklist: effort, category items, note and flag. A
+ * member edits only their own; the organizer also edits the guests they
+ * manage. A saved outfit on the kit (#170) is left as it is.
+ */
 export async function PUT(request: NextRequest, ctx: RouteContext) {
   const { id, date, memberId } = await ctx.params;
   const auth = await requireTripAccess(id);
   if (auth instanceof NextResponse) return auth;
-  const { supabase } = auth;
+  const { supabase, trip, userId } = auth;
 
   const body = await readJson(request);
   const { items, effort, note, state } = (body ?? {}) as {
-    items?: string[];
-    effort?: TripEffort;
-    note?: string | null;
-    state?: TripKitState;
+    items?: unknown;
+    effort?: unknown;
+    note?: unknown;
+    state?: unknown;
   };
+  if ((items !== undefined && (!Array.isArray(items) || !items.every((item) => typeof item === "string" && item.length <= 40) || items.length > 20))
+    || (effort !== undefined && !EFFORTS.includes(effort as TripEffort))
+    || (state !== undefined && !STATES.includes(state as TripKitState))
+    || (note !== undefined && note !== null && (typeof note !== "string" || note.length > 2000))) {
+    return jsonError("Invalid kit", 400);
+  }
+
+  const { data: member } = await supabase
+    .from("trip_members")
+    .select("id, user_id, status")
+    .eq("trip_id", id)
+    .eq("id", memberId)
+    .maybeSingle();
+  if (!member || member.status === "left") return jsonError("Crew member not found", 404);
+  if (!canEditMemberKit(trip, member as Pick<TripMember, "user_id">, userId)) {
+    return jsonError("You can change only your own kit", 403);
+  }
 
   const { data: day } = await supabase
     .from("trip_days")

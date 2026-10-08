@@ -10,6 +10,7 @@ describe("outingReturn", () => {
   it("reads which view to come back to, and nothing else", () => {
     expect(resumeView("outing")).toBe("outing");
     expect(resumeView("packing")).toBe("packing");
+    expect(resumeView("save")).toBe("save");
     expect(resumeView(null)).toBeNull();
     expect(resumeView("layers")).toBeNull();
   });

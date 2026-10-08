@@ -391,6 +391,7 @@ export function useGearUp() {
       setExertion(draft.exertion);
       if (draft.place) locationSearch.handleSelectLocation(draft.place);
     }
+    const returning = resumeView(searchParams.get(RESUME_PARAM));
     dispatch({
       type: "RESTORE",
       owner,
@@ -401,8 +402,8 @@ export function useGearUp() {
         durationDays: draft.durationDays,
         lastOuting: draft.lastOuting,
       },
+      saveOnReturn: returning === "save" ? draft?.lastOuting : null,
     });
-    const returning = resumeView(searchParams.get(RESUME_PARAM));
     if (returning) removeResumeParam();
     if (returning && draft?.lastOuting) {
       pendingResume.current = { outing: draft.lastOuting, onResultsEntry: false, view: returning };
@@ -533,5 +534,6 @@ export function useGearUp() {
     showPlanForm,
     editOuting,
     resetToInitialState,
+    opensSave: !accountChanging && state.opensSave,
   };
 }
