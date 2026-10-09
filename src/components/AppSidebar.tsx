@@ -31,7 +31,7 @@ const FOOTER_ITEMS = [
   },
 ];
 
-// The active destination gets a fill, a heavier label and a teal icon. On
+// The active destination gets a fill, a heavier label and a primary icon. On
 // touch screens the collapsed rail's icon buttons grow to 44px, so the rail
 // padding shrinks to keep them inside its 52px width.
 const SIDEBAR_ITEM_CLASS =
