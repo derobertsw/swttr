@@ -6,14 +6,15 @@ import { toast } from "sonner";
 import {
   ORGANIZER,
   SAM,
-  STOWE_PLACE,
   STOWE_STOP,
   TRIP,
   fakeTripApi,
   reply,
+  sentBodies,
   tripFull,
 } from "@/test/tripApi";
-import type { TripDay, TripMember, TripMemberDayKit } from "@/types/trips";
+import { previewItinerary } from "@/lib/trip-itinerary";
+import type { TripDay, TripFull, TripItineraryRequest, TripMember, TripMemberDayKit } from "@/types/trips";
 import { savedOutfit } from "@/test/savedKit";
 import DayDetailPage from "./page";
 import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
@@ -268,32 +269,84 @@ describe("Trip day page", () => {
     expect(screen.getByText("1 layers picked")).toBeInTheDocument();
   });
 
-  it("keeps the new place in the editor when it can't be saved", async () => {
-    vi.stubGlobal(
-      "fetch",
-      fakeTripApi({
-        "GET /api/v1/trips/trip-1": TRIP_ROUTE,
+  describe("changing the day's location", () => {
+    const JAY_PLACE = { id: 2, name: "Jay", region: "Vermont", country: "United States", latitude: 44.94, longitude: -72.5 };
+    const ITINERARY = "POST /api/v1/trips/trip-1/itinerary";
+    // Saturday at Stowe and Sunday on the base, also Stowe.
+    const SUNDAY: TripDay = { ...DAY, id: "day-2", date: "2026-10-11", stop_id: null };
+
+    /** Picks Jay in the location editor and opens the review. */
+    async function chooseJay(full: TripFull, save: () => ReturnType<typeof reply>, button = "Change") {
+      const fetchMock = fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, full),
         "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
-        "GET /api/geocode": reply(200, { results: [STOWE_PLACE] }),
-        "PATCH /api/v1/trips/trip-1/stops/stop-stowe": reply(500, { error: "Database unavailable" }),
-      })
-    );
-    const user = userEvent.setup();
-    await renderPage();
+        "GET /api/geocode": reply(200, { results: [JAY_PLACE] }),
+        [ITINERARY]: (body) => {
+          const { preview, ...request } = body as Record<string, unknown>;
+          return preview ? reply(200, previewItinerary(full, request as unknown as TripItineraryRequest)) : save();
+        },
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const user = userEvent.setup();
+      await renderPage();
+      await user.click(await screen.findByRole("button", { name: button }));
+      const search = screen.getByRole("combobox");
+      await user.type(search, "Jay");
+      await user.click(await screen.findByRole("option", { name: /Jay/ }));
+      await user.click(screen.getByRole("button", { name: "Choose days" }));
+      return { user, fetchMock, search, dialog: await screen.findByRole("dialog", { name: "Change location" }) };
+    }
 
-    await user.click(await screen.findByRole("button", { name: "Change" }));
-    const search = screen.getByRole("combobox");
-    await user.type(search, "Stowe");
-    await user.click(await screen.findByRole("option", { name: /Stowe/ }));
-    await user.click(screen.getByRole("button", { name: "Save location" }));
+    it("asks whether it's only this day or every day at its stop, with the dates, before saving", async () => {
+      const { user, fetchMock, dialog } = await chooseJay(tripFull({ stops: [STOWE_STOP], days: [DAY, SUNDAY] }), () => reply(200, { ok: true }));
+      const onlyToday = await within(dialog).findByRole("radio", { name: /Only Sat Oct 10/ });
+      const everyDay = within(dialog).getByRole("radio", { name: /Every day at Stowe, Vermont \(2 days\)/ });
+      expect(onlyToday).not.toBeChecked();
+      expect(everyDay).not.toBeChecked();
+      expect(within(dialog).getByRole("button", { name: "Save location" })).toBeDisabled();
 
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Couldn't save the location", {
-        description: "Database unavailable",
-      })
-    );
-    expect(search).toHaveValue("Stowe, Vermont, United States");
-    expect(screen.getByRole("button", { name: "Save location" })).toBeEnabled();
+      await user.click(everyDay);
+      expect(within(dialog).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+        "Sat Oct 10Stowe, Vermont · No activity → Jay, Vermont · No activity",
+        "Sun Oct 11Stowe, Vermont (base) · No activity → Jay, Vermont (base) · No activity",
+      ]);
+      await user.click(onlyToday);
+      expect(within(dialog).getAllByRole("listitem")).toHaveLength(1);
+      await user.click(within(dialog).getByRole("button", { name: "Save location" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+      expect(sentBodies(fetchMock, ITINERARY).at(-1)).toEqual({
+        action: "set_day_place", date: "2026-10-10", place: { name: "Jay, Vermont", latitude: 44.94, longitude: -72.5 },
+        scope: "day", expected: { stop_id: STOWE_STOP.id, dates: ["2026-10-10"] },
+      });
+      // The trip reloads after the save.
+      expect(sentBodies(fetchMock, "GET /api/v1/trips/trip-1")).toHaveLength(2);
+    });
+
+    it("offers one choice when the stop serves only this day", async () => {
+      const { dialog } = await chooseJay(tripFull({ stops: [STOWE_STOP], days: [DAY] }), () => reply(200, { ok: true }));
+      expect(await within(dialog).findByText("Only Sat Oct 10")).toBeInTheDocument();
+      expect(within(dialog).queryByRole("radio")).not.toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Save location" })).toBeEnabled();
+    });
+
+    it("offers the place for every day when the trip has no stops", async () => {
+      const { dialog } = await chooseJay(tripFull({ days: [{ ...DAY, stop_id: null }, SUNDAY] }), () => reply(200, { ok: true }), "Set location");
+      expect(await within(dialog).findByText("Every day (2 days)")).toBeInTheDocument();
+      expect(within(dialog).getByText("Jay, Vermont becomes the trip's base.")).toBeInTheDocument();
+      expect(within(dialog).getAllByRole("listitem")).toHaveLength(2);
+    });
+
+    it("keeps the new place in the editor when it can't be saved", async () => {
+      const { user, dialog, search } = await chooseJay(tripFull({ stops: [STOWE_STOP], days: [DAY] }), () => reply(500, { error: "Couldn't save the change. Nothing was changed; try again." }));
+      await user.click(await within(dialog).findByRole("button", { name: "Save location" }));
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent("Nothing was changed");
+      await user.click(within(dialog).getByRole("button", { name: "Keep editing" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(search).toHaveValue("Jay, Vermont, United States");
+      expect(screen.getByRole("button", { name: "Choose days" })).toHaveFocus();
+    });
   });
 
   it("retries a failed forecast and replaces the error with weather", async () => {

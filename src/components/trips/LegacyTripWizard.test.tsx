@@ -17,6 +17,7 @@ import {
 import NewTripPage from "./LegacyTripWizard";
 import { buildLodging } from "@/lib/trip-lodging";
 import { previewDateChange } from "@/lib/trip-dates";
+import { previewItinerary } from "@/lib/trip-itinerary";
 import type { TripFull } from "@/types/trips";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
@@ -401,28 +402,34 @@ describe("New trip wizard", () => {
     expect(search).toHaveValue("Stowe, Vermont, United States");
   });
 
-  it("keeps a stop listed when removing it fails", async () => {
+  it("removes a stop only after reviewing its days, and keeps it listed when that fails", async () => {
     setQuery("trip=trip-1&step=2");
-    vi.stubGlobal(
-      "fetch",
-      fakeTripApi({
-        "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP] })),
-        "DELETE /api/v1/trips/trip-1/stops/stop-stowe": reply(500, {
-          error: "Database unavailable",
-        }),
-      })
-    );
+    const full = tripFull({ stops: [STOWE_STOP], days: [{ id: "day-1", trip_id: TRIP.id, date: "2026-10-11", stop_id: null, activity: "Hike" }] });
+    let saves = 0;
+    const fetchMock = fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, full),
+      "POST /api/v1/trips/trip-1/itinerary": (body) => (body as { preview?: boolean }).preview
+        ? reply(200, previewItinerary(full, { action: "remove_stop", stop_id: STOWE_STOP.id }))
+        : ++saves === 1 ? reply(500, { error: "Couldn't save the change. Nothing was changed; try again." }) : reply(200, { ok: true }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<NewTripPage />);
 
     await user.click(await screen.findByRole("button", { name: "Remove Stowe, Vermont" }));
+    const dialog = await screen.findByRole("dialog", { name: "Remove Stowe, Vermont" });
+    // The last stop: its day is left without a destination, and that's shown first.
+    expect(await within(dialog).findByRole("listitem")).toHaveTextContent("Sun Oct 11Stowe, Vermont (base) · Hike → No destination · Hike");
+    await user.click(within(dialog).getByRole("button", { name: "Remove stop" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Nothing was changed");
+    expect(screen.getByText("Stowe, Vermont", { selector: "p" })).toBeInTheDocument();
 
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Couldn't remove the stop", {
-        description: "Database unavailable",
-      })
-    );
-    expect(screen.getByText("Stowe, Vermont")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Remove stop" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByText("Stowe, Vermont", { selector: "p" })).not.toBeInTheDocument();
+    expect(sentBodies(fetchMock, "POST /api/v1/trips/trip-1/itinerary").slice(1)).toEqual(Array(2).fill(
+      { action: "remove_stop", stop_id: STOWE_STOP.id, reassign_to: null, expected: ["2026-10-11"] }
+    ));
   });
 
   it("keeps the name when someone can't be added to the crew", async () => {
@@ -590,7 +597,7 @@ describe("New trip wizard", () => {
       await user.click(within(sheet).getByRole("button", { name: "Save stop" }));
 
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-      expect(screen.getByText("Alpine")).toBeInTheDocument();
+      expect(screen.getByText("Base · Alpine")).toBeInTheDocument();
       expect(edit).toHaveFocus();
       expect(sentBodies(fetchMock, "PATCH /api/v1/trips/trip-1/stops/stop-stowe")).toEqual([
         { activities: ["Alpine"], day_dates: [] },
