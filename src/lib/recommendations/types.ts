@@ -2,7 +2,9 @@
  * Shared types for recommendation API routes
  */
 
-export interface GarmentThermalProps {
+import type { GarmentSemantics, ThermalProvenance } from '@/types/garments';
+
+export interface GarmentThermalProps extends ThermalProvenance {
   rcl_torso?: number;
   rcl_arms?: number;
   rcl_legs?: number;
@@ -15,6 +17,8 @@ export interface GarmentThermalProps {
 }
 
 export interface GarmentProtectionProps {
+  data_source?: string | null;
+  generic_estimate?: boolean;
   windproof_rating?: string;
   waterproof_rating?: string;
   waterproof_mm?: number;
@@ -27,7 +31,7 @@ export interface GarmentActivityRatingProps {
   alpine_skiing_score?: number;
 }
 
-export interface GarmentRow {
+export interface GarmentRow extends GarmentSemantics {
   id: string;
   brand: string;
   model_name: string;

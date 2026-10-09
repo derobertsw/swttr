@@ -39,16 +39,18 @@ The biophysics-supported activities share a common recommendation pipeline built
 
 Golden tests in `src/app/api/v1/recommendations/golden.test.ts` pin every sport's full response against a snapshot of the real gear catalog; an intended output change shows up as a snapshot diff to review and update with `npx vitest run -u`.
 
+Running/XC garment and sustained-effort policy contracts, calibration evidence, generic catalog estimates, migration order and validation limits are documented in [Running and XC foundations](docs/running-xc-foundations.md). These foundations precede the remaining selector and presentation changes in #243.
+
 ### 1. Recommendation Pipeline
 
 Every biophysics recommendation passes through the same pipeline, from metabolic rate lookup through final comfort classification. Multi-phase sports run the target steps once per phase: alpine blends a skiing and a chairlift phase, and ski touring computes uphill, downhill, and transition phases.
 
 ```mermaid
 graph TD
-    A[Activity + Exertion Level] --> B[Metabolic Rate Selection]
+    A[Activity + Exertion Level] --> B[Metabolic Rate Selection<br/>Running/XC: sustained MET × mass / body area<br/>Other sports: existing rate and size heuristic]
     B --> C[IREQ Calculation]
     C --> D[Activity Target Range]
-    D --> E[CoWEDA Validation Buffer]
+    D --> E[CoWEDA-inspired heuristic buffer<br/>Running/XC: taper with cold, wind and wet exposure]
     E --> F[Regional & Extremity Targets<br/>see Thermal Targets and Comfort]
     F --> P[Load Gear Pool:<br/>wardrobe, or catalog filtered by activity score]
     P -->|No usable garments| T[Targets-only response]
@@ -85,7 +87,8 @@ Before ensemble building begins, all wardrobe garments are split into four mutua
 
 ```mermaid
 graph TD
-    W[User Wardrobe] --> CAT[categorizeGarments]
+    W[User Wardrobe] --> DATA[Require known covered-region thermal data<br/>Carry type, standalone usage and partial coverage]
+    DATA --> CAT[categorizeGarments]
 
     CAT --> BL[Base Layers]
     CAT --> ML[Mid Layers]
@@ -180,6 +183,7 @@ graph TD
         RUN --> R1[Breathability-sorted at every layer]
         R1 --> R2[Shells conditional:<br/>clo deficit or precipitation]
         R2 --> R3[Whole-body clo budget]
+        R3 --> R4[Retain actual wind/wet protection independently<br/>Warn when available clothing cannot provide it]
     end
 
     subgraph "Biking — shared breathable builder"
@@ -226,7 +230,9 @@ graph TD
 
     RUN --> RCHECK{Clo deficit<br/>OR precipitation?}
     RCHECK -->|Yes| RADD[Add breathability-sorted shells]
-    RCHECK -->|No| RSKIP[Skip shells entirely]
+    RCHECK -->|No| RSKIP[Skip thermal shell step]
+    RADD --> RPROTECT[Check policy wind/wet needs against garment data<br/>Retain protection even above thermal budget]
+    RSKIP --> RPROTECT
 
     BIKE --> BADD[Always consider shells<br/>— breathability-sorted]
 
@@ -297,7 +303,7 @@ Body-part targets are bands, like the whole-body target range. The torso, arms a
 graph TD
     RANGE[Whole-body target range] --> SPLIT[Split across torso, arms and legs<br/>multipliers rescaled to an area-weighted mean of 1]
     SPLIT --> REG[Regional min and neutral targets]
-    PIREQ[Whole-body IREQ of the phase the hands and head follow<br/>alpine: skiing phase] --> EXT[Hand and head targets:<br/>activity multiplier × wind factor<br/>× temperature factor from 0.8 to 1<br/>+ CoWEDA extremity buffer]
+    PIREQ[Whole-body IREQ of the phase the hands and head follow<br/>alpine: skiing phase] --> EXT[Hand and head targets:<br/>activity multiplier × wind factor<br/>× temperature factor from 0.8 to 1<br/>+ CoWEDA-inspired extremity buffer<br/>Running/XC: taper both bands and buffer<br/>Allow zero thermal coverage in mild dry exercise]
 
     RANGE --> DEC{Comfort decision}
     REG --> DEC

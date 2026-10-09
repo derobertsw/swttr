@@ -1,4 +1,5 @@
 import { METABOLIC_RATES } from "./constants";
+import { SUSTAINED_ACTIVITY_METS } from './sport-policy';
 
 export const EXERTION_LEVELS = ["easy", "moderate", "hard"] as const;
 export type ExertionLevel = (typeof EXERTION_LEVELS)[number];
@@ -30,9 +31,9 @@ const METABOLIC_RATE_BY_ACTIVITY: Record<
   Record<ExertionLevel, number>
 > = {
   running: {
-    easy: METABOLIC_RATES.biking_moderate,
-    moderate: METABOLIC_RATES.running_moderate,
-    hard: METABOLIC_RATES.xc_skiing_racing,
+    easy: SUSTAINED_ACTIVITY_METS.running.easy * 58.2,
+    moderate: SUSTAINED_ACTIVITY_METS.running.moderate * 58.2,
+    hard: SUSTAINED_ACTIVITY_METS.running.hard * 58.2,
   },
   biking: {
     easy: METABOLIC_RATES.xc_skiing_easy,
@@ -40,9 +41,9 @@ const METABOLIC_RATE_BY_ACTIVITY: Record<
     hard: METABOLIC_RATES.running_moderate,
   },
   xc_skiing: {
-    easy: METABOLIC_RATES.xc_skiing_easy,
-    moderate: METABOLIC_RATES.xc_skiing_moderate,
-    hard: METABOLIC_RATES.xc_skiing_racing,
+    easy: SUSTAINED_ACTIVITY_METS.xc_skiing.easy * 58.2,
+    moderate: SUSTAINED_ACTIVITY_METS.xc_skiing.moderate * 58.2,
+    hard: SUSTAINED_ACTIVITY_METS.xc_skiing.hard * 58.2,
   },
   alpine_skiing: {
     easy: METABOLIC_RATES.light_activity,

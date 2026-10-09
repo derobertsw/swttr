@@ -6,9 +6,11 @@ import type { GarmentActivityRatingProps, GarmentRow, CategorizedGarments, Handw
 import type { RecommendationRequest } from './request';
 import { getUserWardrobeGarmentIds, fetchGarmentsWithDetails, fetchUserHandwear, fetchUserHeadwear } from './database';
 import { categorizeGarments } from './categorization';
+import { hasUsableThermalData } from './garment-semantics';
 
 /** How to narrow the catalog when the user has no wardrobe. */
 export interface CatalogFilter {
+  activity?: string;
   /** Minimum activity score, applied in the database query. */
   minScore?: { field: keyof GarmentActivityRatingProps; minScore: number };
   /** Applied to the fetched garments. */
@@ -48,7 +50,9 @@ export async function loadGearPool(
   }
 
   const fetched = data ?? [];
-  const garments = usingWardrobe || !catalog.predicate ? fetched : fetched.filter(catalog.predicate);
+  const eligible = usingWardrobe || !catalog.predicate ? fetched : fetched.filter(catalog.predicate);
+  const garments = eligible.filter(g => hasUsableThermalData(g)
+    && (!catalog.activity || !g.suitable_activities?.length || g.suitable_activities.includes(catalog.activity)));
   if (garments.length === 0) {
     return { status: 'empty' };
   }
