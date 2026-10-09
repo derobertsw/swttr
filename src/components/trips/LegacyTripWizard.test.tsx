@@ -16,6 +16,8 @@ import {
 } from "@/test/tripApi";
 import NewTripPage from "./LegacyTripWizard";
 import { buildLodging } from "@/lib/trip-lodging";
+import { previewDateChange } from "@/lib/trip-dates";
+import type { TripFull } from "@/types/trips";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -44,6 +46,21 @@ async function pickDays(user: ReturnType<typeof userEvent.setup>, first: number,
     await user.click(screen.getByRole("button", { name: new RegExp(format(day, "PPPP")) }));
   }
   return days.map((day) => format(day, "yyyy-MM-dd"));
+}
+
+/** Answers the trip's PATCH like the API: a date review for a preview, otherwise the saved trip. */
+const tripPatch = (full: TripFull) => (body: unknown) => {
+  const { preview, start_date, end_date } = body as { preview?: boolean; start_date: string; end_date: string };
+  return preview ? reply(200, previewDateChange(full, start_date, end_date)) : reply(200, { trip: { ...full.trip, ...(body as object) } });
+};
+
+/** Confirms the date review, moving the plan when the trip keeps its length. */
+async function confirmDateChange(user: ReturnType<typeof userEvent.setup>) {
+  const dialog = await screen.findByRole("dialog", { name: "Review date change" });
+  const confirm = await within(dialog).findByRole("button", { name: /change dates$/i });
+  const move = within(dialog).queryByRole("radio", { name: /Move the plan/ });
+  if (move) await user.click(move);
+  await user.click(confirm);
 }
 
 /** Fills in step 1 and creates the trip. */
@@ -159,15 +176,16 @@ describe("New trip wizard", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("reviews preserved stays and morning origins before confirming changed trip dates", async () => {
+  it("reviews each day's plan and the kept stays before changing trip dates", async () => {
     setQuery("trip=trip-1&step=1");
-    const lodging = buildLodging({ ...TRIP, lodging_revision: 2 }, [], []);
-    let attempts = 0;
+    const hotel = { id: "40f9f55e-0e74-4c4a-923f-d7a3f92468a0", trip_id: TRIP.id, name: "Hotel", check_in: "2026-10-10", check_out: "2026-10-12", type: null, address: null, property_url: null, check_in_time: null, check_out_time: null, notes: null, booking_status: "booked" as const, created_at: TRIP.created_at, updated_at: TRIP.updated_at };
+    const full = tripFull({ trip: { ...TRIP, lodging_revision: 2 }, lodging: buildLodging({ ...TRIP, lodging_revision: 2 }, [hotel], []) });
     const api = fakeTripApi({
-      "GET /api/v1/trips/trip-1": reply(200, tripFull({ lodging })),
-      "PATCH /api/v1/trips/trip-1": (body) => ++attempts === 1
-        ? reply(409, { error: "Review stay dates", lodging_after: lodging, lodging_revision: 2 })
-        : reply(200, { trip: { ...TRIP, ...(body as object) } }),
+      "GET /api/v1/trips/trip-1": reply(200, full),
+      "PATCH /api/v1/trips/trip-1": (body) => {
+        const { preview, start_date, end_date } = body as { preview?: boolean; start_date: string; end_date: string };
+        return preview ? reply(200, previewDateChange(full, start_date, end_date)) : reply(200, { trip: { ...TRIP, start_date, end_date } });
+      },
     });
     vi.stubGlobal("fetch", api);
     const user = userEvent.setup();
@@ -175,17 +193,15 @@ describe("New trip wizard", () => {
     await screen.findByRole("heading", { name: "When?" });
     const [start, end] = await pickDays(user, 14, 16, new Date(`${TRIP.start_date}T00:00:00`));
     await user.click(screen.getByRole("button", { name: "Save changes" }));
-    const dialog = await screen.findByRole("dialog", { name: "Review stays before changing dates" });
-    expect(within(dialog).getAllByText(/Starting from Not set/).length).toBeGreaterThan(0);
-    expect(attempts).toBe(1);
-    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([
-      { start_date: start, end_date: end },
-    ]);
-    await user.click(within(dialog).getByRole("button", { name: "Keep stays and change trip dates" }));
+    const dialog = await screen.findByRole("dialog", { name: "Review date change" });
+    expect(await within(dialog).findByText("Stays keep their dates and bookings.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Review nights outside the new dates: 2026-10-10, 2026-10-11")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("radio", { name: /Move the plan/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Change dates" }));
     expect(await screen.findByRole("heading", { name: "Where?" })).toBeInTheDocument();
     expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([
-      { start_date: start, end_date: end },
-      { start_date: start, end_date: end, lodging_revision: 2 },
+      { start_date: start, end_date: end, preview: true },
+      { start_date: start, end_date: end, mode: "move", lodging_revision: 2, expected_removed: [], from: { start_date: TRIP.start_date, end_date: TRIP.end_date } },
     ]);
   });
 
@@ -200,7 +216,7 @@ describe("New trip wizard", () => {
     setQuery(`trip=trip-1&step=${step}`);
     const api = fakeTripApi({
       "GET /api/v1/trips/trip-1": reply(200, tripFull({ trip })),
-      "PATCH /api/v1/trips/trip-1": (body) => reply(200, { trip: { ...trip, ...(body as object) } }),
+      "PATCH /api/v1/trips/trip-1": tripPatch(tripFull({ trip })),
     });
     vi.stubGlobal("fetch", api);
     const user = userEvent.setup();
@@ -210,9 +226,11 @@ describe("New trip wizard", () => {
     expect(screen.getByRole("grid", { name: format(month, "LLLL yyyy") })).toBeInTheDocument();
     const [start, end] = await pickDays(user, 14, 16, month);
     await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await confirmDateChange(user);
     await screen.findByRole("heading", { name: "Where?" });
     expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([
-      { start_date: start, end_date: end },
+      { start_date: start, end_date: end, preview: true },
+      expect.objectContaining({ start_date: start, end_date: end }),
     ]);
   });
 
@@ -229,7 +247,7 @@ describe("New trip wizard", () => {
     setQuery(`trip=trip-1&step=${step}`);
     const api = fakeTripApi({
       "GET /api/v1/trips/trip-1": reply(200, tripFull({ trip })),
-      "PATCH /api/v1/trips/trip-1": (body) => reply(200, { trip: { ...trip, ...(body as object) } }),
+      "PATCH /api/v1/trips/trip-1": tripPatch(tripFull({ trip })),
     });
     vi.stubGlobal("fetch", api);
     const user = userEvent.setup();
@@ -239,10 +257,10 @@ describe("New trip wizard", () => {
     await user.click(screen.getByRole("button", { name: new RegExp(format(firstDay, "PPPP")) }));
     if (last !== 14) await user.click(screen.getByRole("button", { name: new RegExp(format(lastDay, "PPPP")) }));
     await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await confirmDateChange(user);
     await screen.findByRole("heading", { name: "Where?" });
-    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([
-      { start_date: format(firstDay, "yyyy-MM-dd"), end_date: format(lastDay, "yyyy-MM-dd") },
-    ]);
+    const dates = { start_date: format(firstDay, "yyyy-MM-dd"), end_date: format(lastDay, "yyyy-MM-dd") };
+    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([{ ...dates, preview: true }, expect.objectContaining(dates)]);
   });
 
   it("says so when the saved trip can't be reopened", async () => {

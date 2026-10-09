@@ -108,7 +108,7 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
       <div className="flex w-full max-w-2xl flex-col gap-5">
         <BackLink href={`/trips/${id}`}>Trip</BackLink>
         <header>
-          <SectionLabel>Trip settings</SectionLabel>
+          <SectionLabel>Crew</SectionLabel>
           <h1
             id={HEADING_ID}
             tabIndex={-1}

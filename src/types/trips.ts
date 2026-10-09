@@ -141,6 +141,47 @@ export interface TripLodging {
   days: TripLodgingContext[];
 }
 
+/** How a date change treats day plans: see docs/trip-editing.md. */
+export type TripDateChangeMode = "move" | "keep";
+
+export interface TripDateChangeDay {
+  date: string;
+  date_label: string;
+  /** For a moved day, the date its plan comes from. */
+  from_date_label: string | null;
+  destination: string;
+  activity: string | null;
+  /** Names of the crew with a kit on this day. */
+  kits: string[];
+}
+
+/** A removed day as the server last saw it; sent back to confirm the removal. */
+export interface TripRemovedDayCheck {
+  date: string;
+  stop_id: string | null;
+  activity: string | null;
+  kit_ids: string[];
+}
+
+export interface TripDateChangePlan {
+  mode: TripDateChangeMode;
+  moved: TripDateChangeDay[];
+  added: TripDateChangeDay[];
+  removed: TripDateChangeDay[];
+  /** Days that keep their date and plan. */
+  kept: number;
+  expected_removed: TripRemovedDayCheck[];
+}
+
+export interface TripDateChangePreview {
+  from: { start_date: string; end_date: string; label: string };
+  to: { start_date: string; end_date: string; label: string };
+  /** Moving is offered only when the trip keeps its length. */
+  plans: { keep: TripDateChangePlan; move?: TripDateChangePlan };
+  lodging_after: TripLodging;
+  lodging_revision: number;
+}
+
 export type TripLodgingAction = "save" | "remove" | "night";
 export interface TripLodgingPreview {
   revision: number;
