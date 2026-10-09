@@ -12,6 +12,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - **Body-part guidance** (torso, legs, hands, head/neck) with target clo insights
 - **Plan ahead** with multi-day forecasts and a packing list
 - **Trips** start with dates and one destination; add crew, stops, daily kits and shared gear afterward ([creation and recovery](docs/trip-creation.md))
+- **Edit trip** renames a saved trip and changes its dates after reviewing what moves, what's added and what's removed ([editing rules](docs/trip-editing.md))
 - **Crew stays** save optional lodging, assign nights and show each day's morning origin and tonight's stay ([stay planning and deployment](docs/trip-stays.md))
 - **Paid agent API** for machine callers, metered per request over HTTP 402 ([docs](docs/paid-agent-api-mpp.md))
 - **Mobile-first UX**, also shipped as an iOS app via Capacitor

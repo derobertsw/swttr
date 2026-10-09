@@ -37,9 +37,9 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
           <BackLink href="/trips">All trips</BackLink>
           {data && (
             <Button asChild variant="outline" size="sm">
-              <Link href={`/trips/${id}/manage`}>
+              <Link href={`/trips/${id}/settings`}>
                 <Settings />
-                Manage crew
+                Edit trip
               </Link>
             </Button>
           )}

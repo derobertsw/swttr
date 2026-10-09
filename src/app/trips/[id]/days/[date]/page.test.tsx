@@ -398,10 +398,11 @@ describe("Trip day page", () => {
     expect(screen.queryByRole("button", { name: "Hike" })).not.toBeInTheDocument();
   });
 
-  it("doesn't offer to create a day outside the trip dates", async () => {
+  it("explains a date the trip no longer includes and links back to its days", async () => {
     vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": reply(200, tripFull()) }));
     await renderPage("2026-10-13");
-    expect(await screen.findByText(/This date is outside the trip/)).toBeInTheDocument();
+    expect(await screen.findByText("This trip no longer includes this date. It now runs Oct 10 – Oct 12.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See the trip's days" })).toHaveAttribute("href", "/trips/trip-1");
     expect(screen.queryByRole("button", { name: "Create day plan" })).not.toBeInTheDocument();
   });
 

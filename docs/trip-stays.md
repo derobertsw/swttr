@@ -24,7 +24,7 @@ All API reads require the existing trip membership/owner checks; writes require 
 - `DELETE /api/v1/trips/:id/stays/:stayId`: `{expected_revision, mutation_id}`.
 - `PUT /api/v1/trips/:id/lodging-nights/:date`: `{status: "no_stay" | "unplanned", expected_revision, mutation_id, replace_nights?}`.
 
-For #176 and the existing legacy date editor, trip `PATCH` accepts `preview_lodging: true` alongside proposed dates and returns `lodging_after` without writing. A date change with existing lodging requires the reviewed `lodging_revision`; otherwise 409 returns the impact preview. The legacy editor shows it before confirmation. A database trigger increments the lodging revision when trip dates change, invalidating old stay previews. Stay dates, assignments and bookings remain intact.
+A trip date change (#176, [trip-editing.md](trip-editing.md)) is reviewed first: trip `PATCH` with `preview: true` returns `lodging_after` with the day-plan changes. Saving with existing lodging requires the reviewed `lodging_revision`; otherwise 409 returns the current review. A database trigger increments the lodging revision when trip dates change, invalidating old stay previews. Stay dates, assignments and bookings remain intact.
 
 ## Deployment and verification
 

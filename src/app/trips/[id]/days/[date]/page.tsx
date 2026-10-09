@@ -18,6 +18,7 @@ import {
   SectionLabel,
   TripError,
   WeatherGlyph,
+  formatDateRange,
   inferWeatherKind,
   sentenceCase,
 } from "@/components/trips/trip-primitives";
@@ -159,7 +160,7 @@ export default function DayDetailPage({
         {error && <TripError>{error}</TripError>}
 
         {data && !day && (
-          <MissingDayPlan tripId={id} date={date} dateLabel={dateLabel} canCreate={canCreateDay} onSaved={refresh} />
+          <MissingDayPlan tripId={id} date={date} dateLabel={dateLabel} canCreate={canCreateDay} tripDates={formatDateRange(data.trip.start_date, data.trip.end_date)} onSaved={refresh} />
         )}
         {data && day && (
           <>
@@ -236,8 +237,8 @@ export default function DayDetailPage({
   );
 }
 
-function MissingDayPlan({ tripId, date, dateLabel, canCreate, onSaved }: {
-  tripId: string; date: string; dateLabel: string; canCreate: boolean; onSaved: () => Promise<void>;
+function MissingDayPlan({ tripId, date, dateLabel, canCreate, tripDates, onSaved }: {
+  tripId: string; date: string; dateLabel: string; canCreate: boolean; tripDates: string; onSaved: () => Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -258,7 +259,8 @@ function MissingDayPlan({ tripId, date, dateLabel, canCreate, onSaved }: {
       <h1 className="text-xl font-semibold text-foreground">{dateLabel}</h1>
       <p className="mt-2 text-sm text-foreground">{canCreate
         ? "This date has no saved day plan. Create one to choose an activity and plan your kit."
-        : "This date is outside the trip. Return to the trip overview to review its dates."}</p>
+        : `This trip no longer includes this date. It now runs ${tripDates}.`}</p>
+      {!canCreate && <Link href={`/trips/${tripId}`} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">See the trip&apos;s days<ChevronRight className="size-4" /></Link>}
       {error && <p role="alert" className="mt-2 text-sm font-medium text-destructive">Couldn&apos;t create the day plan: {error}</p>}
       {canCreate && <Button type="button" onClick={() => void create()} disabled={saving} aria-busy={saving} className="mt-3">
         {saving ? "Creating day plan…" : "Create day plan"}

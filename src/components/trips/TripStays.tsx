@@ -9,21 +9,11 @@ import { cn } from "@/lib/utils";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { useTripEditorHistory } from "@/hooks/useTripEditorHistory";
-import { errorMessage, tripRequest, TripRequestError } from "@/lib/trip-requests";
+import { errorMessage, timedTripRequest as lodgingRequest, TripRequestError } from "@/lib/trip-requests";
 import type { TripFull, TripLodgingAction, TripLodgingPreview, TripStayInput, TripStaySummary } from "@/types/trips";
 
 type Editor = { action: TripLodgingAction; stay?: TripStaySummary; date?: string; focus?: string };
 const blankStay = (): TripStayInput => ({ id: crypto.randomUUID(), name: "", check_in: null, check_out: null, type: null, address: null, property_url: null, check_in_time: null, check_out_time: null, notes: null, booking_status: "not_booked" });
-
-async function lodgingRequest<T>(url: string, method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", body?: unknown): Promise<T> {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 20_000);
-  try { return await tripRequest<T>(url, method, body, { signal: controller.signal }); }
-  catch (err) {
-    if (controller.signal.aborted) throw new Error("The request took too long. Your changes are still here; try again.");
-    throw err;
-  } finally { window.clearTimeout(timeout); }
-}
 
 export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit: boolean; onSaved: () => Promise<void> }) {
   const [editor, setEditor] = useState<Editor | null>(null);

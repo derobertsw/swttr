@@ -41,6 +41,17 @@ export async function tripRequest<T>(
   return data as T;
 }
 
+/** tripRequest that gives up after 20 seconds, saying the edits are still there. */
+export async function timedTripRequest<T>(url: string, method: TripRequestMethod, body?: unknown): Promise<T> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20_000);
+  try { return await tripRequest<T>(url, method, body, { signal: controller.signal }); }
+  catch (err) {
+    if (controller.signal.aborted) throw new Error("The request took too long. Your changes are still here; try again.");
+    throw err;
+  } finally { window.clearTimeout(timeout); }
+}
+
 export function fetchTripFull(tripId: string): Promise<TripFull> {
   return tripRequest<TripFull>(`/api/v1/trips/${tripId}`);
 }

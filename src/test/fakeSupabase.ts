@@ -2,7 +2,8 @@
  * In-memory stand-in for the subset of the Supabase query builder used by the
  * API routes: from().select().eq().neq().in().gte().order().limit(), awaited
  * directly or via maybeSingle(), from().insert().select().single(), and
- * from().update().eq() or from().delete().eq() awaited directly.
+ * from().update().eq() or from().delete().eq() awaited directly or via
+ * select().single().
  *
  * Embedded one-to-one relations (e.g. garment_thermal_properties) are stored on
  * each row, matching PostgREST's response shape. A gte() filter on an embedded
@@ -86,6 +87,12 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
   /** Resolves to the first matching row, or null. */
   maybeSingle() {
     return Promise.resolve({ data: this.matches()[0] ?? null, error: null });
+  }
+
+  /** Resolves to the first matching row, or PostgREST's error when there is none. */
+  single() {
+    const row = this.matches()[0];
+    return Promise.resolve(row ? { data: row, error: null } : { data: null, error: { code: "PGRST116", message: "No rows" } });
   }
 
   private matches(): Row[] {

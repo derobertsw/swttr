@@ -18,6 +18,7 @@ describe("Saved trip next step", () => {
     vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP], days: [day] })) })); await act(async () => { render(<TripOverviewPage params={params} />); });
     expect(await screen.findByRole("link", { name: "Plan this day" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-10");
     expect(screen.getByRole("link", { name: "Add or edit destinations" })).toHaveAttribute("href", "/trips/trip-1/stops");
+    expect(screen.getByRole("link", { name: "Edit trip" })).toHaveAttribute("href", "/trips/trip-1/settings");
     expect(screen.getByRole("link", { name: "Group gear" })).toHaveAttribute("href", "/trips/trip-1/gear");
     expect(screen.getByRole("link", { name: "My pack list" })).toHaveAttribute("href", "/trips/trip-1/pack");
   });
