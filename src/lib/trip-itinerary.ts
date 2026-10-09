@@ -10,13 +10,15 @@ import type { TripDay, TripFull, TripItineraryOption, TripItineraryPreview, Trip
  */
 
 type DayCheck = { date: string; stop_id: string | null; activity: string | null };
+/** A stop's place as the review showed it, so a save can't overwrite a newer change to it. */
+type StopCheck = { name: string; latitude: number | null; longitude: number | null };
 
 /** A change as it's saved: the action and the payload of the option chosen in the review. */
 type ItineraryEdit =
   | { action: "remove_stop"; payload: { stop_id: string; reassign_to: string | null; expected: string[] } }
   | { action: "reorder_stops"; payload: { order: string[]; expected: string[] } }
   | { action: "assign_days"; payload: { dates: string[]; stop_id?: string; activity?: string | null; expected: DayCheck[] } }
-  | { action: "set_day_place"; payload: { date: string; place: TripPlace; scope: "day" | "stop"; expected: { stop_id: string | null; dates: string[] } } };
+  | { action: "set_day_place"; payload: { date: string; place: TripPlace; scope: "day" | "stop"; expected: { stop_id: string | null; stop: StopCheck | null; dates: string[] } } };
 
 type Invalid = { error: string };
 type Itinerary = { stops: Array<Pick<TripStop, "id" | "name" | "latitude" | "longitude">>; days: Array<Pick<TripDay, "date" | "stop_id" | "activity">> };
@@ -132,11 +134,18 @@ export function parseItineraryEdit(body: unknown): ItineraryEdit | Invalid {
       const place = placeOf(body.place);
       const expected = isObject(body.expected) ? body.expected : null;
       const expectedDates = dates(expected?.dates);
-      const stopId = expected?.stop_id ?? null;
-      if (!place || !isCalendarDate(body.date) || (body.scope !== "day" && body.scope !== "stop") || !expectedDates || !(stopId === null || isUuid(stopId))) return INVALID;
+      const rawStopId = expected?.stop_id ?? null;
+      const stopId = rawStopId === null ? null : isUuid(rawStopId) ? rawStopId.toLowerCase() : undefined;
+      // The day's stop as reviewed: required with its id, and absent when the trip had no stops.
+      const reviewed = isObject(expected?.stop) ? expected.stop : null;
+      const coordinate = (value: unknown) => value === null || (typeof value === "number" && Number.isFinite(value));
+      const stop = reviewed && typeof reviewed.name === "string" && coordinate(reviewed.latitude) && coordinate(reviewed.longitude)
+        ? { name: reviewed.name, latitude: reviewed.latitude as number | null, longitude: reviewed.longitude as number | null } : null;
+      if (!place || !isCalendarDate(body.date) || (body.scope !== "day" && body.scope !== "stop") || !expectedDates) return INVALID;
+      if (stopId === undefined || (stopId === null ? expected?.stop != null : !stop)) return INVALID;
       return {
         action: "set_day_place",
-        payload: { date: body.date, place, scope: body.scope, expected: { stop_id: stopId?.toLowerCase() ?? null, dates: expectedDates } },
+        payload: { date: body.date, place, scope: body.scope, expected: { stop_id: stopId, stop, dates: expectedDates } },
       };
     }
     default:
@@ -257,7 +266,10 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest):
       const { place } = request;
       const atPlace = (stop: Itinerary["stops"][number]) => stop.name === place.name && near(stop.latitude, place.latitude) && near(stop.longitude, place.longitude);
       const current = stopFor(day);
-      const payload = (scope: "day" | "stop", dates: string[]) => ({ date: day.date, place, scope, expected: { stop_id: current?.id ?? null, dates } });
+      const payload = (scope: "day" | "stop", dates: string[]) => ({
+        date: day.date, place, scope,
+        expected: { stop_id: current?.id ?? null, stop: current ? { name: current.name, latitude: current.latitude, longitude: current.longitude } : null, dates },
+      });
       const moved = (stop: Pick<TripStop, "id">) => ({ id: stop.id, name: place.name, latitude: place.latitude, longitude: place.longitude });
 
       if (!current) {
@@ -268,15 +280,29 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest):
         })] };
       }
       const atStop = datesAt(current.id);
-      const everyDay = option(full, { stops: stops.map((stop) => stop === current ? moved(stop) : stop), days }, {
-        key: "stop", label: `Every day at ${current.name} (${plural(atStop.length)})`, detail: `Changes ${current.name} to ${place.name}.`,
+      if (atPlace(current)) {
+        return { options: [option(full, { stops, days }, {
+          key: "stop", label: `${dateLabel(day.date)} is already at ${place.name}`, detail: null, payload: payload("stop", atStop),
+        })] };
+      }
+      // Another stop already at the place takes the days, rather than a second
+      // stop at the same place.
+      const existing = stops.find(atPlace);
+      const everyDay = option(full, existing
+        ? { stops, days: days.map((candidate) => stopFor(candidate) === current ? { ...candidate, stop_id: existing.id } : candidate) }
+        : { stops: stops.map((stop) => stop === current ? moved(stop) : stop), days }, {
+        key: "stop", label: `Every day at ${current.name} (${plural(atStop.length)})`,
+        detail: existing ? `Moves them to ${existing.name}, already a stop on this trip.` : `Changes ${current.name} to ${place.name}.`,
         payload: payload("stop", atStop),
       });
-      if (atPlace(current)) return { options: [{ ...everyDay, label: `${dateLabel(day.date)} is already at ${place.name}`, detail: null }] };
       if (atStop.length === 1) {
-        return { options: [{ ...everyDay, label: `Only ${dateLabel(day.date)}`, detail: `It's the only day at ${current.name}, so ${current.name} changes to ${place.name}.` }] };
+        return { options: [{
+          ...everyDay, label: `Only ${dateLabel(day.date)}`,
+          detail: existing
+            ? `Uses ${existing.name}, already a stop on this trip. ${current.name} will have no days.`
+            : `It's the only day at ${current.name}, so ${current.name} changes to ${place.name}.`,
+        }] };
       }
-      const existing = stops.find(atPlace);
       const target = existing ?? moved({ id: "new" });
       const onlyThisDay = option(full, {
         stops: existing ? stops : [...stops, target],

@@ -14,8 +14,8 @@
 --   sets that field on every date, so "activity": null clears it.
 -- - set_day_place {date, place, scope, expected}: 'day' gives the day a stop at
 --   the place (a stop already there, or a new last stop); 'stop' moves the
---   day's stop to the place for every day at it, or adds the place as the base
---   when the trip has no stops.
+--   day's stop to the place for every day at it, or moves those days to a stop
+--   already there, or adds the place as the base when the trip has no stops.
 --
 -- `expected` is what the review showed. When the trip no longer matches it,
 -- nothing changes and the error is 40001.
@@ -190,19 +190,33 @@ BEGIN
         FROM public.trip_days d
         WHERE d.trip_id = p_trip_id AND (d.stop_id = v_stop OR (d.stop_id IS NULL AND v_stop IS NOT DISTINCT FROM base_id));
     END IF;
+    -- The stop's own place too, so a save can't overwrite a newer change to it.
     IF v_stop IS DISTINCT FROM (p_payload->'expected'->>'stop_id')::uuid
-      OR v_dates IS DISTINCT FROM ARRAY(SELECT e::date FROM jsonb_array_elements_text(p_payload->'expected'->'dates') AS e ORDER BY 1) THEN
+      OR v_dates IS DISTINCT FROM ARRAY(SELECT e::date FROM jsonb_array_elements_text(p_payload->'expected'->'dates') AS e ORDER BY 1)
+      OR (v_stop IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM public.trip_stops s
+          WHERE s.id = v_stop AND s.name = p_payload->'expected'->'stop'->>'name'
+            AND s.latitude IS NOT DISTINCT FROM (p_payload->'expected'->'stop'->>'latitude')::numeric
+            AND s.longitude IS NOT DISTINCT FROM (p_payload->'expected'->'stop'->>'longitude')::numeric
+      )) THEN
       RAISE EXCEPTION 'This day''s destination changed. Review it again.' USING ERRCODE = '40001';
     END IF;
 
+    -- A stop already at this place, the day's own first.
+    SELECT s.id INTO v_target FROM public.trip_stops s
+      WHERE s.trip_id = p_trip_id AND s.name = v_name
+        AND abs(s.latitude - v_latitude) <= 0.0001 AND abs(s.longitude - v_longitude) <= 0.0001
+      ORDER BY (s.id IS NOT DISTINCT FROM v_stop) DESC, s.position LIMIT 1;
     IF v_scope = 'stop' AND v_stop IS NOT NULL THEN
-      UPDATE public.trip_stops AS s SET name = v_name, latitude = v_latitude, longitude = v_longitude WHERE s.id = v_stop;
+      IF v_target IS NULL THEN
+        UPDATE public.trip_stops AS s SET name = v_name, latitude = v_latitude, longitude = v_longitude WHERE s.id = v_stop;
+      ELSIF v_target <> v_stop THEN
+        -- Another stop is already there: its days move to it.
+        UPDATE public.trip_days AS d SET stop_id = v_target
+          WHERE d.trip_id = p_trip_id AND (d.stop_id = v_stop OR (d.stop_id IS NULL AND v_stop = base_id));
+      END IF;
     ELSE
-      -- Use a stop already at this place, or add one after the others.
-      SELECT s.id INTO v_target FROM public.trip_stops s
-        WHERE s.trip_id = p_trip_id AND s.name = v_name
-          AND abs(s.latitude - v_latitude) <= 0.0001 AND abs(s.longitude - v_longitude) <= 0.0001
-        ORDER BY s.position LIMIT 1;
+      -- Add the place after the other stops when no stop is there yet.
       IF v_target IS NULL THEN
         INSERT INTO public.trip_stops (trip_id, position, name, latitude, longitude)
           SELECT p_trip_id, coalesce(max(s.position) + 1, 0), v_name, v_latitude, v_longitude

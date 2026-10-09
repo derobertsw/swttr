@@ -19,6 +19,16 @@ describe("Itinerary previews", () => {
     expect(everyDay).toMatchObject({ key: "stop", label: "Every day at Stowe, Vermont (2 days)" });
   });
 
+  it("moves a stop's only day to a stop already at the picked place, rather than duplicating it", () => {
+    const only = options(previewItinerary(full, { action: "set_day_place", date: "2026-10-12", place: { name: STOWE_STOP.name, latitude: 44.47, longitude: -72.69 } }));
+    expect(only).toEqual([expect.objectContaining({
+      key: "stop", label: "Only Mon Oct 12",
+      detail: "Uses Stowe, Vermont, already a stop on this trip. Jay Peak, Vermont will have no days.",
+      changes: [expect.objectContaining({ before: "Jay Peak, Vermont · No activity", after: "Stowe, Vermont · No activity" })],
+      payload: expect.objectContaining({ scope: "stop", expected: { stop_id: JAY.id, stop: { name: JAY.name, latitude: JAY.latitude, longitude: JAY.longitude }, dates: ["2026-10-12"] } }),
+    })]);
+  });
+
   it("changes nothing when the day is already at the picked place", () => {
     expect(options(previewItinerary(full, { action: "set_day_place", date: "2026-10-10", place: { name: STOWE_STOP.name, latitude: 44.47, longitude: -72.69 } }))).toEqual([
       expect.objectContaining({ label: "Sat Oct 10 is already at Stowe, Vermont", changes: [], unchanged: 3 }),

@@ -54,7 +54,7 @@ Open to any member on the trip. The body has `name`, `start_date` and `end_date`
 - **Removing a stop needs a home for its days.** The review lists the days using it, its own and, for the base, the inherited ones, and asks which stop they move to. Only when it's the last stop do its days become "No destination". There's no silent fallback to the first stop.
 - **Reordering never moves a day.** Move earlier and Move later save at once, without a review, and say "Order saved. Every day keeps its destination." When another stop becomes first, days without a stop are pinned to the old base. If the stops changed elsewhere, the order reloads.
 - **Several days at once.** The Days section on Destinations selects days, then a destination, an activity (including "No activity") or both. Fields left on "Keep" don't change.
-- **A day's new location.** After picking a place, the day page offers "Only Sat Oct 10" (the day gets a stop at the place) or "Every day at Stowe, Vermont (3 days)" (the stop moves to the place), with the exact dates. When the stop serves only this day, it offers just one choice; when the trip has no stops, the place becomes the base for every day. A stop already at the place is reused rather than added again.
+- **A day's new location.** After picking a place, the day page offers "Only Sat Oct 10" (the day gets a stop at the place) or "Every day at Stowe, Vermont (3 days)" (the stop moves to the place), with the exact dates. When the stop serves only this day, it offers just one choice; when the trip has no stops, the place becomes the base for every day. When another stop is already at the place, the days move to it rather than a second stop being added at the same place.
 - **Who.** Any member on the trip, as for name and dates. Deleting the trip and managing stays stay with the organizer.
 
 ### Pages
@@ -83,7 +83,7 @@ Open to any member on the trip.
 | `remove_stop {stop_id, reassign_to}` | The dates using the stop | `reassign_to` is required while other stops remain, must be on the trip and differ from the stop (`22023`). An unknown stop is `P0002`. |
 | `reorder_stops {order}` | The stop ids in saved order | `order` lists every stop once (`22023`). Positions go through negative values, so the unique position holds row by row. |
 | `assign_days {dates, stop_id?, activity?}` | Each date's `{date, stop_id, activity}` | A present key sets that field; `activity: null` clears it. Every requested date must have a day. |
-| `set_day_place {date, place, scope}` | The day's effective stop and the dates that change | `scope` is `day` or `stop`. A missing day is `P0002`. |
+| `set_day_place {date, place, scope}` | The day's effective stop with its name and coordinates, and the dates that change | `scope` is `day` or `stop`. A stop already at the place takes the days. A missing day is `P0002`. |
 
 Only `service_role` may run it.
 

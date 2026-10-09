@@ -12,6 +12,9 @@ const jay = "2e4b8f1a-7c3d-4e5f-9a6b-1c2d3e4f5a66";
 const elsewhere = "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a";
 const JAY_PLACE = { name: "Jay Peak, Vermont", latitude: 44.9379, longitude: -72.5045 };
 const BURLINGTON = { name: "Burlington, Vermont", latitude: 44.4759, longitude: -73.2121 };
+// Each stop's place as a review shows it.
+const AT_STOWE = { name: "Stowe, Vermont", latitude: 44.4654, longitude: -72.6874 };
+const AT_SMUGGS = { name: "Smuggs, Vermont", latitude: 44.5884, longitude: -72.7834 };
 let db: PGlite;
 
 const edit = async (action: string, payload: unknown, user = "user-1") =>
@@ -176,37 +179,51 @@ describe("Itinerary edits in Postgres", () => {
 
   describe("changing a day's place", () => {
     it("gives only this day a new last stop", async () => {
-      await edit("set_day_place", { date: "2026-10-09", place: BURLINGTON, scope: "day", expected: { stop_id: stowe, dates: ["2026-10-09"] } });
+      await edit("set_day_place", { date: "2026-10-09", place: BURLINGTON, scope: "day", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-09"] } });
       expect(await stopNames()).toEqual(["Stowe, Vermont", "Smuggs, Vermont", "Jay Peak, Vermont", "Burlington, Vermont"]);
       expect(await labels()).toMatchObject({ "2026-10-09": "Burlington, Vermont · Ski touring", "2026-10-11": "Stowe, Vermont · No activity" });
     });
 
     it("uses a stop already at the place instead of adding another", async () => {
-      await edit("set_day_place", { date: "2026-10-11", place: { ...JAY_PLACE, latitude: 44.93791 }, scope: "day", expected: { stop_id: stowe, dates: ["2026-10-11"] } });
+      await edit("set_day_place", { date: "2026-10-11", place: { ...JAY_PLACE, latitude: 44.93791 }, scope: "day", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-11"] } });
       expect(await stopNames()).toHaveLength(3);
       expect((await labels())["2026-10-11"]).toBe("Jay Peak, Vermont · No activity");
     });
 
     it("moves the stop to the place for every day at it", async () => {
-      await edit("set_day_place", { date: "2026-10-11", place: BURLINGTON, scope: "stop", expected: { stop_id: stowe, dates: ["2026-10-09", "2026-10-11"] } });
+      await edit("set_day_place", { date: "2026-10-11", place: BURLINGTON, scope: "stop", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-09", "2026-10-11"] } });
       expect(await labels()).toMatchObject({ "2026-10-09": "Burlington, Vermont (base) · Ski touring", "2026-10-11": "Burlington, Vermont · No activity" });
       expect((await loadFull()).stops[0]).toMatchObject({ id: stowe, latitude: BURLINGTON.latitude, longitude: BURLINGTON.longitude });
+    });
+
+    it("moves every day at the stop to another stop already at the place, rather than duplicating it", async () => {
+      await edit("set_day_place", { date: "2026-10-11", place: JAY_PLACE, scope: "stop", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-09", "2026-10-11"] } });
+      expect(await stopNames()).toEqual(["Stowe, Vermont", "Smuggs, Vermont", "Jay Peak, Vermont"]);
+      expect(await labels()).toMatchObject({ "2026-10-09": "Jay Peak, Vermont · Ski touring", "2026-10-11": "Jay Peak, Vermont · No activity" });
+    });
+
+    it("refuses to overwrite a stop whose place changed after the review", async () => {
+      await db.query("UPDATE trip_stops SET name = 'Stowe Mountain Resort, Vermont' WHERE id = $1", [stowe]);
+      await expect(edit("set_day_place", { date: "2026-10-11", place: BURLINGTON, scope: "stop", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-09", "2026-10-11"] } })).rejects.toMatchObject({ code: "40001" });
+      await db.query("UPDATE trip_stops SET name = $2, latitude = 44.5 WHERE id = $1", [stowe, AT_STOWE.name]);
+      await expect(edit("set_day_place", { date: "2026-10-11", place: BURLINGTON, scope: "day", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-11"] } })).rejects.toMatchObject({ code: "40001" });
+      expect((await loadFull()).stops[0]).toMatchObject({ name: "Stowe, Vermont", latitude: 44.5 });
     });
 
     it("adds the place as the base for every day when the trip has no stops", async () => {
       await db.query("UPDATE trip_days SET stop_id = NULL");
       await db.query("DELETE FROM trip_stops");
       const dates = ["2026-10-09", "2026-10-10", "2026-10-11", "2026-10-12"];
-      await expect(edit("set_day_place", { date: "2026-10-10", place: BURLINGTON, scope: "day", expected: { stop_id: null, dates: ["2026-10-10"] } })).rejects.toMatchObject({ code: "22023" });
-      await edit("set_day_place", { date: "2026-10-10", place: BURLINGTON, scope: "stop", expected: { stop_id: null, dates } });
+      await expect(edit("set_day_place", { date: "2026-10-10", place: BURLINGTON, scope: "day", expected: { stop_id: null, stop: null, dates: ["2026-10-10"] } })).rejects.toMatchObject({ code: "22023" });
+      await edit("set_day_place", { date: "2026-10-10", place: BURLINGTON, scope: "stop", expected: { stop_id: null, stop: null, dates } });
       expect(Object.values(await labels()).every((label) => label.startsWith("Burlington, Vermont (base) · "))).toBe(true);
     });
 
     it("refuses a missing day, and a stop or its days that changed after the review", async () => {
-      await expect(edit("set_day_place", { date: "2026-10-13", place: BURLINGTON, scope: "day", expected: { stop_id: stowe, dates: ["2026-10-13"] } })).rejects.toMatchObject({ code: "P0002" });
-      await expect(edit("set_day_place", { date: "2026-10-09", place: BURLINGTON, scope: "day", expected: { stop_id: smuggs, dates: ["2026-10-09"] } })).rejects.toMatchObject({ code: "40001" });
-      await expect(edit("set_day_place", { date: "2026-10-09", place: BURLINGTON, scope: "stop", expected: { stop_id: stowe, dates: ["2026-10-09"] } })).rejects.toMatchObject({ code: "40001" });
-      await expect(edit("set_day_place", { date: "2026-10-09", place: { ...BURLINGTON, latitude: 91 }, scope: "day", expected: { stop_id: stowe, dates: ["2026-10-09"] } })).rejects.toMatchObject({ code: "22023" });
+      await expect(edit("set_day_place", { date: "2026-10-13", place: BURLINGTON, scope: "day", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-13"] } })).rejects.toMatchObject({ code: "P0002" });
+      await expect(edit("set_day_place", { date: "2026-10-09", place: BURLINGTON, scope: "day", expected: { stop_id: smuggs, stop: AT_SMUGGS, dates: ["2026-10-09"] } })).rejects.toMatchObject({ code: "40001" });
+      await expect(edit("set_day_place", { date: "2026-10-09", place: BURLINGTON, scope: "stop", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-09"] } })).rejects.toMatchObject({ code: "40001" });
+      await expect(edit("set_day_place", { date: "2026-10-09", place: { ...BURLINGTON, latitude: 91 }, scope: "day", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-09"] } })).rejects.toMatchObject({ code: "22023" });
       expect(await stopNames()).toHaveLength(3);
     });
   });
@@ -257,6 +274,7 @@ describe("Itinerary edits in Postgres", () => {
       { action: "assign_days", dates: ["2026-10-10"], activity: "Ski touring" },
       { action: "set_day_place", date: "2026-10-09", place: BURLINGTON },
       { action: "set_day_place", date: "2026-10-10", place: BURLINGTON },
+      { action: "set_day_place", date: "2026-10-10", place: JAY_PLACE },
       { action: "set_day_place", date: "2026-10-11", place: JAY_PLACE },
       { action: "set_day_place", date: "2026-10-12", place: JAY_PLACE },
     ])("$action %#", check);

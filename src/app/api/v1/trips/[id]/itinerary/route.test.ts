@@ -55,7 +55,7 @@ describe("Reviewing and saving itinerary changes", () => {
     expect(preview.options[1].changes[0].after).toBe("Burlington, Vermont (base) · Ski touring");
     // Jay Peak serves only Sunday, so moving it is the one choice.
     const sunday = await previewOf({ action: "set_day_place", date: "2026-10-11", place: BURLINGTON });
-    expect(sunday.options).toMatchObject([{ key: "stop", label: "Only Sun Oct 11", payload: { scope: "stop", expected: { stop_id: JAY.id, dates: ["2026-10-11"] } } }]);
+    expect(sunday.options).toMatchObject([{ key: "stop", label: "Only Sun Oct 11", payload: { scope: "stop", expected: { stop_id: JAY.id, stop: { name: "Jay Peak" }, dates: ["2026-10-11"] } } }]);
   });
 
   it("previews assigning several days, including clearing their activity", async () => {
@@ -95,7 +95,9 @@ describe("Reviewing and saving itinerary changes", () => {
     expect((await post({ action: "remove_stop", stop_id: "stop-stowe", reassign_to: JAY.id, expected: [] })).status).toBe(400);
     expect((await post({ action: "reorder_stops", order: [JAY.id, STOWE.id] })).status).toBe(400);
     expect((await post({ action: "assign_days", dates: ["2026-10-11"], expected: [] })).status).toBe(400);
-    expect((await post({ action: "set_day_place", date: "2026-10-11", place: BURLINGTON, scope: "trip", expected: { stop_id: null, dates: [] } })).status).toBe(400);
+    expect((await post({ action: "set_day_place", date: "2026-10-11", place: BURLINGTON, scope: "trip", expected: { stop_id: null, stop: null, dates: [] } })).status).toBe(400);
+    // A day's stop is checked with the place the review showed for it.
+    expect((await post({ action: "set_day_place", date: "2026-10-11", place: BURLINGTON, scope: "stop", expected: { stop_id: JAY.id, dates: ["2026-10-11"] } })).status).toBe(400);
     expect(rpc).not.toHaveBeenCalled();
   });
 

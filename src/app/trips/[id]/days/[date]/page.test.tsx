@@ -318,7 +318,7 @@ describe("Trip day page", () => {
       expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
       expect(sentBodies(fetchMock, ITINERARY).at(-1)).toEqual({
         action: "set_day_place", date: "2026-10-10", place: { name: "Jay, Vermont", latitude: 44.94, longitude: -72.5 },
-        scope: "day", expected: { stop_id: STOWE_STOP.id, dates: ["2026-10-10"] },
+        scope: "day", expected: { stop_id: STOWE_STOP.id, stop: { name: STOWE_STOP.name, latitude: 44.47, longitude: -72.69 }, dates: ["2026-10-10"] },
       });
       // The trip reloads after the save.
       expect(sentBodies(fetchMock, "GET /api/v1/trips/trip-1")).toHaveLength(2);

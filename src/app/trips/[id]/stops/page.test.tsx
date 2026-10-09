@@ -134,7 +134,9 @@ const ITINERARY = "POST /api/v1/trips/trip-1/itinerary";
 async function openItinerary(save: (body: Record<string, unknown>, full: TripFull) => ReturnType<typeof reply> | TripFull) {
   let full = tripFull({ stops: [STOWE_STOP, second, jay], days: itineraryDays() });
   const fetchMock = fakeTripApi({
-    "GET /api/v1/trips/trip-1": () => reply(200, full),
+    // A copy per load, as a real response would be, so a change made here
+    // reaches the page only when it reloads.
+    "GET /api/v1/trips/trip-1": () => reply(200, structuredClone(full)),
     [ITINERARY]: (body) => {
       const { preview, ...request } = body as Record<string, unknown>;
       if (preview) return reply(200, previewItinerary(full, request as unknown as TripItineraryRequest));
@@ -227,7 +229,7 @@ describe("Changing the itinerary from Destinations", () => {
 
   it("reloads the stops when their order changed elsewhere", async () => {
     const { user, current } = await openItinerary(() => reply(409, { error: "The trip changed since you reviewed it. Review the changes again." }));
-    current().stops.reverse();
+    current().stops = [...current().stops].reverse();
     await user.click(screen.getByRole("button", { name: "Move Jay Peak earlier" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("The stops changed since you opened them", expect.anything()));
     await waitFor(() => expect(stopRows()).toEqual(["Jay Peak", "Burlington", "Stowe, Vermont"]));
