@@ -86,8 +86,9 @@ function getUncertaintyContextFactor(metabolicRate: number): {
 }
 
 /**
- * Converts CoWEDA validation skin-temperature uncertainty to clo buffers
- * for recommendation safety margins.
+ * Converts published CoWEDA errors to heuristic clo allowances. The conversion
+ * is an unvalidated SWTTR design assumption, not a measured safety bound or
+ * validation of this engine. Running/XC taper applicability in phaseTargets.
  */
 export function calculateCowedaValidationBuffer(input: CowedaBufferInput): CowedaValidationBuffer {
   const availableHeatFlux = Math.max(45, calculateAvailableHeatFlux(input));

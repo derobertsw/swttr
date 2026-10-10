@@ -128,7 +128,7 @@ describe('garmentToThermalProps', () => {
     expect(result.coversArms).toBe(true);
   });
 
-  it('should default rcl_arms to 0 when not provided', () => {
+  it('keeps missing covered-region insulation unknown', () => {
     const result = garmentToThermalProps(
       {
         id: 'test-id',
@@ -145,7 +145,7 @@ describe('garmentToThermalProps', () => {
       }
     );
 
-    expect(result.rclArms).toBe(0);
+    expect(result.rclArms).toBeNaN();
     expect(result.coversArms).toBe(true);
   });
 });

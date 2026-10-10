@@ -110,7 +110,7 @@ describe('Alpine Recommendations API Route', () => {
         category: 'base_layer',
         covers_torso: true,
         covers_legs: false,
-        garment_thermal_properties: { rcl_torso: 0.2, rcl_arms: 0.2, rcl_whole_body: 0.1, evap_potential: 0.3 },
+        garment_thermal_properties: { recl_torso: 10, recl_arms: 10, recl_legs: 10, rcl_torso: 0.2, rcl_arms: 0.2, rcl_whole_body: 0.1, evap_potential: 0.3 },
       }),
       createMockGarment({
         id: 'base-legs',
@@ -119,7 +119,7 @@ describe('Alpine Recommendations API Route', () => {
         covers_torso: false,
         covers_arms: false,
         covers_legs: true,
-        garment_thermal_properties: { rcl_legs: 0.4, rcl_whole_body: 0.1, evap_potential: 0.3 },
+        garment_thermal_properties: { recl_torso: 10, recl_arms: 10, recl_legs: 10, rcl_legs: 0.4, rcl_whole_body: 0.1, evap_potential: 0.3 },
       }),
       createMockGarment({
         id: 'mid-torso',
@@ -127,7 +127,7 @@ describe('Alpine Recommendations API Route', () => {
         category: 'mid_layer_light',
         covers_torso: true,
         covers_legs: false,
-        garment_thermal_properties: { rcl_torso: 0.3, rcl_arms: 0.3, rcl_whole_body: 0.2, evap_potential: 0.25 },
+        garment_thermal_properties: { recl_torso: 10, recl_arms: 10, recl_legs: 10, rcl_torso: 0.3, rcl_arms: 0.3, rcl_whole_body: 0.2, evap_potential: 0.25 },
       }),
       createMockGarment({
         id: 'ins-legs',
@@ -136,7 +136,7 @@ describe('Alpine Recommendations API Route', () => {
         covers_torso: false,
         covers_arms: false,
         covers_legs: true,
-        garment_thermal_properties: { rcl_legs: 0.8, rcl_whole_body: 0.2, evap_potential: 0.2 },
+        garment_thermal_properties: { recl_torso: 10, recl_arms: 10, recl_legs: 10, rcl_legs: 0.8, rcl_whole_body: 0.2, evap_potential: 0.2 },
       }),
       createMockGarment({
         id: 'shell-torso',
@@ -144,7 +144,7 @@ describe('Alpine Recommendations API Route', () => {
         category: 'hard_shell',
         covers_torso: true,
         covers_legs: false,
-        garment_thermal_properties: { rcl_torso: 0.2, rcl_arms: 0.2, rcl_whole_body: 0.1, evap_potential: 0.15 },
+        garment_thermal_properties: { recl_torso: 10, recl_arms: 10, recl_legs: 10, rcl_torso: 0.2, rcl_arms: 0.2, rcl_whole_body: 0.1, evap_potential: 0.15 },
         garment_protection: { waterproof_mm: 20000 },
       }),
       createMockGarment({
@@ -154,7 +154,7 @@ describe('Alpine Recommendations API Route', () => {
         covers_torso: false,
         covers_arms: false,
         covers_legs: true,
-        garment_thermal_properties: { rcl_legs: 0.4, rcl_whole_body: 0.1, evap_potential: 0.15 },
+        garment_thermal_properties: { recl_torso: 10, recl_arms: 10, recl_legs: 10, rcl_legs: 0.4, rcl_whole_body: 0.1, evap_potential: 0.15 },
         garment_protection: { waterproof_mm: 18000 },
       }),
     ];
