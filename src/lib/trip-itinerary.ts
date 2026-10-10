@@ -11,10 +11,14 @@ import type { TripDay, TripFull, TripItineraryOption, TripItineraryPreview, Trip
  */
 
 type DayCheck = { date: string; stop_id: string | null; activity: string | null };
-/** A day as a copy's review showed it, with the `updated_at` of the user's kit there, or null. */
-type CopyCheck = DayCheck & { kit: string | null };
 /** A stop's place as the review showed it, so a save can't overwrite a newer change to it. */
 type StopCheck = { name: string; latitude: number | null; longitude: number | null };
+/**
+ * A day as a copy's review showed it: its effective stop (its own, or the
+ * base) with that stop's place, or null for no destination, and the
+ * `updated_at` of the user's kit there, or null.
+ */
+type CopyCheck = DayCheck & { stop: (StopCheck & { id: string }) | null; kit: string | null };
 /** Whether a copy brings the user's kit, and what it does where they already have one. */
 type KitCopy = "none" | "replace" | "keep";
 
@@ -105,15 +109,20 @@ export function parseItineraryRequest(body: unknown): TripItineraryRequest | Inv
   }
 }
 
+const coordinate = (value: unknown): value is number | null => value === null || (typeof value === "number" && Number.isFinite(value));
+
 /** A day's destination, activity and the user's kit as a copy's review showed them. Undefined when invalid. */
 function copyCheck(entry: unknown): Omit<CopyCheck, "date"> | undefined {
   if (!isObject(entry)) return undefined;
   const stopId = entry.stop_id ?? null;
   const activity = entry.activity ?? null;
   const kit = entry.kit ?? null;
+  const place = entry.stop ?? null;
   if (!(stopId === null || isUuid(stopId)) || !(activity === null || typeof activity === "string")) return undefined;
   if (!(kit === null || (typeof kit === "string" && kit.length <= 40 && Number.isFinite(Date.parse(kit))))) return undefined;
-  return { stop_id: stopId?.toLowerCase() ?? null, activity, kit };
+  if (place !== null && !(isObject(place) && isUuid(place.id) && typeof place.name === "string" && coordinate(place.latitude) && coordinate(place.longitude))) return undefined;
+  const stop = place && { id: (place.id as string).toLowerCase(), name: place.name as string, latitude: place.latitude as number | null, longitude: place.longitude as number | null };
+  return { stop_id: stopId?.toLowerCase() ?? null, activity, stop, kit };
 }
 
 /** The change to save, rebuilt from its validated fields only, or why it can't be. */
@@ -162,7 +171,6 @@ export function parseItineraryEdit(body: unknown): ItineraryEdit | Invalid {
       const stopId = rawStopId === null ? null : isUuid(rawStopId) ? rawStopId.toLowerCase() : undefined;
       // The day's stop as reviewed: required with its id, and absent when the trip had no stops.
       const reviewed = isObject(expected?.stop) ? expected.stop : null;
-      const coordinate = (value: unknown) => value === null || (typeof value === "number" && Number.isFinite(value));
       const stop = reviewed && typeof reviewed.name === "string" && coordinate(reviewed.latitude) && coordinate(reviewed.longitude)
         ? { name: reviewed.name, latitude: reviewed.latitude as number | null, longitude: reviewed.longitude as number | null } : null;
       if (!place || !isCalendarDate(body.date) || (body.scope !== "day" && body.scope !== "stop") || !expectedDates) return INVALID;
@@ -406,11 +414,18 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest, 
 
       const after = { stops, days: days.map((day) => request.dates.includes(day.date) ? { ...day, stop_id: source.stop_id, activity: source.activity } : day) };
       const plan = dayLabels(full).get(source.date)!;
+      // Each day's place as the review shows it, so a stop renamed or moved since can't slip through.
+      const placeOf = (day: TripDay) => {
+        const stop = stopFor(day);
+        return stop ? { id: stop.id, name: stop.name, latitude: stop.latitude, longitude: stop.longitude } : null;
+      };
       const payload = (kit: KitCopy) => ({
         from: source.date, dates: targets.map((day) => day.date), kit,
         expected: {
-          from: { stop_id: source.stop_id, activity: source.activity, kit: sourceKit?.updated_at ?? null },
-          days: targets.map((day) => ({ date: day.date, stop_id: day.stop_id, activity: day.activity, kit: sourceKit ? myKit(day)?.updated_at ?? null : null })),
+          from: { stop_id: source.stop_id, activity: source.activity, stop: placeOf(source), kit: sourceKit?.updated_at ?? null },
+          days: targets.map((day) => ({
+            date: day.date, stop_id: day.stop_id, activity: day.activity, stop: placeOf(day), kit: sourceKit ? myKit(day)?.updated_at ?? null : null,
+          })),
         },
       });
       if (!sourceKit) {

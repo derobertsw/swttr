@@ -312,6 +312,11 @@ describe("Itinerary edits in Postgres", () => {
         "UPDATE trip_member_day_kits SET items = '[\"shell\"]' WHERE trip_day_id = (SELECT id FROM trip_days WHERE date = '2026-10-11')",
         "UPDATE trip_member_day_kits SET items = '[\"shell\"]' WHERE trip_day_id = (SELECT id FROM trip_days WHERE date = '2026-10-09')",
         `INSERT INTO trip_member_day_kits (trip_day_id, trip_member_id, items) SELECT d.id, m.id, '["pole"]' FROM trip_days d, trip_members m WHERE d.date = '2026-10-12' AND m.user_id = 'user-1'`,
+        // The source goes to the base, so a renamed base or a new first stop changes what it copies.
+        `UPDATE trip_stops SET name = 'Stowe Mountain Resort, Vermont' WHERE id = '${stowe}'`,
+        `UPDATE trip_stops SET position = -1 WHERE id = '${smuggs}'`,
+        // A target's stop moved after the review.
+        `UPDATE trip_stops SET latitude = 45 WHERE id = '${jay}'`,
       ]) {
         const payload = await reviewed(request, "replace");
         await db.exec("BEGIN");

@@ -141,14 +141,19 @@ describe("Saved itinerary changes", () => {
 
   it("rebuilds a copy from validated fields only, and maps it back to the preview request", () => {
     const stopId = "5b7f1f7e-3c52-4c39-9d0e-0a3c1f0b6a11";
-    const expected = { from: { stop_id: stopId.toUpperCase(), activity: "Hike", kit: "2026-10-08T12:00:00+00:00", extra: true }, days: [{ date: "2026-10-11", stop_id: null, activity: null, kit: null }] };
+    const place = { id: stopId.toUpperCase(), name: "Stowe, Vermont", latitude: 44.47, longitude: -72.69 };
+    const expected = { from: { stop_id: stopId.toUpperCase(), activity: "Hike", stop: { ...place, extra: true }, kit: "2026-10-08T12:00:00+00:00", extra: true }, days: [{ date: "2026-10-11", stop_id: null, activity: null, stop: null, kit: null }] };
     const copy = parseItineraryEdit({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11", "2026-10-11"], kit: "keep", expected, sneaky: 1 });
     expect(copy).toEqual({ action: "copy_day", payload: {
       from: "2026-10-10", dates: ["2026-10-11"], kit: "keep",
-      expected: { from: { stop_id: stopId, activity: "Hike", kit: "2026-10-08T12:00:00+00:00" }, days: [{ date: "2026-10-11", stop_id: null, activity: null, kit: null }] },
+      expected: {
+        from: { stop_id: stopId, activity: "Hike", stop: { ...place, id: stopId }, kit: "2026-10-08T12:00:00+00:00" },
+        days: [{ date: "2026-10-11", stop_id: null, activity: null, stop: null, kit: null }],
+      },
     } });
     expect("error" in copy ? null : requestFor(copy)).toEqual({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: true });
-    for (const bad of [{ kit: "merge" }, { kit: undefined }, { from: "2026-02-30" }, { dates: [] }, { expected: { ...expected, days: [{ date: "2026-10-11", kit: "yesterday" }] } }, { expected: { days: [] } }]) {
+    for (const bad of [{ kit: "merge" }, { kit: undefined }, { from: "2026-02-30" }, { dates: [] }, { expected: { ...expected, days: [{ date: "2026-10-11", kit: "yesterday" }] } }, { expected: { days: [] } },
+      { expected: { ...expected, days: [{ date: "2026-10-11", stop: { ...place, latitude: "44.47" } }] } }, { expected: { ...expected, from: { stop: { name: "Stowe" } } } }]) {
       expect(parseItineraryEdit({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: "keep", expected, ...bad })).toHaveProperty("error");
     }
   });

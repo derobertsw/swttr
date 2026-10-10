@@ -93,6 +93,8 @@ describe("Reviewing and saving itinerary changes", () => {
   });
 
   it("previews a copy as the signed-in member and saves it through its own transaction", async () => {
+    // Saturday goes to the base, so the review carries the base's place.
+    const AT_STOWE = { id: STOWE.id, name: STOWE.name, latitude: STOWE.latitude, longitude: STOWE.longitude };
     const preview = await previewOf({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: false });
     expect(preview.options).toMatchObject([{
       key: "copy", label: "Copy Sat Oct 10 to 1 day",
@@ -108,7 +110,10 @@ describe("Reviewing and saving itinerary changes", () => {
       p_trip_id: TRIP.id, p_user_id: "user-2",
       p_payload: {
         from: "2026-10-10", dates: ["2026-10-12"], kit: "none",
-        expected: { from: { stop_id: null, activity: "Ski touring", kit: null }, days: [{ date: "2026-10-12", stop_id: STOWE.id, activity: null, kit: null }] },
+        expected: {
+          from: { stop_id: null, activity: "Ski touring", stop: AT_STOWE, kit: null },
+          days: [{ date: "2026-10-12", stop_id: STOWE.id, activity: null, stop: AT_STOWE, kit: null }],
+        },
       },
     });
   });
