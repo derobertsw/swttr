@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUser } from "@/lib/api";
-import { savedOutfit, WEAR } from "@/test/savedKit";
+import { planDay, savedOutfit, savedPlan, WEAR } from "@/test/savedKit";
 import { TRIP } from "@/test/tripApi";
 import type { TripMemberDayKit } from "@/types/trips";
 import { POST } from "./route";
@@ -55,6 +55,39 @@ describe("Save an outing's kit to a trip", () => {
     }));
   });
 
+  it("saves each day of a plan that has layers, and spans a new trip over the whole outing", async () => {
+    rpc.mockResolvedValue({ data: { status: "saved", trip: { ...TRIP, id: NEW_ID }, created: true, kits: [] }, error: null });
+    const response = await save({ save_id: SAVE_ID, target: { new_trip: { id: NEW_ID, name: "Stowe tour" } }, plan: savedPlan() });
+    expect(response.status).toBe(201);
+    const [, args] = rpc.mock.calls[0];
+    expect(args.p_days).toEqual([
+      { date: "2026-10-10", effort: "hard", activity: "Backcountry", outfit: expect.objectContaining({ kind: "plan_day", startHour: 9, day: planDay("2026-10-10") }) },
+      { date: "2026-10-11", effort: "hard", activity: "Backcountry", outfit: expect.objectContaining({ kind: "plan_day", startHour: 6 }) },
+    ]);
+    // Monday has no layers, but it's still part of the trip.
+    expect(args.p_new_trip).toMatchObject({ name: "Stowe tour", start_date: "2026-10-10", end_date: "2026-10-12", activity: "Backcountry" });
+  });
+
+  it("compares each conflicting day of a plan with that day's new layers", async () => {
+    rpc.mockResolvedValue({ data: { status: "conflict", trip: TRIP, conflicts: [{ date: "2026-10-11", kit: KIT }] }, error: null });
+    const sunday = planDay("2026-10-11", { baseline: { ...planDay("2026-10-11").baseline, recommendation: { ...WEAR, hands: { base: [], outer: [] } } } });
+    const response = await save({ save_id: SAVE_ID, target: { trip_id: TRIP_ID }, plan: savedPlan({ days: [planDay("2026-10-10"), sunday] }) });
+    expect(response.status).toBe(409);
+    expect((await response.json()).conflicts).toEqual([
+      { date: "2026-10-11", kit: KIT, changes: [{ phase: "outing", add: [], remove: [{ bodyPart: "hands", layerType: "outer", name: "Insulated gloves" }] }] },
+    ]);
+  });
+
+  it("fits a full seven-day plan in the body limit", async () => {
+    const week = savedPlan({
+      outing: { ...savedPlan().outing, when: { mode: "later", date: "2026-10-10", time: "09:00", durationDays: 7 } },
+      days: ["2026-10-10", "2026-10-11", "2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16"].map((date) => planDay(date, {
+        dayparts: [0, 1, 2].map((index) => ({ ...planDay(date).dayparts[0], id: (["morning", "midday", "evening"] as const)[index], changes: { add: [], remove: [] } })),
+      })),
+    });
+    expect((await save({ save_id: SAVE_ID, target: { trip_id: TRIP_ID }, plan: week })).status).toBe(200);
+  });
+
   it("classifies a new trip by today at the destination, not on the server's clock", async () => {
     // 10:30pm on Oct 6 in Vermont is already Oct 7 in UTC.
     vi.useFakeTimers({ toFake: ["Date"], now: Date.parse("2026-10-07T02:30:00Z") });
@@ -83,7 +116,7 @@ describe("Save an outing's kit to a trip", () => {
     const response = await save(request({ outfit: next }));
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({
-      error: "You already have a kit for that day.",
+      error: "You already have kits for those days.",
       status: "conflict",
       trip: TRIP,
       conflicts: [
@@ -132,7 +165,7 @@ describe("Save an outing's kit to a trip", () => {
   });
 
   it("refuses an oversized body", async () => {
-    expect((await save(JSON.stringify({ ...request(), padding: "x".repeat(100_000) }))).status).toBe(413);
+    expect((await save(JSON.stringify({ ...request(), padding: "x".repeat(200_000) }))).status).toBe(413);
   });
 
   it("needs a signed-in user", async () => {
