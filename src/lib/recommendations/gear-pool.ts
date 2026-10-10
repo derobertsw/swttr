@@ -30,6 +30,7 @@ type GearPoolResult =
   | { status: 'empty' }
   | { status: 'error'; message: string };
 
+/** Load usable wardrobe/catalog gear, applying activity eligibility before categorization. */
 export async function loadGearPool(
   { supabase, userId, useWardrobeOnly }: RecommendationRequest,
   catalog: CatalogFilter

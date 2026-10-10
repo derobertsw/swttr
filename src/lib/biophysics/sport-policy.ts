@@ -19,10 +19,12 @@ export interface SustainedSportPolicy {
   assumptions: string[];
 }
 
+/** Narrow to the activities governed by the sustained running/XC policy. */
 export function isCalibratedActivity(activity: ActivityType): activity is SustainedSportPolicy['activity'] {
   return activity === 'running' || activity === 'xc_skiing';
 }
 
+/** Build phase assumptions and weather-driven cold allowances/protection needs. */
 export function sustainedSportPolicy(
   activity: SustainedSportPolicy['activity'],
   effort: ExertionLevel,

@@ -39,6 +39,7 @@ interface SinglePhaseSportConfig {
   protect?(ensemble: GarmentRow[], categorized: CategorizedGarments, targets: SinglePhaseTargets): { ensemble: GarmentRow[]; warnings: string[] };
 }
 
+/** Compose one-phase targets, outfit/protection selection, and response evaluation for a sport. */
 export function createSinglePhaseSport(
   config: SinglePhaseSportConfig
 ): SportRecommender<SinglePhaseTargets> {

@@ -1,4 +1,5 @@
 import { METABOLIC_RATES } from "./constants";
+import { DEFAULT_BODY_METRICS, metabolicHeatFluxFromMet } from "./bodyMetrics";
 import { SUSTAINED_ACTIVITY_METS } from './sport-policy';
 
 export const EXERTION_LEVELS = ["easy", "moderate", "hard"] as const;
@@ -31,9 +32,9 @@ const METABOLIC_RATE_BY_ACTIVITY: Record<
   Record<ExertionLevel, number>
 > = {
   running: {
-    easy: SUSTAINED_ACTIVITY_METS.running.easy * 58.2,
-    moderate: SUSTAINED_ACTIVITY_METS.running.moderate * 58.2,
-    hard: SUSTAINED_ACTIVITY_METS.running.hard * 58.2,
+    easy: metabolicHeatFluxFromMet(SUSTAINED_ACTIVITY_METS.running.easy, DEFAULT_BODY_METRICS),
+    moderate: metabolicHeatFluxFromMet(SUSTAINED_ACTIVITY_METS.running.moderate, DEFAULT_BODY_METRICS),
+    hard: metabolicHeatFluxFromMet(SUSTAINED_ACTIVITY_METS.running.hard, DEFAULT_BODY_METRICS),
   },
   biking: {
     easy: METABOLIC_RATES.xc_skiing_easy,
@@ -41,9 +42,9 @@ const METABOLIC_RATE_BY_ACTIVITY: Record<
     hard: METABOLIC_RATES.running_moderate,
   },
   xc_skiing: {
-    easy: SUSTAINED_ACTIVITY_METS.xc_skiing.easy * 58.2,
-    moderate: SUSTAINED_ACTIVITY_METS.xc_skiing.moderate * 58.2,
-    hard: SUSTAINED_ACTIVITY_METS.xc_skiing.hard * 58.2,
+    easy: metabolicHeatFluxFromMet(SUSTAINED_ACTIVITY_METS.xc_skiing.easy, DEFAULT_BODY_METRICS),
+    moderate: metabolicHeatFluxFromMet(SUSTAINED_ACTIVITY_METS.xc_skiing.moderate, DEFAULT_BODY_METRICS),
+    hard: metabolicHeatFluxFromMet(SUSTAINED_ACTIVITY_METS.xc_skiing.hard, DEFAULT_BODY_METRICS),
   },
   alpine_skiing: {
     easy: METABOLIC_RATES.light_activity,
@@ -86,6 +87,7 @@ export function parseExertionLevel(
   return fallback;
 }
 
+/** Return W/m² at default body metrics; running/XC use the calibrated MET conversion. */
 export function getMetabolicRateForActivity(
   activity: ExertionAwareActivity,
   exertion: ExertionLevel

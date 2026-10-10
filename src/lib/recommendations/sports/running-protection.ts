@@ -4,6 +4,7 @@ import { garmentCapabilities } from '../garment-semantics';
 import { sortByInsulation } from '../sorting';
 import type { GarmentRow, CategorizedGarments } from '../types';
 
+/** Retain required torso/leg protection, replacing conflicting shells or warning when unavailable. */
 export function retainRunningProtection(
   ensemble: GarmentRow[],
   categorized: CategorizedGarments,

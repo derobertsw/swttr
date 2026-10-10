@@ -47,7 +47,7 @@ Every biophysics recommendation passes through the same pipeline, from metabolic
 
 ```mermaid
 graph TD
-    A[Activity + Exertion Level] --> B[Metabolic Rate Selection<br/>Running/XC: sustained MET × mass / body area<br/>Other sports: existing rate and size heuristic]
+    A[Activity + Exertion Level] --> B[Metabolic Rate Selection<br/>Running/XC: shared MET-to-W/m² conversion<br/>Rate helper uses default mass and body area<br/>Recommendation uses user mass and body area<br/>Other sports: existing rate and size heuristic]
     B --> C[IREQ Calculation]
     C --> D[Activity Target Range]
     D --> E[CoWEDA-inspired heuristic buffer<br/>Running/XC: taper with cold, wind and wet exposure]
