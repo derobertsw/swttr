@@ -163,14 +163,24 @@ async function savePreferences(payload: Record<string, unknown>, context: string
   }
 }
 
+/** The fields of `now` that aren't in `then`, or hold another value there. */
+function changedSince(then: StoredPreferences, now: StoredPreferences): StoredPreferences {
+  return Object.fromEntries(
+    Object.entries(now).filter(([field, value]) => then[field as keyof StoredPreferences] !== value)
+  );
+}
+
 /**
  * Merges in what the server keeps for `userId`. An account with nothing saved,
- * there or on this device, takes what the guest chose on this device and saves
- * it. Either way the guest's copy is gone afterwards, so no later account can
- * take it.
+ * there or on this device, takes what the guest chose on this device. Either
+ * way the guest's copy is gone afterwards, so no later account can take it.
+ * Whatever the account has on this device that the server lacks, like a
+ * guest's values it took or a change whose save failed, is saved again.
  */
 async function syncServerPreferences(userId: string) {
   const key = storageKey(userId);
+  // What the account had here before asking. A change made while waiting is newer than the server's.
+  const before = ownerPreferences(key).stored;
   try {
     const res = await fetch("/api/preferences");
     if (!res.ok || serverSyncStartedFor !== userId) return;
@@ -185,15 +195,18 @@ async function syncServerPreferences(userId: string) {
       weightLbs: data.weightLbs,
     });
     const own = ownerPreferences(key).stored;
+    const changed = changedSince(before, own);
     const guestKey = storageKey(null);
     const guest = ownerPreferences(guestKey).stored;
-    if (isEmpty(saved) && isEmpty(own) && !isEmpty(guest)) {
-      updateOwner(key, { stored: guest });
-      void savePreferences(toPayload(guest), "usePreferences.claimGuest");
-    } else {
-      // What the server lacks stays as this account last chose it on this device.
-      updateOwner(key, { stored: { ...own, ...saved } });
-    }
+    const merged =
+      isEmpty(saved) && isEmpty(before)
+        ? { ...guest, ...changed }
+        : // What the server lacks stays as this account last chose it on this device.
+          { ...own, ...saved, ...changed };
+    updateOwner(key, { stored: merged });
+    // A change made while waiting saved itself.
+    const unsaved = changedSince({ ...saved, ...changed }, merged);
+    if (!isEmpty(unsaved)) void savePreferences(toPayload(unsaved), "usePreferences.saveUnsaved");
     updateOwner(guestKey, { stored: {} });
   } catch (err) {
     logWarn("usePreferences.fetch", err);

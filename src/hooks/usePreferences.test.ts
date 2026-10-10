@@ -15,6 +15,9 @@ const stored = (key: string) => JSON.parse(localStorage.getItem(key) ?? "null");
 /** What GET /api/preferences returns for each signed-in account; {} when it has no row. */
 let serverPreferences: Record<string, Record<string, unknown>> = {};
 let getOk = true;
+/** While set, GET /api/preferences waits for it, as a slow request would. */
+let getGate: Promise<void> | null = null;
+let putFails = false;
 let puts: { userId: string | null; body: Record<string, unknown> }[] = [];
 
 beforeEach(() => {
@@ -24,16 +27,22 @@ beforeEach(() => {
   authLoaded = true;
   serverPreferences = {};
   getOk = true;
+  getGate = null;
+  putFails = false;
   puts = [];
   localStorage.clear();
   vi.stubGlobal(
     "fetch",
     vi.fn(async (_url: string, init?: RequestInit) => {
       if (init?.method === "PUT") {
+        if (putFails) throw new TypeError("Failed to fetch");
         puts.push({ userId, body: JSON.parse(String(init.body)) });
         return new Response("{}");
       }
+      const requestedFor = userId;
+      if (getGate) await getGate;
       if (!getOk) return new Response("{}", { status: 500 });
+      if (requestedFor !== userId) throw new Error("signed-in account changed during the request");
       return new Response(JSON.stringify(userId ? (serverPreferences[userId] ?? {}) : {}));
     })
   );
@@ -199,6 +208,65 @@ describe("usePreferences", () => {
     expect(result.current.bodyMetricsSelection).toEqual({});
     expect(puts).toEqual([]);
     expect(stored(GUEST_KEY)).toEqual({ heightInches: 60 });
+  });
+
+  it("keeps a change made while an account's preferences load, and still takes the guest's others", async () => {
+    let releaseGet = () => {};
+    getGate = new Promise((resolve) => (releaseGet = resolve));
+    localStorage.setItem(GUEST_KEY, JSON.stringify({ heightInches: 64, weightLbs: 140, sensitivity: "cold" }));
+    userId = "account_new";
+    const { result } = await renderPreferences();
+    expect(result.current.loading).toBe(true);
+
+    await act(() => result.current.updateSensitivity("hot"));
+    await act(async () => releaseGet());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.sensitivity).toBe("hot");
+    expect(result.current.bodyMetricsSelection).toEqual({ heightInches: 64, weightLbs: 140 });
+    expect(puts).toEqual([
+      { userId: "account_new", body: { temperatureSensitivity: "hot" } },
+      { userId: "account_new", body: { heightInches: 64, weightLbs: 140 } },
+    ]);
+    expect(localStorage.getItem(GUEST_KEY)).toBeNull();
+  });
+
+  it("keeps a change made while an account's preferences load over the server's older value", async () => {
+    let releaseGet = () => {};
+    getGate = new Promise((resolve) => (releaseGet = resolve));
+    serverPreferences = { account_a: { temperatureSensitivity: "cold", heightInches: 72 } };
+    userId = "account_a";
+    const { result } = await renderPreferences();
+
+    await act(() => result.current.updateSensitivity("hot"));
+    await act(async () => releaseGet());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.sensitivity).toBe("hot");
+    expect(result.current.bodyMetricsSelection).toEqual({ heightInches: 72 });
+    expect(puts).toEqual([{ userId: "account_a", body: { temperatureSensitivity: "hot" } }]);
+  });
+
+  it("saves the guest's values an account took again when the first save failed", async () => {
+    putFails = true;
+    localStorage.setItem(GUEST_KEY, JSON.stringify({ heightInches: 64, sensitivity: "cold" }));
+    userId = "account_new";
+    const firstPage = await renderPreferences();
+    await waitFor(() => expect(firstPage.result.current.loading).toBe(false));
+    expect(puts).toEqual([]);
+    expect(stored(keyFor("account_new"))).toEqual({ heightInches: 64, sensitivity: "cold" });
+    expect(localStorage.getItem(GUEST_KEY)).toBeNull();
+    firstPage.unmount();
+
+    putFails = false;
+    vi.resetModules();
+    const { result } = await renderPreferences();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.bodyMetricsSelection).toEqual({ heightInches: 64 });
+    expect(puts).toEqual([
+      { userId: "account_new", body: { temperatureSensitivity: "cold", heightInches: 64 } },
+    ]);
   });
 
   it("saves a signed-in change to that account's copy and the server only", async () => {
