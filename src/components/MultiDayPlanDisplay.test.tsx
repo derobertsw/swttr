@@ -6,8 +6,10 @@ import { POST as buildPackingList } from "@/app/api/packing-list/route";
 import { getAuthUserId } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
 import { buildMultiDayLayerPlan } from "@/lib/planAhead";
+import type { Outing } from "@/types/outing";
 import type { ForecastHour } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
+import type { SavedPlan } from "@/types/savedKit";
 import MultiDayPlanDisplay from "./MultiDayPlanDisplay";
 
 // Signed out unless a test says otherwise: the packing list is built without a wardrobe.
@@ -468,6 +470,52 @@ describe("MultiDayPlanDisplay", () => {
       await userEvent.click(screen.getByRole("tab", { name: "Daily plan" }));
 
       expect(day("Thu, Jan 15")).toBeInTheDocument();
+    });
+  });
+
+  describe("Save to trip", () => {
+    const OUTING: Outing = {
+      activity: "alpine_skiing",
+      exertion: "moderate",
+      place: { id: 1, name: "Stowe", region: "Vermont", country: "United States", latitude: 44.47, longitude: -72.69 },
+      when: { mode: "later", date: "2026-01-15", time: "12:00", durationDays: 3 },
+    };
+
+    it("offers the days with layers as shown, with the wardrobe's names", () => {
+      stubPackingList();
+      const saveToTrip = vi.fn<(plan: SavedPlan | null) => null>(() => null);
+      // Friday's forecast is missing, so only Thursday and Saturday have layers.
+      const plan = makePlan({ hours: [hour("2026-01-15T12:00", 30), hour("2026-01-17T09:00", 18)], durationDays: 3, startHour: 12 });
+      render(
+        <MultiDayPlanDisplay
+          plan={{ ...plan, provenance: { provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" }, timeZone: "America/New_York" } }}
+          outing={OUTING}
+          itemMappings={new Map([["torso:mid:Down vest", "Nano Puff vest"]])}
+          saveToTrip={saveToTrip}
+        />
+      );
+
+      const saved = saveToTrip.mock.lastCall?.[0];
+      expect(saved).toMatchObject({
+        version: 1,
+        kind: "plan",
+        outing: OUTING,
+        provenance: { timeZone: "America/New_York" },
+        dayStartHour: 6,
+        dayEndHour: 21,
+        firstDayStartHour: 12,
+      });
+      expect(saved?.days.map((planDay) => planDay.date)).toEqual(["2026-01-15", "2026-01-17"]);
+      expect(saved?.days[1].baseline.recommendation?.torso.mid?.map((item) => item.name)).toEqual(["Fleece jacket", "Nano Puff vest"]);
+    });
+
+    it("has nothing to save without layers, or without the outing", () => {
+      stubPackingList();
+      const saveToTrip = vi.fn<(plan: SavedPlan | null) => null>(() => null);
+      const { rerender } = render(<MultiDayPlanDisplay plan={makePlan({ layers: () => null })} outing={OUTING} saveToTrip={saveToTrip} />);
+      expect(saveToTrip).toHaveBeenLastCalledWith(null);
+      rerender(<MultiDayPlanDisplay plan={makePlan()} saveToTrip={saveToTrip} />);
+      expect(saveToTrip).toHaveBeenLastCalledWith(null);
     });
   });
 });

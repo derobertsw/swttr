@@ -53,6 +53,7 @@ const HomeContent = () => {
     planTab,
     accountChanging,
     opensSave,
+    saveTripId,
   } = useGearUp();
 
   const { itemMappings } = useItemMappings();
@@ -120,6 +121,7 @@ const HomeContent = () => {
             itemMappings={itemMappings}
             initialTab={planTab}
             onReset={showPlanForm}
+            saveToTrip={(plan) => <SaveToTrip plan={plan} defaultOpen={opensSave} defaultTripId={saveTripId} />}
           />
         ) : (
           // Everything shown comes from the result, so it stays tied to the
@@ -140,8 +142,9 @@ const HomeContent = () => {
             onWeatherChange={handleWeatherChange}
             onActivityChange={handleActivityChange}
             weatherLoading={loading}
-            // Back from signing in to save, the resumed outing's results open it as they appear.
-            saveToTrip={(outfit) => <SaveToTrip outfit={outfit} defaultOpen={opensSave} />}
+            // Back from signing in to save, the resumed outing's results open it
+            // as they appear; to update a saved kit, it picks the kit's trip.
+            saveToTrip={(outfit) => <SaveToTrip outfit={outfit} defaultOpen={opensSave} defaultTripId={saveTripId} />}
           />
         )}
       </div>

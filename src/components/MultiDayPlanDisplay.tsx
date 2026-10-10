@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, CalendarRange, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlanDayCard } from "@/components/plan/PlanDayCard";
+import { mapPlanDayNames, PlanDayCard } from "@/components/plan/PlanDayCard";
 import { PlanPacking, type PackingState } from "@/components/plan/PlanPacking";
 import { ACTIVITIES } from "@/data/activities";
 import type { MultiDayLayerPlan, UncoveredPlanDay } from "@/types/plan";
@@ -15,6 +15,7 @@ import type { PackingListData, PackingListWardrobe } from "@/lib/packingList";
 import { OutingTimeSummary } from "@/components/OutingTimeSummary";
 import { WeatherSourceDetails } from "@/components/WeatherSourceDetails";
 import type { Outing } from "@/types/outing";
+import type { SavedPlan } from "@/types/savedKit";
 
 type PlanTab = "days" | "packing";
 
@@ -34,6 +35,11 @@ interface MultiDayPlanDisplayProps {
   initialTab?: PlanTab;
   /** Back to the form with the outing as entered. */
   onReset?: () => void;
+  /**
+   * Renders Save to trip (#170), given the plan's days with layers as shown,
+   * or null when none have any.
+   */
+  saveToTrip?: (plan: SavedPlan | null) => ReactNode;
 }
 
 function formatPlanRange(startDate: string, endDate: string): string {
@@ -43,7 +49,7 @@ function formatPlanRange(startDate: string, endDate: string): string {
 }
 
 /** An hour of the day as "6am", "12pm" or "9pm". */
-function formatHour(hour: number): string {
+export function formatHour(hour: number): string {
   const suffix = hour < 12 ? "am" : "pm";
   const twelveHour = hour % 12 === 0 ? 12 : hour % 12;
   return `${twelveHour}${suffix}`;
@@ -69,6 +75,7 @@ export default function MultiDayPlanDisplay({
   itemMappings,
   initialTab = "days",
   onReset,
+  saveToTrip,
 }: MultiDayPlanDisplayProps) {
   // `list` is null when the request failed.
   const [packingResult, setPackingResult] = useState<{
@@ -130,6 +137,21 @@ export default function MultiDayPlanDisplay({
   const activityOption = ACTIVITIES.find((candidate) => candidate.value === activity);
   const hasLayers = plan.days.some((day) => day.baseline.recommendation !== null);
   const startsLate = plan.firstDayStartHour > plan.dayStartHour;
+
+  // Each day with layers, as shown, for Save to trip.
+  const when = outing?.when;
+  const savedPlan: SavedPlan | null = outing && when?.mode === "later" && hasLayers
+    ? {
+        version: 1,
+        kind: "plan",
+        outing: { ...outing, when },
+        ...(plan.provenance && { provenance: plan.provenance }),
+        dayStartHour: plan.dayStartHour,
+        dayEndHour: plan.dayEndHour,
+        firstDayStartHour: plan.firstDayStartHour,
+        days: plan.days.filter((day) => day.baseline.recommendation !== null).map((day) => mapPlanDayNames(day, itemMappings)),
+      }
+    : null;
 
   return (
     <section className="flex w-full flex-col gap-6 pb-24">
@@ -210,6 +232,8 @@ export default function MultiDayPlanDisplay({
           </section>
         </Card>
       )}
+
+      {saveToTrip?.(savedPlan)}
 
       <Tabs value={tab} onValueChange={(value) => setPickedTab({ plan, tab: value as PlanTab })} className="gap-4">
         <TabsList className="grid w-full grid-cols-2 sm:max-w-sm">

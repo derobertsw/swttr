@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { Backpack, ChevronDown, Minus, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { BODY_PART_LABELS, BODY_PARTS, LAYER_LABELS } from "@/lib/layers";
+import { applyRecommendationMappings, BODY_PART_LABELS, BODY_PARTS, LAYER_LABELS } from "@/lib/layers";
 import type { BodyPart, LayerType } from "@/types/wardrobe";
 import type { DailyLayerPlan, LayerChanges, PlanLayerItem } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
@@ -38,6 +38,25 @@ function mapChanges(changes: LayerChanges | null, itemMappings?: Map<string, str
   return {
     add: add.filter((item) => !removeKeys.has(keyOf(item))),
     remove: remove.filter((item) => !addKeys.has(keyOf(item))),
+  };
+}
+
+/**
+ * The day with the wardrobe's names for the guide's items, as its card shows
+ * them: how a plan day is saved to a trip (#170).
+ */
+export function mapPlanDayNames(day: DailyLayerPlan, itemMappings?: Map<string, string>): DailyLayerPlan {
+  if (!itemMappings) return day;
+  const named = (recommendation: Recommendation | null) => recommendation && applyRecommendationMappings(recommendation, itemMappings);
+  return {
+    ...day,
+    baseline: { ...day.baseline, recommendation: named(day.baseline.recommendation) },
+    changesFromPreviousDay: mapChanges(day.changesFromPreviousDay, itemMappings),
+    dayparts: day.dayparts.map((daypart) => ({
+      ...daypart,
+      recommendation: named(daypart.recommendation),
+      changes: mapChanges(daypart.changes, itemMappings),
+    })),
   };
 }
 

@@ -12,7 +12,10 @@ import type { SaveKitRequest } from "@/types/savedKit";
 export interface KitSaveOutcome {
   tripId: string;
   tripName: string;
+  /** The first, or only, day saved. */
   date: string;
+  /** Every day saved, when a plan saved several. */
+  dates?: string[];
 }
 
 interface KeptKitSave {
@@ -45,6 +48,16 @@ export function keepKitSave(owner: string, outing: Outing, state: Pick<KeptKitSa
   } catch {
     return false;
   }
+}
+
+/**
+ * Forgets what's kept for this account's save of this outing, as when a
+ * saved kit is updated: the outing is asked for again, and its new layers
+ * start a new save rather than showing the last one as saved (#170).
+ * A save kept for another outing or account stays.
+ */
+export function forgetKitSaveFor(owner: string, outing: Outing): void {
+  if (readKitSave(owner, outing)) forgetKitSave();
 }
 
 export function forgetKitSave(): void {

@@ -774,6 +774,7 @@ describe("Home Page", () => {
 
       afterEach(() => {
         mockSearchParams.delete("resume");
+        mockSearchParams.delete("trip");
         window.history.replaceState(null, "", "/");
       });
 
@@ -842,7 +843,7 @@ describe("Home Page", () => {
         mockAccountApis();
         const outingApis = mockFetch.getMockImplementation()!;
         mockFetch.mockImplementation(async (url: string, init?: RequestInit) => url === "/api/v1/trips/kits/options"
-          ? respond(200, { date: "2026-10-06", suggested_name: "Stowe trip", destination: "Stowe, Vermont", trips: [] })
+          ? respond(200, { dates: ["2026-10-06"], start_date: "2026-10-06", end_date: "2026-10-06", suggested_name: "Stowe trip", destination: "Stowe, Vermont", trips: [] })
           : outingApis(url, init));
         const user = userEvent.setup();
         const { unmount } = render(<Home />);
@@ -859,6 +860,31 @@ describe("Home Page", () => {
         await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
         await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
         expect(screen.getByRole("button", { name: "Save to trip" })).toHaveFocus();
+      });
+
+      it("asks again for a saved kit's outing to update it, with Save to trip picking the kit's trip", async () => {
+        const { recommendationRequests } = mockAccountApis();
+        const outingApis = mockFetch.getMockImplementation()!;
+        const trip = { id: "trip-1", name: "Stowe weekend", start_date: "2026-10-06", end_date: "2026-10-07", member_count: 2, day_number: 1 };
+        mockFetch.mockImplementation(async (url: string, init?: RequestInit) => url === "/api/v1/trips/kits/options"
+          ? respond(200, { dates: ["2026-10-06"], start_date: "2026-10-06", end_date: "2026-10-06", suggested_name: "Stowe trip", destination: "Stowe, Vermont", trips: [trip] })
+          : outingApis(url, init));
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+
+        // The trip day keeps the kit's outing as the last one, then comes here.
+        await seeRunningAtStowe(user);
+        unmount();
+        comeBackTo("/?resume=update&trip=trip-1");
+
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+        await waitFor(() => expect(recommendationRequests).toHaveLength(2));
+        expect(window.location.search).toBe("");
+        // Fresh layers show first; saving them picks the kit's trip.
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "Save to trip" }));
+        const dialog = await screen.findByRole("dialog", { name: "Save to trip" });
+        expect(await within(dialog).findByRole("radio", { name: /Stowe weekend/ })).toBeChecked();
       });
 
       it("shows the form with what was entered when sign-in comes back without a last outing", async () => {
