@@ -13,6 +13,7 @@ import {
   tripDestination,
   tripEffort,
 } from "@/lib/trip-saved-kits";
+import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 import { planDay, savedOutfit, savedPlan, STOWE, WEAR } from "@/test/savedKit";
 import type { SavedOutfit } from "@/types/savedKit";
 
@@ -189,6 +190,23 @@ describe("plan day changes through the day", () => {
 describe("outingToUpdate", () => {
   const at = (iso: string) => Date.parse(iso);
 
+  it("plans today from the start of the day, not the first day's late start", () => {
+    // Saturday 11pm to Monday; on Sunday morning, Sunday's kit is updated.
+    const late = savedPlan({ outing: { ...savedPlan().outing, when: { mode: "later", date: "2026-10-10", time: "23:00", durationDays: 3 } }, firstDayStartHour: 23 });
+    const [, sunday] = planDayKits(late);
+    const when = outingToUpdate(sunday.kit, "2026-10-11", at("2026-10-11T12:00:00Z"))!.when;
+    expect(when).toEqual({ mode: "later", date: "2026-10-11", time: "06:00", durationDays: 2 });
+    if (when.mode !== "later") throw new Error("expected a later outing");
+    const hours = ["2026-10-11", "2026-10-12"].flatMap((date) => [8, 14, 19].map((hour) => ({
+      time: `${date}T${String(hour).padStart(2, "0")}:00`, temperature: 30, windSpeed: 5, precipitationProbability: 0,
+    })));
+    const replanned = buildMultiDayLayerPlan({
+      startDate: new Date(`${when.date}T00:00:00`), durationDays: when.durationDays, startHour: Number(when.time.slice(0, 2)),
+      hourlyForecast: hours, getRecommendation: () => WEAR,
+    });
+    expect(replanned.days.map((day) => day.date)).toEqual(["2026-10-11", "2026-10-12"]);
+  });
+
   it("asks again for a later outing until its day has passed at the destination", () => {
     expect(outingToUpdate(savedOutfit(), "2026-10-10", at("2026-10-07T12:00:00Z"))).toEqual(savedOutfit().outing);
     expect(outingToUpdate(savedOutfit(), "2026-10-10", at("2026-10-11T03:30:00Z"))).toEqual(savedOutfit().outing);
@@ -215,9 +233,12 @@ describe("outingToUpdate", () => {
     const [saturday, sunday] = planDayKits(savedPlan());
     expect(outingToUpdate(saturday.kit, "2026-10-11", at("2026-10-07T12:00:00Z"))?.when)
       .toEqual({ mode: "later", date: "2026-10-11", time: "09:00", durationDays: 3 });
-    // Moved earlier, into a plan that has started: from today on.
+    // Moved a day earlier, so it starts today: its start time stays.
     expect(outingToUpdate(sunday.kit, "2026-10-10", at("2026-10-09T12:00:00Z"))?.when)
       .toEqual({ mode: "later", date: "2026-10-09", time: "09:00", durationDays: 3 });
+    // A day later it has started: from today on, all day.
+    expect(outingToUpdate(sunday.kit, "2026-10-10", at("2026-10-10T12:00:00Z"))?.when)
+      .toEqual({ mode: "later", date: "2026-10-10", time: "06:00", durationDays: 2 });
   });
 
   it("asks for an outing for now, moved to a later day, at the time it was read", () => {
@@ -234,7 +255,7 @@ describe("outingToUpdate", () => {
     const [, sunday] = planDayKits(savedPlan());
     expect(outingToUpdate(sunday.kit, "2026-10-11", at("2026-10-09T12:00:00Z"))).toEqual(savedPlan().outing);
     expect(outingToUpdate(sunday.kit, "2026-10-11", at("2026-10-11T12:00:00Z"))?.when)
-      .toEqual({ mode: "later", date: "2026-10-11", time: "09:00", durationDays: 2 });
+      .toEqual({ mode: "later", date: "2026-10-11", time: "06:00", durationDays: 2 });
     expect(outingToUpdate(sunday.kit, "2026-10-11", at("2026-10-12T12:00:00Z"))).toBeNull();
   });
 });

@@ -479,7 +479,8 @@ function daysBetween(from: string, to: string): number {
  * When the trip's dates have moved since the kit was saved, the outing moves
  * with its day: a later outing to the day's date, a plan by as many days, and
  * an outing for now, on a later day, to the same time of day it was read at.
- * A plan that started before today is asked for from today on.
+ * A plan that started before today is asked for from today on, from the
+ * hour its days start rather than its first day's start time.
  */
 export function outingToUpdate(kit: SavedKit, date: string, now = Date.now()): Outing | null {
   const zone = kitTimeZone(kit);
@@ -492,7 +493,10 @@ export function outingToUpdate(kit: SavedKit, date: string, now = Date.now()): O
     const start = addDaysToDateString(when.date, daysBetween(planned, date));
     const end = addDaysToDateString(start, when.durationDays - 1);
     const from = start < today ? today : start;
-    return { ...kit.outing, when: { ...when, date: from, durationDays: daysBetween(from, end) + 1 } };
+    // Only the first day starts at the outing's time; a later day starts at
+    // the plan's daily hour, which its kit keeps.
+    const time = from === start ? when.time : `${String(kit.startHour).padStart(2, "0")}:00`;
+    return { ...kit.outing, when: { ...when, date: from, time, durationDays: daysBetween(from, end) + 1 } };
   }
   const { outing } = kit;
   if (outing.when.mode === "later") return { ...outing, when: { ...outing.when, date } };
