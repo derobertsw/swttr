@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useState, type ComponentProps, type Dispatch, type SetStateAction } from "react";
+import { Suspense, useEffect, useRef, useState, type ComponentProps, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, isSameDay } from "date-fns";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Calendar as CalIcon, CheckCircle2, GripVertical, Loader2, MapPin, Plus, UserPlus, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Calendar as CalIcon, CheckCircle2, Loader2, MapPin, Plus, UserPlus, X } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { DateChangeSheet, type TripDateChangeRequest } from "@/components/trips/DateChangeSheet";
+import { ItineraryChangeSheet } from "@/components/trips/ItineraryChangeSheet";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,7 +30,7 @@ import {
   sectionLabelClassName,
 } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
-import { errorMessage, fetchTripFull, tripRequest } from "@/lib/trip-requests";
+import { errorMessage, fetchTripFull, tripRequest, TripRequestError } from "@/lib/trip-requests";
 import type { DateRange } from "react-day-picker";
 import type { Trip, TripMember, TripStop } from "@/types/trips";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
@@ -62,6 +63,11 @@ function draftBasics(name: string, range: DateRange | undefined): TripBasics | n
 /** The id of a stop's Edit button, which takes focus back from the stop sheet. */
 function editStopButtonId(stopId: string) {
   return `edit-stop-${stopId}`;
+}
+
+/** The id of a stop's Move earlier or Move later button. */
+function moveStopButtonId(stopId: string, offset: -1 | 1) {
+  return `move-stop-${offset < 0 ? "earlier" : "later"}-${stopId}`;
 }
 
 function changedBasics(trip: Trip, basics: TripBasics): Partial<TripBasics> {
@@ -389,6 +395,8 @@ export function TripStopsEditor({
   onBack,
   nextLabel = "Next",
   backLabel = "Back",
+  onItineraryChange,
+  children,
 }: {
   trip: Trip;
   stops: TripStop[];
@@ -397,14 +405,32 @@ export function TripStopsEditor({
   onBack: () => void;
   nextLabel?: string;
   backLabel?: string;
+  /** After a change that can move days between stops, to reload them. */
+  onItineraryChange?: () => void;
+  /** More of the page, above its Back and Next buttons. */
+  children?: ReactNode;
 }) {
   // Keep the stop mounted while its sheet animates closed. A new key resets
   // the editor and reloads saved assignments each time it opens.
   const [editing, setEditing] = useState<{ stop: TripStop; open: boolean; key: number } | null>(null);
   const [adding, setAdding] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [moving, setMoving] = useState(false);
+  const [removing, setRemoving] = useState<TripStop | null>(null);
+  const [announcement, setAnnouncement] = useState("");
   const search = useLocationSearch();
   const editFocus = useReturnFocus();
+  const removeFocus = useReturnFocus();
+  // The Move button pressed last. It moves with its stop, and once the move is
+  // saved, focus goes back to it, or to the stop's other Move button when it
+  // reached either end and is disabled.
+  const moved = useRef<{ stopId: string; offset: -1 | 1 } | null>(null);
+  useEffect(() => {
+    if (moving || !moved.current) return;
+    const { stopId, offset } = moved.current;
+    moved.current = null;
+    const pressed = document.getElementById(moveStopButtonId(stopId, offset)) as HTMLButtonElement | null;
+    (pressed?.disabled ? document.getElementById(moveStopButtonId(stopId, offset < 0 ? 1 : -1)) : pressed)?.focus();
+  }, [moving, stops]);
 
   const openEditor = (stop: TripStop) => {
     editFocus.remember(() => document.getElementById(editStopButtonId(stop.id)));
@@ -440,16 +466,41 @@ export function TripStopsEditor({
     }
   };
 
-  const removeStop = async (stopId: string) => {
-    setRemovingId(stopId);
+  // Swaps a stop with its neighbor. The server keeps every day's destination,
+  // pinning days without a stop to the old base when the first stop changes.
+  const moveStop = async (index: number, offset: -1 | 1) => {
+    if (moving) return;
+    const stopId = stops[index].id;
+    const expected = stops.map((stop) => stop.id);
+    const order = [...expected];
+    [order[index], order[index + offset]] = [order[index + offset], order[index]];
+    setMoving(true);
+    setAnnouncement("");
     try {
-      await tripRequest(`/api/v1/trips/${trip.id}/stops/${stopId}`, "DELETE");
-      onStopsChange((current) => current.filter((s) => s.id !== stopId));
+      await tripRequest(`/api/v1/trips/${trip.id}/itinerary`, "POST", { action: "reorder_stops", order, expected });
+      onStopsChange((current) => order.map((id, position) => ({ ...current.find((stop) => stop.id === id)!, position })));
+      setAnnouncement("Order saved. Every day keeps its destination.");
+      onItineraryChange?.();
     } catch (err) {
-      toast.error("Couldn't remove the stop", { description: errorMessage(err) });
+      if (err instanceof TripRequestError && err.status === 409) {
+        // Someone else changed the stops: show them as they are now.
+        const full = await fetchTripFull(trip.id).catch(() => null);
+        if (full) onStopsChange(full.stops);
+        onItineraryChange?.();
+        toast.error("The stops changed since you opened them", { description: "This is the current order. Move the stop again if you still need to." });
+      } else {
+        toast.error("Couldn't move the stop", { description: errorMessage(err) });
+      }
     } finally {
-      setRemovingId(null);
+      moved.current = { stopId, offset };
+      setMoving(false);
     }
+  };
+
+  const openRemove = (stop: TripStop) => {
+    removeFocus.remember(() => document.querySelector<HTMLElement>('[id^="edit-stop-"]') ?? document.getElementById("trip-stop-search"));
+    setAnnouncement("");
+    setRemoving(stop);
   };
 
   return (
@@ -491,42 +542,63 @@ export function TripStopsEditor({
           <SectionLabel className="mb-2">Trip stops</SectionLabel>
           <div className="flex flex-col divide-y divide-border">
             {stops.map((stop, i) => (
-              <div key={stop.id} className="flex items-center gap-2 py-2">
-                <GripVertical className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-input text-xs font-semibold text-foreground">
-                  {i + 1}
-                </span>
-                <MapPin className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">{stop.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {stop.activities.length === 0
-                      ? "no activities yet"
-                      : stop.activities.join(", ")}
-                  </p>
+              <div key={stop.id} className="flex flex-wrap items-center gap-2 py-2">
+                <div className="flex min-w-0 flex-1 basis-48 items-center gap-2">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-input text-xs font-semibold text-foreground">
+                    {i + 1}
+                  </span>
+                  <MapPin className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-sm font-medium text-foreground">{stop.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {i === 0 ? "Base · " : ""}
+                      {stop.activities.length === 0
+                        ? "no activities yet"
+                        : stop.activities.join(", ")}
+                    </p>
+                  </div>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  id={editStopButtonId(stop.id)}
-                  onClick={() => openEditor(stop)}
-                >
-                  Edit
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeStop(stop.id)}
-                  disabled={removingId !== null}
-                  aria-label={`Remove ${stop.name}`}
-                >
-                  {removingId === stop.id ? <Loader2 className="animate-spin" /> : <X />}
-                </Button>
+                <div className="ml-auto flex items-center gap-1">
+                  {/* Kept enabled while a move saves, so focus stays on the button pressed. */}
+                  {([-1, 1] as const).map((offset) => (
+                    <Button
+                      key={offset}
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      id={moveStopButtonId(stop.id, offset)}
+                      disabled={i + offset < 0 || i + offset >= stops.length}
+                      aria-disabled={moving || undefined}
+                      onClick={() => void moveStop(i, offset)}
+                      aria-label={`Move ${stop.name} ${offset < 0 ? "earlier" : "later"}`}
+                    >
+                      {offset < 0 ? <ArrowUp /> : <ArrowDown />}
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    id={editStopButtonId(stop.id)}
+                    onClick={() => openEditor(stop)}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openRemove(stop)}
+                    disabled={moving}
+                    aria-label={`Remove ${stop.name}`}
+                  >
+                    <X />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
+          <p role="status" className="text-sm text-muted-foreground">{announcement && <span className="mt-2 block">{announcement}</span>}</p>
         </Card>
       )}
 
@@ -535,15 +607,34 @@ export function TripStopsEditor({
           ? "Your first destination becomes the base for all days without an assigned stop."
           : "Adding a stop keeps your daily plan unchanged. Edit the stop to choose which days use it."}
       </p>
+      {children}
       {/* Leaving mid-save would lose the chosen place if that save failed. */}
       <NavBar
         onBack={onBack}
-        backDisabled={adding || removingId !== null}
+        backDisabled={adding || moving}
         backLabel={backLabel}
         onNext={onNext}
         nextLabel={nextLabel}
-        nextDisabled={adding || removingId !== null || stops.length === 0}
+        nextDisabled={adding || moving || stops.length === 0}
       />
+
+      {removing && (
+        <ItineraryChangeSheet
+          tripId={trip.id}
+          change={{ action: "remove_stop", stop_id: removing.id }}
+          title={`Remove ${removing.name}`}
+          description="Review what happens to its days. Nothing changes until you save."
+          question="Where should its days go?"
+          saveLabel="Remove stop"
+          onSaved={() => {
+            onStopsChange((current) => current.filter((stop) => stop.id !== removing.id));
+            setAnnouncement(`${removing.name} removed.`);
+            onItineraryChange?.();
+          }}
+          onClose={() => setRemoving(null)}
+          onCloseAutoFocus={removeFocus.restore}
+        />
+      )}
 
       {editing && (
         <StopDetailSheet
@@ -557,6 +648,7 @@ export function TripStopsEditor({
           onSaved={(updated) => {
             onStopsChange((current) => current.map((s) => (s.id === updated.id ? updated : s)));
             closeEditor();
+            onItineraryChange?.();
           }}
           onCloseAutoFocus={editFocus.restore}
         />
