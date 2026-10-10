@@ -90,6 +90,20 @@ describe("useReturnFocus", () => {
     expect(screen.queryByRole("button", { name: "Show details" })).not.toBeInTheDocument();
   });
 
+  it("falls back when the opener is hidden", async () => {
+    const user = userEvent.setup();
+    render(<DetailsDialog />);
+
+    const opener = screen.getByRole("button", { name: "Show details" });
+    await user.click(opener);
+    expect(await screen.findByRole("dialog", { name: "Details" })).toBeInTheDocument();
+    // A narrower window hides it; jsdom has no layout, so say so directly.
+    opener.checkVisibility = () => false;
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Fallback" })).toHaveFocus());
+  });
+
   it("leaves a dialog opened by its trigger to Radix", async () => {
     function TriggeredDialog() {
       const focus = useReturnFocus();
