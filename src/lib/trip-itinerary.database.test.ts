@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { dayLabels, previewItinerary } from "@/lib/trip-itinerary";
-import type { Trip, TripDay, TripFull, TripItineraryRequest, TripStop } from "@/types/trips";
+import type { Trip, TripDay, TripFull, TripItineraryRequest, TripMember, TripMemberDayKit, TripStop } from "@/types/trips";
 
 const tripId = "a2eb3ecb-a7ac-4b6d-98e3-701c694d8563";
 const stowe = "5b7f1f7e-3c52-4c39-9d0e-0a3c1f0b6a11";
@@ -17,15 +17,21 @@ const AT_STOWE = { name: "Stowe, Vermont", latitude: 44.4654, longitude: -72.687
 const AT_SMUGGS = { name: "Smuggs, Vermont", latitude: 44.5884, longitude: -72.7834 };
 let db: PGlite;
 
-const edit = async (action: string, payload: unknown, user = "user-1") =>
-  (await db.query<{ result: unknown }>("SELECT public.edit_trip_itinerary($1, $2, $3, $4::jsonb) AS result", [tripId, user, action, JSON.stringify(payload)])).rows[0].result;
+const edit = async (action: string, payload: unknown, user = "user-1") => action === "copy_day"
+  ? (await db.query<{ result: unknown }>("SELECT public.copy_trip_day($1, $2, $3::jsonb) AS result", [tripId, user, JSON.stringify(payload)])).rows[0].result
+  : (await db.query<{ result: unknown }>("SELECT public.edit_trip_itinerary($1, $2, $3, $4::jsonb) AS result", [tripId, user, action, JSON.stringify(payload)])).rows[0].result;
 const loadFull = async (): Promise<TripFull> => {
   const rows = async <T,>(sql: string) => (await db.query<T>(sql, [tripId])).rows;
   return {
     trip: (await rows<Trip>("SELECT id, owner_user_id, name, start_date::text, end_date::text, status FROM trips WHERE id = $1"))[0],
     stops: await rows<TripStop>("SELECT id, position, name, latitude::float8 AS latitude, longitude::float8 AS longitude FROM trip_stops WHERE trip_id = $1 ORDER BY position"),
     days: await rows<TripDay>("SELECT id, date::text, stop_id, activity FROM trip_days WHERE trip_id = $1 ORDER BY date"),
-    members: [], kits: [], gear: [],
+    members: await rows<TripMember>("SELECT id, trip_id, user_id, display_name, role, status FROM trip_members WHERE trip_id = $1 ORDER BY created_at, display_name"),
+    // Timestamps as the API sends them (ISO 8601), so reviews carry them that way.
+    kits: await rows<TripMemberDayKit>(`SELECT k.id, k.trip_day_id, k.trip_member_id, k.effort, k.items, k.note, k.state, k.outfit,
+      to_json(k.updated_at) #>> '{}' AS updated_at, to_json(k.outfit_saved_at) #>> '{}' AS outfit_saved_at
+      FROM trip_member_day_kits k JOIN trip_days d ON d.id = k.trip_day_id WHERE d.trip_id = $1`),
+    gear: [],
   };
 };
 const labels = async () => Object.fromEntries(dayLabels(await loadFull()));
@@ -35,13 +41,37 @@ const effectiveStops = async () => {
   return Object.fromEntries(days.map((day) => [day.date, day.stop_id ?? stops[0]?.id ?? null]));
 };
 const stopNames = async () => (await loadFull()).stops.map((stop) => stop.name);
+/** Adds a member's kit on a date: an outfit, checklist items, a note, or any of them. */
+const addKit = async (date: string, user: string, kit: { outfit?: object; items?: string[]; note?: string }) => {
+  await db.query(`INSERT INTO trip_member_day_kits (trip_day_id, trip_member_id, effort, items, note, outfit, outfit_saved_at)
+    SELECT d.id, m.id, 'hard', $4::jsonb, $5, $6::jsonb, CASE WHEN $6::jsonb IS NULL THEN NULL ELSE '2026-10-08T12:00:00Z'::timestamptz END
+      FROM trip_days d JOIN trip_members m ON m.trip_id = d.trip_id
+      WHERE d.trip_id = $1 AND d.date = $2 AND m.user_id = $3`,
+  [tripId, date, user, JSON.stringify(kit.items ?? []), kit.note ?? null, kit.outfit ? JSON.stringify(kit.outfit) : null]);
+};
+/** Each member's kit on each date, without its row id and update time. */
+const kitsByDay = async () => {
+  const full = await loadFull();
+  return Object.fromEntries(full.kits.map(({ trip_day_id, trip_member_id, effort, items, note, state, outfit, outfit_saved_at }) => [
+    `${full.days.find((day) => day.id === trip_day_id)!.date} ${full.members.find((member) => member.id === trip_member_id)!.user_id}`,
+    { effort, items, note, state, outfit, outfit_saved_at },
+  ]));
+};
+/** The payload of a previewed option, as the review would send it. */
+const reviewed = async (request: TripItineraryRequest, key?: string) => {
+  const preview = previewItinerary(await loadFull(), request, "user-1");
+  if ("error" in preview) throw new Error(preview.error);
+  return (key ? preview.options.find((option) => option.key === key)! : preview.options[0]).payload;
+};
+const OUTFIT = { version: 1, outing: { activity: "backcountry_skiing" } };
 
 describe("Itinerary edits in Postgres", () => {
   beforeAll(async () => {
     db = await PGlite.create();
     await db.exec("CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS; CREATE FUNCTION public.update_updated_at_column() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END $$;");
-    await db.exec(await readFile("supabase/migrations/012_trips.sql", "utf8"));
-    await db.exec(await readFile("supabase/migrations/022_trip_itinerary_edits.sql", "utf8"));
+    for (const migration of ["012_trips", "016_atomic_trip_creation", "018_trip_saved_kits", "022_trip_itinerary_edits", "023_trip_copy_day"]) {
+      await db.exec(await readFile(`supabase/migrations/${migration}.sql`, "utf8"));
+    }
   }, 20_000);
 
   // Friday–Monday at Stowe (the base), Smuggs and Jay Peak. Friday inherits the
@@ -228,6 +258,96 @@ describe("Itinerary edits in Postgres", () => {
     });
   });
 
+  describe("copying a day", () => {
+    const copy = (dates: string[], kit = false): TripItineraryRequest => ({ action: "copy_day", from: "2026-10-09", dates, kit });
+
+    it("gives each date the day's destination and activity, keeping a day without a stop on the base", async () => {
+      await edit("copy_day", await reviewed(copy(["2026-10-11", "2026-10-12"])));
+      expect(await labels()).toEqual({
+        "2026-10-09": "Stowe, Vermont (base) · Ski touring",
+        "2026-10-10": "Smuggs, Vermont · Hiking",
+        "2026-10-11": "Stowe, Vermont (base) · Ski touring",
+        "2026-10-12": "Stowe, Vermont (base) · Ski touring",
+      });
+      expect((await loadFull()).days.map((day) => day.stop_id)).toEqual([null, smuggs, null, null]);
+    });
+
+    it("copies your kit and nobody else's, and each day keeps its note", async () => {
+      await addKit("2026-10-09", "user-1", { outfit: OUTFIT, items: ["shell"], note: "Beacon" });
+      await addKit("2026-10-10", "user-1", { note: "Lunch at the hut" });
+      await addKit("2026-10-10", "user-2", { items: ["gloves"] });
+      await addKit("2026-10-09", "user-2", { items: ["helmet"] });
+      const before = await kitsByDay();
+      await edit("copy_day", await reviewed(copy(["2026-10-10"], true)));
+      const after = await kitsByDay();
+      expect(after["2026-10-10 user-1"]).toEqual({ ...before["2026-10-09 user-1"], note: "Lunch at the hut" });
+      expect(after["2026-10-10 user-2"]).toEqual(before["2026-10-10 user-2"]);
+      expect(after["2026-10-09 user-1"]).toEqual(before["2026-10-09 user-1"]);
+    });
+
+    it("keeps your kit where you already have one when asked, and replaces it when asked", async () => {
+      await addKit("2026-10-09", "user-1", { outfit: OUTFIT });
+      await addKit("2026-10-11", "user-1", { items: ["jacket"] });
+      const before = await kitsByDay();
+      await db.exec("BEGIN");
+      await edit("copy_day", await reviewed(copy(["2026-10-11", "2026-10-12"], true), "keep"));
+      let after = await kitsByDay();
+      expect(after["2026-10-11 user-1"]).toEqual(before["2026-10-11 user-1"]);
+      expect(after["2026-10-12 user-1"]).toMatchObject({ outfit: OUTFIT, items: [] });
+      await db.exec("ROLLBACK");
+      await edit("copy_day", await reviewed(copy(["2026-10-11", "2026-10-12"], true), "replace"));
+      after = await kitsByDay();
+      expect(after["2026-10-11 user-1"]).toMatchObject({ outfit: OUTFIT, items: [] });
+      expect(after["2026-10-12 user-1"]).toMatchObject({ outfit: OUTFIT });
+    });
+
+    it("refuses a copy when the day, the days or your kits changed after the review", async () => {
+      await addKit("2026-10-09", "user-1", { outfit: OUTFIT });
+      await addKit("2026-10-11", "user-1", { items: ["jacket"] });
+      const request = copy(["2026-10-11", "2026-10-12"], true);
+      for (const change of [
+        "UPDATE trip_days SET activity = 'Biking' WHERE date = '2026-10-09'",
+        "UPDATE trip_days SET stop_id = NULL WHERE date = '2026-10-12'",
+        "DELETE FROM trip_days WHERE date = '2026-10-12'",
+        "UPDATE trip_member_day_kits SET items = '[\"shell\"]' WHERE trip_day_id = (SELECT id FROM trip_days WHERE date = '2026-10-11')",
+        "UPDATE trip_member_day_kits SET items = '[\"shell\"]' WHERE trip_day_id = (SELECT id FROM trip_days WHERE date = '2026-10-09')",
+        `INSERT INTO trip_member_day_kits (trip_day_id, trip_member_id, items) SELECT d.id, m.id, '["pole"]' FROM trip_days d, trip_members m WHERE d.date = '2026-10-12' AND m.user_id = 'user-1'`,
+      ]) {
+        const payload = await reviewed(request, "replace");
+        await db.exec("BEGIN");
+        try {
+          await db.exec(change);
+          await expect(edit("copy_day", payload)).rejects.toMatchObject({ code: "40001" });
+        } finally {
+          await db.exec("ROLLBACK");
+        }
+      }
+      // Without your kit, a change to it doesn't matter.
+      const payload = await reviewed(copy(["2026-10-11"]));
+      await db.exec("UPDATE trip_member_day_kits SET items = '[\"shell\"]'");
+      await edit("copy_day", payload);
+      expect((await labels())["2026-10-11"]).toBe("Stowe, Vermont (base) · Ski touring");
+    });
+
+    it("rejects copying onto the same day, to no days, in an unknown way, or a kit you don't have", async () => {
+      const payload = await reviewed(copy(["2026-10-11"]));
+      await expect(edit("copy_day", { ...payload, dates: ["2026-10-09", "2026-10-11"] })).rejects.toMatchObject({ code: "22023" });
+      await expect(edit("copy_day", { ...payload, dates: [] })).rejects.toMatchObject({ code: "22023" });
+      await expect(edit("copy_day", { ...payload, kit: "merge" })).rejects.toMatchObject({ code: "22023" });
+      await expect(edit("copy_day", { ...payload, kit: "replace" })).rejects.toMatchObject({ code: "22023" });
+      await expect(edit("copy_day", { ...payload, from: "2026-10-13" })).rejects.toMatchObject({ code: "P0002" });
+      expect((await labels())["2026-10-11"]).toBe("Stowe, Vermont · No activity");
+    });
+
+    it("lets joined members copy, but not someone who left or isn't on the trip", async () => {
+      const payload = await reviewed(copy(["2026-10-12"]));
+      await expect(edit("copy_day", payload, "user-3")).rejects.toMatchObject({ code: "42501" });
+      await expect(edit("copy_day", payload, "user-4")).rejects.toMatchObject({ code: "42501" });
+      await edit("copy_day", payload, "user-2");
+      expect((await labels())["2026-10-12"]).toBe("Stowe, Vermont (base) · Ski touring");
+    });
+  });
+
   it("lets the owner and joined members edit, but not someone who left or isn't on the trip", async () => {
     const assign = async (user: string) => edit("assign_days", { dates: ["2026-10-12"], activity: user, expected: [{ date: "2026-10-12", stop_id: jay, activity: (await loadFull()).days[3].activity }] }, user);
     await expect(assign("user-3")).rejects.toMatchObject({ code: "42501" });
@@ -239,16 +359,21 @@ describe("Itinerary edits in Postgres", () => {
 
   it("is executable only by the service role", async () => {
     const grants = (await db.query<{ role: string; allowed: boolean }>(
-      "SELECT r AS role, has_function_privilege(r, 'public.edit_trip_itinerary(uuid, text, text, jsonb)', 'EXECUTE') AS allowed FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r"
+      `SELECT r AS role, has_function_privilege(r, 'public.edit_trip_itinerary(uuid, text, text, jsonb)', 'EXECUTE')
+          AND has_function_privilege(r, 'public.copy_trip_day(uuid, text, jsonb)', 'EXECUTE') AS allowed,
+        has_function_privilege(r, 'public.edit_trip_itinerary(uuid, text, text, jsonb)', 'EXECUTE')
+          OR has_function_privilege(r, 'public.copy_trip_day(uuid, text, jsonb)', 'EXECUTE') AS any
+        FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r`
     )).rows;
-    expect(grants).toEqual([{ role: "anon", allowed: false }, { role: "authenticated", allowed: false }, { role: "service_role", allowed: true }]);
+    expect(grants).toEqual([{ role: "anon", allowed: false, any: false }, { role: "authenticated", allowed: false, any: false }, { role: "service_role", allowed: true, any: true }]);
   });
 
   describe("applies exactly what the review previewed", () => {
     const check = async (request: TripItineraryRequest) => {
       const full = await loadFull();
       const before = dayLabels(full);
-      const preview = previewItinerary(full, request);
+      const kitsBefore = await kitsByDay();
+      const preview = previewItinerary(full, request, "user-1");
       if ("error" in preview) throw new Error(preview.error);
       expect(preview.options.length).toBeGreaterThan(0);
       for (const option of preview.options) {
@@ -259,6 +384,15 @@ describe("Itinerary edits in Postgres", () => {
           const changed = new Map(option.changes.map((change) => [change.date, change.after]));
           for (const [date, label] of after) expect([option.key, date, label]).toEqual([option.key, date, changed.get(date) ?? before.get(date)]);
           expect(option.unchanged).toBe(after.size - option.changes.length);
+          // Only the days whose review says they get your kit do, with each day's note kept.
+          const copiedTo = option.changes.filter((change) => change.notes?.some((note) => /^(Gets your|Your kit here is replaced)/.test(note))).map((change) => change.date);
+          const source = request.action === "copy_day" ? kitsBefore[`${request.from} user-1`] : undefined;
+          const kitsAfter = await kitsByDay();
+          for (const key of new Set([...Object.keys(kitsBefore), ...Object.keys(kitsAfter)])) {
+            const [date, user] = key.split(" ");
+            const expected = user === "user-1" && copiedTo.includes(date) ? { ...source, note: kitsBefore[key]?.note ?? null } : kitsBefore[key];
+            expect([option.key, key, kitsAfter[key]]).toEqual([option.key, key, expected]);
+          }
         } finally {
           await db.exec("ROLLBACK");
         }
@@ -278,6 +412,17 @@ describe("Itinerary edits in Postgres", () => {
       { action: "set_day_place", date: "2026-10-11", place: JAY_PLACE },
       { action: "set_day_place", date: "2026-10-12", place: JAY_PLACE },
     ])("$action %#", check);
+
+    it("for copies with and without your kit, onto days with and without kits", async () => {
+      await addKit("2026-10-09", "user-1", { outfit: OUTFIT, items: ["shell"], note: "Beacon" });
+      await addKit("2026-10-10", "user-1", { items: ["jacket"], note: "Lunch" });
+      await addKit("2026-10-11", "user-1", { note: "Early start" });
+      await addKit("2026-10-11", "user-2", { outfit: OUTFIT });
+      await check({ action: "copy_day", from: "2026-10-09", dates: ["2026-10-10", "2026-10-11", "2026-10-12"], kit: true });
+      await check({ action: "copy_day", from: "2026-10-09", dates: ["2026-10-11", "2026-10-12"], kit: true });
+      await check({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-09", "2026-10-11"], kit: false });
+      await check({ action: "copy_day", from: "2026-10-11", dates: ["2026-10-12"], kit: false });
+    });
 
     it("for the last stop, a stop no day uses, and a trip without stops", async () => {
       await db.query("UPDATE trip_days SET stop_id = $1 WHERE stop_id = $2", [stowe, smuggs]);

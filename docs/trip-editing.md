@@ -1,6 +1,6 @@
 # Editing a saved trip (#176)
 
-A saved trip can be renamed and its dates changed from **Edit trip** on the overview (`/trips/:id/settings`). Destinations (`/trips/:id/stops`) reorders and removes stops and sets several days at once, and a day page's location change asks which days it's for. This page records the product decisions for #176 and the rules that follow from them. It covers the first two of three PRs; Copy day and bulk-edit conflicts follow.
+A saved trip can be renamed and its dates changed from **Edit trip** on the overview (`/trips/:id/settings`). Destinations (`/trips/:id/stops`) reorders and removes stops and sets several days at once, a day page's location change asks which days it's for, and a day page can copy its plan to other days. This page records the product decisions for #176, delivered in three PRs, and the rules that follow from them.
 
 ## Decisions (October 7, 2026)
 
@@ -11,6 +11,15 @@ A saved trip can be renamed and its dates changed from **Edit trip** on the over
 | What happens to days outside the new dates? | They're **deleted after a confirmation** that lists each one with its destination, activity and whose kits are on it. Nothing is deleted until that exact change is confirmed. |
 | Who can change the shared itinerary? | **Any member on the trip**: name, dates, stops, and each day's destination and activity. Deleting the trip and managing stays (#207) stay with the organizer. |
 | How is #176 delivered? | **Three PRs.** 1) Trip settings: rename and change dates. 2) Itinerary editor: add, edit, remove (with reassignment) and reorder stops without changing destinations, assign several days at once, and choose "Only this day" or "All days at this stop" on the day page. 3) Copy day and bulk-edit conflicts. |
+
+### Copy day and conflicts (October 10, 2026)
+
+| Question | Decision |
+|---|---|
+| What does Copy day copy? | The day's **destination and activity**, plus **your own kit** (its outfit and checklist) when you tick "Also copy my kit". Crew kits are never copied: each member changes only their own. |
+| What if a copied kit lands on a day where you already have one? | **Ask: Replace or Keep.** The review lists those days, and nothing is chosen until you pick. |
+| What happens to crew kits when a day's destination or activity changes? | **They're kept as saved, and flagged.** The review lists each changed day's kits, and the day page says when a saved outfit was planned for another place, date or activity. |
+| Edit stop's day picker? | **It goes through the review** like every other change of a day's destination. `PATCH /days/:date` no longer takes `stop_id`, and `PATCH /stops/:id` no longer takes `day_dates`. |
 
 ## Rules
 
@@ -61,7 +70,7 @@ Open to any member on the trip. The body has `name`, `start_date` and `end_date`
 
 - `ItineraryChangeSheet` (`src/components/trips/ItineraryChangeSheet.tsx`) loads the review, shows the options and the changes, and saves the chosen option. It keeps its input after any failure.
 - `TripStopsEditor` (in `LegacyTripWizard.tsx`, so the legacy wizard gets it too) removes stops through the sheet and reorders them. `TripDaysEditor` is the Days section on Destinations. The day page's WeatherCard opens the sheet after a place is picked.
-- Edit stop still assigns days to that stop directly, with its own list of the exact dates.
+- Edit stop saves the stop's activities, then reviews the days picked for it (`assign_days`) in the same sheet. Closing that review changes no day.
 
 ### API: `POST /api/v1/trips/:id/itinerary`
 
@@ -87,8 +96,38 @@ Open to any member on the trip.
 
 Only `service_role` may run it.
 
+## Copy day and conflicts (PR 3)
+
+### Rules
+
+- **Copy a day's plan.** **Copy this day** on a day page gives the days you pick its destination and activity. A day without a stop of its own copies as "goes to the base", like the source.
+- **Your kit, if you ask.** "Also copy my outfit" (or checklist) copies your kit's outfit, checklist, effort and state. Each day keeps its own note. Nobody else's kit is copied or changed.
+- **Replace or Keep.** When you already have a kit on some of the days, the review asks whether to replace it there or keep it, with no default. "Keep" still gives those days the destination and activity.
+- **Old weather isn't current advice.** A copied outfit is the snapshot it was, with the forecast it was planned for. The review says so, and the day page says "Planned for the forecast on Sat Oct 10, not this day's" for any outfit whose outing date isn't the day's, whether it was copied or moved with a date change.
+- **Kits that no longer fit are flagged, not changed.** Every review that changes a day's destination or activity (removing a stop, a day's new location, the Days section, Copy day, Edit stop) lists the kits kept as saved on that day: "Kept as saved for the old plan: your checklist and Sam's outfit." On the day page, my kit and crew outfits say when they were planned for another place, date or activity. An activity a trip can't match to Gear up's (Rest, Surf, a custom one) isn't compared.
+- **No direct day moves.** A day's destination changes only through a review. The old direct paths are refused with a `400` that asks for a reload.
+
+### Pages
+
+- `CopyDayCard` (`src/components/trips/CopyDayCard.tsx`) is the day page's **Copy this day**: pick other days (with Select all), optionally your kit, then **Review copy** opens `ItineraryChangeSheet`. It isn't shown on a one-day trip.
+- `ItineraryChangeSheet` lists each change's kit notes under the day, and shows a day whose destination and activity stay the same (it only gets your kit) as "(unchanged)".
+- `outfitMismatches` (`src/lib/trip-kit-fit.ts`) builds the day page's notes for a saved outfit: another place, another date's forecast, another activity.
+
+### API and database
+
+`POST /api/v1/trips/:id/itinerary` takes a fourth action:
+
+| Request | Response |
+|---|---|
+| `preview: true`, `action: "copy_day"`, `from`, `dates` and `kit` (boolean) | One option, `copy`; or, when you copy your kit and already have one on some of the dates, `replace` and `keep`. Each change carries `notes`. `400` for copying a day onto itself or a kit you don't have, `404` for a day that's gone. |
+| `action: "copy_day"` plus the option's payload: `from`, `dates`, `kit` (`none`, `replace` or `keep`) and `expected` | Saves through `copy_trip_day`. Errors map as for the other actions. |
+
+`copy_trip_day(p_trip_id, p_user_id, p_payload)` (`supabase/migrations/023_trip_copy_day.sql`) locks the trip and checks that the user owns it or is a member who hasn't left. `expected` holds the source day's stop, activity and your kit's `updated_at`, and each date's stop, activity and your kit's `updated_at` (or null). Your kits are checked only when one is copied. A mismatch, or a date with no day, raises `40001`. A kit is an outfit or checklist items, as `save_trip_kits` counts it. Only `service_role` may run it.
+
+The contract test runs every copy option through the real function, as for the other actions, and also checks each member's kit on every day: only the days whose review says they get your kit change, and each keeps its note.
+
 ## Deployment and validation
 
-Apply `021_trip_date_changes.sql` before deploying this API; production numbers migrations by hand, and 018–020 are #170's. Without it, a date change fails with "Nothing was changed" and renaming still works. Apply `022_trip_itinerary_edits.sql` before deploying the itinerary editor; without it, removing or reordering stops, assigning days and a day's location change fail with "Nothing was changed".
+Apply `021_trip_date_changes.sql` before deploying this API; production numbers migrations by hand, and 018–020 are #170's. Without it, a date change fails with "Nothing was changed" and renaming still works. Apply `022_trip_itinerary_edits.sql` before deploying the itinerary editor; without it, removing or reordering stops, assigning days and a day's location change fail with "Nothing was changed". Apply `023_trip_copy_day.sql` before deploying Copy day; without it, saving a copy fails the same way.
 
-Tests run the function in an in-memory Postgres (PGlite): moving both ways, keeping with added and removed days, stale reviews, the length rule, retries, member access, stays and grants. Route and page tests cover the review, the Move/Keep choice, the 409 refresh, failures that keep the input, field focus and the legacy wizard. For the itinerary editor, PGlite tests cover every action, stale reviews (including a requested date with no day), member access and grants, and run each previewed option through the function; route and page tests cover removing with a choice, the 409 refresh, reordering and its focus, the Days section and the day page's choices. Signed-in checks with real trips, and phone and screen-reader checks, are still to do.
+Tests run the function in an in-memory Postgres (PGlite): moving both ways, keeping with added and removed days, stale reviews, the length rule, retries, member access, stays and grants. Route and page tests cover the review, the Move/Keep choice, the 409 refresh, failures that keep the input, field focus and the legacy wizard. For the itinerary editor, PGlite tests cover every action, stale reviews (including a requested date with no day), member access and grants, and run each previewed option through the function; route and page tests cover removing with a choice, the 409 refresh, reordering and its focus, the Days section and the day page's choices. For Copy day, PGlite tests cover the plan and the base, your kit and nobody else's, notes kept, Replace and Keep, every stale review, invalid copies and access; route and page tests cover the copy review with your kit, a failed save that keeps the picks, Edit stop's review, the refused direct paths, and the day page's planned-for notes. Signed-in checks with real trips, and phone and screen-reader checks, are still to do.

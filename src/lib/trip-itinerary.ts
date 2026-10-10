@@ -1,24 +1,30 @@
 import "server-only";
 import { dateLabel, isCalendarDate, isUuid } from "@/lib/trip-lodging";
-import type { TripDay, TripFull, TripItineraryOption, TripItineraryPreview, TripItineraryRequest, TripPlace, TripStop } from "@/types/trips";
+import type { TripDay, TripFull, TripItineraryOption, TripItineraryPreview, TripItineraryRequest, TripMember, TripMemberDayKit, TripPlace, TripStop } from "@/types/trips";
 
 /**
- * Itinerary edits (#176 PR 2): remove and reorder stops, assign several days,
- * and change one day's place. previewItinerary builds the review with the same
- * rules as edit_trip_itinerary (migration 022), which saves the chosen option
- * and refuses it if the trip no longer matches what the review showed.
+ * Itinerary edits (#176): remove and reorder stops, assign several days,
+ * change one day's place, and copy a day. previewItinerary builds the review
+ * with the same rules as edit_trip_itinerary (migration 022) and copy_trip_day
+ * (023), which save the chosen option and refuse it if the trip no longer
+ * matches what the review showed.
  */
 
 type DayCheck = { date: string; stop_id: string | null; activity: string | null };
+/** A day as a copy's review showed it, with the `updated_at` of the user's kit there, or null. */
+type CopyCheck = DayCheck & { kit: string | null };
 /** A stop's place as the review showed it, so a save can't overwrite a newer change to it. */
 type StopCheck = { name: string; latitude: number | null; longitude: number | null };
+/** Whether a copy brings the user's kit, and what it does where they already have one. */
+type KitCopy = "none" | "replace" | "keep";
 
 /** A change as it's saved: the action and the payload of the option chosen in the review. */
 type ItineraryEdit =
   | { action: "remove_stop"; payload: { stop_id: string; reassign_to: string | null; expected: string[] } }
   | { action: "reorder_stops"; payload: { order: string[]; expected: string[] } }
   | { action: "assign_days"; payload: { dates: string[]; stop_id?: string; activity?: string | null; expected: DayCheck[] } }
-  | { action: "set_day_place"; payload: { date: string; place: TripPlace; scope: "day" | "stop"; expected: { stop_id: string | null; stop: StopCheck | null; dates: string[] } } };
+  | { action: "set_day_place"; payload: { date: string; place: TripPlace; scope: "day" | "stop"; expected: { stop_id: string | null; stop: StopCheck | null; dates: string[] } } }
+  | { action: "copy_day"; payload: { from: string; dates: string[]; kit: KitCopy; expected: { from: Omit<CopyCheck, "date">; days: CopyCheck[] } } };
 
 type Invalid = { error: string };
 type Itinerary = { stops: Array<Pick<TripStop, "id" | "name" | "latitude" | "longitude">>; days: Array<Pick<TripDay, "date" | "stop_id" | "activity">> };
@@ -29,6 +35,7 @@ const INVALID: Invalid = { error: "Reload the trip and try again." };
 
 const isObject = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const plural = (count: number) => `${count} ${count === 1 ? "day" : "days"}`;
+const listed = (items: string[]) => new Intl.ListFormat("en", { type: "conjunction" }).format(items);
 
 function list<T>(value: unknown, max: number, item: (entry: unknown) => T | undefined): T[] | null {
   if (!Array.isArray(value) || value.length > max) return null;
@@ -87,9 +94,26 @@ export function parseItineraryRequest(body: unknown): TripItineraryRequest | Inv
       if (!isCalendarDate(body.date)) return INVALID;
       return place ? { action: "set_day_place", date: body.date, place } : { error: "Choose a place from the search results." };
     }
+    case "copy_day": {
+      const days = dates(body.dates);
+      if (!isCalendarDate(body.from) || typeof body.kit !== "boolean") return INVALID;
+      if (!days?.length) return { error: "Choose days to copy to." };
+      return { action: "copy_day", from: body.from, dates: uniqueSorted(days), kit: body.kit };
+    }
     default:
       return INVALID;
   }
+}
+
+/** A day's destination, activity and the user's kit as a copy's review showed them. Undefined when invalid. */
+function copyCheck(entry: unknown): Omit<CopyCheck, "date"> | undefined {
+  if (!isObject(entry)) return undefined;
+  const stopId = entry.stop_id ?? null;
+  const activity = entry.activity ?? null;
+  const kit = entry.kit ?? null;
+  if (!(stopId === null || isUuid(stopId)) || !(activity === null || typeof activity === "string")) return undefined;
+  if (!(kit === null || (typeof kit === "string" && kit.length <= 40 && Number.isFinite(Date.parse(kit))))) return undefined;
+  return { stop_id: stopId?.toLowerCase() ?? null, activity, kit };
 }
 
 /** The change to save, rebuilt from its validated fields only, or why it can't be. */
@@ -148,6 +172,18 @@ export function parseItineraryEdit(body: unknown): ItineraryEdit | Invalid {
         payload: { date: body.date, place, scope: body.scope, expected: { stop_id: stopId, stop, dates: expectedDates } },
       };
     }
+    case "copy_day": {
+      const days = dates(body.dates);
+      const expected = isObject(body.expected) ? body.expected : null;
+      const from = copyCheck(expected?.from);
+      const checks = list(expected?.days, MAX_DAYS, (entry): CopyCheck | undefined => {
+        const check = copyCheck(entry);
+        return check && isObject(entry) && isCalendarDate(entry.date) ? { date: entry.date, ...check } : undefined;
+      });
+      const kit = body.kit;
+      if (!isCalendarDate(body.from) || !days?.length || !from || !checks || (kit !== "none" && kit !== "replace" && kit !== "keep")) return INVALID;
+      return { action: "copy_day", payload: { from: body.from, dates: uniqueSorted(days), kit, expected: { from, days: checks } } };
+    }
     default:
       return INVALID;
   }
@@ -163,6 +199,7 @@ export function requestFor(edit: ItineraryEdit): TripItineraryRequest {
       return { action: "assign_days", dates, ...("stop_id" in edit.payload ? { stop_id } : {}), ...("activity" in edit.payload ? { activity } : {}) };
     }
     case "set_day_place": return { action: "set_day_place", date: edit.payload.date, place: edit.payload.place };
+    case "copy_day": return { action: "copy_day", from: edit.payload.from, dates: edit.payload.dates, kit: edit.payload.kit !== "none" };
   }
 }
 
@@ -179,14 +216,51 @@ export function dayLabels({ stops, days }: Itinerary): Map<string, string> {
   }));
 }
 
-/** An option that turns the trip's itinerary into `after`, with the days it changes. */
-function option(full: TripFull, after: Itinerary, fields: Pick<TripItineraryOption, "key" | "label" | "detail" | "payload">): TripItineraryOption {
+/** An outfit or checklist items, as save_trip_kits counts a kit. */
+const isKit = (kit: Pick<TripMemberDayKit, "outfit" | "items">) => !!kit.outfit || kit.items.length > 0;
+
+/**
+ * The kits on a day that stay as saved when its destination or activity
+ * changes, the user's first: "your outfit and Sam's checklist". Undefined when
+ * there are none. `copiedOver` leaves out the user's kit, which a copy replaces.
+ */
+function keptKits(full: TripFull, day: Pick<TripDay, "id">, me: TripMember | undefined, copiedOver: boolean): string | undefined {
+  const members = full.members.filter((member) => member.status !== "left" && member !== me);
+  const kits = (me ? [me, ...members] : members).flatMap((member) => {
+    const kit = full.kits.find((candidate) => candidate.trip_day_id === day.id && candidate.trip_member_id === member.id);
+    if (!kit || !isKit(kit) || (copiedOver && member === me)) return [];
+    return [`${member === me ? "your" : `${member.display_name}'s`} ${kit.outfit ? "outfit" : "checklist"}`];
+  });
+  return kits.length > 0 ? `Kept as saved for the old plan: ${listed(kits)}.` : undefined;
+}
+
+/**
+ * An option that turns the trip's itinerary into `after`, with the days it
+ * changes. Each day whose destination or activity changes notes the kits that
+ * stay as saved. `copied` notes the days that get the user's copied kit, which
+ * change even when their destination and activity don't.
+ */
+function option(
+  full: TripFull,
+  after: Itinerary,
+  fields: Pick<TripItineraryOption, "key" | "label" | "detail" | "payload">,
+  me?: TripMember,
+  copied?: Map<string, string>,
+): TripItineraryOption {
   const before = dayLabels(full);
   const next = dayLabels(after);
   const days = [...full.days].sort((a, b) => a.date.localeCompare(b.date));
   const changes = days
-    .filter((day) => before.get(day.date) !== next.get(day.date))
-    .map((day) => ({ date: day.date, date_label: dateLabel(day.date), before: before.get(day.date)!, after: next.get(day.date)! }));
+    .filter((day) => before.get(day.date) !== next.get(day.date) || copied?.has(day.date))
+    .map((day) => {
+      const moved = before.get(day.date) !== next.get(day.date);
+      const notes = [copied?.get(day.date), moved ? keptKits(full, day, me, !!copied?.has(day.date)) : undefined]
+        .filter((note): note is string => !!note);
+      return {
+        date: day.date, date_label: dateLabel(day.date), before: before.get(day.date)!, after: next.get(day.date)!,
+        ...(notes.length > 0 ? { notes } : {}),
+      };
+    });
   return { ...fields, changes, unchanged: days.length - changes.length };
 }
 
@@ -195,12 +269,16 @@ const near = (a: number | null, b: number) => a !== null && Math.abs(a - b) <= 0
 /**
  * The options for a change, each with the days it changes and the payload to
  * save it. `full.stops` is in position order, as loadTripFull returns it.
+ * `userId` is the signed-in user, whose kit a copy can bring and whose kits the
+ * review calls "your".
  */
-export function previewItinerary(full: TripFull, request: TripItineraryRequest): TripItineraryPreview | { error: string; status: 400 | 404 } {
+export function previewItinerary(full: TripFull, request: TripItineraryRequest, userId?: string | null): TripItineraryPreview | { error: string; status: 400 | 404 } {
   const { stops, days } = full;
   const base = stops[0];
   const stopFor = (day: Pick<TripDay, "stop_id">) => stops.find((stop) => stop.id === day.stop_id) ?? base;
   const datesAt = (stopId: string | undefined) => days.filter((day) => stopFor(day)?.id === stopId).map((day) => day.date).sort();
+  const me = userId ? full.members.find((member) => member.user_id === userId && member.status !== "left") : undefined;
+  const review = (after: Itinerary, fields: Parameters<typeof option>[2], copied?: Map<string, string>) => option(full, after, fields, me, copied);
 
   switch (request.action) {
     case "remove_stop": {
@@ -214,18 +292,18 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest):
       });
       const payload = (reassignTo: string | null) => ({ stop_id: removed.id, reassign_to: reassignTo, expected: using });
       if (using.length === 0) {
-        return { options: [option(full, remove(null), {
+        return { options: [review(remove(null), {
           key: "remove", label: `No day uses ${removed.name}`, detail: "Every day keeps its destination.", payload: payload(others[0]?.id ?? null),
         })] };
       }
       if (others.length === 0) {
-        return { options: [option(full, remove(null), {
+        return { options: [review(remove(null), {
           key: "none", label: "No destination",
           detail: `${removed.name} is the only stop, so ${using.length === 1 ? "its day" : "its days"} will have no destination.`,
           payload: payload(null),
         })] };
       }
-      return { options: others.map((stop) => option(full, remove(stop.id), {
+      return { options: others.map((stop) => review(remove(stop.id), {
         key: stop.id, label: stop.name, detail: null, payload: payload(stop.id),
       })) };
     }
@@ -238,7 +316,7 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest):
       const reordered = order as TripStop[];
       // Days without a stop keep going to the old base.
       const pinned = base && reordered[0] !== base ? days.map((day) => day.stop_id ? day : { ...day, stop_id: base.id }) : days;
-      return { options: [option(full, { stops: reordered, days: pinned }, {
+      return { options: [review({ stops: reordered, days: pinned }, {
         key: "reorder", label: "New stop order", detail: "Every day keeps its destination.",
         payload: { order: reordered.map((stop) => stop.id), expected: stops.map((stop) => stop.id) },
       })] };
@@ -251,7 +329,7 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest):
       if ("stop_id" in request && !stop) return { error: "That stop isn't on this trip anymore. Reload the trip.", status: 404 };
       const set = { ...(stop ? { stop_id: stop.id } : {}), ...("activity" in request ? { activity: request.activity ?? null } : {}) };
       const parts = [stop?.name, "activity" in request ? request.activity ?? "No activity" : undefined].filter(Boolean);
-      return { options: [option(full, { stops, days: days.map((day) => request.dates.includes(day.date) ? { ...day, ...set } : day) }, {
+      return { options: [review({ stops, days: days.map((day) => request.dates.includes(day.date) ? { ...day, ...set } : day) }, {
         key: "assign", label: `${parts.join(" and ")} for ${plural(selected.length)}`, detail: null,
         payload: {
           dates: request.dates, ...set,
@@ -274,21 +352,21 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest):
 
       if (!current) {
         // The place becomes the base, so every day goes to it.
-        return { options: [option(full, { stops: [moved({ id: "new" })], days }, {
+        return { options: [review({ stops: [moved({ id: "new" })], days }, {
           key: "stop", label: `Every day (${plural(days.length)})`, detail: `${place.name} becomes the trip's base.`,
           payload: payload("stop", days.map((candidate) => candidate.date).sort()),
         })] };
       }
       const atStop = datesAt(current.id);
       if (atPlace(current)) {
-        return { options: [option(full, { stops, days }, {
+        return { options: [review({ stops, days }, {
           key: "stop", label: `${dateLabel(day.date)} is already at ${place.name}`, detail: null, payload: payload("stop", atStop),
         })] };
       }
       // Another stop already at the place takes the days, rather than a second
       // stop at the same place.
       const existing = stops.find(atPlace);
-      const everyDay = option(full, existing
+      const everyDay = review(existing
         ? { stops, days: days.map((candidate) => stopFor(candidate) === current ? { ...candidate, stop_id: existing.id } : candidate) }
         : { stops: stops.map((stop) => stop === current ? moved(stop) : stop), days }, {
         key: "stop", label: `Every day at ${current.name} (${plural(atStop.length)})`,
@@ -304,7 +382,7 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest):
         }] };
       }
       const target = existing ?? moved({ id: "new" });
-      const onlyThisDay = option(full, {
+      const onlyThisDay = review({
         stops: existing ? stops : [...stops, target],
         days: days.map((candidate) => candidate === day ? { ...candidate, stop_id: target.id } : candidate),
       }, {
@@ -313,6 +391,58 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest):
         payload: payload("day", [day.date]),
       });
       return { options: [onlyThisDay, everyDay] };
+    }
+
+    case "copy_day": {
+      const source = days.find((candidate) => candidate.date === request.from);
+      if (!source) return { error: "The day you're copying isn't on the trip anymore. Reload the trip.", status: 404 };
+      if (request.dates.includes(source.date)) return { error: "Choose days other than the one you're copying.", status: 400 };
+      const targets = days.filter((day) => request.dates.includes(day.date)).sort((a, b) => a.date.localeCompare(b.date));
+      if (targets.length !== request.dates.length) return { error: "Some of these days aren't on the trip anymore. Reload the trip.", status: 404 };
+      const myKit = (day: TripDay) => me && full.kits.find((kit) => kit.trip_day_id === day.id && kit.trip_member_id === me.id && isKit(kit));
+      const sourceKit = request.kit ? myKit(source) : undefined;
+      const from = dateLabel(source.date);
+      if (request.kit && !sourceKit) return { error: `You have no kit on ${from} to copy.`, status: 400 };
+
+      const after = { stops, days: days.map((day) => request.dates.includes(day.date) ? { ...day, stop_id: source.stop_id, activity: source.activity } : day) };
+      const plan = dayLabels(full).get(source.date)!;
+      const payload = (kit: KitCopy) => ({
+        from: source.date, dates: targets.map((day) => day.date), kit,
+        expected: {
+          from: { stop_id: source.stop_id, activity: source.activity, kit: sourceKit?.updated_at ?? null },
+          days: targets.map((day) => ({ date: day.date, stop_id: day.stop_id, activity: day.activity, kit: sourceKit ? myKit(day)?.updated_at ?? null : null })),
+        },
+      });
+      if (!sourceKit) {
+        return { options: [review(after, {
+          key: "copy", label: `Copy ${from} to ${plural(targets.length)}`, detail: `${plan}. Kits stay on their own days.`, payload: payload("none"),
+        })] };
+      }
+
+      // The user's kit comes too: an outfit still shows the forecast it was planned for.
+      const what = sourceKit.outfit ? "outfit" : "checklist";
+      const forecast = sourceKit.outfit ? " The copied outfit keeps the forecast it was planned for, so check each day in Gear up." : "";
+      const mine = targets.filter((day) => myKit(day));
+      const copied = (replace: boolean) => new Map(targets
+        .filter((day) => replace || !myKit(day))
+        .map((day) => [day.date, myKit(day) ? `Your kit here is replaced with your ${what} from ${from}.` : `Gets your ${what} from ${from}.`]));
+      if (mine.length === 0) {
+        return { options: [review(after, {
+          key: "copy", label: `Copy ${from} and your kit to ${plural(targets.length)}`, detail: `${plan}, and your ${what}.${forecast}`, payload: payload("replace"),
+        }, copied(true))] };
+      }
+      const on = listed(mine.map((day) => dateLabel(day.date)));
+      return { options: [
+        review(after, {
+          key: "replace", label: `Replace your kit on ${on}`, detail: `Every day gets ${plan} and your ${what}.${forecast}`, payload: payload("replace"),
+        }, copied(true)),
+        review(after, {
+          key: "keep", label: `Keep your kit on ${on}`,
+          detail: `${mine.length === 1 ? "That day gets" : "Those days get"} ${plan} only.${mine.length < targets.length
+            ? ` ${targets.length - mine.length === 1 ? "The other day also gets" : "The others also get"} your ${what}.${forecast}` : ""}`,
+          payload: payload("keep"),
+        }, copied(false)),
+      ] };
     }
   }
 }

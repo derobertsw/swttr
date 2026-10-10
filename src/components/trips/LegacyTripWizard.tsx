@@ -416,10 +416,14 @@ export function TripStopsEditor({
   const [adding, setAdding] = useState(false);
   const [moving, setMoving] = useState(false);
   const [removing, setRemoving] = useState<TripStop | null>(null);
+  // Days picked in Edit stop, reviewed once its sheet has closed.
+  const [assigning, setAssigning] = useState<{ stop: TripStop; dates: string[] } | null>(null);
+  const pendingAssign = useRef<{ stop: TripStop; dates: string[] } | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const search = useLocationSearch();
   const editFocus = useReturnFocus();
   const removeFocus = useReturnFocus();
+  const assignFocus = useReturnFocus();
   // The Move button pressed last. It moves with its stop, and once the move is
   // saved, focus goes back to it, or to the stop's other Move button when it
   // reached either end and is disabled.
@@ -636,6 +640,23 @@ export function TripStopsEditor({
         />
       )}
 
+      {assigning && (
+        <ItineraryChangeSheet
+          tripId={trip.id}
+          change={{ action: "assign_days", dates: assigning.dates, stop_id: assigning.stop.id }}
+          title={`Days at ${assigning.stop.name}`}
+          description="Review the days that move to this stop. Nothing changes until you save."
+          question="Which change?"
+          saveLabel="Save days"
+          onSaved={() => {
+            setAnnouncement(`Days saved for ${assigning.stop.name}.`);
+            onItineraryChange?.();
+          }}
+          onClose={() => setAssigning(null)}
+          onCloseAutoFocus={assignFocus.restore}
+        />
+      )}
+
       {editing && (
         <StopDetailSheet
           key={editing.key}
@@ -645,12 +666,21 @@ export function TripStopsEditor({
           tripStart={trip.start_date}
           tripEnd={trip.end_date}
           onClose={closeEditor}
-          onSaved={(updated) => {
+          onSaved={(updated, dates) => {
             onStopsChange((current) => current.map((s) => (s.id === updated.id ? updated : s)));
+            pendingAssign.current = dates.length > 0 ? { stop: updated, dates } : null;
             closeEditor();
-            onItineraryChange?.();
+            if (dates.length === 0) onItineraryChange?.();
           }}
-          onCloseAutoFocus={editFocus.restore}
+          onCloseAutoFocus={(event) => {
+            editFocus.restore(event);
+            // Then review the days picked, returning to Edit when the review closes.
+            const pending = pendingAssign.current;
+            pendingAssign.current = null;
+            if (!pending) return;
+            assignFocus.remember(() => document.getElementById(editStopButtonId(pending.stop.id)));
+            setAssigning(pending);
+          }}
         />
       )}
     </div>
@@ -673,7 +703,8 @@ function StopDetailSheet({
   tripStart: string;
   tripEnd: string;
   onClose: () => void;
-  onSaved: (s: TripStop) => void;
+  /** The saved stop, and the days picked for it, which are reviewed next. */
+  onSaved: (s: TripStop, dates: string[]) => void;
   onCloseAutoFocus: (event: Event) => void;
 }) {
   const [activities, setActivities] = useState<string[]>(stop.activities);
@@ -726,9 +757,9 @@ function StopDetailSheet({
       const { stop: updated } = await tripRequest<{ stop: TripStop }>(
         `/api/v1/trips/${tripId}/stops/${stop.id}`,
         "PATCH",
-        { activities, day_dates: selectedDates }
+        { activities }
       );
-      onSaved(updated);
+      onSaved(updated, selectedDates.slice().sort());
     } catch (err) {
       // The sheet stays open with its picks, so Save stop can be tried again.
       toast.error("Couldn't save the stop", { description: errorMessage(err) });
@@ -748,7 +779,7 @@ function StopDetailSheet({
         <>
           <SectionLabel>Stop detail</SectionLabel>
           <TripSheetTitle>Edit stop {stop.name}</TripSheetTitle>
-          <TripSheetDescription>Choose exactly which days to assign. Other days keep their destinations.</TripSheetDescription>
+          <TripSheetDescription>Choose its activities and the days to move to it. You&apos;ll review the days before they change.</TripSheetDescription>
         </>
       }
       footer={
@@ -759,7 +790,7 @@ function StopDetailSheet({
           disabled={assignedDates === null}
           className="w-full"
         >
-          Save stop
+          {selectedDates.length > 0 ? "Save and review days" : "Save stop"}
         </Button>
       }
     >
@@ -777,7 +808,7 @@ function StopDetailSheet({
         <p className="mt-2 text-sm text-foreground">
           {selectedDates.length === 0
             ? "No day assignments will change."
-            : `These days will use ${stop.name}: ${selectedDates.slice().sort().join(", ")}. Other days stay unchanged.`}
+            : `Next, you'll review moving these days to ${stop.name}: ${selectedDates.slice().sort().join(", ")}. Other days stay unchanged.`}
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {tripDates.map((iso) => {
