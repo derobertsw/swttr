@@ -204,7 +204,9 @@ export type TripItineraryRequest =
   | { action: "reorder_stops"; order: string[] }
   /** A present key sets that field on every date; `activity: null` clears it. */
   | { action: "assign_days"; dates: string[]; stop_id?: string; activity?: string | null }
-  | { action: "set_day_place"; date: string; place: TripPlace };
+  | { action: "set_day_place"; date: string; place: TripPlace }
+  /** Gives `dates` the destination and activity of `from`, and with `kit` the signed-in member's kit too. */
+  | { action: "copy_day"; from: string; dates: string[]; kit: boolean };
 
 /** A day's destination and activity before and after, each as "<stop>[ (base)] · <activity|No activity>". */
 export interface TripItineraryChange {
@@ -212,13 +214,15 @@ export interface TripItineraryChange {
   date_label: string;
   before: string;
   after: string;
+  /** What happens to kits on the day: a copied kit, and the kits that stay as saved when its plan changes. */
+  notes?: string[];
 }
 
 export interface TripItineraryOption {
   key: string;
   label: string;
   detail: string | null;
-  /** The days whose destination or activity changes. */
+  /** The days whose destination or activity changes, or that get a copied kit. */
   changes: TripItineraryChange[];
   /** How many other days keep their destination and activity. */
   unchanged: number;

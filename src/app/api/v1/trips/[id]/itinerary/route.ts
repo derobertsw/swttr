@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
 
   const preview = async (change: TripItineraryRequest) => {
     const full = await loadTripFull(supabase, id);
-    return full ? previewItinerary(full, change) : { error: "Not found", status: 404 as const };
+    return full ? previewItinerary(full, change, userId) : { error: "Not found", status: 404 as const };
   };
 
   const body = await readJson<Record<string, unknown>>(request);
@@ -37,9 +37,10 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
 
   const edit = parseItineraryEdit(body);
   if ("error" in edit) return jsonError(edit.error, 400);
-  const { error } = await supabase.rpc("edit_trip_itinerary", {
-    p_trip_id: id, p_user_id: userId, p_action: edit.action, p_payload: edit.payload,
-  });
+  // Copying a day can bring the user's kit, so it has its own function.
+  const { error } = edit.action === "copy_day"
+    ? await supabase.rpc("copy_trip_day", { p_trip_id: id, p_user_id: userId, p_payload: edit.payload })
+    : await supabase.rpc("edit_trip_itinerary", { p_trip_id: id, p_user_id: userId, p_action: edit.action, p_payload: edit.payload });
   if (error?.code === "40001") {
     // Something changed since the review. Show the change as it would be now.
     const current = await preview(requestFor(edit)).catch(() => null);

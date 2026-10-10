@@ -11,6 +11,7 @@ import { ComfortDecision } from "@/components/layers/ComfortDecision";
 import { ResultHeader } from "@/components/layers/ResultHeader";
 import { generalAdviceReason } from "@/components/trips/SaveToTrip";
 import { BODY_PARTS } from "@/lib/layers";
+import { outfitMismatches } from "@/lib/trip-kit-fit";
 import { cn } from "@/lib/utils";
 import type { SavedKitPhase, SavedOutfit } from "@/types/savedKit";
 import type { TripStop } from "@/types/trips";
@@ -18,33 +19,27 @@ import type { TripStop } from "@/types/trips";
 const PHASE_LABELS: Record<SavedKitPhase["id"], string> = { outing: "Outing", climb: "Climb", descent: "Descent" };
 const noop = () => {};
 
-/** Within about 1 km: the saved outing's place and the day's stop are the same place. */
-function samePlace(outfit: SavedOutfit, stop: TripStop): boolean {
-  return stop.latitude !== null && stop.longitude !== null
-    && Math.abs(stop.latitude - outfit.outing.place.latitude) < 0.01
-    && Math.abs(stop.longitude - outfit.outing.place.longitude) < 0.01;
-}
-
 interface SavedKitViewProps {
   outfit: SavedOutfit;
   savedAt?: string | null;
-  /** The day's stop, to point out an outfit saved for somewhere else. */
-  stop?: TripStop | null;
+  /** The trip day it's on, to point out an outfit planned for another place, date or activity. */
+  day: { date: string; activity: string | null; stop: TripStop | null };
 }
 
 /**
  * My kit on a trip day (#170): the outfit saved from Gear up, shown as Gear up
  * showed it, with the outing and forecast it was for. It's a snapshot, so it
- * says when it was saved and doesn't change with newer weather.
+ * says when it was saved, doesn't change with newer weather, and says when it
+ * was planned for another place, date or activity than the day's (#176).
  */
-export function SavedKitView({ outfit, savedAt, stop }: SavedKitViewProps) {
+export function SavedKitView({ outfit, savedAt, day }: SavedKitViewProps) {
   const [phaseId, setPhaseId] = useState(outfit.phases[0].id);
   const wearHeadingId = useId();
   const phase = outfit.phases.find((candidate) => candidate.id === phaseId) ?? outfit.phases[0];
   const touring = outfit.phases.length > 1;
   const phaseLabel = touring ? PHASE_LABELS[phase.id] : undefined;
   const reason = generalAdviceReason(outfit);
-  const elsewhere = stop && !samePlace(outfit, stop);
+  const mismatches = outfitMismatches(outfit, day);
 
   return (
     <section aria-label="My kit" className="flex flex-col gap-5">
@@ -67,11 +62,7 @@ export function SavedKitView({ outfit, savedAt, stop }: SavedKitViewProps) {
           {outfit.edited && ", with your changes"}. It stays as saved when the forecast changes.
         </p>
         {reason && <p className="text-muted-foreground">{reason}</p>}
-        {elsewhere && (
-          <p className="text-muted-foreground">
-            Saved for {outfit.weather.context?.place ?? outfit.outing.place.name}, not this day&apos;s stop ({stop.name}).
-          </p>
-        )}
+        {mismatches.map((note) => <p key={note} className="text-foreground">{note}</p>)}
         <p className="text-muted-foreground">
           To update it, <Link href="/" className="font-medium text-foreground underline underline-offset-2">get layers in Gear up</Link> and save them to this day.
         </p>

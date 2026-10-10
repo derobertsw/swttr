@@ -26,11 +26,13 @@ import { cn } from "@/lib/utils";
 import { useTrip } from "@/hooks/useTrip";
 import { useUserId } from "@/hooks/useUserId";
 import { SavedKitView } from "@/components/trips/SavedKitView";
+import { CopyDayCard } from "@/components/trips/CopyDayCard";
 import { canEditMemberKit } from "@/lib/trip-permissions";
 import { DayLodging } from "@/components/trips/TripStays";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
+import { outfitMismatches } from "@/lib/trip-kit-fit";
 import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
@@ -128,6 +130,8 @@ export default function DayDetailPage({
   const crew = activeMembers.filter((m) => m !== me);
   const kitFor = (member: TripMember) => data?.kits.find((k) => k.trip_member_id === member.id && k.trip_day_id === day?.id);
   const myKit = me ? kitFor(me) : undefined;
+  const fitOf = (kit: TripMemberDayKit | undefined) =>
+    kit?.outfit && day ? outfitMismatches(kit.outfit, { date, activity: day.activity, stop: effectiveStop ?? null }) : [];
 
   // Find prev/next day for arrows.
   const dayIndex = data?.days.findIndex((d) => d.date === date) ?? -1;
@@ -203,7 +207,7 @@ export default function DayDetailPage({
             />
 
             {me && (myKit?.outfit ? (
-              <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} stop={effectiveStop ?? null} />
+              <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} />
             ) : (
               <section aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
                 <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
@@ -226,12 +230,23 @@ export default function DayDetailPage({
                     date={date}
                     member={m}
                     kit={kitFor(m)}
+                    fit={fitOf(kitFor(m))}
                     editable={canEditMemberKit(data.trip, m, userId)}
                     onSaved={refresh}
                   />
                 ))}
               </section>
             )}
+
+            <CopyDayCard
+              tripId={id}
+              day={day}
+              dayLabel={dateLabel}
+              stops={data.stops}
+              days={data.days}
+              kit={myKit?.outfit ? "outfit" : myKit && myKit.items.length > 0 ? "checklist" : null}
+              onSaved={() => void refresh()}
+            />
 
             <div className="h-24" />
           </>
@@ -515,6 +530,7 @@ function MemberKitRow({
   date,
   member,
   kit,
+  fit = [],
   editable,
   onSaved,
 }: {
@@ -522,16 +538,18 @@ function MemberKitRow({
   date: string;
   member: TripMember;
   kit: TripMemberDayKit | undefined;
+  /** Where a saved outfit doesn't fit the day: another place, date or activity. */
+  fit?: string[];
   editable: boolean;
   /** Reloads the trip; the row's controls stay disabled until it finishes. */
   onSaved: () => Promise<void>;
 }) {
-  if (kit?.outfit || !editable) return <MemberKitSummary member={member} kit={kit} />;
+  if (kit?.outfit || !editable) return <MemberKitSummary member={member} kit={kit} fit={fit} />;
   return <EditableMemberKitRow tripId={tripId} date={date} member={member} kit={kit} onSaved={onSaved} />;
 }
 
 /** Someone else's kit, read-only: their saved outfit, or their checklist. */
-function MemberKitSummary({ member, kit }: { member: TripMember; kit: TripMemberDayKit | undefined }) {
+function MemberKitSummary({ member, kit, fit }: { member: TripMember; kit: TripMemberDayKit | undefined; fit: string[] }) {
   const outfit = kit?.outfit;
   const worn = outfit
     ? Object.values(outfit.phases[0].wear).reduce((count, layers) => count + layers.base.length + (layers.mid?.length ?? 0) + layers.outer.length, 0)
@@ -549,6 +567,7 @@ function MemberKitSummary({ member, kit }: { member: TripMember; kit: TripMember
               ? "no kit set"
               : `${sentenceCase(kit.effort)} · ${kit.items.map(sentenceCase).join(", ")}`}
           </p>
+          {fit.map((note) => <p key={note} className="text-sm text-foreground">{note}</p>)}
         </div>
         {kit && !outfit && kit.state !== "ok" && (
           <Badge size="sm" variant="warning">{KIT_STATE_LABEL[kit.state]}</Badge>

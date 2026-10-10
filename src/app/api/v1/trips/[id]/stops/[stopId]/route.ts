@@ -8,11 +8,12 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
   const { id, stopId } = await ctx.params;
   const auth = await requireTripAccess(id);
   if (auth instanceof NextResponse) return auth;
-  const { supabase, trip } = auth;
+  const { supabase } = auth;
 
   const body = await readJson(request);
-  if (body?.day_dates !== undefined && (!Array.isArray(body.day_dates) || body.day_dates.some((date: unknown) => typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date < trip.start_date || date > trip.end_date))) {
-    return NextResponse.json({ error: "Choose days within this trip." }, { status: 400 });
+  // Days move between stops only through a reviewed itinerary change (#176).
+  if (body?.day_dates !== undefined) {
+    return NextResponse.json({ error: "Days are changed through the itinerary review. Reload the page and try again." }, { status: 400 });
   }
   const update: Record<string, unknown> = {};
   if (typeof body?.name === "string") update.name = body.name;
@@ -28,24 +29,5 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     .select("*")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // Allow assigning days to this stop in the same call.
-  if (Array.isArray(body?.day_dates)) {
-    const dates = [...new Set(body.day_dates as string[])];
-    if (dates.length > 0) {
-      const { data: assignedDays, error: assignmentError } = await supabase
-        .from("trip_days")
-        .update({ stop_id: stopId })
-        .eq("trip_id", id)
-        .in("date", dates)
-        .select("date");
-      if (assignmentError) return NextResponse.json({ error: "Stop details saved, but day assignments failed. Retry to assign the selected days." }, { status: 500 });
-      const assignedDates = new Set((assignedDays ?? []).map((day) => day.date));
-      if (dates.some((date) => !assignedDates.has(date))) {
-        return NextResponse.json({ error: "Stop details saved, but some selected days are missing and could not be assigned. Reload the trip and try again." }, { status: 500 });
-      }
-    }
-  }
-
   return NextResponse.json({ stop: data });
 }

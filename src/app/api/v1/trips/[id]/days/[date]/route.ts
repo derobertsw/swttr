@@ -32,8 +32,11 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
   const { supabase } = auth;
 
   const body = await readJson(request);
+  // A day's destination changes only through a reviewed itinerary change (#176).
+  if (body?.stop_id !== undefined) {
+    return NextResponse.json({ error: "Destinations are changed through the itinerary review. Reload the page and try again." }, { status: 400 });
+  }
   const update: Record<string, unknown> = {};
-  if (body?.stop_id !== undefined) update.stop_id = body.stop_id;
   if (typeof body?.activity === "string" || body?.activity === null)
     update.activity = body.activity;
 

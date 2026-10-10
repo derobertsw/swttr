@@ -92,6 +92,42 @@ describe("Reviewing and saving itinerary changes", () => {
     });
   });
 
+  it("previews a copy as the signed-in member and saves it through its own transaction", async () => {
+    // Saturday goes to the base, so the review carries the base's place.
+    const AT_STOWE = { id: STOWE.id, name: STOWE.name, latitude: STOWE.latitude, longitude: STOWE.longitude };
+    const preview = await previewOf({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: false });
+    expect(preview.options).toMatchObject([{
+      key: "copy", label: "Copy Sat Oct 10 to 1 day",
+      changes: [{ date: "2026-10-12", before: "Stowe, Vermont · No activity", after: "Stowe, Vermont (base) · Ski touring" }],
+    }]);
+    // The organizer is "user-1", so there's no kit of this member's to copy.
+    expect(await (await post({ preview: true, action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: true })).json())
+      .toEqual({ error: "You have no kit on Sat Oct 10 to copy." });
+
+    rpc.mockResolvedValue({ data: { action: "copy_day" }, error: null });
+    expect((await post({ action: "copy_day", ...preview.options[0].payload, extra: 1 })).status).toBe(200);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("copy_trip_day", {
+      p_trip_id: TRIP.id, p_user_id: "user-2",
+      p_payload: {
+        from: "2026-10-10", dates: ["2026-10-12"], kit: "none",
+        expected: {
+          from: { stop_id: null, activity: "Ski touring", stop: AT_STOWE, kit: null },
+          days: [{ date: "2026-10-12", stop_id: STOWE.id, activity: null, stop: AT_STOWE, kit: null }],
+        },
+      },
+    });
+  });
+
+  it("returns the current copy review when the trip changed after the review", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "40001", message: "These days changed." } });
+    const response = await post({
+      action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: "none",
+      expected: { from: { stop_id: null, activity: "Hiking", kit: null }, days: [{ date: "2026-10-11", stop_id: JAY.id, activity: null, kit: null }] },
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ options: [{ key: "copy", payload: { expected: { from: { activity: "Ski touring" } } } }] });
+  });
+
   it("rejects a malformed save before calling the transaction", async () => {
     expect((await post({ action: "remove_stop", stop_id: "stop-stowe", reassign_to: JAY.id, expected: [] })).status).toBe(400);
     expect((await post({ action: "reorder_stops", order: [JAY.id, STOWE.id] })).status).toBe(400);
