@@ -190,3 +190,43 @@ export interface TripLodgingPreview {
   review_dates: string[];
   date_label: string;
 }
+
+/** A searched place: its display name and coordinates. */
+export interface TripPlace {
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+/** An itinerary change to review before saving: see docs/trip-editing.md. */
+export type TripItineraryRequest =
+  | { action: "remove_stop"; stop_id: string }
+  | { action: "reorder_stops"; order: string[] }
+  /** A present key sets that field on every date; `activity: null` clears it. */
+  | { action: "assign_days"; dates: string[]; stop_id?: string; activity?: string | null }
+  | { action: "set_day_place"; date: string; place: TripPlace };
+
+/** A day's destination and activity before and after, each as "<stop>[ (base)] · <activity|No activity>". */
+export interface TripItineraryChange {
+  date: string;
+  date_label: string;
+  before: string;
+  after: string;
+}
+
+export interface TripItineraryOption {
+  key: string;
+  label: string;
+  detail: string | null;
+  /** The days whose destination or activity changes. */
+  changes: TripItineraryChange[];
+  /** How many other days keep their destination and activity. */
+  unchanged: number;
+  /** Sent back with the action to save this option; the server checks it against the trip. */
+  payload: Record<string, unknown>;
+}
+
+export interface TripItineraryPreview {
+  /** One option, or several to choose from with no default. */
+  options: TripItineraryOption[];
+}

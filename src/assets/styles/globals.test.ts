@@ -37,9 +37,18 @@ function contrast(a: string, b: string) {
   return (high + 0.05) / (low + 0.05);
 }
 
+// A translucent fill, such as hover:bg-primary/90, composited over a surface.
+function over(fill: string, surface: string, alpha: number) {
+  const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
+  const mixed = [1, 3, 5].map((i) =>
+    Math.round(alpha * channel(fill, i) + (1 - alpha) * channel(surface, i))
+  );
+  return `#${mixed.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+}
+
 const SURFACES = ["background", "card", "popover", "muted", "accent", "primary-soft"];
 
-// Text needs 4.5:1. Control outlines, focus rings and the teal selection mark
+// Text needs 4.5:1. Control outlines, focus rings and the primary selection mark
 // on overlays are non-text and need 3:1.
 const PAIRS: { fg: string; on: string[]; min: number }[] = [
   { fg: "foreground", on: SURFACES, min: 4.5 },
@@ -78,6 +87,18 @@ describe("design tokens", () => {
       for (const bg of on) {
         const ratio = contrast(tokens[fg], tokens[bg]);
         expect(ratio, `${fg} on ${bg}`).toBeGreaterThanOrEqual(min);
+      }
+    });
+
+    // Button hover fills are 90% opaque, so their text is checked on the fill
+    // composited over each surface a button sits on.
+    it.each([
+      ["primary-foreground", "primary"],
+      ["destructive-foreground", "destructive"],
+    ])("%s on %s/90 hover", (fg, fill) => {
+      for (const surface of ["background", "card", "popover"]) {
+        const ratio = contrast(tokens[fg], over(tokens[fill], tokens[surface], 0.9));
+        expect(ratio, `${fg} on ${fill}/90 over ${surface}`).toBeGreaterThanOrEqual(4.5);
       }
     });
   });

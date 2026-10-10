@@ -23,24 +23,25 @@
   }
 }
 
-/* Light: a muted field-guide page with deep-teal actions. */
+/* Light: a cool neutral page with vivid-violet actions. Violet takes the roles
+   mint has in dark: primary actions, selection, active navigation and focus. */
 :root,
 [data-appearance="light"] {
   color-scheme: light;
-  --background: #f1f0ea;
+  --background: #f5f6fa;
   --foreground: #13222f;
-  --card: #fbfaf7;
+  --card: #ffffff;
   --card-foreground: #13222f;
   --popover: #ffffff;
   --popover-foreground: #13222f;
-  --primary: #0b6b63;
+  --primary: #743bea;
   --primary-foreground: #ffffff;
-  --primary-soft: #dcefea;
-  --secondary: #e7e6df;
+  --primary-soft: #eee7ff;
+  --secondary: #e9edf3;
   --secondary-foreground: #13222f;
-  --muted: #e7e6df;
-  --muted-foreground: #4b5b67;
-  --accent: #dfded6;
+  --muted: #e9edf3;
+  --muted-foreground: #4f5d70;
+  --accent: #dfe5ee;
   --accent-foreground: #13222f;
   --destructive: #b3261e;
   --destructive-foreground: #ffffff;
@@ -49,18 +50,18 @@
   --success-soft: #e1f0e4;
   --warning: #7a5200;
   --warning-soft: #f8ebcf;
-  --border: #d3d2ca;
-  --input: #6a7781;
-  --ring: #1f5fcc;
+  --border: #ced5df;
+  --input: #68778c;
+  --ring: #743bea;
   --scrim: rgb(19 34 47 / 0.45);
-  --sidebar: #fbfaf7;
+  --sidebar: #ffffff;
   --sidebar-foreground: #13222f;
-  --sidebar-primary: #0b6b63;
+  --sidebar-primary: #743bea;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #dcefea;
+  --sidebar-accent: #eee7ff;
   --sidebar-accent-foreground: #13222f;
-  --sidebar-border: #d3d2ca;
-  --sidebar-ring: #1f5fcc;
+  --sidebar-border: #ced5df;
+  --sidebar-ring: #743bea;
 }
 
 /* Dark: navy surfaces with light-mint actions. Keep both dark blocks identical

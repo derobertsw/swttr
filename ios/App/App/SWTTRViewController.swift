@@ -207,7 +207,7 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
             if traits.userInterfaceStyle == .dark {
                 return UIColor(red: 15.0 / 255, green: 29.0 / 255, blue: 42.0 / 255, alpha: 1)
             }
-            return UIColor(red: 241.0 / 255, green: 240.0 / 255, blue: 234.0 / 255, alpha: 1)
+            return UIColor(red: 245.0 / 255, green: 246.0 / 255, blue: 250.0 / 255, alpha: 1)
         }
 
         let contentController = WKUserContentController()

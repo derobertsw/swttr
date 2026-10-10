@@ -34,8 +34,10 @@ import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
 import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
+import { useReturnFocus } from "@/hooks/useReturnFocus";
+import { ItineraryChangeSheet } from "@/components/trips/ItineraryChangeSheet";
 import type { TripDayForecastResponse } from "@/types/trip-coverage";
-import type { TripEffort, TripKitState, TripMember, TripMemberDayKit, TripStop } from "@/types/trips";
+import type { TripEffort, TripKitState, TripMember, TripMemberDayKit, TripPlace, TripStop } from "@/types/trips";
 
 const KIT_SLOTS = ["shirt", "midlayer", "jacket", "shell", "pants", "gloves"] as const;
 const EFFORT_OPTIONS: TripEffort[] = ["easy", "steady", "hard"];
@@ -192,6 +194,8 @@ export default function DayDetailPage({
 
             <WeatherCard
               tripId={id}
+              date={date}
+              dateLabel={dateLabel}
               stop={effectiveStop ?? null}
               result={forecast}
               onRetry={() => setWeatherAttempt((attempt) => attempt + 1)}
@@ -271,12 +275,16 @@ function MissingDayPlan({ tripId, date, dateLabel, canCreate, tripDates, onSaved
 
 function WeatherCard({
   tripId,
+  date,
+  dateLabel,
   stop,
   result,
   onRetry,
   onLocationSaved,
 }: {
   tripId: string;
+  date: string;
+  dateLabel: string;
   stop: TripStop | null;
   result: TripDayForecastResponse | null;
   onRetry: () => void;
@@ -284,8 +292,10 @@ function WeatherCard({
 }) {
   const { temperatureUnit } = useTemperatureUnit();
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
+  // The picked place, while the review of which days use it is open.
+  const [reviewing, setReviewing] = useState<TripPlace | null>(null);
   const search = useLocationSearch();
+  const reviewFocus = useReturnFocus();
 
   const hasCoords = typeof stop?.latitude === "number" && Number.isFinite(stop.latitude)
     && typeof stop.longitude === "number" && Number.isFinite(stop.longitude);
@@ -293,37 +303,17 @@ function WeatherCard({
   const canRetry = result?.forecast.status === "error" || result?.forecast.status === "partial"
     || result?.forecast.reason === "no_daytime_hours";
 
-  const save = async () => {
+  // Which days use the place is chosen in a review: only this day, or every
+  // day at its stop. The picked place stays in the editor until it's saved.
+  const review = () => {
     const selected = search.selectedLocation;
     if (!selected) return;
-    setSaving(true);
-    try {
-      const name = selected.region
-        ? `${selected.name}, ${selected.region}`
-        : `${selected.name}, ${selected.country}`;
-      if (stop) {
-        await tripRequest(`/api/v1/trips/${tripId}/stops/${stop.id}`, "PATCH", {
-          name,
-          latitude: selected.latitude,
-          longitude: selected.longitude,
-        });
-      } else {
-        await tripRequest(`/api/v1/trips/${tripId}/stops`, "POST", {
-          name,
-          latitude: selected.latitude,
-          longitude: selected.longitude,
-          activities: [],
-        });
-      }
-      search.reset();
-      setEditing(false);
-      onLocationSaved();
-    } catch (err) {
-      // The picked place stays in the editor, so Save location can be tried again.
-      toast.error("Couldn't save the location", { description: errorMessage(err) });
-    } finally {
-      setSaving(false);
-    }
+    reviewFocus.remember(() => document.getElementById("day-location-change"));
+    setReviewing({
+      name: selected.region ? `${selected.name}, ${selected.region}` : `${selected.name}, ${selected.country}`,
+      latitude: selected.latitude,
+      longitude: selected.longitude,
+    });
   };
 
   return (
@@ -373,11 +363,11 @@ function WeatherCard({
           </Button>
         )}
         {hasCoords ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => setEditing((v) => !v)}>
+          <Button id="day-location-change" type="button" variant="outline" size="sm" onClick={() => setEditing((v) => !v)}>
             {editing ? "Cancel" : "Change"}
           </Button>
         ) : (
-          <Button type="button" size="sm" onClick={() => setEditing(true)}>
+          <Button id="day-location-change" type="button" size="sm" onClick={() => setEditing(true)}>
             Set location
           </Button>
         )}
@@ -403,19 +393,35 @@ function WeatherCard({
           />
           <Button
             type="button"
-            onClick={save}
-            disabled={!search.selectedLocation || saving}
+            onClick={review}
+            disabled={!search.selectedLocation}
             className="mt-3"
           >
-            {saving ? <Loader2 className="animate-spin" /> : null}
-            Save location
+            Choose days
           </Button>
           <p className="mt-1.5 text-sm text-muted-foreground">
             {stop
-              ? "Updates this stop for every day at it."
-              : "Adds a base location to the trip."}
+              ? `Next, choose ${dateLabel} only or every day at ${stop.name}, and review the dates before saving.`
+              : "Next, review the days that will use it before saving."}
           </p>
         </div>
+      )}
+      {reviewing && (
+        <ItineraryChangeSheet
+          tripId={tripId}
+          change={{ action: "set_day_place", date, place: reviewing }}
+          title="Change location"
+          description={`${reviewing.name} for ${dateLabel}. Nothing changes until you save.`}
+          question={`Which days use ${reviewing.name}?`}
+          saveLabel="Save location"
+          onSaved={() => {
+            search.reset();
+            setEditing(false);
+            onLocationSaved();
+          }}
+          onClose={() => setReviewing(null)}
+          onCloseAutoFocus={reviewFocus.restore}
+        />
       )}
     </Card>
   );
