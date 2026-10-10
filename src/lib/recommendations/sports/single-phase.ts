@@ -35,38 +35,43 @@ interface SinglePhaseSportConfig {
   /** Extra fields echoed in `conditions` after temperature, wind and exertion. */
   conditions(request: RecommendationRequest): object;
   guidance(request: RecommendationRequest, ireq: IreqResult): string[];
+  /** Retain functional protection when a calibrated budget changes. */
+  protect?(ensemble: GarmentRow[], categorized: CategorizedGarments, targets: SinglePhaseTargets): { ensemble: GarmentRow[]; warnings: string[] };
 }
 
+/** Compose one-phase targets, outfit/protection selection, and response evaluation for a sport. */
 export function createSinglePhaseSport(
   config: SinglePhaseSportConfig
 ): SportRecommender<SinglePhaseTargets> {
   return {
-    catalog: config.catalog ?? {},
+    catalog: { ...config.catalog, activity: config.activity },
 
     computeTargets(request) {
-      const conditions = { tempC: request.tempC, humidity: request.humidity };
+      const conditions = { tempC: request.tempC, humidity: request.humidity, precipitation: request.precipitation };
       const metabolicRate = metabolicRateFor(config.activity, request.exertion, request.bodyMetrics);
       const ireq = phaseIreq(conditions, request.windMs, metabolicRate);
       return {
         metabolicRate,
         ireq,
-        ...phaseTargets(config.activity, ireq, metabolicRate, conditions, request.windMs),
+        ...phaseTargets(config.activity, ireq, metabolicRate, conditions, request.windMs, ireq, request.exertion),
       };
     },
 
     emptyResponse(request, targets) {
       return {
-        ireq: { min: targets.ireq.ireqMin, neutral: targets.ireq.ireqNeutral },
+        ireq: targets.policy ? formatSinglePhaseIreq(targets.ireq, targets) : { min: targets.ireq.ireqMin, neutral: targets.ireq.ireqNeutral },
         recommendations: {
           target_clo_range: targets.targetRange,
           min_evap_potential: config.minEvapPotential,
-          guidance: config.guidance(request, targets.ireq),
+          guidance: [...config.guidance(request, targets.ireq), ...(targets.policy?.assumptions ?? [])],
         },
       };
     },
 
     recommend(request, targets, pool) {
-      const ensemble = config.buildEnsemble(pool.categorized, targets, request);
+      const built = config.buildEnsemble(pool.categorized, targets, request);
+      const protectedOutfit = config.protect?.(built, pool.categorized, targets);
+      const ensemble = protectedOutfit?.ensemble ?? built;
       const handwear = selectHandwear(
         pool.handwear,
         request.tempC,
@@ -110,8 +115,8 @@ export function createSinglePhaseSport(
         },
         ireq: formatSinglePhaseIreq(targets.ireq, targets),
         recommendation,
-        warnings,
-        guidance: config.guidance(request, targets.ireq),
+        warnings: [...warnings, ...(protectedOutfit?.warnings ?? [])],
+        guidance: [...config.guidance(request, targets.ireq), ...(targets.policy?.assumptions ?? [])],
       };
     },
   };

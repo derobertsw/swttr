@@ -79,6 +79,7 @@ function getTransitionMetabolicRate(exertion: ExertionLevel): number {
 
 export const skiTouring: SportRecommender<SkiTouringTargets> = {
   catalog: {
+    activity: 'ski_touring_uphill',
     predicate: (garment) => {
       const activityRatings = garment.garment_activity_ratings;
       if (!activityRatings) return false;

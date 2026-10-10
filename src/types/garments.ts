@@ -10,11 +10,34 @@ export type EstimationMethod =
   | 'derived_from_similar'
   | 'calculated_from_materials';
 
+/** Coverage is a fraction of each region, separate from its insulation.
+ * Regional rcl/recl values are averages over the ENTIRE region (including
+ * exposed skin). Never multiply these values by coverage fractions again.
+ * Null/absent usage and coverage mean unreviewed legacy data.
+ */
+export interface GarmentSemantics {
+  garment_type?: string;
+  usage?: 'standalone' | 'underlayer' | 'either' | 'unknown' | null;
+  coverage_torso?: number | null;
+  coverage_arms?: number | null;
+  coverage_legs?: number | null;
+  suitable_activities?: string[] | null;
+}
+
+export interface ThermalProvenance {
+  estimation_method?: EstimationMethod;
+  confidence_score?: number | null;
+  data_source?: string | null;
+  /** Broad engineering uncertainty in regional clo, not a confidence interval. */
+  uncertainty_clo?: number | null;
+  generic_estimate?: boolean;
+}
+
 // ============================================
 // DATABASE ROW TYPES
 // ============================================
 
-export interface GarmentThermalProperties {
+export interface GarmentThermalProperties extends ThermalProvenance {
   garment_id: string;
   // Thermal resistance (clo units)
   rcl_whole_body?: number;

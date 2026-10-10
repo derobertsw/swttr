@@ -29,7 +29,7 @@ interface ActivityRangeProfile {
 const RANGE_PROFILE: Record<ActivityType, ActivityRangeProfile> = {
   running: { baseMaxBuffer: 0.10, maxCap: 1.45, minFloorFromNeutral: 0.80 },
   biking: { baseMaxBuffer: 0.16, maxCap: 1.70, minFloorFromNeutral: 0.85 },
-  xc_skiing: { baseMaxBuffer: 0.24, maxCap: 2.00, minFloorFromNeutral: 0.85 },
+  xc_skiing: { baseMaxBuffer: 0.12, maxCap: 2.00, minFloorFromNeutral: 0.85 },
   ski_touring_uphill: { baseMaxBuffer: 0.18, maxCap: 1.90, minFloorFromNeutral: 0.88 },
   ski_touring_downhill: { baseMaxBuffer: 0.28, maxCap: 3.80, minFloorFromNeutral: 0.90 },
   alpine_skiing: { baseMaxBuffer: 0.30, maxCap: 4.60, minFloorFromNeutral: 0.92 },
