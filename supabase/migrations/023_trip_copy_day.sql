@@ -62,7 +62,10 @@ BEGIN
     RAISE EXCEPTION 'Choose other days to copy to' USING ERRCODE = '22023';
   END IF;
 
-  SELECT * INTO v_source FROM public.trip_days d WHERE d.trip_id = p_trip_id AND d.date = v_from;
+  -- Day rows are locked before they're checked: PATCH /days/:date changes an
+  -- activity without the trip lock, so a concurrent edit is waited for and
+  -- then seen, rather than checked stale and overwritten.
+  SELECT * INTO v_source FROM public.trip_days d WHERE d.trip_id = p_trip_id AND d.date = v_from FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Day not found' USING ERRCODE = 'P0002';
   END IF;
@@ -104,7 +107,7 @@ BEGIN
     RAISE EXCEPTION 'These days changed. Review them again.' USING ERRCODE = '40001';
   END IF;
   FOR v_entry IN SELECT value FROM jsonb_array_elements(p_payload->'expected'->'days') LOOP
-    SELECT * INTO v_day FROM public.trip_days d WHERE d.trip_id = p_trip_id AND d.date = (v_entry->>'date')::date;
+    SELECT * INTO v_day FROM public.trip_days d WHERE d.trip_id = p_trip_id AND d.date = (v_entry->>'date')::date FOR UPDATE;
     IF NOT FOUND OR v_day.stop_id IS DISTINCT FROM (v_entry->>'stop_id')::uuid
       OR v_day.activity IS DISTINCT FROM v_entry->>'activity' THEN
       RAISE EXCEPTION 'These days changed. Review them again.' USING ERRCODE = '40001';

@@ -30,10 +30,12 @@ export function outfitMismatches(outfit: SavedOutfit, day: { date: string; activ
   if (date && date !== day.date) {
     notes.push(`Planned for the forecast on ${format(new Date(`${date}T00:00:00`), "EEE MMM d")}, not this day's.`);
   }
-  const dayActivity = tripActivityToRecommendationKey(day.activity);
+  // A day without its own activity has its stop's first, as the day page and packing read it.
+  const activity = day.activity ?? day.stop?.activities[0] ?? null;
+  const dayActivity = tripActivityToRecommendationKey(activity);
   if (dayActivity && dayActivity !== outfit.outing.activity) {
-    const planned = ACTIVITIES.find((activity) => activity.value === outfit.outing.activity)?.name ?? "another activity";
-    notes.push(`Planned for ${planned}, not this day's activity (${day.activity}).`);
+    const planned = ACTIVITIES.find((option) => option.value === outfit.outing.activity)?.name ?? "another activity";
+    notes.push(`Planned for ${planned}, not this day's activity (${activity}).`);
   }
   return notes;
 }

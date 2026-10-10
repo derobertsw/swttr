@@ -29,6 +29,15 @@ describe("Itinerary previews", () => {
     })]);
   });
 
+  it("lists the days whose stop moves to a place with the same name, telling them apart by coordinates", () => {
+    const [onlyThisDay, everyDay] = options(previewItinerary(full, { action: "set_day_place", date: "2026-10-10", place: { name: STOWE_STOP.name, latitude: 45, longitude: -73 } }));
+    expect(onlyThisDay.changes.map(({ before, after }) => [before, after])).toEqual([["Stowe, Vermont (stop 1) · No activity", "Stowe, Vermont (stop 3) · No activity"]]);
+    expect(everyDay.changes.map(({ date, before, after }) => [date, before, after])).toEqual([
+      ["2026-10-10", "Stowe, Vermont (44.47, -72.69) · No activity", "Stowe, Vermont (45, -73) · No activity"],
+      ["2026-10-11", "Stowe, Vermont (base) (44.47, -72.69) · Hike", "Stowe, Vermont (base) (45, -73) · Hike"],
+    ]);
+  });
+
   it("changes nothing when the day is already at the picked place", () => {
     expect(options(previewItinerary(full, { action: "set_day_place", date: "2026-10-10", place: { name: STOWE_STOP.name, latitude: 44.47, longitude: -72.69 } }))).toEqual([
       expect.objectContaining({ label: "Sat Oct 10 is already at Stowe, Vermont", changes: [], unchanged: 3 }),
@@ -116,6 +125,17 @@ describe("Kits in itinerary reviews", () => {
       { action: "copy_day", from: "2026-10-11", dates: ["2026-10-12"], kit: true }, "user-1"))[0];
     expect(sunday.changes).toEqual([{ date: "2026-10-12", date_label: "Mon Oct 12", before: "Stowe, Vermont (base) · Hike", after: "Stowe, Vermont (base) · Hike", notes: ["Gets your checklist from Sun Oct 11."] }]);
     expect(sunday.unchanged).toBe(2);
+  });
+
+  it("lists a copy between two stops with the same name, telling them apart by stop number", () => {
+    const otherStowe = { ...STOWE_STOP, id: "stop-stowe-2", position: 2, latitude: 44.6, longitude: -72.8 };
+    const trip = { ...withKits([kit("2026-10-12", SAM, { items: ["shell"] })]), stops: [STOWE_STOP, JAY, otherStowe],
+      days: [day("2026-10-10", STOWE_STOP.id), day("2026-10-11", null, "Hike"), day("2026-10-12", otherStowe.id)] };
+    expect(options(previewItinerary(trip, { action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: false }, "user-1"))[0].changes).toEqual([{
+      date: "2026-10-12", date_label: "Mon Oct 12",
+      before: "Stowe, Vermont (stop 3) · No activity", after: "Stowe, Vermont (stop 1) · No activity",
+      notes: ["Kept as saved for the old plan: Sam's checklist."],
+    }]);
   });
 
   it("refuses a copy onto its own day, to missing days, or of a kit you don't have", () => {

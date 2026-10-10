@@ -242,9 +242,32 @@ function keptKits(full: TripFull, day: Pick<TripDay, "id">, me: TripMember | und
   return kits.length > 0 ? `Kept as saved for the old plan: ${listed(kits)}.` : undefined;
 }
 
+type Place = Itinerary["stops"][number] | null;
+
+/** Each day's effective stop: its own, or the base (the first stop); null when the trip has none. */
+function effectiveStops({ stops, days }: Itinerary): Map<string, Place> {
+  return new Map(days.map((day) => [day.date, stops.find((stop) => stop.id === day.stop_id) ?? stops[0] ?? null]));
+}
+
+const samePlace = (a: Place | undefined, b: Place | undefined) =>
+  a?.id === b?.id && a?.name === b?.name && a?.latitude === b?.latitude && a?.longitude === b?.longitude;
+
+/**
+ * Tells apart two labels that read the same for different places: another stop
+ * with the same name gets its stop number, and a stop that moved its coordinates.
+ */
+function distinguish(label: string, place: Place | undefined, other: Place | undefined, stops: Itinerary["stops"]): string {
+  if (!place) return label;
+  const at = label.lastIndexOf(" · ");
+  const suffix = place.id === other?.id ? `${place.latitude}, ${place.longitude}` : `stop ${stops.indexOf(place) + 1}`;
+  return `${label.slice(0, at)} (${suffix})${label.slice(at)}`;
+}
+
 /**
  * An option that turns the trip's itinerary into `after`, with the days it
- * changes. Each day whose destination or activity changes notes the kits that
+ * changes. A day changes when its place (stop and coordinates) or activity
+ * does, or how it reads, like a day pinned to the base; labels are only for
+ * reading, since two stops can share a name. Each such day notes the kits that
  * stay as saved. `copied` notes the days that get the user's copied kit, which
  * change even when their destination and activity don't.
  */
@@ -257,17 +280,27 @@ function option(
 ): TripItineraryOption {
   const before = dayLabels(full);
   const next = dayLabels(after);
+  const placeBefore = effectiveStops(full);
+  const placeAfter = effectiveStops(after);
+  const activityAfter = new Map(after.days.map((day) => [day.date, day.activity]));
+  const moves = (day: TripDay) => before.get(day.date) !== next.get(day.date)
+    || !samePlace(placeBefore.get(day.date), placeAfter.get(day.date))
+    || (activityAfter.get(day.date) ?? null) !== day.activity;
   const days = [...full.days].sort((a, b) => a.date.localeCompare(b.date));
   const changes = days
-    .filter((day) => before.get(day.date) !== next.get(day.date) || copied?.has(day.date))
+    .filter((day) => moves(day) || copied?.has(day.date))
     .map((day) => {
-      const moved = before.get(day.date) !== next.get(day.date);
+      const moved = moves(day);
+      let [from, to] = [before.get(day.date)!, next.get(day.date)!];
+      if (moved && from === to) {
+        [from, to] = [
+          distinguish(from, placeBefore.get(day.date), placeAfter.get(day.date), full.stops),
+          distinguish(to, placeAfter.get(day.date), placeBefore.get(day.date), after.stops),
+        ];
+      }
       const notes = [copied?.get(day.date), moved ? keptKits(full, day, me, !!copied?.has(day.date)) : undefined]
         .filter((note): note is string => !!note);
-      return {
-        date: day.date, date_label: dateLabel(day.date), before: before.get(day.date)!, after: next.get(day.date)!,
-        ...(notes.length > 0 ? { notes } : {}),
-      };
+      return { date: day.date, date_label: dateLabel(day.date), before: from, after: to, ...(notes.length > 0 ? { notes } : {}) };
     });
   return { ...fields, changes, unchanged: days.length - changes.length };
 }

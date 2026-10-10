@@ -26,4 +26,11 @@ describe("Where a saved outfit doesn't fit its day", () => {
     ]);
     expect(outfitMismatches(outfit, { date: "2026-10-10", activity: "Rest", stop: STOWE_STOP })).toEqual([]);
   });
+
+  it("compares a day without its own activity with its stop's first, as the day page shows it", () => {
+    const hiking = { ...STOWE_STOP, activities: ["Hike", "Alpine"] };
+    expect(outfitMismatches(outfit, { date: "2026-10-10", activity: null, stop: hiking }))
+      .toEqual(["Planned for Alpine Skiing, not this day's activity (Hike)."]);
+    expect(outfitMismatches(outfit, { date: "2026-10-10", activity: "Alpine", stop: hiking })).toEqual([]);
+  });
 });

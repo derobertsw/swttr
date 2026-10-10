@@ -334,6 +334,21 @@ describe("Itinerary edits in Postgres", () => {
       expect((await labels())["2026-10-11"]).toBe("Stowe, Vermont (base) · Ski touring");
     });
 
+    it("reviews and applies a copy between two stops with the same name", async () => {
+      const otherStowe = "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+      await db.query("INSERT INTO trip_stops (id, trip_id, position, name, latitude, longitude) VALUES ($1, $2, 3, 'Stowe, Vermont', 44.6, -72.8)", [otherStowe, tripId]);
+      await db.query("UPDATE trip_days SET stop_id = $1 WHERE date = '2026-10-12'", [otherStowe]);
+      await addKit("2026-10-12", "user-2", { items: ["shell"] });
+      const preview = previewItinerary(await loadFull(), { action: "copy_day", from: "2026-10-11", dates: ["2026-10-12"], kit: false }, "user-1");
+      if ("error" in preview) throw new Error(preview.error);
+      expect(preview.options[0].changes).toEqual([expect.objectContaining({
+        before: "Stowe, Vermont (stop 4) · No activity", after: "Stowe, Vermont (stop 1) · No activity",
+        notes: ["Kept as saved for the old plan: Sam's checklist."],
+      })]);
+      await edit("copy_day", preview.options[0].payload);
+      expect((await loadFull()).days.find((day) => day.date === "2026-10-12")?.stop_id).toBe(stowe);
+    });
+
     it("rejects copying onto the same day, to no days, in an unknown way, or a kit you don't have", async () => {
       const payload = await reviewed(copy(["2026-10-11"]));
       await expect(edit("copy_day", { ...payload, dates: ["2026-10-09", "2026-10-11"] })).rejects.toMatchObject({ code: "22023" });
