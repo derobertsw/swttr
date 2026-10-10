@@ -154,22 +154,35 @@ describe("gearUpReducer", () => {
 
   it("opens Save to trip only on the results of the outing asked for again to save it", () => {
     const restored = gearUpReducer(createInitialState("now"), {
-      type: "RESTORE", owner: "user_1", kept: null, saveOnReturn: ALPINE_OUTING,
+      type: "RESTORE", owner: "user_1", kept: null, saveOnReturn: { outing: ALPINE_OUTING, open: true, tripId: null },
     });
     // Asking again shows the form first; the outing waits for its result.
     const asking = gearUpReducer(
       gearUpReducer(restored, { type: "SHOW_FORM", mode: "later", keepLoading: true }),
       { type: "SUBMIT_START", outing: ALPINE_OUTING }
     );
-    expect(asking.saveOnReturn).toBe(ALPINE_OUTING);
+    expect(asking.saveOnReturn?.outing).toBe(ALPINE_OUTING);
     const shown = gearUpReducer(asking, { type: "SUBMIT_SUCCESS", result: { ...LAYERS_RESULT, outing: { ...ALPINE_OUTING } } });
-    expect(shown).toMatchObject({ opensSave: true, saveOnReturn: null });
+    expect(shown).toMatchObject({ opensSave: true, saveTripId: null, saveOnReturn: null });
     // The next result, like another activity, doesn't open it again.
     expect(gearUpReducer(shown, { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT }).opensSave).toBe(false);
     // Another outing's result doesn't open it, and Start over forgets it.
     const other = { ...LAYERS_RESULT, outing: { ...ALPINE_OUTING, activity: "xc_skiing" } };
     expect(gearUpReducer(asking, { type: "SUBMIT_SUCCESS", result: other }).opensSave).toBe(false);
     expect(gearUpReducer(asking, { type: "RESET" }).saveOnReturn).toBeNull();
+  });
+
+  it("picks the trip of a saved kit being updated on that outing's results, without opening Save to trip", () => {
+    const asking = gearUpReducer(
+      gearUpReducer(createInitialState("now"), {
+        type: "RESTORE", owner: "user_1", kept: null, saveOnReturn: { outing: ALPINE_OUTING, open: false, tripId: "trip-1" },
+      }),
+      { type: "SUBMIT_START", outing: ALPINE_OUTING }
+    );
+    const shown = gearUpReducer(asking, { type: "SUBMIT_SUCCESS", result: { ...LAYERS_RESULT, outing: { ...ALPINE_OUTING } } });
+    expect(shown).toMatchObject({ opensSave: false, saveTripId: "trip-1" });
+    // Changing the outing from the results forgets the trip: its date may differ.
+    expect(gearUpReducer(shown, { type: "SUBMIT_SUCCESS", result: LAYERS_RESULT }).saveTripId).toBeNull();
   });
 });
 

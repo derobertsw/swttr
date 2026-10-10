@@ -23,7 +23,7 @@ import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui
 import {
   BODY_PARTS,
   BODY_PART_LABELS,
-  applyItemMappings,
+  applyRecommendationMappings,
   buildDescentLayers,
   buildRecommendedLayers,
   collectInUseIds,
@@ -125,21 +125,6 @@ function recommendedCatalogItems(phases: BodyPartLayers[]): RecommendedItem[] {
     }
   }
   return items;
-}
-
-/** General guidance's layers with the wardrobe names they're shown with. */
-function mappedRecommendation(recommendation: Recommendation, itemMappings: Map<string, string> | undefined): Recommendation {
-  if (!itemMappings) return recommendation;
-  const mapped = { ...recommendation };
-  for (const bodyPart of BODY_PARTS) {
-    const layers = recommendation[bodyPart];
-    mapped[bodyPart] = {
-      base: applyItemMappings(layers.base, bodyPart, "base", itemMappings),
-      outer: applyItemMappings(layers.outer, bodyPart, "outer", itemMappings),
-      ...(layers.mid && { mid: applyItemMappings(layers.mid, bodyPart, "mid", itemMappings) }),
-    };
-  }
-  return mapped;
 }
 
 /** A collapsed section of supporting detail below the outfit. */
@@ -462,7 +447,7 @@ const LayerDisplay = ({
       ]
     : [{
         id: "outing",
-        wear: !biophysicsActive && recommendation ? mappedRecommendation(recommendation, itemMappings) : climb.layers,
+        wear: !biophysicsActive && recommendation ? applyRecommendationMappings(recommendation, itemMappings) : climb.layers,
         carry: [],
         decision: biophysicsActive ? savedDecision("climb") : null,
       }];

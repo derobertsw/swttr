@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { STORAGE_KEYS } from "@/lib/storage";
-import { savedOutfit } from "@/test/savedKit";
+import { savedOutfit, savedPlan } from "@/test/savedKit";
 import { fakeTripApi, reply, sentBodies, TRIP } from "@/test/tripApi";
 import type { SaveKitOptions, SaveKitRequest } from "@/types/savedKit";
 import type { TripMemberDayKit } from "@/types/trips";
@@ -12,7 +12,9 @@ const mockAuth = vi.hoisted(() => ({ userId: "user-1" as string | null, isLoaded
 vi.mock("@clerk/nextjs", () => ({ useAuth: () => mockAuth }));
 
 const OPTIONS: SaveKitOptions = {
-  date: "2026-10-10",
+  dates: ["2026-10-10"],
+  start_date: "2026-10-10",
+  end_date: "2026-10-10",
   suggested_name: "Stowe trip",
   destination: "Stowe, Vermont",
   trips: [
@@ -235,7 +237,7 @@ describe("Save to trip", () => {
     await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
     await within(dialog).findByRole("link", { name: "Open trip day" });
     const [sent] = sentBodies(fetchMock, "POST /api/v1/trips/kits") as SaveKitRequest[];
-    expect(sent.outfit.phases[0].decision).toEqual(savedOutfit().phases[0].decision);
+    expect(sent.outfit?.phases[0].decision).toEqual(savedOutfit().phases[0].decision);
     expect(sentBodies(fetchMock, "POST /api/v1/trips/kits/options")).toHaveLength(1);
   });
 
@@ -243,5 +245,151 @@ describe("Save to trip", () => {
     setup({});
     render(<SaveToTrip outfit={savedOutfit()} defaultOpen />);
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("picks the trip whose kit is being updated, when it includes the date", async () => {
+    setup({});
+    const user = userEvent.setup();
+    const { unmount } = render(<SaveToTrip outfit={savedOutfit()} defaultTripId={TRIP.id} />);
+    await user.click(screen.getByRole("button", { name: "Save to trip" }));
+    expect(await within(await screen.findByRole("dialog")).findByRole("radio", { name: /Whistler/ })).toBeChecked();
+    unmount();
+
+    // A trip that doesn't include the date isn't picked.
+    render(<SaveToTrip outfit={savedOutfit()} defaultTripId="trip-2" />);
+    await user.click(screen.getByRole("button", { name: "Save to trip" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByRole("radio", { name: /Whistler/ })).not.toBeChecked();
+    expect(within(dialog).getByRole("button", { name: "Save kit" })).toBeDisabled();
+  });
+});
+
+describe("Save a multi-day plan to a trip", () => {
+  const PLAN_OPTIONS: SaveKitOptions = {
+    ...OPTIONS,
+    dates: ["2026-10-10", "2026-10-11"],
+    start_date: "2026-10-10",
+    end_date: "2026-10-12",
+    trips: [
+      { ...OPTIONS.trips[0], day_number: 2 },
+      { id: "trip-3", name: "Saturday only", start_date: "2026-10-10", end_date: "2026-10-10", member_count: 1, day_number: null },
+    ],
+  };
+  const SAVED_PLAN = {
+    status: "saved", trip: TRIP, created: false,
+    kits: [{ ...KIT, date: "2026-10-10" }, { ...KIT, id: "kit-2", date: "2026-10-11" }],
+  };
+
+  beforeEach(() => {
+    mockAuth.userId = "user-1";
+    mockAuth.isLoaded = true;
+    sessionStorage.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function openPlan(routes: Parameters<typeof fakeTripApi>[0] = {}) {
+    const fetchMock = fakeTripApi({ "POST /api/v1/trips/kits/options": reply(200, PLAN_OPTIONS), ...routes });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<SaveToTrip plan={savedPlan()} />);
+    await user.click(screen.getByRole("button", { name: "Save to trip" }));
+    return { fetchMock, user, dialog: await screen.findByRole("dialog") };
+  }
+
+  it("saves a kit for each day with layers, naming the days left out, to a trip with all of them", async () => {
+    const { fetchMock, user, dialog } = await openPlan({ "POST /api/v1/trips/kits": reply(200, SAVED_PLAN) });
+    expect(within(dialog).getByText("Backcountry Skiing · Hard effort")).toBeInTheDocument();
+    expect(within(dialog).getByText("General guide")).toBeInTheDocument();
+    expect(within(dialog).getByText("General guide for each day's conditions: multi-day plans aren't personalized yet.")).toBeInTheDocument();
+    expect(within(dialog).getByText("A kit for each of 2 days, with that day's forecast.")).toBeInTheDocument();
+    expect(await within(dialog).findByText("Mon, Oct 12 has no layers in this plan, so it isn't saved.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Stowe, Vermont, United States · Sat, Oct 10 – Sun, Oct 11")).toBeInTheDocument();
+    expect(within(dialog).getByText("Days 2–3 · Fri, Oct 9 – Mon, Oct 12 · 3 people")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("radio", { name: /Saturday only/ })).not.toBeInTheDocument();
+    expect(within(dialog).getByText("1 of your trips doesn't include all of Sat, Oct 10 – Sun, Oct 11.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Sat, Oct 10 – Mon, Oct 12 at Stowe, Vermont")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("radio", { name: /Whistler/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+    expect(await within(dialog).findByText(/Your kits for Sat, Oct 10 – Sun, Oct 11 are saved as shown/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Open trip" })).toHaveAttribute("href", "/trips/trip-1");
+    const [sent] = sentBodies(fetchMock, "POST /api/v1/trips/kits") as SaveKitRequest[];
+    expect(sent).toEqual({ save_id: expect.any(String), target: { trip_id: TRIP.id }, plan: savedPlan() });
+    expect(sentBodies(fetchMock, "POST /api/v1/trips/kits/options")).toEqual([{ plan: savedPlan() }]);
+  });
+
+  it("asks once about every day that already has a kit, with each day's changes", async () => {
+    let attempts = 0;
+    const conflicts = [
+      { date: "2026-10-10", kit: KIT, changes: null },
+      { date: "2026-10-11", kit: { ...KIT, items: [], outfit: savedOutfit() }, changes: [{ phase: "outing", add: [], remove: [{ bodyPart: "hands", layerType: "outer", name: "Insulated gloves" }] }] },
+    ];
+    const { fetchMock, user, dialog } = await openPlan({
+      "POST /api/v1/trips/kits": () => (++attempts === 1 ? reply(409, { ...CONFLICT, conflicts }) : reply(200, SAVED_PLAN)),
+    });
+    await user.click(await within(dialog).findByRole("radio", { name: /Whistler/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+
+    expect(await within(dialog).findByText("Replace your kits for 2 days?")).toBeInTheDocument();
+    expect(within(dialog).getByText("Whistler already has your kits for these days. Nothing is saved unless you replace them.")).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Sat, Oct 10" })).toBeInTheDocument();
+    expect(within(dialog).getByText("Replacing it swaps the checklist for these layers.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Insulated gloves (hands)")).toBeInTheDocument();
+    expect(within(dialog).getAllByText(/These layers are for 25°F – 31°F, wind up to 12 mph · forecast for Sun, Oct 11/)).toHaveLength(1);
+    await user.click(within(dialog).getByRole("button", { name: "Replace kits" }));
+    await within(dialog).findByRole("link", { name: "Open trip" });
+
+    const [first, second] = sentBodies(fetchMock, "POST /api/v1/trips/kits") as SaveKitRequest[];
+    expect(second).toEqual({ ...first, replace: { "2026-10-10": KIT.updated_at, "2026-10-11": KIT.updated_at } });
+  });
+
+  it("keeps the days already confirmed when a kit changes before replacing", async () => {
+    let attempts = 0;
+    const conflicts = [
+      { date: "2026-10-10", kit: KIT, changes: null },
+      { date: "2026-10-11", kit: { ...KIT, id: "kit-2" }, changes: null },
+    ];
+    // Sunday's kit changed after the question was asked.
+    const newer = { ...KIT, id: "kit-2", updated_at: "2026-10-07T08:00:00.5+00:00" };
+    const { fetchMock, user, dialog } = await openPlan({
+      "POST /api/v1/trips/kits": () => (++attempts === 1
+        ? reply(409, { ...CONFLICT, conflicts })
+        : attempts === 2 ? reply(409, { ...CONFLICT, conflicts: [{ date: "2026-10-11", kit: newer, changes: null }] }) : reply(200, SAVED_PLAN)),
+    });
+    await user.click(await within(dialog).findByRole("radio", { name: /Whistler/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Replace kits" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Replace kit" }));
+    await within(dialog).findByRole("link", { name: "Open trip" });
+
+    const [, second, third] = sentBodies(fetchMock, "POST /api/v1/trips/kits") as SaveKitRequest[];
+    expect(second.replace).toEqual({ "2026-10-10": KIT.updated_at, "2026-10-11": KIT.updated_at });
+    expect(third.replace).toEqual({ "2026-10-10": KIT.updated_at, "2026-10-11": newer.updated_at });
+  });
+
+  it("names the daypart a plan day's change is in", async () => {
+    const changes = [
+      { phase: "outing", add: [], remove: [] },
+      { phase: "evening", add: [{ bodyPart: "hands", layerType: "outer", name: "Warm mittens" }], remove: [] },
+    ];
+    const { user, dialog } = await openPlan({
+      "POST /api/v1/trips/kits": reply(409, { ...CONFLICT, conflicts: [{ date: "2026-10-10", kit: { ...KIT, items: [], outfit: savedOutfit() }, changes }] }),
+    });
+    await user.click(await within(dialog).findByRole("radio", { name: /Whistler/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+    expect(await within(dialog).findByText("Evening adds:")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/The layers are the same/)).not.toBeInTheDocument();
+  });
+
+  it("keeps every saved kit when asked to", async () => {
+    const { user, dialog } = await openPlan({
+      "POST /api/v1/trips/kits": reply(409, { ...CONFLICT, conflicts: [CONFLICT.conflicts[0], { ...CONFLICT.conflicts[0], date: "2026-10-11" }] }),
+    });
+    await user.click(await within(dialog).findByRole("radio", { name: /Whistler/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Keep saved kits" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 });

@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError, requireUser } from "@/lib/api";
 import { tripActivityFromRecommendationKey } from "@/lib/trip-activities";
-import { destinationToday, kitChanges, outfitDate, parseSaveKitRequest, tripDestination, tripEffort } from "@/lib/trip-saved-kits";
+import { destinationToday, kitChanges, kitsToSave, parseSaveKitRequest, tripDestination, tripEffort } from "@/lib/trip-saved-kits";
 import { classifyTripStatus } from "@/lib/trips";
 import type { SaveKitConflict, SaveKitResponse } from "@/types/savedKit";
 
-/** Generous for one outfit with two phases; anything bigger isn't one. */
-const MAX_BODY_LENGTH = 100_000;
+/** Generous for a seven-day plan or one outfit with two phases; anything bigger isn't one. */
+const MAX_BODY_LENGTH = 200_000;
 
 /**
- * Save to trip (#170): saves an outing's outfit as the signed-in member's kit
- * for the trip day it's for, on an existing trip or a new one made from the
- * outing. A day that already has a kit stops the save with a 409 listing it,
- * until the request names it in `replace`. A retry with the same `save_id`
- * and body returns the first answer. See docs/trip-saved-kits.md.
+ * Save to trip (#170): saves an outing's outfit, or each day of a multi-day
+ * plan that has layers, as the signed-in member's kit for the trip day it's
+ * for, on an existing trip or a new one made from the outing. A day that
+ * already has a kit stops the save with a 409 listing it, until the request
+ * names it in `replace`. A retry with the same `save_id` and body returns
+ * the first answer. See docs/trip-saved-kits.md.
  */
 export async function POST(request: NextRequest) {
   const auth = await requireUser();
@@ -27,18 +28,20 @@ export async function POST(request: NextRequest) {
   const input = parseSaveKitRequest(body);
   if (typeof input === "string") return jsonError(input, 400);
 
-  const { outfit } = input;
-  const date = outfitDate(outfit);
-  if (!date) return jsonError("Couldn't tell the date at this place. Get layers for a later time there, then save.", 400);
-  const activity = tripActivityFromRecommendationKey(outfit.outing.activity);
-  const days = [{ date, effort: tripEffort(outfit.outing.exertion), activity, outfit }];
+  const { source } = input;
+  const planned = kitsToSave(source);
+  if (!planned) return jsonError("Couldn't tell the date at this place. Get layers for a later time there, then save.", 400);
+  const { outing } = source;
+  const activity = tripActivityFromRecommendationKey(outing.activity);
+  const effort = tripEffort(outing.exertion);
+  const days = planned.kits.map(({ date, kit }) => ({ date, effort, activity, outfit: kit }));
   const newTrip = input.newTripName === undefined ? null : {
     name: input.newTripName,
-    start_date: date,
-    end_date: date,
+    start_date: planned.startDate,
+    end_date: planned.endDate,
     // Today where the trip is, not on the server's clock.
-    status: classifyTripStatus(date, date, destinationToday(outfit)),
-    destination: tripDestination(outfit.outing.place),
+    status: classifyTripStatus(planned.startDate, planned.endDate, destinationToday(source)),
+    destination: tripDestination(outing.place),
     activity,
   };
 
@@ -63,12 +66,12 @@ export async function POST(request: NextRequest) {
 
   const result = data as SaveKitResponse;
   if (result.status === "conflict") {
-    const conflicts: SaveKitConflict[] = result.conflicts.map((conflict) => ({
-      ...conflict,
-      changes: kitChanges(conflict.kit, outfit),
-    }));
+    const conflicts: SaveKitConflict[] = result.conflicts.map((conflict) => {
+      const next = planned.kits.find((kit) => kit.date === conflict.date)?.kit;
+      return { ...conflict, changes: next ? kitChanges(conflict.kit, next) : null };
+    });
     return NextResponse.json(
-      { error: "You already have a kit for that day.", ...result, conflicts },
+      { error: conflicts.length === 1 ? "You already have a kit for that day." : "You already have kits for those days.", ...result, conflicts },
       { status: 409 }
     );
   }
