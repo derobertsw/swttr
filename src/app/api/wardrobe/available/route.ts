@@ -35,7 +35,7 @@ export async function GET() {
     const [garmentsResult, handwearResult, headwearResult] = await Promise.all([
       supabase
         .from("garments")
-        .select("id, brand, model_name, brand_logo_url, item_image_url, category, garment_type, usage, coverage_torso, coverage_arms, coverage_legs, suitable_activities, garment_thermal_properties(*)")
+        .select("id, brand, model_name, brand_logo_url, item_image_url, category, garment_type, usage, coverage_torso, coverage_arms, coverage_legs, suitable_activities, garment_thermal_properties(*), garment_protection(*)")
         .order("brand")
         .order("model_name"),
       supabase
@@ -68,6 +68,7 @@ export async function GET() {
         category: g.category,
         garment_type: g.garment_type,
         usage: g.usage,
+        protection: Array.isArray(g.garment_protection) ? g.garment_protection[0] : g.garment_protection,
         coverage_torso: g.coverage_torso,
         coverage_arms: g.coverage_arms,
         coverage_legs: g.coverage_legs,

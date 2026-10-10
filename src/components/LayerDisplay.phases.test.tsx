@@ -6,6 +6,9 @@ import { POST as evaluateLayers } from "@/app/api/v1/ensembles/evaluate/route";
 import type { BiophysicsRecommendation } from "@/types/biophysics";
 import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
 import LayerDisplay from "./LayerDisplay";
+import { createFakeSupabase } from '@/test/fakeSupabase';
+const database = vi.hoisted(() => ({ client: null as unknown }));
+vi.mock('@/lib/supabase', () => ({ getSupabase: () => database.client }));
 
 vi.mock("@clerk/nextjs", () => ({
   useAuth: () => ({ userId: "fixture-user", isLoaded: true, isSignedIn: true }),
@@ -20,7 +23,7 @@ const touring: BiophysicsRecommendation = {
     downhill_target_range: [0.6, 1.2],
   },
   recommendation: {
-    garments: [{ id: "base", name: "Merino base", category: "base_layer", rcl: 0.3, covers_torso: true }],
+    garments: [{ id: "base", name: "Merino base", category: "base_layer", rcl: 0.3, rcl_torso: 0.3, covers_torso: true }],
     handwear: { id: "climb-gloves", name: "Climb gloves", type: "liner", rcl: 0.4 },
     ensemble_properties: { total_clo: 0.4, regional_clo: { torso: 0.3, arms: 0.3, legs: 0 }, evap_potential: 0.3, permeability_index: 0.3 },
     score: 80,
@@ -55,6 +58,16 @@ const catalog: AvailableItem[] = [0.4, 1.2, 1.4, 2.4].map((clo) => ({
 
 let drawerStyles: HTMLStyleElement;
 beforeEach(() => {
+  database.client = createFakeSupabase({
+    garments: [...touring.recommendation.garments.map(g => ({
+      ...g, brand: 'Fixture', model_name: g.name,
+      garment_thermal_properties: { rcl_whole_body: g.rcl, rcl_torso: g.rcl_torso, recl_torso: 1 },
+    })), ...catalog.map(item => ({
+      ...item, covers_torso: true,
+      garment_thermal_properties: { rcl_whole_body: item.rcl_clo, rcl_torso: item.rcl_torso, recl_torso: 1 },
+    }))],
+    handwear: wardrobe.map(item => ({ id: item.item_id, ...item.details })),
+  });
   // jsdom has no animation or transform defaults; let the real Vaul drawer
   // finish closing and read a valid transform without emulating its behavior.
   drawerStyles = document.createElement("style");
@@ -123,6 +136,6 @@ describe("backcountry phase editing with the real picker", () => {
     expect(hands).toHaveTextContent("Descent gloves");
     expect(hands).not.toHaveTextContent("Climb gloves");
     expect(screen.queryByRole("button", { name: /Undo last/ })).not.toBeInTheDocument();
-    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === "POST" && init.body?.toString().includes("item_type"))).toBe(false);
+    expect(vi.mocked(fetch).mock.calls.some(([url, init]) => init?.method === "POST" && String(url) === "/api/wardrobe/gear")).toBe(false);
   });
 });

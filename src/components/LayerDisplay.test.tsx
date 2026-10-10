@@ -8,7 +8,11 @@ import { buildLayersResult, layerDisplayAdvice } from "@/lib/gearUp";
 import type { SavedOutfit } from "@/types/savedKit";
 import LayerDisplay from "./LayerDisplay";
 
-// Layer evaluation runs on the server; serve it from the real route handler.
+// Serve the real request parser/evaluator. These view tests supply their own
+// regional data; authoritative catalog lookups are covered by route integration tests.
+vi.mock('@/lib/recommendations/evaluation-items', () => ({
+  resolveEvaluationItems: async (phases: unknown) => phases,
+}));
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
@@ -50,6 +54,9 @@ vi.mock("@/hooks/useLayerPicker", () => ({
 // Mock LayerPickerDrawer — while open, offers a mid layer that isn't in the wardrobe
 // and a base layer that is, whichever layer it was opened for
 const catalogFleece: PickerItem = {
+  item_type: 'garment',
+  usage: 'either', coverage_torso: 1, coverage_arms: 1, coverage_legs: 0,
+  thermal_provenance: { generic_estimate: true, data_source: 'test estimate' },
   id: "catalog-fleece",
   name: "Catalog fleece",
   brand: "Test Brand",
@@ -59,6 +66,7 @@ const catalogFleece: PickerItem = {
   isOwned: false,
 };
 const merinoCrew: PickerItem = {
+  item_type: 'garment',
   id: "merino-crew",
   name: "Merino crew",
   brand: "Test Brand",
@@ -342,6 +350,7 @@ describe("LayerDisplay", () => {
             name: "Merino Base Layer",
             category: "base_layer",
             rcl: 0.35,
+            rcl_torso: 0.35,
             covers_torso: true,
             covers_legs: false,
           },
@@ -350,6 +359,7 @@ describe("LayerDisplay", () => {
             name: "Down Puffy",
             category: "insulation_down",
             rcl: 1.2,
+            rcl_torso: 1.2,
             covers_torso: true,
             covers_legs: false,
           },
@@ -358,6 +368,7 @@ describe("LayerDisplay", () => {
             name: "Gore-Tex Shell",
             category: "hard_shell",
             rcl: 0.15,
+            rcl_torso: 0.15,
             covers_torso: true,
             covers_legs: false,
           },
@@ -367,6 +378,7 @@ describe("LayerDisplay", () => {
             category: "base_layer",
             rcl: 0.25,
             covers_torso: false,
+            rcl_legs: 0.25,
             covers_legs: true,
           },
         ],
@@ -414,6 +426,24 @@ describe("LayerDisplay", () => {
       warnings: [],
       guidance: ["Layer up for the chairlift"],
     };
+
+    it('shows unknown comfort without falling back to the original score when regional data is missing', async () => {
+      const data = {
+        ...mockBiophysicsData,
+        recommendation: {
+          ...mockBiophysicsData.recommendation,
+          garments: mockBiophysicsData.recommendation.garments.map(garment => ({ ...garment, rcl_torso: undefined })),
+        },
+      };
+      render(<LayerDisplay recommendation={null} temperature={25} windspeed={10} biophysicsData={data} />);
+      await screen.findByText(/Comfort unknown/);
+      expect(screen.queryByText(/In the comfort range/)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText('Technical details'));
+      expect(screen.queryByText('Comfort')).not.toBeInTheDocument();
+      const sent = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+      expect(sent.phases[0].itemClo.torso).toEqual([null, null, null]);
+      expect(sent.phases[0].items.torso[0]).toMatchObject({ sourceId: 'garment-1', item_type: 'garment' });
+    });
 
     describe("the outfit Save to trip keeps", () => {
       const outing = {
@@ -469,8 +499,10 @@ describe("LayerDisplay", () => {
         fireEvent.click(screen.getByText("Pick catalog fleece"));
 
         expect(latest()!.edited).toBe(true);
-        expect(latest()!.phases[0].wear.legs.mid).toEqual([
-          { name: "Catalog fleece", rcl: 0.3, sourceId: "catalog-fleece", isRecommended: true, brand: "Test Brand" },
+        expect(latest()!.phases[0].wear.legs.mid).toMatchObject([
+          { name: "Catalog fleece", rcl: 0.3, sourceId: "catalog-fleece", isRecommended: true, brand: "Test Brand",
+            item_type: 'garment', usage: 'either', coverage_torso: 1,
+            thermal_provenance: { generic_estimate: true, data_source: 'test estimate' } },
         ]);
         expect(latest()!.phases[0].decision).toBeNull();
         await waitFor(() => expect(latest()!.phases[0].decision).not.toBeNull());
@@ -853,7 +885,8 @@ describe("LayerDisplay", () => {
               name: "Patagonia Capilene Cool Lightweight",
               category: "base_layer",
               rcl: 0.22,
-              covers_torso: true,
+              rcl_torso: 0.22,
+            covers_torso: true,
               covers_legs: false,
             },
             {
@@ -861,7 +894,8 @@ describe("LayerDisplay", () => {
               name: "Lululemon Pace Breaker Jacket",
               category: "soft_shell",
               rcl: 0.19,
-              covers_torso: true,
+              rcl_torso: 0.19,
+            covers_torso: true,
               covers_legs: false,
             },
           ],
@@ -951,7 +985,8 @@ describe("LayerDisplay", () => {
               category: "insulation_synthetic",
               rcl: 1.1,
               covers_torso: false,
-              covers_legs: true,
+              rcl_legs: 1.1,
+            covers_legs: true,
             },
           ],
           handwear: {

@@ -197,9 +197,22 @@ export interface ThermalDecision {
   delta: number;
 }
 
+/** Metadata survives recommendation, picker and manual evaluation. Catalog
+ * references are resolved on the server; client clo never overrides them. */
+export interface EvaluationItem extends GarmentSemantics {
+  sourceId?: string;
+  item_type?: 'garment' | 'handwear' | 'headwear' | 'custom';
+  rcl?: number;
+  thermal_data_status?: 'known' | 'unknown';
+  thermal_provenance?: ThermalProvenance;
+  protection?: RecommendedGarment['protection'];
+}
+
 export interface PhaseEvaluationInput {
-  /** Clo of each item worn on each body part. */
-  itemClo: Record<EvaluatedBodyPart, number[]>;
+  /** Null means unknown, while zero means known zero insulation. Legacy
+   * numeric inputs remain supported; items, when sent, are authoritative. */
+  itemClo: Record<EvaluatedBodyPart, (number | null)[]>;
+  items?: Record<EvaluatedBodyPart, EvaluationItem[]>;
   /** Neutral clo target per body part, when the recommendation has one. */
   targets: Partial<Record<EvaluatedBodyPart, number>>;
   /**
@@ -217,7 +230,8 @@ export interface PhaseEvaluationInput {
 }
 
 export interface BodyPartEvaluation {
-  clo: number;
+  clo?: number;
+  thermal_data_status?: 'unknown';
   target?: number;
   /** target - clo: positive when more insulation is needed. */
   delta?: number;
@@ -226,6 +240,8 @@ export interface BodyPartEvaluation {
 }
 
 export interface PhaseEvaluation {
+  thermal_data_status?: 'known' | 'unknown';
+  items?: Record<EvaluatedBodyPart, EvaluationItem[]>;
   bodyParts: Record<EvaluatedBodyPart, BodyPartEvaluation>;
   /** Regional clo weighted by each region's share of the body. */
   breakdown?: {
@@ -233,10 +249,10 @@ export interface PhaseEvaluation {
     total: number;
   };
   totalClo?: number;
-  maxRegionalDeficit: number;
-  maxExtremityDeficit: number;
-  hasRegionalGap: boolean;
-  hasExtremityGap: boolean;
+  maxRegionalDeficit: number | null;
+  maxExtremityDeficit: number | null;
+  hasRegionalGap: boolean | null;
+  hasExtremityGap: boolean | null;
   decision: ThermalDecision | null;
   comfortScore: number | null;
 }

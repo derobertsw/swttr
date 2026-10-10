@@ -22,6 +22,7 @@ function immediateAction(decision: ThermalDecision): string {
 }
 
 interface ComfortDecisionProps {
+  unknown?: boolean;
   /** The server's evaluation of the worn layers; nothing shows until it arrives. */
   decision: ThermalDecision | null | undefined;
   /** Prefixes the title, e.g. "Climb" or "Descent". */
@@ -47,8 +48,14 @@ function StaleLabel({ staleness }: { staleness: "updating" | "outdated" }) {
  * overheating risk with what to change, or that they're in range. A verdict
  * on earlier layers stays on screen, labeled as such.
  */
-export function ComfortDecision({ decision, phase, staleness }: ComfortDecisionProps) {
+export function ComfortDecision({ decision, phase, staleness, unknown }: ComfortDecisionProps) {
   const titleId = useId();
+  if (unknown) return (
+    <p role="status" className="text-sm font-medium text-muted-foreground">
+      {phase ? `${phase}: comfort` : "Comfort"} unknown. Thermal data is missing for one or more worn items.
+      {staleness && <StaleLabel staleness={staleness} />}
+    </p>
+  );
   if (!decision) return null;
 
   if (decision.riskType === "comfortable") {

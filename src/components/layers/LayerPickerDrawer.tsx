@@ -71,7 +71,7 @@ function PickerItemRow({
       <div className="flex shrink-0 items-center gap-2">
         {item.isInUse && <Badge size="sm">In use</Badge>}
         <Badge size="sm" variant="outline" className="tabular-nums">
-          {item.rcl.toFixed(2)} clo
+          {item.rcl === undefined ? "Warmth unknown" : `${item.thermal_provenance?.generic_estimate ? "Estimated " : ""}${item.rcl.toFixed(2)} clo`}
         </Badge>
       </div>
     </button>
