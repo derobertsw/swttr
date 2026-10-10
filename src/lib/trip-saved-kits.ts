@@ -3,7 +3,6 @@
  * save means for the trip, on the server, and reads saved kits wherever
  * they're shown. See docs/trip-saved-kits.md.
  */
-import { format } from "date-fns";
 import { EXERTION_LEVELS, type ExertionLevel } from "@/lib/biophysics/exertion";
 import { addDaysToDateString } from "@/lib/forecastRange";
 import { diffRecommendations } from "@/lib/planAhead";
@@ -444,12 +443,15 @@ export function kitChanges(kit: Pick<TripMemberDayKit, "outfit">, next: SavedKit
 
 /**
  * The outing to ask Gear up for again to update a kit saved for `date`, on
- * the destination's calendar; null once that day has passed there. A plan
- * that started before today is asked for from today on.
+ * the destination's calendar; null once that day has passed there, or when
+ * the destination's time zone isn't known, so the viewer's own calendar
+ * never stands in for it. A plan that started before today is asked for from
+ * today on.
  */
 export function outingToUpdate(kit: SavedKit, date: string, now = Date.now()): Outing | null {
   const zone = kitTimeZone(kit);
-  const today = zone ? formatZonedTime(now, zone).slice(0, 10) : format(now, "yyyy-MM-dd");
+  if (!zone) return null;
+  const today = formatZonedTime(now, zone).slice(0, 10);
   if (date < today) return null;
   if (kit.kind === "plan_day" && kit.outing.when.date < today) {
     const { when } = kit.outing;

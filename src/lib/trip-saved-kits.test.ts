@@ -168,6 +168,13 @@ describe("outingToUpdate", () => {
     expect(outingToUpdate(savedOutfit(), "2026-10-10", at("2026-10-11T04:30:00Z"))).toBeNull();
   });
 
+  it("isn't offered without the destination's time zone, rather than using the viewer's calendar", () => {
+    const unzoned = savedOutfit({ outing: { ...savedOutfit().outing, place: { ...STOWE, timeZone: undefined } }, weather: { temperature: 30, windSpeed: 5 } });
+    expect(outingToUpdate(unzoned, "2026-10-10", at("2026-10-07T12:00:00Z"))).toBeNull();
+    const [saturday] = planDayKits(savedPlan({ provenance: undefined, outing: { ...savedPlan().outing, place: { ...STOWE, timeZone: undefined } } }));
+    expect(outingToUpdate(saturday.kit, "2026-10-10", at("2026-10-07T12:00:00Z"))).toBeNull();
+  });
+
   it("asks again for an outing for now only on its own day", () => {
     const now = savedOutfit({ outing: { ...savedOutfit().outing, when: { mode: "now" } } });
     expect(outingToUpdate(now, "2026-10-06", at("2026-10-06T20:00:00Z"))).toEqual(now.outing);
