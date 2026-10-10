@@ -28,6 +28,13 @@ function trackClicks() {
   );
 }
 
+/** Whether an element is on the page and not hidden, so it can take focus. */
+export function isShown(element: HTMLElement | null | undefined): element is HTMLElement {
+  if (!element?.isConnected) return false;
+  // jsdom has no checkVisibility.
+  return typeof element.checkVisibility !== "function" || element.checkVisibility();
+}
+
 /** The control being clicked, or else the focused one. */
 function activeControl(): HTMLElement | null {
   const target = clicked?.closest<HTMLElement>(FOCUSABLE);
@@ -40,7 +47,8 @@ function activeControl(): HTMLElement | null {
  * Radix returns focus only to a DialogTrigger, so an overlay opened from code
  * leaves focus on <body> when it closes. Call `remember` as the overlay opens
  * and pass `restore` to its content's `onCloseAutoFocus`: focus goes back to
- * the control that opened it, or to `fallback` when that control is gone.
+ * the control that opened it, or to `fallback` when that control is gone or
+ * hidden.
  * `forget` drops the opener when focus should go somewhere else.
  */
 export function useReturnFocus() {
@@ -60,7 +68,7 @@ export function useReturnFocus() {
     event.preventDefault();
     // Don't scroll the page: the opener was in view, and after a tap nothing
     // was focused there.
-    if (saved.element?.isConnected) {
+    if (isShown(saved.element)) {
       saved.element.focus({ preventScroll: true });
     } else {
       saved.fallback()?.focus({ preventScroll: true });
