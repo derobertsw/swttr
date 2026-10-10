@@ -12,6 +12,30 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/PageLayout", () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 const params = Promise.resolve({ id: TRIP.id });
 const second = { ...STOWE_STOP, id: "stop-2", position: 1, name: "Burlington" };
+const ITINERARY = "POST /api/v1/trips/trip-1/itinerary";
+
+/**
+ * A trip with Stowe and Burlington over Saturday–Monday, each day at the stop
+ * given. The fake API previews days with the server's own rules and applies
+ * a saved assignment, so a reload shows it.
+ */
+function stopDays(stopIds: string[], saveStop: () => ReturnType<typeof reply>) {
+  let days: TripDay[] = ["2026-10-10", "2026-10-11", "2026-10-12"].map((date, i) => ({ id: `day-${date}`, trip_id: TRIP.id, date, stop_id: stopIds[i], activity: null }));
+  const full = () => tripFull({ stops: [STOWE_STOP, second], days });
+  const fetchMock = fakeTripApi({
+    "GET /api/v1/trips/trip-1": () => reply(200, full()),
+    "PATCH /api/v1/trips/trip-1/stops/stop-2": saveStop,
+    [ITINERARY]: (body) => {
+      const { preview, ...request } = body as Record<string, unknown>;
+      if (preview) return reply(200, previewItinerary(full(), request as unknown as TripItineraryRequest));
+      const { dates, stop_id } = request as { dates: string[]; stop_id: string };
+      days = days.map((day) => dates.includes(day.date) ? { ...day, stop_id } : day);
+      return reply(200, { ok: true });
+    },
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return { fetchMock };
+}
 
 describe("Destinations after creation", () => {
   beforeEach(() => { vi.clearAllMocks(); });
@@ -24,52 +48,63 @@ describe("Destinations after creation", () => {
     expect(sentBodies(fetchMock, "POST /api/v1/trips/trip-1/stops")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH")).toHaveLength(0);
   });
-  it("previews exact affected dates and retains them after a failed assignment", async () => {
+  it("saves the stop, then reviews the days picked for it, keeping them after a failed save", async () => {
     let attempts = 0;
-    const fetchMock = fakeTripApi({ "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP, second] })), "PATCH /api/v1/trips/trip-1/stops/stop-2": () => ++attempts === 1 ? reply(500, { error: "Assignment failed" }) : reply(200, { stop: second }) }); vi.stubGlobal("fetch", fetchMock);
+    const { fetchMock } = stopDays(["2026-10-10", "2026-10-11", "2026-10-12"].map(() => STOWE_STOP.id), () => ++attempts === 1 ? reply(500, { error: "Save failed" }) : reply(200, { stop: second }));
     const user = userEvent.setup(); await act(async () => { render(<TripStopsPage params={params} />); });
     await screen.findByText("Burlington", { selector: "p" }); await user.click(screen.getAllByRole("button", { name: "Edit" })[1]);
     const dialog = screen.getByRole("dialog", { name: "Edit stop Burlington" });
     await waitFor(() => expect(within(dialog).getByRole("button", { name: /Sunday, October 11/ })).toBeEnabled());
     expect(within(dialog).getByText("No day assignments will change.")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: /Sunday, October 11, 2026/ }));
-    expect(within(dialog).getByText(/These days will use Burlington: 2026-10-11. Other days stay unchanged./)).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Save stop" }));
+    expect(within(dialog).getByText(/Next, you'll review moving these days to Burlington: 2026-10-11. Other days stay unchanged./)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Save and review days" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(within(dialog).getByRole("button", { name: /Sunday, October 11/ })).toHaveAttribute("aria-pressed", "true");
-    await user.click(within(dialog).getByRole("button", { name: "Save stop" })); await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await user.click(within(dialog).getByRole("button", { name: "Save and review days" }));
+
+    // The stop is saved; its days change only after their own review.
+    const review = await screen.findByRole("dialog", { name: "Days at Burlington" });
+    expect(await within(review).findByText("Sun Oct 11")).toBeInTheDocument();
+    expect(within(review).getByText("Burlington · No activity", { exact: false })).toBeInTheDocument();
+    expect(sentBodies(fetchMock, ITINERARY)).toEqual([{ action: "assign_days", dates: ["2026-10-11"], stop_id: second.id, preview: true }]);
+    await user.click(within(review).getByRole("button", { name: "Save days" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getAllByRole("button", { name: "Edit" })[1]).toHaveFocus();
-    expect(sentBodies(fetchMock, "PATCH /api/v1/trips/trip-1/stops/stop-2")).toEqual([{ activities: [], day_dates: ["2026-10-11"] }, { activities: [], day_dates: ["2026-10-11"] }]);
+    expect(screen.getByText("Days saved for Burlington.")).toBeInTheDocument();
+    expect(sentBodies(fetchMock, "PATCH /api/v1/trips/trip-1/stops/stop-2")).toEqual([{ activities: [] }, { activities: [] }]);
+    expect(sentBodies(fetchMock, ITINERARY)[1]).toMatchObject({ action: "assign_days", dates: ["2026-10-11"], stop_id: second.id, expected: [{ date: "2026-10-11", stop_id: STOWE_STOP.id, activity: null }] });
   });
-  it("shows saved assignments on opening and after assigning an additional day", async () => {
-    let days = ["2026-10-10", "2026-10-11", "2026-10-12"].map((date) => ({ id: `day-${date}`, trip_id: TRIP.id, date, stop_id: date === "2026-10-11" ? second.id : STOWE_STOP.id, activity: null }));
-    const fetchMock = fakeTripApi({
-      "GET /api/v1/trips/trip-1": () => reply(200, tripFull({ stops: [STOWE_STOP, second], days })),
-      "PATCH /api/v1/trips/trip-1/stops/stop-2": () => {
-        days = days.map((day) => day.date === "2026-10-10" ? { ...day, stop_id: second.id } : day);
-        return reply(200, { stop: second });
-      },
-    });
-    vi.stubGlobal("fetch", fetchMock);
+  it("changes no day when the review is closed, and shows saved assignments after one is saved", async () => {
+    const { fetchMock } = stopDays([STOWE_STOP.id, second.id, STOWE_STOP.id], () => reply(200, { stop: second }));
     const user = userEvent.setup();
     await act(async () => { render(<TripStopsPage params={params} />); });
     await screen.findByText("Burlington", { selector: "p" });
-    await user.click(screen.getAllByRole("button", { name: "Edit" })[1]);
-    let dialog = screen.getByRole("dialog", { name: "Edit stop Burlington" });
-    await within(dialog).findByText(/Already assigned to Burlington: 2026-10-11/);
-    expect(within(dialog).getByRole("button", { name: /Sunday, October 11/ })).toHaveAttribute("aria-pressed", "true");
-    expect(within(dialog).getByRole("button", { name: /Sunday, October 11/ })).toBeDisabled();
-    expect(within(dialog).getByRole("button", { name: /Saturday, October 10/ })).toHaveAttribute("aria-pressed", "false");
-    await user.click(within(dialog).getByRole("button", { name: /Saturday, October 10/ }));
-    expect(within(dialog).getByText(/These days will use Burlington: 2026-10-10. Other days stay unchanged./)).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Save stop" }));
+    const edit = () => screen.getAllByRole("button", { name: "Edit" })[1];
+    const pickSaturday = async () => {
+      await user.click(edit());
+      const dialog = screen.getByRole("dialog", { name: "Edit stop Burlington" });
+      await within(dialog).findByText(/Already assigned to Burlington: 2026-10-11/);
+      expect(within(dialog).getByRole("button", { name: /Sunday, October 11/ })).toBeDisabled();
+      await user.click(within(dialog).getByRole("button", { name: /Saturday, October 10/ }));
+      await user.click(within(dialog).getByRole("button", { name: "Save and review days" }));
+      return screen.findByRole("dialog", { name: "Days at Burlington" });
+    };
+
+    await user.click(within(await pickSaturday()).getByRole("button", { name: "Keep editing" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    await user.click(screen.getAllByRole("button", { name: "Edit" })[1]);
-    dialog = screen.getByRole("dialog", { name: "Edit stop Burlington" });
+    expect(edit()).toHaveFocus();
+    expect(sentBodies(fetchMock, ITINERARY).filter((body) => !(body as { preview?: boolean }).preview)).toEqual([]);
+
+    const review = await pickSaturday();
+    await within(review).findByText("Sat Oct 10");
+    await user.click(within(review).getByRole("button", { name: "Save days" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await user.click(edit());
+    const dialog = screen.getByRole("dialog", { name: "Edit stop Burlington" });
     await within(dialog).findByText(/Already assigned to Burlington: 2026-10-10, 2026-10-11/);
     expect(within(dialog).getByRole("button", { name: /Saturday, October 10/ })).toHaveAttribute("aria-pressed", "true");
     expect(within(dialog).getByRole("button", { name: /Monday, October 12/ })).toHaveAttribute("aria-pressed", "false");
-    expect(sentBodies(fetchMock, "PATCH /api/v1/trips/trip-1/stops/stop-2")).toEqual([{ activities: [], day_dates: ["2026-10-10"] }]);
   });
   it("blocks saving while assignments cannot be loaded and allows retry", async () => {
     let loads = 0;
@@ -105,7 +140,7 @@ describe("Destinations after creation", () => {
     const hike = within(dialog).getByRole("button", { name: "Hike" });
     await waitFor(() => expect(sunday).toBeEnabled());
     await user.click(sunday); await user.click(alpine);
-    await user.click(within(dialog).getByRole("button", { name: "Save stop" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save and review days" }));
     expect(sunday).toBeDisabled(); expect(monday).toBeDisabled();
     expect(alpine).toBeDisabled(); expect(hike).toBeDisabled();
     await user.click(monday); await user.click(hike);
@@ -116,7 +151,7 @@ describe("Destinations after creation", () => {
     expect(monday).toHaveAttribute("aria-pressed", "false");
     expect(alpine).toHaveAttribute("aria-pressed", "true");
     expect(hike).toHaveAttribute("aria-pressed", "false");
-    expect(sentBodies(fetchMock, "PATCH /api/v1/trips/trip-1/stops/stop-2")).toEqual([{ activities: ["Alpine"], day_dates: ["2026-10-11"] }]);
+    expect(sentBodies(fetchMock, "PATCH /api/v1/trips/trip-1/stops/stop-2")).toEqual([{ activities: ["Alpine"] }]);
   });
 
 });
@@ -128,7 +163,6 @@ const itineraryDays = (): TripDay[] => [
   { id: "day-11", trip_id: TRIP.id, date: "2026-10-11", stop_id: second.id, activity: null },
   { id: "day-12", trip_id: TRIP.id, date: "2026-10-12", stop_id: jay.id, activity: null },
 ];
-const ITINERARY = "POST /api/v1/trips/trip-1/itinerary";
 
 /** The stops page on a trip the fake API previews with the server's own rules; `save` answers each save. */
 async function openItinerary(save: (body: Record<string, unknown>, full: TripFull) => ReturnType<typeof reply> | TripFull) {

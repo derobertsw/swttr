@@ -16,9 +16,9 @@ function unchangedText({ changes, unchanged }: TripItineraryOption) {
 
 /**
  * Reviews a change to the shared itinerary before saving it: the server lists
- * each day it changes, before and after, and refuses a save that no longer
- * matches the review. When the change can go more than one way, nothing is
- * chosen until the person picks an option.
+ * each day it changes, before and after, with what happens to kits there, and
+ * refuses a save that no longer matches the review. When the change can go
+ * more than one way, nothing is chosen until the person picks an option.
  */
 export function ItineraryChangeSheet({ tripId, change, title, description, question, saveLabel, onSaved, onClose, onCloseAutoFocus }: {
   tripId: string;
@@ -138,7 +138,10 @@ export function ItineraryChangeSheet({ tripId, change, title, description, quest
               {chosen.changes.map((day) => (
                 <li key={day.date} className="break-words">
                   <p className="font-medium">{day.date_label}</p>
-                  <p><span className="text-muted-foreground">{day.before}</span> → {day.after}</p>
+                  {day.before === day.after
+                    ? <p>{day.after} <span className="text-muted-foreground">(unchanged)</span></p>
+                    : <p><span className="text-muted-foreground">{day.before}</span> → {day.after}</p>}
+                  {day.notes?.map((note) => <p key={note} className="text-sm text-muted-foreground">{note}</p>)}
                 </li>
               ))}
             </ul>

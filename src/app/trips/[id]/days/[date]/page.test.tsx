@@ -554,5 +554,109 @@ describe("Trip day page", () => {
       expect(screen.queryByRole("group", { name: "Effort for Sam" })).not.toBeInTheDocument();
       expect(screen.getByText("Outfit saved · Personalized · 6 items")).toBeInTheDocument();
     });
+
+    it("says when a saved outfit was planned for another date or activity, mine and the crew's", async () => {
+      const friday = savedOutfit({ outing: { ...savedOutfit().outing, when: { mode: "later", date: "2026-10-09", time: "09:00", durationDays: 1 } } });
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({
+          stops: [STOWE_STOP], days: [{ ...DAY, activity: "Hike" }], members: [ORGANIZER, ANA],
+          kits: [kit(ORGANIZER, { outfit: friday }), kit(ANA, { outfit: savedOutfit() })],
+        })),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      expect(within(myKit).getByText("Planned for the forecast on Fri Oct 9, not this day's.")).toBeInTheDocument();
+      expect(within(myKit).getByText("Planned for Alpine Skiing, not this day's activity (Hike).")).toBeInTheDocument();
+      const crew = screen.getByText("Ana").closest("div")!;
+      expect(within(crew).getByText("Planned for Alpine Skiing, not this day's activity (Hike).")).toBeInTheDocument();
+      expect(within(crew).queryByText(/forecast on/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("copying the day", () => {
+    const ITINERARY = "POST /api/v1/trips/trip-1/itinerary";
+    const JAY = { ...STOWE_STOP, id: "stop-jay", position: 1, name: "Jay Peak, Vermont", latitude: 44.94, longitude: -72.5 };
+    // Saturday alpine at Stowe, Sunday at Jay Peak, Monday hiking on the base.
+    const days: TripDay[] = [
+      { ...DAY, activity: "Alpine" },
+      { ...DAY, id: "day-2", date: "2026-10-11", stop_id: JAY.id },
+      { ...DAY, id: "day-3", date: "2026-10-12", stop_id: null, activity: "Hike" },
+    ];
+    const myKit = (day: TripDay, extra: Partial<TripMemberDayKit>): TripMemberDayKit => ({
+      id: `kit-${day.id}`, trip_day_id: day.id, trip_member_id: ORGANIZER.id, effort: "steady", items: [], note: null,
+      state: "ok", updated_at: "2026-10-06T20:01:02.000000+00:00", outfit: null, outfit_saved_at: null, ...extra,
+    });
+
+    function copyTrip(full: TripFull, save: () => ReturnType<typeof reply>) {
+      const fetchMock = fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, full),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        [ITINERARY]: (body) => {
+          const { preview, ...request } = body as Record<string, unknown>;
+          return preview ? reply(200, previewItinerary(full, request as unknown as TripItineraryRequest, "user-1")) : save();
+        },
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    }
+
+    it("copies the plan and my kit to the days picked, asking about my kit already on one", async () => {
+      const fetchMock = copyTrip(tripFull({ stops: [STOWE_STOP, JAY], days, kits: [myKit(days[0], { outfit: savedOutfit() }), myKit(days[1], { items: ["shell"] })] }), () => reply(200, { ok: true }));
+      const user = userEvent.setup();
+      await renderPage();
+      const card = (await screen.findByRole("heading", { name: "Copy this day" })).closest("div")!;
+      expect(within(card).getByText("Give other days this day's plan: Stowe, Vermont · Alpine.")).toBeInTheDocument();
+      await user.click(within(card).getByRole("button", { name: "Copy to other days" }));
+      expect(within(card).getByRole("button", { name: "Review copy" })).toBeDisabled();
+      expect(within(card).queryByRole("checkbox", { name: /Sat, Oct 10/ })).not.toBeInTheDocument();
+      await user.click(within(card).getByRole("checkbox", { name: "Select all days" }));
+      await user.click(within(card).getByRole("checkbox", { name: /Also copy my outfit/ }));
+      await user.click(within(card).getByRole("button", { name: "Review copy to 2 days" }));
+
+      const dialog = await screen.findByRole("dialog", { name: "Copy Sat, Oct 10" });
+      const keep = await within(dialog).findByRole("radio", { name: /Keep your kit on Sun Oct 11/ });
+      expect(within(dialog).getByRole("radio", { name: /Replace your kit on Sun Oct 11/ })).not.toBeChecked();
+      expect(within(dialog).getByRole("button", { name: "Copy day" })).toBeDisabled();
+      await user.click(keep);
+      expect(within(dialog).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+        "Sun Oct 11Jay Peak, Vermont · No activity → Stowe, Vermont · AlpineKept as saved for the old plan: your checklist.",
+        "Mon Oct 12Stowe, Vermont (base) · Hike → Stowe, Vermont · AlpineGets your outfit from Sat Oct 10.",
+      ]);
+      await user.click(within(dialog).getByRole("button", { name: "Copy day" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(screen.getByText("Copied to 2 days.")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Copy this day" })).toHaveFocus();
+      expect(sentBodies(fetchMock, ITINERARY).at(-1)).toMatchObject({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11", "2026-10-12"], kit: "keep" });
+      expect(sentBodies(fetchMock, "GET /api/v1/trips/trip-1")).toHaveLength(2);
+    });
+
+    it("copies only the plan without a kit of mine, and keeps the picks when the save fails", async () => {
+      const fetchMock = copyTrip(tripFull({ stops: [STOWE_STOP, JAY], days }), () => reply(500, { error: "Couldn't save the change. Nothing was changed; try again." }));
+      const user = userEvent.setup();
+      await renderPage();
+      await user.click(await screen.findByRole("button", { name: "Copy to other days" }));
+      expect(screen.queryByRole("checkbox", { name: /Also copy my/ })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("checkbox", { name: /Mon, Oct 12/ }));
+      await user.click(screen.getByRole("button", { name: "Review copy to 1 day" }));
+      const dialog = await screen.findByRole("dialog", { name: "Copy Sat, Oct 10" });
+      expect(await within(dialog).findByText("Copy Sat Oct 10 to 1 day")).toBeInTheDocument();
+      expect(within(dialog).getByText("Stowe, Vermont · Alpine. Kits stay on their own days.")).toBeInTheDocument();
+      await user.click(within(dialog).getByRole("button", { name: "Copy day" }));
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent("Nothing was changed");
+      await user.click(within(dialog).getByRole("button", { name: "Keep editing" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(screen.getByRole("checkbox", { name: /Mon, Oct 12/ })).toBeChecked();
+      expect(screen.getByRole("button", { name: "Review copy to 1 day" })).toHaveFocus();
+      expect(sentBodies(fetchMock, ITINERARY).at(-1)).toMatchObject({ action: "copy_day", kit: "none" });
+    });
+
+    it("isn't offered on a one-day trip", async () => {
+      copyTrip(tripFull({ stops: [STOWE_STOP], days: [DAY] }), () => reply(200, { ok: true }));
+      await renderPage();
+      await screen.findByRole("heading", { name: "My kit" });
+      expect(screen.queryByRole("heading", { name: "Copy this day" })).not.toBeInTheDocument();
+    });
   });
 });
