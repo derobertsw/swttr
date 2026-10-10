@@ -17,7 +17,7 @@ An `Outing` is what a person asked for, as submitted:
 
 Every outing is plain data, so it can be stored and restored.
 
-Account preferences aren't part of the outing: temperature sensitivity, body metrics and wardrobe. The request reads them for the signed-in user.
+Account preferences aren't part of the outing: temperature sensitivity, body metrics and wardrobe. The request reads them for the signed-in user. On the device, `usePreferences` keeps sensitivity, default activity, height and weight apart for the guest and for each account (`swttr-preferences:guest`, `swttr-preferences:user:<id>`), and reads neither until Clerk says who's signed in. The first account to sign in takes the guest's copy when it has nothing saved, and drops it otherwise (#256).
 
 ## Result
 
@@ -209,7 +209,7 @@ PR #231 added the sign-in and Wardrobe return, validated redirects and per-accou
 | Adding gear returns to the outing without duplicate ownership changes | Wardrobe's card is a link that changes no gear. Adds and 409s are #128's (`useWardrobe`). One-day and plan returns checked with a real account. |
 | Prior advice isn't relabeled; recalculation and errors are explicit | Coming back always asks again. Only the API's answer is labeled Personalized. A failed return shows the failed-update notice with the outing named and inputs kept; a real Open-Meteo 502 was seen and handled this way. |
 | Cancel, expiry and failed saves keep recoverable input | Back from sign-in returns to the results' entry. A 401 gives `auth_required` with Sign in. Failed Wardrobe changes keep their row with Retry (#128). Edit outing and Build my plan keep the inputs. |
-| Sign-out and account switching don't hand one account's draft or gear to another | Per-account drafts, `accountChanging` and `useItemMappings` ownership (#231), with page tests. A real sign-out cleared the results and showed a fresh guest draft. Body metrics and sensitivity are still device-wide: **#256**. |
+| Sign-out and account switching don't hand one account's draft or gear to another | Per-account drafts, `accountChanging` and `useItemMappings` ownership (#231), with page tests. A real sign-out cleared the results and showed a fresh guest draft. Body metrics, sensitivity and default activity are kept per account too, and switch in the same render as the account (#256). |
 | Browser tests of auth and Wardrobe return; native return with #130/#146 | jsdom page tests plus real-account checks in a browser. The iOS shell and deep links remain with #130/#146. |
 
 Known limits:
