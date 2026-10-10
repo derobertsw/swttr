@@ -600,7 +600,7 @@ describe("New trip wizard", () => {
       expect(screen.getByText("Base · Alpine")).toBeInTheDocument();
       expect(edit).toHaveFocus();
       expect(sentBodies(fetchMock, "PATCH /api/v1/trips/trip-1/stops/stop-stowe")).toEqual([
-        { activities: ["Alpine"], day_dates: [] },
+        { activities: ["Alpine"] },
       ]);
     });
   });

@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireTripAccess } from "@/lib/trips";
 import { TRIP } from "@/test/tripApi";
 import type { TripDay } from "@/types/trips";
-import { POST } from "./route";
+import { PATCH, POST } from "./route";
 
 vi.mock("@/lib/trips", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/trips")>(), requireTripAccess: vi.fn(),
@@ -91,5 +91,19 @@ describe("Restore a trip day", () => {
     const response = await createDay();
     expect(response.status).toBe(500);
     expect(await response.json()).toHaveProperty("error");
+  });
+});
+
+describe("Change a trip day", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it("refuses a new destination, which goes through the itinerary review, before any change", async () => {
+    const { from } = mockDatabase();
+    const response = await PATCH(new NextRequest(`http://localhost/api/v1/trips/${TRIP.id}/days/2026-10-10`, {
+      method: "PATCH", body: JSON.stringify({ stop_id: "stop-jay", activity: "Hike" }),
+    }), { params: Promise.resolve({ id: TRIP.id, date: "2026-10-10" }) });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Destinations are changed through the itinerary review. Reload the page and try again." });
+    expect(from).not.toHaveBeenCalled();
   });
 });

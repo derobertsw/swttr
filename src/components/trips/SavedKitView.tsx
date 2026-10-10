@@ -24,11 +24,11 @@ import { addDaysToDateString } from "@/lib/forecastRange";
 import { keepOutingForGearUp } from "@/lib/gearUpDraft";
 import { BODY_PARTS } from "@/lib/layers";
 import { resumeUpdatePath } from "@/lib/outingReturn";
-import { kitAdvice, kitDate, outingToUpdate } from "@/lib/trip-saved-kits";
+import { outfitMismatches, type KitDay } from "@/lib/trip-kit-fit";
+import { kitAdvice, outingToUpdate } from "@/lib/trip-saved-kits";
 import { forgetKitSaveFor } from "@/lib/tripKitSave";
 import { cn } from "@/lib/utils";
 import type { SavedKit, SavedKitPhase, SavedOutfit, SavedPlanDay } from "@/types/savedKit";
-import type { TripStop } from "@/types/trips";
 
 const PHASE_LABELS: Record<SavedKitPhase["id"], string> = { outing: "Outing", climb: "Climb", descent: "Descent" };
 const noop = () => {};
@@ -36,32 +36,27 @@ const noop = () => {};
 /** "Sat, Oct 10" for a "yyyy-MM-dd" date. */
 const formatDay = (date: string) => format(new Date(`${date}T00:00:00`), "EEE, MMM d");
 
-/** Within about 1 km: the saved outing's place and the day's stop are the same place. */
-function samePlace(kit: SavedKit, stop: TripStop): boolean {
-  return stop.latitude !== null && stop.longitude !== null
-    && Math.abs(stop.latitude - kit.outing.place.latitude) < 0.01
-    && Math.abs(stop.longitude - kit.outing.place.longitude) < 0.01;
-}
-
 interface SavedKitViewProps {
   /** The saved outing outfit, or plan day. */
   outfit: SavedKit;
   savedAt?: string | null;
-  /** The day's stop, to point out a kit saved for somewhere else. */
-  stop?: TripStop | null;
-  /** The trip and day it's saved to, which updating it saves back to. */
+  /**
+   * The trip day it's on, to point out a kit planned for another place, date
+   * or activity (#176), and which updating it saves back to.
+   */
+  day: KitDay;
   tripId: string;
-  date: string;
 }
 
 /**
  * My kit on a trip day (#170): the outfit or plan day saved from Gear up,
  * shown as Gear up showed it, with the outing and forecast it was for. It's a
- * snapshot, so it says when it was saved and doesn't change with newer
- * weather. Update in Gear up asks for layers again for the same outing.
+ * snapshot, so it says when it was saved, doesn't change with newer weather,
+ * and says when it was planned for another place, date or activity than the
+ * day's (#176). Update in Gear up asks for layers again for the same outing.
  */
-export function SavedKitView({ outfit, savedAt, stop, tripId, date }: SavedKitViewProps) {
-  const note = <SavedNote kit={outfit} savedAt={savedAt} stop={stop} tripId={tripId} date={date} />;
+export function SavedKitView({ outfit, savedAt, day, tripId }: SavedKitViewProps) {
+  const note = <SavedNote kit={outfit} savedAt={savedAt} day={day} tripId={tripId} />;
   return outfit.kind === "plan_day"
     ? <SavedPlanDayView kit={outfit} note={note} />
     : <SavedOutfitView outfit={outfit} note={note} />;
@@ -185,12 +180,9 @@ function SavedPlanDayView({ kit, note }: { kit: SavedPlanDay; note: React.ReactN
 }
 
 /** When and how the kit was saved, what it's for, and how to update it. */
-function SavedNote({ kit, savedAt, stop, tripId, date }: Omit<SavedKitViewProps, "outfit"> & { kit: SavedKit }) {
+function SavedNote({ kit, savedAt, day, tripId }: Omit<SavedKitViewProps, "outfit"> & { kit: SavedKit }) {
   const reason = generalAdviceReason(kit.outing.activity, kitAdvice(kit));
-  const elsewhere = stop && !samePlace(kit, stop);
-  // The trip's dates changed after it was saved.
-  const planned = kitDate(kit);
-  const moved = planned !== null && planned !== date;
+  const mismatches = outfitMismatches(kit, day);
   const from = kit.kind === "plan_day" ? `from a ${kit.outing.when.durationDays}-day plan in Gear up` : "from Gear up";
   return (
     <Card variant="muted" className="flex flex-col gap-1 text-sm">
@@ -199,17 +191,8 @@ function SavedNote({ kit, savedAt, stop, tripId, date }: Omit<SavedKitViewProps,
         {kit.kind !== "plan_day" && kit.edited && ", with your changes"}. It stays as saved when the forecast changes.
       </p>
       {reason && <p className="text-muted-foreground">{reason}</p>}
-      {moved && (
-        <p className="text-muted-foreground">
-          Saved for {formatDay(planned)}, before the trip&apos;s dates changed, so its forecast is for that day.
-        </p>
-      )}
-      {elsewhere && (
-        <p className="text-muted-foreground">
-          Saved for {(kit.kind !== "plan_day" && kit.weather.context?.place) || kit.outing.place.name}, not this day&apos;s stop ({stop.name}).
-        </p>
-      )}
-      <UpdateInGearUp kit={kit} tripId={tripId} date={date} />
+      {mismatches.map((mismatch) => <p key={mismatch} className="text-foreground">{mismatch}</p>)}
+      <UpdateInGearUp kit={kit} tripId={tripId} date={day.date} />
     </Card>
   );
 }
