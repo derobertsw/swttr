@@ -110,9 +110,9 @@ export function TripError({ className, ...props }: ComponentProps<"div">) {
 
 // Each stop keeps one color on the overview: the dot on its chip and its group
 // of days, and those days' spines. The stop's name always goes with the color,
-// so it borrows the primary, ring and warning hues, which stay apart in both
-// palettes, without implying a status.
-const STOP_COLORS = ["bg-primary", "bg-ring", "bg-warning"] as const;
+// so it borrows the primary, input and warning hues, which stay apart in both
+// palettes, without implying a status. Ring matches primary in light.
+const STOP_COLORS = ["bg-primary", "bg-input", "bg-warning"] as const;
 
 function stopColor(index: number) {
   return STOP_COLORS[index % STOP_COLORS.length];
