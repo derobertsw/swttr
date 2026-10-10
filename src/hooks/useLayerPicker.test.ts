@@ -91,6 +91,25 @@ function mockFetchResponses(
 }
 
 describe("useLayerPicker", () => {
+  it('preserves partial coverage and estimate metadata and keeps missing regional warmth unknown', async () => {
+    mockFetchResponses([{
+      ...JACKET_WARDROBE,
+      details: { ...JACKET_WARDROBE.details, garment_thermal_properties: undefined },
+    }], [{
+      id: 'shorts', type: 'garment', brand: 'SWTTR', model_name: 'Shorts',
+      category: 'base_layer', garment_type: 'shorts', usage: 'standalone', coverage_legs: 0.3,
+      rcl_clo: 0.02, rcl_legs: 0.06, thermal_provenance: { generic_estimate: true },
+    }, {
+      id: 'unknown-pants', type: 'garment', brand: 'Example', model_name: 'Unknown pants',
+      category: 'base_layer', garment_type: 'pants', rcl_clo: 0.8,
+    }]);
+    const { result } = renderHook(() => useLayerPicker(new Set()));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const { recommendedItems } = result.current.getItems('legs', 'base', 0);
+    expect(recommendedItems[0]).toMatchObject({ id: 'shorts', item_type: 'garment', usage: 'standalone', coverage_legs: 0.3, rcl: 0.06, thermal_provenance: { generic_estimate: true } });
+    expect(recommendedItems[1].rcl).toBeUndefined();
+    expect(result.current.getItems('torso', 'mid').wardrobeItems[0].rcl).toBeUndefined();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();

@@ -29,6 +29,7 @@ import {
   collectInUseIds,
   createEmptyLayerSet,
   itemCloByBodyPart,
+  evaluationItemsByBodyPart,
   itemNamesMissingFrom,
   type BodyPart,
   type BodyPartLayers,
@@ -239,6 +240,7 @@ const LayerDisplay = ({
   // Thermal evaluation of the worn layers (including edits) runs on the server.
   const climbInput: PhaseEvaluationInput = {
     itemClo: itemCloByBodyPart(climb.layers),
+    items: evaluationItemsByBodyPart(climb.layers),
     targets: bodyPartTargets(ireq?.regional, ireq?.extremity),
     minTargets: bodyPartTargets(ireq?.regional, ireq?.extremity, "min"),
     arms: regionalClo
@@ -249,6 +251,7 @@ const LayerDisplay = ({
   const descentRegional = descentBreakdown?.regional_ireq ?? ireq?.regional;
   const descentInput: PhaseEvaluationInput = {
     itemClo: itemCloByBodyPart(descent.layers),
+    items: evaluationItemsByBodyPart(descent.layers),
     targets: descentBreakdown
       ? bodyPartTargets(descentBreakdown.regional_ireq, descentBreakdown.extremity_ireq)
       : climbInput.targets,
@@ -282,7 +285,7 @@ const LayerDisplay = ({
   const descentEvaluation = showDescent ? evaluation?.[1] : undefined;
   const phaseEvaluation = (phase: Phase) => (phase === "descent" ? descentEvaluation : climbEvaluation);
 
-  const comfortScore = climbEvaluation
+  const comfortScore = climbEvaluation?.thermal_data_status === "unknown" ? undefined : climbEvaluation
     ? (climbEvaluation.comfortScore
       ?? biophysicsData?.recommendation?.thermal_comfort_score
       ?? biophysicsData?.recommendation?.score)
@@ -312,7 +315,7 @@ const LayerDisplay = ({
   const pickerBodyPart = pickerTarget && biophysicsActive
     ? phaseEvaluation(pickerTarget.phase)?.bodyParts[pickerTarget.bodyPart]
     : undefined;
-  const pickerCloContext = pickerBodyPart?.target !== undefined && pickerBodyPart.delta !== undefined
+  const pickerCloContext = pickerBodyPart?.target !== undefined && pickerBodyPart.clo !== undefined && pickerBodyPart.delta !== undefined
     ? { targetClo: pickerBodyPart.target, currentClo: pickerBodyPart.clo, delta: pickerBodyPart.delta }
     : undefined;
 
@@ -345,6 +348,12 @@ const LayerDisplay = ({
     const newItem: LayerItem = {
       name: item.name,
       rcl: item.rcl,
+      item_type: item.item_type,
+      garment_type: item.garment_type, usage: item.usage,
+      coverage_torso: item.coverage_torso, coverage_arms: item.coverage_arms,
+      coverage_legs: item.coverage_legs, suitable_activities: item.suitable_activities,
+      thermal_data_status: item.thermal_data_status,
+      thermal_provenance: item.thermal_provenance, protection: item.protection,
       sourceId: item.id,
       isRecommended: !item.isOwned,
       brand: item.brand,
@@ -564,6 +573,7 @@ const LayerDisplay = ({
 
               <ComfortDecision
                 decision={shownDecision}
+                unknown={shownEvaluation?.thermal_data_status === "unknown"}
                 phase={phaseLabel}
                 staleness={evaluationFailed ? "outdated" : evaluationPending ? "updating" : undefined}
               />
@@ -664,7 +674,7 @@ const LayerDisplay = ({
                         <dl className="mt-2 flex flex-col gap-1.5 text-sm">
                           {BODY_PARTS.map((bodyPart) => {
                             const part = shownEvaluation.bodyParts[bodyPart];
-                            if (!part || part.target === undefined) return null;
+                            if (!part || part.target === undefined || part.clo === undefined) return null;
                             return (
                               <div key={bodyPart} className="flex flex-wrap items-baseline justify-between gap-x-3">
                                 <dt className="text-muted-foreground">{BODY_PART_LABELS[bodyPart]}</dt>

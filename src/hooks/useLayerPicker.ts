@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useUserId } from "@/hooks/useUserId";
 import { logWarn } from "@/lib/logger";
+import type { EvaluationItem } from "@/types/biophysics";
+import type { GarmentSemantics } from "@/types/garments";
 import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
 import {
   getClo,
@@ -11,11 +13,11 @@ import {
 } from "@/components/wardrobe/wardrobe-utils";
 import { CATEGORY_TO_LAYER_TYPE, BodyPart, LayerType } from "@/lib/layers";
 
-export interface PickerItem {
+export interface PickerItem extends EvaluationItem {
   id: string;
   name: string;
   brand: string;
-  rcl: number;
+  rcl?: number;
   nativeLayerType: LayerType;
   isInUse: boolean;
   isOwned: boolean;
@@ -75,16 +77,16 @@ function isLayerCompatible(itemLayer: LayerType | null, targetLayer: LayerType):
 
 /**
  * Get regional clo value for a wardrobe item matching its body part.
- * Falls back to whole-body rcl_clo if regional values aren't available.
+ * Garments require regional data; extremities/custom estimates use their local clo.
  */
-function getRegionalClo(item: WardrobeItem, bodyPart: BodyPart): number {
+function getRegionalClo(item: WardrobeItem, bodyPart: BodyPart): number | undefined {
   const tp = item.details.garment_thermal_properties;
   const props = Array.isArray(tp) ? tp[0] : tp;
   if (props) {
     if (bodyPart === "legs" && props.rcl_legs != null) return props.rcl_legs;
     if (bodyPart === "torso" && props.rcl_torso != null) return props.rcl_torso;
   }
-  return getClo(item) ?? 0;
+  return item.item_type === "garment" ? undefined : getClo(item);
 }
 
 /** The `items` an API route returns; throws when the request fails. */
@@ -93,6 +95,31 @@ async function fetchItems<T>(url: string): Promise<T[]> {
   if (!res.ok) throw new Error(`${url} returned ${res.status}`);
   const data = await res.json() as { items?: T[] };
   return data.items ?? [];
+}
+
+function semantics(item: GarmentSemantics): GarmentSemantics {
+  return {
+    garment_type: item.garment_type, usage: item.usage,
+    coverage_torso: item.coverage_torso, coverage_arms: item.coverage_arms,
+    coverage_legs: item.coverage_legs, suitable_activities: item.suitable_activities,
+  };
+}
+
+function wardrobeProvenance(item: WardrobeItem) {
+  const tp = item.details.garment_thermal_properties;
+  const props = Array.isArray(tp) ? tp[0] : tp;
+  if (item.item_type === 'custom') return { generic_estimate: true, data_source: 'user_custom_items' };
+  return props ? {
+    estimation_method: props.estimation_method, confidence_score: props.confidence_score,
+    data_source: props.data_source, uncertainty_clo: props.uncertainty_clo, generic_estimate: props.generic_estimate,
+  } : undefined;
+}
+
+// Unknown warmth is listed after known data, never ranked as zero clo.
+function compareClo(a: PickerItem, b: PickerItem, target?: number): number {
+  if (a.rcl === undefined) return b.rcl === undefined ? 0 : 1;
+  if (b.rcl === undefined) return -1;
+  return target === undefined ? b.rcl - a.rcl : Math.abs(a.rcl - target) - Math.abs(b.rcl - target);
 }
 
 const EMPTY_WARDROBE_ITEMS: WardrobeItem[] = [];
@@ -162,6 +189,11 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
           return isLayerCompatible(lt, layerType);
         })
         .map((item) => ({
+          ...semantics(item.details),
+          item_type: item.item_type,
+          thermal_provenance: wardrobeProvenance(item),
+          protection: item.details.garment_protection,
+          thermal_data_status: getRegionalClo(item, bodyPart) === undefined ? "unknown" as const : "known" as const,
           id: item.item_id,
           name: item.nickname || item.details.model_name,
           brand: item.details.brand,
@@ -170,7 +202,7 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
           isInUse: inUseItemIds.has(item.item_id),
           isOwned: true,
         }))
-        .sort((a, b) => b.rcl - a.rcl);
+        .sort((a, b) => compareClo(a, b));
 
       // Filter and map available items (exclude those already in wardrobe)
       const rItems: PickerItem[] = availableItems
@@ -184,10 +216,15 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
             : bodyPart === "torso" ? item.rcl_torso
             : undefined;
           return {
+            ...semantics(item),
+            item_type: item.type,
+            thermal_provenance: item.thermal_provenance,
+            protection: item.protection,
             id: item.id,
             name: item.model_name,
             brand: item.brand,
-            rcl: regionalRcl ?? item.rcl_clo ?? 0,
+            rcl: item.type === "garment" ? regionalRcl : item.rcl_clo,
+            thermal_data_status: (item.type === "garment" ? regionalRcl : item.rcl_clo) === undefined ? "unknown" as const : "known" as const,
             nativeLayerType: inferAvailableLayer(item),
             isInUse: inUseItemIds.has(item.id),
             isOwned: false,
@@ -196,9 +233,9 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
 
       // Sort recommendations by proximity to target (closest first), then by clo descending
       if (targetClo !== undefined) {
-        rItems.sort((a, b) => Math.abs(a.rcl - targetClo) - Math.abs(b.rcl - targetClo));
+        rItems.sort((a, b) => compareClo(a, b, targetClo));
       } else {
-        rItems.sort((a, b) => b.rcl - a.rcl);
+        rItems.sort((a, b) => compareClo(a, b));
       }
 
       return { wardrobeItems: wItems, recommendedItems: rItems.slice(0, 3) };

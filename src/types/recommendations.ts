@@ -1,4 +1,6 @@
-export interface LayerItem {
+import type { EvaluationItem } from './biophysics';
+
+export interface LayerItem extends EvaluationItem {
   name: string;
   rcl?: number;
   isGeneric?: boolean;
