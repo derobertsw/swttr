@@ -49,18 +49,3 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
 
   return NextResponse.json({ stop: data });
 }
-
-export async function DELETE(_request: NextRequest, ctx: RouteContext) {
-  const { id, stopId } = await ctx.params;
-  const auth = await requireTripAccess(id);
-  if (auth instanceof NextResponse) return auth;
-  const { supabase } = auth;
-
-  const { error } = await supabase
-    .from("trip_stops")
-    .delete()
-    .eq("id", stopId)
-    .eq("trip_id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
-}
