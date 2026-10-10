@@ -1,6 +1,6 @@
 # SWTTR design system
 
-SWTTR's interface should read like a calm outdoor field guide. The navy and teal identity stays. Surfaces are solid and readable, and color marks actions, selection and status. Each screen has one clear primary action.
+SWTTR's interface should read like a calm outdoor field guide. Surfaces are solid and readable, and color marks actions, selection and status. Each screen has one clear primary action.
 
 The system is a thin layer over the existing shadcn/Radix components:
 - Tokens live in [`src/assets/styles/globals.css`](../src/assets/styles/globals.css).
@@ -11,8 +11,10 @@ The system is a thin layer over the existing shadcn/Radix components:
 
 SWTTR follows the device's light or dark setting. There is no in-app preference.
 
-- **Light** is a muted field-guide page with deep-teal actions.
 - **Dark** is navy surfaces with light-mint actions.
+- **Light** is cool neutral surfaces and navy text with vivid-violet actions.
+
+The two are one app in two appearances, not two designs. Layout, spacing, type, shapes, components, content and behavior are identical; only the token values change. Violet in light takes exactly the roles mint has in dark: primary actions, selection outlines, selected fills (`primary-soft`), active navigation icons and links. In light the focus ring is violet too. The canvas and ordinary controls stay neutral in both, so the accent stays concentrated on the one primary action and on what is selected. Neither appearance uses gradients, glass or decorative motifs.
 
 `data-appearance="light"` or `data-appearance="dark"` on an element pins that subtree to one palette.
 
@@ -31,19 +33,19 @@ The names follow shadcn, so `bg-card`, `text-muted-foreground`, `border-input` a
 
 | Role | Token | Light | Dark | Use |
 |---|---|---|---|---|
-| Canvas | `background` | `#f1f0ea` | `#0f1d2a` | Page background |
+| Canvas | `background` | `#f5f6fa` | `#0f1d2a` | Page background |
 | Text | `foreground` | `#13222f` | `#f4f8fa` | Headings and body text |
-| Supporting text | `muted-foreground` | `#4b5b67` | `#b7c8d4` | Help, metadata, placeholders. Never lower its opacity. |
-| Surface | `card` | `#fbfaf7` | `#172b3a` | Cards, inputs, sidebar, tab bar, dialogs, drawers, sheets |
+| Supporting text | `muted-foreground` | `#4f5d70` | `#b7c8d4` | Help, metadata, placeholders. Never lower its opacity. |
+| Surface | `card` | `#ffffff` | `#172b3a` | Cards, inputs, sidebar, tab bar, dialogs, drawers, sheets |
 | Overlay | `popover` | `#ffffff` | `#203a4b` | Menus, popovers, select lists |
-| Muted | `muted` / `secondary` | `#e7e6df` | `#203a4b` | Wells, segmented tracks, secondary buttons |
-| Hover | `accent` | `#dfded6` | `#2a4a5e` | Hover and highlighted menu items |
-| Action | `primary` | `#0b6b63` | `#74e0cf` | Primary buttons, links, selection outline |
+| Muted | `muted` / `secondary` | `#e9edf3` | `#203a4b` | Wells, segmented tracks, secondary buttons |
+| Hover | `accent` | `#dfe5ee` | `#2a4a5e` | Hover and highlighted menu items |
+| Action | `primary` | `#743bea` | `#74e0cf` | Primary buttons, links, selection outline |
 | Text on action | `primary-foreground` | `#ffffff` | `#0b2427` | |
-| Selected | `primary-soft` | `#dcefea` | `#264852` | Selected choice, active nav item |
-| Divider | `border` | `#d3d2ca` | `#456477` | Decorative separators only. Too faint to mark a control. |
-| Control outline | `input` | `#6a7781` | `#7a96a7` | Borders of inputs, selects, outline buttons |
-| Focus | `ring` | `#1f5fcc` | `#96beff` | 2px focus outline, offset 2px |
+| Selected | `primary-soft` | `#eee7ff` | `#264852` | Selected choice, active nav item |
+| Divider | `border` | `#ced5df` | `#456477` | Decorative separators only. Too faint to mark a control. |
+| Control outline | `input` | `#68778c` | `#7a96a7` | Borders of inputs, selects, outline buttons |
+| Focus | `ring` | `#743bea` | `#96beff` | 2px focus outline, offset 2px. Matches `primary` in light; the offset keeps it apart from a primary button. |
 | Success | `success` / `success-soft` | `#1f6b3b` / `#e1f0e4` | `#a7e3ba` / `#2b454c` | Status text and its chip background |
 | Warning | `warning` / `warning-soft` | `#7a5200` / `#f8ebcf` | `#f4c778` / `#364143` | |
 | Error | `destructive` / `destructive-soft` | `#b3261e` / `#f9e2df` | `#ffb4ab` / `#373e4a` | Errors, invalid fields, destructive actions |
@@ -53,6 +55,7 @@ The names follow shadcn, so `bg-card`, `text-muted-foreground`, `border-input` a
 [`globals.test.ts`](../src/assets/styles/globals.test.ts) checks the pairs components rely on:
 - Text pairs need 4.5:1.
 - Control outlines, focus rings and selection marks need 3:1.
+- Button text on the 90% hover fills (`hover:bg-primary/90`, `hover:bg-destructive/90`), composited over each surface, needs 4.5:1.
 - The two copies of the dark palette must stay identical: one is pinned, one follows the system.
 
 Translucent colors such as `bg-primary/90` composite over whatever sits below. Check those against the rendered background, not the token alone.
@@ -147,5 +150,5 @@ Remaining exceptions, each with a reason:
 - **Product image wells** stay white in both appearances, because catalog photos have white backgrounds.
 - **Clerk's sign-in and account UI** keep Clerk's own styling.
 - **The custom UIKit shell's native chrome** in `ios/App/App/SWTTRViewController.swift` keeps its fixed dark tab bar and action button. Its web content, loading canvas and status text follow the device appearance. Tab/action chrome migration belongs to #130/#146; the Capacitor status-bar setting does not control this standalone UIKit shell.
-- **Trip stop colors** on the trip overview mark each stop with a dot and its days with a spine. They borrow the `primary`, `ring` and `warning` hues, which stay distinct in both palettes, rather than adding categorical tokens. The stop's name always goes with the color, so it never carries meaning alone and doesn't imply a status.
+- **Trip stop colors** on the trip overview mark each stop with a dot and its days with a spine. They borrow the `primary`, `input` and `warning` hues, which stay distinct in both palettes, rather than adding categorical tokens. (`ring` matches `primary` in light, so it can't mark a stop.) The stop's name always goes with the color, so it never carries meaning alone and doesn't imply a status.
 - **The thermal gauge's cold-to-hot gradient** in `layers/ThermalGauge.tsx` keeps its fixed blue-to-amber hues. It's a scale, not a status, and its marker, band and labels use tokens.
