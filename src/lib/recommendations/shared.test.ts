@@ -370,6 +370,9 @@ describe('formatGarmentResponse', () => {
     const result = formatGarmentResponse(garment);
 
     expect(result).toEqual({
+      thermal_data_status: 'unknown',
+      thermal_provenance: {},
+      protection: { windproof_rating: 'none', waterproof_rating: 'none' },
       id: 'abc-123',
       name: 'Patagonia Capilene',
       category: 'base_layer',

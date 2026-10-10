@@ -57,6 +57,9 @@ const createMockLegsBaseLayer = () => ({
   covers_legs: true,
   weight_grams: 150,
   garment_thermal_properties: {
+    recl_torso: 0,
+    recl_arms: 0,
+    recl_legs: 6,
     rcl_torso: 0,
     rcl_arms: 0,
     rcl_legs: 0.3,
@@ -83,6 +86,8 @@ const createMockInsulation = () => ({
   covers_legs: false,
   weight_grams: 350,
   garment_thermal_properties: {
+    recl_torso: 20,
+    recl_arms: 16,
     rcl_torso: 1.2,
     rcl_arms: 0.8,
     rcl_legs: 0,
@@ -109,6 +114,8 @@ const createMockSoftShell = () => ({
   covers_legs: false,
   weight_grams: 300,
   garment_thermal_properties: {
+    recl_torso: 10,
+    recl_arms: 8,
     rcl_torso: 0.4,
     rcl_arms: 0.3,
     rcl_legs: 0,

@@ -9,28 +9,38 @@ import type { IreqResult } from '@/types/garments';
 import type { GarmentRow, HandwearRow, HeadwearRow, HeadwearRecommendations } from './types';
 import type { WeatherInput } from './request';
 import type { PhaseTargets } from './thermal-targets';
+import type { RecommendedGarment } from '@/types/biophysics';
+import { hasUsableThermalData } from './garment-semantics';
 
 /**
  * Format garment for API response
  */
-export function formatGarmentResponse(garment: GarmentRow): {
-  id: string;
-  name: string;
-  category: string;
-  rcl?: number;
-  rcl_torso?: number;
-  rcl_arms?: number;
-  rcl_legs?: number;
-  recl?: number;
-  evap_potential?: number;
-  covers_torso: boolean;
-  covers_arms: boolean;
-  covers_legs: boolean;
-} {
+export function formatGarmentResponse(garment: GarmentRow): RecommendedGarment {
   return {
     id: garment.id,
     name: `${garment.brand} ${garment.model_name}`,
     category: garment.category,
+    garment_type: garment.garment_type,
+    usage: garment.usage,
+    coverage_torso: garment.coverage_torso,
+    coverage_arms: garment.coverage_arms,
+    coverage_legs: garment.coverage_legs,
+    suitable_activities: garment.suitable_activities,
+    thermal_data_status: hasUsableThermalData(garment) ? 'known' : 'unknown',
+    thermal_provenance: garment.garment_thermal_properties ? {
+      estimation_method: garment.garment_thermal_properties.estimation_method,
+      confidence_score: garment.garment_thermal_properties.confidence_score,
+      data_source: garment.garment_thermal_properties.data_source,
+      uncertainty_clo: garment.garment_thermal_properties.uncertainty_clo,
+      generic_estimate: garment.garment_thermal_properties.generic_estimate,
+    } : undefined,
+    protection: garment.garment_protection ? {
+      windproof_rating: garment.garment_protection.windproof_rating,
+      waterproof_rating: garment.garment_protection.waterproof_rating,
+      waterproof_mm: garment.garment_protection.waterproof_mm,
+      data_source: garment.garment_protection.data_source,
+      generic_estimate: garment.garment_protection.generic_estimate,
+    } : undefined,
     rcl: garment.garment_thermal_properties?.rcl_whole_body,
     rcl_torso: garment.garment_thermal_properties?.rcl_torso,
     rcl_arms: garment.garment_thermal_properties?.rcl_arms,
@@ -140,6 +150,7 @@ export function formatSinglePhaseIreq(ireq: IreqResult, targets: PhaseTargets) {
     regional: targets.regional,
     extremity: targets.extremity,
     validation_buffer_clo: formatValidationBuffer(targets.validationBuffer),
-    validation_source: COWEDA_VALIDATION_SOURCE,
+    validation_source: targets.policy ? 'coweda_inspired_unvalidated_swttr_margin' : COWEDA_VALIDATION_SOURCE,
+    ...(targets.policy ? { policy: targets.policy } : {}),
   };
 }

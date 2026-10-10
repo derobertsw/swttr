@@ -5,6 +5,7 @@
 import type { CategorizedGarments, GarmentRow } from '../types';
 import { createSinglePhaseSport } from './single-phase';
 import { buildBreathableEnsemble } from './breathable-ensemble';
+import { retainRunningProtection } from './running-protection';
 
 const MIN_EVAP_POTENTIAL = 0.3;
 
@@ -59,6 +60,9 @@ export const running = createSinglePhaseSport({
   activity: 'running',
   profile: { name: 'Running', windExposure: 'normal' },
   minEvapPotential: MIN_EVAP_POTENTIAL,
+  protect: (ensemble, categorized, targets) => targets.policy
+    ? retainRunningProtection(ensemble, categorized, targets.policy.protection)
+    : { ensemble, warnings: [] },
   buildEnsemble: (categorized, targets, request) =>
     buildRunningEnsemble(
       categorized,

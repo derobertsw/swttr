@@ -3,7 +3,8 @@
  * recommenders are typed against these, so the client and server agree.
  */
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
-import type { EnsembleScore } from "@/types/garments";
+import type { EnsembleScore, GarmentSemantics, ThermalProvenance } from "@/types/garments";
+import type { SustainedSportPolicy } from '@/lib/biophysics/sport-policy';
 
 export interface IreqData {
   min: number;
@@ -38,6 +39,7 @@ export interface ExtremityIreqRange {
  * `skiing`/`chairlift` and ski touring `uphill`/`downhill` phases instead.
  */
 export interface IreqRange {
+  policy?: SustainedSportPolicy;
   min?: number;
   neutral?: number;
   skiing?: IreqData;
@@ -106,7 +108,11 @@ export interface TransitionProtocol {
   warnings: string[];
 }
 
-export interface RecommendedGarment {
+export interface RecommendedGarment extends GarmentSemantics {
+  /** Missing regional data is unknown, never zero insulation. */
+  thermal_data_status?: 'known' | 'unknown';
+  thermal_provenance?: ThermalProvenance;
+  protection?: { windproof_rating?: string; waterproof_rating?: string; waterproof_mm?: number; data_source?: string | null; generic_estimate?: boolean };
   id: string;
   name: string;
   category: string;
