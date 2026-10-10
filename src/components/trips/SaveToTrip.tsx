@@ -344,7 +344,9 @@ function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocu
           type="button"
           onClick={() => void send({
             ...step.request,
-            replace: Object.fromEntries(conflicts.map((c) => [c.date, c.kit.updated_at])),
+            // Added to the days confirmed before, which the server didn't
+            // report again because their kits haven't changed since.
+            replace: { ...step.request.replace, ...Object.fromEntries(conflicts.map((c) => [c.date, c.kit.updated_at])) },
           })}
         >
           {several ? "Replace kits" : "Replace kit"}
@@ -575,9 +577,13 @@ function describeItems(items: LayerChanges["add"]): string {
   return items.map((item) => `${item.name} (${BODY_PART_LABELS[item.bodyPart].toLowerCase()})`).join(", ");
 }
 
-/** "Adds:" for one outfit, "Climb adds:" or "Descent removes:" for a ski tour's phases. */
+const PART_LABELS: Record<Exclude<SaveKitPhaseChanges["phase"], "outing">, string> = {
+  climb: "Climb", descent: "Descent", morning: "Morning", midday: "Midday", evening: "Evening",
+};
+
+/** "Adds:" for the outfit, "Climb adds:" for a ski tour's phase, "Evening removes:" for a plan day's daypart. */
 function changeLabel(phase: SaveKitPhaseChanges["phase"], change: "adds" | "removes"): string {
-  return phase === "outing" ? `${change[0].toUpperCase()}${change.slice(1)}: ` : `${phase === "climb" ? "Climb" : "Descent"} ${change}: `;
+  return phase === "outing" ? `${change[0].toUpperCase()}${change.slice(1)}: ` : `${PART_LABELS[phase]} ${change}: `;
 }
 
 /** What replacing the saved kit changes: the conditions, and the layers as worked out by the server. */

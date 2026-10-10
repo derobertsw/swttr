@@ -345,6 +345,44 @@ describe("Save a multi-day plan to a trip", () => {
     expect(second).toEqual({ ...first, replace: { "2026-10-10": KIT.updated_at, "2026-10-11": KIT.updated_at } });
   });
 
+  it("keeps the days already confirmed when a kit changes before replacing", async () => {
+    let attempts = 0;
+    const conflicts = [
+      { date: "2026-10-10", kit: KIT, changes: null },
+      { date: "2026-10-11", kit: { ...KIT, id: "kit-2" }, changes: null },
+    ];
+    // Sunday's kit changed after the question was asked.
+    const newer = { ...KIT, id: "kit-2", updated_at: "2026-10-07T08:00:00.5+00:00" };
+    const { fetchMock, user, dialog } = await openPlan({
+      "POST /api/v1/trips/kits": () => (++attempts === 1
+        ? reply(409, { ...CONFLICT, conflicts })
+        : attempts === 2 ? reply(409, { ...CONFLICT, conflicts: [{ date: "2026-10-11", kit: newer, changes: null }] }) : reply(200, SAVED_PLAN)),
+    });
+    await user.click(await within(dialog).findByRole("radio", { name: /Whistler/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Replace kits" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Replace kit" }));
+    await within(dialog).findByRole("link", { name: "Open trip" });
+
+    const [, second, third] = sentBodies(fetchMock, "POST /api/v1/trips/kits") as SaveKitRequest[];
+    expect(second.replace).toEqual({ "2026-10-10": KIT.updated_at, "2026-10-11": KIT.updated_at });
+    expect(third.replace).toEqual({ "2026-10-10": KIT.updated_at, "2026-10-11": newer.updated_at });
+  });
+
+  it("names the daypart a plan day's change is in", async () => {
+    const changes = [
+      { phase: "outing", add: [], remove: [] },
+      { phase: "evening", add: [{ bodyPart: "hands", layerType: "outer", name: "Warm mittens" }], remove: [] },
+    ];
+    const { user, dialog } = await openPlan({
+      "POST /api/v1/trips/kits": reply(409, { ...CONFLICT, conflicts: [{ date: "2026-10-10", kit: { ...KIT, items: [], outfit: savedOutfit() }, changes }] }),
+    });
+    await user.click(await within(dialog).findByRole("radio", { name: /Whistler/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+    expect(await within(dialog).findByText("Evening adds:")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/The layers are the same/)).not.toBeInTheDocument();
+  });
+
   it("keeps every saved kit when asked to", async () => {
     const { user, dialog } = await openPlan({
       "POST /api/v1/trips/kits": reply(409, { ...CONFLICT, conflicts: [CONFLICT.conflicts[0], { ...CONFLICT.conflicts[0], date: "2026-10-11" }] }),

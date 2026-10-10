@@ -541,6 +541,16 @@ describe("Trip day page", () => {
       expect(draft).toMatchObject({ lastOuting: savedOutfit().outing, activity: "alpine_skiing", date: "2026-10-10", time: "09:00", inputMode: "later" });
     });
 
+    it("says when the trip moved after the kit was saved, and updates it for the day it's on now", async () => {
+      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit({ outing: { ...savedOutfit().outing, when: { mode: "later", date: "2026-10-09", time: "09:00", durationDays: 1 } } }) })]));
+      await renderPage();
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      expect(within(myKit).getByText("Saved for Fri, Oct 9, before the trip's dates changed, so its forecast is for that day.")).toBeInTheDocument();
+      await userEvent.click(within(myKit).getByRole("button", { name: "Update in Gear up" }));
+      const draft = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.GEAR_UP_DRAFT)!)["user-1"];
+      expect(draft.lastOuting.when).toEqual({ mode: "later", date: "2026-10-10", time: "09:00", durationDays: 1 });
+    });
+
     it("doesn't offer an update once the day has passed at the destination", async () => {
       vi.setSystemTime(Date.parse("2026-10-11T12:00:00Z"));
       vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit() })]));

@@ -159,6 +159,33 @@ describe("plan days as kits", () => {
   });
 });
 
+describe("plan day changes through the day", () => {
+  const MITTENS = { ...WEAR, hands: { base: [], outer: [{ name: "Warm mittens" }] } };
+  const withEvening = (evening: typeof WEAR, baseline = WEAR) => planDayKits(savedPlan({
+    days: [planDay("2026-10-10", {
+      baseline: { ...planDay("2026-10-10").baseline, recommendation: baseline },
+      dayparts: [{ ...planDay("2026-10-10").dayparts[0], recommendation: baseline }, { ...planDay("2026-10-10").dayparts[1], recommendation: evening }],
+    })],
+  }))[0].kit;
+
+  it("lists a daypart whose layers change when the day's outfit doesn't", () => {
+    expect(kitChanges({ outfit: withEvening(WEAR) }, withEvening(MITTENS))).toEqual([
+      { phase: "outing", add: [], remove: [] },
+      {
+        phase: "evening",
+        add: [{ bodyPart: "hands", layerType: "outer", name: "Warm mittens" }],
+        remove: [{ bodyPart: "hands", layerType: "outer", name: "Insulated gloves" }],
+      },
+    ]);
+  });
+
+  it("doesn't repeat a change the whole day makes for each daypart", () => {
+    expect(kitChanges({ outfit: withEvening(WEAR) }, withEvening(MITTENS, MITTENS))).toEqual([
+      expect.objectContaining({ phase: "outing", add: [expect.objectContaining({ name: "Warm mittens" })] }),
+    ]);
+  });
+});
+
 describe("outingToUpdate", () => {
   const at = (iso: string) => Date.parse(iso);
 
@@ -179,6 +206,28 @@ describe("outingToUpdate", () => {
     const now = savedOutfit({ outing: { ...savedOutfit().outing, when: { mode: "now" } } });
     expect(outingToUpdate(now, "2026-10-06", at("2026-10-06T20:00:00Z"))).toEqual(now.outing);
     expect(outingToUpdate(now, "2026-10-06", at("2026-10-07T12:00:00Z"))).toBeNull();
+  });
+
+  it("moves the outing with its day when the trip's dates changed after saving", () => {
+    // Saved for Sat, Oct 10; the trip moved a day later.
+    expect(outingToUpdate(savedOutfit(), "2026-10-11", at("2026-10-07T12:00:00Z"))?.when)
+      .toEqual({ mode: "later", date: "2026-10-11", time: "09:00", durationDays: 1 });
+    const [saturday, sunday] = planDayKits(savedPlan());
+    expect(outingToUpdate(saturday.kit, "2026-10-11", at("2026-10-07T12:00:00Z"))?.when)
+      .toEqual({ mode: "later", date: "2026-10-11", time: "09:00", durationDays: 3 });
+    // Moved earlier, into a plan that has started: from today on.
+    expect(outingToUpdate(sunday.kit, "2026-10-10", at("2026-10-09T12:00:00Z"))?.when)
+      .toEqual({ mode: "later", date: "2026-10-09", time: "09:00", durationDays: 3 });
+  });
+
+  it("asks for an outing for now, moved to a later day, at the time it was read", () => {
+    const now = savedOutfit({
+      outing: { ...savedOutfit().outing, when: { mode: "now" } },
+      weather: { temperature: 30, windSpeed: 5, context: { source: "current", provenance: { provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" }, timeZone: "America/New_York", observedTime: "2026-10-06T14:15-04:00" } } },
+    });
+    expect(outingToUpdate(now, "2026-10-08", at("2026-10-07T12:00:00Z"))?.when)
+      .toEqual({ mode: "later", date: "2026-10-08", time: "14:15", durationDays: 1 });
+    expect(outingToUpdate(now, "2026-10-07", at("2026-10-07T12:00:00Z"))?.when).toEqual({ mode: "now" });
   });
 
   it("asks again for a plan from today on, once it has started", () => {

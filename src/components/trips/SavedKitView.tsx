@@ -24,7 +24,7 @@ import { addDaysToDateString } from "@/lib/forecastRange";
 import { keepOutingForGearUp } from "@/lib/gearUpDraft";
 import { BODY_PARTS } from "@/lib/layers";
 import { resumeUpdatePath } from "@/lib/outingReturn";
-import { kitAdvice, outingToUpdate } from "@/lib/trip-saved-kits";
+import { kitAdvice, kitDate, outingToUpdate } from "@/lib/trip-saved-kits";
 import { forgetKitSaveFor } from "@/lib/tripKitSave";
 import { cn } from "@/lib/utils";
 import type { SavedKit, SavedKitPhase, SavedOutfit, SavedPlanDay } from "@/types/savedKit";
@@ -188,6 +188,9 @@ function SavedPlanDayView({ kit, note }: { kit: SavedPlanDay; note: React.ReactN
 function SavedNote({ kit, savedAt, stop, tripId, date }: Omit<SavedKitViewProps, "outfit"> & { kit: SavedKit }) {
   const reason = generalAdviceReason(kit.outing.activity, kitAdvice(kit));
   const elsewhere = stop && !samePlace(kit, stop);
+  // The trip's dates changed after it was saved.
+  const planned = kitDate(kit);
+  const moved = planned !== null && planned !== date;
   const from = kit.kind === "plan_day" ? `from a ${kit.outing.when.durationDays}-day plan in Gear up` : "from Gear up";
   return (
     <Card variant="muted" className="flex flex-col gap-1 text-sm">
@@ -196,6 +199,11 @@ function SavedNote({ kit, savedAt, stop, tripId, date }: Omit<SavedKitViewProps,
         {kit.kind !== "plan_day" && kit.edited && ", with your changes"}. It stays as saved when the forecast changes.
       </p>
       {reason && <p className="text-muted-foreground">{reason}</p>}
+      {moved && (
+        <p className="text-muted-foreground">
+          Saved for {formatDay(planned)}, before the trip&apos;s dates changed, so its forecast is for that day.
+        </p>
+      )}
       {elsewhere && (
         <p className="text-muted-foreground">
           Saved for {(kit.kind !== "plan_day" && kit.weather.context?.place) || kit.outing.place.name}, not this day&apos;s stop ({stop.name}).

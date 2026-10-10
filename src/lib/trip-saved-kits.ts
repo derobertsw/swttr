@@ -15,6 +15,7 @@ import type { DailyLayerPlan, DaypartId, DaypartLayerPlan, LayerChanges, PlanLay
 import type { LayerItem, LayerSet, LocationSuggestion, Recommendation } from "@/types/recommendations";
 import type {
   MultiDayOuting,
+  SaveKitChangePart,
   SaveKitPhaseChanges,
   SavedKit,
   SavedKitAdvice,
@@ -413,11 +414,18 @@ export function tripDestination(place: LocationSuggestion): { name: string; lati
   return { name: name.slice(0, 200), latitude: place.latitude, longitude: place.longitude };
 }
 
-/** What a saved kit has worn, phase by phase: a ski tour's climb and descent, or one outfit (a plan day's for its coldest part). */
-export function kitWear(kit: SavedKit): Array<{ id: SavedKitPhaseId; wear: Recommendation }> {
+/**
+ * What a saved kit has worn, part by part: a ski tour's climb and descent, or
+ * one outfit. A plan day's outfit, for its coldest part, comes first, then
+ * each daypart's layers.
+ */
+export function kitWear(kit: SavedKit): Array<{ id: SaveKitChangePart; wear: Recommendation }> {
   if (kit.kind === "plan_day") {
     const wear = kit.day?.baseline?.recommendation;
-    return wear ? [{ id: "outing", wear }] : [];
+    if (!wear) return [];
+    const dayparts = (kit.day.dayparts ?? []).flatMap((daypart) =>
+      daypart.recommendation ? [{ id: daypart.id, wear: daypart.recommendation }] : []);
+    return [{ id: "outing", wear }, ...dayparts];
   }
   return kit.phases ?? [];
 }
@@ -427,38 +435,69 @@ export function kitAdvice(kit: SavedKit): SavedKitAdvice {
   return kit.kind === "plan_day" ? { kind: "general", reason: "multi_day" } : kit.advice;
 }
 
+/** Changes as a comparable key, whatever order their items are in. */
+function changesKey({ add, remove }: LayerChanges): string {
+  const keys = (items: PlanLayerItem[]) => items.map((item) => `${item.bodyPart}:${item.layerType}:${item.name}`).sort();
+  return JSON.stringify([keys(add), keys(remove)]);
+}
+
 /**
- * What changes from a saved kit's outfit to a new one, phase by phase (a ski
- * tour's climb and descent); null when the saved kit is a checklist. A phase
- * the saved outfit doesn't have is compared with its first.
+ * What changes from a saved kit's outfit to a new one, part by part (a ski
+ * tour's climb and descent, a plan day's dayparts); null when the saved kit
+ * is a checklist. A part the saved kit doesn't have is compared with its
+ * first. A daypart is listed only when it changes, and differently from the
+ * whole day.
  */
 export function kitChanges(kit: Pick<TripMemberDayKit, "outfit">, next: SavedKit): SaveKitPhaseChanges[] | null {
   const saved = kit.outfit ? kitWear(kit.outfit) : [];
   if (!saved.length) return null;
-  return kitWear(next).map((phase) => {
-    const before = saved.find((candidate) => candidate.id === phase.id) ?? saved[0];
-    return { phase: phase.id, ...(diffRecommendations(before.wear, phase.wear) ?? { add: [], remove: [] }) };
+  const changes = kitWear(next).map((part) => {
+    const before = saved.find((candidate) => candidate.id === part.id) ?? saved[0];
+    return { phase: part.id, ...(diffRecommendations(before.wear, part.wear) ?? { add: [], remove: [] }) };
   });
+  const whole = changes[0] && changesKey(changes[0]);
+  return changes.filter((part, index) => index === 0 || !DAYPART_IDS.includes(part.phase as DaypartId)
+    || ((part.add.length > 0 || part.remove.length > 0) && changesKey(part) !== whole));
+}
+
+/** The trip date a saved kit was planned for: its outing's, or its plan day's. */
+export function kitDate(kit: SavedKit): string | null {
+  return kit.kind === "plan_day" ? kit.day.date : outfitDate(kit);
+}
+
+/** Whole days from one "yyyy-MM-dd" date to another. */
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
 /**
- * The outing to ask Gear up for again to update a kit saved for `date`, on
- * the destination's calendar; null once that day has passed there, or when
- * the destination's time zone isn't known, so the viewer's own calendar
- * never stands in for it. A plan that started before today is asked for from
- * today on.
+ * The outing to ask Gear up for again to update a kit on the trip day
+ * `date`, on the destination's calendar; null once that day has passed there,
+ * or when the destination's time zone isn't known, so the viewer's own
+ * calendar never stands in for it.
+ *
+ * When the trip's dates have moved since the kit was saved, the outing moves
+ * with its day: a later outing to the day's date, a plan by as many days, and
+ * an outing for now, on a later day, to the same time of day it was read at.
+ * A plan that started before today is asked for from today on.
  */
 export function outingToUpdate(kit: SavedKit, date: string, now = Date.now()): Outing | null {
   const zone = kitTimeZone(kit);
-  if (!zone) return null;
+  const planned = kitDate(kit);
+  if (!zone || !planned) return null;
   const today = formatZonedTime(now, zone).slice(0, 10);
   if (date < today) return null;
-  if (kit.kind === "plan_day" && kit.outing.when.date < today) {
+  if (kit.kind === "plan_day") {
     const { when } = kit.outing;
-    const end = addDaysToDateString(when.date, when.durationDays - 1);
-    let durationDays = 1;
-    while (addDaysToDateString(today, durationDays - 1) < end) durationDays += 1;
-    return { ...kit.outing, when: { ...when, date: today, durationDays } };
+    const start = addDaysToDateString(when.date, daysBetween(planned, date));
+    const end = addDaysToDateString(start, when.durationDays - 1);
+    const from = start < today ? today : start;
+    return { ...kit.outing, when: { ...when, date: from, durationDays: daysBetween(from, end) + 1 } };
   }
-  return kit.outing;
+  const { outing } = kit;
+  if (outing.when.mode === "later") return { ...outing, when: { ...outing.when, date } };
+  if (date === today) return outing;
+  const context = kit.weather.context;
+  const readAt = context?.source === "forecast" ? context.forecastTime : context?.provenance?.observedTime;
+  return { ...outing, when: { mode: "later", date, time: readAt?.slice(11, 16) ?? "12:00", durationDays: 1 } };
 }

@@ -4,7 +4,7 @@
  */
 import type { ThermalDecision } from "@/types/biophysics";
 import type { LaterTime, Outing, PersonalizationGap } from "@/types/outing";
-import type { DailyLayerPlan, LayerChanges } from "@/types/plan";
+import type { DailyLayerPlan, DaypartId, LayerChanges } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
 import type { Trip, TripMemberDayKit } from "@/types/trips";
 import type { WeatherData, WeatherProvenance } from "@/types/weather";
@@ -102,9 +102,16 @@ export interface SaveKitRequest {
   replace?: Record<string, string>;
 }
 
-/** What changes in one phase of the outfit when a saved kit is replaced. */
+/**
+ * A part of a kit that what changes is listed by: the outfit (a plan day's
+ * for its coldest part), a ski tour's climb or descent, or a plan day's
+ * morning, midday or evening.
+ */
+export type SaveKitChangePart = SavedKitPhaseId | DaypartId;
+
+/** What changes in one part of the kit when a saved kit is replaced. */
 export interface SaveKitPhaseChanges extends LayerChanges {
-  phase: SavedKitPhaseId;
+  phase: SaveKitChangePart;
 }
 
 /** A trip day that already has a kit, so saving stops for a decision. */
