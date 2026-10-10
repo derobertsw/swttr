@@ -254,12 +254,14 @@ const samePlace = (a: Place | undefined, b: Place | undefined) =>
 
 /**
  * Tells apart two labels that read the same for different places: another stop
- * with the same name gets its stop number, and a stop that moved its coordinates.
+ * with the same name gets its stop number, and a stop that moved its
+ * coordinates. `numbers` holds one number per stop for both sides of the
+ * change, so a removed stop and the one replacing it can't share a number.
  */
-function distinguish(label: string, place: Place | undefined, other: Place | undefined, stops: Itinerary["stops"]): string {
+function distinguish(label: string, place: Place | undefined, other: Place | undefined, numbers: Map<string, number>): string {
   if (!place) return label;
   const at = label.lastIndexOf(" · ");
-  const suffix = place.id === other?.id ? `${place.latitude}, ${place.longitude}` : `stop ${stops.indexOf(place) + 1}`;
+  const suffix = place.id === other?.id ? `${place.latitude}, ${place.longitude}` : `stop ${numbers.get(place.id)}`;
   return `${label.slice(0, at)} (${suffix})${label.slice(at)}`;
 }
 
@@ -283,6 +285,9 @@ function option(
   const placeBefore = effectiveStops(full);
   const placeAfter = effectiveStops(after);
   const activityAfter = new Map(after.days.map((day) => [day.date, day.activity]));
+  // Stops are numbered as the trip has them now; a new one comes after them.
+  const numbers = new Map(full.stops.map((stop, i) => [stop.id, i + 1]));
+  for (const stop of after.stops) if (!numbers.has(stop.id)) numbers.set(stop.id, numbers.size + 1);
   const moves = (day: TripDay) => before.get(day.date) !== next.get(day.date)
     || !samePlace(placeBefore.get(day.date), placeAfter.get(day.date))
     || (activityAfter.get(day.date) ?? null) !== day.activity;
@@ -294,8 +299,8 @@ function option(
       let [from, to] = [before.get(day.date)!, next.get(day.date)!];
       if (moved && from === to) {
         [from, to] = [
-          distinguish(from, placeBefore.get(day.date), placeAfter.get(day.date), full.stops),
-          distinguish(to, placeAfter.get(day.date), placeBefore.get(day.date), after.stops),
+          distinguish(from, placeBefore.get(day.date), placeAfter.get(day.date), numbers),
+          distinguish(to, placeAfter.get(day.date), placeBefore.get(day.date), numbers),
         ];
       }
       const notes = [copied?.get(day.date), moved ? keptKits(full, day, me, !!copied?.has(day.date)) : undefined]

@@ -138,6 +138,15 @@ describe("Kits in itinerary reviews", () => {
     }]);
   });
 
+  it("numbers same-named stops the same way on both sides when one is removed", () => {
+    const otherStowe = { ...STOWE_STOP, id: "stop-stowe-2", position: 1, latitude: 44.6, longitude: -72.8 };
+    const trip = { ...withKits([]), stops: [STOWE_STOP, otherStowe], days: [day("2026-10-10", STOWE_STOP.id, "Hike"), day("2026-10-11", otherStowe.id)] };
+    const [only] = options(previewItinerary(trip, { action: "remove_stop", stop_id: STOWE_STOP.id }, "user-1"));
+    expect(only.changes.map(({ date, before, after }) => [date, before, after])).toEqual([
+      ["2026-10-10", "Stowe, Vermont (stop 1) · Hike", "Stowe, Vermont (stop 2) · Hike"],
+    ]);
+  });
+
   it("refuses a copy onto its own day, to missing days, or of a kit you don't have", () => {
     const trip = withKits([kit("2026-10-10", SAM, { outfit })]);
     expect(previewItinerary(trip, { action: "copy_day", from: "2026-10-10", dates: ["2026-10-10"], kit: false }, "user-1")).toMatchObject({ status: 400 });
