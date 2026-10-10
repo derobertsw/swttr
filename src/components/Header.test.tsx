@@ -99,6 +99,35 @@ describe("Header settings entry points", () => {
     expect(screen.getByRole("link", { name: "Sign In" })).toHaveFocus();
   });
 
+  it("leaves the avatar out of the mobile menu and lists Settings first", async () => {
+    const user = userEvent.setup();
+    render(chrome());
+
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
+
+    const menu = screen.getByRole("navigation", { name: "Menu" });
+    expect(within(menu).queryByRole("button", { name: "Open user menu" })).not.toBeInTheDocument();
+    expect(within(menu).queryByText("Account")).not.toBeInTheDocument();
+    expect(Array.from(menu.children, (item) => item.textContent)).toEqual(["Settings", "FAQ", "Feedback", "Share"]);
+  });
+
+  it("lists Sign In and then Settings in the mobile menu for guests", async () => {
+    fakeClerkState.signedIn = false;
+    const user = userEvent.setup();
+    render(chrome());
+
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
+
+    const menu = screen.getByRole("navigation", { name: "Menu" });
+    expect(Array.from(menu.children, (item) => item.textContent)).toEqual([
+      "Sign In",
+      "Settings",
+      "FAQ",
+      "Feedback",
+      "Share",
+    ]);
+  });
+
   it("keeps Settings in the mobile menu", async () => {
     const user = userEvent.setup();
     render(chrome());
