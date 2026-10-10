@@ -1,15 +1,16 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Share2, HelpCircle, Menu, MessageSquare, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { logWarn } from "@/lib/logger";
+import { AccountMenu } from "@/components/AccountMenu";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useNativeTabShell } from "@/hooks/useNativeTabShell";
-import { useReturnFocus } from "@/hooks/useReturnFocus";
+import { isShown, useReturnFocus } from "@/hooks/useReturnFocus";
 import {
   Sheet,
   SheetContent,
@@ -34,6 +35,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const menuButtonId = useId();
+  const accountAreaRef = useRef<HTMLDivElement>(null);
   const preferencesFocus = useReturnFocus();
   // The native shell has no web sidebar, so its menu and logo show at every width.
   const isNativeTabShell = useNativeTabShell();
@@ -68,13 +70,25 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
     }
   };
 
+  const menuButton = () => document.getElementById(menuButtonId);
+  // The avatar when signed in, or the Sign In link after a sign-out.
+  const accountControl = () => accountAreaRef.current?.querySelector<HTMLElement>("a[href], button") ?? null;
+
   const openPreferencesFromMenu = () => {
-    // The menu, and its Settings item, close first, so focus returns to the menu button.
-    preferencesFocus.remember(() => document.getElementById(menuButtonId));
+    // The menu, and its Settings item, close first, so focus returns to the
+    // menu button, or to the account area if the window has since widened.
+    preferencesFocus.remember(() => [menuButton(), accountControl()].find(isShown) ?? null);
     setMobileMenuOpen(false);
     window.setTimeout(() => {
       setPreferencesOpen(true);
     }, 120);
+  };
+
+  const openPreferencesFromAvatar = () => {
+    // The avatar's menu item is gone, so focus returns to the avatar, or to
+    // whatever replaced it after a sign-out or a narrower window.
+    preferencesFocus.remember(() => [accountControl(), menuButton()].find(isShown) ?? null);
+    setPreferencesOpen(true);
   };
 
   return (
@@ -100,14 +114,9 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
 
       <div className="flex items-center gap-4">
         {/* Desktop: show UserButton or Sign In */}
-        <div className={cn("hidden items-center gap-4", !isNativeTabShell && "md:flex")}>
+        <div ref={accountAreaRef} className={cn("hidden items-center gap-4", !isNativeTabShell && "md:flex")}>
           <SignedIn>
-            <UserButton>
-              <UserButton.MenuItems>
-                <UserButton.Link label="FAQ" labelIcon={<HelpCircle size={16} />} href="/faq" />
-                <UserButton.Action label="Share" labelIcon={<Share2 size={16} />} onClick={handleShare} />
-              </UserButton.MenuItems>
-            </UserButton>
+            <AccountMenu onOpenSettings={openPreferencesFromAvatar} onShare={handleShare} />
           </SignedIn>
           <SignedOut>
             <Link
