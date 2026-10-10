@@ -72,7 +72,8 @@ describe("Reviewing and saving itinerary changes", () => {
   it("rejects a change it can't review", async () => {
     expect((await post({ preview: true, action: "rename_trip" })).status).toBe(400);
     expect(await (await post({ preview: true, action: "assign_days", dates: ["2026-10-10"] })).json()).toEqual({ error: "Choose a destination or an activity." });
-    expect((await post({ preview: true, action: "assign_days", dates: ["2026-10-13"], activity: null })).status).toBe(400);
+    expect((await post({ preview: true, action: "assign_days", dates: ["2026-10-13"], activity: null })).status).toBe(404);
+    expect((await post({ preview: true, action: "assign_days", dates: ["2026-10-10"], stop_id: "stop-gone" })).status).toBe(404);
     expect((await post({ preview: true, action: "remove_stop", stop_id: "stop-gone" })).status).toBe(404);
     expect((await post({ preview: true, action: "set_day_place", date: "2026-10-10", place: { name: "Nowhere" } })).status).toBe(400);
     expect(rpc).not.toHaveBeenCalled();

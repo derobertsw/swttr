@@ -246,9 +246,9 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest):
 
     case "assign_days": {
       const selected = days.filter((day) => request.dates.includes(day.date));
-      if (selected.length !== request.dates.length) return { error: "Some of these days aren't on the trip anymore. Reload the trip.", status: 400 };
+      if (selected.length !== request.dates.length) return { error: "Some of these days aren't on the trip anymore. Reload the trip.", status: 404 };
       const stop = "stop_id" in request ? stops.find((candidate) => candidate.id === request.stop_id) : undefined;
-      if ("stop_id" in request && !stop) return { error: "That stop isn't on this trip anymore. Reload the trip.", status: 400 };
+      if ("stop_id" in request && !stop) return { error: "That stop isn't on this trip anymore. Reload the trip.", status: 404 };
       const set = { ...(stop ? { stop_id: stop.id } : {}), ...("activity" in request ? { activity: request.activity ?? null } : {}) };
       const parts = [stop?.name, "activity" in request ? request.activity ?? "No activity" : undefined].filter(Boolean);
       return { options: [option(full, { stops, days: days.map((day) => request.dates.includes(day.date) ? { ...day, ...set } : day) }, {
