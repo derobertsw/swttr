@@ -85,6 +85,14 @@ function getHeatDensity(heightInches: number, weightLbs: number): number {
   return lbsToKg(weightLbs) / bsa;
 }
 
+/** Compendium MET (kcal/kg/hour) -> W/m² using mass and Du Bois surface area.
+ * This replaces, rather than compounds, the legacy bounded size heuristic.
+ */
+export function metabolicHeatFluxFromMet(met: number, metrics: UserBodyMetrics): number {
+  const sanitized = sanitizeBodyMetrics(metrics);
+  return met * (4184 / 3600) * getHeatDensity(sanitized.heightInches, sanitized.weightLbs);
+}
+
 /**
  * Returns a bounded multiplier for metabolic rate based on body-size ratio.
  * Smaller/lighter users receive a lower effective metabolic factor (warmer recommendations),

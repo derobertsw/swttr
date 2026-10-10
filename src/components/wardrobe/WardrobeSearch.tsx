@@ -423,7 +423,7 @@ function CatalogRow({ item, owned, state, onAdd, onRemove }: CatalogRowProps) {
           {item.brand}
           {item.category && <span className="ml-1.5">· {formatCategory(item.category)}</span>}
           {typeof item.rcl_clo === "number" && (
-            <span className="ml-1.5 font-medium">· {item.rcl_clo.toFixed(2)} clo</span>
+            <span className="ml-1.5 font-medium">· {item.thermal_provenance?.generic_estimate ? "estimated " : ""}{item.rcl_clo.toFixed(2)} clo</span>
           )}
         </p>
         {owned && (

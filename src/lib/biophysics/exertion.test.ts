@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_BODY_METRICS } from "./bodyMetrics";
+import { metabolicRateFor } from "@/lib/recommendations/thermal-targets";
 import {
   DEFAULT_EXERTION_LEVEL,
+  EXERTION_LEVELS,
   exertionToXcIntensity,
   getMetabolicRateForActivity,
   parseExertionLevel,
@@ -31,4 +34,14 @@ describe("exertion utilities", () => {
     expect(hard).toBeGreaterThan(easy);
   });
 
+  it.each(
+    (["running", "xc_skiing"] as const).flatMap(activity =>
+      EXERTION_LEVELS.map(exertion => ({ activity, exertion }))
+    )
+  )("matches the recommendation rate for $activity at $exertion effort with default body metrics", ({ activity, exertion }) => {
+    expect(getMetabolicRateForActivity(activity, exertion)).toBeCloseTo(
+      metabolicRateFor(activity, exertion, DEFAULT_BODY_METRICS),
+      8
+    );
+  });
 });

@@ -1,4 +1,4 @@
-import type { GarmentThermalProperties } from "@/types/garments";
+import type { GarmentThermalProperties, GarmentSemantics, ThermalProvenance } from "@/types/garments";
 
 // Body parts and their layer types
 export const BODY_PARTS = ["torso", "legs", "headNeck", "hands"] as const;
@@ -16,7 +16,8 @@ export interface UserItemMapping {
   custom_name: string;
 }
 
-export interface AvailableItem {
+export interface AvailableItem extends GarmentSemantics {
+  thermal_provenance?: ThermalProvenance;
   id: string;
   type: "garment" | "handwear" | "headwear" | "custom";
   brand: string;
@@ -41,7 +42,7 @@ export interface WardrobeItem {
   item_id: string;
   nickname?: string;
   disabled?: boolean;
-  details: {
+  details: GarmentSemantics & {
     brand: string;
     model_name: string;
     brand_logo_url?: string;

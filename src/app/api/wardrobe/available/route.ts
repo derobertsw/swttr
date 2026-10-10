@@ -21,7 +21,7 @@ function extractNumericField(
 
 /**
  * GET /api/wardrobe/available
- * Get all available calibrated items (garments, handwear, headwear)
+ * Get catalog items and their thermal/provenance data, including generic estimates.
  */
 export async function GET() {
   const supabase = getSupabase();
@@ -35,7 +35,7 @@ export async function GET() {
     const [garmentsResult, handwearResult, headwearResult] = await Promise.all([
       supabase
         .from("garments")
-        .select("id, brand, model_name, brand_logo_url, item_image_url, category, garment_type, garment_thermal_properties(rcl_whole_body, rcl_torso, rcl_arms, rcl_legs)")
+        .select("id, brand, model_name, brand_logo_url, item_image_url, category, garment_type, usage, coverage_torso, coverage_arms, coverage_legs, suitable_activities, garment_thermal_properties(*)")
         .order("brand")
         .order("model_name"),
       supabase
@@ -67,6 +67,21 @@ export async function GET() {
         item_image_url: g.item_image_url,
         category: g.category,
         garment_type: g.garment_type,
+        usage: g.usage,
+        coverage_torso: g.coverage_torso,
+        coverage_arms: g.coverage_arms,
+        coverage_legs: g.coverage_legs,
+        suitable_activities: g.suitable_activities,
+        thermal_provenance: (() => {
+          const t = Array.isArray(g.garment_thermal_properties) ? g.garment_thermal_properties[0] : g.garment_thermal_properties;
+          return t ? {
+            estimation_method: t.estimation_method,
+            confidence_score: t.confidence_score,
+            data_source: t.data_source,
+            uncertainty_clo: t.uncertainty_clo,
+            generic_estimate: t.generic_estimate,
+          } : undefined;
+        })(),
         rcl_clo: extractNumericField(g.garment_thermal_properties, "rcl_whole_body"),
         rcl_torso: extractNumericField(g.garment_thermal_properties, "rcl_torso"),
         rcl_arms: extractNumericField(g.garment_thermal_properties, "rcl_arms"),

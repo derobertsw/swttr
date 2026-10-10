@@ -36,7 +36,7 @@ interface AlpineTargets extends PhaseTargets {
 }
 
 export const alpine: SportRecommender<AlpineTargets> = {
-  catalog: { minScore: { field: 'alpine_skiing_score', minScore: 5 } },
+  catalog: { activity: 'alpine_skiing', minScore: { field: 'alpine_skiing_score', minScore: 5 } },
 
   computeTargets({ tempC, windMs, humidity, exertion, bodyMetrics }) {
     const conditions = { tempC, humidity };
