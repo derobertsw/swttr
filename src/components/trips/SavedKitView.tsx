@@ -25,6 +25,7 @@ import { keepOutingForGearUp } from "@/lib/gearUpDraft";
 import { BODY_PARTS } from "@/lib/layers";
 import { resumeUpdatePath } from "@/lib/outingReturn";
 import { kitAdvice, outingToUpdate } from "@/lib/trip-saved-kits";
+import { forgetKitSaveFor } from "@/lib/tripKitSave";
 import { cn } from "@/lib/utils";
 import type { SavedKit, SavedKitPhase, SavedOutfit, SavedPlanDay } from "@/types/savedKit";
 import type { TripStop } from "@/types/trips";
@@ -230,6 +231,9 @@ function UpdateInGearUp({ kit, tripId, date }: { kit: SavedKit; tripId: string; 
         variant="outline"
         size="sm"
         onClick={() => {
+          // A save of this outing earlier in the tab would otherwise show
+          // as saved on the new layers, rather than offering to replace it.
+          forgetKitSaveFor(userId, outing);
           keepOutingForGearUp(userId, outing);
           router.push(resumeUpdatePath(tripId));
         }}

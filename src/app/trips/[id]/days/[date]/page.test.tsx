@@ -529,8 +529,13 @@ describe("Trip day page", () => {
       await renderPage();
       const myKit = await screen.findByRole("region", { name: "My kit" });
       expect(within(myKit).getByText(/Saving them to this day shows what changes before anything is replaced\./)).toBeInTheDocument();
+      // Saved earlier in this tab: that save is forgotten, so the new layers start a new one.
+      sessionStorage.setItem(STORAGE_KEYS.TRIP_KIT_SAVE, JSON.stringify({
+        owner: "user-1", outing: JSON.stringify(savedOutfit().outing), saved: { tripId: "trip-1", tripName: "Whistler", date: "2026-10-10" },
+      }));
       await userEvent.click(within(myKit).getByRole("button", { name: "Update in Gear up" }));
 
+      expect(sessionStorage.getItem(STORAGE_KEYS.TRIP_KIT_SAVE)).toBeNull();
       expect(push).toHaveBeenCalledExactlyOnceWith("/?resume=update&trip=trip-1");
       const draft = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.GEAR_UP_DRAFT)!)["user-1"];
       expect(draft).toMatchObject({ lastOuting: savedOutfit().outing, activity: "alpine_skiing", date: "2026-10-10", time: "09:00", inputMode: "later" });
@@ -566,7 +571,11 @@ describe("Trip day page", () => {
       expect(screen.getByText("Outfit saved · General guide · 6 items")).toBeInTheDocument();
 
       expect(within(myKit).getByText(/Saving it to this trip shows what changes on each day/)).toBeInTheDocument();
+      // A save of another outing in this tab is kept, so it can still be retried.
+      const other = JSON.stringify({ owner: "user-1", outing: JSON.stringify(savedOutfit().outing), request: { save_id: "s" } });
+      sessionStorage.setItem(STORAGE_KEYS.TRIP_KIT_SAVE, other);
       await userEvent.click(within(myKit).getByRole("button", { name: "Update in Gear up" }));
+      expect(sessionStorage.getItem(STORAGE_KEYS.TRIP_KIT_SAVE)).toBe(other);
       const draft = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.GEAR_UP_DRAFT)!)["user-1"];
       expect(draft).toMatchObject({ lastOuting: savedPlan().outing, durationDays: 3 });
     });
