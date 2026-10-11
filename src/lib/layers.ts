@@ -1,4 +1,5 @@
 import type {
+  EvaluationItem,
   PackItemGarment,
   RecommendedGarment,
   RecommendedHandwear,
@@ -6,6 +7,8 @@ import type {
 } from "@/types/biophysics";
 import { LayerSet, LayerItem, type Recommendation } from "@/types/recommendations";
 import { BodyPart, LayerType, BODY_PARTS as _BODY_PARTS } from "@/types/wardrobe";
+
+import { garmentMetadata } from '@/lib/garment-metadata';
 
 // Re-export for convenience
 export type { LayerSet, LayerItem };
@@ -100,12 +103,8 @@ export function garmentsToLayerSet(
         : bodyPart === "torso" ? garment.rcl_torso
         : undefined;
       layers[layerType]?.push({
-        name: garment.name, rcl: regionalRcl, sourceId: garment.id, item_type: 'garment',
-        garment_type: garment.garment_type, usage: garment.usage,
-        coverage_torso: garment.coverage_torso, coverage_arms: garment.coverage_arms,
-        coverage_legs: garment.coverage_legs, suitable_activities: garment.suitable_activities,
-        thermal_data_status: garment.thermal_data_status,
-        thermal_provenance: garment.thermal_provenance, protection: garment.protection,
+        name: garment.name, rcl: regionalRcl ?? undefined, sourceId: garment.id, item_type: 'garment',
+        ...garmentMetadata(garment),
       });
     }
   }
@@ -176,7 +175,8 @@ export function buildDescentLayers(
 
   const packLayerItems: LayerItem[] = packItems.map((item) => ({
     name: item.name,
-    rcl: typeof item.rcl_clo === "number" ? item.rcl_clo : undefined,
+    rcl: item.rcl_torso ?? undefined,
+    ...garmentMetadata(item),
     sourceId: item.id,
     item_type: 'garment',
   }));
@@ -238,10 +238,12 @@ export function itemCloByBodyPart(layers: BodyPartLayers): Record<BodyPart, (num
   return clo;
 }
 
-/** Send identities and semantics with the same ordering as itemClo. */
-export function evaluationItemsByBodyPart(layers: BodyPartLayers): Record<BodyPart, LayerItem[]> {
-  const items: Record<BodyPart, LayerItem[]> = { torso: [], legs: [], hands: [], headNeck: [] };
-  forEachItem(layers, (item, part) => items[part].push(item));
+/** Only thermal references affect request identity; ownership and names do not. */
+export function evaluationItemsByBodyPart(layers: BodyPartLayers): Record<BodyPart, EvaluationItem[]> {
+  const items: Record<BodyPart, EvaluationItem[]> = { torso: [], legs: [], hands: [], headNeck: [] };
+  forEachItem(layers, (item, part) => items[part].push(item.sourceId
+    ? { sourceId: item.sourceId, item_type: item.item_type }
+    : { rcl: item.rcl ?? null, thermal_provenance: { generic_estimate: item.thermal_provenance?.generic_estimate === true } }));
   return items;
 }
 

@@ -23,13 +23,13 @@ const touring: BiophysicsRecommendation = {
     downhill_target_range: [0.6, 1.2],
   },
   recommendation: {
-    garments: [{ id: "base", name: "Merino base", category: "base_layer", rcl: 0.3, rcl_torso: 0.3, covers_torso: true }],
-    handwear: { id: "climb-gloves", name: "Climb gloves", type: "liner", rcl: 0.4 },
+    garments: [{ id: "7d3bb318-69a4-5eb2-aa03-98091020d0c9", name: "Merino base", category: "base_layer", rcl: 0.3, rcl_torso: 0.3, covers_torso: true }],
+    handwear: { id: "c0cb3c04-2e4e-5c05-944c-9d273aea9923", name: "Climb gloves", type: "liner", rcl: 0.4 },
     ensemble_properties: { total_clo: 0.4, regional_clo: { torso: 0.3, arms: 0.3, legs: 0 }, evap_potential: 0.3, permeability_index: 0.3 },
     score: 80,
     component_scores: { coldProtection: 80, overheatPrevention: 80, breathability: 80, weatherProtection: 80, weight: 80 },
   },
-  descent_handwear: { id: "descent-gloves", name: "Descent gloves", type: "insulated", rcl: 0.8 },
+  descent_handwear: { id: "09afec94-bf50-5ac7-96c1-6be442f07664", name: "Descent gloves", type: "insulated", rcl: 0.8 },
   descent_breakdown: {
     total_clo: 0.9,
     regional_clo: { torso: 1.1, arms: 0.9, legs: 0 },
@@ -44,15 +44,15 @@ const wardrobe: WardrobeItem[] = [touring.recommendation.handwear!, touring.desc
   id: item.id,
   item_id: item.id,
   item_type: "handwear",
-  details: { brand: "Fixture", model_name: item.name, rcl_clo: item.rcl, handwear_type: item.type },
+  details: { brand: "Fixture", model_name: item.name, rcl_clo: item.rcl, handwear_type: item.type, thermal_data_status: 'known' },
 }));
 const catalog: AvailableItem[] = [0.4, 1.2, 1.4, 2.4].map((clo) => ({
-  id: `fleece-${clo}`,
+  id: `00000000-0000-0000-0000-${Math.round(clo * 100).toString().padStart(12, "0")}`,
   type: "garment",
   brand: "Fixture",
   model_name: `Fleece ${clo}`,
   category: "mid_layer_light",
-  rcl_torso: clo,
+  rcl_torso: clo, thermal_data_status: 'known',
   rcl_clo: clo,
 }));
 

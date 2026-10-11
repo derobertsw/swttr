@@ -1,23 +1,6 @@
 import { NextResponse } from "next/server";
+import { itemThermalMetadata } from '@/lib/recommendations/item-thermal-metadata';
 import { getSupabase } from "@/lib/supabase";
-
-function extractNumericField(
-  thermalData: unknown,
-  field: string
-): number | undefined {
-  const data = Array.isArray(thermalData) ? thermalData[0] : thermalData;
-  if (!data || typeof data !== "object") return undefined;
-
-  const raw = (data as Record<string, unknown>)[field];
-  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
-
-  if (typeof raw === "string") {
-    const parsed = Number.parseFloat(raw);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-
-  return undefined;
-}
 
 /**
  * GET /api/wardrobe/available
@@ -35,7 +18,7 @@ export async function GET() {
     const [garmentsResult, handwearResult, headwearResult] = await Promise.all([
       supabase
         .from("garments")
-        .select("id, brand, model_name, brand_logo_url, item_image_url, category, garment_type, usage, coverage_torso, coverage_arms, coverage_legs, suitable_activities, garment_thermal_properties(*), garment_protection(*)")
+        .select("id, brand, model_name, brand_logo_url, item_image_url, category, covers_torso, covers_arms, covers_legs, garment_type, usage, coverage_torso, coverage_arms, coverage_legs, suitable_activities, garment_thermal_properties(*), garment_protection(*)")
         .order("brand")
         .order("model_name"),
       supabase
@@ -66,27 +49,7 @@ export async function GET() {
         brand_logo_url: g.brand_logo_url,
         item_image_url: g.item_image_url,
         category: g.category,
-        garment_type: g.garment_type,
-        usage: g.usage,
-        protection: Array.isArray(g.garment_protection) ? g.garment_protection[0] : g.garment_protection,
-        coverage_torso: g.coverage_torso,
-        coverage_arms: g.coverage_arms,
-        coverage_legs: g.coverage_legs,
-        suitable_activities: g.suitable_activities,
-        thermal_provenance: (() => {
-          const t = Array.isArray(g.garment_thermal_properties) ? g.garment_thermal_properties[0] : g.garment_thermal_properties;
-          return t ? {
-            estimation_method: t.estimation_method,
-            confidence_score: t.confidence_score,
-            data_source: t.data_source,
-            uncertainty_clo: t.uncertainty_clo,
-            generic_estimate: t.generic_estimate,
-          } : undefined;
-        })(),
-        rcl_clo: extractNumericField(g.garment_thermal_properties, "rcl_whole_body"),
-        rcl_torso: extractNumericField(g.garment_thermal_properties, "rcl_torso"),
-        rcl_arms: extractNumericField(g.garment_thermal_properties, "rcl_arms"),
-        rcl_legs: extractNumericField(g.garment_thermal_properties, "rcl_legs"),
+        ...itemThermalMetadata('garment', g),
       })),
       ...(handwearResult.data || []).map((h) => ({
         id: h.id,
@@ -96,7 +59,7 @@ export async function GET() {
         brand_logo_url: h.brand_logo_url,
         item_image_url: h.item_image_url,
         category: h.handwear_type,
-        rcl_clo: h.rcl_clo,
+        ...itemThermalMetadata('handwear', h),
         dexterity_score: h.dexterity_score,
       })),
       ...(headwearResult.data || []).map((h) => ({
@@ -107,7 +70,7 @@ export async function GET() {
         brand_logo_url: h.brand_logo_url,
         item_image_url: h.item_image_url,
         category: h.headwear_type,
-        rcl_clo: h.rcl_clo,
+        ...itemThermalMetadata('headwear', h),
         covers_ears: h.covers_ears,
         covers_neck: h.covers_neck,
         covers_face: h.covers_face,

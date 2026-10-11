@@ -89,7 +89,11 @@ export interface EnsembleProperties {
   permeability_index: number;
 }
 
-export interface PackItemGarment {
+export interface PackItemGarment extends GarmentSemantics {
+  rcl_torso?: number;
+  thermal_data_status?: 'known' | 'unknown';
+  thermal_provenance?: ThermalProvenance;
+  protection?: RecommendedGarment['protection'];
   id: string;
   name: string;
   weight_g?: number;
@@ -202,7 +206,7 @@ export interface ThermalDecision {
 export interface EvaluationItem extends GarmentSemantics {
   sourceId?: string;
   item_type?: 'garment' | 'handwear' | 'headwear' | 'custom';
-  rcl?: number;
+  rcl?: number | null;
   thermal_data_status?: 'known' | 'unknown';
   thermal_provenance?: ThermalProvenance;
   protection?: RecommendedGarment['protection'];
@@ -211,7 +215,7 @@ export interface EvaluationItem extends GarmentSemantics {
 export interface PhaseEvaluationInput {
   /** Null means unknown, while zero means known zero insulation. Legacy
    * numeric inputs remain supported; items, when sent, are authoritative. */
-  itemClo: Record<EvaluatedBodyPart, (number | null)[]>;
+  itemClo?: Record<EvaluatedBodyPart, (number | null)[]>;
   items?: Record<EvaluatedBodyPart, EvaluationItem[]>;
   /** Neutral clo target per body part, when the recommendation has one. */
   targets: Partial<Record<EvaluatedBodyPart, number>>;

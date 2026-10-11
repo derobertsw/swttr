@@ -4,10 +4,9 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useUserId } from "@/hooks/useUserId";
 import { logWarn } from "@/lib/logger";
 import type { EvaluationItem } from "@/types/biophysics";
-import type { GarmentSemantics } from "@/types/garments";
+import { garmentMetadata } from '@/lib/garment-metadata';
 import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
 import {
-  getClo,
   getBodyPart,
   inferAvailableBodyPart,
 } from "@/components/wardrobe/wardrobe-utils";
@@ -75,44 +74,12 @@ function isLayerCompatible(itemLayer: LayerType | null, targetLayer: LayerType):
   return false;
 }
 
-/**
- * Get regional clo value for a wardrobe item matching its body part.
- * Garments require regional data; extremities/custom estimates use their local clo.
- */
-function getRegionalClo(item: WardrobeItem, bodyPart: BodyPart): number | undefined {
-  const tp = item.details.garment_thermal_properties;
-  const props = Array.isArray(tp) ? tp[0] : tp;
-  if (props) {
-    if (bodyPart === "legs" && props.rcl_legs != null) return props.rcl_legs;
-    if (bodyPart === "torso" && props.rcl_torso != null) return props.rcl_torso;
-  }
-  return item.item_type === "garment" ? undefined : getClo(item);
-}
-
 /** The `items` an API route returns; throws when the request fails. */
 async function fetchItems<T>(url: string): Promise<T[]> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url} returned ${res.status}`);
   const data = await res.json() as { items?: T[] };
   return data.items ?? [];
-}
-
-function semantics(item: GarmentSemantics): GarmentSemantics {
-  return {
-    garment_type: item.garment_type, usage: item.usage,
-    coverage_torso: item.coverage_torso, coverage_arms: item.coverage_arms,
-    coverage_legs: item.coverage_legs, suitable_activities: item.suitable_activities,
-  };
-}
-
-function wardrobeProvenance(item: WardrobeItem) {
-  const tp = item.details.garment_thermal_properties;
-  const props = Array.isArray(tp) ? tp[0] : tp;
-  if (item.item_type === 'custom') return { generic_estimate: true, data_source: 'user_custom_items' };
-  return props ? {
-    estimation_method: props.estimation_method, confidence_score: props.confidence_score,
-    data_source: props.data_source, uncertainty_clo: props.uncertainty_clo, generic_estimate: props.generic_estimate,
-  } : undefined;
 }
 
 // Unknown warmth is listed after known data, never ranked as zero clo.
@@ -189,15 +156,16 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
           return isLayerCompatible(lt, layerType);
         })
         .map((item) => ({
-          ...semantics(item.details),
+          ...garmentMetadata(item.details),
           item_type: item.item_type,
-          thermal_provenance: wardrobeProvenance(item),
-          protection: item.details.garment_protection,
-          thermal_data_status: getRegionalClo(item, bodyPart) === undefined ? "unknown" as const : "known" as const,
           id: item.item_id,
           name: item.nickname || item.details.model_name,
           brand: item.details.brand,
-          rcl: getRegionalClo(item, bodyPart),
+          rcl: item.details.thermal_data_status === 'known'
+            ? item.item_type === 'garment'
+              ? (bodyPart === 'legs' ? item.details.rcl_legs : item.details.rcl_torso)
+              : item.details.rcl_clo
+            : undefined,
           nativeLayerType: wardrobeLayerType(item) ?? layerType,
           isInUse: inUseItemIds.has(item.item_id),
           isOwned: true,
@@ -216,15 +184,12 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
             : bodyPart === "torso" ? item.rcl_torso
             : undefined;
           return {
-            ...semantics(item),
+            ...garmentMetadata(item),
             item_type: item.type,
-            thermal_provenance: item.thermal_provenance,
-            protection: item.protection,
             id: item.id,
             name: item.model_name,
             brand: item.brand,
-            rcl: item.type === "garment" ? regionalRcl : item.rcl_clo,
-            thermal_data_status: (item.type === "garment" ? regionalRcl : item.rcl_clo) === undefined ? "unknown" as const : "known" as const,
+            rcl: item.thermal_data_status === 'known' ? item.type === "garment" ? regionalRcl : item.rcl_clo : undefined,
             nativeLayerType: inferAvailableLayer(item),
             isInUse: inUseItemIds.has(item.id),
             isOwned: false,

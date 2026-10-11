@@ -18,6 +18,7 @@ export interface UserItemMapping {
 }
 
 export interface AvailableItem extends GarmentSemantics {
+  thermal_data_status?: 'known' | 'unknown';
   thermal_provenance?: ThermalProvenance;
   protection?: RecommendedGarment["protection"];
   id: string;
@@ -45,6 +46,11 @@ export interface WardrobeItem {
   nickname?: string;
   disabled?: boolean;
   details: GarmentSemantics & {
+    thermal_data_status?: 'known' | 'unknown';
+    thermal_provenance?: ThermalProvenance;
+    protection?: RecommendedGarment['protection'];
+    rcl_torso?: number;
+    rcl_legs?: number;
     brand: string;
     model_name: string;
     brand_logo_url?: string;

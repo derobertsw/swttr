@@ -1,20 +1,16 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EvaluatedBodyPart, EvaluationItem, PhaseEvaluationInput } from '@/types/biophysics';
-import type { GarmentRow } from './types';
 import { EVALUATED_BODY_PARTS } from './layer-evaluation';
-import { hasUsableThermalData } from './garment-semantics';
-import { formatGarmentResponse } from './formatting';
+import { itemThermalMetadata, knownClo } from './item-thermal-metadata';
+import { cacheCatalogRows, cachedCatalogRow } from './evaluation-catalog-cache';
+import { garmentMetadata } from '@/lib/garment-metadata';
 
 type ItemType = NonNullable<EvaluationItem['item_type']>;
 type Row = Record<string, unknown> & { id: string };
 const TABLES: Record<ItemType, string> = {
   garment: 'garments', handwear: 'handwear', headwear: 'headwear', custom: 'user_custom_items',
 };
-
-function known(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
 
 function resolveItem(item: EvaluationItem, part: EvaluatedBodyPart, row: Row | undefined): EvaluationItem {
   const unknown: EvaluationItem = {
@@ -23,33 +19,21 @@ function resolveItem(item: EvaluationItem, part: EvaluatedBodyPart, row: Row | u
   // A source-free estimate is explicitly identified as such, never a substitute
   // for a catalog record that failed to load or was deleted.
   if (!item.sourceId) {
-    return item.thermal_data_status !== "unknown" && item.thermal_provenance?.generic_estimate && known(item.rcl)
-      ? { ...item, thermal_data_status: 'known' } : unknown;
+    return item.thermal_provenance?.generic_estimate && knownClo(item.rcl)
+      ? { rcl: item.rcl, item_type: item.item_type, thermal_provenance: { generic_estimate: true }, thermal_data_status: 'known' } : unknown;
   }
   if (!row) return unknown;
-  if (item.item_type === 'garment') {
-    const garment = row as unknown as GarmentRow;
-    const response = formatGarmentResponse(garment);
-    const region = part === 'torso' ? 'torso' : part === 'legs' ? 'legs' : null;
-    const rcl = region && garment[`covers_${region}`]
-      && hasUsableThermalData(garment) ? garment.garment_thermal_properties?.[`rcl_${region}`] : undefined;
-    return {
-      sourceId: item.sourceId, item_type: 'garment',
-      garment_type: response.garment_type, usage: response.usage,
-      coverage_torso: response.coverage_torso, coverage_arms: response.coverage_arms,
-      coverage_legs: response.coverage_legs, suitable_activities: response.suitable_activities,
-      thermal_provenance: response.thermal_provenance, protection: response.protection,
-      thermal_data_status: known(rcl) ? 'known' : 'unknown', rcl: known(rcl) ? rcl : undefined,
-    };
-  }
-  const matchesPart = item.item_type === 'handwear' ? part === 'hands'
+  const metadata = itemThermalMetadata(item.item_type!, row);
+  const matchesPart = item.item_type === 'garment' ? part === 'torso' || part === 'legs'
+    : item.item_type === 'handwear' ? part === 'hands'
     : item.item_type === 'headwear' ? part === 'headNeck' : row.body_part === part;
-  const rcl = matchesPart && known(row.rcl_clo) ? row.rcl_clo : undefined;
+  const localClo = item.item_type === 'garment'
+    ? part === 'torso' ? metadata.rcl_torso : part === 'legs' ? metadata.rcl_legs : undefined
+    : metadata.rcl_clo;
+  const rcl = matchesPart && metadata.thermal_data_status === 'known' && knownClo(localClo) ? localClo : undefined;
   return {
-    ...unknown, rcl, thermal_data_status: known(rcl) ? 'known' : 'unknown',
-    ...(item.item_type === 'custom' && {
-      thermal_provenance: { generic_estimate: true, data_source: 'user_custom_items' },
-    }),
+    ...unknown, ...garmentMetadata(metadata), rcl,
+    thermal_data_status: knownClo(rcl) ? 'known' : 'unknown',
   };
 }
 
@@ -65,13 +49,25 @@ export async function resolveEvaluationItems(
       (phase.items?.[part] ?? []).filter(item => item.item_type === type && item.sourceId)
         .map(item => item.sourceId!))))];
     if (!ids.length || (type === 'custom' && !userId)) return;
+    const byId = new Map<string, Row>();
+    rows.set(type, byId);
+    if (supabase && type !== 'custom') {
+      for (const id of ids) {
+        const cached = cachedCatalogRow(supabase, type, id);
+        if (cached) byId.set(id, cached as Row);
+      }
+    }
+    const missing = ids.filter(id => !byId.has(id));
+    if (!missing.length) return;
     if (!supabase) throw new Error('Catalog unavailable');
     let query = supabase.from(TABLES[type])
-      .select(type === 'garment' ? '*, garment_thermal_properties(*), garment_protection(*)' : '*').in('id', ids);
+      .select(type === 'garment' ? '*, garment_thermal_properties(*), garment_protection(*)' : '*').in('id', missing);
     if (type === 'custom') query = query.eq('user_id', userId);
     const { data, error } = await query;
     if (error) throw new Error('Failed to load evaluation items');
-    rows.set(type, new Map(((data ?? []) as unknown as Row[]).map(row => [row.id, row])));
+    const loaded = (data ?? []) as unknown as Row[];
+    if (type !== 'custom') cacheCatalogRows(supabase, type, loaded);
+    for (const row of loaded) byId.set(row.id.toLowerCase(), row);
   }));
   return phases.map(phase => {
     if (!phase.items) return phase;

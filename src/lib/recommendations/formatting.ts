@@ -10,22 +10,23 @@ import type { GarmentRow, HandwearRow, HeadwearRow, HeadwearRecommendations } fr
 import type { WeatherInput } from './request';
 import type { PhaseTargets } from './thermal-targets';
 import type { RecommendedGarment } from '@/types/biophysics';
+import { garmentMetadata } from '@/lib/garment-metadata';
 import { hasUsableThermalData } from './garment-semantics';
 
 /**
  * Format garment for API response
  */
-export function formatGarmentResponse(garment: GarmentRow): RecommendedGarment {
+export function formatGarmentResponse(row: GarmentRow): RecommendedGarment {
+  const garment = {
+    ...row,
+    garment_thermal_properties: Array.isArray(row.garment_thermal_properties) ? row.garment_thermal_properties[0] : row.garment_thermal_properties,
+    garment_protection: Array.isArray(row.garment_protection) ? row.garment_protection[0] : row.garment_protection,
+  };
   return {
     id: garment.id,
     name: `${garment.brand} ${garment.model_name}`,
     category: garment.category,
-    garment_type: garment.garment_type,
-    usage: garment.usage,
-    coverage_torso: garment.coverage_torso,
-    coverage_arms: garment.coverage_arms,
-    coverage_legs: garment.coverage_legs,
-    suitable_activities: garment.suitable_activities,
+    ...garmentMetadata(garment),
     thermal_data_status: hasUsableThermalData(garment) ? 'known' : 'unknown',
     thermal_provenance: garment.garment_thermal_properties ? {
       estimation_method: garment.garment_thermal_properties.estimation_method,

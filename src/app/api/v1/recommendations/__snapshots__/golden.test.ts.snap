@@ -9032,9 +9032,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
     "pack_items": {
       "garments": [
         {
+          "garment_type": "jacket",
           "id": "c3686983-28d6-491f-b0a7-0c5d8245b4bb",
           "name": "Arc'teryx Atom LT Hoody",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "DWR_only",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 1.1,
+          "rcl_torso": 1.15,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.75,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 375,
         },
       ],
@@ -9366,9 +9378,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
     "pack_items": {
       "garments": [
         {
+          "garment_type": "jacket",
           "id": "c3686983-28d6-491f-b0a7-0c5d8245b4bb",
           "name": "Arc'teryx Atom LT Hoody",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "DWR_only",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 1.1,
+          "rcl_torso": 1.15,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.75,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 375,
         },
       ],
@@ -9699,9 +9723,16 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
     "pack_items": {
       "garments": [
         {
+          "garment_type": "jacket",
           "id": "40c21244-2776-4e3c-8aa5-8179ba00f4e3",
           "name": "Patagonia Nano-Air Hoody",
           "rcl_clo": 1.65,
+          "rcl_torso": 2.34,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.98,
+            "estimation_method": "lab_tested",
+          },
           "weight_g": 336,
         },
       ],
@@ -10035,9 +10066,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
     "pack_items": {
       "garments": [
         {
+          "garment_type": "jacket",
           "id": "c3686983-28d6-491f-b0a7-0c5d8245b4bb",
           "name": "Arc'teryx Atom LT Hoody",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "DWR_only",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 1.1,
+          "rcl_torso": 1.15,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.75,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 375,
         },
       ],
@@ -10362,9 +10405,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
     "pack_items": {
       "garments": [
         {
+          "garment_type": "vest",
           "id": "1270910a-5ec9-4b69-9899-855178b247c8",
           "name": "Columbia Powder Lite Vest",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "water_resistant",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 0.55,
+          "rcl_torso": 0.95,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.65,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 280,
         },
       ],
@@ -10679,9 +10734,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
     "pack_items": {
       "garments": [
         {
+          "garment_type": "vest",
           "id": "1270910a-5ec9-4b69-9899-855178b247c8",
           "name": "Columbia Powder Lite Vest",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "water_resistant",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 0.55,
+          "rcl_torso": 0.95,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.65,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 280,
         },
       ],
@@ -10974,9 +11041,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
     "pack_items": {
       "garments": [
         {
+          "garment_type": "vest",
           "id": "03e9c466-66ac-47a5-bda4-2c4a809fc49d",
           "name": "Patagonia Nano-Air Light Vest",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "DWR_only",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 0.45,
+          "rcl_torso": 0.85,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.75,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 156,
         },
       ],
@@ -11308,9 +11387,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
     "pack_items": {
       "garments": [
         {
+          "garment_type": "jacket",
           "id": "c3686983-28d6-491f-b0a7-0c5d8245b4bb",
           "name": "Arc'teryx Atom LT Hoody",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "DWR_only",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 1.1,
+          "rcl_torso": 1.15,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.75,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 375,
         },
       ],
@@ -11662,9 +11753,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
     "pack_items": {
       "garments": [
         {
+          "garment_type": "vest",
           "id": "03e9c466-66ac-47a5-bda4-2c4a809fc49d",
           "name": "Patagonia Nano-Air Light Vest",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "DWR_only",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 0.45,
+          "rcl_torso": 0.85,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.75,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 156,
         },
       ],
@@ -12016,9 +12119,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
     "pack_items": {
       "garments": [
         {
+          "garment_type": "jacket",
           "id": "c7d24e19-d2c7-4894-afc6-9a565eeb6342",
           "name": "Norrøna Lyngen Down850 Hood Jacket",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "DWR_only",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 1.9,
+          "rcl_torso": 2.8,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.75,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 382,
         },
       ],
@@ -12372,9 +12487,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
     "pack_items": {
       "garments": [
         {
+          "garment_type": "jacket",
           "id": "c3686983-28d6-491f-b0a7-0c5d8245b4bb",
           "name": "Arc'teryx Atom LT Hoody",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "DWR_only",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 1.1,
+          "rcl_torso": 1.15,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.75,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 375,
         },
       ],
@@ -12716,9 +12843,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
     "pack_items": {
       "garments": [
         {
+          "garment_type": "vest",
           "id": "03e9c466-66ac-47a5-bda4-2c4a809fc49d",
           "name": "Patagonia Nano-Air Light Vest",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "DWR_only",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 0.45,
+          "rcl_torso": 0.85,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.75,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 156,
         },
       ],
@@ -13051,9 +13190,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
     "pack_items": {
       "garments": [
         {
+          "garment_type": "vest",
           "id": "03e9c466-66ac-47a5-bda4-2c4a809fc49d",
           "name": "Patagonia Nano-Air Light Vest",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "DWR_only",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 0.45,
+          "rcl_torso": 0.85,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.75,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 156,
         },
       ],
@@ -16352,9 +16503,21 @@ exports[`POST /api/v1/recommendations/ski-touring (golden, pack options) > prior
     "pack_items": {
       "garments": [
         {
+          "garment_type": "vest",
           "id": "03e9c466-66ac-47a5-bda4-2c4a809fc49d",
           "name": "Patagonia Nano-Air Light Vest",
+          "protection": {
+            "waterproof_mm": null,
+            "waterproof_rating": "DWR_only",
+            "windproof_rating": "wind_resistant",
+          },
           "rcl_clo": 0.45,
+          "rcl_torso": 0.85,
+          "thermal_data_status": "known",
+          "thermal_provenance": {
+            "confidence_score": 0.75,
+            "estimation_method": "derived_from_similar",
+          },
           "weight_g": 156,
         },
       ],

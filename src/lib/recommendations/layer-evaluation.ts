@@ -74,13 +74,15 @@ function bodyPartStatus(clo: number, minimum: number, target: number): BodyPartE
 }
 
 export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
+  if (!input.itemClo) throw new Error('Evaluation items must be resolved before evaluating');
+  const itemClo = input.itemClo;
   // Measure shortfalls against each part's minimum, or its neutral target
   // when the caller sent no minimum.
   const minimum = (part: EvaluatedBodyPart) => input.minTargets?.[part] ?? input.targets[part];
 
   const bodyParts = Object.fromEntries(
     EVALUATED_BODY_PARTS.map((part) => {
-      const rawClo = sum(input.itemClo[part]);
+      const rawClo = sum(itemClo[part]);
       if (rawClo === null) return [part, { thermal_data_status: 'unknown', target: input.targets[part] }];
       const coef = REGRESSION_COEF[part];
       const clo = coef ? rawClo * coef : rawClo;

@@ -308,10 +308,11 @@ graph TD
     RANGE --> DEC{Comfort decision}
     REG --> DEC
     EXT --> DEC
-    EDIT[Manual outfit edits:<br/>item IDs, coverage, usage and provenance] --> LOOKUP[Server resolves catalog regional data<br/>Custom items restricted to signed-in owner]
+    EDIT[Manual outfit edits:<br/>UUID references or explicit source-free estimates<br/>Ownership and names do not trigger checks] --> LOOKUP[Server resolves catalog regional data<br/>Public rows reused for up to 30 seconds<br/>Custom items always read for signed-in owner]
+    LOOKUP --> PICKER[Picker and packed garments use the same<br/>server status, regional clo and provenance]
     LOOKUP --> KNOWN{All worn items have usable thermal data?}
     KNOWN -->|Yes: regional averages already include partial coverage| DEC
-    KNOWN -->|No| UNKNOWN[Comfort unknown<br/>No total clo, decision or score]
+    KNOWN -->|No| UNKNOWN[Comfort unknown with missing body areas<br/>No total clo, decision or score]
     DEC -->|Whole body more than 0.05 clo below the range| COLD[Cold]
     DEC -->|Whole body more than 0.3 clo above the range| HOT[Overheating]
     DEC -->|A body part more than 0.05 clo below its minimum| COLD

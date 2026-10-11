@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import * as evaluator from '@/lib/recommendations/layer-evaluation';
 import { POST } from "./route";
 import catalog from '@/test/fixtures/gear-catalog.json';
 import { createFakeSupabase } from '@/test/fakeSupabase';
@@ -87,11 +88,11 @@ describe("POST /api/v1/ensembles/evaluate", () => {
 
   it('limits custom item reads to the signed-in owner and matching body area', async () => {
     state.client = createFakeSupabase({ user_custom_items: [
-      { id: 'own', user_id: 'user-1', body_part: 'torso', rcl_clo: 0.3 },
-      { id: 'other', user_id: 'user-2', body_part: 'torso', rcl_clo: 1.2 },
+      { id: '00000000-0000-0000-0000-000000000001', user_id: 'user-1', body_part: 'torso', rcl_clo: 0.3 },
+      { id: '00000000-0000-0000-0000-000000000002', user_id: 'user-2', body_part: 'torso', rcl_clo: 1.2 },
     ] });
     const custom = (id: string): EvaluationItem => ({ sourceId: id, item_type: 'custom', rcl: 9 });
-    const request = { phases: [itemPhase([custom('own')]), itemPhase([custom('other')])] };
+    const request = { phases: [itemPhase([custom('00000000-0000-0000-0000-000000000001')]), itemPhase([custom('00000000-0000-0000-0000-000000000002')])] };
     const { phases: anonymous } = await (await post(request)).json();
     expect(anonymous[0].thermal_data_status).toBe('unknown');
     state.userId = 'user-1';
@@ -99,7 +100,7 @@ describe("POST /api/v1/ensembles/evaluate", () => {
     expect(own.bodyParts.torso.clo).toBeCloseTo(0.3 * 0.836);
     expect(own.items.torso[0].thermal_provenance.generic_estimate).toBe(true);
     expect(other.comfortScore).toBeNull();
-    const { phases: [wrongRegion] } = await (await post({ phases: [itemPhase([], [custom('own')])] })).json();
+    const { phases: [wrongRegion] } = await (await post({ phases: [itemPhase([], [custom('00000000-0000-0000-0000-000000000001')])] })).json();
     expect(wrongRegion.comfortScore).toBeNull();
   });
 
@@ -137,6 +138,95 @@ describe("POST /api/v1/ensembles/evaluate", () => {
     expect(minimums.maxRegionalDeficit).toBe(0);
   });
 
+  it('accepts items alone and ignores the obsolete numeric payload, including alignment', async () => {
+    const input = itemPhase([reference(shirt.id)]);
+    const itemsOnly = { ...input, itemClo: undefined };
+    const first = await post({ phases: [itemsOnly, { ...input, itemClo: { torso: [] } }] });
+    expect(first.status).toBe(200);
+    const { phases } = await first.json();
+    expect(phases[0]).toEqual(phases[1]);
+    expect(phases[0].bodyParts.torso.clo).toBeCloseTo(0.1 * 0.836);
+  });
+
+  it('normalizes uppercase UUID references before querying and matching results', async () => {
+    const response = await post({ phases: [itemPhase([reference(shirt.id.toUpperCase())])] });
+    expect(response.status).toBe(200);
+    const { phases: [result] } = await response.json();
+    expect(result.items.torso[0].sourceId).toBe(shirt.id);
+    expect(result.thermal_data_status).toBe('known');
+  });
+
+  it('treats null item warmth as unknown instead of rejecting the phase', async () => {
+    const response = await post({ phases: [itemPhase([{ rcl: null, thermal_provenance: { generic_estimate: true } }])] });
+    expect(response.status).toBe(200);
+    expect((await response.json()).phases[0]).toMatchObject({ thermal_data_status: 'unknown', decision: null });
+  });
+
+  it('whitelists source-free estimates instead of echoing unvalidated client fields', async () => {
+    const response = await post({ phases: [itemPhase([{
+      rcl: 0.2, item_type: 'custom', thermal_provenance: { generic_estimate: true, data_source: 'unchecked' },
+      thermal_data_status: 'bogus', protection: { waterproof_rating: 'unchecked' }, arbitrary: 'unchecked',
+    } as unknown as EvaluationItem])] });
+    expect(response.status).toBe(200);
+    expect((await response.json()).phases[0].items.torso[0]).toEqual({
+      rcl: 0.2, item_type: 'custom', thermal_provenance: { generic_estimate: true }, thermal_data_status: 'known',
+    });
+  });
+
+  it('does not report an evaluation exception as a database outage', async () => {
+    const failure = new Error('Evaluation programming error');
+    const evaluate = vi.spyOn(evaluator, 'evaluatePhase').mockImplementation(() => { throw failure; });
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(post({ phases: [phase] })).rejects.toBe(failure);
+      expect(log).not.toHaveBeenCalled();
+    } finally { evaluate.mockRestore(); log.mockRestore(); }
+  });
+
+  it('reuses public catalog rows until expiry, then reads deletion instead of stale data', async () => {
+    const client = createFakeSupabase({ garments: [shirt] });
+    state.client = client;
+    const from = vi.spyOn(client, 'from');
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const input = { phases: [itemPhase([reference(shirt.id)])] };
+      await post(input);
+      await post(input);
+      expect(from).toHaveBeenCalledTimes(1);
+      await client.from('garments').delete().eq('id', shirt.id);
+      from.mockClear();
+      now.mockReturnValue(31_000);
+      const { phases: [result] } = await (await post(input)).json();
+      expect(from).toHaveBeenCalledTimes(1);
+      expect(result.thermal_data_status).toBe('unknown');
+    } finally { now.mockRestore(); }
+  });
+
+  it('uses rows already loaded by the recommendation route', async () => {
+    const { fetchGarmentsWithDetails } = await import('@/lib/recommendations/database');
+    const client = createFakeSupabase({ garments: [shirt] });
+    state.client = client;
+    await fetchGarmentsWithDetails(client as unknown as NonNullable<ReturnType<typeof import('@/lib/supabase')['getSupabase']>>);
+    const from = vi.spyOn(client, 'from');
+    const { phases: [result] } = await (await post({ phases: [itemPhase([reference(shirt.id)])] })).json();
+    expect(from).not.toHaveBeenCalled();
+    expect(result.thermal_data_status).toBe('known');
+  });
+
+  it('does not cache private custom rows across users or deletion', async () => {
+    const id = '00000000-0000-0000-0000-000000000001';
+    const client = createFakeSupabase({ user_custom_items: [{ id, user_id: 'user-1', body_part: 'torso', rcl_clo: 0.3 }] });
+    state.client = client;
+    state.userId = 'user-1';
+    const input = { phases: [itemPhase([{ sourceId: id, item_type: 'custom' }])] };
+    expect((await (await post(input)).json()).phases[0].thermal_data_status).toBe('known');
+    state.userId = 'user-2';
+    expect((await (await post(input)).json()).phases[0].thermal_data_status).toBe('unknown');
+    state.userId = 'user-1';
+    await client.from('user_custom_items').delete().eq('id', id);
+    expect((await (await post(input)).json()).phases[0].thermal_data_status).toBe('unknown');
+  });
+
   it.each([
     ["malformed JSON", "{"],
     ["no phases", { phases: [] }],
@@ -148,7 +238,8 @@ describe("POST /api/v1/ensembles/evaluate", () => {
     ["non-numeric minimum", { phases: [{ ...phase, minTargets: { torso: "low" } }] }],
     ["non-numeric arm minimum", { phases: [{ ...phase, arms: { clo: 0.8, minTarget: "low" } }] }],
     ['negative clo', { phases: [{ ...phase, itemClo: { ...phase.itemClo, torso: [-1] } }] }],
-    ['misaligned metadata', { phases: [{ ...phase, items: { torso: [], legs: [], hands: [], headNeck: [] } }] }],
+    ['malformed UUID', { phases: [itemPhase([reference('invalid')])] }],
+    ['too many references', { phases: [itemPhase(Array.from({ length: 21 }, () => reference(shirt.id)))] }],
     ['source without type', { phases: [itemPhase([{ sourceId: shirt.id }])] }],
     ['invalid item type', { phases: [itemPhase([{ sourceId: shirt.id, item_type: 'invalid' } as unknown as EvaluationItem])] }],
   ])("rejects %s with 400", async (_label, body) => {
