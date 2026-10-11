@@ -8,7 +8,7 @@ type Row = Record<string, unknown> & { id: string };
 
 /** Where each wardrobe item type's details live. */
 const ITEM_TABLES: Record<ItemType, { table: string; select: string; ownedByUser: boolean }> = {
-  garment: { table: "garments", select: "*, garment_thermal_properties(*)", ownedByUser: false },
+  garment: { table: "garments", select: "*, garment_thermal_properties(*), garment_protection(*)", ownedByUser: false },
   handwear: { table: "handwear", select: "*", ownedByUser: false },
   headwear: { table: "headwear", select: "*", ownedByUser: false },
   custom: { table: "user_custom_items", select: "*", ownedByUser: true },

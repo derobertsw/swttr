@@ -3,19 +3,20 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useUserId } from "@/hooks/useUserId";
 import { logWarn } from "@/lib/logger";
+import type { EvaluationItem } from "@/types/biophysics";
+import { garmentMetadata } from '@/lib/garment-metadata';
 import type { AvailableItem, WardrobeItem } from "@/types/wardrobe";
 import {
-  getClo,
   getBodyPart,
   inferAvailableBodyPart,
 } from "@/components/wardrobe/wardrobe-utils";
 import { CATEGORY_TO_LAYER_TYPE, BodyPart, LayerType } from "@/lib/layers";
 
-export interface PickerItem {
+export interface PickerItem extends EvaluationItem {
   id: string;
   name: string;
   brand: string;
-  rcl: number;
+  rcl?: number;
   nativeLayerType: LayerType;
   isInUse: boolean;
   isOwned: boolean;
@@ -73,26 +74,19 @@ function isLayerCompatible(itemLayer: LayerType | null, targetLayer: LayerType):
   return false;
 }
 
-/**
- * Get regional clo value for a wardrobe item matching its body part.
- * Falls back to whole-body rcl_clo if regional values aren't available.
- */
-function getRegionalClo(item: WardrobeItem, bodyPart: BodyPart): number {
-  const tp = item.details.garment_thermal_properties;
-  const props = Array.isArray(tp) ? tp[0] : tp;
-  if (props) {
-    if (bodyPart === "legs" && props.rcl_legs != null) return props.rcl_legs;
-    if (bodyPart === "torso" && props.rcl_torso != null) return props.rcl_torso;
-  }
-  return getClo(item) ?? 0;
-}
-
 /** The `items` an API route returns; throws when the request fails. */
 async function fetchItems<T>(url: string): Promise<T[]> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url} returned ${res.status}`);
   const data = await res.json() as { items?: T[] };
   return data.items ?? [];
+}
+
+// Unknown warmth is listed after known data, never ranked as zero clo.
+function compareClo(a: PickerItem, b: PickerItem, target?: number): number {
+  if (a.rcl === undefined) return b.rcl === undefined ? 0 : 1;
+  if (b.rcl === undefined) return -1;
+  return target === undefined ? b.rcl - a.rcl : Math.abs(a.rcl - target) - Math.abs(b.rcl - target);
 }
 
 const EMPTY_WARDROBE_ITEMS: WardrobeItem[] = [];
@@ -162,15 +156,21 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
           return isLayerCompatible(lt, layerType);
         })
         .map((item) => ({
+          ...garmentMetadata(item.details),
+          item_type: item.item_type,
           id: item.item_id,
           name: item.nickname || item.details.model_name,
           brand: item.details.brand,
-          rcl: getRegionalClo(item, bodyPart),
+          rcl: item.details.thermal_data_status === 'known'
+            ? item.item_type === 'garment'
+              ? (bodyPart === 'legs' ? item.details.rcl_legs : item.details.rcl_torso)
+              : item.details.rcl_clo
+            : undefined,
           nativeLayerType: wardrobeLayerType(item) ?? layerType,
           isInUse: inUseItemIds.has(item.item_id),
           isOwned: true,
         }))
-        .sort((a, b) => b.rcl - a.rcl);
+        .sort((a, b) => compareClo(a, b));
 
       // Filter and map available items (exclude those already in wardrobe)
       const rItems: PickerItem[] = availableItems
@@ -184,10 +184,12 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
             : bodyPart === "torso" ? item.rcl_torso
             : undefined;
           return {
+            ...garmentMetadata(item),
+            item_type: item.type,
             id: item.id,
             name: item.model_name,
             brand: item.brand,
-            rcl: regionalRcl ?? item.rcl_clo ?? 0,
+            rcl: item.thermal_data_status === 'known' ? item.type === "garment" ? regionalRcl : item.rcl_clo : undefined,
             nativeLayerType: inferAvailableLayer(item),
             isInUse: inUseItemIds.has(item.id),
             isOwned: false,
@@ -196,9 +198,9 @@ export function useLayerPicker(inUseItemIds: Set<string>) {
 
       // Sort recommendations by proximity to target (closest first), then by clo descending
       if (targetClo !== undefined) {
-        rItems.sort((a, b) => Math.abs(a.rcl - targetClo) - Math.abs(b.rcl - targetClo));
+        rItems.sort((a, b) => compareClo(a, b, targetClo));
       } else {
-        rItems.sort((a, b) => b.rcl - a.rcl);
+        rItems.sort((a, b) => compareClo(a, b));
       }
 
       return { wardrobeItems: wItems, recommendedItems: rItems.slice(0, 3) };

@@ -31,7 +31,7 @@ const GLOVE_WARDROBE: WardrobeItem = makeWardrobeItem({
     brand: "BrandH",
     model_name: "Warm Glove",
     handwear_type: "insulated",
-    rcl_clo: 0.55,
+    rcl_clo: 0.55, thermal_data_status: 'known',
   },
 });
 
@@ -42,7 +42,7 @@ const BEANIE_WARDROBE: WardrobeItem = makeWardrobeItem({
     brand: "BrandHead",
     model_name: "Fleece Beanie",
     headwear_type: "beanie",
-    rcl_clo: 0.22,
+    rcl_clo: 0.22, thermal_data_status: 'known',
   },
 });
 
@@ -53,7 +53,7 @@ const JACKET_WARDROBE: WardrobeItem = makeWardrobeItem({
     brand: "BrandJ",
     model_name: "Mid Layer",
     category: "mid_layer_heavy",
-    garment_type: "jacket",
+    garment_type: "jacket", thermal_data_status: 'known', rcl_torso: 0.85, rcl_legs: 0,
     garment_thermal_properties: {
       garment_id: "jacket-1",
       rcl_whole_body: 0.8,
@@ -91,6 +91,38 @@ function mockFetchResponses(
 }
 
 describe("useLayerPicker", () => {
+  it('preserves partial coverage and estimate metadata and keeps missing regional warmth unknown', async () => {
+    mockFetchResponses([{
+      ...JACKET_WARDROBE,
+      details: { ...JACKET_WARDROBE.details, garment_thermal_properties: undefined, thermal_data_status: 'unknown', rcl_torso: undefined },
+    }], [{
+      id: 'shorts', type: 'garment', brand: 'SWTTR', model_name: 'Shorts',
+      category: 'base_layer', garment_type: 'shorts', usage: 'standalone', coverage_legs: 0.3,
+      thermal_data_status: 'known', rcl_clo: 0.02, rcl_legs: 0.06, thermal_provenance: { generic_estimate: true },
+    }, {
+      id: 'unknown-pants', type: 'garment', brand: 'Example', model_name: 'Unknown pants',
+      category: 'base_layer', garment_type: 'pants', rcl_clo: 0.8,
+    }]);
+    const { result } = renderHook(() => useLayerPicker(new Set()));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const { recommendedItems } = result.current.getItems('legs', 'base', 0);
+    expect(recommendedItems[0]).toMatchObject({ id: 'shorts', item_type: 'garment', usage: 'standalone', coverage_legs: 0.3, rcl: 0.06, thermal_provenance: { generic_estimate: true } });
+    expect(recommendedItems[1].rcl).toBeUndefined();
+    expect(result.current.getItems('torso', 'mid').wardrobeItems[0].rcl).toBeUndefined();
+  });
+  it('trusts the API status when regional clo alone appears usable', async () => {
+    mockFetchResponses([{ ...JACKET_WARDROBE, details: { ...JACKET_WARDROBE.details, thermal_data_status: 'unknown' } }], [{
+      id: 'incomplete-jacket', type: 'garment', brand: 'Example', model_name: 'Incomplete jacket',
+      category: 'mid_layer_heavy', rcl_torso: 0.85, thermal_data_status: 'unknown',
+    }]);
+    const { result } = renderHook(() => useLayerPicker(new Set()));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const items = result.current.getItems('torso', 'mid');
+    for (const item of [...items.wardrobeItems, ...items.recommendedItems]) {
+      expect(item.thermal_data_status).toBe('unknown');
+      expect(item.rcl).toBeUndefined();
+    }
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
@@ -174,7 +206,7 @@ describe("useLayerPicker", () => {
       brand: "BrandH",
       model_name: "Warm Glove",
       category: "",
-      rcl_clo: 0.55,
+      rcl_clo: 0.55, thermal_data_status: 'known',
     };
     mockFetchResponses([], [catalogGlove]);
     const { result } = renderHook(() => useLayerPicker(new Set()));
@@ -197,7 +229,7 @@ describe("useLayerPicker", () => {
       brand: "BrandHead",
       model_name: "Headband",
       category: "",
-      rcl_clo: 0.1,
+      rcl_clo: 0.1, thermal_data_status: 'known',
     };
 
     /** Fails `failing` URLs (500, or a network error) and serves the rest. */

@@ -5,11 +5,27 @@ import {
   collectInUseIds,
   garmentsToLayerSet,
   itemCloByBodyPart,
+  evaluationItemsByBodyPart,
   itemNamesMissingFrom,
 } from "./layers";
 import type { RecommendedGarment, RecommendedHandwear, RecommendedHeadwear } from "@/types/biophysics";
 
 describe("garmentsToLayerSet", () => {
+  it('preserves garment semantics and provenance for manual evaluation without whole-body fallback', () => {
+    const shorts: RecommendedGarment = {
+      id: 'shorts', name: 'Shorts', category: 'base_layer', garment_type: 'shorts',
+      covers_legs: true, usage: 'standalone', coverage_legs: 0.3,
+      rcl: 0.02, rcl_legs: 0.06, thermal_provenance: { generic_estimate: true },
+      protection: { windproof_rating: 'none' },
+    };
+    const layers = buildRecommendedLayers([shorts], null, null);
+    expect(layers.legs.base[0]).toMatchObject({
+      sourceId: 'shorts', item_type: 'garment', usage: 'standalone', coverage_legs: 0.3,
+      rcl: 0.06, thermal_provenance: { generic_estimate: true }, protection: { windproof_rating: 'none' },
+    });
+    const unknown = buildRecommendedLayers([{ ...shorts, rcl_legs: undefined }], null, null);
+    expect(itemCloByBodyPart(unknown).legs).toEqual([null]);
+  });
   const insulatedJacket: RecommendedGarment = {
     id: "insulated-jacket",
     name: "Insulated Jacket",
@@ -72,11 +88,14 @@ const HEADWEAR: RecommendedHeadwear = {
 describe("buildRecommendedLayers", () => {
   it("places garments by coverage, gloves as outer, and headwear warmth as base under the helmet", () => {
     const layers = buildRecommendedLayers(GARMENTS, CLIMB_GLOVES, HEADWEAR);
-    expect(layers.torso.base).toEqual([{ name: "Merino Top", rcl: 0.4, sourceId: "g-base" }]);
-    expect(layers.legs.outer).toEqual([{ name: "Shell Pants", rcl: 0.25, sourceId: "g-shell" }]);
-    expect(layers.hands.outer.map((i) => i.name)).toEqual(["Liner Gloves"]);
-    expect(layers.headNeck.base.map((i) => i.name)).toEqual(["Beanie", "Gaiter"]);
-    expect(layers.headNeck.outer.map((i) => i.name)).toEqual(["Helmet"]);
+    expect(layers.torso.base).toMatchObject([{ name: "Merino Top", rcl: 0.4, sourceId: "g-base" }]);
+    expect(layers.legs.outer).toMatchObject([{ name: "Shell Pants", rcl: 0.25, sourceId: "g-shell" }]);
+    expect(layers.hands.outer).toEqual([{ name: "Liner Gloves", rcl: 0.3, sourceId: "h-1", item_type: "handwear" }]);
+    expect(layers.headNeck.base).toEqual([
+      { name: "Beanie", rcl: 0.2, sourceId: "hw-1", item_type: "headwear" },
+      { name: "Gaiter", rcl: 0.1, sourceId: "hw-2", item_type: "headwear" },
+    ]);
+    expect(layers.headNeck.outer).toEqual([{ name: "Helmet", rcl: 0.3, sourceId: "hw-3", item_type: "headwear" }]);
   });
 });
 
@@ -86,19 +105,22 @@ describe("buildDescentLayers", () => {
       GARMENTS,
       CLIMB_GLOVES,
       { ...HEADWEAR, helmet: null },
-      [{ id: "p-1", name: "Puffy", rcl_clo: 0.9 }],
+      [{ id: "p-1", name: "Puffy", rcl_clo: 0.9, rcl_torso: 1.2, thermal_data_status: 'known' }],
       DESCENT_GLOVES,
       HEADWEAR
     );
-    expect(layers.torso.outer).toEqual([{ name: "Puffy", rcl: 0.9, sourceId: "p-1" }]);
-    expect(layers.hands.outer.map((i) => i.name)).toEqual(["Ski Mitts"]);
-    expect(layers.headNeck.outer.map((i) => i.name)).toEqual(["Helmet"]);
+    expect(layers.torso.outer).toMatchObject([{ name: "Puffy", rcl: 1.2, sourceId: "p-1", item_type: "garment" }]);
+    expect(layers.hands.outer).toEqual([{ name: "Ski Mitts", rcl: 1.1, sourceId: "h-2", item_type: "handwear" }]);
+    expect(layers.headNeck.outer).toEqual([{ name: "Helmet", rcl: 0.3, sourceId: "hw-3", item_type: "headwear" }]);
   });
 
   it("keeps the climb gloves and headwear when the descent has none of its own", () => {
     const layers = buildDescentLayers(GARMENTS, CLIMB_GLOVES, HEADWEAR, [], null, null);
-    expect(layers.hands.outer.map((i) => i.name)).toEqual(["Liner Gloves"]);
-    expect(layers.headNeck.base.map((i) => i.name)).toEqual(["Beanie", "Gaiter"]);
+    expect(layers.hands.outer).toEqual([{ name: "Liner Gloves", rcl: 0.3, sourceId: "h-1", item_type: "handwear" }]);
+    expect(layers.headNeck.base).toEqual([
+      { name: "Beanie", rcl: 0.2, sourceId: "hw-1", item_type: "headwear" },
+      { name: "Gaiter", rcl: 0.1, sourceId: "hw-2", item_type: "headwear" },
+    ]);
   });
 });
 
@@ -109,7 +131,7 @@ describe("collectInUseIds and itemCloByBodyPart", () => {
 
     expect([...collectInUseIds(layers)].sort()).toEqual(["g-base", "g-shell", "h-1", "hw-1", "hw-2", "hw-3"]);
     expect(itemCloByBodyPart(layers)).toEqual({
-      torso: [0.4, 0],
+      torso: [0.4, null],
       legs: [0.25],
       hands: [0.3],
       headNeck: [0.2, 0.1, 0.3],
@@ -120,10 +142,23 @@ describe("collectInUseIds and itemCloByBodyPart", () => {
 describe("itemNamesMissingFrom", () => {
   it("lists items worn in one phase but not the other, once each", () => {
     const climb = buildRecommendedLayers(GARMENTS, CLIMB_GLOVES, null);
-    const descent = buildDescentLayers(GARMENTS, CLIMB_GLOVES, null, [{ id: "p-1", name: "Puffy", rcl_clo: 0.9 }], DESCENT_GLOVES, null);
+    const descent = buildDescentLayers(GARMENTS, CLIMB_GLOVES, null, [{ id: "p-1", name: "Puffy", rcl_clo: 0.9, rcl_torso: 1.2, thermal_data_status: 'known' }], DESCENT_GLOVES, null);
     descent.legs.mid = [{ name: "Puffy", sourceId: "p-1" }];
 
     expect(itemNamesMissingFrom(descent, climb)).toEqual(["Puffy", "Ski Mitts"]);
     expect(itemNamesMissingFrom(climb, descent)).toEqual(["Liner Gloves"]);
+  });
+});
+
+
+describe('evaluation request identity', () => {
+  it('sends only thermal references and leaves ownership/name changes out of the check', () => {
+    const layers = buildRecommendedLayers(GARMENTS, CLIMB_GLOVES, HEADWEAR);
+    const before = JSON.stringify(evaluationItemsByBodyPart(layers));
+    layers.torso.base[0] = { ...layers.torso.base[0], name: 'My top', brand: 'My brand', isRecommended: false };
+    expect(JSON.stringify(evaluationItemsByBodyPart(layers))).toBe(before);
+    expect(evaluationItemsByBodyPart(layers).torso).toEqual([{ sourceId: 'g-base', item_type: 'garment' }]);
+    layers.legs.mid = [{ name: 'Estimated pants', rcl: 0.2, thermal_provenance: { generic_estimate: true, data_source: 'client label' } }];
+    expect(evaluationItemsByBodyPart(layers).legs[0]).toEqual({ rcl: 0.2, thermal_provenance: { generic_estimate: true } });
   });
 });

@@ -2,6 +2,7 @@
  * Ski touring: a breathable climbing ensemble plus pack layers for the
  * transition and descent, each phase with its own IREQ targets.
  */
+import { garmentMetadata } from '@/lib/garment-metadata';
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { DLE_ESTIMATION_METHOD } from '@/lib/biophysics/ireq';
 import { scoreEnsemble } from '@/lib/biophysics/scorer';
@@ -305,12 +306,16 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         extremity_ireq: downhill.extremity,
       },
       pack_items: {
-        garments: packItems.map((g) => ({
-          id: g.id,
-          name: `${g.brand} ${g.model_name}`,
-          weight_g: g.weight_grams,
-          rcl_clo: g.garment_thermal_properties?.rcl_whole_body,
-        })),
+        garments: packItems.map((g) => {
+          const formatted = formatGarmentResponse(g);
+          return {
+            id: formatted.id, name: formatted.name,
+            ...garmentMetadata(formatted),
+            weight_g: g.weight_grams,
+            rcl_clo: formatted.rcl,
+            rcl_torso: formatted.rcl_torso,
+          };
+        }),
         total_weight_g: totalPackWeightGrams,
       },
       transition_protocol: transitionProtocol,

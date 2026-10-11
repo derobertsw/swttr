@@ -29,8 +29,9 @@ const REGRESSION_COEF: Partial<Record<EvaluatedBodyPart, number>> = {
   legs: ENSEMBLE_REGRESSION.thermal.leg.coef,
 };
 
-function sum(values: number[]): number {
-  return values.reduce((total, value) => total + value, 0);
+function sum(values: (number | null)[]): number | null {
+  if (values.some(value => value === null || !Number.isFinite(value) || value < 0)) return null;
+  return (values as number[]).reduce((total, value) => total + value, 0);
 }
 
 interface PartAgainstMinimum {
@@ -73,13 +74,16 @@ function bodyPartStatus(clo: number, minimum: number, target: number): BodyPartE
 }
 
 export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
+  if (!input.itemClo) throw new Error('Evaluation items must be resolved before evaluating');
+  const itemClo = input.itemClo;
   // Measure shortfalls against each part's minimum, or its neutral target
   // when the caller sent no minimum.
   const minimum = (part: EvaluatedBodyPart) => input.minTargets?.[part] ?? input.targets[part];
 
   const bodyParts = Object.fromEntries(
     EVALUATED_BODY_PARTS.map((part) => {
-      const rawClo = sum(input.itemClo[part]);
+      const rawClo = sum(itemClo[part]);
+      if (rawClo === null) return [part, { thermal_data_status: 'unknown', target: input.targets[part] }];
       const coef = REGRESSION_COEF[part];
       const clo = coef ? rawClo * coef : rawClo;
       const target = input.targets[part];
@@ -91,10 +95,18 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
     })
   ) as Record<EvaluatedBodyPart, BodyPartEvaluation>;
 
+  if (EVALUATED_BODY_PARTS.some(part => bodyParts[part].clo === undefined)) {
+    return {
+      thermal_data_status: 'unknown', items: input.items, bodyParts,
+      maxRegionalDeficit: null, maxExtremityDeficit: null,
+      hasRegionalGap: null, hasExtremityGap: null, decision: null, comfortScore: null,
+    };
+  }
+
   const { torso, legs, hands, headNeck } = bodyParts;
   const regions: PartAgainstMinimum[] = [
-    { clo: torso.clo, minimum: minimum('torso') },
-    { clo: legs.clo, minimum: minimum('legs') },
+    { clo: torso.clo!, minimum: minimum('torso') },
+    { clo: legs.clo!, minimum: minimum('legs') },
   ];
   if (input.arms) {
     regions.push({
@@ -103,13 +115,13 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
     });
   }
   const extremities: PartAgainstMinimum[] = [
-    { clo: hands.clo, minimum: minimum('hands') },
-    { clo: headNeck.clo, minimum: minimum('headNeck') },
+    { clo: hands.clo!, minimum: minimum('hands') },
+    { clo: headNeck.clo!, minimum: minimum('headNeck') },
   ];
   const maxRegionalDeficit = maxDeficit(regions);
   const maxExtremityDeficit = maxDeficit(extremities);
 
-  const breakdown = input.arms ? weightedBreakdown(torso.clo, input.arms.clo, legs.clo) : undefined;
+  const breakdown = input.arms ? weightedBreakdown(torso.clo!, input.arms.clo, legs.clo!) : undefined;
 
   const comfortInput = {
     totalClo: breakdown?.total,
@@ -118,6 +130,7 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
   };
 
   return {
+    ...(input.items && { thermal_data_status: 'known', items: input.items }),
     bodyParts,
     breakdown,
     totalClo: breakdown?.total,

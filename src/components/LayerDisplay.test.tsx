@@ -8,8 +8,39 @@ import { buildLayersResult, layerDisplayAdvice } from "@/lib/gearUp";
 import type { SavedOutfit } from "@/types/savedKit";
 import LayerDisplay from "./LayerDisplay";
 
-// Layer evaluation runs on the server; serve it from the real route handler.
+// Use the real request parser/evaluator with fixture thermal values captured
+// from the recommendation. Catalog authority is covered by the phase/route tests.
+const thermalFixture = vi.hoisted(() => ({ values: new Map<string, number | null>() }));
+vi.mock('@/lib/layers', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/layers')>();
+  function remember(layers: ReturnType<typeof actual.buildRecommendedLayers>) {
+    for (const part of actual.BODY_PARTS) {
+      for (const layer of [layers[part].base, layers[part].mid ?? [], layers[part].outer]) {
+        for (const item of layer) if (item.sourceId) thermalFixture.values.set(`${part}:${item.sourceId}`, item.rcl ?? null);
+      }
+    }
+    return layers;
+  }
+  return {
+    ...actual,
+    buildRecommendedLayers: (...args: Parameters<typeof actual.buildRecommendedLayers>) => remember(actual.buildRecommendedLayers(...args)),
+    buildDescentLayers: (...args: Parameters<typeof actual.buildDescentLayers>) => remember(actual.buildDescentLayers(...args)),
+  };
+});
+vi.mock('@/lib/recommendations/evaluation-items', () => ({
+  resolveEvaluationItems: async (phases: import('@/types/biophysics').PhaseEvaluationInput[]) => phases.map(phase => ({
+    ...phase,
+    itemClo: Object.fromEntries(Object.entries(phase.items!).map(([part, items]) => [part,
+      items.map(item => item.sourceId ? thermalFixture.values.get(`${part}:${item.sourceId}`) ?? null : item.rcl ?? null),
+    ])),
+  })),
+}));
 beforeEach(() => {
+  thermalFixture.values.clear();
+  for (const part of ['torso', 'legs']) {
+    thermalFixture.values.set(`${part}:71cd29f7-7743-5842-ac34-eecde26bd165`, 0.3);
+    thermalFixture.values.set(`${part}:9be2376e-eebf-528d-bde0-bfb6e0b4a74f`, 0.2);
+  }
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -50,7 +81,10 @@ vi.mock("@/hooks/useLayerPicker", () => ({
 // Mock LayerPickerDrawer — while open, offers a mid layer that isn't in the wardrobe
 // and a base layer that is, whichever layer it was opened for
 const catalogFleece: PickerItem = {
-  id: "catalog-fleece",
+  item_type: 'garment',
+  usage: 'either', coverage_torso: 1, coverage_arms: 1, coverage_legs: 0,
+  thermal_provenance: { generic_estimate: true, data_source: 'test estimate' },
+  id: "71cd29f7-7743-5842-ac34-eecde26bd165",
   name: "Catalog fleece",
   brand: "Test Brand",
   rcl: 0.3,
@@ -59,7 +93,8 @@ const catalogFleece: PickerItem = {
   isOwned: false,
 };
 const merinoCrew: PickerItem = {
-  id: "merino-crew",
+  item_type: 'garment',
+  id: "9be2376e-eebf-528d-bde0-bfb6e0b4a74f",
   name: "Merino crew",
   brand: "Test Brand",
   rcl: 0.2,
@@ -338,59 +373,63 @@ describe("LayerDisplay", () => {
       recommendation: {
         garments: [
           {
-            id: "garment-1",
+            id: "72ec5159-3cc2-542f-9cde-945471fff950",
             name: "Merino Base Layer",
             category: "base_layer",
             rcl: 0.35,
+            rcl_torso: 0.35,
             covers_torso: true,
             covers_legs: false,
           },
           {
-            id: "garment-2",
+            id: "7d9337df-accc-5698-8486-fdedfc63bb80",
             name: "Down Puffy",
             category: "insulation_down",
             rcl: 1.2,
+            rcl_torso: 1.2,
             covers_torso: true,
             covers_legs: false,
           },
           {
-            id: "garment-3",
+            id: "913a94d3-3f03-598d-81e3-d699a934f1f3",
             name: "Gore-Tex Shell",
             category: "hard_shell",
             rcl: 0.15,
+            rcl_torso: 0.15,
             covers_torso: true,
             covers_legs: false,
           },
           {
-            id: "garment-4",
+            id: "580c55c2-b7a8-5e90-936e-8dcc7fe66cf4",
             name: "Thermal Tights",
             category: "base_layer",
             rcl: 0.25,
             covers_torso: false,
+            rcl_legs: 0.25,
             covers_legs: true,
           },
         ],
         handwear: {
-          id: "glove-1",
+          id: "5bf23329-8831-593b-97e5-51f69dc46ffb",
           name: "Hestra Insulated Gloves",
           type: "insulated",
           rcl: 0.65,
         },
         headwear: {
           helmet: {
-            id: "helmet-1",
+            id: "1abebd4d-5821-5780-b9a3-6eaa00a03da2",
             name: "Smith Vantage",
             type: "ski_helmet",
             rcl: 0.15,
           },
           head_warmth: {
-            id: "beanie-1",
+            id: "80e37b74-18c0-5400-b5ec-6681458d2890",
             name: "Merino Beanie",
             type: "beanie",
             rcl: 0.25,
           },
           neck_warmth: {
-            id: "gaiter-1",
+            id: "4ae840fe-87f6-5845-9330-0ba9636f8d06",
             name: "Buff Neck Gaiter",
             type: "neck_gaiter",
             rcl: 0.12,
@@ -414,6 +453,26 @@ describe("LayerDisplay", () => {
       warnings: [],
       guidance: ["Layer up for the chairlift"],
     };
+
+    it('shows unknown comfort without falling back to the original score when regional data is missing', async () => {
+      const data = {
+        ...mockBiophysicsData,
+        recommendation: {
+          ...mockBiophysicsData.recommendation,
+          garments: mockBiophysicsData.recommendation.garments.map(garment => ({ ...garment, rcl_torso: undefined })),
+        },
+      };
+      render(<LayerDisplay recommendation={null} temperature={25} windspeed={10} biophysicsData={data} />);
+      await screen.findByText(/Comfort unknown/);
+      expect(screen.queryByText(/In the comfort range/)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText('Technical details'));
+      expect(screen.queryByText('Comfort')).not.toBeInTheDocument();
+      expect(screen.getByText('Warmth unknown')).toBeInTheDocument();
+      expect(screen.getByText('Warmth unknown').closest('div')).toHaveTextContent('Upper body');
+      const sent = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+      expect(sent.phases[0].itemClo).toBeUndefined();
+      expect(sent.phases[0].items.torso[0]).toMatchObject({ sourceId: '72ec5159-3cc2-542f-9cde-945471fff950', item_type: 'garment' });
+    });
 
     describe("the outfit Save to trip keeps", () => {
       const outing = {
@@ -469,8 +528,10 @@ describe("LayerDisplay", () => {
         fireEvent.click(screen.getByText("Pick catalog fleece"));
 
         expect(latest()!.edited).toBe(true);
-        expect(latest()!.phases[0].wear.legs.mid).toEqual([
-          { name: "Catalog fleece", rcl: 0.3, sourceId: "catalog-fleece", isRecommended: true, brand: "Test Brand" },
+        expect(latest()!.phases[0].wear.legs.mid).toMatchObject([
+          { name: "Catalog fleece", rcl: 0.3, sourceId: "71cd29f7-7743-5842-ac34-eecde26bd165", isRecommended: true, brand: "Test Brand",
+            item_type: 'garment', usage: 'either', coverage_torso: 1,
+            thermal_provenance: { generic_estimate: true, data_source: 'test estimate' } },
         ]);
         expect(latest()!.phases[0].decision).toBeNull();
         await waitFor(() => expect(latest()!.phases[0].decision).not.toBeNull());
@@ -550,15 +611,19 @@ describe("LayerDisplay", () => {
         const addRequests = stubWardrobeAdd(201);
         const { legs, card } = renderAndPickCatalogFleeceForLegs();
 
+        await waitFor(() => expect(screen.queryByText('Updating comfort check…')).not.toBeInTheDocument());
+        const checksBefore = vi.mocked(fetch).mock.calls.filter(([url]) => String(url) === '/api/v1/ensembles/evaluate').length;
         fireEvent.click(within(card).getByRole("button", { name: /^I own this/ }));
 
         await waitFor(() =>
           expect(screen.queryByRole("region", { name: "Not in your wardrobe" })).not.toBeInTheDocument()
         );
-        expect(addRequests).toEqual([{ item_type: "garment", item_id: "catalog-fleece" }]);
+        expect(addRequests).toEqual([{ item_type: "garment", item_id: "71cd29f7-7743-5842-ac34-eecde26bd165" }]);
         expect(toast.success).toHaveBeenCalledWith("Catalog fleece added to your wardrobe");
         expect(within(legs).getByText("Catalog fleece")).not.toHaveTextContent("Not in your wardrobe");
         expect(mockReloadPicker).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url) === '/api/v1/ensembles/evaluate')).toHaveLength(checksBefore);
+        expect(screen.queryByText('Updating comfort check…')).not.toBeInTheDocument();
       });
 
       it("lists an item picked for the descent", () => {
@@ -849,19 +914,21 @@ describe("LayerDisplay", () => {
           ...mockBiophysicsData.recommendation,
           garments: [
             {
-              id: "torso-base",
+              id: "ceeb9aaa-f92d-5620-9b33-4dcc9d891f52",
               name: "Patagonia Capilene Cool Lightweight",
               category: "base_layer",
               rcl: 0.22,
-              covers_torso: true,
+              rcl_torso: 0.22,
+            covers_torso: true,
               covers_legs: false,
             },
             {
-              id: "torso-outer",
+              id: "f4ec619b-2d7e-500c-9b04-2c9d73ed6c7e",
               name: "Lululemon Pace Breaker Jacket",
               category: "soft_shell",
               rcl: 0.19,
-              covers_torso: true,
+              rcl_torso: 0.19,
+            covers_torso: true,
               covers_legs: false,
             },
           ],
@@ -946,12 +1013,13 @@ describe("LayerDisplay", () => {
           garments: [
             ...mockBiophysicsData.recommendation.garments,
             {
-              id: "garment-5",
+              id: "0718dc2e-bbd7-5801-b482-27b4a090bd94",
               name: "Insulated Ski Pants",
               category: "insulation_synthetic",
               rcl: 1.1,
               covers_torso: false,
-              covers_legs: true,
+              rcl_legs: 1.1,
+            covers_legs: true,
             },
           ],
           handwear: {
@@ -1041,10 +1109,10 @@ describe("LayerDisplay", () => {
         pack_items: {
           garments: [
             {
-              id: "pack-1",
+              id: "630748e4-393c-5b5a-9616-96b0a38ae347",
               name: "Patagonia Nano Puff",
               weight_g: 320,
-              rcl_clo: 0.7,
+              rcl_clo: 0.7, rcl_torso: 0.7,
             },
           ],
           total_weight_g: 320,
@@ -1087,10 +1155,10 @@ describe("LayerDisplay", () => {
         pack_items: {
           garments: [
             {
-              id: "pack-1",
+              id: "630748e4-393c-5b5a-9616-96b0a38ae347",
               name: "Patagonia Nano Puff",
               weight_g: 320,
-              rcl_clo: 0.7,
+              rcl_clo: 0.7, rcl_torso: 0.7,
             },
           ],
           total_weight_g: 320,
@@ -1126,10 +1194,10 @@ describe("LayerDisplay", () => {
         pack_items: {
           garments: [
             {
-              id: "pack-1",
+              id: "630748e4-393c-5b5a-9616-96b0a38ae347",
               name: "Light Wind Shell",
               weight_g: 120,
-              rcl_clo: 0.2,
+              rcl_clo: 0.2, rcl_torso: 0.2,
             },
           ],
           total_weight_g: 120,
@@ -1326,6 +1394,24 @@ describe("LayerDisplay", () => {
 
         expect(await screen.findByText("Comfort check updated.")).toBeInTheDocument();
         expect(screen.queryByText("Updating…")).not.toBeInTheDocument();
+      });
+
+      it('keeps an unknown result visible and labeled outdated after a failed re-check', async () => {
+        const control = stubEvaluation();
+        const data = {
+          ...mockBiophysicsData,
+          recommendation: {
+            ...mockBiophysicsData.recommendation,
+            garments: mockBiophysicsData.recommendation.garments.map(g => ({ ...g, rcl_torso: undefined })),
+          },
+        };
+        render(<LayerDisplay activity="alpine_skiing" recommendation={null} temperature={15} windspeed={10} biophysicsData={data} />);
+        await screen.findByText(/Comfort unknown/);
+        control.failing = true;
+        addCatalogFleece(screen.getByRole('region', { name: 'Legs' }));
+        await screen.findByRole('region', { name: "Couldn't check these layers" });
+        expect(screen.getByText(/Comfort unknown/)).toBeInTheDocument();
+        expect(screen.getByText('Before your change')).toBeInTheDocument();
       });
 
       it("keeps the earlier check labeled when checking a change fails, and tries again", async () => {

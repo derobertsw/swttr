@@ -1,4 +1,5 @@
 import type {
+  EvaluationItem,
   PackItemGarment,
   RecommendedGarment,
   RecommendedHandwear,
@@ -6,6 +7,8 @@ import type {
 } from "@/types/biophysics";
 import { LayerSet, LayerItem, type Recommendation } from "@/types/recommendations";
 import { BodyPart, LayerType, BODY_PARTS as _BODY_PARTS } from "@/types/wardrobe";
+
+import { garmentMetadata } from '@/lib/garment-metadata';
 
 // Re-export for convenience
 export type { LayerSet, LayerItem };
@@ -99,7 +102,10 @@ export function garmentsToLayerSet(
       const regionalRcl = bodyPart === "legs" ? garment.rcl_legs
         : bodyPart === "torso" ? garment.rcl_torso
         : undefined;
-      layers[layerType]?.push({ name: garment.name, rcl: regionalRcl ?? garment.rcl, sourceId: garment.id });
+      layers[layerType]?.push({
+        name: garment.name, rcl: regionalRcl ?? undefined, sourceId: garment.id, item_type: 'garment',
+        ...garmentMetadata(garment),
+      });
     }
   }
 
@@ -114,7 +120,7 @@ const LAYER_TYPES: LayerType[] = ["base", "mid", "outer"];
 function handwearLayers(handwear: RecommendedHandwear | null | undefined): LayerSet {
   const layers = createEmptyLayerSet();
   if (handwear) {
-    layers.outer = [{ name: handwear.name, rcl: handwear.rcl, sourceId: handwear.id }];
+    layers.outer = [{ name: handwear.name, rcl: handwear.rcl, sourceId: handwear.id, item_type: 'handwear' }];
   }
   return layers;
 }
@@ -126,14 +132,14 @@ function headwearLayers(headwear: RecommendedHeadwear | null | undefined): Layer
 
   const baseItems: LayerItem[] = [];
   if (headwear.head_warmth) {
-    baseItems.push({ name: headwear.head_warmth.name, rcl: headwear.head_warmth.rcl, sourceId: headwear.head_warmth.id });
+    baseItems.push({ name: headwear.head_warmth.name, rcl: headwear.head_warmth.rcl, sourceId: headwear.head_warmth.id, item_type: 'headwear' });
   }
   if (headwear.neck_warmth) {
-    baseItems.push({ name: headwear.neck_warmth.name, rcl: headwear.neck_warmth.rcl, sourceId: headwear.neck_warmth.id });
+    baseItems.push({ name: headwear.neck_warmth.name, rcl: headwear.neck_warmth.rcl, sourceId: headwear.neck_warmth.id, item_type: 'headwear' });
   }
   if (baseItems.length > 0) layers.base = baseItems;
   if (headwear.helmet) {
-    layers.outer = [{ name: headwear.helmet.name, rcl: headwear.helmet.rcl, sourceId: headwear.helmet.id }];
+    layers.outer = [{ name: headwear.helmet.name, rcl: headwear.helmet.rcl, sourceId: headwear.helmet.id, item_type: 'headwear' }];
   }
   return layers;
 }
@@ -169,8 +175,10 @@ export function buildDescentLayers(
 
   const packLayerItems: LayerItem[] = packItems.map((item) => ({
     name: item.name,
-    rcl: typeof item.rcl_clo === "number" ? item.rcl_clo : undefined,
+    rcl: item.rcl_torso ?? undefined,
+    ...garmentMetadata(item),
     sourceId: item.id,
+    item_type: 'garment',
   }));
   torso.outer = [...torso.outer, ...packLayerItems];
 
@@ -223,11 +231,20 @@ export function itemNamesMissingFrom(layers: BodyPartLayers, other: BodyPartLaye
   return names;
 }
 
-/** Clo of every item worn, per body part (items without a clo value count as 0). */
-export function itemCloByBodyPart(layers: BodyPartLayers): Record<BodyPart, number[]> {
-  const clo: Record<BodyPart, number[]> = { torso: [], legs: [], hands: [], headNeck: [] };
-  forEachItem(layers, (item, part) => clo[part].push(item.rcl ?? 0));
+/** Clo of every item worn; missing data remains unknown across JSON. */
+export function itemCloByBodyPart(layers: BodyPartLayers): Record<BodyPart, (number | null)[]> {
+  const clo: Record<BodyPart, (number | null)[]> = { torso: [], legs: [], hands: [], headNeck: [] };
+  forEachItem(layers, (item, part) => clo[part].push(item.rcl ?? null));
   return clo;
+}
+
+/** Only thermal references affect request identity; ownership and names do not. */
+export function evaluationItemsByBodyPart(layers: BodyPartLayers): Record<BodyPart, EvaluationItem[]> {
+  const items: Record<BodyPart, EvaluationItem[]> = { torso: [], legs: [], hands: [], headNeck: [] };
+  forEachItem(layers, (item, part) => items[part].push(item.sourceId
+    ? { sourceId: item.sourceId, item_type: item.item_type }
+    : { rcl: item.rcl ?? null, thermal_provenance: { generic_estimate: item.thermal_provenance?.generic_estimate === true } }));
+  return items;
 }
 
 /**

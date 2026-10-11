@@ -1,6 +1,7 @@
 /**
  * Database helpers for recommendation API routes
  */
+import { cacheCatalogRows } from './evaluation-catalog-cache';
 import { getSupabase } from '@/lib/supabase';
 import type { GarmentActivityRatingProps, GarmentRow, HandwearRow, HeadwearRow } from './types';
 
@@ -62,6 +63,7 @@ export async function fetchGarmentsWithDetails(
 
   const { data, error } = await query;
 
+  if (!error && data) cacheCatalogRows(supabase, 'garment', data as GarmentRow[]);
   return {
     data: data as GarmentRow[] | null,
     error: error ? new Error(error.message) : null,
@@ -98,18 +100,20 @@ export async function fetchUserHandwear(
 ): Promise<HandwearRow[]> {
   // Anonymous callers (agent API) have no wardrobe — select from the full catalog.
   if (!userId) {
-    const { data } = await supabase.from('handwear').select('*');
+    const { data, error } = await supabase.from('handwear').select('*');
+    if (!error && data) cacheCatalogRows(supabase, 'handwear', data as HandwearRow[]);
     return (data as HandwearRow[]) || [];
   }
 
   const ids = await getUserWardrobeItemIds(supabase, userId, 'handwear');
   if (!ids || ids.length === 0) return [];
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('handwear')
     .select('*')
     .in('id', ids);
 
+  if (!error && data) cacheCatalogRows(supabase, 'handwear', data as HandwearRow[]);
   return (data as HandwearRow[]) || [];
 }
 
@@ -122,17 +126,19 @@ export async function fetchUserHeadwear(
 ): Promise<HeadwearRow[]> {
   // Anonymous callers (agent API) have no wardrobe — select from the full catalog.
   if (!userId) {
-    const { data } = await supabase.from('headwear').select('*');
+    const { data, error } = await supabase.from('headwear').select('*');
+    if (!error && data) cacheCatalogRows(supabase, 'headwear', data as HeadwearRow[]);
     return (data as HeadwearRow[]) || [];
   }
 
   const ids = await getUserWardrobeItemIds(supabase, userId, 'headwear');
   if (!ids || ids.length === 0) return [];
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('headwear')
     .select('*')
     .in('id', ids);
 
+  if (!error && data) cacheCatalogRows(supabase, 'headwear', data as HeadwearRow[]);
   return (data as HeadwearRow[]) || [];
 }

@@ -1,3 +1,6 @@
+import { itemThermalMetadata } from '@/lib/recommendations/item-thermal-metadata';
+import type { EvaluationItem } from '@/types/biophysics';
+
 type Row = Record<string, unknown> & { id: string };
 
 interface WardrobeEntry {
@@ -27,7 +30,10 @@ function customItemDetails(row: Row) {
  * returns it. `details` is null when the item no longer exists.
  */
 export function toWardrobeItem(entry: WardrobeEntry, row: Row | undefined) {
-  const details = row ? (entry.item_type === "custom" ? customItemDetails(row) : row) : null;
+  const details = row ? {
+    ...(entry.item_type === "custom" ? customItemDetails(row) : row),
+    ...itemThermalMetadata(entry.item_type as NonNullable<EvaluationItem['item_type']>, row),
+  } : null;
   return {
     id: entry.id,
     item_type: entry.item_type,
