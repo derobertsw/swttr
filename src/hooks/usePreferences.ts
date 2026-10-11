@@ -154,13 +154,15 @@ function toPayload(stored: StoredPreferences): Record<string, unknown> {
 
 async function savePreferences(payload: Record<string, unknown>, context: string) {
   try {
-    await fetch("/api/preferences", {
+    const res = await fetch("/api/preferences", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
     });
+    // The change stays on this device. A field the server lacks is saved again on the next sync.
+    if (!res.ok) logWarn(context, new Error(`Preferences not saved: HTTP ${res.status}`));
   } catch (err) {
     logWarn(context, err);
   }
