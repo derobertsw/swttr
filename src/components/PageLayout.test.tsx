@@ -162,6 +162,13 @@ describe("PageLayout", () => {
     expect(document.querySelector('[data-slot="sidebar"]')).toHaveClass("hidden", "md:block");
   });
 
+  it("shows the avatar in the header at every width, not only beside the sidebar", () => {
+    renderLayout();
+    // jsdom applies no media queries, so check that no breakpoint class hides it.
+    expect(screen.getAllByTestId("user-button")).toHaveLength(1);
+    expect(screen.getByTestId("user-button").closest(".hidden")).toBeNull();
+  });
+
   it("drops the web sidebar and tab bar in the native shell but keeps the menu", () => {
     const userAgent = vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue(NATIVE_USER_AGENT);
     try {
@@ -169,6 +176,7 @@ describe("PageLayout", () => {
       expect(screen.queryByRole("navigation", { name: "Primary" })).toBeNull();
       expect(document.querySelector('[data-slot="sidebar"]')).toBeNull();
       expect(screen.getByRole("button", { name: "Open menu" })).not.toHaveClass("md:hidden");
+      expect(screen.getByTestId("user-button").closest(".hidden")).toBeNull();
     } finally {
       userAgent.mockRestore();
     }

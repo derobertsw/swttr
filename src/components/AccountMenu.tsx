@@ -8,6 +8,21 @@ import { HelpCircle, Settings, Share2 } from "lucide-react";
 // Focus doesn't move if the avatar already had it, so don't wait for long.
 const MENU_CLOSE_TIMEOUT_MS = 300;
 
+// Clerk's trigger is only as big as its 28px avatar, and its faint focus halo
+// replaces the app's focus outline. Clerk's styles outrank the app's layered
+// CSS, so size the tap target and draw the usual outline through Clerk.
+const APPEARANCE = {
+  elements: {
+    userButtonTrigger: {
+      width: "2.75rem",
+      height: "2.75rem",
+      justifyContent: "center",
+      borderRadius: "9999px",
+      "&:focus-visible": { outline: "2px solid var(--ring)", outlineOffset: "2px", boxShadow: "none" },
+    },
+  },
+};
+
 interface AccountMenuProps {
   onOpenSettings: () => void;
   onShare: () => void;
@@ -41,7 +56,7 @@ export function AccountMenu({ onOpenSettings, onShare }: AccountMenuProps) {
 
   return (
     <span ref={rootRef} className="inline-flex">
-      <UserButton>
+      <UserButton appearance={APPEARANCE}>
         <UserButton.MenuItems>
           <UserButton.Action label="Settings" labelIcon={<Settings size={16} />} onClick={openSettings} />
           <UserButton.Action label="manageAccount" />
