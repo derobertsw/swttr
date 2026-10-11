@@ -1,6 +1,8 @@
+import { format } from "date-fns";
 import type { Outing } from "@/types/outing";
+import type { DailyLayerPlan } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
-import type { SavedOutfit } from "@/types/savedKit";
+import type { SavedOutfit, SavedPlan } from "@/types/savedKit";
 
 /** A place as /api/geocode returns it, with its time zone. */
 export const STOWE: Outing["place"] = {
@@ -50,6 +52,47 @@ export function savedOutfit(overrides: Partial<SavedOutfit> = {}): SavedOutfit {
     advice: { kind: "personalized" },
     phases: [{ id: "outing", wear: WEAR, carry: [], decision: { riskType: "comfortable", severity: "moderate", delta: 0.1 } }],
     edited: false,
+    ...overrides,
+  };
+}
+
+const SHELL_ON = { add: [{ bodyPart: "torso" as const, layerType: "outer" as const, name: "Ski shell" }], remove: [] };
+
+/** A day of a multi-day plan at Stowe, with its layers. */
+export function planDay(date: string, overrides: Partial<DailyLayerPlan> = {}): DailyLayerPlan {
+  return {
+    date,
+    label: format(new Date(`${date}T00:00:00`), "EEE, MMM d"),
+    baseline: { minTemp: 18, maxTemp: 31, maxWindSpeed: 12, maxPrecipProbability: 30, effectiveTemperature: 14, recommendation: WEAR },
+    changesFromPreviousDay: null,
+    dayparts: [
+      { id: "morning", label: "Morning", timeRangeLabel: "6am-10am", minTemp: 18, maxTemp: 22, maxWindSpeed: 12, maxPrecipProbability: 30, effectiveTemperature: 14, recommendation: WEAR, changes: { add: [], remove: [] } },
+      { id: "evening", label: "Evening", timeRangeLabel: "4pm-9pm", minTemp: 20, maxTemp: 25, maxWindSpeed: 20, maxPrecipProbability: 30, effectiveTemperature: 15, recommendation: WEAR, changes: SHELL_ON },
+    ],
+    carryItems: ["Warm gloves and head insulation"],
+    ...overrides,
+  };
+}
+
+/**
+ * A three-day ski tour plan at Stowe from Saturday, Oct 10, starting at
+ * 9am. Monday has no forecast, so only Saturday and Sunday have layers.
+ */
+export function savedPlan(overrides: Partial<SavedPlan> = {}): SavedPlan {
+  return {
+    version: 1,
+    kind: "plan",
+    outing: {
+      activity: "backcountry_skiing",
+      exertion: "hard",
+      place: STOWE,
+      when: { mode: "later", date: "2026-10-10", time: "09:00", durationDays: 3 },
+    },
+    provenance: { provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" }, timeZone: "America/New_York" },
+    dayStartHour: 6,
+    dayEndHour: 21,
+    firstDayStartHour: 9,
+    days: [planDay("2026-10-10"), planDay("2026-10-11", { baseline: { ...planDay("2026-10-11").baseline, minTemp: 25 } })],
     ...overrides,
   };
 }

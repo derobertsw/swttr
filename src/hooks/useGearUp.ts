@@ -25,7 +25,7 @@ import {
 } from "@/lib/gearUp";
 import { readGearUpDraft, saveGearUpDraft } from "@/lib/gearUpDraft";
 import { logWarn } from "@/lib/logger";
-import { RESUME_PARAM, resumeView, type ResumeView } from "@/lib/outingReturn";
+import { RESUME_PARAM, resumeView, TRIP_PARAM, type ResumeView } from "@/lib/outingReturn";
 import type { LaterTime, LayersResult, Outing, OutingTime } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
@@ -34,10 +34,11 @@ function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boole
   return b !== null && a.latitude === b.latitude && a.longitude === b.longitude;
 }
 
-/** Takes /?resume=… out of the address, so a reload or Edit outing doesn't ask again. */
+/** Takes /?resume=… (and an update's trip=…) out of the address, so a reload or Edit outing doesn't ask again. */
 function removeResumeParam() {
   const url = new URL(window.location.href);
   url.searchParams.delete(RESUME_PARAM);
+  url.searchParams.delete(TRIP_PARAM);
   // Without Next.js's own state (`__NA`), Next.js takes the new URL as the
   // router's too. With it, the next refresh puts the old URL back.
   window.history.replaceState(null, "", url.pathname + url.search + url.hash);
@@ -392,6 +393,7 @@ export function useGearUp() {
       if (draft.place) locationSearch.handleSelectLocation(draft.place);
     }
     const returning = resumeView(searchParams.get(RESUME_PARAM));
+    const saving = returning === "save" || returning === "update";
     dispatch({
       type: "RESTORE",
       owner,
@@ -402,7 +404,11 @@ export function useGearUp() {
         durationDays: draft.durationDays,
         lastOuting: draft.lastOuting,
       },
-      saveOnReturn: returning === "save" ? draft?.lastOuting : null,
+      // Back to save the outing: Save to trip opens after signing in, or
+      // picks the trip whose kit is being updated.
+      saveOnReturn: saving && draft?.lastOuting
+        ? { outing: draft.lastOuting, open: returning === "save", tripId: returning === "update" ? searchParams.get(TRIP_PARAM) : null }
+        : null,
     });
     if (returning) removeResumeParam();
     if (returning && draft?.lastOuting) {
@@ -535,5 +541,6 @@ export function useGearUp() {
     editOuting,
     resetToInitialState,
     opensSave: !accountChanging && state.opensSave,
+    saveTripId: accountChanging ? null : state.saveTripId,
   };
 }

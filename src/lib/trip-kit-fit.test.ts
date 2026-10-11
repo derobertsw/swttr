@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { outfitMismatches } from "@/lib/trip-kit-fit";
+import { planDayKits } from "@/lib/trip-saved-kits";
 import { STOWE_STOP } from "@/test/tripApi";
-import { savedOutfit } from "@/test/savedKit";
+import { savedOutfit, savedPlan } from "@/test/savedKit";
 
 // The fixture outfit is alpine skiing at Stowe, planned for Sat Oct 10.
 const outfit = savedOutfit();
@@ -32,5 +33,13 @@ describe("Where a saved outfit doesn't fit its day", () => {
     expect(outfitMismatches(outfit, { date: "2026-10-10", activity: null, stop: hiking }))
       .toEqual(["Planned for Alpine Skiing, not this day's activity (Hike)."]);
     expect(outfitMismatches(outfit, { date: "2026-10-10", activity: "Alpine", stop: hiking })).toEqual([]);
+  });
+
+  it("judges a saved plan day by its own day of the plan", () => {
+    // Sunday of the ski tour plan, at Stowe.
+    const [, sunday] = planDayKits(savedPlan());
+    expect(outfitMismatches(sunday.kit, { date: "2026-10-11", activity: "Backcountry", stop: STOWE_STOP })).toEqual([]);
+    expect(outfitMismatches(sunday.kit, { date: "2026-10-12", activity: "Backcountry", stop: STOWE_STOP }))
+      .toEqual(["Planned for the forecast on Sun Oct 11, not this day's."]);
   });
 });

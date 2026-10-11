@@ -56,10 +56,25 @@ interface GearUpState {
   restored: boolean;
   /** Whose outing the page holds once restored: a Clerk user ID, or null for a guest. */
   owner: string | null;
-  /** The outing asked for again after signing in to save it (#170); its results open Save to trip. */
-  saveOnReturn: Outing | null;
+  /**
+   * The outing asked for again to save it (#170): after signing in to save
+   * it, its results open Save to trip; to update its saved kit, they pick
+   * that kit's trip.
+   */
+  saveOnReturn: SaveOnReturn | null;
   /** Whether the result on screen is that outing's, so Save to trip opens as it appears. */
   opensSave: boolean;
+  /** The trip Save to trip picks for the result on screen, when it's the outing of a kit being updated. */
+  saveTripId: string | null;
+}
+
+/** An outing asked for again to save it, and how Save to trip starts on its results (#170). */
+interface SaveOnReturn {
+  outing: Outing;
+  /** Opens as the results appear: back from signing in to save them. */
+  open: boolean;
+  /** The trip to pick: the one whose saved kit is being updated. */
+  tripId: string | null;
 }
 
 /** What's kept for the tab besides the activity, effort and place. */
@@ -80,7 +95,7 @@ type GearUpAction =
   /** `keepLoading` when the running request was made from the form in this mode (see useGearUp). */
   | { type: "SHOW_FORM"; mode: InputMode; keepLoading: boolean }
   /** `kept` is null when nothing was kept for `owner`. */
-  | { type: "RESTORE"; owner: string | null; kept: RestoredFields | null; saveOnReturn?: Outing | null }
+  | { type: "RESTORE"; owner: string | null; kept: RestoredFields | null; saveOnReturn?: SaveOnReturn | null }
   | { type: "RESET" };
 
 export function createInitialState(inputMode: InputMode): GearUpState {
@@ -98,6 +113,7 @@ export function createInitialState(inputMode: InputMode): GearUpState {
     owner: null,
     saveOnReturn: null,
     opensSave: false,
+    saveTripId: null,
   };
 }
 
@@ -134,15 +150,19 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
       };
     case "SUBMIT_START":
       return { ...state, request: { status: "loading", outing: action.outing }, startDateError: null };
-    case "SUBMIT_SUCCESS":
+    case "SUBMIT_SUCCESS": {
+      const returned = state.saveOnReturn !== null
+        && JSON.stringify(state.saveOnReturn.outing) === JSON.stringify(action.result.outing) ? state.saveOnReturn : null;
       return {
         ...state,
         request: { status: "idle" },
         result: action.result,
         lastOuting: action.result.outing,
         saveOnReturn: null,
-        opensSave: state.saveOnReturn !== null && JSON.stringify(state.saveOnReturn) === JSON.stringify(action.result.outing),
+        opensSave: returned?.open ?? false,
+        saveTripId: returned?.tripId ?? null,
       };
+    }
     case "SUBMIT_ERROR":
       return state.request.status === "loading"
         ? { ...state, request: { status: "error", outing: state.request.outing, message: action.message } }

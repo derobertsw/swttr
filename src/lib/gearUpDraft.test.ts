@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { claimGuestGearUpDraft, readGearUpDraft, saveGearUpDraft, type GearUpDraft } from "./gearUpDraft";
+import { claimGuestGearUpDraft, keepOutingForGearUp, readGearUpDraft, saveGearUpDraft, type GearUpDraft } from "./gearUpDraft";
 import { STORAGE_KEYS } from "./storage";
 
 const STOWE = { id: 1, name: "Stowe", region: "Vermont", country: "United States", latitude: 44.47, longitude: -72.69 };
@@ -112,6 +112,21 @@ describe("gearUpDraft", () => {
   ])("ignores a draft with %s", (_, draft) => {
     store({ guest: draft });
     expect(readGearUpDraft(null)).toBeNull();
+  });
+
+  it("keeps an outing to ask for again as the account's last, over a guest's draft", () => {
+    saveGearUpDraft(null, DRAFT);
+    const alpine = { activity: "alpine_skiing", exertion: "moderate" as const, place: STOWE, when: { mode: "later" as const, date: "2026-10-10", time: "09:00", durationDays: 1 } };
+    keepOutingForGearUp("user_1", alpine);
+    expect(readGearUpDraft("user_1")).toEqual({
+      activity: "alpine_skiing", exertion: "moderate", place: STOWE, inputMode: "later", date: "2026-10-10", time: "09:00", durationDays: 1, lastOuting: alpine,
+    });
+    expect(readGearUpDraft(null)).toBeNull();
+
+    // An outing for now keeps the later date and time that were entered.
+    const now = { ...alpine, when: { mode: "now" as const } };
+    keepOutingForGearUp("user_1", now);
+    expect(readGearUpDraft("user_1")).toMatchObject({ inputMode: "now", date: "2026-10-10", time: "09:00", lastOuting: now });
   });
 
   it("does without storage when the browser won't allow it", () => {

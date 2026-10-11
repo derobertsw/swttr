@@ -4,7 +4,7 @@ import type {
   RecommendedHandwear,
   RecommendedHeadwear,
 } from "@/types/biophysics";
-import { LayerSet, LayerItem } from "@/types/recommendations";
+import { LayerSet, LayerItem, type Recommendation } from "@/types/recommendations";
 import { BodyPart, LayerType, BODY_PARTS as _BODY_PARTS } from "@/types/wardrobe";
 
 // Re-export for convenience
@@ -265,6 +265,21 @@ export function applyItemMappings(
     const customName = mappings.get(key);
     return customName ? { ...item, name: customName } : item;
   });
+}
+
+/** General guidance's layers with the wardrobe names they're shown with. */
+export function applyRecommendationMappings(recommendation: Recommendation, mappings: Map<string, string> | undefined): Recommendation {
+  if (!mappings) return recommendation;
+  const mapped = { ...recommendation };
+  for (const bodyPart of BODY_PARTS) {
+    const layers = recommendation[bodyPart];
+    mapped[bodyPart] = {
+      base: applyItemMappings(layers.base, bodyPart, "base", mappings),
+      outer: applyItemMappings(layers.outer, bodyPart, "outer", mappings),
+      ...(layers.mid && { mid: applyItemMappings(layers.mid, bodyPart, "mid", mappings) }),
+    };
+  }
+  return mapped;
 }
 
 /**

@@ -14,12 +14,23 @@ export const RESUME_PACKING_PATH = `/?${RESUME_PARAM}=packing`;
 /** Gear up, asking again for the last outing and then offering Save to trip (#170). */
 export const RESUME_SAVE_PATH = `/?${RESUME_PARAM}=save`;
 
-/** What Gear up comes back to: the last outing, its plan's packing list, or Save to trip on its results. */
-export type ResumeView = "outing" | "packing" | "save";
+/** What Gear up comes back to: the last outing, its plan's packing list, Save to trip on its results, or a saved kit's outing to update. */
+export type ResumeView = "outing" | "packing" | "save" | "update";
 
 /** The `resume` param's view, or null when it doesn't name one. */
 export function resumeView(value: string | null): ResumeView | null {
-  return value === "outing" || value === "packing" || value === "save" ? value : null;
+  return value === "outing" || value === "packing" || value === "save" || value === "update" ? value : null;
+}
+
+/** Gear up's search param for the trip whose saved kit is being updated. */
+export const TRIP_PARAM = "trip";
+
+/**
+ * Gear up, asking again for the last outing, which is a saved kit's, with
+ * Save to trip picking the kit's trip (#170).
+ */
+export function resumeUpdatePath(tripId: string): string {
+  return `/?${RESUME_PARAM}=update&${TRIP_PARAM}=${encodeURIComponent(tripId)}`;
 }
 
 /** Wardrobe's search param for the outing it was opened from. */

@@ -28,6 +28,7 @@ import { useUserId } from "@/hooks/useUserId";
 import { SavedKitView } from "@/components/trips/SavedKitView";
 import { CopyDayCard } from "@/components/trips/CopyDayCard";
 import { canEditMemberKit } from "@/lib/trip-permissions";
+import { kitAdvice, kitWear } from "@/lib/trip-saved-kits";
 import { DayLodging } from "@/components/trips/TripStays";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
@@ -207,7 +208,7 @@ export default function DayDetailPage({
             />
 
             {me && (myKit?.outfit ? (
-              <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} />
+              <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} />
             ) : (
               <section aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
                 <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
@@ -551,8 +552,9 @@ function MemberKitRow({
 /** Someone else's kit, read-only: their saved outfit, or their checklist. */
 function MemberKitSummary({ member, kit, fit }: { member: TripMember; kit: TripMemberDayKit | undefined; fit: string[] }) {
   const outfit = kit?.outfit;
-  const worn = outfit
-    ? Object.values(outfit.phases[0].wear).reduce((count, layers) => count + layers.base.length + (layers.mid?.length ?? 0) + layers.outer.length, 0)
+  const wear = outfit ? kitWear(outfit)[0]?.wear : undefined;
+  const worn = wear
+    ? Object.values(wear).reduce((count, layers) => count + layers.base.length + (layers.mid?.length ?? 0) + layers.outer.length, 0)
     : 0;
   return (
     <Card className={cn(kit?.state === "warn" && !outfit && "border-warning")}>
@@ -562,7 +564,7 @@ function MemberKitSummary({ member, kit, fit }: { member: TripMember; kit: TripM
           <p className="truncate text-sm font-medium text-foreground">{member.display_name}</p>
           <p className="text-sm text-muted-foreground">
             {outfit
-              ? `Outfit saved · ${outfit.advice.kind === "personalized" ? "Personalized" : "General guide"} · ${worn} ${worn === 1 ? "item" : "items"}`
+              ? `Outfit saved · ${kitAdvice(outfit).kind === "personalized" ? "Personalized" : "General guide"} · ${worn} ${worn === 1 ? "item" : "items"}`
               : !kit || kit.items.length === 0
               ? "no kit set"
               : `${sentenceCase(kit.effort)} · ${kit.items.map(sentenceCase).join(", ")}`}

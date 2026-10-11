@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUser } from "@/lib/api";
 import { listTripsForUser } from "@/lib/trips";
-import { savedOutfit } from "@/test/savedKit";
+import { savedOutfit, savedPlan } from "@/test/savedKit";
 import { TRIP } from "@/test/tripApi";
 import { POST } from "./route";
 
@@ -26,7 +26,9 @@ describe("Where an outfit can be saved", () => {
     const response = await options({ outfit: savedOutfit() });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      date: "2026-10-10",
+      dates: ["2026-10-10"],
+      start_date: "2026-10-10",
+      end_date: "2026-10-10",
       suggested_name: "Stowe trip",
       destination: "Stowe, Vermont",
       trips: [
@@ -35,6 +37,20 @@ describe("Where an outfit can be saved", () => {
       ],
     });
     expect(listTripsForUser).toHaveBeenCalledWith(expect.anything(), "user-1");
+  });
+
+  it("gives a plan's days with layers, its whole range for a new trip, and only trips with every day", async () => {
+    vi.mocked(listTripsForUser).mockResolvedValue([
+      { ...TRIP, start_date: "2026-10-09", end_date: "2026-10-12", member_count: 3, stop_count: 1 },
+      { ...TRIP, id: "trip-2", name: "Saturday", start_date: "2026-10-10", end_date: "2026-10-10", member_count: 1, stop_count: 0 },
+    ]);
+    const response = await options({ plan: savedPlan() });
+    expect(await response.json()).toMatchObject({
+      dates: ["2026-10-10", "2026-10-11"],
+      start_date: "2026-10-10",
+      end_date: "2026-10-12",
+      trips: [{ id: TRIP.id, day_number: 2 }, { id: "trip-2", day_number: null }],
+    });
   });
 
   it("refuses an outfit that can't be saved", async () => {

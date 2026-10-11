@@ -132,6 +132,26 @@ export function claimGuestGearUpDraft(owner: string): void {
   if (draft) saveGearUpDraft(owner, draft);
 }
 
+/**
+ * Makes `outing` the last one `owner` got results for, as if Gear up had just
+ * shown them, so /?resume=… asks for it again: how a saved trip kit is
+ * updated (#170). What else was entered is kept where the outing has none.
+ */
+export function keepOutingForGearUp(owner: string, outing: Outing): void {
+  const kept = readGearUpDraft(owner);
+  const later = outing.when.mode === "later" ? outing.when : null;
+  saveGearUpDraft(owner, {
+    activity: outing.activity,
+    exertion: outing.exertion,
+    place: outing.place,
+    inputMode: outing.when.mode,
+    date: later?.date ?? kept?.date ?? null,
+    time: later?.time ?? kept?.time ?? "12:00",
+    durationDays: later?.durationDays ?? kept?.durationDays ?? 1,
+    lastOuting: outing,
+  });
+}
+
 /** Keeps `owner`'s draft. An account's takes the place of the guest's, which it carries on. */
 export function saveGearUpDraft(owner: string | null, draft: GearUpDraft): void {
   const kept = readKept();

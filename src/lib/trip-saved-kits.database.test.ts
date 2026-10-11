@@ -63,6 +63,20 @@ describe("Saving outing kits to a trip in Postgres", () => {
     expect(stops).toEqual([{ name: "Stowe, Vermont" }]);
   });
 
+  it("makes a multi-day trip with a kit for each planned day that has layers", async () => {
+    const result = await save({
+      newTrip: { ...NEW_TRIP, end_date: "2026-10-12" },
+      days: [day("2026-10-10"), day("2026-10-11", { outfit: outfit("Wool base") })],
+    }) as Saved;
+    expect(result.kits.map((kit) => kit.date)).toEqual(["2026-10-10", "2026-10-11"]);
+    expect((await db.query("SELECT start_date::text, end_date::text FROM trips WHERE id = $1", [tripId])).rows)
+      .toEqual([{ start_date: "2026-10-10", end_date: "2026-10-12" }]);
+    expect((await kits()).map(({ date, outfit: saved }) => [date, saved])).toEqual([
+      ["2026-10-10", outfit()],
+      ["2026-10-11", outfit("Wool base")],
+    ]);
+  });
+
   it("returns the first answer for a repeated save and never overwrites later changes", async () => {
     const saveId = randomUUID();
     const first = await save({ saveId, newTrip: NEW_TRIP }) as Saved;
