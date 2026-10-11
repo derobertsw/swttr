@@ -269,6 +269,29 @@ describe("usePreferences", () => {
     ]);
   });
 
+  it("asks the server again when the next caller mounts after a failed read", async () => {
+    getOk = false;
+    localStorage.setItem(GUEST_KEY, JSON.stringify({ heightInches: 64 }));
+    userId = "account_new";
+    const { usePreferences } = await import("./usePreferences");
+    const first = renderHook(() => usePreferences());
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    const gets = () => vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method !== "PUT").length;
+    expect(gets()).toBe(1);
+
+    // Nothing asks again on its own, but the account isn't held up meanwhile.
+    first.rerender();
+    expect(gets()).toBe(1);
+
+    getOk = true;
+    const second = renderHook(() => usePreferences());
+    await waitFor(() => expect(first.result.current.bodyMetricsSelection).toEqual({ heightInches: 64 }));
+    expect(gets()).toBe(2);
+    expect(second.result.current.bodyMetricsSelection).toEqual({ heightInches: 64 });
+    expect(puts).toEqual([{ userId: "account_new", body: { heightInches: 64 } }]);
+    expect(localStorage.getItem(GUEST_KEY)).toBeNull();
+  });
+
   it("saves a signed-in change to that account's copy and the server only", async () => {
     serverPreferences = { account_a: { defaultActivity: "running" } };
     localStorage.setItem(keyFor("account_b"), JSON.stringify({ heightInches: 80 }));

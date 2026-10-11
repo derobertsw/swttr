@@ -28,8 +28,11 @@ interface StoredPreferences {
 /** The guest's preferences on this device, or one account's. */
 interface OwnerPreferences {
   stored: StoredPreferences;
-  /** For an account: whether what the server keeps for it has been merged in on this page. */
-  serverSynced: boolean;
+  /**
+   * For an account: whether this page has had the server's answer, or failed to.
+   * Either way it goes on from here; only a merge counts as synced.
+   */
+  serverAsked: boolean;
 }
 
 const NOTHING_STORED: StoredPreferences = {};
@@ -115,7 +118,7 @@ function ownerPreferences(key: string): OwnerPreferences {
   let preferences = owners.get(key);
   if (!preferences) {
     moveLegacyPreferences();
-    preferences = { stored: readStored(key), serverSynced: false };
+    preferences = { stored: readStored(key), serverAsked: false };
     owners.set(key, preferences);
   }
   return preferences;
@@ -176,11 +179,16 @@ function changedSince(then: StoredPreferences, now: StoredPreferences): StoredPr
  * way the guest's copy is gone afterwards, so no later account can take it.
  * Whatever the account has on this device that the server lacks, like a
  * guest's values it took or a change whose save failed, is saved again.
+ *
+ * When the server can't answer, the account goes on with what it has on this
+ * device, the guest's copy stays, and the next usePreferences() to mount asks
+ * again.
  */
 async function syncServerPreferences(userId: string) {
   const key = storageKey(userId);
   // What the account had here before asking. A change made while waiting is newer than the server's.
   const before = ownerPreferences(key).stored;
+  let synced = false;
   try {
     const res = await fetch("/api/preferences");
     if (!res.ok || serverSyncStartedFor !== userId) return;
@@ -208,10 +216,14 @@ async function syncServerPreferences(userId: string) {
     const unsaved = changedSince({ ...saved, ...changed }, merged);
     if (!isEmpty(unsaved)) void savePreferences(toPayload(unsaved), "usePreferences.saveUnsaved");
     updateOwner(guestKey, { stored: {} });
+    synced = true;
   } catch (err) {
     logWarn("usePreferences.fetch", err);
   } finally {
-    if (serverSyncStartedFor === userId) updateOwner(key, { serverSynced: true });
+    if (serverSyncStartedFor === userId) {
+      if (!synced) serverSyncStartedFor = null;
+      updateOwner(key, { serverAsked: true });
+    }
   }
 }
 
@@ -285,6 +297,6 @@ export function usePreferences() {
     updateSensitivity,
     updateDefaultActivity,
     updateBodyMetrics,
-    loading: preferences === null || (owner !== null && !preferences.serverSynced),
+    loading: preferences === null || (owner !== null && !preferences.serverAsked),
   };
 }
