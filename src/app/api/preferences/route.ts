@@ -25,9 +25,10 @@ export async function GET() {
       return NextResponse.json({});
     }
 
+    // Not "nothing saved": the client would put the device's values in place of the account's.
     if (error) {
       console.error("Failed to fetch preferences:", error);
-      return NextResponse.json({});
+      return NextResponse.json({ error: "Failed to fetch preferences" }, { status: 500 });
     }
 
     const savedOptionalMetrics = sanitizeOptionalBodyMetrics({
@@ -58,7 +59,7 @@ export async function GET() {
     return NextResponse.json(response);
   } catch (err) {
     console.error("Database error:", err);
-    return NextResponse.json({});
+    return NextResponse.json({ error: "Failed to fetch preferences" }, { status: 500 });
   }
 }
 
