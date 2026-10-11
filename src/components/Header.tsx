@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { Share2, HelpCircle, Menu, MessageSquare, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { logWarn } from "@/lib/logger";
@@ -86,7 +86,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
 
   const openPreferencesFromAvatar = () => {
     // The avatar's menu item is gone, so focus returns to the avatar, or to
-    // whatever replaced it after a sign-out or a narrower window.
+    // whatever replaced it after a sign-out.
     preferencesFocus.remember(() => [accountControl(), menuButton()].find(isShown) ?? null);
     setPreferencesOpen(true);
   };
@@ -113,15 +113,19 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Desktop: show UserButton or Sign In */}
-        <div ref={accountAreaRef} className={cn("hidden items-center gap-4", !isNativeTabShell && "md:flex")}>
+        {/* The avatar shows at every width. Below md, and in the native shell,
+            Sign In is in the menu instead. */}
+        <div ref={accountAreaRef} className="flex items-center gap-4">
           <SignedIn>
             <AccountMenu onOpenSettings={openPreferencesFromAvatar} onShare={handleShare} />
           </SignedIn>
           <SignedOut>
             <Link
               href="/sign-in"
-              className="inline-flex min-h-11 items-center rounded-control px-2 text-sm font-semibold text-foreground underline-offset-4 hover:underline"
+              className={cn(
+                "hidden min-h-11 items-center rounded-control px-2 text-sm font-semibold text-foreground underline-offset-4 hover:underline",
+                !isNativeTabShell && "md:inline-flex"
+              )}
             >
               Sign In
             </Link>
@@ -136,18 +140,22 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
               <span className="sr-only">Open menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-64">
+          <SheetContent
+            side="right"
+            className="w-64"
+            onCloseAutoFocus={(event) => {
+              // The window widened past md while the menu was open, which
+              // hid the menu button, so focus the account area instead.
+              if (isShown(menuButton())) return;
+              event.preventDefault();
+              accountControl()?.focus({ preventScroll: true });
+            }}
+          >
             <SheetHeader>
               <SheetTitle>Menu</SheetTitle>
-              <SheetDescription className="sr-only">Navigation and account options</SheetDescription>
+              <SheetDescription className="sr-only">Settings, help and sharing</SheetDescription>
             </SheetHeader>
             <nav aria-label="Menu" className="flex flex-col gap-1 px-2 pb-4">
-              <SignedIn>
-                <div className="mb-2 flex items-center gap-3 border-b border-border px-3 pb-4">
-                  <UserButton />
-                  <span className="text-sm text-muted-foreground">Account</span>
-                </div>
-              </SignedIn>
               <SignedOut>
                 <SheetClose asChild>
                   <Link
@@ -158,6 +166,13 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
                   </Link>
                 </SheetClose>
               </SignedOut>
+              <button
+                onClick={openPreferencesFromMenu}
+                className={MENU_ITEM_CLASS}
+              >
+                <Settings />
+                Settings
+              </button>
               <SheetClose asChild>
                 <Link
                   href="/faq"
@@ -176,13 +191,6 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
                 <MessageSquare />
                 Feedback
               </a>
-              <button
-                onClick={openPreferencesFromMenu}
-                className={MENU_ITEM_CLASS}
-              >
-                <Settings />
-                Settings
-              </button>
               <button
                 onClick={handleShare}
                 className={MENU_ITEM_CLASS}
