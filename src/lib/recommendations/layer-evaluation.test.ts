@@ -90,7 +90,7 @@ describe("evaluatePhase", () => {
   it("flags cold risk when a region is under target even if the total is in range", () => {
     const result = evaluatePhase({
       ...base,
-      itemClo: { ...base.itemClo, hands: [0.2] },
+      itemClo: { ...base.itemClo!, hands: [0.2] },
     });
     expect(result.decision).toMatchObject({ riskType: "cold" });
     expect(result.decision?.delta).toBeCloseTo(0.8, 10);

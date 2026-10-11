@@ -1,3 +1,4 @@
+import type { RecommendedGarment } from "./biophysics";
 import type { GarmentThermalProperties, GarmentSemantics, ThermalProvenance } from "@/types/garments";
 
 // Body parts and their layer types
@@ -17,7 +18,9 @@ export interface UserItemMapping {
 }
 
 export interface AvailableItem extends GarmentSemantics {
+  thermal_data_status?: 'known' | 'unknown';
   thermal_provenance?: ThermalProvenance;
+  protection?: RecommendedGarment["protection"];
   id: string;
   type: "garment" | "handwear" | "headwear" | "custom";
   brand: string;
@@ -43,6 +46,11 @@ export interface WardrobeItem {
   nickname?: string;
   disabled?: boolean;
   details: GarmentSemantics & {
+    thermal_data_status?: 'known' | 'unknown';
+    thermal_provenance?: ThermalProvenance;
+    protection?: RecommendedGarment['protection'];
+    rcl_torso?: number;
+    rcl_legs?: number;
     brand: string;
     model_name: string;
     brand_logo_url?: string;
@@ -61,6 +69,7 @@ export interface WardrobeItem {
     covers_ears?: boolean;
     covers_neck?: boolean;
     covers_face?: boolean;
+    garment_protection?: RecommendedGarment["protection"];
     garment_thermal_properties?: GarmentThermalProperties | GarmentThermalProperties[];
     // For custom items
     body_part?: BodyPart;

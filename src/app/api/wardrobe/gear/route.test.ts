@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { createFakeSupabase } from "@/test/fakeSupabase";
+import catalog from '@/test/fixtures/gear-catalog.json';
 import { GET, POST } from "./route";
 
 const state = vi.hoisted(() => ({ client: null as unknown }));
@@ -31,6 +32,22 @@ beforeEach(() => {
 });
 
 describe("GET /api/wardrobe/gear", () => {
+  it('returns the shared server status and provenance for complete and incomplete garments', async () => {
+    const garment = catalog.garments.find(g => g.covers_torso && g.covers_arms)!;
+    for (const complete of [true, false]) {
+      state.client = createFakeSupabase({
+        user_wardrobe: [{ id: 'owned', user_id: 'user_1', item_type: 'garment', item_id: garment.id }],
+        garments: [{ ...garment, garment_thermal_properties: { ...garment.garment_thermal_properties,
+          ...(complete ? {} : { recl_arms: null }),
+        } }],
+      });
+      const { items: [{ details }] } = await (await GET()).json();
+      expect(details.thermal_data_status).toBe(complete ? 'known' : 'unknown');
+      expect(details.rcl_torso).toBe(complete ? garment.garment_thermal_properties.rcl_torso : undefined);
+      expect(details.thermal_provenance.data_source).toBe(garment.garment_thermal_properties.data_source);
+    }
+  });
+
   it("returns the user's items newest first with their details", async () => {
     const body = await (await GET()).json();
 

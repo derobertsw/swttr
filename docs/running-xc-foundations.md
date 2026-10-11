@@ -58,6 +58,28 @@ These rounded insulation values, regional evaporative resistance, coverage fract
 
 Migration 022 checks matching basics again at deployment time, adds only missing types, uses conflict guards and does not overwrite existing thermal data. Apply it before deploying code that reads the new wardrobe columns. Preparing/testing the migration does not change the production database.
 
+## Manual evaluation (#244 follow-up)
+
+The recommendation-to-layer conversion and manual picker retain garment type, usage,
+coverage and estimate provenance. `/api/v1/ensembles/evaluate` accepts item references
+alongside the legacy numeric arrays. With references present, it loads catalog
+regional values on the server; submitted clo and standalone claims cannot override
+the catalog. Custom wardrobe items are loaded only for their authenticated owner
+and matching body area. Source-free estimates require an explicit generic-estimate
+label. Neither an item reference nor its capabilities asserts ownership.
+
+Regional thermal values already include partial coverage. They are not multiplied
+by coverage again or replaced with whole-body values when missing. Unknown covered
+insulation/evaporative data or a deleted item returns `thermal_data_status: unknown`
+with no total, comfort decision, score or inferred gap. Known zero clo stays valid.
+Database failures retain the existing failed-check/retry behavior. The view displays
+comfort as unknown and does not fall back to the original recommendation's score.
+
+Legacy numeric requests remain supported, with null representing unknown clo.
+This change preserves the existing targets, accessory decisions and arm-target
+context; complete selector and manual-edit comfort policy integration remains in
+#247/#248/#250. No new catalog products or database migrations are needed.
+
 ## Validation and limits
 
 Behavioral tests cover MET conversion, body size, effort and warmer-weather monotonicity, zero-target/taper boundaries, wet/strong-wind/cold cases, weighted regional consistency, partial-coverage arithmetic, standalone versus underlayer semantics, unknown data, catalog API/pool availability, and Postgres migration replay, deployment-time matching, range constraints and preservation of existing insulation/access policies. Golden response changes require semantic review; a snapshot update alone does not establish correctness. After removing newly added garment metadata, all 45 cycling/alpine/touring golden cases preserve their previous behavior. The 28 running/XC cases change targets and resulting outfits; mild XC becomes lighter, cold/wet targets remain positive, running retains known weather protection, and alpine chairlift/touring phases retain their prior targets and transitions. Some running/XC outcomes still reflect the old selection and comfort heuristics, including forced accessories and unsuitable layering. Those are pending integration work, not evidence of correctness from high comfort scores.

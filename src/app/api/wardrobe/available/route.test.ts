@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from 'next/server';
+import { POST as evaluate } from '@/app/api/v1/ensembles/evaluate/route';
+import { createFakeSupabase } from '@/test/fakeSupabase';
+import catalog from '@/test/fixtures/gear-catalog.json';
 import { GET } from "./route";
 
 vi.mock("@/lib/supabase", () => ({
@@ -50,6 +54,35 @@ describe("Wardrobe Available API Route", () => {
 
     expect(response.status).toBe(500);
     expect((await response.json()).items).toBeUndefined();
+  });
+
+  it.each(['complete', 'missing arm evaporation', 'missing whole body', 'uncovered torso'])('agrees with evaluation about %s warmth', async kind => {
+    const base = catalog.garments.find(g => g.covers_torso && g.covers_arms)!;
+    const garment = {
+      ...base,
+      covers_torso: kind !== 'uncovered torso',
+      garment_thermal_properties: [{ ...base.garment_thermal_properties,
+        ...(kind === 'missing arm evaporation' ? { recl_arms: null } : {}),
+        ...(kind === 'missing whole body' ? { rcl_whole_body: null } : {}),
+      }],
+    };
+    mockGetSupabase.mockReturnValue(createFakeSupabase({ garments: [garment] }) as unknown as ReturnType<typeof getSupabase>);
+    const { items: [item] } = await (await GET()).json();
+    const result = await evaluate(new NextRequest('http://localhost/api/v1/ensembles/evaluate', {
+      method: 'POST', body: JSON.stringify({ phases: [{
+        items: { torso: [{ sourceId: garment.id, item_type: 'garment' }], legs: [], hands: [], headNeck: [] }, targets: {},
+      }] }),
+    }));
+    expect(result.status).toBe(200);
+    const { phases: [phase] } = await result.json();
+    if (kind === 'complete') {
+      expect(item.thermal_data_status).toBe('known');
+      expect(phase.items.torso[0].rcl).toBe(item.rcl_torso);
+    } else {
+      expect(item.rcl_torso).toBeUndefined();
+      expect(phase.thermal_data_status).toBe('unknown');
+      if (kind !== 'uncovered torso') expect(item.thermal_data_status).toBe('unknown');
+    }
   });
 
   it("normalizes garment rcl values from object and array relationship shapes", async () => {
