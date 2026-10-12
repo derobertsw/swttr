@@ -8,8 +8,11 @@ import { createFakeSupabase } from "@/test/fakeSupabase";
 import { ORGANIZER, SAM } from "@/test/tripApi";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
 import { addDaysToDateString } from "@/lib/forecastRange";
-import type { TripFull } from "@/types/trips";
-import { GET } from "./route";
+import { savedOutfit, WEAR } from "@/test/savedKit";
+import type { TripPackResponse } from "@/types/trip-packing";
+import type { TripFull, TripMember, TripMemberDayKit } from "@/types/trips";
+import type { SavedKit } from "@/types/savedKit";
+import { GET, POST } from "./route";
 
 vi.mock("@/lib/trips", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/trips")>(), requireTripAccess: vi.fn(), loadTripFull: vi.fn(),
@@ -124,7 +127,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.coveredDays).toBe(dates.length);
+    expect(data.suggestedDays).toBe(dates.length);
     const url = new URL(vi.mocked(global.fetch).mock.calls[0][0] as string);
     expect(url.searchParams.get("latitude")).toBe(String(latitude));
     expect(url.searchParams.get("longitude")).toBe(String(longitude));
@@ -144,8 +147,8 @@ describe("GET /api/v1/trips/[id]/pack", () => {
         { id: "evening", minTemp: 56, maxTemp: 61 },
       ]);
     }
-    expect(data.packingList.totalRequiredSlots).toBeGreaterThan(0);
-    expect(data.packingList.extras).toEqual(["Removable mid-layer for daytime swings"]);
+    expect(data.suggestions.totalRequiredSlots).toBeGreaterThan(0);
+    expect(data.suggestions.extras).toEqual(["Removable mid-layer for daytime swings"]);
   });
 
   it("packs without a wardrobe when it couldn't be read", async () => {
@@ -176,7 +179,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     expect(day.baseline).toMatchObject({ minTemp: 49, maxWindSpeed: 0, maxPrecipProbability: 0 });
     expect(day.dayparts[0]).toMatchObject({ id: "morning", minTemp: 49 });
     const data = await response.json();
-    expect(data.coveredDays).toBe(1);
+    expect(data.suggestedDays).toBe(1);
     expect(data.coverage[0].forecast).toMatchObject({ status: "partial", availableHours: 13, expectedHours: 16 });
   });
 
@@ -189,8 +192,8 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.coveredDays).toBe(0);
-    expect(data.packingList.totalRequiredSlots).toBe(0);
+    expect(data.suggestedDays).toBe(0);
+    expect(data.suggestions.totalRequiredSlots).toBe(0);
     expect(data.coverage[0]).toMatchObject({ advice: "unavailable", action: "retry_weather", forecast: { status: "error" } });
   });
 
@@ -204,7 +207,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     const data = await (await getPack()).json();
     expect(data.coverage.map((day: { date: string }) => day.date)).toEqual(dates);
     expect(data.totalDays).toBe(10);
-    expect(data.coveredDays).toBe(9);
+    expect(data.suggestedDays).toBe(9);
     expect(data.coverage[3]).toMatchObject({ advice: "missing_inputs", reason: "no_day" });
     expect(data.skipped).toEqual([{ date: "2026-10-11", reason: "no_day" }]);
     expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -222,7 +225,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     } }));
     const data = await (await getPack()).json();
     const plans = vi.mocked(packingList.buildPackingListFromDays).mock.calls[0][0];
-    expect(data.coveredDays).toBe(10);
+    expect(data.suggestedDays).toBe(10);
     expect(plans.map((day) => day.baseline.minTemp)).toEqual([46, 20, 20, 20, 20, 20, 20, 20, 20, 46]);
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
@@ -234,14 +237,14 @@ describe("GET /api/v1/trips/[id]/pack", () => {
       forecastFixture("America/New_York", "2026-10-08T04:00Z", 24, () => -4) });
     const data = await (await getPack()).json();
     const supported = ["Alpine", "XC", "Hike", "Climb"].includes(activity);
-    expect(data.coveredDays).toBe(supported ? 1 : 0);
+    expect(data.suggestedDays).toBe(supported ? 1 : 0);
     expect(data.coverage[0]).toMatchObject({
       advice: supported ? "available" : activity === "Rest" ? "rest" : "unsupported",
       forecast: { status: supported ? "available" : "not_requested", availableHours: supported ? 16 : 0 },
     });
     if (activity === "Climb") expect(data.coverage[0].approximation).toMatch(/hiking guidance/);
     if (!supported) {
-      expect(data.packingList.totalRequiredSlots).toBe(0);
+      expect(data.suggestions.totalRequiredSlots).toBe(0);
       expect(data.coverage[0].forecast.reason).toBe("not_needed");
       expect(data.coverage[0].forecast.message).not.toMatch(/Choose a location/);
       expect(global.fetch).not.toHaveBeenCalled();
@@ -255,12 +258,12 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     else Object.values(fixture.hourly).forEach((series) => { series.length = 0; });
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => fixture });
     const data = await (await getPack()).json();
-    expect(data.coveredDays).toBe(0);
+    expect(data.suggestedDays).toBe(0);
     expect(data.coverage).toHaveLength(2);
     expect(data.coverage.every((day: { forecast: { status: string }; reason: string }) =>
       day.forecast.status === "unavailable" && day.reason === "no_daytime_hours")).toBe(true);
     expect(data.skipped).toHaveLength(2);
-    expect(data.packingList.extras).toEqual([]);
+    expect(data.suggestions.extras).toEqual([]);
   });
 
   it.each(["http", "network", "invalid_json"])("isolates a %s failure to its stop", async (failure) => {
@@ -275,7 +278,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
       return { ok: true, json: async () => forecastFixture("America/New_York", "2026-10-08T04:00Z", 48, () => -4) };
     });
     const data = await (await getPack()).json();
-    expect(data.coveredDays).toBe(1);
+    expect(data.suggestedDays).toBe(1);
     expect(data.coverage[1]).toMatchObject({ advice: "unavailable", forecast: { status: "error" }, action: "retry_weather" });
     expect(data.coverage[1].message).not.toMatch(/Choose/);
   });
@@ -287,7 +290,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
       forecastFixture("America/New_York", "2026-10-08T04:00Z", 384, () => -4) });
     const data = await (await getPack()).json();
     expect(data.totalDays).toBe(19);
-    expect(data.coveredDays).toBe(16);
+    expect(data.suggestedDays).toBe(16);
     expect(data.coverage[0]).toMatchObject({ reason: "past", action: "plan_manually" });
     expect(data.coverage[17]).toMatchObject({ reason: "outside_forecast", action: "check_later" });
     expect(data.skipped.map((day: { date: string }) => day.date)).toEqual(["2026-10-07", "2026-10-24", "2026-10-25"]);
@@ -304,7 +307,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () =>
       forecastFixture("America/New_York", "2026-10-08T04:00Z", 48, () => -4) });
     const data = await (await getPack()).json();
-    expect(data.coveredDays).toBe(1);
+    expect(data.suggestedDays).toBe(1);
     expect(data.coverage[0]).toMatchObject({ advice: "manual", forecast: { status: "available" } });
     expect(data.coverage[1].advice).toBe("available");
   });
@@ -317,7 +320,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () =>
       forecastFixture("America/New_York", "2026-10-08T04:00Z", 24, () => -4) });
     const data = await (await getPack()).json();
-    expect(data.coveredDays).toBe(0);
+    expect(data.suggestedDays).toBe(0);
     expect(data.coverage[0]).toMatchObject({ advice: "missing_inputs", reason,
       action: reason === "no_activity" ? "set_activity" : "set_location" });
   });
@@ -341,7 +344,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     global.fetch = vi.fn().mockRejectedValue(new Error("Provider should not be called"));
     const data = await (await getPack()).json();
     expect(global.fetch).not.toHaveBeenCalled();
-    expect(data.coveredDays).toBe(0);
+    expect(data.suggestedDays).toBe(0);
     expect(data.coverage).toHaveLength(2);
     for (const day of data.coverage) {
       expect(day.forecast).toMatchObject(kind === "past" ? { status: "unavailable", reason: "past" }
@@ -365,7 +368,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () =>
       forecastFixture("America/New_York", "2026-10-08T04:00Z", 120, () => -4) });
     const data = await (await getPack()).json();
-    expect(data.coveredDays).toBe(1);
+    expect(data.suggestedDays).toBe(1);
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(new URL(vi.mocked(global.fetch).mock.calls[0][0] as string).searchParams.get("latitude")).toBe("40");
     expect(data.coverage.slice(1, 4).every((day: { forecast: { reason: string } }) => day.forecast.reason === "not_needed")).toBe(true);
@@ -391,7 +394,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     expect(peak).toBe(3);
     expect(inFlight).toBe(0);
     expect(global.fetch).toHaveBeenCalledTimes(7);
-    expect(data.coveredDays).toBe(7);
+    expect(data.suggestedDays).toBe(7);
     expect(data.totalDays).toBe(7);
   });
 
@@ -404,7 +407,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () =>
       forecastFixture(timezone, firstHour, 24, () => offset) });
     const data = await (await getPack()).json();
-    expect(data.coveredDays).toBe(1);
+    expect(data.suggestedDays).toBe(1);
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -412,7 +415,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     mockTrip(["2026-10-08"], 0, 0);
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () =>
       forecastFixture("UTC", "2026-10-08T00:00Z", 24, () => 0) });
-    expect((await (await getPack()).json()).coveredDays).toBe(1);
+    expect((await (await getPack()).json()).suggestedDays).toBe(1);
   });
 
   it("preserves the trip authorization error without fetching weather", async () => {
@@ -422,4 +425,211 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+});
+
+const ANA: TripMember = { ...SAM, id: "member-ana", user_id: "user-2", display_name: "Ana", status: "joined" };
+const RAIN_SHELL = { ...WEAR, torso: { ...WEAR.torso, outer: [{ name: "Rain shell", sourceId: "g-9" }] } };
+const outfitWith = (wear = WEAR) => savedOutfit({ phases: [{ id: "outing", wear, carry: [], decision: null }] });
+
+function kit(day: string, member: TripMember, outfit: SavedKit | null, items: string[] = []): TripMemberDayKit {
+  return {
+    id: `kit-${member.id}-${day}`, trip_day_id: day, trip_member_id: member.id, effort: "steady", items, note: null, state: "ok",
+    updated_at: `${day}T01:00:00+00:00`, outfit, outfit_saved_at: outfit ? `${day}T01:00:00+00:00` : null,
+  };
+}
+
+/** A three-day trip at Stowe with the organizer and Ana, and a database client with `packing` rows and an rpc. */
+function mockKitTrip(options: { kits?: TripMemberDayKit[]; userId?: string; packing?: Record<string, unknown>[]; packingError?: boolean } = {}) {
+  const dates = ["2026-10-10", "2026-10-11", "2026-10-12"];
+  const full: TripFull = {
+    trip: { id: "trip-1", owner_user_id: "user-1", name: "Stowe", start_date: dates[0], end_date: dates[2], status: "planning", created_at: "", updated_at: "" },
+    stops: [{ id: "stop-1", trip_id: "trip-1", position: 0, name: "Stowe, Vermont", latitude: 44.47, longitude: -72.69, activities: ["Alpine"], created_at: "" }],
+    days: dates.map((date) => ({ id: date, trip_id: "trip-1", stop_id: "stop-1", date, activity: "Alpine" })),
+    members: [ORGANIZER, ANA], kits: options.kits ?? [], gear: [],
+  };
+  const fake = createFakeSupabase({ trip_member_packing: options.packing ?? [] });
+  const rpc = vi.fn().mockResolvedValue({ data: { items: [], quantities: {} }, error: null });
+  const supabase = {
+    from: (table: string) => table === "trip_member_packing" && options.packingError
+      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { code: "42P01", message: "missing" } }) }) }) }
+      : fake.from(table),
+    rpc,
+  };
+  vi.mocked(loadTripFull).mockResolvedValue(full);
+  vi.mocked(requireTripAccess).mockResolvedValue({ trip: full.trip, userId: options.userId ?? "user-1", supabase: supabase as unknown as SupabaseClient });
+  return { full, rpc };
+}
+
+const postPack = (body: unknown) => POST(
+  new NextRequest("http://localhost:3000/api/v1/trips/trip-1/pack", { method: "POST", body: JSON.stringify(body) }),
+  { params: Promise.resolve({ id: "trip-1" }) }
+);
+
+describe("GET /api/v1/trips/[id]/pack from saved outfits", () => {
+  const originalFetch = global.fetch;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-08T12:00Z"));
+    vi.mocked(fetchUserWardrobeItems).mockResolvedValue([]);
+    vi.spyOn(packingList, "buildPackingListFromDays");
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () =>
+      forecastFixture("America/New_York", "2026-10-08T04:00Z", 120, () => -4) });
+  });
+  afterEach(() => { global.fetch = originalFetch; vi.restoreAllMocks(); });
+
+  it("packs the same jacket on three days once, with each day, and asks no forecast for them", async () => {
+    mockKitTrip({ kits: ["2026-10-10", "2026-10-11", "2026-10-12"].map((day) => kit(day, ORGANIZER, outfitWith())) });
+    const data: TripPackResponse = await (await getPack()).json();
+    expect(data.items.filter((item) => item.name === "Ski shell")).toEqual([expect.objectContaining({
+      key: "item:g-3", ownership: "owned", quantity: 1,
+      days: ["2026-10-10", "2026-10-11", "2026-10-12"].map((date) => ({ date, uses: ["wear"] })),
+    })]);
+    expect(data.items.find((item) => item.name === "Fleece")?.ownership).toBe("suggested");
+    expect(data.coverage.map((day) => day.advice)).toEqual(["saved", "saved", "saved"]);
+    expect(data.suggestedDays).toBe(0);
+    expect(data.suggestions.totalRequiredSlots).toBe(0);
+    expect(data.skipped).toEqual([]);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps two members' lists to themselves", async () => {
+    const kits = [kit("2026-10-10", ORGANIZER, outfitWith()), kit("2026-10-10", ANA, outfitWith(RAIN_SHELL))];
+    mockKitTrip({ kits });
+    const mine: TripPackResponse = await (await getPack()).json();
+    expect(mine.items.map((item) => item.name)).toContain("Ski shell");
+    expect(mine.items.map((item) => item.name)).not.toContain("Rain shell");
+    expect(Object.keys(mine.kitVersions)).toEqual(["kit-member-you-2026-10-10"]);
+    mockKitTrip({ kits, userId: "user-2" });
+    const anas: TripPackResponse = await (await getPack()).json();
+    expect(anas.items.map((item) => item.name)).toContain("Rain shell");
+    expect(anas.items.map((item) => item.name)).not.toContain("Ski shell");
+  });
+
+  it("lists an older checklist apart, and suggests only for the day with nothing saved", async () => {
+    mockKitTrip({ kits: [kit("2026-10-10", ORGANIZER, null, ["shell", "gloves"]), kit("2026-10-12", ORGANIZER, outfitWith())] });
+    const data: TripPackResponse = await (await getPack()).json();
+    expect(data.checklists).toEqual([{ date: "2026-10-10", items: ["shell", "gloves"] }]);
+    expect(data.coverage.map((day) => day.advice)).toEqual(["manual", "available", "saved"]);
+    expect(data.coverage[0].message).toMatch(/Older checklist/);
+    expect(data.coverage[1].message).toMatch(/No outfit saved/);
+    expect(data.suggestedDays).toBe(1);
+    expect(data.suggestions.totalRequiredSlots).toBeGreaterThan(0);
+    expect(vi.mocked(packingList.buildPackingListFromDays).mock.calls[0][0].map((day) => day.date)).toEqual(["2026-10-11"]);
+    // Checklist slots never become named items.
+    expect(data.items.some((item) => item.name === "shell")).toBe(false);
+    expect(data.skipped).toEqual([{ date: "2026-10-10", reason: "manual_kit" }]);
+  });
+
+  it("notes a saved outfit planned for another activity, without changing it", async () => {
+    const { full } = mockKitTrip({ kits: [kit("2026-10-10", ORGANIZER, outfitWith())] });
+    full.days[0].activity = "XC";
+    const data: TripPackResponse = await (await getPack()).json();
+    expect(data.coverage[0]).toMatchObject({ advice: "saved", action: "review_day", notes: [expect.stringMatching(/Planned for Alpine Skiing, not this day's activity \(XC\)/)] });
+    expect(data.items.some((item) => item.name === "Ski shell")).toBe(true);
+  });
+
+  it("records the first list as acknowledged, without flagging it", async () => {
+    const { rpc } = mockKitTrip({ kits: [kit("2026-10-10", ORGANIZER, outfitWith())] });
+    const data: TripPackResponse = await (await getPack()).json();
+    expect(data.items.every((item) => !item.change)).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("update_trip_packing", expect.objectContaining({ p_trip_id: "trip-1", p_user_id: "user-1", p_op: expect.objectContaining({
+      op: "acknowledge", kits: { "kit-member-you-2026-10-10": "2026-10-10T01:00:00+00:00" },
+      seen: expect.objectContaining({ "item:g-3": { name: "Ski shell", dates: ["2026-10-10"], slots: ["2026-10-10:torso:outer"] } }),
+    }) }));
+  });
+
+  it("doesn't record an empty list, so the first outfit saved isn't flagged as new", async () => {
+    const { rpc } = mockKitTrip();
+    await getPack();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("flags a substituted jacket and an item that left since the list was acknowledged, with saved quantities and items", async () => {
+    const seen = {
+      "item:g-3": { name: "Ski shell", dates: ["2026-10-10"], slots: ["2026-10-10:torso:outer"] },
+      "item:old": { name: "Old gloves", dates: ["2026-10-10"], slots: ["2026-10-10:hands:outer"] },
+    };
+    const manual = [{ id: "0b4b6a7e-9c1d-4f53-a8b2-2f6c1d9e7a10", name: "Headlamp", quantity: 1 }];
+    const { rpc } = mockKitTrip({
+      kits: [kit("2026-10-10", ORGANIZER, outfitWith(RAIN_SHELL))],
+      packing: [{ trip_member_id: ORGANIZER.id, seen, items: manual, quantities: { "item:g-1": 3 } }],
+    });
+    const data: TripPackResponse = await (await getPack()).json();
+    expect(data.items.find((item) => item.name === "Rain shell")?.change).toEqual({ kind: "replaced", replaces: ["Ski shell"] });
+    expect(data.items.find((item) => item.name === "Insulated gloves")?.change).toEqual({ kind: "replaced", replaces: ["Old gloves"] });
+    expect(data.items.find((item) => item.name === "Merino crew")).toMatchObject({ quantity: 3, change: { kind: "added" } });
+    expect(data.removed).toEqual([]);
+    expect(data.manual).toEqual(manual);
+    expect(data.editable).toBe(true);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("still lists the outfits when the person's own choices can't be read, and offers no changes", async () => {
+    const { rpc } = mockKitTrip({ kits: [kit("2026-10-10", ORGANIZER, outfitWith())], packingError: true });
+    const data: TripPackResponse = await (await getPack()).json();
+    expect(data.editable).toBe(false);
+    expect(data.manual).toEqual([]);
+    expect(data.items.length).toBeGreaterThan(0);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/v1/trips/[id]/pack", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+  const id = "0b4b6a7e-9c1d-4f53-a8b2-2f6c1d9e7a10";
+
+  it("applies a change to the signed-in member's list and returns their choices", async () => {
+    const { rpc } = mockKitTrip();
+    rpc.mockResolvedValueOnce({ data: { items: [{ id, name: "Headlamp", quantity: 2 }], quantities: { "item:g-1": 3 } }, error: null });
+    const response = await postPack({ op: "add_item", id, name: " Headlamp ", quantity: 2 });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ manual: [{ id, name: "Headlamp", quantity: 2 }], quantities: { "item:g-1": 3 } });
+    expect(rpc).toHaveBeenCalledWith("update_trip_packing", { p_trip_id: "trip-1", p_user_id: "user-1", p_op: { op: "add_item", id, name: "Headlamp", quantity: 2 } });
+  });
+
+  it("refuses an invalid change without saving", async () => {
+    const { rpc } = mockKitTrip();
+    const response = await postPack({ op: "item_quantity", id, quantity: 0 });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/1 to 20/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["P0002", 404, /removed in another session/],
+    ["40001", 409, /saved outfits changed/],
+    ["22023", 400, /Check the change/],
+    ["42501", 404, /Not found/],
+    ["42883", 503, /can't be saved yet/],
+    ["XX000", 500, /Couldn't save/],
+  ])("answers a %s failure with %i", async (failure, status, message) => {
+    const { rpc } = mockKitTrip();
+    rpc.mockResolvedValueOnce({ data: null, error: { code: failure, message: "failed" } });
+    const response = await postPack({ op: "item_quantity", id, quantity: 2 });
+    expect(response.status).toBe(status);
+    expect((await response.json()).error).toMatch(message);
+  });
+
+  it("acknowledges the list the person saw, worked out again on the server", async () => {
+    const { rpc } = mockKitTrip({ kits: [kit("2026-10-10", ORGANIZER, outfitWith()), kit("2026-10-11", ANA, outfitWith(RAIN_SHELL))] });
+    const response = await postPack({ op: "acknowledge", kits: { "kit-member-you-2026-10-10": "2026-10-10T01:00:00Z" } });
+    expect(response.status).toBe(200);
+    const op = rpc.mock.calls[0][1].p_op;
+    expect(op).toMatchObject({ op: "acknowledge", kits: { "kit-member-you-2026-10-10": "2026-10-10T01:00:00+00:00" } });
+    expect(Object.keys(op.seen)).toContain("item:g-3");
+    expect(Object.keys(op.seen)).not.toContain("item:g-9");
+  });
+
+  it("refuses to acknowledge a list whose outfits changed since it was shown", async () => {
+    const { rpc } = mockKitTrip({ kits: [kit("2026-10-10", ORGANIZER, outfitWith())] });
+    const response = await postPack({ op: "acknowledge", kits: { "kit-member-you-2026-10-10": "2026-10-09T01:00:00Z" } });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "kits_changed" });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("preserves the trip authorization error", async () => {
+    vi.mocked(requireTripAccess).mockResolvedValue(NextResponse.json({ error: "Not found" }, { status: 404 }));
+    expect((await postPack({ op: "remove_item", id })).status).toBe(404);
+  });
 });

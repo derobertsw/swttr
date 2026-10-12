@@ -1,29 +1,21 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
-import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import PageLayout from "@/components/PageLayout";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BackLink, SectionLabel, TripError, sentenceCase } from "@/components/trips/trip-primitives";
-import { cn } from "@/lib/utils";
-import type { TripDayCoverage, TripPackResponse } from "@/types/trip-coverage";
-
-const BODY_PART_LABEL: Record<string, string> = {
-  torso: "Torso",
-  legs: "Legs",
-  hands: "Hands",
-  headNeck: "Head & neck",
-};
-
-const LAYER_LABEL: Record<string, string> = {
-  base: "Base",
-  mid: "Mid",
-  outer: "Outer",
-};
+import { BackLink, SectionLabel, TripError } from "@/components/trips/trip-primitives";
+import {
+  ManualItems, OlderChecklists, PackingChanges, PackingItems, PackingSuggestions, packingDay,
+} from "@/components/trips/TripPacking";
+import { errorMessage, tripRequest, TripRequestError } from "@/lib/trip-requests";
+import type { TripDayCoverage } from "@/types/trip-coverage";
+import type { PackingChange, PackingChoices, PackingItem, PackingManualItem, TripPackResponse } from "@/types/trip-packing";
 
 const COVERAGE_ACTION_LABEL: Record<TripDayCoverage["action"], string> = {
   set_location: "Choose location", set_activity: "Choose activity", plan_manually: "Plan kit manually",
@@ -31,20 +23,20 @@ const COVERAGE_ACTION_LABEL: Record<TripDayCoverage["action"], string> = {
 };
 
 function coverageActionLabel(day: TripDayCoverage) {
-  return day.advice === "manual" ? "Review manual kit" : COVERAGE_ACTION_LABEL[day.action];
+  if (day.advice === "saved") return "Review saved outfit";
+  if (day.advice === "manual") return "Review checklist";
+  if (day.advice === "available") return "Plan this day";
+  return COVERAGE_ACTION_LABEL[day.action];
 }
 
-async function fetchPackList(tripId: string): Promise<TripPackResponse> {
-  const res = await fetch(`/api/v1/trips/${tripId}/pack`);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.error ?? `Failed (${res.status})`);
-  }
-  return (await res.json()) as TripPackResponse;
+/** A day to look at: no saved outfit, one that no longer fits, or weather the suggestions are missing. */
+function needsReview(day: TripDayCoverage) {
+  if (day.advice === "saved") return (day.notes?.length ?? 0) > 0;
+  return true;
 }
 
-function toErrorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : "Failed to load pack list";
+function fetchPackList(tripId: string): Promise<TripPackResponse> {
+  return tripRequest<TripPackResponse>(`/api/v1/trips/${tripId}/pack`);
 }
 
 export default function PackListPage({ params }: { params: Promise<{ id: string }> }) {
@@ -53,6 +45,13 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // The item or hand-added item whose change is saving.
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [acknowledging, setAcknowledging] = useState(false);
+  const [status, setStatus] = useState("");
+  // A hand-added item keeps its identity until it's saved, so a retry adds it once.
+  const pendingAdd = useRef<{ id: string; name: string } | null>(null);
+  const listHeading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +62,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
         setError(null);
       })
       .catch((err) => {
-        if (!cancelled) setError(toErrorMessage(err));
+        if (!cancelled) setError(errorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -79,38 +78,91 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
     try {
       setData(await fetchPackList(id));
     } catch (err) {
-      setError(toErrorMessage(err));
+      setError(errorMessage(err));
     } finally {
       setRefreshing(false);
     }
   };
 
-  const sections = useMemo(() => {
-    if (!data) return [];
-    const list = data.packingList;
-    const result: { name: string; items: { label: string; sub?: string; auto?: boolean }[] }[] = [];
-    for (const bodyPart of ["torso", "legs", "hands", "headNeck"]) {
-      const layers = list.byBodyPart[bodyPart as keyof typeof list.byBodyPart];
-      if (!layers) continue;
-      const items: { label: string; sub?: string; auto?: boolean }[] = [];
-      for (const layer of ["base", "mid", "outer"] as const) {
-        for (const entry of layers[layer]) {
-          items.push({
-            label: entry.specificItem,
-            sub: `${LAYER_LABEL[layer]} · ${entry.standardOption}`,
-            auto: entry.source === "auto",
-          });
-        }
-      }
-      if (items.length > 0) result.push({ name: BODY_PART_LABEL[bodyPart] ?? bodyPart, items });
+  /**
+   * Saves one change and shows the saved choices. A change the server says is
+   * out of date (an item removed elsewhere, outfits changed) reloads the list.
+   */
+  const save = async (change: PackingChange, failure: string): Promise<PackingChoices | string> => {
+    try {
+      const choices = await tripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST", change);
+      setData((current) => current && {
+        ...current,
+        manual: choices.manual,
+        items: current.items.map((item) => ({ ...item, quantity: choices.quantities[item.key] ?? 1 })),
+      });
+      return choices;
+    } catch (err) {
+      const message = errorMessage(err);
+      if (err instanceof TripRequestError && (err.status === 404 || err.status === 409)) void refresh();
+      toast.error(failure, { description: message });
+      return message;
     }
-    return result;
-  }, [data]);
+  };
 
-  const gaps = data?.packingList.gaps ?? [];
-  const extras = data?.packingList.extras ?? [];
+  const setQuantity = async (key: string, change: PackingChange, name: string, previous: number, next: number,
+    apply: (current: TripPackResponse, quantity: number) => TripPackResponse) => {
+    setBusyKey(key);
+    // Shown at once, and put back if the save fails.
+    setData((current) => current && apply(current, next));
+    const result = await save(change, `Couldn't change how many ${name}`);
+    if (typeof result === "string") setData((current) => current && apply(current, previous));
+    else setStatus(`${name}: ${next}`);
+    setBusyKey(null);
+  };
+
+  const itemQuantity = (item: PackingItem, quantity: number) => void setQuantity(item.key,
+    { op: "quantity", key: item.key, quantity }, item.name, item.quantity, quantity,
+    (current, value) => ({ ...current, items: current.items.map((entry) => entry.key === item.key ? { ...entry, quantity: value } : entry) }));
+
+  const manualQuantity = (item: PackingManualItem, quantity: number) => void setQuantity(item.id,
+    { op: "item_quantity", id: item.id, quantity }, item.name, item.quantity, quantity,
+    (current, value) => ({ ...current, manual: current.manual.map((entry) => entry.id === item.id ? { ...entry, quantity: value } : entry) }));
+
+  const addItem = async (name: string): Promise<string | null> => {
+    const pending = pendingAdd.current?.name === name ? pendingAdd.current : { id: crypto.randomUUID(), name };
+    pendingAdd.current = pending;
+    try {
+      const choices = await tripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST",
+        { op: "add_item", id: pending.id, name, quantity: 1 } satisfies PackingChange);
+      pendingAdd.current = null;
+      setData((current) => current && { ...current, manual: choices.manual });
+      setStatus(`Added ${name}`);
+      return null;
+    } catch (err) {
+      return `Couldn't add ${name}: ${errorMessage(err)}`;
+    }
+  };
+
+  const removeItem = async (item: PackingManualItem) => {
+    setBusyKey(item.id);
+    const result = await save({ op: "remove_item", id: item.id }, `Couldn't remove ${item.name}`);
+    if (typeof result !== "string") setStatus(`Removed ${item.name}`);
+    setBusyKey(null);
+  };
+
+  const acknowledge = async () => {
+    if (!data) return;
+    setAcknowledging(true);
+    const result = await save({ op: "acknowledge", kits: data.kitVersions }, "Couldn't mark the changes as seen");
+    if (typeof result !== "string") {
+      // The card goes, so focus moves to the list it described.
+      flushSync(() => setData((current) => current && { ...current, removed: [], items: current.items.map((item) => ({ ...item, change: undefined })) }));
+      listHeading.current?.focus();
+      setStatus("Changes marked as seen");
+    }
+    setAcknowledging(false);
+  };
+
+  const review = data?.coverage.filter(needsReview) ?? [];
+  const savedDays = data?.coverage.filter((day) => day.advice === "saved").length ?? 0;
+  const changed = !!data && (data.removed.length > 0 || data.items.some((item) => item.change));
   const groupGear = data?.groupGear ?? [];
-  const needsReview = data?.coverage.filter((day) => day.advice !== "available" || day.forecast.status !== "available" || day.approximation) ?? [];
 
   return (
     <PageLayout chromeVariant="compact">
@@ -124,9 +176,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
             </h1>
             {data && (
               <p className="mt-1 text-sm text-muted-foreground">
-                General clothing guidance for {data.coveredDays} of {data.totalDays}{" "}
-                {data.totalDays === 1 ? "day" : "days"} · activity + weather.
-                Saved manual kits are reviewed separately.
+                From your saved outfits for {savedDays} of {data.totalDays} {data.totalDays === 1 ? "day" : "days"}.
               </p>
             )}
           </div>
@@ -138,34 +188,41 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
               void refresh();
             }}
             disabled={loading || refreshing}
-            aria-label="Regenerate pack list"
+            aria-label="Refresh pack list"
             aria-busy={refreshing}
           >
             {refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-            Regenerate
+            Refresh
           </Button>
         </header>
+        <p role="status" className="sr-only">{status}</p>
 
         {loading && <Skeleton className="h-48 w-full rounded-card" />}
         {error && <TripError>{error}</TripError>}
 
-        {data && needsReview.length > 0 && (
+        {data && changed && (
+          <PackingChanges items={data.items} removed={data.removed} editable={data.editable}
+            acknowledging={acknowledging} onAcknowledge={() => void acknowledge()} />
+        )}
+
+        {data && review.length > 0 && (
           <Card>
             <h2 className="text-xl font-semibold text-foreground">Days to review</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Weather availability and clothing guidance are separate. Partial forecasts and manual kits need your review.
+              Days without a saved outfit aren&apos;t in your list yet, and a saved outfit stays as it was saved when the day&apos;s plan changes.
             </p>
             <ul className="mt-3 divide-y divide-border">
-              {needsReview.map((day) => (
+              {review.map((day) => (
                 <li key={day.date} className="py-3 text-sm">
                   <p className="font-medium text-foreground">
-                    {new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, {
-                      weekday: "short", month: "short", day: "numeric",
-                    })} · {day.activity ?? "Activity not set"}
+                    {packingDay(day.date)} · {day.activity ?? "Activity not set"}
                   </p>
                   {day.stopName && <p className="break-words text-muted-foreground">{day.stopName}</p>}
                   <p className="mt-1 text-foreground">{day.message}</p>
-                  {day.message !== day.forecast.message && <p className="mt-1 text-muted-foreground">{day.forecast.message}</p>}
+                  {day.notes?.map((note) => <p key={note} className="mt-1 text-foreground">{note}</p>)}
+                  {day.message !== day.forecast.message && !["available", "not_requested"].includes(day.forecast.status) && (
+                    <p className="mt-1 text-muted-foreground">{day.forecast.message}</p>
+                  )}
                   {day.approximation && <p className="mt-1 text-muted-foreground">{day.approximation}</p>}
                   <Link href={`/trips/${id}/days/${day.date}`}
                     className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-4 hover:no-underline"
@@ -178,106 +235,59 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
           </Card>
         )}
 
-        {data && data.packingList.totalRequiredSlots === 0 && (
-          <Card>
-            <p className="text-sm text-foreground">
-              No automatic clothing list is available. Review the days above for missing inputs,
-              forecast availability or manual planning. Group gear is listed separately when assigned.
-            </p>
-          </Card>
+        {data && (
+          <section aria-labelledby="pack-kits-heading" className="flex flex-col gap-2.5">
+            <h2 id="pack-kits-heading" ref={listHeading} tabIndex={-1} className="text-xl font-semibold text-foreground">From your saved outfits</h2>
+            {data.items.length > 0 ? (
+              <PackingItems items={data.items} editable={data.editable} busyKey={busyKey} onQuantity={itemQuantity} />
+            ) : (
+              <Card>
+                <p className="text-sm text-foreground">
+                  No saved outfits yet. Get layers for a day in Gear up and use Save to trip; what you save is packed here, once per item.
+                </p>
+              </Card>
+            )}
+          </section>
         )}
 
-        {sections.map((s) => (
-          <Card key={s.name}>
-            <h2 className="text-xl font-semibold text-foreground">{s.name}</h2>
-            <ul className="mt-2 space-y-1.5">
-              {s.items.map((it, i) => (
-                <li
-                  key={`${s.name}-${i}`}
-                  className="flex items-start gap-2 text-sm text-foreground"
-                >
-                  <ListMarker className="mt-2" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate">
-                      {it.label}
-                      {it.auto && (
-                        <span className="ml-2 text-xs font-medium text-primary">From your closet</span>
-                      )}
-                    </p>
-                    {it.sub && <p className="text-xs text-muted-foreground">{it.sub}</p>}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        ))}
-
-        {gaps.length > 0 && (
-          <Card>
-            <SectionLabel className="mb-1">Gaps you don&apos;t own yet</SectionLabel>
-            <p className="text-sm text-muted-foreground">
-              Clothing slots the general guidance called for that nothing in your wardrobe
-              maps to. Add an item in the Wardrobe tab to fill these in.
-            </p>
-            <ul className="mt-2 space-y-1.5">
-              {gaps.map((gap) => (
-                <li key={gap.mappingKey} className="flex items-center gap-2 text-sm text-foreground">
-                  <AlertTriangle className="size-3.5 shrink-0 text-warning" aria-hidden />
-                  <span className="flex-1">
-                    {gap.standardOption}{" "}
-                    <span className="text-xs text-muted-foreground">
-                      · {BODY_PART_LABEL[gap.bodyPart] ?? gap.bodyPart} / {LAYER_LABEL[gap.layerType] ?? gap.layerType}
-                    </span>
-                  </span>
-                  <Badge size="sm" variant={gap.priorityLabel === "high" ? "warning" : "outline"}>
-                    {sentenceCase(gap.priorityLabel)}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          </Card>
+        {data && (
+          <section aria-labelledby="pack-own-heading" className="flex flex-col gap-2.5">
+            <h2 id="pack-own-heading" className="text-xl font-semibold text-foreground">Your own items</h2>
+            <ManualItems items={data.manual} editable={data.editable} busyKey={busyKey}
+              onAdd={addItem} onQuantity={manualQuantity} onRemove={(item) => void removeItem(item)} />
+          </section>
         )}
 
-        {extras.length > 0 && (
-          <Card>
-            <h2 className="text-xl font-semibold text-foreground">Carry items</h2>
-            <ul className="mt-2 space-y-1.5">
-              {extras.map((x) => (
-                <li key={x} className="flex items-center gap-2 text-sm text-foreground">
-                  <ListMarker />
-                  {x}
-                </li>
-              ))}
-            </ul>
-          </Card>
+        {data && data.checklists.length > 0 && (
+          <section aria-labelledby="pack-checklists-heading" className="flex flex-col gap-2.5">
+            <h2 id="pack-checklists-heading" className="text-xl font-semibold text-foreground">Older day checklists</h2>
+            <OlderChecklists tripId={id} checklists={data.checklists} />
+          </section>
+        )}
+
+        {data && data.suggestions.totalRequiredSlots + data.suggestions.extras.length > 0 && (
+          <section aria-labelledby="pack-suggestions-heading" className="flex flex-col gap-2.5">
+            <h2 id="pack-suggestions-heading" className="text-xl font-semibold text-foreground">Suggestions, not in your outfits</h2>
+            <PackingSuggestions list={data.suggestions} days={data.suggestedDays} />
+          </section>
         )}
 
         {groupGear.length > 0 && (
-          <Card>
-            <h2 className="text-xl font-semibold text-foreground">Group gear (yours)</h2>
-            <ul className="mt-2 space-y-1.5">
-              {groupGear.map((g) => (
-                <li key={g} className="flex items-center gap-2 text-sm text-foreground">
-                  <ListMarker />
-                  {g}
-                </li>
-              ))}
-            </ul>
-          </Card>
+          <section aria-labelledby="pack-gear-heading" className="flex flex-col gap-2.5">
+            <h2 id="pack-gear-heading" className="text-xl font-semibold text-foreground">Group gear (yours)</h2>
+            <Card>
+              <p className="text-sm text-muted-foreground">Assigned to you on the trip&apos;s Gear list, apart from your own things.</p>
+              <ul className="mt-2 space-y-1.5">
+                {groupGear.map((g) => (
+                  <li key={g} className="break-words text-base text-foreground">{g}</li>
+                ))}
+              </ul>
+            </Card>
+          </section>
         )}
 
         <div className="h-24" />
       </div>
     </PageLayout>
-  );
-}
-
-/** A plain bullet, not a checkbox: nothing records what's been packed yet. */
-function ListMarker({ className }: { className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={cn("inline-block size-1.5 shrink-0 rounded-full bg-muted-foreground", className)}
-    />
   );
 }
