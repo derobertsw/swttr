@@ -15,8 +15,8 @@ vi.mock("@clerk/nextjs/server", async (importOriginal) => ({
 
 import proxy from "./proxy";
 
-async function visit(path: string, method = "GET") {
-  const request = new NextRequest(`http://localhost:3000${path}`, { method });
+async function visit(path: string, method = "GET", userAgent = "Mozilla/5.0") {
+  const request = new NextRequest(`http://localhost:3000${path}`, { method, headers: { "user-agent": userAgent } });
   return (await proxy(request, {} as NextFetchEvent)) as Response | undefined;
 }
 
@@ -35,6 +35,34 @@ describe("proxy, signed out", () => {
     await visit("/api/wardrobe/items");
     await visit("/trips");
     expect(auth.protect).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["SWTTRNativeMac/1", "SWTTRNativeTabs"])("keeps protected page auth on the app origin in %s", async (marker) => {
+    await visit("/wardrobe?from=outing", "GET", `Mozilla/5.0 ${marker}`);
+    expect(auth.protect).toHaveBeenCalledWith({
+      unauthenticatedUrl: "http://localhost:3000/sign-in?redirect_url=%2Fwardrobe%3Ffrom%3Douting",
+    });
+    await visit("/trips/abc/days/2026-10-11", "GET", marker);
+    const url = new URL(auth.protect.mock.calls[1][0].unauthenticatedUrl);
+    expect(url.pathname).toBe("/sign-in");
+    expect(url.searchParams.get("redirect_url")).toBe("/trips/abc/days/2026-10-11");
+  });
+
+  it("keeps browser and native API protection as before", async () => {
+    await visit("/wardrobe");
+    await visit("/api/wardrobe/items", "GET", "SWTTRNativeMac/1");
+    expect(auth.protect.mock.calls).toEqual([[], []]);
+  });
+
+  it.each(["/sign-in", "/sign-up", "/sign-in/sso-callback"])("keeps native auth pages public: %s", async (path) => {
+    await visit(path, "GET", "SWTTRNativeMac/1");
+    expect(auth.protect).not.toHaveBeenCalled();
+  });
+
+  it("keeps native recommendation requests at JSON 401", async () => {
+    const response = await visit("/api/v1/recommendations/alpine", "POST", "SWTTRNativeMac/1");
+    expect(response?.status).toBe(401);
+    expect(auth.protect).not.toHaveBeenCalled();
   });
 
   it("answers recommendation requests with a JSON 401 the app can read", async () => {
