@@ -17,9 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TemperatureSensitivity } from "@/types/preferences";
+import { PreferenceSaveResult, TemperatureSensitivity } from "@/types/preferences";
 import { ACTIVITIES } from "@/data/activities";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import {
   MAX_HEIGHT_INCHES,
   MAX_WEIGHT_LBS,
@@ -56,15 +56,30 @@ const SENSITIVITY_OPTIONS: { value: TemperatureSensitivity; label: string; descr
   },
 ];
 
+/** What the header says in place of "Changes save automatically." when a change wasn't saved. */
+const NOT_SAVED_NOTICES = {
+  "kept-on-device": {
+    text: "Couldn’t save to your account. It’s kept on this device, and we’ll try again next time you open SWTTR.",
+    className: "text-foreground",
+  },
+  "not-saved": {
+    text: "Couldn’t save this change. It only lasts until the page reloads.",
+    className: "text-destructive",
+  },
+} as const;
+
 interface PreferencesDrawerProps {
   children?: ReactNode;
   sensitivity: TemperatureSensitivity;
   defaultActivity: string;
   heightInches?: number;
   weightLbs?: number;
-  onSensitivityChange: (value: TemperatureSensitivity) => void | Promise<void>;
-  onDefaultActivityChange: (value: string) => void | Promise<void>;
-  onBodyMetricsChange: (metrics: { heightInches?: number; weightLbs?: number }) => void | Promise<void>;
+  onSensitivityChange: (value: TemperatureSensitivity) => void | Promise<void | PreferenceSaveResult>;
+  onDefaultActivityChange: (value: string) => void | Promise<void | PreferenceSaveResult>;
+  onBodyMetricsChange: (metrics: {
+    heightInches?: number;
+    weightLbs?: number;
+  }) => void | Promise<void | PreferenceSaveResult>;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   /** Where focus goes on close, when the drawer opens from code rather than `children`. */
@@ -87,7 +102,11 @@ export function PreferencesDrawer({
   const { temperatureUnit, isReady, updateTemperatureUnit } = useTemperatureUnit();
   const [unitSaveError, setUnitSaveError] = useState(false);
   const selectedSensitivity = SENSITIVITY_OPTIONS.find((opt) => opt.value === sensitivity);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  // Unlike "saved", a change that wasn't saved is noted until the next change
+  // or until the drawer closes.
+  const [saveState, setSaveState] = useState<"idle" | "saving" | PreferenceSaveResult>("idle");
+  const notSavedNotice =
+    saveState === "kept-on-device" || saveState === "not-saved" ? NOT_SAVED_NOTICES[saveState] : null;
 
   useEffect(() => {
     if (saveState !== "saved") return;
@@ -95,14 +114,28 @@ export function PreferencesDrawer({
     return () => window.clearTimeout(timer);
   }, [saveState]);
 
-  const runWithSaveState = async (fn: () => void | Promise<void>) => {
+  // Counts changes and closes. The status describes the latest change, so a
+  // save that finishes after a newer change, or after the drawer closed, is ignored.
+  const saveGeneration = useRef(0);
+
+  const runWithSaveState = async (fn: () => void | Promise<void | PreferenceSaveResult>) => {
+    const generation = ++saveGeneration.current;
     setSaveState("saving");
+    let result: "idle" | PreferenceSaveResult;
     try {
-      await fn();
-      setSaveState("saved");
+      result = (await fn()) ?? "saved";
     } catch {
+      result = "idle";
+    }
+    if (generation === saveGeneration.current) setSaveState(result);
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      saveGeneration.current += 1;
       setSaveState("idle");
     }
+    onOpenChange?.(nextOpen);
   };
 
   const heightOptions = Array.from(
@@ -120,7 +153,7 @@ export function PreferencesDrawer({
   };
 
   return (
-      <Drawer open={open} onOpenChange={onOpenChange}>
+      <Drawer open={open} onOpenChange={handleOpenChange}>
       {children && <DrawerTrigger asChild>{children}</DrawerTrigger>}
       <DrawerContent onCloseAutoFocus={onCloseAutoFocus}>
         <div className="mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col">
@@ -131,8 +164,12 @@ export function PreferencesDrawer({
                 <DrawerDescription>
                   Customize your recommendations
                 </DrawerDescription>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Changes save automatically.
+                <p role="status" className="mt-1 text-sm text-muted-foreground">
+                  {notSavedNotice ? (
+                    <span className={notSavedNotice.className}>{notSavedNotice.text}</span>
+                  ) : (
+                    "Changes save automatically."
+                  )}
                 </p>
               </div>
               <div className="flex items-center gap-2">
