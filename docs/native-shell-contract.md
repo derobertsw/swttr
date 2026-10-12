@@ -77,4 +77,6 @@ For visual QA, append `SWTTRNativeMac/1` in Chrome DevTools → Network conditio
 → User agent, reload, then check 1280×800 and 700×800. Dispatch the Settings
 event above. Remove the marker and check 390×844, 768×1024 and 1280×720;
 append `SWTTRNativeTabs` to compare iOS chrome. Real Mac app verification belongs
-to #137, after the shared package and shell exist.
+to #137; [macos/README.md](../macos/README.md) documents the SwiftUI shell build
+and runtime acceptance checks. The package foundation in `apple/SWTTRShellKit`
+is used by Mac; iOS adoption and its build plumbing remain under #145.
