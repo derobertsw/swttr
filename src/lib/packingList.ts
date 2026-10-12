@@ -54,7 +54,7 @@ export const BODY_PART_ORDER: BodyPartKey[] = ["torso", "legs", "hands", "headNe
 export const LAYER_TYPE_ORDER: LayerType[] = ["base", "mid", "outer"];
 const LEGS_GARMENT_TYPES = new Set(["pants", "shorts", "bib"]);
 
-function normalizeText(value: string): string {
+export function normalizeText(value: string): string {
   return value
     .toLowerCase()
     .normalize("NFD")

@@ -23,7 +23,7 @@ Save to trip keeps an outing's outfit, or each day of a multi-day plan, on a tri
 - **Refresh by re-planning.** Update in Gear up on My kit keeps the kit's outing as the account's last one, forgets a save of that outing kept in the tab (so the new layers don't show as already saved), and opens `/?resume=update&trip=<id>`. Gear up asks for layers again, shows them, and Save to trip picks that trip, so saving goes through the conflict question above. If the trip's dates changed after the kit was saved, the outing moves with its day: a later outing to the day's date, a plan by as many days, and an outing for now, on a later day, to the time of day it was read at. A plan that has already started is asked for from today on, from the hour its days start rather than its first day's start time. Once the day has passed at the destination, or when the destination's time zone isn't known, Update isn't offered.
 - **One durable result.** The browser makes a save identity (and, for a new trip, the trip's identity) before sending, and keeps the request in `sessionStorage` (`swttr-trip-kit-save`, per account and outing). A retry after a failure, a lost response or a reload sends the same request, and the server returns the first answer. A duplicate click waits on the first. Once saved, the same outing shows as saved instead of saving again. If the trip was deleted after it was saved to, a retry reports it as gone instead of making it again.
 - **Per-member authorization.** A save writes only the signed-in member's kit, on a trip they own or have joined. The checklist API lets a member change only their own kit, and lets the organizer change the kits of guests they manage. The trip day shows edit controls only where the API allows them.
-- **Personal and shared stay separate.** My kit holds what one person wears and carries. Shared group equipment stays in Gear (`trip_group_gear`). Packing derivation from saved kits is #177; packing checks are #171.
+- **Personal and shared stay separate.** My kit holds what one person wears and carries. Shared group equipment stays in Gear (`trip_group_gear`). Packing from saved kits is #177 ([trip-packing.md](trip-packing.md)); packing checks are #171.
 
 ## How it works
 
@@ -63,6 +63,6 @@ Save to trip keeps an outing's outfit, or each day of a multi-day plan, on a tri
 
 ## Not in this release
 
-- Packing from saved kits (#177) and durable packing checks (#171).
+- Durable packing checks (#171). Packing from saved kits shipped in #177 ([trip-packing.md](trip-packing.md)).
 - Saving some of a plan's days while keeping the kits on others. Keep saves none of them.
 - Editing a saved outfit on the trip day. Change it in Gear up and replace it.
