@@ -25,9 +25,10 @@ export async function GET() {
       return NextResponse.json({});
     }
 
+    // Not "nothing saved": the client would put the device's values in place of the account's.
     if (error) {
       console.error("Failed to fetch preferences:", error);
-      return NextResponse.json({});
+      return NextResponse.json({ error: "Failed to fetch preferences" }, { status: 500 });
     }
 
     const savedOptionalMetrics = sanitizeOptionalBodyMetrics({
@@ -58,7 +59,7 @@ export async function GET() {
     return NextResponse.json(response);
   } catch (err) {
     console.error("Database error:", err);
-    return NextResponse.json({});
+    return NextResponse.json({ error: "Failed to fetch preferences" }, { status: 500 });
   }
 }
 
@@ -136,25 +137,10 @@ export async function PUT(request: NextRequest) {
       .select()
       .single();
 
+    // A 200 would tell the client the change was saved.
     if (error) {
       console.error("Failed to upsert preferences:", error);
-      // Return what was sent - client already saved to localStorage
-      const response: {
-        temperatureSensitivity: TemperatureSensitivity;
-        defaultActivity: string;
-        heightInches?: number;
-        weightLbs?: number;
-      } = {
-        temperatureSensitivity: temperatureSensitivity || "neutral",
-        defaultActivity: defaultActivity || "alpine_skiing",
-      };
-      if (hasHeightInput && sanitizedMetrics.heightInches !== undefined) {
-        response.heightInches = sanitizedMetrics.heightInches;
-      }
-      if (hasWeightInput && sanitizedMetrics.weightLbs !== undefined) {
-        response.weightLbs = sanitizedMetrics.weightLbs;
-      }
-      return NextResponse.json(response);
+      return NextResponse.json({ error: "Failed to save preferences" }, { status: 500 });
     }
 
     const savedMetrics = sanitizeOptionalBodyMetrics({
@@ -180,22 +166,6 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(response);
   } catch (err) {
     console.error("Error saving preferences:", err);
-    // Return what was sent - client already saved to localStorage
-    const response: {
-      temperatureSensitivity: TemperatureSensitivity;
-      defaultActivity: string;
-      heightInches?: number;
-      weightLbs?: number;
-    } = {
-      temperatureSensitivity: temperatureSensitivity || "neutral",
-      defaultActivity: defaultActivity || "alpine_skiing",
-    };
-    if (hasHeightInput && sanitizedMetrics.heightInches !== undefined) {
-      response.heightInches = sanitizedMetrics.heightInches;
-    }
-    if (hasWeightInput && sanitizedMetrics.weightLbs !== undefined) {
-      response.weightLbs = sanitizedMetrics.weightLbs;
-    }
-    return NextResponse.json(response);
+    return NextResponse.json({ error: "Failed to save preferences" }, { status: 500 });
   }
 }

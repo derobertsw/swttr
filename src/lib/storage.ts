@@ -5,12 +5,18 @@
 export const STORAGE_KEYS = {
   /** @deprecated Legacy key — only used by useMigrateUser for one-time migration. Auth now uses Clerk. */
   USER_ID: "swttr-user-id",
+  /** Account-scoped suffixes are added by usePreferences: sensitivity, default activity, height and weight. */
+  PREFERENCES: "swttr-preferences",
+  /** @deprecated Legacy device-wide preference; usePreferences moves it to the guest's preferences once. */
   SENSITIVITY: "swttr-temperature-sensitivity",
   /** Account-scoped suffixes are added by TemperatureUnitProvider. */
   TEMPERATURE_UNIT: "swttr-temperature-unit",
+  /** @deprecated Legacy device-wide preference; usePreferences moves it to the guest's preferences once. */
   DEFAULT_ACTIVITY: "swttr-default-activity",
   LAST_ACTIVITY: "swttr-last-activity",
+  /** @deprecated Legacy device-wide body metric of unknown owner; usePreferences removes it. */
   HEIGHT_INCHES: "swttr-height-inches",
+  /** @deprecated Legacy device-wide body metric of unknown owner; usePreferences removes it. */
   WEIGHT_LBS: "swttr-weight-lbs",
   /** In sessionStorage: account-bound trip creation, including uncertain submissions. */
   TRIP_CREATION_DRAFT: "swttr-trip-creation",

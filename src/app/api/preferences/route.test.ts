@@ -102,7 +102,7 @@ describe("Preferences API Route", () => {
         expect(data.weightLbs).toBeUndefined();
       });
 
-      it("should return empty object on database error", async () => {
+      it("should return 500, not an empty object, on database error", async () => {
         const mockSupabase = {
           from: vi.fn().mockReturnThis(),
           select: vi.fn().mockReturnThis(),
@@ -117,14 +117,11 @@ describe("Preferences API Route", () => {
         const response = await GET();
         const data = await response.json();
 
-        expect(response.status).toBe(200);
-        expect(data.temperatureSensitivity).toBeUndefined();
-        expect(data.defaultActivity).toBeUndefined();
-        expect(data.heightInches).toBeUndefined();
-        expect(data.weightLbs).toBeUndefined();
+        expect(response.status).toBe(500);
+        expect(data).toEqual({ error: "Failed to fetch preferences" });
       });
 
-      it("should return empty object on exception", async () => {
+      it("should return 500, not an empty object, on exception", async () => {
         const mockSupabase = {
           from: vi.fn().mockReturnThis(),
           select: vi.fn().mockReturnThis(),
@@ -136,11 +133,8 @@ describe("Preferences API Route", () => {
         const response = await GET();
         const data = await response.json();
 
-        expect(response.status).toBe(200);
-        expect(data.temperatureSensitivity).toBeUndefined();
-        expect(data.defaultActivity).toBeUndefined();
-        expect(data.heightInches).toBeUndefined();
-        expect(data.weightLbs).toBeUndefined();
+        expect(response.status).toBe(500);
+        expect(data).toEqual({ error: "Failed to fetch preferences" });
       });
     });
   });
@@ -290,7 +284,7 @@ describe("Preferences API Route", () => {
         expect(data.defaultActivity).toBe("biking");
       });
 
-      it("should return sent values on database error", async () => {
+      it("should return 500 on database error", async () => {
         const mockSupabase = {
           from: vi.fn().mockReturnThis(),
           upsert: vi.fn().mockReturnThis(),
@@ -313,8 +307,32 @@ describe("Preferences API Route", () => {
         const response = await PUT(request);
         const data = await response.json();
 
-        expect(response.status).toBe(200);
-        expect(data.temperatureSensitivity).toBe("cold");
+        expect(response.status).toBe(500);
+        expect(data).toEqual({ error: "Failed to save preferences" });
+      });
+
+      it("should return 500 on exception", async () => {
+        const mockSupabase = {
+          from: vi.fn().mockReturnThis(),
+          upsert: vi.fn().mockReturnThis(),
+          select: vi.fn().mockReturnThis(),
+          single: vi.fn().mockRejectedValue(new Error("Connection failed")),
+        };
+        mockGetSupabase.mockReturnValue(mockSupabase as unknown as ReturnType<typeof getSupabase>);
+
+        const request = new NextRequest("http://localhost:3000/api/preferences", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ temperatureSensitivity: "cold" }),
+        });
+
+        const response = await PUT(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(500);
+        expect(data).toEqual({ error: "Failed to save preferences" });
       });
     });
   });
