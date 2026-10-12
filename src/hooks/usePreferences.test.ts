@@ -18,6 +18,12 @@ let getOk = true;
 /** While set, GET /api/preferences waits for it, as a slow request would. */
 let getGate: Promise<void> | null = null;
 let putFails = false;
+/** What PUT /api/preferences answers, e.g. 500 when the database fails. */
+let putStatus = 200;
+/** While set, each PUT waits until the test answers it from `heldPuts` with a status. */
+let holdPuts = false;
+let heldPuts: ((status: number) => void)[] = [];
+/** The PUTs the server saved, in the order it answered them. */
 let puts: { userId: string | null; body: Record<string, unknown> }[] = [];
 
 beforeEach(() => {
@@ -29,6 +35,9 @@ beforeEach(() => {
   getOk = true;
   getGate = null;
   putFails = false;
+  putStatus = 200;
+  holdPuts = false;
+  heldPuts = [];
   puts = [];
   localStorage.clear();
   vi.stubGlobal(
@@ -36,8 +45,10 @@ beforeEach(() => {
     vi.fn(async (_url: string, init?: RequestInit) => {
       if (init?.method === "PUT") {
         if (putFails) throw new TypeError("Failed to fetch");
-        puts.push({ userId, body: JSON.parse(String(init.body)) });
-        return new Response("{}");
+        const put = { userId, body: JSON.parse(String(init.body)) };
+        const status = holdPuts ? await new Promise<number>((answer) => heldPuts.push(answer)) : putStatus;
+        if (status === 200) puts.push(put);
+        return new Response("{}", { status });
       }
       const requestedFor = userId;
       if (getGate) await getGate;
@@ -83,7 +94,7 @@ describe("usePreferences", () => {
     await act(() => result.current.updateBodyMetrics({ heightInches: 64 }));
     await act(() => result.current.updateBodyMetrics({ weightLbs: 140 }));
     await act(() => result.current.updateSensitivity("cold"));
-    await act(() => result.current.updateDefaultActivity("running"));
+    expect(await act(() => result.current.updateDefaultActivity("running"))).toBe("saved");
 
     expect(stored(GUEST_KEY)).toEqual({
       heightInches: 64,
@@ -254,7 +265,11 @@ describe("usePreferences", () => {
     const firstPage = await renderPreferences();
     await waitFor(() => expect(firstPage.result.current.loading).toBe(false));
     expect(puts).toEqual([]);
-    expect(stored(keyFor("account_new"))).toEqual({ heightInches: 64, sensitivity: "cold" });
+    expect(stored(keyFor("account_new"))).toEqual({
+      heightInches: 64,
+      sensitivity: "cold",
+      unsaved: ["sensitivity", "heightInches"],
+    });
     expect(localStorage.getItem(GUEST_KEY)).toBeNull();
     firstPage.unmount();
 
@@ -267,6 +282,97 @@ describe("usePreferences", () => {
     expect(puts).toEqual([
       { userId: "account_new", body: { temperatureSensitivity: "cold", heightInches: 64 } },
     ]);
+    await waitFor(() => expect(stored(keyFor("account_new"))).toEqual({ heightInches: 64, sensitivity: "cold" }));
+  });
+
+  it("keeps a change the server couldn't save over its older value, and saves it on the next visit", async () => {
+    serverPreferences = { account_a: { temperatureSensitivity: "cold", heightInches: 72 } };
+    userId = "account_a";
+    const firstPage = await renderPreferences();
+    await waitFor(() => expect(firstPage.result.current.loading).toBe(false));
+
+    putStatus = 500;
+    expect(await act(() => firstPage.result.current.updateSensitivity("hot"))).toBe("kept-on-device");
+    expect(firstPage.result.current.sensitivity).toBe("hot");
+    expect(stored(keyFor("account_a"))).toEqual({ sensitivity: "hot", heightInches: 72, unsaved: ["sensitivity"] });
+    firstPage.unmount();
+
+    // The server still has the older value.
+    putStatus = 200;
+    vi.resetModules();
+    const { result } = await renderPreferences();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.sensitivity).toBe("hot");
+    expect(result.current.bodyMetricsSelection).toEqual({ heightInches: 72 });
+    expect(puts).toEqual([{ userId: "account_a", body: { temperatureSensitivity: "hot" } }]);
+    await waitFor(() => expect(stored(keyFor("account_a"))).toEqual({ sensitivity: "hot", heightInches: 72 }));
+  });
+
+  it("keeps a change unsaved when only an earlier save of the same field succeeded", async () => {
+    serverPreferences = { account_a: { temperatureSensitivity: "neutral" } };
+    userId = "account_a";
+    const firstPage = await renderPreferences();
+    await waitFor(() => expect(firstPage.result.current.loading).toBe(false));
+
+    holdPuts = true;
+    let saves: Promise<unknown>[] = [];
+    act(() => {
+      saves = (["hot", "cold", "hot"] as const).map((value) => firstPage.result.current.updateSensitivity(value));
+    });
+    expect(heldPuts).toHaveLength(3);
+
+    // The first two succeed after the field changed again. The first sent "hot", its value now,
+    // but a later save of it is still out.
+    await act(async () => {
+      heldPuts[0](200);
+      heldPuts[1](200);
+      expect(await Promise.all(saves.slice(0, 2))).toEqual(["saved", "saved"]);
+    });
+    expect(stored(keyFor("account_a"))).toEqual({ sensitivity: "hot", unsaved: ["sensitivity"] });
+
+    await act(async () => {
+      heldPuts[2](500);
+      expect(await saves[2]).toBe("kept-on-device");
+    });
+    expect(stored(keyFor("account_a"))).toEqual({ sensitivity: "hot", unsaved: ["sensitivity"] });
+    firstPage.unmount();
+
+    // The server was left with the stale "cold".
+    serverPreferences = { account_a: { temperatureSensitivity: "cold" } };
+    holdPuts = false;
+    vi.resetModules();
+    const { result } = await renderPreferences();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.sensitivity).toBe("hot");
+    expect(puts.map(({ body }) => body)).toEqual([
+      { temperatureSensitivity: "hot" },
+      { temperatureSensitivity: "cold" },
+      { temperatureSensitivity: "hot" },
+    ]);
+    await waitFor(() => expect(stored(keyFor("account_a"))).toEqual({ sensitivity: "hot" }));
+  });
+
+  it("counts a field saved when its latest save succeeds, even if an earlier one then fails", async () => {
+    serverPreferences = { account_a: { heightInches: 70 } };
+    userId = "account_a";
+    const { result } = await renderPreferences();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    holdPuts = true;
+    let saves: Promise<unknown>[] = [];
+    act(() => {
+      saves = [result.current.updateBodyMetrics({ heightInches: 71 }), result.current.updateBodyMetrics({ heightInches: 72 })];
+    });
+
+    // The later save answers first; the earlier one failing after it changes nothing.
+    await act(async () => {
+      heldPuts[1](200);
+      heldPuts[0](500);
+      expect(await Promise.all(saves)).toEqual(["kept-on-device", "saved"]);
+    });
+    expect(stored(keyFor("account_a"))).toEqual({ heightInches: 72 });
   });
 
   it("asks the server again when the next caller mounts after a failed read", async () => {
@@ -299,7 +405,7 @@ describe("usePreferences", () => {
     const { result } = await renderPreferences();
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await act(() => result.current.updateBodyMetrics({ weightLbs: 155 }));
+    expect(await act(() => result.current.updateBodyMetrics({ weightLbs: 155 }))).toBe("saved");
 
     expect(puts).toEqual([{ userId: "account_a", body: { weightLbs: 155 } }]);
     expect(stored(keyFor("account_a"))).toEqual({ defaultActivity: "running", weightLbs: 155 });
