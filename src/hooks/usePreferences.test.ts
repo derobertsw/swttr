@@ -60,6 +60,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   localStorage.clear();
 });
@@ -373,6 +374,31 @@ describe("usePreferences", () => {
       expect(await Promise.all(saves)).toEqual(["kept-on-device", "saved"]);
     });
     expect(stored(keyFor("account_a"))).toEqual({ heightInches: 72 });
+  });
+
+  it("says a change wasn't saved when nothing kept it, not even this device", async () => {
+    serverPreferences = { account_a: { temperatureSensitivity: "cold" } };
+    userId = "account_a";
+    const { result, rerender } = await renderPreferences();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // Storage is blocked or full.
+    vi.spyOn(window.Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("Full");
+    });
+    // The server has it, so the next sync brings it back.
+    expect(await act(() => result.current.updateSensitivity("neutral"))).toBe("saved");
+
+    putStatus = 500;
+    expect(await act(() => result.current.updateSensitivity("hot"))).toBe("not-saved");
+    // It lasts for this page only.
+    expect(result.current.sensitivity).toBe("hot");
+    expect(stored(keyFor("account_a"))).toEqual({ sensitivity: "cold" });
+
+    userId = null;
+    rerender();
+    expect(await act(() => result.current.updateSensitivity("cold"))).toBe("not-saved");
+    expect(localStorage.getItem(GUEST_KEY)).toBeNull();
   });
 
   it("asks the server again when the next caller mounts after a failed read", async () => {

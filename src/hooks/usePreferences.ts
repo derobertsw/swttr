@@ -109,6 +109,19 @@ function writeStored(key: string, { stored, unsaved }: StoredRecord) {
 }
 
 /**
+ * Whether storage holds what this page has for the owner under `key`. When
+ * it's blocked or full, writes fail and the page's copy is the only one.
+ */
+function keptInStorage(key: string) {
+  const kept = ownerPreferences(key);
+  const persisted = readStored(key);
+  return (
+    PREFERENCE_FIELDS.every((field) => kept.stored[field] === persisted.stored[field]) &&
+    kept.unsaved.join() === persisted.unsaved.join()
+  );
+}
+
+/**
  * Before the guest and each account kept their own, the device kept one copy
  * for whoever used it. There's no telling whose height and weight it holds,
  * so they're dropped. Its sensitivity and default activity become the guest's.
@@ -326,8 +339,10 @@ export function usePreferences() {
     async (change: StoredPreferences, context: string): Promise<PreferenceSaveResult> => {
       if (!key) throw new Error("Preferences are not ready");
       updateOwner(key, { stored: { ...ownerPreferences(key).stored, ...change } });
-      if (!owner) return "saved";
-      return (await savePreferences(key, change, context)) ? "saved" : "kept-on-device";
+      if (owner && (await savePreferences(key, change, context))) return "saved";
+      // Without the server, the change lasts only if storage has it (marked unsaved, for an account).
+      if (!keptInStorage(key)) return "not-saved";
+      return owner ? "kept-on-device" : "saved";
     },
     [key, owner]
   );

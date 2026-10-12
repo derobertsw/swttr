@@ -165,6 +165,17 @@ describe("PreferencesDrawer", () => {
       expect(screen.queryByText(/Couldn’t save to your account/)).not.toBeInTheDocument();
     });
 
+    it("says when nothing could keep a change, not even this device", async () => {
+      render(<PreferencesDrawer {...defaultProps} onSensitivityChange={vi.fn().mockResolvedValue("not-saved")} open />);
+
+      fireEvent.click(screen.getByRole("radio", { name: "Run Warm" }));
+      expect(
+        await screen.findByText("Couldn’t save this change. It only lasts until the page reloads.")
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Changes save automatically.")).not.toBeInTheDocument();
+      expect(screen.queryByText("Saved")).not.toBeInTheDocument();
+    });
+
     it("clears the couldn't-save notice when the drawer closes", async () => {
       const onOpenChange = vi.fn();
       render(
