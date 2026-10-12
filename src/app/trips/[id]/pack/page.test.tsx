@@ -188,6 +188,28 @@ describe("Packing from saved outfits", () => {
     expect(within(stepper).getByRole("button", { name: "One more Ski shell" })).toHaveFocus();
   });
 
+  it("keeps both quantities when an earlier save answers after a later one", async () => {
+    let releaseFirst = () => {};
+    const fetchMock = fakeTripApi({
+      [PACK]: reply(200, pack([saved("2026-10-10")], { items: [SHELL, FLEECE] })),
+      [CHANGE]: (body) => (body as { key: string }).key === SHELL.key
+        // The shell's save answers last, with a snapshot from before the fleece's.
+        ? new Promise((resolve) => { releaseFirst = () => resolve(reply(200, { manual: [], quantities: { [SHELL.key]: 2 } })); })
+        : reply(200, { manual: [], quantities: { [SHELL.key]: 2, [FLEECE.key]: 2 } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("button", { name: "One more Ski shell" }));
+    await user.click(screen.getByRole("button", { name: "One more Fleece" }));
+    expect(screen.getByRole("group", { name: "How many Fleece" })).toHaveTextContent("2");
+    // The shell is still saving, so its buttons ignore taps.
+    expect(screen.getByRole("button", { name: "One more Ski shell" })).toHaveAttribute("aria-disabled", "true");
+    await act(async () => { releaseFirst(); });
+    expect(screen.getByRole("group", { name: "How many Ski shell" })).toHaveTextContent("2");
+    expect(screen.getByRole("group", { name: "How many Fleece" })).toHaveTextContent("2");
+  });
+
   it("adds an item by hand once across a retry, and removes it", async () => {
     let attempt = 0;
     const fetchMock = fakeTripApi({

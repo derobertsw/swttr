@@ -45,8 +45,13 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // The item or hand-added item whose change is saving.
-  const [busyKey, setBusyKey] = useState<string | null>(null);
+  // The items and hand-added items whose changes are saving.
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  const markBusy = (key: string, on: boolean) => setBusy((current) => {
+    const next = new Set(current);
+    if (on) next.add(key); else next.delete(key);
+    return next;
+  });
   const [acknowledging, setAcknowledging] = useState(false);
   const [status, setStatus] = useState("");
   // A hand-added item keeps its identity until it's saved, so a retry adds it once.
@@ -85,18 +90,14 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   };
 
   /**
-   * Saves one change and shows the saved choices. A change the server says is
-   * out of date (an item removed elsewhere, outfits changed) reloads the list.
+   * Saves one change and returns the saved choices, which the caller merges
+   * for its own item only: responses to changes on other rows can arrive in
+   * any order. A change the server says is out of date (an item removed
+   * elsewhere, outfits changed) reloads the list.
    */
   const save = async (change: PackingChange, failure: string): Promise<PackingChoices | string> => {
     try {
-      const choices = await tripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST", change);
-      setData((current) => current && {
-        ...current,
-        manual: choices.manual,
-        items: current.items.map((item) => ({ ...item, quantity: choices.quantities[item.key] ?? 1 })),
-      });
-      return choices;
+      return await tripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST", change);
     } catch (err) {
       const message = errorMessage(err);
       if (err instanceof TripRequestError && (err.status === 404 || err.status === 409)) void refresh();
@@ -106,23 +107,25 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   };
 
   const setQuantity = async (key: string, change: PackingChange, name: string, previous: number, next: number,
-    apply: (current: TripPackResponse, quantity: number) => TripPackResponse) => {
-    setBusyKey(key);
+    apply: (current: TripPackResponse, quantity: number) => TripPackResponse, saved: (choices: PackingChoices) => number) => {
+    markBusy(key, true);
     // Shown at once, and put back if the save fails.
     setData((current) => current && apply(current, next));
     const result = await save(change, `Couldn't change how many ${name}`);
-    if (typeof result === "string") setData((current) => current && apply(current, previous));
-    else setStatus(`${name}: ${next}`);
-    setBusyKey(null);
+    setData((current) => current && apply(current, typeof result === "string" ? previous : saved(result)));
+    if (typeof result !== "string") setStatus(`${name}: ${next}`);
+    markBusy(key, false);
   };
 
   const itemQuantity = (item: PackingItem, quantity: number) => void setQuantity(item.key,
     { op: "quantity", key: item.key, quantity }, item.name, item.quantity, quantity,
-    (current, value) => ({ ...current, items: current.items.map((entry) => entry.key === item.key ? { ...entry, quantity: value } : entry) }));
+    (current, value) => ({ ...current, items: current.items.map((entry) => entry.key === item.key ? { ...entry, quantity: value } : entry) }),
+    (choices) => choices.quantities[item.key] ?? 1);
 
   const manualQuantity = (item: PackingManualItem, quantity: number) => void setQuantity(item.id,
     { op: "item_quantity", id: item.id, quantity }, item.name, item.quantity, quantity,
-    (current, value) => ({ ...current, manual: current.manual.map((entry) => entry.id === item.id ? { ...entry, quantity: value } : entry) }));
+    (current, value) => ({ ...current, manual: current.manual.map((entry) => entry.id === item.id ? { ...entry, quantity: value } : entry) }),
+    (choices) => choices.manual.find((entry) => entry.id === item.id)?.quantity ?? quantity);
 
   const addItem = async (name: string): Promise<string | null> => {
     const pending = pendingAdd.current?.name === name ? pendingAdd.current : { id: crypto.randomUUID(), name };
@@ -131,7 +134,8 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
       const choices = await tripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST",
         { op: "add_item", id: pending.id, name, quantity: 1 } satisfies PackingChange);
       pendingAdd.current = null;
-      setData((current) => current && { ...current, manual: choices.manual });
+      const added = choices.manual.find((entry) => entry.id === pending.id);
+      if (added) setData((current) => current && { ...current, manual: [...current.manual.filter((entry) => entry.id !== added.id), added] });
       setStatus(`Added ${name}`);
       return null;
     } catch (err) {
@@ -140,10 +144,13 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   };
 
   const removeItem = async (item: PackingManualItem) => {
-    setBusyKey(item.id);
+    markBusy(item.id, true);
     const result = await save({ op: "remove_item", id: item.id }, `Couldn't remove ${item.name}`);
-    if (typeof result !== "string") setStatus(`Removed ${item.name}`);
-    setBusyKey(null);
+    if (typeof result !== "string") {
+      setData((current) => current && { ...current, manual: current.manual.filter((entry) => entry.id !== item.id) });
+      setStatus(`Removed ${item.name}`);
+    }
+    markBusy(item.id, false);
   };
 
   const acknowledge = async () => {
@@ -239,7 +246,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
           <section aria-labelledby="pack-kits-heading" className="flex flex-col gap-2.5">
             <h2 id="pack-kits-heading" ref={listHeading} tabIndex={-1} className="text-xl font-semibold text-foreground">From your saved outfits</h2>
             {data.items.length > 0 ? (
-              <PackingItems items={data.items} editable={data.editable} busyKey={busyKey} onQuantity={itemQuantity} />
+              <PackingItems items={data.items} editable={data.editable} busy={busy} onQuantity={itemQuantity} />
             ) : (
               <Card>
                 <p className="text-sm text-foreground">
@@ -253,7 +260,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
         {data && (
           <section aria-labelledby="pack-own-heading" className="flex flex-col gap-2.5">
             <h2 id="pack-own-heading" className="text-xl font-semibold text-foreground">Your own items</h2>
-            <ManualItems items={data.manual} editable={data.editable} busyKey={busyKey}
+            <ManualItems items={data.manual} editable={data.editable} busy={busy}
               onAdd={addItem} onQuantity={manualQuantity} onRemove={(item) => void removeItem(item)} />
           </section>
         )}
