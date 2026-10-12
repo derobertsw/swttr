@@ -8,8 +8,10 @@ import Testing
 
     @Test func primaryDestinations() {
         #expect(SWTTRDestination.matching(path: "/") == .gearUp)
+        #expect(SWTTRDestination.matching(path: "") == .gearUp)
         #expect(SWTTRDestination.matching(path: "/wardrobe") == .wardrobe)
-        for path in ["/faq", "/sign-in", "/sign-up", "/tripster", "/trips-other", "/wardrobes", "/wardrobe/item"] {
+        #expect(SWTTRDestination.matching(path: "/wardrobe/item") == .wardrobe)
+        for path in ["/faq", "/sign-in", "/sign-up", "/tripster", "/trips-other", "/wardrobes"] {
             #expect(SWTTRDestination.matching(path: path) == nil)
         }
     }

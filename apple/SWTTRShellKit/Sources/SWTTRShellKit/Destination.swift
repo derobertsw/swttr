@@ -14,9 +14,9 @@ public enum SWTTRDestination: String, CaseIterable, Identifiable, Sendable {
     }
 
     public static func matching(path: String) -> Self? {
-        if path == "/" { return .gearUp }
+        if path.isEmpty || path == "/" { return .gearUp }
         if path == "/trips" || path.hasPrefix("/trips/") { return .trips }
-        if path == "/wardrobe" { return .wardrobe }
+        if path == "/wardrobe" || path.hasPrefix("/wardrobe/") { return .wardrobe }
         return nil
     }
 }
