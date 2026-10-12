@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { Share2, HelpCircle, Menu, MessageSquare, Settings } from "lucide-react";
@@ -9,7 +9,7 @@ import { logWarn } from "@/lib/logger";
 import { AccountMenu } from "@/components/AccountMenu";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
-import { useNativeTabShell } from "@/hooks/useNativeTabShell";
+import { useNativeShell } from "@/hooks/useNativeShell";
 import { isShown, useReturnFocus } from "@/hooks/useReturnFocus";
 import {
   Sheet,
@@ -38,8 +38,9 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   const accountAreaRef = useRef<HTMLDivElement>(null);
   const preferencesFocus = useReturnFocus();
   // The native shell has no web sidebar, so its menu and logo show at every width.
-  const isNativeTabShell = useNativeTabShell();
-  const mobileOnly = isNativeTabShell ? undefined : "md:hidden";
+  const nativeShell = useNativeShell();
+  const isNativeShell = nativeShell !== null;
+  const mobileOnly = isNativeShell ? undefined : "md:hidden";
   const {
     sensitivity,
     defaultActivity,
@@ -48,6 +49,21 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
     updateDefaultActivity,
     updateBodyMetrics,
   } = usePreferences();
+
+  useEffect(() => {
+    if (nativeShell !== "mac") return;
+    const openPreferences = () => {
+      if (preferencesOpen) return;
+      preferencesFocus.remember(() => [
+        accountAreaRef.current?.querySelector<HTMLElement>("a[href], button"),
+        document.getElementById(menuButtonId),
+      ].find(isShown) ?? null);
+      setMobileMenuOpen(false);
+      setPreferencesOpen(true);
+    };
+    window.addEventListener("openPreferences", openPreferences);
+    return () => window.removeEventListener("openPreferences", openPreferences);
+  }, [nativeShell, preferencesOpen, preferencesFocus, menuButtonId]);
 
   const handleShare = async () => {
     const shareData = {
@@ -124,7 +140,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
               href="/sign-in"
               className={cn(
                 "hidden min-h-11 items-center rounded-control px-2 text-sm font-semibold text-foreground underline-offset-4 hover:underline",
-                !isNativeTabShell && "md:inline-flex"
+                !isNativeShell && "md:inline-flex"
               )}
             >
               Sign In

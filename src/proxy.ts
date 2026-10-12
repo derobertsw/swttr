@@ -1,5 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { detectNativeShell } from "@/lib/native-shell";
+import { safeReturnPath, signInHref } from "@/lib/outingReturn";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -50,7 +52,15 @@ export default clerkMiddleware(async (auth, request) => {
   }
 
   if (!isPublicRoute(request)) {
-    await auth.protect();
+    // Keep native page sign-in on this origin; the hosted Account Portal
+    // would lose the web view's session and its sessionStorage outing draft.
+    // API requests keep Clerk's existing protection/error behavior.
+    if (detectNativeShell(request.headers.get("user-agent")) && !request.nextUrl.pathname.startsWith("/api/")) {
+      const returnTo = safeReturnPath(request.url, request.nextUrl.host);
+      await auth.protect({ unauthenticatedUrl: new URL(signInHref(returnTo), request.url).href });
+    } else {
+      await auth.protect();
+    }
   }
 });
 

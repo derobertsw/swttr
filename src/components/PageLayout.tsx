@@ -9,7 +9,7 @@ import { MobileTabBar } from "@/components/AppNavigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useClaimGuestDraft } from "@/hooks/useClaimGuestDraft";
 import { useMigrateUser } from "@/hooks/useMigrateUser";
-import { useNativeTabShell } from "@/hooks/useNativeTabShell";
+import { useNativeShell } from "@/hooks/useNativeShell";
 import { cn } from "@/lib/utils";
 
 interface PageLayoutProps {
@@ -42,7 +42,8 @@ const PageLayout = ({
 }: PageLayoutProps) => {
   useMigrateUser();
   useClaimGuestDraft();
-  const isNativeTabShell = useNativeTabShell();
+  const nativeShell = useNativeShell();
+  const isNativeShell = nativeShell !== null;
   const isCompactChrome = chromeVariant === "compact";
   const isSidebarWide = useIsSidebarWide();
   // A manual toggle holds until the window crosses the expanded breakpoint.
@@ -82,8 +83,8 @@ const PageLayout = ({
         open={isSidebarOpen}
         onOpenChange={(open) => setSidebarToggle({ wide: isSidebarWide, open })}
       >
-        {/* Desktop sidebar. The native shell has its own tab bar at every width. */}
-        {!isNativeTabShell && <AppSidebar />}
+        {/* Native shells own their primary navigation at every width. */}
+        {!isNativeShell && <AppSidebar />}
 
         <div className="relative flex w-full min-w-0 flex-1 flex-col">
           <div
@@ -93,7 +94,7 @@ const PageLayout = ({
                 ? "gap-4 p-4 pt-[calc(0.9rem_+_env(safe-area-inset-top))] sm:gap-5 sm:p-8 sm:pt-[calc(1.4rem_+_env(safe-area-inset-top))]"
                 : "gap-5 p-4 pt-[calc(1.35rem_+_env(safe-area-inset-top))] sm:gap-6 sm:p-8 sm:pt-[calc(2rem_+_env(safe-area-inset-top))]",
               // Room for the fixed mobile tab bar, or for the native one.
-              isNativeTabShell
+              isNativeShell
                 ? "pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]"
                 : "pb-[calc(5.5rem_+_env(safe-area-inset-bottom))]",
               // Keep the bottom inset: on wide native screens (iPad, landscape) the native tab bar still covers the bottom.
