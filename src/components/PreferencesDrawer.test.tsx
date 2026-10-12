@@ -1,7 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PreferencesDrawer } from "./PreferencesDrawer";
+import { PreferenceSaveResult } from "@/types/preferences";
+
+/** A save that finishes when the test says so. */
+function heldSave() {
+  let finish: (result: PreferenceSaveResult) => void = () => {};
+  const promise = new Promise<PreferenceSaveResult>((resolve) => (finish = resolve));
+  return { promise, finish };
+}
 
 describe("PreferencesDrawer", () => {
   const defaultProps = {
@@ -195,6 +203,40 @@ describe("PreferencesDrawer", () => {
       expect(onOpenChange).toHaveBeenCalledWith(false);
       expect(screen.queryByText(/Couldn’t save to your account/)).not.toBeInTheDocument();
       expect(screen.getByText("Changes save automatically.")).toBeInTheDocument();
+    });
+
+    it("ignores a save that finishes after the drawer closed", async () => {
+      const save = heldSave();
+      render(
+        <PreferencesDrawer {...defaultProps} onSensitivityChange={() => save.promise} open onOpenChange={vi.fn()} />
+      );
+
+      fireEvent.click(screen.getByRole("radio", { name: "Run Warm" }));
+      expect(screen.getByText("Saving...")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Done" }));
+      expect(screen.queryByText("Saving...")).not.toBeInTheDocument();
+
+      await act(async () => save.finish("kept-on-device"));
+      expect(screen.queryByText(/Couldn’t save to your account/)).not.toBeInTheDocument();
+      expect(screen.getByText("Changes save automatically.")).toBeInTheDocument();
+    });
+
+    it("shows the latest change's result when an earlier save finishes after it", async () => {
+      const saves = [heldSave(), heldSave()];
+      const onSensitivityChange = vi
+        .fn()
+        .mockReturnValueOnce(saves[0].promise)
+        .mockReturnValueOnce(saves[1].promise);
+      render(<PreferencesDrawer {...defaultProps} onSensitivityChange={onSensitivityChange} open />);
+
+      fireEvent.click(screen.getByRole("radio", { name: "Run Warm" }));
+      fireEvent.click(screen.getByRole("radio", { name: "Run Cold" }));
+      await act(async () => saves[1].finish("saved"));
+      expect(screen.getByText("Saved")).toBeInTheDocument();
+
+      await act(async () => saves[0].finish("kept-on-device"));
+      expect(screen.getByText("Saved")).toBeInTheDocument();
+      expect(screen.queryByText(/Couldn’t save to your account/)).not.toBeInTheDocument();
     });
   });
 
