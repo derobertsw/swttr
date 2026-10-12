@@ -56,6 +56,18 @@ const SENSITIVITY_OPTIONS: { value: TemperatureSensitivity; label: string; descr
   },
 ];
 
+/** What the header says in place of "Changes save automatically." when a change wasn't saved. */
+const NOT_SAVED_NOTICES = {
+  "kept-on-device": {
+    text: "Couldn’t save to your account. It’s kept on this device, and we’ll try again next time you open SWTTR.",
+    className: "text-foreground",
+  },
+  "not-saved": {
+    text: "Couldn’t save this change. It only lasts until the page reloads.",
+    className: "text-destructive",
+  },
+} as const;
+
 interface PreferencesDrawerProps {
   children?: ReactNode;
   sensitivity: TemperatureSensitivity;
@@ -90,9 +102,11 @@ export function PreferencesDrawer({
   const { temperatureUnit, isReady, updateTemperatureUnit } = useTemperatureUnit();
   const [unitSaveError, setUnitSaveError] = useState(false);
   const selectedSensitivity = SENSITIVITY_OPTIONS.find((opt) => opt.value === sensitivity);
-  // "kept-on-device": the server couldn't save an account's change. Unlike
-  // "saved", it stays until the next change or until the drawer closes.
+  // Unlike "saved", a change that wasn't saved is noted until the next change
+  // or until the drawer closes.
   const [saveState, setSaveState] = useState<"idle" | "saving" | PreferenceSaveResult>("idle");
+  const notSavedNotice =
+    saveState === "kept-on-device" || saveState === "not-saved" ? NOT_SAVED_NOTICES[saveState] : null;
 
   useEffect(() => {
     if (saveState !== "saved") return;
@@ -141,11 +155,8 @@ export function PreferencesDrawer({
                   Customize your recommendations
                 </DrawerDescription>
                 <p role="status" className="mt-1 text-sm text-muted-foreground">
-                  {saveState === "kept-on-device" ? (
-                    <span className="text-foreground">
-                      Couldn’t save to your account. It’s kept on this device, and we’ll try again next
-                      time you open SWTTR.
-                    </span>
+                  {notSavedNotice ? (
+                    <span className={notSavedNotice.className}>{notSavedNotice.text}</span>
                   ) : (
                     "Changes save automatically."
                   )}
