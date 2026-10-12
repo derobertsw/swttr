@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { PreferenceSaveResult, TemperatureSensitivity } from "@/types/preferences";
 import { ACTIVITIES } from "@/data/activities";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import {
   MAX_HEIGHT_INCHES,
   MAX_WEIGHT_LBS,
@@ -114,17 +114,27 @@ export function PreferencesDrawer({
     return () => window.clearTimeout(timer);
   }, [saveState]);
 
+  // Counts changes and closes. The status describes the latest change, so a
+  // save that finishes after a newer change, or after the drawer closed, is ignored.
+  const saveGeneration = useRef(0);
+
   const runWithSaveState = async (fn: () => void | Promise<void | PreferenceSaveResult>) => {
+    const generation = ++saveGeneration.current;
     setSaveState("saving");
+    let result: "idle" | PreferenceSaveResult;
     try {
-      setSaveState((await fn()) ?? "saved");
+      result = (await fn()) ?? "saved";
     } catch {
-      setSaveState("idle");
+      result = "idle";
     }
+    if (generation === saveGeneration.current) setSaveState(result);
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) setSaveState("idle");
+    if (!nextOpen) {
+      saveGeneration.current += 1;
+      setSaveState("idle");
+    }
     onOpenChange?.(nextOpen);
   };
 
