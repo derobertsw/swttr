@@ -136,10 +136,10 @@ function ItemRow({ item, editable, busy, onQuantity }: {
 }
 
 /** Everything the person's saved outfits call for, by body area, then what's only carried. */
-export function PackingItems({ items, editable, busyKey, onQuantity }: {
+export function PackingItems({ items, editable, busy, onQuantity }: {
   items: PackingItem[];
   editable: boolean;
-  busyKey: string | null;
+  busy: ReadonlySet<string>;
   onQuantity: (item: PackingItem, quantity: number) => void;
 }) {
   const groups = [
@@ -156,7 +156,7 @@ export function PackingItems({ items, editable, busyKey, onQuantity }: {
           </h3>
           <ul className="mt-2 flex flex-col divide-y divide-border">
             {group.items.map((item) => (
-              <ItemRow key={item.key} item={item} editable={editable} busy={busyKey === item.key} onQuantity={onQuantity} />
+              <ItemRow key={item.key} item={item} editable={editable} busy={busy.has(item.key)} onQuantity={onQuantity} />
             ))}
           </ul>
         </section>
@@ -166,10 +166,10 @@ export function PackingItems({ items, editable, busyKey, onQuantity }: {
 }
 
 /** Items the person added by hand, and the form to add one. */
-export function ManualItems({ items, editable, busyKey, onAdd, onQuantity, onRemove }: {
+export function ManualItems({ items, editable, busy, onAdd, onQuantity, onRemove }: {
   items: PackingManualItem[];
   editable: boolean;
-  busyKey: string | null;
+  busy: ReadonlySet<string>;
   /** Resolves with an error to show, or null once it's added. */
   onAdd: (name: string) => Promise<string | null>;
   onQuantity: (item: PackingManualItem, quantity: number) => void;
@@ -207,10 +207,10 @@ export function ManualItems({ items, editable, busyKey, onAdd, onQuantity, onRem
               <p className="min-w-0 flex-1 basis-28 break-words text-base font-medium text-foreground">{item.name}</p>
               {editable ? (
                 <div className="ml-auto flex items-center gap-1">
-                  <QuantityStepper name={item.name} value={item.quantity} busy={busyKey === item.id} onChange={(next) => onQuantity(item, next)} />
+                  <QuantityStepper name={item.name} value={item.quantity} busy={busy.has(item.id)} onChange={(next) => onQuantity(item, next)} />
                   <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${item.name}`}
-                    aria-disabled={busyKey === item.id || undefined}
-                    onClick={() => { if (busyKey !== item.id) onRemove(item); }}>
+                    aria-disabled={busy.has(item.id) || undefined}
+                    onClick={() => { if (!busy.has(item.id)) onRemove(item); }}>
                     <X aria-hidden="true" />
                   </Button>
                 </div>
