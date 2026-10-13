@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { SignUp } from "@clerk/nextjs";
+import { detectNativeShell, NATIVE_SHELL_AUTH_APPEARANCE } from "@/lib/native-shell";
 import { safeReturnPath } from "@/lib/outingReturn";
 
 export default async function SignUpPage({
@@ -8,10 +9,19 @@ export default async function SignUpPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   // Back to where an account was asked for, like an outing or a protected page.
-  const returnTo = safeReturnPath((await searchParams).redirect_url, (await headers()).get("host"));
+  const requestHeaders = await headers();
+  const returnTo = safeReturnPath((await searchParams).redirect_url, requestHeaders.get("host"));
+  const nativeShell = detectNativeShell(requestHeaders.get("user-agent"));
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <SignUp forceRedirectUrl={returnTo} signInForceRedirectUrl={returnTo} />
+      <SignUp
+        forceRedirectUrl={returnTo}
+        signInForceRedirectUrl={returnTo}
+        {...(nativeShell ? {
+          appearance: NATIVE_SHELL_AUTH_APPEARANCE,
+          signInUrl: `/sign-in?redirect_url=${encodeURIComponent(returnTo)}`,
+        } : {})}
+      />
     </div>
   );
 }

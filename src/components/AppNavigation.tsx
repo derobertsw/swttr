@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Layers, Map, Shirt } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useNativeTabShell } from "@/hooks/useNativeTabShell";
+import { useNativeShell } from "@/hooks/useNativeShell";
 
 // The app's three destinations, in order. The desktop sidebar and the mobile
 // tab bar both render this list; Settings, Help and Account stay secondary.
@@ -24,7 +24,8 @@ export function isNavItemActive(href: string, pathname: string) {
 }
 
 export function MobileTabBar() {
-  const isNativeTabShell = useNativeTabShell();
+  const nativeShell = useNativeShell();
+  const isNativeShell = nativeShell !== null;
   const pathname = usePathname();
 
   const renderTab = (item: NavItem) => {
@@ -55,7 +56,7 @@ export function MobileTabBar() {
     );
   };
 
-  if (isNativeTabShell) {
+  if (isNativeShell) {
     return null;
   }
 

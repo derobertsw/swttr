@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { TemperatureSensitivity, UserBodyMetrics } from "@/types/preferences";
+import { PreferenceSaveResult, TemperatureSensitivity, UserBodyMetrics } from "@/types/preferences";
 import { DEFAULT_ACTIVITY } from "@/data/activities";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { logWarn } from "@/lib/logger";
@@ -25,9 +25,21 @@ interface StoredPreferences {
   weightLbs?: number;
 }
 
+type PreferenceField = keyof StoredPreferences;
+
+/** Every field, in the order an unsaved list keeps them. */
+const PREFERENCE_FIELDS: readonly PreferenceField[] = ["sensitivity", "defaultActivity", "heightInches", "weightLbs"];
+
 /** The guest's preferences on this device, or one account's. */
 interface OwnerPreferences {
   stored: StoredPreferences;
+  /**
+   * For an account: the fields whose value here the server hasn't confirmed
+   * saving, because the save failed or hasn't finished. They're stored with
+   * the values, win over the server's on each sync and are saved again then,
+   * until a save of their current value succeeds.
+   */
+  unsaved: readonly PreferenceField[];
   /**
    * For an account: whether this page has had the server's answer, or failed to.
    * Either way it goes on from here; only a merge counts as synced.
@@ -64,23 +76,49 @@ let serverSyncStartedFor: string | null = null;
 let legacyPreferencesMoved = false;
 const listeners = new Set<() => void>();
 
-function readStored(key: string): StoredPreferences {
+/** What's kept in storage for one owner. */
+type StoredRecord = Pick<OwnerPreferences, "stored" | "unsaved">;
+
+/** The fields `record` lists as unsaved that `stored` has a value for. */
+function unsavedFields(record: unknown, stored: StoredPreferences): PreferenceField[] {
+  const listed = typeof record === "object" && record !== null ? (record as { unsaved?: unknown }).unsaved : undefined;
+  if (!Array.isArray(listed)) return [];
+  return PREFERENCE_FIELDS.filter((field) => listed.includes(field) && stored[field] !== undefined);
+}
+
+function readStored(key: string): StoredRecord {
   try {
     const saved = localStorage.getItem(key);
-    return saved ? validPreferences(JSON.parse(saved)) : {};
+    if (!saved) return { stored: {}, unsaved: [] };
+    const record: unknown = JSON.parse(saved);
+    const stored = validPreferences(record);
+    return { stored, unsaved: unsavedFields(record, stored) };
   } catch {
     // Storage can be unavailable (some private modes), or hold something unreadable.
-    return {};
+    return { stored: {}, unsaved: [] };
   }
 }
 
-function writeStored(key: string, stored: StoredPreferences) {
+function writeStored(key: string, { stored, unsaved }: StoredRecord) {
   try {
     if (isEmpty(stored)) localStorage.removeItem(key);
-    else localStorage.setItem(key, JSON.stringify(stored));
+    else localStorage.setItem(key, JSON.stringify(unsaved.length ? { ...stored, unsaved } : stored));
   } catch {
     // Without storage, a choice lasts until the page reloads (and on the server, for an account).
   }
+}
+
+/**
+ * Whether storage holds what this page has for the owner under `key`. When
+ * it's blocked or full, writes fail and the page's copy is the only one.
+ */
+function keptInStorage(key: string) {
+  const kept = ownerPreferences(key);
+  const persisted = readStored(key);
+  return (
+    PREFERENCE_FIELDS.every((field) => kept.stored[field] === persisted.stored[field]) &&
+    kept.unsaved.join() === persisted.unsaved.join()
+  );
 }
 
 /**
@@ -98,7 +136,7 @@ function moveLegacyPreferences() {
     });
     if (!isEmpty(legacy)) {
       const guestKey = storageKey(null);
-      writeStored(guestKey, { ...legacy, ...readStored(guestKey) });
+      writeStored(guestKey, { stored: { ...legacy, ...readStored(guestKey).stored }, unsaved: [] });
     }
     for (const key of [
       STORAGE_KEYS.SENSITIVITY,
@@ -118,7 +156,7 @@ function ownerPreferences(key: string): OwnerPreferences {
   let preferences = owners.get(key);
   if (!preferences) {
     moveLegacyPreferences();
-    preferences = { stored: readStored(key), serverAsked: false };
+    preferences = { ...readStored(key), serverAsked: false };
     owners.set(key, preferences);
   }
   return preferences;
@@ -138,8 +176,14 @@ function subscribe(listener: () => void) {
 function updateOwner(key: string, patch: Partial<OwnerPreferences>) {
   const next = { ...ownerPreferences(key), ...patch };
   owners.set(key, next);
-  if (patch.stored) writeStored(key, next.stored);
+  if (patch.stored || patch.unsaved) writeStored(key, next);
   listeners.forEach((listener) => listener());
+}
+
+/** Makes `fields` the unsaved ones of the account kept under `key`. */
+function setUnsaved(key: string, fields: readonly PreferenceField[]) {
+  const unsaved = PREFERENCE_FIELDS.filter((field) => fields.includes(field));
+  if (unsaved.join() !== ownerPreferences(key).unsaved.join()) updateOwner(key, { unsaved });
 }
 
 /** The preferences API's names for the stored fields that are set. */
@@ -152,35 +196,61 @@ function toPayload(stored: StoredPreferences): Record<string, unknown> {
   return payload;
 }
 
-async function savePreferences(payload: Record<string, unknown>, context: string) {
+// Which save of each account field started last. One that finishes after the
+// field was saved again doesn't confirm its value, even if it's the same again.
+let savesStarted = 0;
+const latestSaves = new Map<string, Partial<Record<PreferenceField, number>>>();
+
+/**
+ * Saves `values` on the server for the account kept under `key`. They're
+ * unsaved until it succeeds; a failed save leaves them for the next sync.
+ * Resolves whether the server saved them.
+ */
+async function savePreferences(key: string, values: StoredPreferences, context: string) {
+  const save = ++savesStarted;
+  const fields = PREFERENCE_FIELDS.filter((field) => values[field] !== undefined);
+  latestSaves.set(key, { ...latestSaves.get(key), ...Object.fromEntries(fields.map((field) => [field, save])) });
+  setUnsaved(key, [...ownerPreferences(key).unsaved, ...fields]);
   try {
     const res = await fetch("/api/preferences", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(toPayload(values)),
     });
-    // The change stays on this device. A field the server lacks is saved again on the next sync.
-    if (!res.ok) logWarn(context, new Error(`Preferences not saved: HTTP ${res.status}`));
+    if (!res.ok) {
+      logWarn(context, new Error(`Preferences not saved: HTTP ${res.status}`));
+      return false;
+    }
   } catch (err) {
     logWarn(context, err);
+    return false;
   }
+  const latest = latestSaves.get(key);
+  setUnsaved(key, ownerPreferences(key).unsaved.filter((field) => latest?.[field] !== save));
+  return true;
 }
 
 /** The fields of `now` that aren't in `then`, or hold another value there. */
 function changedSince(then: StoredPreferences, now: StoredPreferences): StoredPreferences {
   return Object.fromEntries(
-    Object.entries(now).filter(([field, value]) => then[field as keyof StoredPreferences] !== value)
+    Object.entries(now).filter(([field, value]) => then[field as PreferenceField] !== value)
   );
+}
+
+/** The fields of `stored` that `keep` accepts. */
+function pick(stored: StoredPreferences, keep: (field: PreferenceField) => boolean): StoredPreferences {
+  return Object.fromEntries(Object.entries(stored).filter(([field]) => keep(field as PreferenceField)));
 }
 
 /**
  * Merges in what the server keeps for `userId`. An account with nothing saved,
  * there or on this device, takes what the guest chose on this device. Either
  * way the guest's copy is gone afterwards, so no later account can take it.
- * Whatever the account has on this device that the server lacks, like a
- * guest's values it took or a change whose save failed, is saved again.
+ * A change the server hasn't confirmed saving wins over the server's value.
+ * It's saved again, along with anything else the account has on this device
+ * that the server lacks, like a guest's values it took.
  *
  * When the server can't answer, the account goes on with what it has on this
  * device, the guest's copy stays, and the next usePreferences() to mount asks
@@ -204,19 +274,20 @@ async function syncServerPreferences(userId: string) {
       heightInches: data.heightInches,
       weightLbs: data.weightLbs,
     });
-    const own = ownerPreferences(key).stored;
+    const { stored: own, unsaved } = ownerPreferences(key);
     const changed = changedSince(before, own);
+    const pending = pick(own, (field) => unsaved.includes(field));
     const guestKey = storageKey(null);
     const guest = ownerPreferences(guestKey).stored;
     const merged =
       isEmpty(saved) && isEmpty(before)
         ? { ...guest, ...changed }
-        : // What the server lacks stays as this account last chose it on this device.
-          { ...own, ...saved, ...changed };
+        : // What the server lacks, or hasn't confirmed saving, stays as this account last chose it here.
+          { ...own, ...saved, ...pending, ...changed };
     updateOwner(key, { stored: merged });
-    // A change made while waiting saved itself.
-    const unsaved = changedSince({ ...saved, ...changed }, merged);
-    if (!isEmpty(unsaved)) void savePreferences(toPayload(unsaved), "usePreferences.saveUnsaved");
+    // A change made while waiting is being saved already.
+    const toSave = pick({ ...changedSince(saved, merged), ...pending }, (field) => !(field in changed));
+    if (!isEmpty(toSave)) void savePreferences(key, toSave, "usePreferences.saveUnsaved");
     updateOwner(guestKey, { stored: {} });
     synced = true;
   } catch (err) {
@@ -232,7 +303,7 @@ async function syncServerPreferences(userId: string) {
 /**
  * Temperature sensitivity, default activity, height and weight, kept apart for
  * the guest and for each account on this device. An account's are also saved
- * on the server, which has the final say.
+ * on the server, which has the final say once it has saved this device's changes.
  */
 export function usePreferences() {
   const { userId, isLoaded } = useAuth();
@@ -265,10 +336,13 @@ export function usePreferences() {
 
   /** Keeps a change for whoever is signed in: on this device, and on the server for an account. */
   const update = useCallback(
-    async (change: StoredPreferences, context: string) => {
+    async (change: StoredPreferences, context: string): Promise<PreferenceSaveResult> => {
       if (!key) throw new Error("Preferences are not ready");
       updateOwner(key, { stored: { ...ownerPreferences(key).stored, ...change } });
-      if (owner) await savePreferences(toPayload(change), context);
+      if (owner && (await savePreferences(key, change, context))) return "saved";
+      // Without the server, the change lasts only if storage has it (marked unsaved, for an account).
+      if (!keptInStorage(key)) return "not-saved";
+      return owner ? "kept-on-device" : "saved";
     },
     [key, owner]
   );
