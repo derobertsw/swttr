@@ -113,6 +113,15 @@ describe("packingFromOutfits", () => {
     expect(find(items, "Neck gaiter")?.days).toEqual([{ date: SAT, uses: ["wear"] }]);
   });
 
+  it("keeps names in every script apart", () => {
+    const hat: Recommendation = { ...WEAR, headNeck: { base: [{ name: "帽子" }, { name: "Шапка" }], outer: [] } };
+    const items = packingFromOutfits([planDayKit(SAT, { baseline: { ...planDay(SAT).baseline, recommendation: hat }, dayparts: [], carryItems: ["手袋", "帽子 ", "!!", "??"] })]);
+    expect(items.filter((item) => item.bodyPart === "headNeck").map((item) => item.key)).toEqual(["general:headNeck:base:шапка", "general:headNeck:base:帽子"]);
+    // A carried 帽子 is the 帽子 worn that day; the other carried names stay apart.
+    expect(find(items, "帽子")?.days).toEqual([{ date: SAT, uses: ["wear", "carry"] }]);
+    expect(items.filter((item) => !item.bodyPart).map((item) => item.name).sort()).toEqual(["!!", "??", "手袋"]);
+  });
+
   it("leaves out blank names and copes with an outfit missing its layers", () => {
     const blank = withShell({ name: "   " });
     const broken = { date: SUN, savedAt: null, outfit: { ...savedOutfit(), phases: undefined } } as unknown as DayOutfit;
@@ -152,6 +161,25 @@ describe("packingWithChanges", () => {
   it("keeps an item's quantity when it comes back", () => {
     const { items } = packingWithChanges(before, { "item:g-3": 2, "item:gone": 4 }, seen);
     expect(find(items, "Ski shell")?.quantity).toBe(2);
+  });
+
+  it("keeps a quantity and acknowledgement saved under an item that joined another", () => {
+    const general: Recommendation = { ...WEAR, torso: { base: [{ name: "Merino crew" }], outer: [] } };
+    const planOnly = [planDayKit(SUN, { baseline: { ...planDay(SUN).baseline, recommendation: general }, dayparts: [], carryItems: ["Ski shell"] })];
+    const seenBefore = packingSeen(packingFromOutfits(planOnly));
+    const quantities = { "general:torso:base:merino crew": 3, "carry:ski shell": 2 };
+    const joined = packingFromOutfits([day(SAT), ...planOnly]);
+    expect(find(joined, "Merino crew")).toMatchObject({ key: "item:g-1", aliases: ["general:torso:base:merino crew"] });
+    expect(find(joined, "Ski shell")).toMatchObject({ key: "item:g-3", aliases: ["carry:ski shell"] });
+
+    const { items, removed } = packingWithChanges(joined, quantities, seenBefore);
+    expect(find(items, "Merino crew")).toMatchObject({ quantity: 3 });
+    expect(find(items, "Merino crew")?.change).toBeUndefined();
+    expect(find(items, "Ski shell")).toMatchObject({ quantity: 2 });
+    expect(find(items, "Ski shell")?.change).toBeUndefined();
+    expect(removed).toEqual([]);
+    // A quantity chosen for the item it joined wins, one included.
+    expect(find(packingWithChanges(joined, { ...quantities, "item:g-1": 1 }, null).items, "Merino crew")?.quantity).toBe(1);
   });
 
   it("records carried items without slots, so they're added or removed rather than replaced", () => {

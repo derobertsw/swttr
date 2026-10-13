@@ -57,6 +57,9 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   // A hand-added item keeps its identity until it's saved, so a retry adds it once.
   const pendingAdd = useRef<{ id: string; name: string } | null>(null);
   const listHeading = useRef<HTMLHeadingElement>(null);
+  // Saves in flight and finished, so a list read while one saved isn't shown
+  // over it; and whether to read the list again once they're done.
+  const saves = useRef({ inFlight: 0, finished: 0, refreshAfter: false });
 
   useEffect(() => {
     let cancelled = false;
@@ -77,15 +80,45 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
     };
   }, [id]);
 
+  /**
+   * Reads the list again. A list read while a change saved may not have it,
+   * so it's read again once no change is saving rather than shown over it.
+   */
   const refresh = async () => {
     setRefreshing(true);
     setError(null);
     try {
-      setData(await fetchPackList(id));
+      for (;;) {
+        const finished = saves.current.finished;
+        const body = await fetchPackList(id);
+        if (saves.current.inFlight > 0) {
+          saves.current.refreshAfter = true;
+          return;
+        }
+        if (saves.current.finished === finished) {
+          setData(body);
+          return;
+        }
+      }
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  /** Runs a change's request, counted as saving, then any refresh waiting for it. */
+  const track = async <T,>(request: () => Promise<T>): Promise<T> => {
+    saves.current.inFlight += 1;
+    try {
+      return await request();
+    } finally {
+      saves.current.inFlight -= 1;
+      saves.current.finished += 1;
+      if (saves.current.inFlight === 0 && saves.current.refreshAfter) {
+        saves.current.refreshAfter = false;
+        void refresh();
+      }
     }
   };
 
@@ -97,10 +130,16 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
    */
   const save = async (change: PackingChange, failure: string): Promise<PackingChoices | string> => {
     try {
-      return await tripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST", change);
+      return await track(async () => {
+        try {
+          return await tripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST", change);
+        } catch (err) {
+          if (err instanceof TripRequestError && (err.status === 404 || err.status === 409)) saves.current.refreshAfter = true;
+          throw err;
+        }
+      });
     } catch (err) {
       const message = errorMessage(err);
-      if (err instanceof TripRequestError && (err.status === 404 || err.status === 409)) void refresh();
       toast.error(failure, { description: message });
       return message;
     }
@@ -131,8 +170,8 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
     const pending = pendingAdd.current?.name === name ? pendingAdd.current : { id: crypto.randomUUID(), name };
     pendingAdd.current = pending;
     try {
-      const choices = await tripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST",
-        { op: "add_item", id: pending.id, name, quantity: 1 } satisfies PackingChange);
+      const choices = await track(() => tripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST",
+        { op: "add_item", id: pending.id, name, quantity: 1 } satisfies PackingChange));
       pendingAdd.current = null;
       const added = choices.manual.find((entry) => entry.id === pending.id);
       if (added) setData((current) => current && { ...current, manual: [...current.manual.filter((entry) => entry.id !== added.id), added] });

@@ -30,6 +30,12 @@ export interface PackingItem {
   ownership: PackingOwnership;
   /** Each day that calls for it, in date order, and whether it's worn or carried then. */
   days: Array<{ date: string; uses: PackingUse[] }>;
+  /**
+   * The keys of items that joined this one, like a general plan item named as
+   * a catalog item worn elsewhere; their saved quantity and acknowledgement
+   * still apply to it.
+   */
+  aliases?: string[];
   /** How many to pack: one, unless the person chose another number. */
   quantity: number;
   /** Since the person last acknowledged their list: new, or in place of items that left. */

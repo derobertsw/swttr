@@ -14,9 +14,9 @@ A trip's **What to pack** page (`/trips/:id/pack`) lists what the signed-in memb
 ## Rules
 
 - **Personal.** Each member sees only what their own saved outfits call for, and only they change their own additions and quantities. Shared group gear assigned to them is listed separately, as before; accepting and packing shared gear is #179.
-- **One item, many days.** The same catalog or wardrobe item on several days is one item, listed with each day and whether it's worn or carried then. A general item (one with no catalog identity, like a multi-day plan's) with the same body area, layer and name is one item too, and joins a catalog item worn under the same name in that body area and layer. A carried item worn in another part of the same outfit, like a ski tour's descent shell on the climb, is that item. A carried item worn on another day under the same name is that item as well.
+- **One item, many days.** The same catalog or wardrobe item on several days is one item, listed with each day and whether it's worn or carried then. A general item (one with no catalog identity, like a multi-day plan's) with the same body area, layer and name is one item too, and joins a catalog item worn under the same name in that body area and layer. A carried item worn in another part of the same outfit, like a ski tour's descent shell on the climb, is that item. A carried item worn on another day under the same name is that item as well. Names are compared with letters and numbers in every script kept, so 手袋 and 帽子 stay two items.
 - **Whose item it is.** Items from the wardrobe say Your gear. Suggested items that aren't in the wardrobe say Not in your wardrobe. General items, which name a kind of layer rather than one of the person's, say General item. A multi-day plan's item renamed to one of the person's own item names (their item mappings) counts as theirs. An item is the person's own when any outfit had it from their wardrobe.
-- **Quantity.** An item counts once however many days use it. The person can choose another number from 1 to 20; it's kept by the item's identity, so it stays when the item leaves the outfits and is back when the item returns.
+- **Quantity.** An item counts once however many days use it. The person can choose another number from 1 to 20; it's kept by the item's identity, so it stays when the item leaves the outfits and is back when the item returns. When an item joins another (a general plan item renamed to a catalog item worn elsewhere, or a carried item worn under the same name), its quantity and acknowledgement go with it (`aliases`) until a quantity is chosen for the item it joined.
 - **Changes since last time.** The list as the person last acknowledged it is kept (`seen`). An item that's new where an item that left was worn (the same day, body area and layer) **replaces** it. Other new items are **new**. Items that left without a replacement are listed as **no longer in your outfits**, with the days they were for. Carried-only items are new or removed, never replacements. Got it acknowledges every change at once. The first list someone sees is recorded without flags, so their first outfits don't all show as new.
 - **No silent acknowledgement.** Got it sends back the version of each of the person's kits it was shown for. If any changed since, nothing is recorded and the page reloads the list with the new changes. The database locks those kits while it records the acknowledgement, so a kit saved meanwhile is flagged afterwards rather than absorbed.
 - **Saved outfits stay as saved.** A day whose plan changed after its outfit was saved (another place, date or activity) is listed under Days to review with why, the same notes the day page shows. Its outfit stays in the list until the person replaces it from Gear up.
@@ -36,7 +36,7 @@ A trip's **What to pack** page (`/trips/:id/pack`) lists what the signed-in memb
 
 | Field | Holds |
 |---|---|
-| `items` | Each item from their saved outfits: `key`, `name`, `brand`, `bodyPart` and `layerType` (null when only carried), `ownership`, `days` (`{date, uses}`), `quantity`, and `change` when it's new or replaces items. |
+| `items` | Each item from their saved outfits: `key`, `name`, `brand`, `bodyPart` and `layerType` (null when only carried), `ownership`, `days` (`{date, uses}`), `aliases` when other items joined it, `quantity`, and `change` when it's new or replaces items. |
 | `removed` | Items that left since the last acknowledgement: `key`, `name`, `dates`. |
 | `kitVersions` | Each of their kits with an outfit or checklist, by id, with its `updated_at`: sent back to acknowledge. |
 | `checklists` | Older category checklists by date. |
@@ -52,7 +52,7 @@ A trip's **What to pack** page (`/trips/:id/pack`) lists what the signed-in memb
 | `{op: "add_item", id, name, quantity}` | Adds an item by hand (name up to 80 characters, at most 50 items). A repeat with the same `id` adds nothing. |
 | `{op: "item_quantity", id, quantity}` | `404` when the item was removed meanwhile. |
 | `{op: "remove_item", id}` | Removing an item that's gone changes nothing. |
-| `{op: "quantity", key, quantity}` | For an item from the outfits; 1 clears the choice. |
+| `{op: "quantity", key, quantity}` | For an item from the outfits. A chosen 1 is kept, so it overrides a joined item's quantity. |
 | `{op: "acknowledge", kits}` | Works out the list again on the server and records it. `409` with `code: "kits_changed"` when `kits` doesn't match their kits now. |
 
 Quantities run from 1 to 20. Without the migration, `GET` still lists the outfits (read-only) and `POST` returns `503`.
