@@ -31,7 +31,7 @@ describe("Trip packing coverage", () => {
     await renderPage();
     expect(await screen.findByRole("heading", { name: "Days to review" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Retry weather for 2026-10-10" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-10");
-    expect(screen.getByText(/No automatic clothing list/)).toBeInTheDocument();
+    expect(screen.getByText(/No automatic clothing suggestions/)).toBeInTheDocument();
     expect(screen.queryByText(/assign activities and a base location/)).not.toBeInTheDocument();
   });
 
@@ -69,7 +69,7 @@ describe("Trip packing coverage", () => {
     const user = userEvent.setup();
     await renderPage();
     await screen.findByRole("heading", { name: "Days to review" });
-    await user.click(screen.getByRole("button", { name: "Regenerate pack list" }));
+    await user.click(screen.getByRole("button", { name: "Refresh packing suggestions and saved kit changes" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Database unavailable");
     expect(screen.getByRole("link", { name: "Retry weather for 2026-10-10" })).toBeInTheDocument();
   });

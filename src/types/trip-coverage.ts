@@ -1,3 +1,4 @@
+import type { TripPackingReview } from "@/types/trip-packing";
 import type { PackingListData } from "@/lib/packingList";
 
 export interface TripForecastCoverage {
@@ -29,6 +30,7 @@ export interface TripDayCoverage {
   message: string;
   action: "set_location" | "set_activity" | "plan_manually" | "retry_weather" | "check_later" | "review_day";
   approximation?: string;
+  savedKit?: boolean;
 }
 
 export interface TripPackResponse {
@@ -39,4 +41,6 @@ export interface TripPackResponse {
   skipped: { date: string; reason: string }[];
   packingList: PackingListData;
   groupGear: string[];
+  assignedGroupGear?: Array<{ id: string; description: string }>;
+  packing?: TripPackingReview;
 }

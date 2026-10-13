@@ -3,6 +3,7 @@
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { SavedPacking } from "@/components/trips/SavedPacking";
 import PageLayout from "@/components/PageLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -109,8 +110,8 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
 
   const gaps = data?.packingList.gaps ?? [];
   const extras = data?.packingList.extras ?? [];
-  const groupGear = data?.groupGear ?? [];
-  const needsReview = data?.coverage.filter((day) => day.advice !== "available" || day.forecast.status !== "available" || day.approximation) ?? [];
+  const groupGear = data?.assignedGroupGear ?? data?.groupGear.map((description, index) => ({ id: `legacy-${index}`, description })) ?? [];
+  const needsReview = data?.coverage.filter((day) => day.advice !== "available" || (!day.savedKit && day.forecast.status !== "available") || day.approximation) ?? [];
 
   return (
     <PageLayout chromeVariant="compact">
@@ -124,9 +125,12 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
             </h1>
             {data && (
               <p className="mt-1 text-sm text-muted-foreground">
-                General clothing guidance for {data.coveredDays} of {data.totalDays}{" "}
-                {data.totalDays === 1 ? "day" : "days"} · activity + weather.
-                Saved manual kits are reviewed separately.
+                {data.packing ? <>Accepted kits for {data.coverage.filter(day => day.savedKit).length} of {data.totalDays} days.
+                  General suggestions for {data.coveredDays} additional {data.coveredDays === 1 ? "day" : "days"}.
+                  Saved outfits supply your personal requirements below.</>
+                  : <>General clothing guidance for {data.coveredDays} of {data.totalDays}{" "}
+                    {data.totalDays === 1 ? "day" : "days"} · activity + weather.
+                    General guidance is a suggestion to review.</>}
               </p>
             )}
           </div>
@@ -138,11 +142,11 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
               void refresh();
             }}
             disabled={loading || refreshing}
-            aria-label="Regenerate pack list"
+            aria-label="Refresh packing suggestions and saved kit changes"
             aria-busy={refreshing}
           >
             {refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-            Regenerate
+            Refresh
           </Button>
         </header>
 
@@ -178,10 +182,16 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
           </Card>
         )}
 
-        {data && data.packingList.totalRequiredSlots === 0 && (
+        {data?.packing && <SavedPacking key={data.trip.id} tripId={data.trip.id} packing={data.packing}
+          onChange={packing => setData(previous => previous && { ...previous, packing })}
+          onConflict={refresh} />}
+
+        {sections.length > 0 && <h2 className="text-xl font-semibold">Suggestions for days without accepted kits</h2>}
+
+        {data && data.packingList.totalRequiredSlots === 0 && !data.packing?.proposed.length && (
           <Card>
             <p className="text-sm text-foreground">
-              No automatic clothing list is available. Review the days above for missing inputs,
+              No automatic clothing suggestions are available. Review the days above for missing inputs,
               forecast availability or manual planning. Group gear is listed separately when assigned.
             </p>
           </Card>
@@ -198,7 +208,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
                 >
                   <ListMarker className="mt-2" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate">
+                    <p className="break-words">
                       {it.label}
                       {it.auto && (
                         <span className="ml-2 text-xs font-medium text-primary">From your closet</span>
@@ -254,12 +264,13 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
 
         {groupGear.length > 0 && (
           <Card>
-            <h2 className="text-xl font-semibold text-foreground">Group gear (yours)</h2>
+            <h2 className="text-xl font-semibold text-foreground">Group gear assigned to you</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Assignment is separate from acceptance and physically packed status.</p>
             <ul className="mt-2 space-y-1.5">
               {groupGear.map((g) => (
-                <li key={g} className="flex items-center gap-2 text-sm text-foreground">
+                <li key={g.id} className="flex items-center gap-2 text-sm text-foreground">
                   <ListMarker />
-                  {g}
+                  {g.description}
                 </li>
               ))}
             </ul>

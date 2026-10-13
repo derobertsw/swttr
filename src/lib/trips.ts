@@ -139,7 +139,8 @@ export async function listTripsForUser(
 
 export async function loadTripFull(
   supabase: SupabaseClient,
-  tripId: string
+  tripId: string,
+  options: { strict?: boolean } = {}
 ): Promise<TripFull | null> {
   const { data: trip } = await supabase
     .from("trips")
@@ -159,16 +160,20 @@ export async function loadTripFull(
       .order("sort_order"),
   ]);
 
+  if (options.strict && [stopsRes, membersRes, daysRes, gearRes].some(result => result.error)) {
+    throw new Error("Could not load the complete trip. Try again.");
+  }
   const days = (daysRes.data ?? []) as TripDay[];
   let kits: TripMemberDayKit[] = [];
   if (days.length > 0) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("trip_member_day_kits")
       .select("*")
       .in(
         "trip_day_id",
         days.map((d) => d.id)
       );
+    if (options.strict && error) throw new Error("Could not load saved kits. Try again.");
     kits = (data ?? []) as TripMemberDayKit[];
   }
 

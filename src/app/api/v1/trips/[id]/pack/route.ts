@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { jsonError, readJson } from "@/lib/api";
+import { emptyPacking, packingReview, packingSources, readPackingEdits } from "@/lib/trip-packing";
+import { tripEffort } from "@/lib/trip-saved-kits";
+import { outfitMismatches } from "@/lib/trip-kit-fit";
+import type { TripPackingSnapshot } from "@/types/trip-packing";
 import { requireTripAccess, loadTripFull, enumerateDates } from "@/lib/trips";
 import { buildMultiDayLayerPlan } from "@/lib/planAhead";
 import { buildPackingListFromDays } from "@/lib/packingList";
@@ -32,8 +37,18 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   if (auth instanceof NextResponse) return auth;
   const { supabase, userId } = auth;
 
-  const full = await loadTripFull(supabase, id);
+  let full;
+  try { full = await loadTripFull(supabase, id, { strict: true }); }
+  catch { return jsonError("Could not load trip packing. Try again.", 503); }
   if (!full) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const member = full.members.find(m => m.user_id === userId && m.status !== "left");
+  let packing;
+  if (member) {
+    const { data: snapshot, error } = await supabase.from("trip_member_packing").select("*").eq("trip_member_id", member.id).maybeSingle();
+    if (error) return jsonError("Could not load saved packing. Try again.", 503);
+    packing = packingReview(full, member.id, (snapshot as unknown as TripPackingSnapshot) ?? emptyPacking);
+  }
 
   // Read sensitivity preference if it exists (best-effort).
   let sensitivity: TemperatureSensitivity = "neutral";
@@ -57,12 +72,13 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     const stop = resolveTripStop(day ?? { stop_id: null }, full.stops);
     const activity = day?.activity || stop?.activities[0] || null;
     const activityKey = tripActivityToRecommendationKey(activity);
+    const savedKit = day && myMember && full.kits.find(kit => kit.trip_day_id === day.id && kit.trip_member_id === myMember.id && kit.outfit);
     const manualKit = day && myMember && full.kits.find((kit) =>
       kit.trip_day_id === day.id && kit.trip_member_id === myMember.id && kit.items.length > 0);
     const outsideWindow = tripForecastDateOutsideWindow(date);
-    const needsForecast = !!day && activity !== "Rest" && !manualKit && !!activityKey
+    const needsForecast = !!day && activity !== "Rest" && !manualKit && !savedKit && !!activityKey
       && Object.hasOwn(layerRecommendations, activityKey) && hasTripCoordinates(stop) && !outsideWindow;
-    return { date, day, stop, activity, activityKey, manualKit, outsideWindow, needsForecast };
+    return { date, day, stop, activity, activityKey, manualKit, savedKit, outsideWindow, needsForecast };
   });
   const requestedStops = new Map<string, NonNullable<ReturnType<typeof resolveTripStop>>>();
   for (const { stop, needsForecast } of daysForCoverage) {
@@ -81,7 +97,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   }));
 
   const dailyPlans: DailyLayerPlan[] = [];
-  const coverage: TripDayCoverage[] = daysForCoverage.map(({ date, day, stop, activity, activityKey, manualKit, outsideWindow }) => {
+  const coverage: TripDayCoverage[] = daysForCoverage.map(({ date, day, stop, activity, activityKey, manualKit, savedKit, outsideWindow }) => {
     const { forecast, hours } = tripDayForecast(date,
       outsideWindow ? undefined : stop ? sources.get(stop.id) : undefined,
       outsideWindow ?? (hasTripCoordinates(stop) ? "not_needed" : "no_location"));
@@ -92,8 +108,16 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     if (!day) {
       return { ...entry, advice: "missing_inputs", reason: "no_day", message: "This date has no saved day plan. Open this day to create one.", action: "review_day" };
     }
+    if (savedKit?.outfit) {
+      const notes = outfitMismatches(savedKit.outfit, { date, activity, stop });
+      if (savedKit.effort !== tripEffort(savedKit.outfit.outing.exertion)) notes.push("Effort changed since this outfit was accepted. Re-plan in Gear up to review new advice; packing keeps the saved selections.");
+      return { ...entry, advice: "available", savedKit: true, action: "review_day",
+        forecast: { status: "not_requested", availableHours: 0, expectedHours: 0, reason: "not_needed", message: "Packing uses your saved selections, not a new forecast." },
+        message: "Accepted kit supplies packing requirements.",
+        ...(notes.length > 0 && { approximation: notes.join(" ") }) };
+    }
     if (manualKit) {
-      return { ...entry, advice: "manual", reason: "manual_kit", message: "Manual kit saved. Review it on this day; it is not included in automatic packing." };
+      return { ...entry, advice: "manual", reason: "manual_kit", message: "Legacy category checklist saved. Resolve its gear on this day; it is not an accepted outfit or automatic packing." };
     }
     if (activity === "Rest") {
       return { ...entry, advice: "rest", reason: "rest_day", message: "Rest day; review personal items manually." };
@@ -165,6 +189,42 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     coverage,
     skipped,
     packingList,
+    packing,
     groupGear: myGear,
+    assignedGroupGear: myMember ? full.gear.filter(g => g.assignee_member_id === myMember.id).map(g => ({ id: g.id, description: g.description })) : [],
   });
+}
+
+/** Preview manual/quantity edits, or apply exactly the reviewed personal requirements. */
+export async function POST(request: NextRequest, ctx: RouteContext) {
+  const { id } = await ctx.params;
+  const auth = await requireTripAccess(id);
+  if (auth instanceof NextResponse) return auth;
+  const body = await readJson(request);
+  if (!body || (body.action !== "preview" && body.action !== "apply") || !Number.isInteger(body.revision) || Number(body.revision) < 0) return jsonError("Invalid packing request", 400);
+  const edits = readPackingEdits(body);
+  if (!edits) return jsonError("Check item names and quantities (1–100).", 400);
+  let full;
+  try { full = await loadTripFull(auth.supabase, id, { strict: true }); }
+  catch { return jsonError("Could not load saved kits. Your edits have been kept; try again.", 503); }
+  const member = full?.members.find(m => m.user_id === auth.userId && m.status !== "left");
+  if (!full || !member) return jsonError("Not found", 404);
+  const { data, error } = await auth.supabase.from("trip_member_packing").select("*").eq("trip_member_id", member.id).maybeSingle();
+  if (error) return jsonError("Could not load saved packing. Try again.", 503);
+  const snapshot = (data as unknown as TripPackingSnapshot) ?? emptyPacking;
+  const review = packingReview(full, member.id, { ...snapshot, ...edits });
+  if (body.action === "preview") {
+    if (snapshot.revision !== body.revision) return jsonError("Packing changed in another session. Reload to review it; your edits have been kept.", 409);
+    return NextResponse.json({ packing: review });
+  }
+  if (review.source_revision !== body.source_revision || review.proposal_revision !== body.proposal_revision) return jsonError("Saved kits or packing choices changed. Review packing again; your edits have been kept.", 409);
+  const result = await auth.supabase.rpc("apply_trip_packing", {
+    p_trip_id: id, p_user_id: auth.userId, p_revision: body.revision,
+    p_sources: packingSources(full, member.id), p_requirements: review.proposed,
+    p_manual_items: edits.manual_items, p_quantities: edits.quantities,
+  });
+  if (result.error) return jsonError(result.error.code === "40001" ? "Packing or saved kits changed. Reload to review them; your edits have been kept."
+    : result.error.code === "42501" ? "Not found" : "Could not save packing. Your edits have been kept; try again.",
+    result.error.code === "40001" ? 409 : result.error.code === "42501" ? 404 : 503);
+  return NextResponse.json({ packing: packingReview(full, member.id, result.data as TripPackingSnapshot) });
 }
