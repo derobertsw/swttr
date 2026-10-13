@@ -36,7 +36,7 @@ Each screen was audited in the page:
 
 In total the audit covered 96 screens, 1,551 controls and 2,959 text nodes. Apart from sign-in, every screen passed every check. The condensed results are in [checks.json](checks.json).
 
-**Sign-in (#285).** Wardrobe and Trips send a guest to Clerk's default sign-in card. It has no SWTTR header or navigation and no `<main>`. It isn't themed, so dark mode shows a white card. On phones its controls are 30px tall, under the 44px target. The audit also listed contrast failures there, but those were false positives: Clerk's footer sits on a background image, which the audit doesn't composite. In the screenshots its text is readable.
+**Sign-in (#285).** Wardrobe and Trips send a guest to Clerk's default sign-in card. It has no SWTTR header or navigation and no `<main>`. It isn't themed, so dark mode shows a white card. On phones its controls are 30px tall, under the 44px target. Two links, **Sign up** (46 × 18) and the Clerk logo (48 × 14), are under 24px at every width, so `checks.json` lists them under `under24px`. Both still meet WCAG 2.5.8 through its spacing exception: a 24px circle centred on either one touches no other control, measured at 1280 and 390. **Sign up** also ends its sentence ("Don’t have an account? Sign up"). On phones they also miss the 44px target. The audit also listed contrast failures there, but those were false positives: Clerk's footer sits on a background image, which the audit doesn't composite. In the screenshots its text is readable.
 
 ## Advice states
 
