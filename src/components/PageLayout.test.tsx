@@ -88,6 +88,7 @@ describe("PageLayout", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     window.matchMedia = originalMatchMedia;
     setWidth(originalInnerWidth);
   });
@@ -167,6 +168,25 @@ describe("PageLayout", () => {
     // jsdom applies no media queries, so check that no breakpoint class hides it.
     expect(screen.getAllByTestId("user-button")).toHaveLength(1);
     expect(screen.getByTestId("user-button").closest(".hidden")).toBeNull();
+  });
+
+  it.each([700, 1280])("uses native navigation and bottom padding on Mac at %ipx", (width) => {
+    setWidth(width);
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 SWTTRNativeMac/1");
+    renderLayout();
+    expect(screen.queryByRole("navigation", { name: "Primary" })).toBeNull();
+    expect(document.querySelector('[data-slot="sidebar"]')).toBeNull();
+    expect(screen.getByRole("main").parentElement).toHaveClass("pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]");
+    expect(screen.getByRole("button", { name: "Open menu" })).not.toHaveClass("md:hidden");
+    expect(StatusBar.setStyle).not.toHaveBeenCalled();
+  });
+
+  it.each([390, 768, 1280])("keeps browser navigation and padding at %ipx", (width) => {
+    setWidth(width);
+    renderLayout();
+    expect(screen.getAllByRole("navigation", { name: "Primary" })).toHaveLength(width < 768 ? 1 : 2);
+    expect(screen.getByRole("main").parentElement).toHaveClass("pb-[calc(5.5rem_+_env(safe-area-inset-bottom))]");
+    expect(screen.getByRole("button", { name: "Open menu" })).toHaveClass("md:hidden");
   });
 
   it("drops the web sidebar and tab bar in the native shell but keeps the menu", () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { MobileTabBar, isNavItemActive } from "./AppNavigation";
@@ -31,6 +31,7 @@ const localStorageMock = {
 Object.defineProperty(window, "localStorage", { value: localStorageMock });
 
 describe("AppNavigation", () => {
+  afterEach(() => vi.restoreAllMocks());
   beforeEach(() => {
     vi.clearAllMocks();
     mockPathname = "/";
@@ -70,6 +71,13 @@ describe("AppNavigation", () => {
         userAgent.mockRestore();
       }
     });
+  });
+
+  it("leaves both web navigations out of the Mac shell", () => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 SWTTRNativeMac/1");
+    render(<SidebarProvider><AppSidebar /><MobileTabBar /></SidebarProvider>);
+    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(document.querySelector('[data-slot="sidebar"]')).toBeNull();
   });
 
   describe("active tab", () => {

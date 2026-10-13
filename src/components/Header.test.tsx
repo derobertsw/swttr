@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Header from "./Header";
 import { AppSidebar } from "./AppSidebar";
@@ -49,6 +49,31 @@ describe("Header settings entry points", () => {
   afterEach(() => {
     noAnimation.remove();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it.each([true, false])("opens Settings from the Mac menu event, signed in: %s", async (signedIn) => {
+    fakeClerkState.signedIn = signedIn;
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 SWTTRNativeMac/1");
+    render(chrome());
+    const opener = signedIn ? avatar() : screen.getByRole("button", { name: "Open menu" });
+    opener.focus();
+    act(() => window.dispatchEvent(new Event("openPreferences")));
+    const drawer = await screen.findByRole("dialog", { name: "Settings" });
+    act(() => window.dispatchEvent(new Event("openPreferences")));
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    fireEvent.click(within(drawer).getByRole("button", { name: "Done" }));
+    await closeDrawer();
+    expect(opener).toHaveFocus();
+    act(() => window.dispatchEvent(new Event("openPreferences")));
+    await screen.findByRole("dialog", { name: "Settings" });
+  });
+
+  it.each(["Mozilla/5.0", "Mozilla/5.0 SWTTRNativeTabs"])("ignores the Mac menu event outside the Mac shell: %s", (agent) => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue(agent);
+    render(chrome());
+    act(() => window.dispatchEvent(new Event("openPreferences")));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("opens one Settings drawer from the avatar and returns focus to it on Escape", async () => {
