@@ -52,7 +52,6 @@ type DerivedItem = Omit<PackingItem, "quantity" | "change">;
 
 interface Draft extends Omit<DerivedItem, "days" | "aliases"> {
   uses: Map<string, Set<PackingUse>>;
-  aliases: string[];
   /** When the outfit that named it was saved: the latest save's name is kept. */
   namedAt: string;
 }
@@ -69,8 +68,21 @@ function mergeInto(target: Draft, source: Draft) {
     target.uses.set(date, into);
   }
   if (OWNERSHIP_RANK[source.ownership] > OWNERSHIP_RANK[target.ownership]) target.ownership = source.ownership;
-  // Its quantity and acknowledgement go with it.
-  target.aliases.push(source.key, ...source.aliases);
+}
+
+/**
+ * The other keys the same item can be saved under, worked out from its own
+ * name, body area and layer, so they hold whether or not an outfit still
+ * names it that way: a catalog item's general key (a plan's item named as
+ * it), and a worn item's carry key (carried under its name).
+ */
+function aliasesOf(item: Pick<Draft, "key" | "name" | "bodyPart" | "layerType">): string[] {
+  if (!item.bodyPart) return [];
+  const text = identityText(item.name);
+  return [
+    ...(item.key.startsWith("item:") ? [`general:${item.bodyPart}:${item.layerType}:${text}`] : []),
+    `carry:${text}`,
+  ].filter((alias) => alias !== item.key);
 }
 
 /** The one draft matching, or undefined when none or several do. */
@@ -93,8 +105,9 @@ function only(drafts: Draft[]): Draft | undefined {
  *   `mapped` holds "bodyPart:layerType:name" for the names the person gave
  *   their own items, which a multi-day plan's items carry.
  * - Names come from the latest save.
- * - An item that joined another is listed in its `aliases`, so a quantity or
- *   acknowledgement saved under its own key still applies.
+ * - `aliases` lists the other keys the same item can be saved under (see
+ *   aliasesOf), so a quantity or acknowledgement saved under one still
+ *   applies after an outfit names the item another way.
  */
 export function packingFromOutfits(outfits: DayOutfit[], mapped: ReadonlySet<string> = new Set()): DerivedItem[] {
   const drafts = new Map<string, Draft>();
@@ -103,10 +116,10 @@ export function packingFromOutfits(outfits: DayOutfit[], mapped: ReadonlySet<str
     uses.add(use);
     draft.uses.set(date, uses);
   };
-  const add = (date: string, use: PackingUse, item: Omit<Draft, "uses" | "aliases">) => {
+  const add = (date: string, use: PackingUse, item: Omit<Draft, "uses">) => {
     let draft = drafts.get(item.key);
     if (!draft) {
-      draft = { ...item, uses: new Map(), aliases: [] };
+      draft = { ...item, uses: new Map() };
       drafts.set(item.key, draft);
     } else {
       if (OWNERSHIP_RANK[item.ownership] > OWNERSHIP_RANK[draft.ownership]) draft.ownership = item.ownership;
@@ -168,8 +181,9 @@ export function packingFromOutfits(outfits: DayOutfit[], mapped: ReadonlySet<str
     : 100;
   return [...drafts.values()]
     .sort((a, b) => order(a) - order(b) || a.name.localeCompare(b.name))
-    .map(({ uses, key, name, brand, bodyPart, layerType, ownership, aliases }) => ({
-      key, name, ...(brand && { brand }), bodyPart, layerType, ownership, ...(aliases.length > 0 && { aliases }),
+    .map(({ uses, key, name, brand, bodyPart, layerType, ownership }) => ({
+      key, name, ...(brand && { brand }), bodyPart, layerType, ownership,
+      ...(bodyPart && { aliases: aliasesOf({ key, name, bodyPart, layerType }) }),
       days: [...uses.entries()].sort(([a], [b]) => a.localeCompare(b))
         .map(([date, set]) => ({ date, uses: USES.filter((use) => set.has(use)) })),
     }));
@@ -191,9 +205,9 @@ export function packingSeen(items: DerivedItem[]): PackingSeen {
  * acknowledged their list: an item that's new where an item that left was
  * worn (the same day, body area and layer) replaces it, another new item is
  * added, and items that left without being replaced are listed as removed.
- * Nothing is flagged before the first acknowledgement. An item that joined
- * another (its alias) hasn't left, and its quantity applies until one is
- * chosen for the item it joined.
+ * Nothing is flagged before the first acknowledgement. An item saved under
+ * one of an item's aliases is that item, so it hasn't left, and its quantity
+ * applies until one is chosen under the item's own key.
  */
 export function packingWithChanges(items: DerivedItem[], quantities: Record<string, number>, seen: PackingSeen | null): {
   items: PackingItem[];
