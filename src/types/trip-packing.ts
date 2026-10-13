@@ -31,9 +31,10 @@ export interface PackingItem {
   /** Each day that calls for it, in date order, and whether it's worn or carried then. */
   days: Array<{ date: string; uses: PackingUse[] }>;
   /**
-   * The keys of items that joined this one, like a general plan item named as
-   * a catalog item worn elsewhere; their saved quantity and acknowledgement
-   * still apply to it.
+   * The other keys the same item can be saved under, from its name, body area
+   * and layer: a catalog item's general key (a plan's item named as it) and a
+   * worn item's carry key. A quantity or acknowledgement saved under one
+   * applies to it, whether or not an outfit still names it that way.
    */
   aliases?: string[];
   /** How many to pack: one, unless the person chose another number. */
