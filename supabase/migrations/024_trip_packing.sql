@@ -3,9 +3,10 @@
 -- the member decided about it. See docs/trip-packing.md.
 --
 -- - items: what they added by hand, [{id, name, quantity}].
--- - quantities: how many of an item from their kits to pack, by its key, when
---   it isn't one. A quantity stays when the item leaves the kits, so it's
---   there again if the item comes back.
+-- - quantities: how many of an item from their kits to pack, by its key, once
+--   they choose. A quantity stays when the item leaves the kits, so it's
+--   there again if the item comes back. A chosen 1 is kept too: it overrides
+--   the quantity of an item that has since joined this one.
 -- - seen: their kit items as they last acknowledged them, by key, each
 --   {name, slots}. Items since then show as new or replaced, and items gone
 --   since then as no longer in their kits. Null until the first.
@@ -31,7 +32,7 @@ GRANT ALL ON public.trip_member_packing TO service_role;
 --   the same id changes nothing, so a retried request adds it once.
 -- - {op: 'item_quantity', id, quantity}: P0002 when the item was removed.
 -- - {op: 'remove_item', id}: removing an item that's gone changes nothing.
--- - {op: 'quantity', key, quantity}: for an item from the kits; 1 clears it.
+-- - {op: 'quantity', key, quantity}: for an item from the kits.
 -- - {op: 'acknowledge', seen, kits}: records `seen`. `kits` is each of the
 --   member's kits on the trip's dates (an outfit or checklist items) by id, with the
 --   updated_at it had when `seen` was worked out. When the kits no longer
@@ -103,14 +104,10 @@ BEGIN
   ELSIF v_op = 'quantity' THEN
     v_key := p_op->>'key';
     IF v_key IS NULL OR v_key = '' OR char_length(v_key) > 300 THEN RAISE EXCEPTION 'Invalid item' USING ERRCODE = '22023'; END IF;
-    IF v_quantity = 1 THEN
-      v_row.quantities := v_row.quantities - v_key;
-    ELSE
-      IF NOT v_row.quantities ? v_key AND (SELECT count(*) FROM jsonb_object_keys(v_row.quantities)) >= 300 THEN
-        RAISE EXCEPTION 'Too many quantities' USING ERRCODE = '22023';
-      END IF;
-      v_row.quantities := v_row.quantities || jsonb_build_object(v_key, v_quantity);
+    IF NOT v_row.quantities ? v_key AND (SELECT count(*) FROM jsonb_object_keys(v_row.quantities)) >= 300 THEN
+      RAISE EXCEPTION 'Too many quantities' USING ERRCODE = '22023';
     END IF;
+    v_row.quantities := v_row.quantities || jsonb_build_object(v_key, v_quantity);
   ELSE
     IF jsonb_typeof(p_op->'seen') IS DISTINCT FROM 'object' OR jsonb_typeof(p_op->'kits') IS DISTINCT FROM 'object'
       OR octet_length((p_op->'seen')::text) > 200000 THEN

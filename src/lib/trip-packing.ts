@@ -3,7 +3,7 @@
  * server from the outfits saved to their trip days, and the changes since they
  * last acknowledged it. See docs/trip-packing.md.
  */
-import { BODY_PART_ORDER, LAYER_TYPE_ORDER, normalizeText } from "@/lib/packingList";
+import { BODY_PART_ORDER, LAYER_TYPE_ORDER } from "@/lib/packingList";
 import { kitWear } from "@/lib/trip-saved-kits";
 import type { SavedKit } from "@/types/savedKit";
 import type {
@@ -29,6 +29,17 @@ const isObject = (value: unknown): value is Fields => typeof value === "object" 
 const isQuantity = (value: unknown): value is number => Number.isInteger(value) && Number(value) >= 1 && Number(value) <= MAX_QUANTITY;
 const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((entry) => typeof entry === "string");
 
+/**
+ * A name as an item's identity: compatibility forms folded, lowercase, and
+ * punctuation and spacing collapsed, keeping letters and numbers in every
+ * script so 手袋 and 帽子 stay two items. A name with no letters or numbers
+ * keeps its own text.
+ */
+function identityText(value: string): string {
+  const folded = value.normalize("NFKC").toLowerCase();
+  return folded.replace(/[^\p{L}\p{N}\p{M}]+/gu, " ").trim() || folded.trim();
+}
+
 /** A saved outfit on one of the person's trip days. */
 export interface DayOutfit {
   date: string;
@@ -39,8 +50,9 @@ export interface DayOutfit {
 /** An item as the outfits name it, before its quantity and changes are known. */
 type DerivedItem = Omit<PackingItem, "quantity" | "change">;
 
-interface Draft extends Omit<DerivedItem, "days"> {
+interface Draft extends Omit<DerivedItem, "days" | "aliases"> {
   uses: Map<string, Set<PackingUse>>;
+  aliases: string[];
   /** When the outfit that named it was saved: the latest save's name is kept. */
   namedAt: string;
 }
@@ -57,6 +69,8 @@ function mergeInto(target: Draft, source: Draft) {
     target.uses.set(date, into);
   }
   if (OWNERSHIP_RANK[source.ownership] > OWNERSHIP_RANK[target.ownership]) target.ownership = source.ownership;
+  // Its quantity and acknowledgement go with it.
+  target.aliases.push(source.key, ...source.aliases);
 }
 
 /** The one draft matching, or undefined when none or several do. */
@@ -79,6 +93,8 @@ function only(drafts: Draft[]): Draft | undefined {
  *   `mapped` holds "bodyPart:layerType:name" for the names the person gave
  *   their own items, which a multi-day plan's items carry.
  * - Names come from the latest save.
+ * - An item that joined another is listed in its `aliases`, so a quantity or
+ *   acknowledgement saved under its own key still applies.
  */
 export function packingFromOutfits(outfits: DayOutfit[], mapped: ReadonlySet<string> = new Set()): DerivedItem[] {
   const drafts = new Map<string, Draft>();
@@ -87,10 +103,10 @@ export function packingFromOutfits(outfits: DayOutfit[], mapped: ReadonlySet<str
     uses.add(use);
     draft.uses.set(date, uses);
   };
-  const add = (date: string, use: PackingUse, item: Omit<Draft, "uses">) => {
+  const add = (date: string, use: PackingUse, item: Omit<Draft, "uses" | "aliases">) => {
     let draft = drafts.get(item.key);
     if (!draft) {
-      draft = { ...item, uses: new Map() };
+      draft = { ...item, uses: new Map(), aliases: [] };
       drafts.set(item.key, draft);
     } else {
       if (OWNERSHIP_RANK[item.ownership] > OWNERSHIP_RANK[draft.ownership]) draft.ownership = item.ownership;
@@ -113,12 +129,12 @@ export function packingFromOutfits(outfits: DayOutfit[], mapped: ReadonlySet<str
           for (const item of wear?.[bodyPart]?.[layerType] ?? []) {
             const name = item.name.trim();
             if (!name) continue;
-            const key = item.sourceId ? `item:${item.sourceId}` : `general:${bodyPart}:${layerType}:${normalizeText(name)}`;
+            const key = item.sourceId ? `item:${item.sourceId}` : `general:${bodyPart}:${layerType}:${identityText(name)}`;
             const ownership: PackingOwnership = item.sourceId
               ? item.isRecommended ? "suggested" : "owned"
               : mapped.has(`${bodyPart}:${layerType}:${name}`) ? "owned" : "general";
             add(date, "wear", { key, name, ...(item.brand && { brand: item.brand }), bodyPart, layerType, ownership, namedAt });
-            worn.set(normalizeText(name), drafts.get(key)!);
+            worn.set(identityText(name), drafts.get(key)!);
           }
         }
       }
@@ -126,15 +142,15 @@ export function packingFromOutfits(outfits: DayOutfit[], mapped: ReadonlySet<str
     for (const text of outfitCarry(outfit)) {
       const name = text.trim();
       if (!name) continue;
-      const known = worn.get(normalizeText(name));
+      const known = worn.get(identityText(name));
       if (known) mark(known, date, "carry");
-      else add(date, "carry", { key: `carry:${normalizeText(name)}`, name, bodyPart: null, layerType: null, ownership: "general", namedAt });
+      else add(date, "carry", { key: `carry:${identityText(name)}`, name, bodyPart: null, layerType: null, ownership: "general", namedAt });
     }
   }
 
   const all = [...drafts.values()];
   const wornIn = (draft: Draft) => all.filter((other) => other !== draft && drafts.has(other.key) && other.bodyPart
-    && normalizeText(other.name) === normalizeText(draft.name));
+    && identityText(other.name) === identityText(draft.name));
   for (const draft of all) {
     if (!draft.key.startsWith("general:")) continue;
     const target = only(wornIn(draft).filter((other) => other.key.startsWith("item:")
@@ -152,8 +168,8 @@ export function packingFromOutfits(outfits: DayOutfit[], mapped: ReadonlySet<str
     : 100;
   return [...drafts.values()]
     .sort((a, b) => order(a) - order(b) || a.name.localeCompare(b.name))
-    .map(({ uses, key, name, brand, bodyPart, layerType, ownership }) => ({
-      key, name, ...(brand && { brand }), bodyPart, layerType, ownership,
+    .map(({ uses, key, name, brand, bodyPart, layerType, ownership, aliases }) => ({
+      key, name, ...(brand && { brand }), bodyPart, layerType, ownership, ...(aliases.length > 0 && { aliases }),
       days: [...uses.entries()].sort(([a], [b]) => a.localeCompare(b))
         .map(([date, set]) => ({ date, uses: USES.filter((use) => set.has(use)) })),
     }));
@@ -175,18 +191,21 @@ export function packingSeen(items: DerivedItem[]): PackingSeen {
  * acknowledged their list: an item that's new where an item that left was
  * worn (the same day, body area and layer) replaces it, another new item is
  * added, and items that left without being replaced are listed as removed.
- * Nothing is flagged before the first acknowledgement.
+ * Nothing is flagged before the first acknowledgement. An item that joined
+ * another (its alias) hasn't left, and its quantity applies until one is
+ * chosen for the item it joined.
  */
 export function packingWithChanges(items: DerivedItem[], quantities: Record<string, number>, seen: PackingSeen | null): {
   items: PackingItem[];
   removed: PackingRemovedItem[];
 } {
-  const current = new Set(items.map((item) => item.key));
+  const current = new Set(items.flatMap((item) => [item.key, ...(item.aliases ?? [])]));
   const gone = seen ? Object.entries(seen).filter(([key]) => !current.has(key)) : [];
   const replaced = new Set<string>();
   const result = items.map((item): PackingItem => {
-    const withQuantity = { ...item, quantity: quantities[item.key] ?? 1 };
-    if (!seen || seen[item.key]) return withQuantity;
+    const quantity = [item.key, ...(item.aliases ?? [])].map((key) => quantities[key]).find((value) => value !== undefined);
+    const withQuantity = { ...item, quantity: quantity ?? 1 };
+    if (!seen || [item.key, ...(item.aliases ?? [])].some((key) => seen[key])) return withQuantity;
     const slots = new Set(packingSeen([item])[item.key].slots);
     const replaces = gone.filter(([, before]) => before.slots.some((slot) => slots.has(slot)));
     if (replaces.length === 0) return { ...withQuantity, change: { kind: "added" } };

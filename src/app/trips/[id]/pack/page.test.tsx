@@ -210,6 +210,59 @@ describe("Packing from saved outfits", () => {
     expect(screen.getByRole("group", { name: "How many Fleece" })).toHaveTextContent("2");
   });
 
+  it("reads the list again when a quantity saved while it was being read", async () => {
+    let releaseRead = () => {};
+    let reads = 0;
+    const fetchMock = fakeTripApi({
+      [PACK]: () => {
+        reads += 1;
+        if (reads === 2) {
+          // Read before the save below, answered after it.
+          return new Promise((resolve) => { releaseRead = () => resolve(reply(200, pack([saved("2026-10-10")], { items: [SHELL] }))); });
+        }
+        return reply(200, pack([saved("2026-10-10")], { items: [{ ...SHELL, quantity: reads === 1 ? 1 : 2 }] }));
+      },
+      [CHANGE]: reply(200, { manual: [], quantities: { [SHELL.key]: 2 } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("button", { name: "Refresh pack list" }));
+    await user.click(screen.getByRole("button", { name: "One more Ski shell" }));
+    expect(screen.getByRole("group", { name: "How many Ski shell" })).toHaveTextContent("2");
+    await act(async () => { releaseRead(); });
+    expect(reads).toBe(3);
+    expect(screen.getByRole("group", { name: "How many Ski shell" })).toHaveTextContent("2");
+    await user.click(screen.getByRole("button", { name: "One more Ski shell" }));
+    expect(sentBodies(fetchMock, CHANGE).at(-1)).toEqual({ op: "quantity", key: SHELL.key, quantity: 3 });
+  });
+
+  it("waits for a change still saving before reading the list again", async () => {
+    let releaseSave = () => {};
+    let releaseRead = () => {};
+    let reads = 0;
+    const fetchMock = fakeTripApi({
+      [PACK]: () => {
+        reads += 1;
+        if (reads === 2) return new Promise((resolve) => { releaseRead = () => resolve(reply(200, pack([saved("2026-10-10")], { items: [SHELL] }))); });
+        return reply(200, pack([saved("2026-10-10")], { items: [{ ...SHELL, quantity: reads === 1 ? 1 : 2 }] }));
+      },
+      [CHANGE]: () => new Promise((resolve) => { releaseSave = () => resolve(reply(200, { manual: [], quantities: { [SHELL.key]: 2 } })); }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("button", { name: "Refresh pack list" }));
+    await user.click(screen.getByRole("button", { name: "One more Ski shell" }));
+    // The list read answers while the save is still out: it isn't shown.
+    await act(async () => { releaseRead(); });
+    expect(screen.getByRole("group", { name: "How many Ski shell" })).toHaveTextContent("2");
+    expect(reads).toBe(2);
+    await act(async () => { releaseSave(); });
+    expect(reads).toBe(3);
+    expect(screen.getByRole("group", { name: "How many Ski shell" })).toHaveTextContent("2");
+  });
+
   it("adds an item by hand once across a retry, and removes it", async () => {
     let attempt = 0;
     const fetchMock = fakeTripApi({

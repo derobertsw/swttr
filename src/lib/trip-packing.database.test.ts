@@ -63,10 +63,11 @@ describe("A member's own packing choices in Postgres", () => {
     expect((await update({ op: "remove_item", id: socks })).items).toEqual([]);
   });
 
-  it("keeps a kit item's quantity until it's set back to one", async () => {
+  it("keeps each kit item's chosen quantity, one included", async () => {
     expect((await update({ op: "quantity", key: "item:g-1", quantity: 3 })).quantities).toEqual({ "item:g-1": 3 });
     expect((await update({ op: "quantity", key: "carry:spare gloves", quantity: 2 })).quantities).toEqual({ "item:g-1": 3, "carry:spare gloves": 2 });
-    expect((await update({ op: "quantity", key: "item:g-1", quantity: 1 })).quantities).toEqual({ "carry:spare gloves": 2 });
+    // A chosen 1 is kept, so it overrides an older quantity of an item that joined this one.
+    expect((await update({ op: "quantity", key: "item:g-1", quantity: 1 })).quantities).toEqual({ "item:g-1": 1, "carry:spare gloves": 2 });
   });
 
   it("merges changes from two sessions instead of overwriting either", async () => {
