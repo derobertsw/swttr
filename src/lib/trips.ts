@@ -81,16 +81,14 @@ export async function listTripsForUser(
   supabase: SupabaseClient,
   userId: string
 ): Promise<TripSummary[]> {
-  const { data: owned } = await supabase
-    .from("trips")
-    .select("*")
-    .eq("owner_user_id", userId);
-
-  const { data: memberships } = await supabase
-    .from("trip_members")
-    .select("trip_id")
-    .eq("user_id", userId)
-    .neq("status", "left");
+  const [{ data: owned }, { data: memberships }] = await Promise.all([
+    supabase.from("trips").select("*").eq("owner_user_id", userId),
+    supabase
+      .from("trip_members")
+      .select("trip_id")
+      .eq("user_id", userId)
+      .neq("status", "left"),
+  ]);
 
   const memberTripIds = (memberships ?? []).map((m) => m.trip_id);
   const ownedIds = new Set((owned ?? []).map((t) => t.id));
@@ -137,49 +135,55 @@ export async function listTripsForUser(
     .sort((a, b) => a.start_date.localeCompare(b.start_date));
 }
 
+/** Pass the trip from requireTripAccess to reuse its authorized database read. */
 export async function loadTripFull(
   supabase: SupabaseClient,
-  tripId: string
+  tripOrId: Trip | string
 ): Promise<TripFull | null> {
-  const { data: trip } = await supabase
-    .from("trips")
-    .select("*")
-    .eq("id", tripId)
-    .maybeSingle();
+  let trip: Trip | null;
+  if (typeof tripOrId === "string") {
+    const { data } = await supabase.from("trips").select("*").eq("id", tripOrId).maybeSingle();
+    trip = data as Trip | null;
+  } else {
+    trip = tripOrId;
+  }
   if (!trip) return null;
+  const tripId = trip.id;
 
-  const [stopsRes, membersRes, daysRes, gearRes] = await Promise.all([
+  // Kits depend only on days; don't wait for stops, members or gear to start
+  // them. Accommodation is independent of all of these reads.
+  const loadDaysAndKits = async () => {
+    const { data } = await supabase
+      .from("trip_days").select("*").eq("trip_id", tripId).order("date");
+    const days = (data ?? []) as TripDay[];
+    if (days.length === 0) return { days, kits: [] };
+    const { data: kits } = await supabase
+      .from("trip_member_day_kits")
+      .select("*")
+      .in("trip_day_id", days.map((d) => d.id));
+    return { days, kits: (kits ?? []) as TripMemberDayKit[] };
+  };
+
+  const [stopsRes, membersRes, { days, kits }, gearRes, lodging] = await Promise.all([
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("position"),
     supabase.from("trip_members").select("*").eq("trip_id", tripId),
-    supabase.from("trip_days").select("*").eq("trip_id", tripId).order("date"),
+    loadDaysAndKits(),
     supabase
       .from("trip_group_gear")
       .select("*")
       .eq("trip_id", tripId)
       .order("sort_order"),
+    loadLodging(supabase, trip),
   ]);
 
-  const days = (daysRes.data ?? []) as TripDay[];
-  let kits: TripMemberDayKit[] = [];
-  if (days.length > 0) {
-    const { data } = await supabase
-      .from("trip_member_day_kits")
-      .select("*")
-      .in(
-        "trip_day_id",
-        days.map((d) => d.id)
-      );
-    kits = (data ?? []) as TripMemberDayKit[];
-  }
-
   return {
-    trip: trip as Trip,
+    trip,
     stops: (stopsRes.data ?? []) as TripStop[],
     members: (membersRes.data ?? []) as TripMember[],
     days,
     kits,
     gear: (gearRes.data ?? []) as TripGroupGear[],
-    lodging: await loadLodging(supabase, trip as Trip),
+    lodging,
   };
 }
 
