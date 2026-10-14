@@ -57,6 +57,14 @@ describe("Ranking Geoapify results (pilot answers)", () => {
     expect(labels(rankResults([near(5, 0), near(4, 0.2), near(1, 1), near(3, 1), near(2, 0), near(6, 0.95), near(7, 0)], [JAY_PEAK])))
       .toEqual(["Place 1", "Place 3", "Place 6", "Place 4", "Place 2", "Place 5"]);
   });
+  it("never puts a less confident place first, however near it is", () => {
+    const base = pilot.hotel_jay.results[0];
+    expect(labels(rankResults([
+      { ...base, name: "Next door", lat: 44.939, rank: { confidence: 0.95 } },
+      { ...base, name: "Across the valley", lat: 45.2, rank: { confidence: 1 } },
+      { ...base, name: "No score", lat: 44.938, rank: { confidence: Number.NaN } },
+    ], [JAY_PEAK]))).toEqual(["Across the valley", "Next door", "No score"]);
+  });
   it("keeps an unknown time zone out and keeps the source's own credit", () => {
     const [result] = rankResults([{ ...pilot.rental_address.results[0], timezone: { name: "Mars/Olympus" }, datasource: { attribution: "© Example data" } }], []);
     expect(result).toMatchObject({ time_zone: null, attribution: "© Example data" });

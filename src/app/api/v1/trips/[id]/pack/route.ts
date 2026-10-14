@@ -80,7 +80,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   if (auth instanceof NextResponse) return auth;
   const { supabase, userId } = auth;
 
-  const full = await loadTripFull(supabase, id);
+  const full = await loadTripFull(supabase, auth.trip);
   if (!full) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Read sensitivity preference if it exists (best-effort).
