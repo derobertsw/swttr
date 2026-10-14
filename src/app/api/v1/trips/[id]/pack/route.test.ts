@@ -379,7 +379,7 @@ describe("GET /api/v1/trips/[id]/pack", () => {
   it("limits concurrent forecast requests and still accounts for every required stop", async () => {
     const dates = Array.from({ length: 7 }, (_, index) => addDaysToDateString("2026-10-08", index));
     const full = mockTrip(dates);
-    full.stops = dates.map((_, index) => ({ ...full.stops[0], id: `stop-${index}` }));
+    full.stops = dates.map((_, index) => ({ ...full.stops[0], id: `stop-${index}`, latitude: 40 + index }));
     full.days.forEach((day, index) => { day.stop_id = full.stops[index].id; });
     let inFlight = 0;
     let peak = 0;
