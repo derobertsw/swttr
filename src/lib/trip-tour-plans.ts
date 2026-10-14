@@ -128,13 +128,19 @@ export function buildTourPlanSummary(plan: TripTourPlan, date: string): TripTour
   };
 }
 
-export async function loadTourPlans(supabase: SupabaseClient, tripId: string, days: TripDay[]): Promise<TripTourPlanSummary[]> {
+/** The trip's saved plans. Plans don't wait for days, so the trip loads in its usual two stages. */
+export async function loadTourPlans(supabase: SupabaseClient, tripId: string): Promise<TripTourPlan[]> {
   const { data, error } = await supabase.from("trip_day_tour_plans").select("*").eq("trip_id", tripId);
   // Before migration 026 there's no table, and so no saved plan to hide. Any other failure might hide one.
   if (error && ["42P01", "PGRST205"].includes(error.code)) return [];
   if (error) throw new Error("Couldn't load tour plans. Try again.");
+  return (data ?? []) as TripTourPlan[];
+}
+
+/** Each plan labelled for its day's date, in date order. */
+export function summarizeTourPlans(plans: TripTourPlan[], days: TripDay[]): TripTourPlanSummary[] {
   const dates = new Map(days.map((day) => [day.id, day.date]));
-  return ((data ?? []) as TripTourPlan[])
+  return plans
     .filter((plan) => dates.has(plan.trip_day_id))
     .map((plan) => buildTourPlanSummary(plan, dates.get(plan.trip_day_id)!))
     .sort((a, b) => a.date.localeCompare(b.date));
