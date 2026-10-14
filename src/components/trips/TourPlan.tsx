@@ -99,6 +99,7 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
     finally { setRestoring(false); }
   };
   const editor = editing && <TourPlanEditor key={plan?.revision ?? 0} tripId={data.trip.id} date={date} dateLabel={dateLabel} plan={plan}
+    dayId={data.days.find((day) => day.date === date)?.id}
     onClose={() => setEditing(false)} onCloseAutoFocus={focus.restore}
     onSaved={async (message) => { setStatus(message); await onSaved(); }} />;
 
@@ -194,11 +195,13 @@ function TourPlanSummary({ plan }: { plan: TripTourPlanSummary }) {
   );
 }
 
-function TourPlanEditor({ tripId, date, dateLabel, plan, onClose, onSaved, onCloseAutoFocus }: {
+function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, onClose, onSaved, onCloseAutoFocus }: {
   tripId: string;
   date: string;
   dateLabel: string;
   plan: TripTourPlanSummary | undefined;
+  /** The day the editor opened for; after a date change another day can hold this date. */
+  dayId: string | undefined;
   onClose: () => void;
   onSaved: (message: string) => Promise<void>;
   onCloseAutoFocus: (event: Event) => void;
@@ -207,6 +210,7 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, onClose, onSaved, onClo
   const [draft, setDraft] = useState(() => draftOf(plan, temperatureUnit === "C"));
   const [original] = useState(() => JSON.stringify(draft));
   const [revision, setRevision] = useState(plan?.revision ?? 0);
+  const [day, setDay] = useState(dayId);
   const [removing, setRemoving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -260,7 +264,7 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, onClose, onSaved, onClo
     setBusy(true); setError(null); setErrorField(null);
     try {
       await timedTripRequest(`/api/v1/trips/${tripId}/days/${date}/tour-plan`, method,
-        { ...body, expected_revision: revision, mutation_id: mutationId.current });
+        { ...body, day_id: day, expected_revision: revision, mutation_id: mutationId.current });
       await onSaved(message);
       close();
     } catch (err) { showError(err); }
@@ -280,6 +284,7 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, onClose, onSaved, onClo
       const current = await timedTripRequest<TripFull>(`/api/v1/trips/${tripId}`, "GET");
       const saved = current.tour_plans?.find((entry) => entry.date === date) ?? null;
       setSavedPlan(saved); setRevision(saved?.revision ?? 0); setConflict(false);
+      setDay(current.days.find((entry) => entry.date === date)?.id);
       mutationId.current = null;
     } catch (err) { showError(err); }
     finally { setBusy(false); }

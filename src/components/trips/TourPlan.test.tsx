@@ -16,10 +16,11 @@ const saved = (extra: Partial<TripTourPlan> = {}): TripTourPlanSummary => buildT
   checkin_notes: "Text Sam by 5 PM", pickup_notes: null, time_zone: "America/New_York", revision: 3, created_by: "user-1",
   updated_by: "user-1", created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z", ...extra,
 }, DATE);
+const DAYS = [{ id: "day-1", trip_id: TRIP.id, stop_id: null, date: DATE, activity: "Backcountry" }];
 const onSaved = vi.fn().mockResolvedValue(undefined);
 const onRestore = vi.fn().mockResolvedValue(undefined);
 function renderPlan({ plans = [] as TripTourPlanSummary[], activity = "Backcountry" as string | null, canEdit = true } = {}) {
-  return render(<DayTourPlan data={tripFull({ tour_plans: plans })} date={DATE} dateLabel="Sat Oct 10" activity={activity}
+  return render(<DayTourPlan data={tripFull({ days: DAYS, tour_plans: plans })} date={DATE} dateLabel="Sat Oct 10" activity={activity}
     canEdit={canEdit} onSaved={onSaved} onRestore={onRestore} />);
 }
 
@@ -48,7 +49,7 @@ describe("Day tour plan", () => {
     expect(await screen.findByText("Tour plan saved.")).toBeInTheDocument();
     expect(onSaved).toHaveBeenCalledOnce();
     expect(sentBodies(api, `PUT ${route}`)[0]).toMatchObject({
-      expected_revision: 0,
+      day_id: "day-1", expected_revision: 0,
       plan: { objective: "Tuckerman Ravine", meet_time: null, meet_day_offset: 0, distance: null, distance_unit: null, duration_minutes: null, return_day_offset: 0 },
     });
   });
@@ -125,10 +126,11 @@ describe("Day tour plan", () => {
   });
 
   it("keeps pending text while showing a newer saved plan, then saves over that revision", async () => {
-    const newer = saved({ revision: 4, backup_plan: "Stay below treeline" });
+    // The trip's dates moved, so another day holds this date now, with its own plan.
+    const newer = saved({ revision: 4, trip_day_id: "day-2", backup_plan: "Stay below treeline" });
     const api = fakeTripApi({
-      [`PUT ${route}`]: (body) => reply((body as { expected_revision: number }).expected_revision === 4 ? 200 : 409, { error: "The tour plan changed. Review the saved plan before saving again." }),
-      [`GET /api/v1/trips/${TRIP.id}`]: reply(200, tripFull({ tour_plans: [newer] })),
+      [`PUT ${route}`]: (body) => reply((body as { expected_revision: number }).expected_revision === 4 ? 200 : 409, { error: "The tour plan or this day changed. Review the saved plan before saving again." }),
+      [`GET /api/v1/trips/${TRIP.id}`]: reply(200, tripFull({ days: [{ ...DAYS[0], id: "day-2" }], tour_plans: [newer] })),
     });
     vi.stubGlobal("fetch", api);
     const user = userEvent.setup();
@@ -138,14 +140,17 @@ describe("Day tour plan", () => {
     await user.clear(objective);
     await user.type(objective, "Gulf of Slides");
     await user.click(screen.getByRole("button", { name: "Save tour plan" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("The tour plan changed");
+    expect(await screen.findByRole("alert")).toHaveTextContent("The tour plan or this day changed");
     await user.click(screen.getByRole("button", { name: "Review saved plan" }));
     const dialog = screen.getByRole("dialog");
     expect(await within(dialog).findByText("Stay below treeline")).toBeInTheDocument();
     expect(screen.getByLabelText("Route or objective")).toHaveValue("Gulf of Slides");
     await user.click(screen.getByRole("button", { name: "Save tour plan" }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
-    expect(sentBodies(api, `PUT ${route}`).map((body) => (body as { expected_revision: number }).expected_revision)).toEqual([3, 4]);
+    expect(sentBodies(api, `PUT ${route}`).map((body) => {
+      const { day_id, expected_revision } = body as { day_id: string; expected_revision: number };
+      return [day_id, expected_revision];
+    })).toEqual([["day-1", 3], ["day-2", 4]]);
   });
 
   it("removes a plan only after confirming, at its revision", async () => {
@@ -159,7 +164,7 @@ describe("Day tour plan", () => {
     expect(api).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Remove tour plan" }));
     expect(await screen.findByText("Tour plan removed.")).toBeInTheDocument();
-    expect(sentBodies(api, `DELETE ${route}`)[0]).toMatchObject({ expected_revision: 3 });
+    expect(sentBodies(api, `DELETE ${route}`)[0]).toMatchObject({ day_id: "day-1", expected_revision: 3 });
   });
 
   it("asks before discarding edits", async () => {
@@ -188,7 +193,7 @@ describe("Day tour plan", () => {
     const user = userEvent.setup();
     const view = renderPlan({ plans: [saved()], activity: "Alpine" });
     onRestore.mockImplementationOnce(async () => {
-      view.rerender(<DayTourPlan data={tripFull({ tour_plans: [saved()] })} date={DATE} dateLabel="Sat Oct 10" activity="Backcountry"
+      view.rerender(<DayTourPlan data={tripFull({ days: DAYS, tour_plans: [saved()] })} date={DATE} dateLabel="Sat Oct 10" activity="Backcountry"
         canEdit onSaved={onSaved} onRestore={onRestore} />);
     });
     await user.click(screen.getByText("Saved tour plan · Tuckerman Ravine"));

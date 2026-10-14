@@ -72,11 +72,13 @@ REVOKE ALL ON public.trip_day_tour_plans, public.trip_tour_plan_mutations FROM P
 GRANT ALL ON public.trip_day_tour_plans, public.trip_tour_plan_mutations TO service_role;
 
 -- p_action 'save' writes p_payload's fields over the day's plan (adding one if
--- there's none); 'remove' deletes it. p_expected_revision is the plan revision
--- the editor started from, 0 for no plan; a mismatch is 40001. The time zone
--- is the server's lookup, so a retry that found another one still replays.
+-- there's none); 'remove' deletes it. p_day_id is the day the editor opened
+-- for: after a date change another day can hold p_date, and a mismatch is
+-- 40001. p_expected_revision is the plan revision the editor started from, 0
+-- for no plan; a mismatch is 40001 too. The time zone is the server's lookup,
+-- so a retry that found another one still replays.
 CREATE FUNCTION public.mutate_trip_tour_plan(
-  p_trip_id uuid, p_user_id text, p_date date, p_expected_revision integer,
+  p_trip_id uuid, p_user_id text, p_date date, p_day_id uuid, p_expected_revision integer,
   p_request_id uuid, p_action text, p_payload jsonb DEFAULT '{}'::jsonb
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE
@@ -91,7 +93,7 @@ BEGIN
   IF NOT FOUND OR p_user_id IS NULL OR current_trip.owner_user_id <> p_user_id THEN
     RAISE EXCEPTION 'Organizer only' USING ERRCODE = '42501';
   END IF;
-  request_hash := encode(sha256(convert_to(jsonb_build_object('date', p_date, 'action', p_action,
+  request_hash := encode(sha256(convert_to(jsonb_build_object('date', p_date, 'day', p_day_id, 'action', p_action,
     'payload', coalesce(p_payload, '{}'::jsonb) - 'time_zone')::text, 'UTF8')), 'hex');
   SELECT * INTO prior FROM public.trip_tour_plan_mutations WHERE trip_id = p_trip_id AND request_id = p_request_id;
   IF FOUND THEN
@@ -101,6 +103,9 @@ BEGIN
 
   SELECT * INTO v_day FROM public.trip_days WHERE trip_id = p_trip_id AND date = p_date FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Day not found' USING ERRCODE = 'P0002'; END IF;
+  IF p_day_id IS NULL OR v_day.id <> p_day_id THEN
+    RAISE EXCEPTION 'This date is another day now. Review the saved plan.' USING ERRCODE = '40001';
+  END IF;
   SELECT * INTO saved FROM public.trip_day_tour_plans WHERE trip_day_id = v_day.id FOR UPDATE;
   IF p_expected_revision IS NULL OR coalesce(saved.revision, 0) <> p_expected_revision THEN
     RAISE EXCEPTION 'Tour plan changed. Review the saved plan.' USING ERRCODE = '40001';
@@ -140,8 +145,8 @@ BEGIN
   RETURN response;
 END;
 $$;
-REVOKE ALL ON FUNCTION public.mutate_trip_tour_plan(uuid, text, date, integer, uuid, text, jsonb) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.mutate_trip_tour_plan(uuid, text, date, integer, uuid, text, jsonb) TO service_role;
+REVOKE ALL ON FUNCTION public.mutate_trip_tour_plan(uuid, text, date, uuid, integer, uuid, text, jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.mutate_trip_tour_plan(uuid, text, date, uuid, integer, uuid, text, jsonb) TO service_role;
 
 -- change_trip_dates (021) as before, except that a removed day with a tour plan
 -- carries its plan's id, so a plan added after the review isn't deleted

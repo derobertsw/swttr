@@ -157,7 +157,7 @@ describe("Trip date changes in Postgres", () => {
     ["keep", "2026-10-07", "2026-10-09"],
   ] as const)("applies exactly the previewed %s plan for %s to %s", async (mode, start, end) => {
     // Sunday has a tour plan, which a removal must list and a move takes along.
-    await db.query("SELECT public.mutate_trip_tour_plan($1, 'user-1', '2026-10-11', 0, gen_random_uuid(), 'save', '{\"objective\": \"Tuckerman\"}')", [tripId]);
+    await db.query("SELECT public.mutate_trip_tour_plan($1, 'user-1', '2026-10-11', (SELECT id FROM trip_days WHERE trip_id = $1 AND date = '2026-10-11'), 0, gen_random_uuid(), 'save', '{\"objective\": \"Tuckerman\"}')", [tripId]);
     const plan = previewDateChange(await loadFull(), start, end).plans[mode]!;
     await change({ to: [start, end], mode, removed: plan.expected_removed });
     const tourDates = (await db.query<{ date: string }>("SELECT d.date::text FROM trip_day_tour_plans t JOIN trip_days d ON d.id = t.trip_day_id")).rows.map((row) => row.date);

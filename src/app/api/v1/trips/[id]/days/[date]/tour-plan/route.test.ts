@@ -10,13 +10,14 @@ import { DELETE, PUT } from "./route";
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), requireUser: vi.fn() }));
 
 const mutationId = "323b232c-af2a-46b6-982b-02e247964fe0";
+const dayId = "6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f";
 const rpc = vi.fn();
 const fetchMock = vi.fn();
 const request = (body: unknown, method = "PUT") => new NextRequest(`http://localhost/api/v1/trips/${TRIP.id}/days/2026-10-10/tour-plan`, { method, body: JSON.stringify(body) });
 const context = (date = "2026-10-10") => ({ params: Promise.resolve({ id: TRIP.id, date }) });
-const body = { plan: { objective: " Tuckerman Ravine " }, expected_revision: 0, mutation_id: mutationId };
+const body = { plan: { objective: " Tuckerman Ravine " }, day_id: dayId, expected_revision: 0, mutation_id: mutationId };
 const stop = { id: "stop-1", trip_id: TRIP.id, position: 0, name: "Pinkham Notch", latitude: 44.257, longitude: -71.253, activities: ["Backcountry"] };
-const day = { id: "day-1", trip_id: TRIP.id, date: "2026-10-10", stop_id: null, activity: "Backcountry" };
+const day = { id: dayId, trip_id: TRIP.id, date: "2026-10-10", stop_id: null, activity: "Backcountry" };
 let supabase: SupabaseClient;
 
 function identity(userId: string, { status = "joined", stops = [stop] as Record<string, unknown>[], plans = [] as Record<string, unknown>[] } = {}) {
@@ -42,7 +43,7 @@ describe("Tour plan API", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ revision: 1 });
     expect(rpc).toHaveBeenCalledWith("mutate_trip_tour_plan", expect.objectContaining({
-      p_trip_id: TRIP.id, p_user_id: "user-1", p_date: "2026-10-10", p_expected_revision: 0, p_request_id: mutationId, p_action: "save",
+      p_trip_id: TRIP.id, p_user_id: "user-1", p_date: "2026-10-10", p_day_id: dayId, p_expected_revision: 0, p_request_id: mutationId, p_action: "save",
       p_payload: expect.objectContaining({ objective: "Tuckerman Ravine", meet_time: null, time_zone: null }),
     }));
     expect(fetchMock).not.toHaveBeenCalled();
@@ -68,16 +69,16 @@ describe("Tour plan API", () => {
   });
 
   it("removes with the reviewed revision only", async () => {
-    expect((await DELETE(request({ expected_revision: 2, mutation_id: mutationId }, "DELETE"), context())).status).toBe(200);
+    expect((await DELETE(request({ day_id: dayId, expected_revision: 2, mutation_id: mutationId }, "DELETE"), context())).status).toBe(200);
     expect(rpc).toHaveBeenCalledWith("mutate_trip_tour_plan", expect.objectContaining({ p_action: "remove", p_expected_revision: 2, p_payload: {} }));
-    expect((await DELETE(request({ expected_revision: 0, mutation_id: mutationId }, "DELETE"), context())).status).toBe(400);
+    expect((await DELETE(request({ day_id: dayId, expected_revision: 0, mutation_id: mutationId }, "DELETE"), context())).status).toBe(400);
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
   it("lets members read but not write", async () => {
     identity("member-user");
     expect((await PUT(request(body), context())).status).toBe(403);
-    expect((await DELETE(request({ expected_revision: 1, mutation_id: mutationId }, "DELETE"), context())).status).toBe(403);
+    expect((await DELETE(request({ day_id: dayId, expected_revision: 1, mutation_id: mutationId }, "DELETE"), context())).status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -100,6 +101,8 @@ describe("Tour plan API", () => {
     [{ ...body, expected_revision: -1 }, undefined],
     [{ ...body, expected_revision: "0" }, undefined],
     [{ ...body, mutation_id: "bad" }, undefined],
+    [{ ...body, day_id: undefined }, undefined],
+    [{ ...body, day_id: "day-1" }, undefined],
   ])("rejects invalid requests before the transaction (%#)", async (input, field) => {
     const response = await PUT(request(input), context());
     expect(response.status).toBe(400);
@@ -130,7 +133,7 @@ describe("Tour plan API", () => {
   });
 
   it("loads saved plans with the trip, labelled for their day", async () => {
-    identity("user-1", { plans: [{ id: "plan-1", trip_id: TRIP.id, trip_day_id: "day-1", objective: "Tuckerman", meet_time: "06:30:00",
+    identity("user-1", { plans: [{ id: "plan-1", trip_id: TRIP.id, trip_day_id: dayId, objective: "Tuckerman", meet_time: "06:30:00",
       meet_day_offset: 0, return_time: null, return_day_offset: 0, distance: null, distance_unit: null, ascent: null, ascent_unit: null,
       duration_minutes: null, metrics_source: null, time_zone: "America/New_York", updated_at: "2026-10-14T20:00:00Z" }] });
     const full = await loadTripFull(supabase, TRIP.id);

@@ -9,9 +9,11 @@ const otherTrip = "2d6b6e38-77b6-46bc-8d6c-906fbb40d633";
 let db: PGlite;
 
 const plan = (extra: object = {}) => ({ objective: "Mount Washington via Tuckerman", ...extra });
-const mutate = async ({ date = "2026-10-10", revision = 0, action = "save", payload = plan() as object, requestId = randomUUID(), user = "user-1", trip = tripId } = {}) =>
-  (await db.query<{ result: { revision: number } }>("SELECT public.mutate_trip_tour_plan($1,$2,$3,$4,$5,$6,$7) AS result",
-    [trip, user, date, revision, requestId, action, JSON.stringify(payload)])).rows[0].result;
+const dayId = async (date: string, trip = tripId) =>
+  (await db.query<{ id: string }>("SELECT id FROM trip_days WHERE trip_id = $1 AND date = $2", [trip, date])).rows[0]?.id ?? randomUUID();
+const mutate = async ({ date = "2026-10-10", day = undefined as string | undefined, revision = 0, action = "save", payload = plan() as object, requestId = randomUUID(), user = "user-1", trip = tripId } = {}) =>
+  (await db.query<{ result: { revision: number } }>("SELECT public.mutate_trip_tour_plan($1,$2,$3,$4,$5,$6,$7,$8) AS result",
+    [trip, user, date, day ?? await dayId(date, trip), revision, requestId, action, JSON.stringify(payload)])).rows[0].result;
 const saved = async () => (await db.query<Record<string, unknown>>(
   `SELECT d.date::text, t.objective, t.meet_time::text, t.meet_day_offset, t.return_time::text, t.return_day_offset,
      t.time_zone, t.revision, t.created_by, t.updated_by
@@ -101,6 +103,17 @@ describe("Tour plan transactions in Postgres", () => {
     expect((await saved()).map((entry) => entry.date)).toEqual(["2026-10-17"]);
   });
 
+  it("refuses a save for a day that no longer holds its date", async () => {
+    // Saturday's editor is open; the dates move back a day, so Sunday's row is on Saturday now.
+    const saturday = await dayId("2026-10-10");
+    await db.query("SELECT public.change_trip_dates($1, 'user-1', '2026-10-09', '2026-10-11', '2026-10-08', '2026-10-10', 'move', 'planning', NULL, NULL, '[]')", [tripId]);
+    await expect(mutate({ date: "2026-10-10", day: saturday })).rejects.toMatchObject({ code: "40001" });
+    await mutate({ date: "2026-10-09", day: saturday, payload: plan({ objective: "Saturday's tour" }) });
+    await mutate({ date: "2026-10-10" });
+    await expect(mutate({ date: "2026-10-10", day: saturday, revision: 1, payload: plan({ objective: "Overwrite" }) })).rejects.toMatchObject({ code: "40001" });
+    expect((await saved()).map((entry) => [entry.date, entry.objective])).toEqual([["2026-10-09", "Saturday's tour"], ["2026-10-10", "Mount Washington via Tuckerman"]]);
+  });
+
   it("isn't removed with its day unless the review listed it", async () => {
     const { rows: [day] } = await db.query<{ id: string }>("SELECT id FROM trip_days WHERE trip_id = $1 AND date = '2026-10-11'", [tripId]);
     const removed = { date: "2026-10-11", stop_id: null, activity: "Backcountry", kit_ids: [] };
@@ -120,7 +133,7 @@ describe("Tour plan transactions in Postgres", () => {
   });
 
   it("is reachable only by the service role", async () => {
-    const signature = "public.mutate_trip_tour_plan(uuid, text, date, integer, uuid, text, jsonb)";
+    const signature = "public.mutate_trip_tour_plan(uuid, text, date, uuid, integer, uuid, text, jsonb)";
     expect((await db.query("SELECT has_function_privilege('anon',$1,'EXECUTE') AS anon, has_function_privilege('authenticated',$1,'EXECUTE') AS authenticated, has_function_privilege('service_role',$1,'EXECUTE') AS service", [signature])).rows[0])
       .toEqual({ anon: false, authenticated: false, service: true });
     for (const table of ["public.trip_day_tour_plans", "public.trip_tour_plan_mutations"]) {
