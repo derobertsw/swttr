@@ -408,6 +408,8 @@ The alpine/XC outfit search also has parity tests against its previous implement
 
 Trip packing reports one coverage record per trip date, with forecast availability separate from clothing guidance. It uses the static table (Alpine, XC and Hiking; Climb is an explicit hiking approximation), rather than the sport-specific biophysics endpoints. Partial daytime forecasts remain visible, past/out-of-window dates stay planned, and saved manual kits are reviewed separately until packing can derive requirements from those kits. Packing fetches forecasts only for stops needed by automatic guidance, with up to three requests in flight, and labels skipped weather requests explicitly. Missing day plans can be restored from day detail without overwriting existing plans. Trip day weather is summarized server-side by the authenticated `/api/v1/trips/[id]/days/[date]/weather` route.
 
+Trip subpages share an in-memory snapshot through their layout, scoped to the trip and Clerk session. Saves refresh it before returning to the overview; navigation and returning to a visible tab recheck snapshots older than one minute without hiding the current page. Switching trips, accounts, or sessions drops the snapshot. Packing-only visits do not fetch an unused full-trip snapshot. Public Open-Meteo responses use Next's Data Cache with five-minute revalidation, and simultaneous requests for the same coordinates share one provider request. User and trip data are never stored in that server cache.
+
 ## Project Structure
 
 ```

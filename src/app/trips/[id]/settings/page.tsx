@@ -19,7 +19,7 @@ const FIELD_IDS: Record<string, string> = { name: "trip-name", start_date: "trip
 
 export default function TripSettingsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data, loading, error } = useTrip(id);
+  const { data, loading, error, refresh } = useTrip(id);
   return (
     <PageLayout chromeVariant="compact">
       <div className="flex w-full max-w-2xl flex-col gap-5">
@@ -30,13 +30,13 @@ export default function TripSettingsPage({ params }: { params: Promise<{ id: str
         </header>
         {loading && <Skeleton className="h-64 w-full rounded-card" />}
         {error && <TripError>{error}</TripError>}
-        {data && <SettingsForm key={data.trip.id} trip={data.trip} />}
+        {data && <SettingsForm key={data.trip.id} trip={data.trip} onSaved={refresh} />}
       </div>
     </PageLayout>
   );
 }
 
-function SettingsForm({ trip }: { trip: Trip }) {
+function SettingsForm({ trip, onSaved }: { trip: Trip; onSaved: () => Promise<void> }) {
   const router = useRouter();
   const [name, setName] = useState(trip.name);
   const [start, setStart] = useState(trip.start_date);
@@ -60,7 +60,8 @@ function SettingsForm({ trip }: { trip: Trip }) {
     if (error?.field) document.getElementById(FIELD_IDS[error.field] ?? "")?.focus();
   }, [error]);
 
-  const saved = (updated: Trip, message: string) => {
+  const saved = async (updated: Trip, message: string) => {
+    await onSaved();
     toast.success(message);
     router.push(`/trips/${updated.id}`);
   };
@@ -82,7 +83,7 @@ function SettingsForm({ trip }: { trip: Trip }) {
     setSaving(true);
     try {
       const { trip: updated } = await timedTripRequest<{ trip: Trip }>(`/api/v1/trips/${trip.id}`, "PATCH", { name: name.trim() });
-      saved(updated, "Trip renamed.");
+      await saved(updated, "Trip renamed.");
     } catch (err) {
       const field = err instanceof TripRequestError && typeof err.details?.field === "string" ? err.details.field : null;
       setError({ message: `Couldn't save the trip: ${errorMessage(err)}`, field });
