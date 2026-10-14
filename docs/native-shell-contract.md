@@ -18,9 +18,11 @@ Do not replace the user agent with a spoofed browser identity.
 
 The Mac marker must be a separate whitespace-delimited token. If both markers
 appear, Mac wins. Detection lives in `src/lib/native-shell.ts` and the client
-hook `src/hooks/useNativeShell.ts`. Server-side sign-in and sign-up use the same
-detector to hide Clerk's social buttons and divider before rendering. Email code
-and password stay in the web view. This appearance setting does not disable
+hook `src/hooks/useNativeShell.ts`. The root server layout supplies the detected
+shell through context, so native navigation is absent from the first HTML and
+stays absent during hydration. The root ClerkProvider hides social buttons,
+the divider and connected-account actions across auth pages, invite modals and
+UserProfile. Email code and password stay in the web view. This appearance setting does not disable
 OAuth providers on the Clerk instance. Passkey behavior and Clerk bot protection
 still need native device verification under #146 and #137.
 
@@ -41,6 +43,8 @@ retain the originating web view through same-tab email-code verification.
 | `activityChange` | Web → iOS shell script | `CustomEvent` with `detail: { name, value }`; synchronize the chosen activity. Not a command to generate advice. |
 
 The Mac Settings… menu (⌘,) dispatches `openPreferences` into the current page.
+An open web menu closes and returns focus before the Settings drawer opens;
+repeated events during that transition are ignored.
 No calculation or advice generation moves into the native shell.
 
 ## Query parameters and storage
@@ -54,6 +58,12 @@ No calculation or advice generation moves into the native shell.
 Native navigation follows `/`, `/trips` and its nested routes, and `/wardrobe`,
 as defined in `src/components/AppNavigation.tsx`. Other pages clear the native
 primary destination selection.
+
+The Mac shell stores the last successful page in `swttr-mac-last-page` in
+UserDefaults. Restoration requires the same origin and excludes auth paths,
+`/trips/invite/...` bearer links, and credential-bearing query/fragment
+parameters. The Mac Feedback menu opens `/feedback` in the default browser;
+the server controls the current form destination without a binary update.
 
 ## Script message handlers
 

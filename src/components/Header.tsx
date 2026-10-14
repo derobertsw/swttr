@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { Share2, HelpCircle, Menu, MessageSquare, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { logWarn } from "@/lib/logger";
-import { AccountMenu } from "@/components/AccountMenu";
+import { AccountMenu, type AccountMenuHandle } from "@/components/AccountMenu";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useNativeShell } from "@/hooks/useNativeShell";
@@ -36,6 +36,8 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const menuButtonId = useId();
   const accountAreaRef = useRef<HTMLDivElement>(null);
+  const accountMenuRef = useRef<AccountMenuHandle>(null);
+  const pendingPreferences = useRef<number | null>(null);
   const preferencesFocus = useReturnFocus();
   // The native shell has no web sidebar, so its menu and logo show at every width.
   const nativeShell = useNativeShell();
@@ -49,21 +51,6 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
     updateDefaultActivity,
     updateBodyMetrics,
   } = usePreferences();
-
-  useEffect(() => {
-    if (nativeShell !== "mac") return;
-    const openPreferences = () => {
-      if (preferencesOpen) return;
-      preferencesFocus.remember(() => [
-        accountAreaRef.current?.querySelector<HTMLElement>("a[href], button"),
-        document.getElementById(menuButtonId),
-      ].find(isShown) ?? null);
-      setMobileMenuOpen(false);
-      setPreferencesOpen(true);
-    };
-    window.addEventListener("openPreferences", openPreferences);
-    return () => window.removeEventListener("openPreferences", openPreferences);
-  }, [nativeShell, preferencesOpen, preferencesFocus, menuButtonId]);
 
   const handleShare = async () => {
     const shareData = {
@@ -86,26 +73,44 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
     }
   };
 
-  const menuButton = () => document.getElementById(menuButtonId);
+  const menuButton = useCallback(() => document.getElementById(menuButtonId), [menuButtonId]);
   // The avatar when signed in, or the Sign In link after a sign-out.
-  const accountControl = () => accountAreaRef.current?.querySelector<HTMLElement>("a[href], button") ?? null;
+  const accountControl = useCallback(() => accountAreaRef.current?.querySelector<HTMLElement>("a[href], button") ?? null, []);
 
-  const openPreferencesFromMenu = () => {
+  const openPreferencesFromMenu = useCallback(() => {
+    if (pendingPreferences.current !== null) return;
     // The menu, and its Settings item, close first, so focus returns to the
     // menu button, or to the account area if the window has since widened.
     preferencesFocus.remember(() => [menuButton(), accountControl()].find(isShown) ?? null);
     setMobileMenuOpen(false);
-    window.setTimeout(() => {
+    pendingPreferences.current = window.setTimeout(() => {
+      pendingPreferences.current = null;
       setPreferencesOpen(true);
     }, 120);
-  };
+  }, [preferencesFocus, menuButton, accountControl]);
 
-  const openPreferencesFromAvatar = () => {
+  const openPreferencesFromAvatar = useCallback(() => {
     // The avatar's menu item is gone, so focus returns to the avatar, or to
     // whatever replaced it after a sign-out.
     preferencesFocus.remember(() => [accountControl(), menuButton()].find(isShown) ?? null);
     setPreferencesOpen(true);
-  };
+  }, [preferencesFocus, menuButton, accountControl]);
+
+  useEffect(() => () => {
+    if (pendingPreferences.current !== null) window.clearTimeout(pendingPreferences.current);
+  }, []);
+
+  useEffect(() => {
+    if (nativeShell !== "mac") return;
+    const openPreferences = () => {
+      if (preferencesOpen || pendingPreferences.current !== null) return;
+      if (mobileMenuOpen) openPreferencesFromMenu();
+      else if (accountMenuRef.current) accountMenuRef.current.openSettings();
+      else openPreferencesFromAvatar();
+    };
+    window.addEventListener("openPreferences", openPreferences);
+    return () => window.removeEventListener("openPreferences", openPreferences);
+  }, [nativeShell, preferencesOpen, mobileMenuOpen, openPreferencesFromMenu, openPreferencesFromAvatar]);
 
   return (
     <header className={cn(
@@ -133,7 +138,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
             Sign In is in the menu instead. */}
         <div ref={accountAreaRef} className="flex items-center gap-4">
           <SignedIn>
-            <AccountMenu onOpenSettings={openPreferencesFromAvatar} onShare={handleShare} />
+            <AccountMenu ref={accountMenuRef} onOpenSettings={openPreferencesFromAvatar} onShare={handleShare} />
           </SignedIn>
           <SignedOut>
             <Link
@@ -199,7 +204,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
                 </Link>
               </SheetClose>
               <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSfpX2tVx485Q0ybdNH_t48_-Z_WY0ldx3VhhkUeGKIXQ2N9fg/viewform?usp=publish-editor"
+                href="/feedback"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={MENU_ITEM_CLASS}

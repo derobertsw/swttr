@@ -20,6 +20,7 @@ final class SWTTRBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUI
     private var retryURL: URL
     private var observations: [NSKeyValueObservation] = []
     private var didFallbackFromLocalDev = false
+    private var processRecovery = SWTTRProcessRecovery()
     private let lastPageKey = "swttr-mac-last-page"
 
     override init() {
@@ -42,7 +43,7 @@ final class SWTTRBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUI
         super.init()
         webView.navigationDelegate = self
         webView.uiDelegate = self
-        webView.underPageBackgroundColor = NSColor(red: 15 / 255, green: 29 / 255, blue: 42 / 255, alpha: 1)
+        webView.underPageBackgroundColor = SWTTRAppearance.canvas
         #if DEBUG
         webView.isInspectable = true
         #endif
@@ -54,6 +55,7 @@ final class SWTTRBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUI
             webView.observe(\.isLoading, options: [.new]) { [weak self] _, _ in self?.scheduleSync() }
         ]
         let restored = SWTTRLastPage.restorableURL(UserDefaults.standard.string(forKey: lastPageKey), baseURL: baseURL)
+        if restored == nil { UserDefaults.standard.removeObject(forKey: lastPageKey) }
         load(restored ?? baseURL)
     }
 
@@ -68,9 +70,13 @@ final class SWTTRBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUI
         isLoading = webView.isLoading
         let url = webView.url
         let isOnSite = url.map { SWTTRLastPage.sameOrigin($0, baseURL) } ?? false
+        let path = url?.path.lowercased() ?? ""
+        let isAuthPage = ["/sign-in", "/sign-up", "/sso-callback", "/oauth", "/authenticate"].contains {
+            path == $0 || path.hasPrefix($0 + "/")
+        }
         destination = isOnSite ? url.flatMap { SWTTRDestination.matching(path: $0.path) } : nil
-        canOpenPreferences = isOnSite && hasLoadedPage && !isLoading && failure == nil
-            && (url.flatMap { SWTTRLastPage.restorableURL($0.absoluteString, baseURL: baseURL) } != nil)
+        // Invite pages render Header even though their bearer URL is never saved.
+        canOpenPreferences = isOnSite && hasLoadedPage && !isLoading && failure == nil && !isAuthPage
         // Includes History API route changes, not just document loads.
         if !isLoading, hasLoadedPage, failure == nil, let url,
            SWTTRLastPage.restorableURL(url.absoluteString, baseURL: baseURL) != nil {
@@ -94,9 +100,17 @@ final class SWTTRBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUI
 
     func goBack() { failure = nil; webView.goBack() }
     func goForward() { failure = nil; webView.goForward() }
-    func reload() { load(webView.url ?? retryURL) }
-    func retry() { load(retryURL) }
-    func setZoom(_ zoom: Double) { webView.pageZoom = min(2, max(0.5, zoom)) }
+    func reload() {
+        if failure != nil { retry() }
+        else { load(webView.url ?? retryURL) }
+    }
+    func retry() { processRecovery.reset(); load(retryURL) }
+    func setZoom(_ zoom: Double) { webView.pageZoom = min(2, max(0.5, (zoom * 10).rounded() / 10)) }
+
+    func openFeedback() {
+        guard let url = URL(string: "/feedback", relativeTo: baseURL)?.absoluteURL else { return }
+        NSWorkspace.shared.open(url)
+    }
 
     func openPreferences() {
         guard canOpenPreferences else { return }
@@ -107,7 +121,9 @@ final class SWTTRBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUI
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = action.request.url else { decisionHandler(.cancel); return }
         let isNewWindow = action.targetFrame == nil
-        switch policy.decide(targetURL: url, isMainFrame: action.targetFrame?.isMainFrame ?? true, opensNewWindow: isNewWindow) {
+        switch policy.decide(targetURL: url, isMainFrame: action.targetFrame?.isMainFrame ?? true,
+                             opensNewWindow: isNewWindow, userInitiated: action.navigationType == .linkActivated,
+                             sourceIsMainFrame: action.sourceFrame.isMainFrame) {
         case .allow:
             // WKUIDelegate creates no extra web view: trusted new windows load here.
             if isNewWindow { decisionHandler(.cancel); load(url) }
@@ -127,7 +143,9 @@ final class SWTTRBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUI
                  for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Also handle WebKit versions that deliver new windows straight here.
         guard let url = action.request.url else { return nil }
-        switch policy.decide(targetURL: url, isMainFrame: true, opensNewWindow: true) {
+        switch policy.decide(targetURL: url, isMainFrame: true, opensNewWindow: true,
+                             userInitiated: action.navigationType == .linkActivated,
+                             sourceIsMainFrame: action.sourceFrame.isMainFrame) {
         case .allow: load(url)
         case .openExternal: NSWorkspace.shared.open(url)
         case .cancel: break
@@ -160,7 +178,7 @@ final class SWTTRBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUI
         let kind = SWTTRLoadFailure.classify(error)
         if kind == .cancelled { return }
         #if DEBUG
-        let loopback = ["localhost", "127.0.0.1", "[::1]"].contains(baseURL.host ?? "")
+        let loopback = SWTTRShellConfig.isLoopback(host: baseURL.host)
         if loopback, !didFallbackFromLocalDev, kind == .network {
             didFallbackFromLocalDev = true
             let previous = SWTTRLastPage.restorableURL(retryURL.absoluteString, baseURL: baseURL)
@@ -180,7 +198,27 @@ final class SWTTRBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUI
         canOpenPreferences = false
     }
 
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { reload() }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        if processRecovery.shouldReload(now: ProcessInfo.processInfo.systemUptime) { reload() }
+        else {
+            failure = "This page stopped responding. Try again or choose another page."
+            isLoading = false
+            canOpenPreferences = false
+        }
+    }
+
+    func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
+        guard frame.isMainFrame, policy.isAllowedHost(frame.securityOrigin.host) || policy.isClerkHost(frame.securityOrigin.host),
+              let window = webView.window else { completionHandler(nil); return }
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        panel.canChooseDirectories = parameters.allowsDirectories
+        panel.canChooseFiles = true
+        panel.beginSheetModal(for: window) { response in
+            completionHandler(response == .OK ? panel.urls : nil)
+        }
+    }
 
     private func show(_ alert: NSAlert, frame: WKFrameInfo, completion: @escaping (NSApplication.ModalResponse) -> Void) {
         guard policy.isAllowedHost(frame.securityOrigin.host), let window = webView.window else {

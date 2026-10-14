@@ -22,12 +22,19 @@ public struct SWTTRNavigationPolicy: Sendable {
         case allow, openExternal, cancel
     }
 
-    public func decide(targetURL: URL, isMainFrame: Bool, opensNewWindow: Bool = false) -> Decision {
+    public func decide(targetURL: URL, isMainFrame: Bool, opensNewWindow: Bool = false,
+                       userInitiated: Bool = false, sourceIsMainFrame: Bool = true) -> Decision {
         let scheme = (targetURL.scheme ?? "").lowercased()
-        if scheme == "about", targetURL.absoluteString == "about:blank", !opensNewWindow { return .allow }
+        if scheme == "about" {
+            let blank = targetURL.absoluteString == "about:blank"
+            let srcdocFrame = !isMainFrame && targetURL.absoluteString == "about:srcdoc"
+            return !opensNewWindow && (blank || srcdocFrame) ? .allow : .cancel
+        }
         // Never open local files or executable URLs from remote web content.
         if ["", "file", "javascript", "data"].contains(scheme) { return .cancel }
-        guard scheme == "https" || scheme == "http" else { return .openExternal }
+        guard scheme == "https" || scheme == "http" else {
+            return isMainFrame && sourceIsMainFrame && userInitiated ? .openExternal : .cancel
+        }
         guard let host = targetURL.host else { return .cancel }
         if isAllowedHost(host) || isClerkHost(host) { return .allow }
         return isMainFrame || opensNewWindow ? .openExternal : .allow

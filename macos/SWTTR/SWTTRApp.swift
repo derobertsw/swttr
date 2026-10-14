@@ -10,7 +10,6 @@ struct SWTTRApp: App {
         Window("SWTTR", id: "main") {
             SWTTRContentView(browser: browser)
                 .frame(minWidth: 720, minHeight: 540)
-                .preferredColorScheme(.dark)
         }
         .defaultSize(width: 1280, height: 820)
         .windowResizability(.contentMinSize)
@@ -23,12 +22,18 @@ struct SWTTRContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(selection: Binding(
-                get: { browser.destination },
-                set: { if let destination = $0 { browser.navigate(to: destination.path) } }
-            )) {
+            List {
                 ForEach(SWTTRDestination.allCases) { destination in
-                    Label(destination.title, systemImage: destination.symbol).tag(destination)
+                    Button { browser.navigate(to: destination.path) } label: {
+                        Label(destination.title, systemImage: destination.symbol)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 8)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(browser.destination == destination ? Color.accentColor.opacity(0.2) : Color.clear)
+                    .accessibilityAddTraits(browser.destination == destination ? [.isSelected] : [])
                 }
             }
             .navigationTitle("SWTTR")
@@ -45,11 +50,11 @@ struct SWTTRContentView: View {
                         Button("Retry", action: browser.retry).buttonStyle(.borderedProminent)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(red: 15 / 255, green: 29 / 255, blue: 42 / 255))
+                    .background(Color(nsColor: SWTTRAppearance.canvas))
                 } else if !browser.hasLoadedPage {
                     ProgressView("Loading SWTTR…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(red: 15 / 255, green: 29 / 255, blue: 42 / 255))
+                        .background(Color(nsColor: SWTTRAppearance.canvas))
                 }
             }
             .navigationTitle(browser.destination?.title ?? "SWTTR")

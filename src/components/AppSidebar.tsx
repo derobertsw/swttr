@@ -20,12 +20,11 @@ import { PRIMARY_NAV_ITEMS, isNavItemActive } from "@/components/AppNavigation";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
 import { cn } from "@/lib/utils";
-import { useNativeShell } from "@/hooks/useNativeShell";
 
 const FOOTER_ITEMS = [
   { href: "/faq", label: "FAQ", icon: HelpCircle },
   {
-    href: "https://docs.google.com/forms/d/e/1FAIpQLSfpX2tVx485Q0ybdNH_t48_-Z_WY0ldx3VhhkUeGKIXQ2N9fg/viewform?usp=publish-editor",
+    href: "/feedback",
     label: "Feedback",
     icon: MessageSquare,
     external: true,
@@ -40,7 +39,6 @@ const SIDEBAR_ITEM_CLASS =
 const COLLAPSED_COARSE_INSET = "pointer-coarse:group-data-[collapsible=icon]:px-1";
 
 export function AppSidebar() {
-  const nativeShell = useNativeShell();
   const pathname = usePathname();
   const {
     sensitivity,
@@ -50,8 +48,6 @@ export function AppSidebar() {
     updateDefaultActivity,
     updateBodyMetrics,
   } = usePreferences();
-
-  if (nativeShell === "mac") return null;
 
   return (
     <Sidebar

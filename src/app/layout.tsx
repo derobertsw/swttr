@@ -4,6 +4,9 @@ import "@/assets/styles/globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ClerkProvider } from "@clerk/nextjs";
 import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
+import { headers } from "next/headers";
+import { NativeShellProvider } from "@/components/NativeShellProvider";
+import { detectNativeShell, NATIVE_SHELL_AUTH_APPEARANCE } from "@/lib/native-shell";
 
 import React from "react";
 
@@ -51,16 +54,19 @@ export const viewport: Viewport = {
   ],
 };
 
-const RootLayout = ({ children }: { children: React.ReactNode }) => {
+const RootLayout = async ({ children }: { children: React.ReactNode }) => {
+  const shell = detectNativeShell((await headers()).get("user-agent"));
   return (
-    <ClerkProvider>
+    <ClerkProvider appearance={shell ? NATIVE_SHELL_AUTH_APPEARANCE : undefined}>
       <html
         lang="en"
         className={`${geistSans.variable} ${geistMono.variable}`}
       >
         <body className="antialiased">
-          <TemperatureUnitProvider>{children}</TemperatureUnitProvider>
-          <Toaster />
+          <NativeShellProvider shell={shell}>
+            <TemperatureUnitProvider>{children}</TemperatureUnitProvider>
+            <Toaster />
+          </NativeShellProvider>
         </body>
       </html>
     </ClerkProvider>

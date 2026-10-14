@@ -73,11 +73,10 @@ describe("AppNavigation", () => {
     });
   });
 
-  it("leaves both web navigations out of the Mac shell", () => {
+  it("leaves web bottom tabs out of the Mac shell", () => {
     vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 SWTTRNativeMac/1");
-    render(<SidebarProvider><AppSidebar /><MobileTabBar /></SidebarProvider>);
+    render(<MobileTabBar />);
     expect(screen.queryByRole("navigation")).toBeNull();
-    expect(document.querySelector('[data-slot="sidebar"]')).toBeNull();
   });
 
   describe("active tab", () => {

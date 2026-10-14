@@ -76,6 +76,27 @@ describe("Header settings entry points", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it.each(["menu", "avatar"])("closes the %s overlay before native Settings takes focus", async (entry) => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("SWTTRNativeMac/1");
+    const user = userEvent.setup();
+    render(chrome());
+    const opener = entry === "menu" ? screen.getByRole("button", { name: "Open menu" }) : avatar();
+    await user.click(opener);
+    act(() => {
+      window.dispatchEvent(new Event("openPreferences"));
+      window.dispatchEvent(new Event("openPreferences"));
+    });
+    expect(screen.queryByRole("dialog", { name: "Settings" })).toBeNull();
+    const drawer = await screen.findByRole("dialog", { name: "Settings" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Menu" })).toBeNull();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    await waitFor(() => expect(drawer).toHaveFocus());
+    fireEvent.click(within(drawer).getByRole("button", { name: "Done" }));
+    await closeDrawer();
+    expect(opener).toHaveFocus();
+  });
+
   it("opens one Settings drawer from the avatar and returns focus to it on Escape", async () => {
     const user = userEvent.setup();
     render(chrome());
