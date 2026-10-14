@@ -4,7 +4,6 @@ import { render } from "@testing-library/react";
 import { SignIn, SignUp } from "@clerk/nextjs";
 import SignInPage from "@/app/sign-in/[[...sign-in]]/page";
 import SignUpPage from "@/app/sign-up/[[...sign-up]]/page";
-import { NATIVE_SHELL_AUTH_APPEARANCE } from "./native-shell";
 
 const request = vi.hoisted(() => ({ userAgent: "Mozilla/5.0" }));
 vi.mock("next/headers", () => ({
@@ -16,7 +15,7 @@ describe("native shell auth pages", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it.each(["Mozilla/5.0", "Mozilla/5.0 SWTTRNativeTabs", "Mozilla/5.0 SWTTRNativeMac/1"])(
-    "selects sign-in and sign-up appearance on the server for %s",
+    "preserves local auth returns and inherits provider appearance for %s",
     async (userAgent) => {
       request.userAgent = userAgent;
       const searchParams = Promise.resolve({ redirect_url: "/?resume=packing" });
@@ -25,8 +24,8 @@ describe("native shell auth pages", () => {
       const signIn = vi.mocked(SignIn).mock.calls[0][0] as ComponentProps<typeof SignIn>;
       const signUp = vi.mocked(SignUp).mock.calls[0][0] as ComponentProps<typeof SignUp>;
       const native = userAgent !== "Mozilla/5.0";
-      expect(signIn.appearance).toEqual(native ? NATIVE_SHELL_AUTH_APPEARANCE : undefined);
-      expect(signUp.appearance).toEqual(native ? NATIVE_SHELL_AUTH_APPEARANCE : undefined);
+      expect(signIn.appearance).toBeUndefined();
+      expect(signUp.appearance).toBeUndefined();
       expect(signIn.forceRedirectUrl).toBe("/?resume=packing");
       expect(signIn.signUpForceRedirectUrl).toBe("/?resume=packing");
       expect(signUp.forceRedirectUrl).toBe("/?resume=packing");

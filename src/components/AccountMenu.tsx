@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
 import { UserButton } from "@clerk/nextjs";
 import { HelpCircle, Settings, Share2 } from "lucide-react";
 
@@ -24,15 +24,20 @@ const APPEARANCE = {
 };
 
 interface AccountMenuProps {
+  ref?: Ref<AccountMenuHandle>;
   onOpenSettings: () => void;
   onShare: () => void;
+}
+
+export interface AccountMenuHandle {
+  openSettings: () => void;
 }
 
 /**
  * The signed-in avatar and its menu: SWTTR Settings first, then Clerk's
  * account management, FAQ, Share and, last, Sign out.
  */
-export function AccountMenu({ onOpenSettings, onShare }: AccountMenuProps) {
+export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) {
   const rootRef = useRef<HTMLSpanElement>(null);
   const pendingSettings = useRef<AbortController | null>(null);
 
@@ -53,6 +58,20 @@ export function AccountMenu({ onOpenSettings, onShare }: AccountMenuProps) {
     const timer = window.setTimeout(open, MENU_CLOSE_TIMEOUT_MS);
     pending.signal.addEventListener("abort", () => window.clearTimeout(timer));
   };
+
+  useImperativeHandle(ref, () => ({
+    openSettings: () => {
+      if (pendingSettings.current && !pendingSettings.current.signal.aborted) return;
+      const trigger = rootRef.current?.querySelector<HTMLButtonElement>("button[aria-expanded]");
+      if (trigger?.getAttribute("aria-expanded") === "true") {
+        openSettings();
+        // Toggle the same accessible trigger that opened Clerk's popover.
+        trigger.click();
+      } else {
+        onOpenSettings();
+      }
+    },
+  }));
 
   return (
     <span ref={rootRef} className="inline-flex">

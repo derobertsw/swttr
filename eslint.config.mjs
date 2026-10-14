@@ -11,6 +11,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "coverage/**",
     "ios/**",
+    "apple/**",
+    "macos/**",
     "next-env.d.ts",
   ]),
 ]);

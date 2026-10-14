@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { renderToString } from "react-dom/server";
+import { NativeShellProvider } from "./NativeShellProvider";
 import PageLayout from "./PageLayout";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
@@ -179,6 +181,17 @@ describe("PageLayout", () => {
     expect(screen.getByRole("main").parentElement).toHaveClass("pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]");
     expect(screen.getByRole("button", { name: "Open menu" })).not.toHaveClass("md:hidden");
     expect(StatusBar.setStyle).not.toHaveBeenCalled();
+  });
+
+  it.each(["mac", "ios"] as const)("omits native navigation in the first server HTML for %s", (shell) => {
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(
+      <NativeShellProvider shell={shell}><PageLayout><h1>Trip</h1></PageLayout></NativeShellProvider>
+    );
+    expect(container.querySelector('[aria-label="Primary"]')).toBeNull();
+    expect(container.querySelector('[data-slot="sidebar"]')).toBeNull();
+    const menu = Array.from(container.querySelectorAll("button")).find(button => button.textContent?.includes("Open menu"));
+    expect(menu).not.toHaveClass("md:hidden");
   });
 
   it.each([390, 768, 1280])("keeps browser navigation and padding at %ipx", (width) => {

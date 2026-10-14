@@ -54,7 +54,7 @@ describe("proxy, signed out", () => {
     expect(auth.protect.mock.calls).toEqual([[], []]);
   });
 
-  it.each(["/sign-in", "/sign-up", "/sign-in/sso-callback"])("keeps native auth pages public: %s", async (path) => {
+  it.each(["/sign-in", "/sign-up", "/sign-in/sso-callback", "/feedback"])("keeps native auth and support pages public: %s", async (path) => {
     await visit(path, "GET", "SWTTRNativeMac/1");
     expect(auth.protect).not.toHaveBeenCalled();
   });

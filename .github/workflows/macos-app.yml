@@ -1,0 +1,39 @@
+name: macOS app
+
+on:
+  pull_request:
+    paths:
+      - 'apple/**'
+      - 'macos/**'
+      - '.github/workflows/macos-app.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apple/**'
+      - 'macos/**'
+      - '.github/workflows/macos-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Shared shell tests
+        run: swift test --package-path apple/SWTTRShellKit
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate --spec macos/project.yml
+      - name: Build sandboxed app (Debug and Release)
+        run: |
+          for configuration in Debug Release; do
+            xcodebuild build -project macos/SWTTR.xcodeproj -scheme SWTTR \
+              -configuration "$configuration" -destination 'platform=macOS' \
+              -derivedDataPath /tmp/swttr-mac-build CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=YES
+          done

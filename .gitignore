@@ -49,3 +49,10 @@ ios/App/App.xcworkspace/xcuserdata/
 
 # Claude
 CLAUDE.md
+
+# Native Swift packages and generated Mac project
+apple/**/.build/
+apple/**/.swiftpm/
+macos/.build/
+macos/.swiftpm/
+macos/*.xcodeproj/
