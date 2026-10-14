@@ -1,0 +1,1909 @@
+{
+ "note": "Signed-out web matrix for #130, 2026-10-12, origin/main 054078b, headless Chrome 155. One entry per width-appearance-screen. Each list holds what the automated audit flagged; empty means nothing was flagged. On the sign-in card, signInPixelCheck replaces the audit's contrast results.",
+ "scenes": {
+  "390-dark-home-now": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 20,
+   "textNodesChecked": 24,
+   "contrastBelowMinimum": []
+  },
+  "390-dark-home-later-one": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 24,
+   "textNodesChecked": 31,
+   "contrastBelowMinimum": []
+  },
+  "390-dark-home-later-several": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 26,
+   "textNodesChecked": 33,
+   "contrastBelowMinimum": []
+  },
+  "390-dark-result-alpine": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 12,
+   "textNodesChecked": 37,
+   "contrastBelowMinimum": []
+  },
+  "390-dark-result-running-guest": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 11,
+   "textNodesChecked": 21,
+   "contrastBelowMinimum": []
+  },
+  "390-dark-result-hiking": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 11,
+   "textNodesChecked": 33,
+   "contrastBelowMinimum": []
+  },
+  "390-dark-plan-days": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 15,
+   "textNodesChecked": 64,
+   "contrastBelowMinimum": []
+  },
+  "390-dark-plan-packing": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 14,
+   "textNodesChecked": 35,
+   "contrastBelowMinimum": []
+  },
+  "390-dark-faq": {
+   "path": "/faq",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Frequently Asked Questions"
+   ],
+   "controlsChecked": 23,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  },
+  "390-dark-wardrobe": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Fwardrobe",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [
+    "button \"Apple\" 272x30",
+    "button \"Google\" 272x30",
+    "input#identifier-field \"Example format: name@example.com\" 272x30",
+    "button \"Continue\" 272x30"
+   ],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "390-dark-trips": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Ftrips",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [
+    "button \"Apple\" 272x30",
+    "button \"Google\" 272x30",
+    "input#identifier-field \"Example format: name@example.com\" 272x30",
+    "button \"Continue\" 272x30"
+   ],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "390-dark-settings": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 9,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  },
+  "390-light-home-now": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 20,
+   "textNodesChecked": 24,
+   "contrastBelowMinimum": []
+  },
+  "390-light-home-later-one": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 24,
+   "textNodesChecked": 31,
+   "contrastBelowMinimum": []
+  },
+  "390-light-home-later-several": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 26,
+   "textNodesChecked": 33,
+   "contrastBelowMinimum": []
+  },
+  "390-light-result-alpine": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 12,
+   "textNodesChecked": 37,
+   "contrastBelowMinimum": []
+  },
+  "390-light-result-running-guest": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 11,
+   "textNodesChecked": 21,
+   "contrastBelowMinimum": []
+  },
+  "390-light-result-hiking": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 11,
+   "textNodesChecked": 33,
+   "contrastBelowMinimum": []
+  },
+  "390-light-plan-days": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 15,
+   "textNodesChecked": 64,
+   "contrastBelowMinimum": []
+  },
+  "390-light-plan-packing": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 14,
+   "textNodesChecked": 35,
+   "contrastBelowMinimum": []
+  },
+  "390-light-faq": {
+   "path": "/faq",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Frequently Asked Questions"
+   ],
+   "controlsChecked": 23,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  },
+  "390-light-wardrobe": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Fwardrobe",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [
+    "button \"Apple\" 272x30",
+    "button \"Google\" 272x30",
+    "input#identifier-field \"Example format: name@example.com\" 272x30",
+    "button \"Continue\" 272x30"
+   ],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "2.81<4.5 \"Development mode\" (p.cl-internal-1fpq5at)"
+   ]
+  },
+  "390-light-trips": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Ftrips",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [
+    "button \"Apple\" 272x30",
+    "button \"Google\" 272x30",
+    "input#identifier-field \"Example format: name@example.com\" 272x30",
+    "button \"Continue\" 272x30"
+   ],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "2.81<4.5 \"Development mode\" (p.cl-internal-1fpq5at)"
+   ]
+  },
+  "390-light-settings": {
+   "path": "/",
+   "viewport": "390x844",
+   "touch": true,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 9,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  },
+  "320-dark-home-now": {
+   "path": "/",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 20,
+   "textNodesChecked": 24,
+   "contrastBelowMinimum": []
+  },
+  "320-dark-home-later-one": {
+   "path": "/",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 24,
+   "textNodesChecked": 31,
+   "contrastBelowMinimum": []
+  },
+  "320-dark-home-later-several": {
+   "path": "/",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 26,
+   "textNodesChecked": 33,
+   "contrastBelowMinimum": []
+  },
+  "320-dark-result-alpine": {
+   "path": "/",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 12,
+   "textNodesChecked": 37,
+   "contrastBelowMinimum": []
+  },
+  "320-dark-result-running-guest": {
+   "path": "/",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 11,
+   "textNodesChecked": 21,
+   "contrastBelowMinimum": []
+  },
+  "320-dark-result-hiking": {
+   "path": "/",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 11,
+   "textNodesChecked": 33,
+   "contrastBelowMinimum": []
+  },
+  "320-dark-plan-days": {
+   "path": "/",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 15,
+   "textNodesChecked": 64,
+   "contrastBelowMinimum": []
+  },
+  "320-dark-plan-packing": {
+   "path": "/",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 14,
+   "textNodesChecked": 35,
+   "contrastBelowMinimum": []
+  },
+  "320-dark-faq": {
+   "path": "/faq",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Frequently Asked Questions"
+   ],
+   "controlsChecked": 23,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  },
+  "320-dark-wardrobe": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Fwardrobe",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [
+    "button \"Apple\" 202x30",
+    "button \"Google\" 202x30",
+    "input#identifier-field \"Example format: name@example.com\" 202x30",
+    "button \"Continue\" 202x30"
+   ],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "320-dark-trips": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Ftrips",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [
+    "button \"Apple\" 202x30",
+    "button \"Google\" 202x30",
+    "input#identifier-field \"Example format: name@example.com\" 202x30",
+    "button \"Continue\" 202x30"
+   ],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "320-dark-settings": {
+   "path": "/",
+   "viewport": "320x568",
+   "touch": true,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 9,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  },
+  "768-dark-home-now": {
+   "path": "/",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 23,
+   "textNodesChecked": 27,
+   "contrastBelowMinimum": []
+  },
+  "768-dark-home-later-one": {
+   "path": "/",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 27,
+   "textNodesChecked": 34,
+   "contrastBelowMinimum": []
+  },
+  "768-dark-home-later-several": {
+   "path": "/",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 29,
+   "textNodesChecked": 36,
+   "contrastBelowMinimum": []
+  },
+  "768-dark-result-alpine": {
+   "path": "/",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 15,
+   "textNodesChecked": 40,
+   "contrastBelowMinimum": []
+  },
+  "768-dark-result-running-guest": {
+   "path": "/",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 14,
+   "textNodesChecked": 24,
+   "contrastBelowMinimum": []
+  },
+  "768-dark-result-hiking": {
+   "path": "/",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 14,
+   "textNodesChecked": 36,
+   "contrastBelowMinimum": []
+  },
+  "768-dark-plan-days": {
+   "path": "/",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 18,
+   "textNodesChecked": 67,
+   "contrastBelowMinimum": []
+  },
+  "768-dark-plan-packing": {
+   "path": "/",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 17,
+   "textNodesChecked": 38,
+   "contrastBelowMinimum": []
+  },
+  "768-dark-faq": {
+   "path": "/faq",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Frequently Asked Questions"
+   ],
+   "controlsChecked": 26,
+   "textNodesChecked": 26,
+   "contrastBelowMinimum": []
+  },
+  "768-dark-wardrobe": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Fwardrobe",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "768-dark-trips": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Ftrips",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "768-dark-settings": {
+   "path": "/",
+   "viewport": "768x1024",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 9,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  },
+  "1024-dark-home-now": {
+   "path": "/",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 24,
+   "textNodesChecked": 29,
+   "contrastBelowMinimum": []
+  },
+  "1024-dark-home-later-one": {
+   "path": "/",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 28,
+   "textNodesChecked": 36,
+   "contrastBelowMinimum": []
+  },
+  "1024-dark-home-later-several": {
+   "path": "/",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 30,
+   "textNodesChecked": 38,
+   "contrastBelowMinimum": []
+  },
+  "1024-dark-result-alpine": {
+   "path": "/",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 16,
+   "textNodesChecked": 42,
+   "contrastBelowMinimum": []
+  },
+  "1024-dark-result-running-guest": {
+   "path": "/",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 15,
+   "textNodesChecked": 26,
+   "contrastBelowMinimum": []
+  },
+  "1024-dark-result-hiking": {
+   "path": "/",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 15,
+   "textNodesChecked": 38,
+   "contrastBelowMinimum": []
+  },
+  "1024-dark-plan-days": {
+   "path": "/",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 19,
+   "textNodesChecked": 69,
+   "contrastBelowMinimum": []
+  },
+  "1024-dark-plan-packing": {
+   "path": "/",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 18,
+   "textNodesChecked": 40,
+   "contrastBelowMinimum": []
+  },
+  "1024-dark-faq": {
+   "path": "/faq",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Frequently Asked Questions"
+   ],
+   "controlsChecked": 27,
+   "textNodesChecked": 28,
+   "contrastBelowMinimum": []
+  },
+  "1024-dark-wardrobe": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Fwardrobe",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "1024-dark-trips": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Ftrips",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "1024-dark-settings": {
+   "path": "/",
+   "viewport": "1024x768",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 9,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  },
+  "1280-dark-home-now": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 24,
+   "textNodesChecked": 29,
+   "contrastBelowMinimum": []
+  },
+  "1280-dark-home-later-one": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 28,
+   "textNodesChecked": 36,
+   "contrastBelowMinimum": []
+  },
+  "1280-dark-home-later-several": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 30,
+   "textNodesChecked": 38,
+   "contrastBelowMinimum": []
+  },
+  "1280-dark-result-alpine": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 16,
+   "textNodesChecked": 42,
+   "contrastBelowMinimum": []
+  },
+  "1280-dark-result-running-guest": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 15,
+   "textNodesChecked": 26,
+   "contrastBelowMinimum": []
+  },
+  "1280-dark-result-hiking": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 15,
+   "textNodesChecked": 38,
+   "contrastBelowMinimum": []
+  },
+  "1280-dark-plan-days": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 19,
+   "textNodesChecked": 69,
+   "contrastBelowMinimum": []
+  },
+  "1280-dark-plan-packing": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 18,
+   "textNodesChecked": 40,
+   "contrastBelowMinimum": []
+  },
+  "1280-dark-faq": {
+   "path": "/faq",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Frequently Asked Questions"
+   ],
+   "controlsChecked": 27,
+   "textNodesChecked": 28,
+   "contrastBelowMinimum": []
+  },
+  "1280-dark-wardrobe": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Fwardrobe",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "1280-dark-trips": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Ftrips",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "1280-dark-settings": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 9,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  },
+  "1280-light-home-now": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 24,
+   "textNodesChecked": 29,
+   "contrastBelowMinimum": []
+  },
+  "1280-light-home-later-one": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 28,
+   "textNodesChecked": 36,
+   "contrastBelowMinimum": []
+  },
+  "1280-light-home-later-several": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 30,
+   "textNodesChecked": 38,
+   "contrastBelowMinimum": []
+  },
+  "1280-light-result-alpine": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 16,
+   "textNodesChecked": 42,
+   "contrastBelowMinimum": []
+  },
+  "1280-light-result-running-guest": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 15,
+   "textNodesChecked": 27,
+   "contrastBelowMinimum": []
+  },
+  "1280-light-result-hiking": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 15,
+   "textNodesChecked": 39,
+   "contrastBelowMinimum": []
+  },
+  "1280-light-plan-days": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 19,
+   "textNodesChecked": 79,
+   "contrastBelowMinimum": []
+  },
+  "1280-light-plan-packing": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 18,
+   "textNodesChecked": 42,
+   "contrastBelowMinimum": []
+  },
+  "1280-light-faq": {
+   "path": "/faq",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Frequently Asked Questions"
+   ],
+   "controlsChecked": 27,
+   "textNodesChecked": 28,
+   "contrastBelowMinimum": []
+  },
+  "1280-light-wardrobe": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Fwardrobe",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "2.81<4.5 \"Development mode\" (p.cl-internal-1fpq5at)"
+   ]
+  },
+  "1280-light-trips": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Ftrips",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "2.81<4.5 \"Development mode\" (p.cl-internal-1fpq5at)"
+   ]
+  },
+  "1280-light-settings": {
+   "path": "/",
+   "viewport": "1280x720",
+   "touch": false,
+   "appearance": "light",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 9,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  },
+  "zoom200-dark-home-now": {
+   "path": "/",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 20,
+   "textNodesChecked": 24,
+   "contrastBelowMinimum": []
+  },
+  "zoom200-dark-home-later-one": {
+   "path": "/",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 24,
+   "textNodesChecked": 31,
+   "contrastBelowMinimum": []
+  },
+  "zoom200-dark-home-later-several": {
+   "path": "/",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 26,
+   "textNodesChecked": 33,
+   "contrastBelowMinimum": []
+  },
+  "zoom200-dark-result-alpine": {
+   "path": "/",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 12,
+   "textNodesChecked": 38,
+   "contrastBelowMinimum": []
+  },
+  "zoom200-dark-result-running-guest": {
+   "path": "/",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 11,
+   "textNodesChecked": 22,
+   "contrastBelowMinimum": []
+  },
+  "zoom200-dark-result-hiking": {
+   "path": "/",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 11,
+   "textNodesChecked": 34,
+   "contrastBelowMinimum": []
+  },
+  "zoom200-dark-plan-days": {
+   "path": "/",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 15,
+   "textNodesChecked": 74,
+   "contrastBelowMinimum": []
+  },
+  "zoom200-dark-plan-packing": {
+   "path": "/",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Gear up"
+   ],
+   "controlsChecked": 14,
+   "textNodesChecked": 37,
+   "contrastBelowMinimum": []
+  },
+  "zoom200-dark-faq": {
+   "path": "/faq",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "Frequently Asked Questions"
+   ],
+   "controlsChecked": 23,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  },
+  "zoom200-dark-wardrobe": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Fwardrobe",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "zoom200-dark-trips": {
+   "path": "/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A3131%2Ftrips",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [
+    "a \"Sign up\" 46x18",
+    "a \"Clerk logo\" 48x14"
+   ],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 0,
+   "h1": [
+    "Sign in to Swttr"
+   ],
+   "controlsChecked": 6,
+   "textNodesChecked": 11,
+   "contrastBelowMinimum": [
+    "1.03<4.5 \"Don’t have an account?\" (span.cl-footerActionText.🔒️.cl-internal-n1i35g)",
+    "1.30<4.5 \"Sign up\" (a.cl-footerActionLink.🔒️.cl-internal-130egly)",
+    "1.03<4.5 \"Secured by\" (p.cl-internal-1scq7x4)"
+   ]
+  },
+  "zoom200-dark-settings": {
+   "path": "/",
+   "viewport": "640x360",
+   "touch": false,
+   "appearance": "dark",
+   "horizontalOverflowPx": 0,
+   "outsideViewport": [],
+   "under24px": [],
+   "under44pxOnTouch": [],
+   "unnamedControls": [],
+   "mainLandmarks": 1,
+   "h1": [
+    "What should I wear?"
+   ],
+   "controlsChecked": 9,
+   "textNodesChecked": 23,
+   "contrastBelowMinimum": []
+  }
+ },
+ "signInPixelCheck": {
+  "method": "1280 × 720, both appearances, 2026-10-14. Each text was hidden, the box behind it captured, and its computed color (composited when translucent) compared with the lightest and darkest background pixels. The audit composited the card's footer onto the page instead, because Clerk paints it with a background image.",
+  "results": [
+   {
+    "text": "Don’t have an account?",
+    "font": "13px/400",
+    "contrast": "4.95–4.97",
+    "minimum": 4.5,
+    "passes": true
+   },
+   {
+    "text": "Sign up",
+    "font": "13px/500",
+    "contrast": "12.26–12.37",
+    "minimum": 4.5,
+    "passes": true
+   },
+   {
+    "text": "Secured by",
+    "font": "12px/500",
+    "contrast": "4.84–4.94",
+    "minimum": 4.5,
+    "passes": true
+   },
+   {
+    "text": "Development mode",
+    "font": "13px/600",
+    "contrast": "2.59–2.73",
+    "minimum": 4.5,
+    "passes": false,
+    "note": "Clerk's badge for a development instance, in both appearances. The audit missed it in dark. The live site still uses a development key, so it shows there too until #16."
+   }
+  ]
+ },
+ "totals": {
+  "scenes": 96,
+  "controls": 1551,
+  "textNodes": 2959,
+  "scenesWithFlags": 16,
+  "scenesWithFlagsAreAllSignIn": true,
+  "scenesThatFailedToRun": 0
+ }
+}
