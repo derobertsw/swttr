@@ -91,6 +91,27 @@ export interface TripFull {
 
 export type TripStayType = "hotel" | "rental" | "hut" | "campground" | "other";
 
+/**
+ * A confirmed place for trip logistics (#208): a stay now, access points next.
+ * It is never an activity's weather location. See docs/trip-locations.md.
+ */
+export interface TripLocation {
+  label: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  /** "approximate" is a town or area: too broad for a drive estimate. */
+  precision: "exact" | "approximate";
+  /** IANA zone, when the provider resolved one. */
+  time_zone: string | null;
+  /** A search result, or coordinates the organizer typed. */
+  source: "search" | "manual";
+  provider: "geoapify" | null;
+  provider_id: string | null;
+  /** The data source's credit, kept with the place as the provider asks. */
+  attribution: string | null;
+}
+
 export interface TripStayInput {
   id: string;
   name: string;
@@ -103,6 +124,8 @@ export interface TripStayInput {
   check_out_time: string | null;
   notes: string | null;
   booking_status: "not_booked" | "booked";
+  /** Missing in a save keeps the saved location; null removes it. */
+  location?: TripLocation | null;
 }
 
 export interface TripStay extends TripStayInput {
