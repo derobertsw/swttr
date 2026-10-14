@@ -112,6 +112,28 @@ describe("shared trip data", () => {
     expect(screen.queryByText("Loading")).not.toBeInTheDocument();
   });
 
+  it("retries at once on reconnect after a background check fails, keeping the shown trip", async () => {
+    let now = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    const api = fakeTripApi({ "GET /api/v1/trips/trip-1": reply(200, tripFull()) });
+    vi.stubGlobal("fetch", api);
+    render(<TripProvider tripId={TRIP.id}><Consumer /></TripProvider>);
+    await screen.findByText(TRIP.name);
+    now = 61_000;
+    api.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await act(async () => { fireEvent.focus(window); });
+    await screen.findByRole("alert");
+    expect(screen.getByText(TRIP.name)).toBeInTheDocument();
+    // Back online a second later: the failed check didn't count as fresh data.
+    now = 62_000;
+    await act(async () => { fireEvent(window, new Event("online")); });
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(api).toHaveBeenCalledTimes(3);
+    // A successful check is fresh for a minute again.
+    await act(async () => { fireEvent.focus(window); });
+    expect(api).toHaveBeenCalledTimes(3);
+  });
+
   it("revalidates on navigation after a minute and clears data if access was revoked", async () => {
     let now = 0;
     vi.spyOn(Date, "now").mockImplementation(() => now);

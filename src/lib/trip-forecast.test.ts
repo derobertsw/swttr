@@ -64,4 +64,17 @@ describe("trip forecast reuse", () => {
     now.mockReturnValue(Date.parse("2026-10-11T04:01Z"));
     expect((await fetchTripForecast(STOWE_STOP))?.today).toBe("2026-10-11");
   });
+
+  it("ends a cached response's window at its last hour, not a day past it after local midnight", async () => {
+    // A full window fetched late on Oct 10 local time: hours through Oct 25.
+    const hours = Array.from({ length: 16 }, (_, day) => Date.parse(`2026-10-${String(10 + day).padStart(2, "0")}T16:00Z`) / 1000);
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => Response.json({ timezone: "America/New_York", hourly: {
+      time: hours, temperature_2m: hours.map(() => 45), wind_speed_10m: hours.map(() => 10), precipitation_probability: hours.map(() => 20),
+    } })));
+    const now = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-11T03:59Z"));
+    expect(await fetchTripForecast(STOWE_STOP)).toMatchObject({ today: "2026-10-10", lastDate: "2026-10-25" });
+    // Reused just after midnight: today moves on, but the cached hours still end on Oct 25.
+    now.mockReturnValue(Date.parse("2026-10-11T04:01Z"));
+    expect(await fetchTripForecast(STOWE_STOP)).toMatchObject({ today: "2026-10-11", lastDate: "2026-10-25" });
+  });
 });

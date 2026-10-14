@@ -41,11 +41,12 @@ async function loadTripForecast(stop: TripStop): Promise<TripForecast> {
     if (!isTimeZone(data?.timezone) || !["time", "temperature_2m", "wind_speed_10m", "precipitation_probability"]
       .every((key) => Array.isArray(data?.hourly?.[key]))) return null;
     const today = formatZonedTime(Date.now(), data.timezone).slice(0, 10);
-    return {
-      hourly: parseOpenMeteoHourly(data, data.timezone),
-      today,
-      lastDate: addDaysToDateString(today, FORECAST_DAYS - 1),
-    };
+    const hourly = parseOpenMeteoHourly(data, data.timezone);
+    // A cached response fetched before local midnight still ends on its own
+    // window, so the window ends at its last hour, not a day after it.
+    const window = addDaysToDateString(today, FORECAST_DAYS - 1);
+    const lastHour = hourly.reduce((last, hour) => hour.time.slice(0, 10) > last ? hour.time.slice(0, 10) : last, "");
+    return { hourly, today, lastDate: lastHour && lastHour < window ? lastHour : window };
   } catch {
     return null;
   }

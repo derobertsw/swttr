@@ -35,19 +35,22 @@ export function useTripState(tripId: string | null) {
   // older snapshot that arrives last can't replace newer data.
   const newestLoad = useRef<Promise<void> | null>(null);
   const inFlight = useRef(false);
-  const lastAttempt = useRef<number | null>(null);
+  // When the shown snapshot was loaded: null before the first load settles,
+  // and -Infinity after a failed load, so the next focus or reconnect retries at once.
+  const freshAt = useRef<number | null>(null);
 
   const load = useCallback((id: string) => {
     inFlight.current = true;
-    lastAttempt.current = Date.now();
     const settled: Promise<void> = fetchTripFull(id)
       .then((body) => {
         if (newestLoad.current !== settled) return;
+        freshAt.current = Date.now();
         setData(body);
         setError(null);
       })
       .catch((err) => {
         if (newestLoad.current !== settled) return;
+        freshAt.current = Number.NEGATIVE_INFINITY;
         if (err instanceof TripRequestError && [401, 403, 404].includes(err.status)) setData(null);
         setError(toErrorMessage(err));
       })
@@ -90,7 +93,7 @@ export function useTripState(tripId: string | null) {
   // Background checks keep the current page visible and never supersede a
   // mutation reload. Navigating repeatedly within a minute needs no new read.
   const revalidate = useCallback(() => {
-    if (!tripId || inFlight.current || lastAttempt.current === null || Date.now() - lastAttempt.current < 60_000) return;
+    if (!tripId || inFlight.current || freshAt.current === null || Date.now() - freshAt.current < 60_000) return;
     return load(tripId);
   }, [tripId, load]);
 
