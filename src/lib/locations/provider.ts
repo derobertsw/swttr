@@ -85,7 +85,7 @@ export function rankResults(results: GeoapifyResult[], near: Point[]): TripLocat
     const key = `${location.label.toLowerCase()}|${location.latitude.toFixed(4)}|${location.longitude.toFixed(4)}`;
     if (seen.has(key)) return [];
     seen.add(key);
-    const confidence = typeof result.rank?.confidence === "number" ? Math.round(result.rank.confidence * 10) : 0;
+    const confidence = typeof result.rank?.confidence === "number" && Number.isFinite(result.rank.confidence) ? result.rank.confidence : 0;
     return [{ location, confidence, distance, order }];
   }).sort((a, b) => b.confidence - a.confidence || exactFirst(a.location) - exactFirst(b.location)
     || a.distance - b.distance || a.order - b.order)
