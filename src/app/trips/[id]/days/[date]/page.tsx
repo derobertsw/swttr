@@ -30,6 +30,7 @@ import { CopyDayCard } from "@/components/trips/CopyDayCard";
 import { canEditMemberKit } from "@/lib/trip-permissions";
 import { kitAdvice, kitWear } from "@/lib/trip-saved-kits";
 import { DayLodging } from "@/components/trips/TripStays";
+import { DayAccessPoint } from "@/components/trips/DayAccessPoint";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
@@ -188,6 +189,8 @@ export default function DayDetailPage({
             </header>
 
             <DayLodging data={data} date={date} />
+
+            <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()} />
 
             <ActivityPicker
               tripId={id}

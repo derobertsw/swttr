@@ -1,5 +1,5 @@
 import { isTimeZone } from "@/lib/timeZones";
-import type { TripLocation } from "@/types/trips";
+import type { TripDay, TripLocation, TripStop } from "@/types/trips";
 
 /** The search results' required credit when they come from Geoapify (#208). */
 export const GEOAPIFY_CREDIT = { label: "Powered by Geoapify", url: "https://www.geoapify.com/" };
@@ -49,4 +49,30 @@ export function parseTripLocation(value: unknown): TripLocation | { error: strin
 export function locationMapUrl(location: Pick<TripLocation, "latitude" | "longitude">): string {
   const { latitude, longitude } = location;
   return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=17/${latitude}/${longitude}`;
+}
+
+/** The same place: two saved copies of one search result or one pair of typed coordinates. */
+export const sameLocation = (a: TripLocation, b: TripLocation) =>
+  a.label === b.label && a.address === b.address && a.latitude === b.latitude && a.longitude === b.longitude;
+
+/** A day's access point (#208) and whose it is. */
+export interface DayAccessPoint {
+  location: TripLocation;
+  /** "day" when it's the day's own, "stop" when every day at the stop shares it. */
+  scope: "day" | "stop";
+}
+
+/**
+ * The access point a day uses: its own while it's still at the stop it was
+ * set for, otherwise its stop's. A day without a stop goes to the base, the
+ * first stop, so `stops` must be in position order. Null when there's none.
+ */
+export function accessPointFor(
+  stops: Array<Pick<TripStop, "id" | "access_point">>,
+  day: Pick<TripDay, "stop_id" | "access_point" | "access_point_stop_id">,
+): DayAccessPoint | null {
+  const stop = stops.find((candidate) => candidate.id === day.stop_id) ?? stops[0];
+  if (!stop) return null;
+  if (day.access_point && day.access_point_stop_id === stop.id) return { location: day.access_point, scope: "day" };
+  return stop.access_point ? { location: stop.access_point, scope: "stop" } : null;
 }

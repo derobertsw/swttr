@@ -1,5 +1,6 @@
 import "server-only";
 import { dateLabel, isCalendarDate, isUuid } from "@/lib/trip-lodging";
+import { accessPointFor, sameLocation } from "@/lib/trip-location";
 import type { TripDay, TripFull, TripItineraryOption, TripItineraryPreview, TripItineraryRequest, TripMember, TripMemberDayKit, TripPlace, TripStop } from "@/types/trips";
 
 /**
@@ -31,7 +32,10 @@ type ItineraryEdit =
   | { action: "copy_day"; payload: { from: string; dates: string[]; kit: KitCopy; expected: { from: Omit<CopyCheck, "date">; days: CopyCheck[] } } };
 
 type Invalid = { error: string };
-type Itinerary = { stops: Array<Pick<TripStop, "id" | "name" | "latitude" | "longitude">>; days: Array<Pick<TripDay, "date" | "stop_id" | "activity">> };
+type Itinerary = {
+  stops: Array<Pick<TripStop, "id" | "name" | "latitude" | "longitude" | "access_point">>;
+  days: Array<Pick<TripDay, "date" | "stop_id" | "activity" | "access_point" | "access_point_stop_id">>;
+};
 
 const MAX_DAYS = 400;
 const MAX_STOPS = 100;
@@ -244,6 +248,23 @@ function keptKits(full: TripFull, day: Pick<TripDay, "id">, me: TripMember | und
 
 type Place = Itinerary["stops"][number] | null;
 
+/**
+ * What happens to the access point (#208) of a day whose destination changes:
+ * a day's own point applies only at the stop it was set for, so it can give
+ * way to the new stop's. A stop that moves keeps its point, which may no
+ * longer fit. Undefined when the day has none before or after.
+ */
+function accessNote(full: TripFull, after: Itinerary, day: TripDay, place: Place | undefined): string | undefined {
+  const was = accessPointFor(full.stops, day);
+  const now = accessPointFor(after.stops, after.days.find((candidate) => candidate.date === day.date) ?? day);
+  if (!was && !now) return undefined;
+  if (was && now && sameLocation(was.location, now.location)) {
+    const stopBefore = full.stops.find((stop) => stop.id === day.stop_id) ?? full.stops[0];
+    return place && stopBefore?.id === place.id ? `Access point stays ${now.location.label}. Check it's right for ${place.name}.` : undefined;
+  }
+  return `Access point: ${was?.location.label ?? "Not set"} → ${now?.location.label ?? "Not set"}.`;
+}
+
 /** Each day's effective stop: its own, or the base (the first stop); null when the trip has none. */
 function effectiveStops({ stops, days }: Itinerary): Map<string, Place> {
   return new Map(days.map((day) => [day.date, stops.find((stop) => stop.id === day.stop_id) ?? stops[0] ?? null]));
@@ -303,7 +324,8 @@ function option(
           distinguish(to, placeAfter.get(day.date), placeBefore.get(day.date), numbers),
         ];
       }
-      const notes = [copied?.get(day.date), moved ? keptKits(full, day, me, !!copied?.has(day.date)) : undefined]
+      const notes = [copied?.get(day.date), moved ? keptKits(full, day, me, !!copied?.has(day.date)) : undefined,
+        moved ? accessNote(full, after, day, placeAfter.get(day.date)) : undefined]
         .filter((note): note is string => !!note);
       return { date: day.date, date_label: dateLabel(day.date), before: from, after: to, ...(notes.length > 0 ? { notes } : {}) };
     });
@@ -394,7 +416,8 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest, 
         date: day.date, place, scope,
         expected: { stop_id: current?.id ?? null, stop: current ? { name: current.name, latitude: current.latitude, longitude: current.longitude } : null, dates },
       });
-      const moved = (stop: Pick<TripStop, "id">) => ({ id: stop.id, name: place.name, latitude: place.latitude, longitude: place.longitude });
+      // A stop that moves keeps its access point.
+      const moved = (stop: Pick<TripStop, "id" | "access_point">) => ({ id: stop.id, access_point: stop.access_point, name: place.name, latitude: place.latitude, longitude: place.longitude });
 
       if (!current) {
         // The place becomes the base, so every day goes to it.
