@@ -8,7 +8,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   const { id, date } = await ctx.params;
   const auth = await requireTripAccess(id);
   if (auth instanceof NextResponse) return auth;
-  const full = await loadTripFull(auth.supabase, id);
+  const full = await loadTripFull(auth.supabase, auth.trip);
   if (!full || !enumerateDates(full.trip.start_date, full.trip.end_date).includes(date)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
