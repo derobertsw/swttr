@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { SignIn } from "@clerk/nextjs";
-import { detectNativeShell, NATIVE_SHELL_AUTH_APPEARANCE } from "@/lib/native-shell";
+import { detectNativeShell } from "@/lib/native-shell";
 import { safeReturnPath } from "@/lib/outingReturn";
 
 export default async function SignInPage({
@@ -18,7 +18,6 @@ export default async function SignInPage({
         forceRedirectUrl={returnTo}
         signUpForceRedirectUrl={returnTo}
         {...(nativeShell ? {
-          appearance: NATIVE_SHELL_AUTH_APPEARANCE,
           signUpUrl: `/sign-up?redirect_url=${encodeURIComponent(returnTo)}`,
         } : {})}
       />

@@ -16,7 +16,7 @@ struct SWTTRCommands: Commands {
             Button("Reload", action: browser.reload).keyboardShortcut("r")
             Divider()
             Button("Actual Size") { browser.setZoom(1) }.keyboardShortcut("0")
-            Button("Zoom In") { browser.setZoom(browser.webView.pageZoom + 0.1) }.keyboardShortcut("+")
+            Button("Zoom In") { browser.setZoom(browser.webView.pageZoom + 0.1) }.keyboardShortcut("=")
             Button("Zoom Out") { browser.setZoom(browser.webView.pageZoom - 0.1) }.keyboardShortcut("-")
         }
         SidebarCommands()
@@ -31,7 +31,7 @@ struct SWTTRCommands: Commands {
         CommandGroup(replacing: .help) {
             Button("SWTTR Help") { browser.navigate(to: "/faq") }
             Button("Send Feedback…") {
-                NSWorkspace.shared.open(URL(string: "https://docs.google.com/forms/d/e/1FAIpQLSfpX2tVx485Q0ybdNH_t48_-Z_WY0ldx3VhhkUeGKIXQ2N9fg/viewform?usp=publish-editor")!)
+                browser.openFeedback()
             }
         }
     }

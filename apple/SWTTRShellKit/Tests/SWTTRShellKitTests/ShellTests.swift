@@ -51,7 +51,12 @@ import Testing
 
     @Test(arguments: ["mailto:help@example.com", "tel:123", "sms:123", "maps://?q=Stowe"])
     func externalSchemes(value: String) {
-        #expect(policy.decide(targetURL: URL(string: value)!, isMainFrame: true) == .openExternal)
+        let url = URL(string: value)!
+        #expect(policy.decide(targetURL: url, isMainFrame: true, userInitiated: true) == .openExternal)
+        #expect(policy.decide(targetURL: url, isMainFrame: true) == .cancel)
+        #expect(policy.decide(targetURL: url, isMainFrame: false, userInitiated: true) == .cancel)
+        #expect(policy.decide(targetURL: url, isMainFrame: true, opensNewWindow: true,
+                              userInitiated: true, sourceIsMainFrame: false) == .cancel)
     }
 
     @Test func unsafeSchemes() {
@@ -59,7 +64,10 @@ import Testing
             #expect(policy.decide(targetURL: URL(string: value)!, isMainFrame: true) == .cancel)
         }
         #expect(policy.decide(targetURL: URL(string: "about:blank")!, isMainFrame: false) == .allow)
-        #expect(policy.decide(targetURL: URL(string: "about:blank")!, isMainFrame: true, opensNewWindow: true) == .openExternal)
+        #expect(policy.decide(targetURL: URL(string: "about:blank")!, isMainFrame: true, opensNewWindow: true) == .cancel)
+        #expect(policy.decide(targetURL: URL(string: "about:srcdoc")!, isMainFrame: false) == .allow)
+        #expect(policy.decide(targetURL: URL(string: "about:srcdoc")!, isMainFrame: true) == .cancel)
+        #expect(policy.decide(targetURL: URL(string: "about:config")!, isMainFrame: true) == .cancel)
     }
 }
 
@@ -85,6 +93,15 @@ import Testing
         let config = SWTTRShellConfig.resolve(info: ["SWTTRWebURLDebug": "http://evil.com"], isDebug: true)
         #expect(config.appURL.absoluteString == "http://localhost:3000")
     }
+
+    @Test func ipv6LoopbackIsValidatedAndEligibleForFallback() {
+        let config = SWTTRShellConfig.resolve(info: ["SWTTRWebURLDebug": "http://[::1]:3001"], isDebug: true)
+        #expect(config.appURL.absoluteString == "http://[::1]:3001")
+        #expect(SWTTRShellConfig.isLoopback(host: config.appURL.host))
+        #expect(SWTTRShellConfig.isLoopback(host: "::1"))
+        #expect(SWTTRShellConfig.isLoopback(host: "[::1]"))
+        #expect(!SWTTRShellConfig.isLoopback(host: "localhost.evil.com"))
+    }
 }
 
 @Suite struct RestorationTests {
@@ -106,9 +123,28 @@ import Testing
         #expect(SWTTRLastPage.restorableURL("/trips", baseURL: base) == nil)
     }
 
-    @Test(arguments: ["/sign-in", "/sign-in/verify", "/sign-up", "/sso-callback", "/oauth/callback", "/authenticate", "/?__clerk_status=done", "/?code=secret", "/?redirect_url=/trips", "/?token=secret", "/?state=secret"])
+    @Test(arguments: ["/sign-in", "/sign-in/verify", "/sign-up", "/sso-callback", "/oauth/callback", "/authenticate", "/trips/invite", "/trips/invite/secret", "/?__clerk_status=done", "/?code=secret", "/?redirect_url=/trips", "/?token=secret", "/?state=secret", "/?access_token=secret", "/?id_token=secret", "/?refreshToken=secret", "/?%61ccess_token=secret", "/#access_token=secret", "/#id_token=secret", "/#access_token%3Dsecret", "/#/callback?access_token=secret"])
     func doesNotRestoreAuth(path: String) {
         #expect(SWTTRLastPage.restorableURL("https://swttr.vercel.app" + path, baseURL: base) == nil)
+    }
+}
+
+@Suite struct ProcessRecoveryTests {
+    @Test func crashLoopRequiresExplicitRetry() {
+        var recovery = SWTTRProcessRecovery()
+        let first = recovery.shouldReload(now: 100)
+        let repeated = recovery.shouldReload(now: 101)
+        let withinWindow = recovery.shouldReload(now: 129)
+        let nextWindow = recovery.shouldReload(now: 130)
+        let repeatedAgain = recovery.shouldReload(now: 131)
+        #expect(first)
+        #expect(!repeated)
+        #expect(!withinWindow)
+        #expect(nextWindow)
+        #expect(!repeatedAgain)
+        recovery.reset()
+        let explicitRetry = recovery.shouldReload(now: 132)
+        #expect(explicitRetry)
     }
 }
 

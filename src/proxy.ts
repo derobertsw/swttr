@@ -6,6 +6,7 @@ import { safeReturnPath, signInHref } from "@/lib/outingReturn";
 const isPublicRoute = createRouteMatcher([
   "/",
   "/faq",
+  "/feedback",
   // Design reference; 404s outside dev and Vercel previews (see src/app/design/page.tsx).
   "/design",
   "/sign-in(.*)",
