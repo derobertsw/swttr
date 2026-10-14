@@ -39,6 +39,13 @@ export async function handleLodging(request: Request, tripId: string, options: O
   }
   if (!isUuid(body.mutation_id)) return jsonError("Invalid save identity. Reopen the editor.", 400);
   if (body.replace_nights !== undefined && typeof body.replace_nights !== "boolean") return jsonError("Invalid night replacement choice.", 400);
+  // Before migration 025 the transaction would drop the place and still succeed.
+  if ("location" in payload && payload.location) {
+    const { error: missing } = await auth.supabase.from("trip_stays").select("location").limit(1);
+    if (missing?.code === "42703") {
+      return NextResponse.json({ error: "Stay locations can't be saved yet. Remove the location to save the stay now.", field: "location" }, { status: 503 });
+    }
+  }
   const { data, error } = await auth.supabase.rpc("mutate_trip_lodging", {
     p_trip_id: tripId, p_user_id: auth.userId, p_expected_revision: body.expected_revision,
     p_request_id: body.mutation_id, p_action: action,

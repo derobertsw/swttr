@@ -22,6 +22,8 @@ describe("Crew lodging transactions in Postgres", () => {
     await db.exec("CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS; CREATE FUNCTION public.update_updated_at_column() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END $$;");
     await db.exec(await readFile("supabase/migrations/012_trips.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/017_trip_stays.sql", "utf8"));
+    // Every test here runs against 025's version of the lodging transaction.
+    await db.exec(await readFile("supabase/migrations/025_trip_stay_locations.sql", "utf8"));
   }, 20_000);
   beforeEach(async () => {
     await db.exec("TRUNCATE trips CASCADE;");
@@ -111,6 +113,47 @@ describe("Crew lodging transactions in Postgres", () => {
     expect((await db.query("SELECT check_out::text, booking_status FROM trip_stays")).rows[0]).toEqual({ check_out: "2026-10-12", booking_status: "booked" });
     expect(await revision()).toBe(2);
     await expect(mutate(1, "save", input(hotel, { existing: true }))).rejects.toMatchObject({ code: "40001" });
+  });
+  describe("stay locations (#208)", () => {
+    const topnotch = { label: "Topnotch Resort", address: "4000 Mountain Road, Stowe, VT", latitude: 44.49391, longitude: -72.73918, precision: "exact",
+      time_zone: "America/New_York", source: "search", provider: "geoapify", provider_id: "51a8d60c", attribution: "© OpenStreetMap contributors" };
+    const location = async () => (await db.query<{ location: unknown }>("SELECT location FROM trip_stays WHERE id = $1", [hotel])).rows[0].location;
+    it("saves a place with the stay and keeps it through saves that don't mention it", async () => {
+      await mutate(0, "save", input(hotel, { location: topnotch }));
+      expect(await location()).toEqual(topnotch);
+      await mutate(1, "save", input(hotel, { existing: true, notes: "Meet in lobby" }));
+      expect(await location()).toEqual(topnotch);
+    });
+    it("replaces a corrected place and removes it on an explicit null", async () => {
+      await mutate(0, "save", input(hotel, { location: { ...topnotch, label: "Wrong lot", precision: "approximate" } }));
+      await mutate(1, "save", input(hotel, { existing: true, location: topnotch }));
+      expect(await location()).toEqual(topnotch);
+      await mutate(2, "save", input(hotel, { existing: true, location: null }));
+      expect(await location()).toBeNull();
+    });
+    it("leaves the saved place and revision alone when a replacement is rejected", async () => {
+      await mutate(0, "save", input(hotel, { location: topnotch }));
+      await expect(mutate(1, "save", input(hotel, { existing: true, location: { ...topnotch, latitude: 0, longitude: 0 } }))).rejects.toMatchObject({ code: "23514" });
+      expect(await location()).toEqual(topnotch);
+      expect(await revision()).toBe(1);
+    });
+    it.each([
+      ["0, 0", { latitude: 0, longitude: 0 }],
+      ["an out-of-range latitude", { latitude: 90.5 }],
+      ["a longitude as text", { longitude: "-72.7" }],
+      ["no label", { label: undefined }],
+      ["an unknown precision", { precision: "rooftop" }],
+      ["typed coordinates with a provider ID", { source: "manual", provider: null }],
+    ])("refuses a stored place with %s", async (_, change) => {
+      await mutate(0);
+      await expect(db.query("UPDATE trip_stays SET location = $1 WHERE id = $2", [JSON.stringify({ ...topnotch, ...change }), hotel])).rejects.toMatchObject({ code: "23514" });
+    });
+    it("accepts typed coordinates without provider data", async () => {
+      const typed = { label: "Entered coordinates", address: "44.49391, -72.73918", latitude: 44.49391, longitude: -72.73918, precision: "exact",
+        time_zone: null, source: "manual", provider: null, provider_id: null, attribution: null };
+      await mutate(0, "save", input(hotel, { location: typed }));
+      expect(await location()).toEqual(typed);
+    });
   });
   it("blocks browser roles at both the RPC and table boundaries", async () => {
     const signature = "public.mutate_trip_lodging(uuid,text,integer,uuid,text,jsonb,boolean)";
