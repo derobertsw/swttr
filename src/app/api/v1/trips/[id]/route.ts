@@ -21,7 +21,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   const { supabase } = auth;
 
   try {
-    const full = await loadTripFull(supabase, id);
+    const full = await loadTripFull(supabase, auth.trip);
     if (!full) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(full);
   } catch {
