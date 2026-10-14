@@ -1,5 +1,5 @@
 {
- "note": "Signed-out web matrix for #130, 2026-10-12, origin/main 054078b, headless Chrome 155. One entry per width-appearance-screen. Lists are failures; empty means none.",
+ "note": "Signed-out web matrix for #130, 2026-10-12, origin/main 054078b, headless Chrome 155. One entry per width-appearance-screen. Each list holds what the automated audit flagged; empty means nothing was flagged. On the sign-in card, signInPixelCheck replaces the audit's contrast results.",
  "scenes": {
   "390-dark-home-now": {
    "path": "/",
@@ -1864,10 +1864,46 @@
    "contrastBelowMinimum": []
   }
  },
+ "signInPixelCheck": {
+  "method": "1280 × 720, both appearances, 2026-10-14. Each text was hidden, the box behind it captured, and its computed color (composited when translucent) compared with the lightest and darkest background pixels. The audit composited the card's footer onto the page instead, because Clerk paints it with a background image.",
+  "results": [
+   {
+    "text": "Don’t have an account?",
+    "font": "13px/400",
+    "contrast": "4.95–4.97",
+    "minimum": 4.5,
+    "passes": true
+   },
+   {
+    "text": "Sign up",
+    "font": "13px/500",
+    "contrast": "12.26–12.37",
+    "minimum": 4.5,
+    "passes": true
+   },
+   {
+    "text": "Secured by",
+    "font": "12px/500",
+    "contrast": "4.84–4.94",
+    "minimum": 4.5,
+    "passes": true
+   },
+   {
+    "text": "Development mode",
+    "font": "13px/600",
+    "contrast": "2.59–2.73",
+    "minimum": 4.5,
+    "passes": false,
+    "note": "Clerk's badge for a development instance, in both appearances. The audit missed it in dark. The live site still uses a development key, so it shows there too until #16."
+   }
+  ]
+ },
  "totals": {
   "scenes": 96,
   "controls": 1551,
   "textNodes": 2959,
-  "errors": 0
+  "scenesWithFlags": 16,
+  "scenesWithFlagsAreAllSignIn": true,
+  "scenesThatFailedToRun": 0
  }
 }
