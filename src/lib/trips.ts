@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 import { jsonError, requireUser, type AuthedContext } from "@/lib/api";
 import { loadLodging } from "@/lib/trip-lodging";
+import { loadTourPlans } from "@/lib/trip-tour-plans";
 import type {
   Trip,
   TripDay,
@@ -180,6 +181,7 @@ export async function loadTripFull(
     kits,
     gear: (gearRes.data ?? []) as TripGroupGear[],
     lodging: await loadLodging(supabase, trip as Trip),
+    tour_plans: await loadTourPlans(supabase, tripId, days),
   };
 }
 

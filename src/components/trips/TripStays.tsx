@@ -233,11 +233,13 @@ function StayEditor({ editor, data, onClose, onSaved, onCloseAutoFocus }: {
   </TripSheet>;
 }
 
-export function DayLodging({ data, date }: { data: TripFull; date: string }) {
+/** The day's starting point and stay, with the tour plan's meet time between them when there's one (#210). */
+export function DayLodging({ data, date, meet }: { data: TripFull; date: string; meet?: string | null }) {
   const context = data.lodging?.days.find((day) => day.date === date);
   if (!context) return null;
-  return <Card><SectionLabel>Crew stay</SectionLabel><dl className="mt-2 space-y-2 text-base">
+  return <Card><SectionLabel>{meet ? "Crew stay and meet" : "Crew stay"}</SectionLabel><dl className="mt-2 space-y-2 text-base">
     <div><dt className="text-muted-foreground">Starting from</dt><dd className="break-words text-foreground">{context.starting_from}</dd></div>
+    {meet && <div><dt className="text-muted-foreground">Meet</dt><dd className="break-words text-foreground">{meet} · Meeting point not set</dd></div>}
     <div><dt className="text-muted-foreground">Staying tonight</dt><dd className="break-words text-foreground">{context.staying_tonight}</dd></div>
   </dl></Card>;
 }

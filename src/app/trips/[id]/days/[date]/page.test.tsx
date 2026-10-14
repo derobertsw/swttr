@@ -15,6 +15,8 @@ import {
 } from "@/test/tripApi";
 import { previewItinerary } from "@/lib/trip-itinerary";
 import { planDayKits } from "@/lib/trip-saved-kits";
+import { buildLodging } from "@/lib/trip-lodging";
+import { buildTourPlanSummary } from "@/lib/trip-tour-plans";
 import type { TripDay, TripFull, TripItineraryRequest, TripMember, TripMemberDayKit } from "@/types/trips";
 import { savedOutfit, savedPlan } from "@/test/savedKit";
 import DayDetailPage from "./page";
@@ -733,6 +735,64 @@ describe("Trip day page", () => {
       await renderPage();
       await screen.findByRole("heading", { name: "My kit" });
       expect(screen.queryByRole("heading", { name: "Copy this day" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Tour plan", () => {
+    const tourDay: TripDay = { ...DAY, activity: "Backcountry" };
+    const plan = buildTourPlanSummary({
+      id: "plan-1", trip_id: TRIP.id, trip_day_id: DAY.id, objective: "Tuckerman Ravine", route_url: null,
+      meet_time: "06:30:00", meet_day_offset: 0, distance: null, distance_unit: null, ascent: null, ascent_unit: null,
+      duration_minutes: null, metrics_source: null, metrics_source_url: null, approach_notes: null, access_notes: null,
+      access_url: null, backup_plan: "Lower snowfields", return_time: null, return_day_offset: 0, checkin_notes: null,
+      pickup_notes: null, time_zone: "America/New_York", revision: 1, created_by: "user-1", updated_by: "user-1",
+      created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z",
+    }, DAY.date);
+    const trip = (day: TripDay, members: TripMember[] = [ORGANIZER]) => reply(200, tripFull({
+      stops: [STOWE_STOP], days: [day], members, lodging: buildLodging(TRIP, [], []), tour_plans: [plan],
+    }));
+
+    it("puts the meet time with the day's start and the plan after My kit", async () => {
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": trip(tourDay),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      const heading = await screen.findByRole("heading", { name: "Tour plan" });
+      expect(screen.getByText("Crew stay and meet")).toBeInTheDocument();
+      expect(screen.getAllByText("6:30 AM EDT · Sat Oct 10 · Meeting point not set")).toHaveLength(2);
+      expect(screen.getByRole("heading", { name: "My kit" }).compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Change tour plan" })).toBeInTheDocument();
+    });
+
+    it("shows a member the plan without organizer actions", async () => {
+      mockAuth.userId = "user-2";
+      const member: TripMember = { ...SAM, user_id: "user-2", status: "joined" };
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": trip(tourDay, [ORGANIZER, member]),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      expect(await screen.findByText("Lower snowfields")).toBeInTheDocument();
+      expect(screen.getByText("Managed by the organizer")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Change tour plan" })).not.toBeInTheDocument();
+    });
+
+    it("restores a plan kept from Backcountry by setting the activity back", async () => {
+      let day: TripDay = { ...DAY, activity: "Alpine" };
+      const api = fakeTripApi({
+        "GET /api/v1/trips/trip-1": () => trip(day),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        "PATCH /api/v1/trips/trip-1/days/2026-10-10": () => { day = tourDay; return reply(200, { day }); },
+      });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      await renderPage();
+      await user.click(await screen.findByText("Saved tour plan · Tuckerman Ravine"));
+      expect(screen.queryByText("Crew stay and meet")).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Restore tour plan" }));
+      expect(await screen.findByRole("heading", { name: "Tour plan" })).toBeInTheDocument();
+      expect(sentBodies(api, "PATCH /api/v1/trips/trip-1/days/2026-10-10")).toEqual([{ activity: "Backcountry" }]);
     });
   });
 });

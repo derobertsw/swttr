@@ -41,7 +41,7 @@ export function parseTripSettings(body: unknown, trip: Trip): TripSettingsInput 
 /**
  * What changing the trip to start–end does to each day plan, for every mode
  * the change allows. It follows the same rules as change_trip_dates (migration
- * 021), which applies the chosen plan.
+ * 021, as replaced in 026), which applies the chosen plan.
  */
 export function previewDateChange(full: TripFull, start: string, end: string): TripDateChangePreview {
   const { trip } = full;
@@ -65,11 +65,13 @@ function planFor(full: TripFull, start: string, end: string, mode: TripDateChang
   const base = full.stops[0]?.name;
   const memberNames = new Map(full.members.map((member) => [member.id, member.display_name]));
   const kitsOn = (day: TripDay) => full.kits.filter((kit) => kit.trip_day_id === day.id);
+  const tourPlanOn = (day: TripDay) => full.tour_plans?.find((plan) => plan.trip_day_id === day.id);
   const destination = (stopId: string | null) => stopId ? stopNames.get(stopId) ?? "No destination" : base ? `${base} (base)` : "No destination";
   const describe = (day: TripDay, date: string, from: string | null): TripDateChangeDay => ({
     date, date_label: dateLabel(date), from_date_label: from ? dateLabel(from) : null,
     destination: destination(day.stop_id), activity: day.activity,
     kits: kitsOn(day).map((kit) => memberNames.get(kit.trip_member_id) ?? "Crew member"),
+    tour_plan: tourPlanOn(day)?.objective ?? null,
   });
 
   const days = [...full.days].sort((a, b) => a.date.localeCompare(b.date));
@@ -89,12 +91,15 @@ function planFor(full: TripFull, start: string, end: string, mode: TripDateChang
     moved: shift === 0 ? [] : staying.map((day) => describe(day, target(day), day.date)),
     added: datesFrom(start, end).filter((date) => !covered.has(date)).map((date) => ({
       date, date_label: dateLabel(date), from_date_label: null,
-      destination: destination(nearest(date)?.stop_id ?? null), activity: null, kits: [],
+      destination: destination(nearest(date)?.stop_id ?? null), activity: null, kits: [], tour_plan: null,
     })),
     removed: removed.map((day) => describe(day, day.date, null)),
     kept: shift === 0 ? staying.length : 0,
-    expected_removed: removed.map((day) => ({
-      date: day.date, stop_id: day.stop_id, activity: day.activity, kit_ids: kitsOn(day).map((kit) => kit.id),
-    })),
+    // A day's tour plan is listed only when it has one, as change_trip_dates (026) lists it.
+    expected_removed: removed.map((day) => {
+      const plan = tourPlanOn(day);
+      return { date: day.date, stop_id: day.stop_id, activity: day.activity, kit_ids: kitsOn(day).map((kit) => kit.id),
+        ...(plan ? { tour_plan_id: plan.id } : {}) };
+    }),
   };
 }

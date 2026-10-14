@@ -30,6 +30,7 @@ import { CopyDayCard } from "@/components/trips/CopyDayCard";
 import { canEditMemberKit } from "@/lib/trip-permissions";
 import { kitAdvice, kitWear } from "@/lib/trip-saved-kits";
 import { DayLodging } from "@/components/trips/TripStays";
+import { DayTourPlan, TOUR_ACTIVITY } from "@/components/trips/TourPlan";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
@@ -131,6 +132,9 @@ export default function DayDetailPage({
   const crew = activeMembers.filter((m) => m !== me);
   const kitFor = (member: TripMember) => data?.kits.find((k) => k.trip_member_id === member.id && k.trip_day_id === day?.id);
   const myKit = me ? kitFor(me) : undefined;
+  // The activity the header shows: the day's own, or its stop's first.
+  const activity = day?.activity ?? effectiveStop?.activities[0] ?? null;
+  const tourPlan = data?.tour_plans?.find((plan) => plan.date === date);
   const fitOf = (kit: TripMemberDayKit | undefined) =>
     kit?.outfit && day ? outfitMismatches(kit.outfit, { date, activity: day.activity, stop: effectiveStop ?? null }) : [];
 
@@ -174,7 +178,7 @@ export default function DayDetailPage({
             <header>
               <SectionLabel>
                 Day {dayIndex + 1} of {data.days.length} ·{" "}
-                {day.activity ?? effectiveStop?.activities[0] ?? "no activity"}
+                {activity ?? "no activity"}
               </SectionLabel>
               <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
                 {dateLabel}
@@ -187,7 +191,7 @@ export default function DayDetailPage({
               )}
             </header>
 
-            <DayLodging data={data} date={date} />
+            <DayLodging data={data} date={date} meet={activity === TOUR_ACTIVITY ? tourPlan?.meet_label : null} />
 
             <ActivityPicker
               tripId={id}
@@ -220,6 +224,19 @@ export default function DayDetailPage({
                 <MemberKitRow tripId={id} date={date} member={me} kit={myKit} editable onSaved={refresh} />
               </section>
             ))}
+
+            <DayTourPlan
+              data={data}
+              date={date}
+              dateLabel={dateLabel}
+              activity={activity}
+              canEdit={!!userId && data.trip.owner_user_id === userId}
+              onSaved={refresh}
+              onRestore={async () => {
+                await tripRequest(`/api/v1/trips/${id}/days/${date}`, "PATCH", { activity: TOUR_ACTIVITY });
+                await refresh();
+              }}
+            />
 
             {crew.length > 0 && (
               <section className="flex flex-col gap-2.5">
