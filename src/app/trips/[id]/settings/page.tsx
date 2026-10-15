@@ -19,7 +19,7 @@ const FIELD_IDS: Record<string, string> = { name: "trip-name", start_date: "trip
 
 export default function TripSettingsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data, loading, error, refresh } = useTrip(id);
+  const { data, loading, error, reload } = useTrip(id);
   return (
     <PageLayout chromeVariant="compact">
       <div className="flex w-full max-w-2xl flex-col gap-5">
@@ -30,13 +30,13 @@ export default function TripSettingsPage({ params }: { params: Promise<{ id: str
         </header>
         {loading && <Skeleton className="h-64 w-full rounded-card" />}
         {error && <TripError>{error}</TripError>}
-        {data && <SettingsForm key={data.trip.id} trip={data.trip} onSaved={refresh} />}
+        {data && <SettingsForm key={data.trip.id} trip={data.trip} onSaved={reload} />}
       </div>
     </PageLayout>
   );
 }
 
-function SettingsForm({ trip, onSaved }: { trip: Trip; onSaved: () => Promise<void> }) {
+function SettingsForm({ trip, onSaved }: { trip: Trip; onSaved: () => Promise<boolean> }) {
   const router = useRouter();
   const [name, setName] = useState(trip.name);
   const [start, setStart] = useState(trip.start_date);
@@ -44,6 +44,8 @@ function SettingsForm({ trip, onSaved }: { trip: Trip; onSaved: () => Promise<vo
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ message: string; field: string | null } | null>(null);
   const [review, setReview] = useState<TripDateChangeRequest | null>(null);
+  // A save that went through when reloading the trip afterwards didn't.
+  const [unreloaded, setUnreloaded] = useState<{ trip: Trip; message: string } | null>(null);
   const reviewFocus = useReturnFocus();
   const nameChanged = name.trim() !== trip.name;
   const datesChanged = start !== trip.start_date || end !== trip.end_date;
@@ -60,10 +62,22 @@ function SettingsForm({ trip, onSaved }: { trip: Trip; onSaved: () => Promise<vo
     if (error?.field) document.getElementById(FIELD_IDS[error.field] ?? "")?.focus();
   }, [error]);
 
+  // Leaves only once the trip has reloaded, so its pages never show the old
+  // name or dates as current. Otherwise it stays here and offers a reload.
   const saved = async (updated: Trip, message: string) => {
-    await onSaved();
+    if (!(await onSaved())) {
+      setUnreloaded({ trip: updated, message });
+      return;
+    }
+    setUnreloaded(null);
     toast.success(message);
     router.push(`/trips/${updated.id}`);
+  };
+  const reload = async () => {
+    if (!unreloaded || saving) return;
+    setSaving(true);
+    try { await saved(unreloaded.trip, unreloaded.message); }
+    finally { setSaving(false); }
   };
 
   const submit = async (event: FormEvent) => {
@@ -121,6 +135,10 @@ function SettingsForm({ trip, onSaved }: { trip: Trip; onSaved: () => Promise<vo
             Before new dates are saved, you&apos;ll see what happens to each day&apos;s plan and kits.
           </p>
           {error && <p id="trip-settings-error" role="alert" className="text-sm font-medium text-destructive">{error.message}</p>}
+          {unreloaded && <div role="alert" className="flex flex-col gap-2 text-sm text-foreground">
+            <p>{unreloaded.message} The trip couldn&apos;t be reloaded, so its pages may still show the old name and dates.</p>
+            <Button type="button" variant="outline" className="w-fit" loading={saving} onClick={() => void reload()}>Reload trip</Button>
+          </div>}
           <div className="flex flex-wrap gap-2">
             <Button id="trip-settings-submit" type="submit" loading={saving} disabled={!dirty}>
               {datesChanged ? "Review date change" : "Save"}

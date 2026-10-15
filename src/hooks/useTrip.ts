@@ -33,7 +33,7 @@ export function useTripState(tripId: string | null) {
   // Loads can overlap: every save reloads the trip, so two saves close
   // together start two reloads. Only the newest load's result is used, so an
   // older snapshot that arrives last can't replace newer data.
-  const newestLoad = useRef<Promise<void> | null>(null);
+  const newestLoad = useRef<Promise<boolean> | null>(null);
   const inFlight = useRef(false);
   // When the shown snapshot was loaded: null before the first load settles,
   // and -Infinity after a failed load, so the next focus or reconnect retries at once.
@@ -41,18 +41,21 @@ export function useTripState(tripId: string | null) {
 
   const load = useCallback((id: string) => {
     inFlight.current = true;
-    const settled: Promise<void> = fetchTripFull(id)
+    // Resolves to whether this load succeeded and was still the newest.
+    const settled: Promise<boolean> = fetchTripFull(id)
       .then((body) => {
-        if (newestLoad.current !== settled) return;
+        if (newestLoad.current !== settled) return false;
         freshAt.current = Date.now();
         setData(body);
         setError(null);
+        return true;
       })
       .catch((err) => {
-        if (newestLoad.current !== settled) return;
+        if (newestLoad.current !== settled) return false;
         freshAt.current = Number.NEGATIVE_INFINITY;
         if (err instanceof TripRequestError && [401, 403, 404].includes(err.status)) setData(null);
         setError(toErrorMessage(err));
+        return false;
       })
       .finally(() => {
         if (newestLoad.current === settled) {
@@ -77,18 +80,22 @@ export function useTripState(tripId: string | null) {
 
   // Reloads after a mutation; the initial load relies on `loading` starting
   // true. It resolves once the newest load has finished, so the caller sees
-  // data at least as new as its own save.
-  const refresh = useCallback(async () => {
-    if (!tripId) return;
+  // data at least as new as its own save, to whether that load succeeded. It
+  // never rejects: the save itself already happened.
+  const reload = useCallback(async (): Promise<boolean> => {
+    if (!tripId) return false;
     setLoading(true);
     let settled = load(tripId);
-    await settled;
+    let loaded = await settled;
     // A newer reload started meanwhile, and this one's result was dropped.
     while (newestLoad.current && newestLoad.current !== settled) {
       settled = newestLoad.current;
-      await settled;
+      loaded = await settled;
     }
+    return loaded;
   }, [tripId, load]);
+  // `reload` for callers that don't need to know whether it worked.
+  const refresh = useCallback(async () => { await reload(); }, [reload]);
 
   // Background checks keep the current page visible and never supersede a
   // mutation reload. Navigating repeatedly within a minute needs no new read.
@@ -97,5 +104,5 @@ export function useTripState(tripId: string | null) {
     return load(tripId);
   }, [tripId, load]);
 
-  return { data, loading, error, refresh, revalidate };
+  return { data, loading, error, refresh, reload, revalidate };
 }

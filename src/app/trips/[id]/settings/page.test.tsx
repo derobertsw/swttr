@@ -50,6 +50,26 @@ describe("Trip settings", () => {
     expect(toast.success).toHaveBeenCalledWith("Trip renamed.");
   });
 
+  it("stays on settings with a reload when the trip can't be reloaded after a save", async () => {
+    let loads = 0;
+    const { api, user } = await open({
+      "GET /api/v1/trips/trip-1": () => ++loads === 2 ? reply(500, { error: "Unavailable" }) : reply(200, full),
+      "PATCH /api/v1/trips/trip-1": saved,
+    });
+    await user.clear(screen.getByRole("textbox", { name: "Trip name" }));
+    await user.type(screen.getByRole("textbox", { name: "Trip name" }), "Leaf peeping");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText(/Trip renamed\. The trip couldn't be reloaded/)).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Reload trip" }));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/trips/trip-1"));
+    expect(toast.success).toHaveBeenCalledWith("Trip renamed.");
+    // Reloading doesn't save the change again.
+    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([{ name: "Leaf peeping" }]);
+  });
+
   it("asks whether to move the plan or keep it before moving the trip a week later", async () => {
     const { api, user } = await open({ "PATCH /api/v1/trips/trip-1": (body) => (body as Body).preview ? reply(200, previewOf(body)) : saved(body) });
     setDates("2026-10-17", "2026-10-19");
