@@ -73,6 +73,53 @@ describe("Stay API authorization and validation", () => {
     expect(rpc).toHaveBeenCalledWith("mutate_trip_lodging", expect.objectContaining({ p_payload: { date: "2026-10-10", status: "no_stay" } }));
     expect((await PUT(request({ ...body, status: "no_stay" }), { params: Promise.resolve({ id: TRIP.id, date: "2026-10-20" }) })).status).toBe(400);
   });
+  describe("stay locations (#208)", () => {
+    const topnotch = { label: " Topnotch Resort ", address: "4000 Mountain Road, Stowe, VT", latitude: 44.49391234, longitude: -72.7391801, precision: "exact",
+      time_zone: "America/New_York", source: "search", provider: "geoapify", provider_id: "51a8d60cba4e", attribution: "© OpenStreetMap contributors", extra: "dropped" };
+    const payload = () => rpc.mock.lastCall![1].p_payload as Record<string, unknown>;
+    it("saves a confirmed place, trimmed to the known fields", async () => {
+      expect((await POST(request({ ...body, stay: { ...body.stay, location: topnotch } }), context)).status).toBe(200);
+      expect(payload().location).toEqual({ label: "Topnotch Resort", address: "4000 Mountain Road, Stowe, VT", latitude: 44.493912, longitude: -72.73918,
+        precision: "exact", time_zone: "America/New_York", source: "search", provider: "geoapify", provider_id: "51a8d60cba4e", attribution: "© OpenStreetMap contributors" });
+    });
+    it("leaves the saved place alone when a save doesn't mention it, and clears it on null", async () => {
+      await PATCH(request(body), stayContext);
+      expect(payload()).not.toHaveProperty("location");
+      await PATCH(request({ ...body, stay: { ...body.stay, location: null } }), stayContext);
+      expect(payload()).toHaveProperty("location", null);
+    });
+    it.each([
+      ["0, 0", { ...topnotch, latitude: 0, longitude: 0 }],
+      ["latitude out of range", { ...topnotch, latitude: 91 }],
+      ["longitude as text", { ...topnotch, longitude: "-72.7" }],
+      ["no label", { ...topnotch, label: " " }],
+      ["unknown precision", { ...topnotch, precision: "rooftop" }],
+      ["unknown provider", { ...topnotch, provider: "google" }],
+      ["typed coordinates claiming a provider ID", { ...topnotch, source: "manual", provider: null }],
+      ["a list", [topnotch]],
+    ])("rejects a location with %s before the transaction", async (_, location) => {
+      const response = await POST(request({ ...body, stay: { ...body.stay, location } }), context);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ field: "location" });
+      expect(rpc).not.toHaveBeenCalled();
+    });
+    it("refuses a place before migration 025 instead of saving the stay without it", async () => {
+      const from = supabase.from.bind(supabase);
+      const select = vi.fn(() => ({ limit: async () => ({ data: null, error: { code: "42703", message: "column trip_stays.location does not exist" } }) }));
+      supabase.from = ((table: string) => table === "trip_stays" ? { select } : from(table)) as typeof supabase.from;
+      const response = await POST(request({ ...body, stay: { ...body.stay, location: topnotch } }), context);
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: "Stay locations can't be saved yet. Remove the location to save the stay now.", field: "location" });
+      expect(rpc).not.toHaveBeenCalled();
+      // Saves without a place don't need the column.
+      expect((await POST(request({ ...body, stay: { ...body.stay, location: null } }), context)).status).toBe(200);
+      expect(select).toHaveBeenCalledOnce();
+    });
+    it("drops an unknown time zone rather than the place", async () => {
+      await POST(request({ ...body, stay: { ...body.stay, location: { ...topnotch, time_zone: "Mars/Olympus" } } }), context);
+      expect(payload().location).toMatchObject({ label: "Topnotch Resort", time_zone: null });
+    });
+  });
   it.each([["40001", 409], ["23P01", 409], ["42501", 404], ["P0002", 404], ["XX000", 500]])("sanitizes %s transaction failures", async (code, status) => {
     rpc.mockResolvedValue({ error: { code, message: "Internal database details" } });
     const response = await POST(request(body), context); expect(response.status).toBe(status);

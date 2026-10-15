@@ -1,0 +1,383 @@
+{
+  "_note": "Geoapify Address Autocomplete answers from the #208 pilot (2026-10-12/14), trimmed to the fields the adapter reads.",
+  "rental_address": {
+    "results": [
+      {
+        "name": "Topnotch Resort",
+        "address_line1": "Topnotch Resort",
+        "address_line2": "4000 Mountain Road, Stowe, VT 05672, United States of America",
+        "formatted": "Topnotch Resort, 4000 Mountain Road, Stowe, VT 05672, United States of America",
+        "lat": 44.49391,
+        "lon": -72.7391801,
+        "result_type": "amenity",
+        "category": "building.accommodation",
+        "place_id": "51a8d60cba4e2f52c0596c956071383f4640f00102f901ce41e20d00000000c0020192030f546f706e6f746368205265736f7274",
+        "timezone": {
+          "name": "America/New_York"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      }
+    ]
+  },
+  "hotel_jay": {
+    "results": [
+      {
+        "name": "Hotel Jay & Conference Center",
+        "address_line1": "Hotel Jay & Conference Center",
+        "address_line2": "830 Jay Peak Road, Jay, VT 05859, United States of America",
+        "formatted": "Hotel Jay & Conference Center, 830 Jay Peak Road, Jay, VT 05859, United States of America",
+        "lat": 44.9380611,
+        "lon": -72.5047199,
+        "result_type": "amenity",
+        "category": "accommodation.hotel",
+        "place_id": "51fc08b2544d2052c0592c13d96212784640f00102f90128423d0f00000000c0020192031d486f74656c204a6179202620436f6e666572656e63652043656e746572",
+        "timezone": {
+          "name": "America/New_York"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "Stateside Hotel & Base Lodge",
+        "address_line1": "Stateside Hotel & Base Lodge",
+        "address_line2": "360 Stateside Road, Jay, VT 05859, United States of America",
+        "formatted": "Stateside Hotel & Base Lodge, 360 Stateside Road, Jay, VT 05859, United States of America",
+        "lat": 44.9292101,
+        "lon": -72.5047552,
+        "result_type": "amenity",
+        "category": "accommodation.hotel",
+        "place_id": "511a1fc1e84d2052c059734e475bf0764640f00102f90160b1eb0b00000000c0020192031c53746174657369646520486f74656c20262042617365204c6f646765",
+        "timezone": {
+          "name": "America/New_York"
+        },
+        "rank": {
+          "confidence": 0
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "The Blue Jay Hotel & Events",
+        "address_line1": "The Blue Jay Hotel & Events",
+        "address_line2": "644 Bridge Street Northwest, Grand Rapids, MI 49504, United States of America",
+        "formatted": "The Blue Jay Hotel & Events, 644 Bridge Street Northwest, Grand Rapids, MI 49504, United States of America",
+        "lat": 42.9705235,
+        "lon": -85.6833979,
+        "result_type": "amenity",
+        "category": "accommodation.hotel",
+        "place_id": "51eda98bcabc6b55c059ee3f321d3a7c4540f00103f901e84b71d002000000c0020192031b54686520426c7565204a617920486f74656c2026204576656e7473",
+        "timezone": {
+          "name": "America/Detroit"
+        },
+        "rank": {
+          "confidence": 0.6561000000000001
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "Hotel Utz Jay",
+        "address_line1": "Hotel Utz Jay",
+        "address_line2": "Calle 15 de Febrero, 07010-Panajachel, Guatemala",
+        "formatted": "Hotel Utz Jay, Calle 15 de Febrero, 07010-Panajachel, Guatemala",
+        "lat": 14.7393852,
+        "lon": -91.1588872,
+        "result_type": "amenity",
+        "category": "accommodation.hotel",
+        "place_id": "5131f037352bca56c059f74a6ab2907a2d40f00102f901d39d131800000000c0020192030d486f74656c2055747a204a6179",
+        "timezone": {
+          "name": "America/Guatemala"
+        },
+        "rank": {
+          "confidence": 0.9
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "HOTEL Jay",
+        "address_line1": "HOTEL Jay",
+        "address_line2": "叶田筋, Naniwa Ward, Osaka, Osaka Prefecture 556-0016, Japan",
+        "formatted": "HOTEL Jay, 叶田筋, Naniwa Ward, Osaka, Osaka Prefecture 556-0016, Japan",
+        "lat": 34.6663904,
+        "lon": 135.4981599,
+        "result_type": "amenity",
+        "category": null,
+        "place_id": "51b7d507edf0ef604059262fd7474c554140f00102f90197ff510d00000000c00201920309484f54454c204a6179",
+        "timezone": {
+          "name": "Asia/Tokyo"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "Hotel Jay Bijay",
+        "address_line1": "Hotel Jay Bijay",
+        "address_line2": "Sidhartha Highway, Belahiya, Rupandehi, Nepal",
+        "formatted": "Hotel Jay Bijay, Sidhartha Highway, Belahiya, Rupandehi, Nepal",
+        "lat": 27.4785194,
+        "lon": 83.4693688,
+        "result_type": "amenity",
+        "category": "accommodation.guest_house",
+        "place_id": "51d1706f230ade5440596580553f807a3b40f00103f901cd16a34802000000c0020192030f486f74656c204a61792042696a6179",
+        "timezone": {
+          "name": "Asia/Kathmandu"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "Hotel jay bhavani",
+        "address_line1": "Hotel jay bhavani",
+        "address_line2": "NH48, Amjhhara - 314804, RJ, India",
+        "formatted": "Hotel jay bhavani, NH48, Amjhhara - 314804, RJ, India",
+        "lat": 23.8803258,
+        "lon": 73.5320081,
+        "result_type": "amenity",
+        "category": "accommodation.hotel",
+        "place_id": "5141adb36b0c6252405936d318085de13740f00103f901cd6ae93201000000c00201920311486f74656c206a61792062686176616e69",
+        "timezone": {
+          "name": "Asia/Kolkata"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "Hotel Jay Shriram",
+        "address_line1": "Hotel Jay Shriram",
+        "address_line2": "NH44, Silari, Silari - 470226, MP, India",
+        "formatted": "Hotel Jay Shriram, NH44, Silari, Silari - 470226, MP, India",
+        "lat": 23.4066362,
+        "lon": 79.0206625,
+        "result_type": "amenity",
+        "category": "accommodation.motel",
+        "place_id": "513b70ce8852c1534059a65e5c4f19683740f00103f901174172d002000000c00201920311486f74656c204a6179205368726972616d",
+        "timezone": {
+          "name": "Asia/Kolkata"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      }
+    ]
+  },
+  "johns_brook_lodge": {
+    "results": [
+      {
+        "name": "Johns Brook Lodge",
+        "address_line1": "Johns Brook Lodge",
+        "address_line2": "Phelps Trail, Keene, NY 12943, United States of America",
+        "formatted": "Johns Brook Lodge, Phelps Trail, Keene, NY 12943, United States of America",
+        "lat": 44.158423,
+        "lon": -73.8624701,
+        "result_type": "amenity",
+        "category": "accommodation.hut",
+        "place_id": "51c851cab5327752c05994f7713447144640f00102f901cb91370e00000000c002019203114a6f686e732042726f6f6b204c6f646765",
+        "timezone": {
+          "name": "America/New_York"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": null,
+        "address_line1": "Johns Brook Lodge",
+        "address_line2": "Keene, NY 12943, United States of America",
+        "formatted": "Johns Brook Lodge, Keene, NY 12943, United States of America",
+        "lat": 44.158443,
+        "lon": -73.862347,
+        "result_type": "street",
+        "category": null,
+        "place_id": "5170b378b1307752c059dba337dc47144640f00102f901cb91370e00000000c00204e203216f70656e7374726565746d61703a76656e75653a7761792f323338353232383237",
+        "timezone": {
+          "name": "America/New_York"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "Torbay Road - Glenn Brook Lodge",
+        "address_line1": "Torbay Road - Glenn Brook Lodge",
+        "address_line2": "Torbay Road, St. John's, NL A1A 2G9, Canada",
+        "formatted": "Torbay Road - Glenn Brook Lodge, Torbay Road, St. John's, NL A1A 2G9, Canada",
+        "lat": 47.5886058,
+        "lon": -52.7094392,
+        "result_type": "amenity",
+        "category": "public_transport.bus",
+        "place_id": "510d4059e7ce5a4ac059339e526f57cb4740f00103f901abc54b4f00000000c0020192031f546f7262617920526f6164202d20476c656e6e2042726f6f6b204c6f646765",
+        "timezone": {
+          "name": "America/St_Johns"
+        },
+        "rank": {
+          "confidence": 0
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "Brookridge Golf Club",
+        "address_line1": "Brookridge Golf Club",
+        "address_line2": "Indian Creek Trail, Overland Park, KS 66212, United States of America",
+        "formatted": "Brookridge Golf Club, Indian Creek Trail, Overland Park, KS 66212, United States of America",
+        "lat": 38.9385607,
+        "lon": -94.6859915,
+        "result_type": "amenity",
+        "category": null,
+        "place_id": "516075e448e7ab57c059cae7cbc122784340f00102f901ceb21a1c00000000c0020192031442726f6f6b726964676520476f6c6620436c7562",
+        "timezone": {
+          "name": "America/Chicago"
+        },
+        "rank": {
+          "confidence": 0
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      }
+    ]
+  },
+  "lake_placid": {
+    "results": [
+      {
+        "name": "Village of Lake Placid",
+        "address_line1": "Village of Lake Placid",
+        "address_line2": "Village of Lake Placid, NY, United States of America",
+        "formatted": "Village of Lake Placid, NY, United States of America",
+        "lat": 44.2831194,
+        "lon": -73.9828318,
+        "result_type": "city",
+        "category": "administrative",
+        "place_id": "51019e59b7e67e52c0597beea9413d244640f00101f901e1ae020000000000c0020892031656696c6c616765206f66204c616b6520506c61636964",
+        "timezone": {
+          "name": "America/New_York"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "Lake Placid",
+        "address_line1": "Lake Placid",
+        "address_line2": "Lake Placid, FL, United States of America",
+        "formatted": "Lake Placid, FL, United States of America",
+        "lat": 27.2930999,
+        "lon": -81.3628502,
+        "result_type": "city",
+        "category": "administrative",
+        "place_id": "5136960bf0385754c059fcf55498084b3b40f00101f9019ccb010000000000c0020892030b4c616b6520506c61636964",
+        "timezone": {
+          "name": "America/New_York"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "Lake Placid",
+        "address_line1": "Lake Placid",
+        "address_line2": "Cairns, QLD, Australia",
+        "formatted": "Lake Placid, Cairns, QLD, Australia",
+        "lat": -16.8689672,
+        "lon": 145.6785177,
+        "result_type": "suburb",
+        "category": "populated_place",
+        "place_id": "513a68c06ab635624059f44b69a274de30c0f00103f9019db5a41000000000c0020592030b4c616b6520506c61636964",
+        "timezone": {
+          "name": "Australia/Brisbane"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      }
+    ]
+  },
+  "jay_peak_nordic": {
+    "results": [
+      {
+        "name": "Jay Peak Nordic Center",
+        "address_line1": "Jay Peak Nordic Center",
+        "address_line2": "844 Jay Peak Road, Jay, VT 05859, United States of America",
+        "formatted": "Jay Peak Nordic Center, 844 Jay Peak Road, Jay, VT 05859, United States of America",
+        "lat": 44.9387906,
+        "lon": -72.5058737,
+        "result_type": "amenity",
+        "category": "sport.sports_centre",
+        "place_id": "51045a153c602052c0596765564a2a784640f00103f90133c49abb02000000c002019203164a6179205065616b204e6f726469632043656e746572",
+        "timezone": {
+          "name": "America/New_York"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      },
+      {
+        "name": "Jay Peak Nordic Center",
+        "address_line1": "Jay Peak Nordic Center",
+        "address_line2": "Jay, VT 05859, United States of America",
+        "formatted": "Jay Peak Nordic Center, Jay, VT 05859, United States of America",
+        "lat": 44.938791,
+        "lon": -72.505874,
+        "result_type": "amenity",
+        "category": null,
+        "place_id": "516479573d602052c059bb63b14d2a784640f00103f90133c49abb02000000c002019203164a6179205065616b204e6f726469632043656e746572e203246f70656e7374726565746d61703a76656e75653a6e6f64652f3131373337343136373535",
+        "timezone": {
+          "name": "America/New_York"
+        },
+        "rank": {
+          "confidence": 1
+        },
+        "datasource": {
+          "attribution": "© OpenStreetMap contributors"
+        }
+      }
+    ]
+  }
+}

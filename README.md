@@ -354,6 +354,10 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_or_secret_key
 # Paid agent API (optional; /api/agent/* returns 503 without it).
 # See docs/paid-agent-api-mpp.md.
 MPP_SECRET_KEY=...
+
+# Trip place search (optional; server-only). Without it, location search says
+# it's unavailable and stays save with an address. See docs/trip-locations.md.
+GEOAPIFY_API_KEY=...
 ```
 
 Without Supabase configured, database-backed API routes return 503. The home page then falls back to static layer recommendations from `src/data/layerRecommendations.json`, or shows a Try again prompt for activities that have none.

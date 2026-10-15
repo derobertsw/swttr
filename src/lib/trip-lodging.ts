@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Trip, TripLodging, TripLodgingAction, TripLodgingNight, TripLodgingPreview, TripStay, TripStayInput } from "@/types/trips";
+import { parseTripLocation } from "@/lib/trip-location";
+import type { Trip, TripLocation, TripLodging, TripLodgingAction, TripLodgingNight, TripLodgingPreview, TripStay, TripStayInput } from "@/types/trips";
 
 export function isCalendarDate(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value < "1000-01-01") return false;
@@ -43,10 +44,18 @@ export function parseStay(value: unknown): TripStayInput | { error: string; fiel
   const inTime = time("check_in_time"), outTime = time("check_out_time");
   if (inTime === undefined || outTime === undefined) return { error: "Choose valid local check-in and check-out times.", field: inTime === undefined ? "check_in_time" : "check_out_time" };
   if (input.booking_status !== undefined && !["not_booked", "booked"].includes(String(input.booking_status))) return { error: "Choose a booking status.", field: "booking_status" };
+  // No location key keeps the saved one (see TripStayInput.location).
+  let location: TripLocation | null | undefined = input.location === null ? null : undefined;
+  if (input.location != null) {
+    const parsed = parseTripLocation(input.location);
+    if ("error" in parsed) return { error: parsed.error, field: "location" };
+    location = parsed;
+  }
   return { id: input.id, name, check_in: checkIn as string | null, check_out: checkOut as string | null,
     type: (input.type || null) as TripStayInput["type"], address: address ?? null, property_url: url ?? null,
     notes: notes ?? null, check_in_time: inTime, check_out_time: outTime,
-    booking_status: (input.booking_status ?? "not_booked") as TripStayInput["booking_status"] };
+    booking_status: (input.booking_status ?? "not_booked") as TripStayInput["booking_status"],
+    ...(location === undefined ? {} : { location }) };
 }
 
 export function buildLodging(trip: Trip, stays: TripStay[], assignments: TripLodgingNight[]): TripLodging {
