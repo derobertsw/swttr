@@ -7,13 +7,15 @@ import { Input, fieldClassName } from "@/components/ui/input";
 import { SectionLabel } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
+import { LocationPicker, LocationSummary } from "@/components/trips/LocationPicker";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { useTripEditorHistory } from "@/hooks/useTripEditorHistory";
 import { errorMessage, timedTripRequest as lodgingRequest, TripRequestError } from "@/lib/trip-requests";
 import type { TripFull, TripLodgingAction, TripLodgingPreview, TripStayInput, TripStaySummary } from "@/types/trips";
 
 type Editor = { action: TripLodgingAction; stay?: TripStaySummary; date?: string; focus?: string };
-const blankStay = (): TripStayInput => ({ id: crypto.randomUUID(), name: "", check_in: null, check_out: null, type: null, address: null, property_url: null, check_in_time: null, check_out_time: null, notes: null, booking_status: "not_booked" });
+const STAY_EXACT = "the exact property";
+const blankStay = (): TripStayInput => ({ id: crypto.randomUUID(), name: "", check_in: null, check_out: null, type: null, address: null, property_url: null, check_in_time: null, check_out_time: null, notes: null, booking_status: "not_booked", location: null });
 
 export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit: boolean; onSaved: () => Promise<void> }) {
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -39,13 +41,14 @@ export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit:
           <article key={stay.id} className="min-w-0 py-3">
             <h3 className="break-words text-base font-semibold text-foreground">{stay.name}</h3>
             <p className="mt-1 text-base text-foreground">{stay.date_label}</p>
-            <p className="text-base text-muted-foreground">{stay.booking_status === "booked" ? "Booked" : "Not booked"} · {stay.address ? "Location confirmation needed for drive times" : "Location not set"}</p>
+            <p className="text-base text-muted-foreground">{stay.booking_status === "booked" ? "Booked" : "Not booked"} · {stay.location ? stay.location.precision === "exact" ? "Location set" : "Approximate location" : stay.address ? "Location confirmation needed for drive times" : "Location not set"}</p>
             {stay.check_in && <p className="mt-1 text-sm text-muted-foreground">Assigned crew nights: {stay.assigned_nights.length ? stay.assigned_nights.join(", ") : "None"}</p>}
             {!!stay.review_dates.length && <p className="mt-2 text-base text-warning">Review dates outside the itinerary: {stay.review_dates.join(", ")}. Stay dates and bookings have been kept.</p>}
             <details className="mt-2 text-base text-foreground">
               <summary className="min-h-11 cursor-pointer py-2">Stay details</summary>
               <div className="space-y-2 break-words pb-2">
                 {stay.type && <p>Type: {stay.type}</p>}
+                {stay.location && <div><p>Location:</p><LocationSummary location={stay.location} exactTarget={STAY_EXACT} /></div>}
                 {stay.address && <p>Address: {stay.address}</p>}
                 {stay.check_in_time && <p>Check-in time: {stay.check_in_time.slice(0, 5)} · property local time</p>}
                 {stay.check_out_time && <p>Check-out time: {stay.check_out_time.slice(0, 5)} · property local time</p>}
@@ -56,7 +59,7 @@ export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit:
             {canEdit && <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={() => open({ action: "save", stay })} aria-label={`Edit ${stay.name}`}>Edit</Button>
               {!stay.check_in && <Button type="button" variant="outline" onClick={() => open({ action: "save", stay, focus: "check_in" })}>Add dates</Button>}
-              {!stay.address && <Button type="button" variant="outline" onClick={() => open({ action: "save", stay, focus: "address" })}>Set location</Button>}
+              {!stay.location && <Button type="button" variant="outline" onClick={() => open({ action: "save", stay, focus: "location" })} aria-label={`Set location for ${stay.name}`}>Set location</Button>}
               <Button type="button" variant="outline" onClick={() => open({ action: "remove", stay })} aria-label={`Remove ${stay.name} from trip`}>Remove from trip</Button>
             </div>}
           </article>
@@ -87,7 +90,7 @@ function StayEditor({ editor, data, onClose, onSaved, onCloseAutoFocus }: {
     id: editor.stay.id, name: editor.stay.name, check_in: editor.stay.check_in, check_out: editor.stay.check_out,
     type: editor.stay.type, address: editor.stay.address, property_url: editor.stay.property_url,
     check_in_time: editor.stay.check_in_time?.slice(0, 5) ?? null, check_out_time: editor.stay.check_out_time?.slice(0, 5) ?? null,
-    notes: editor.stay.notes, booking_status: editor.stay.booking_status,
+    notes: editor.stay.notes, booking_status: editor.stay.booking_status, location: editor.stay.location ?? null,
   } : blankStay());
   const [original] = useState(() => JSON.stringify(stay));
   const [revision, setRevision] = useState(data.lodging?.revision ?? 0);
@@ -117,9 +120,15 @@ function StayEditor({ editor, data, onClose, onSaved, onCloseAutoFocus }: {
     if (handleBack()) history.ensureEntry();
     else history.leave();
   };
-  const change = (field: keyof TripStayInput, value: string) => {
-    setStay((prev) => ({ ...prev, [field]: field === "name" ? value : value || null }));
+  const update = (patch: Partial<TripStayInput>) => {
+    setStay((prev) => ({ ...prev, ...patch }));
     setPreview(null); setErrorField(null); setError(null); setReplacement(false);
+  };
+  const change = (field: keyof TripStayInput, value: string) => update({ [field]: field === "name" ? value : value || null });
+  // Keeps what was typed in the address so the place can be confirmed later.
+  const saveLocationLater = (query: string) => {
+    if (!stay.address?.trim()) update({ address: query });
+    setTimeout(() => (form.current?.elements.namedItem("address") as HTMLElement | null)?.focus(), 0);
   };
   const requestBody = () => ({ action: editor.action, stay, existing: !!editor.stay, stay_id: editor.stay?.id, date: editor.date, status: nightStatus, expected_revision: revision });
   const showError = (err: unknown) => {
@@ -168,7 +177,7 @@ function StayEditor({ editor, data, onClose, onSaved, onCloseAutoFocus }: {
     } catch (err) { showError(err); }
     finally { setBusy(false); }
   };
-  const input = (field: keyof TripStayInput, label: string, type = "text", required = false, maxLength?: number) => <label className="block min-w-0 space-y-1 text-base text-foreground">
+  const input = (field: Exclude<keyof TripStayInput, "location">, label: string, type = "text", required = false, maxLength?: number) => <label className="block min-w-0 space-y-1 text-base text-foreground">
     <span>{label}</span><Input name={field} type={type} required={required} maxLength={maxLength} value={stay[field] ?? ""} onChange={(event) => change(field, event.target.value)}
       className={fieldClassName} aria-invalid={errorField === field || undefined} aria-describedby={errorField === field ? "stay-error" : undefined} />
   </label>;
@@ -197,11 +206,12 @@ function StayEditor({ editor, data, onClose, onSaved, onCloseAutoFocus }: {
             <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{input("check_in", "Check-in", "date")}{input("check_out", "Check-out", "date")}</div>
             <p className="text-base text-muted-foreground">Dates are optional. Check-out morning is included as a starting point, not another night.</p>
             <label className="block space-y-1 text-base text-foreground"><span>Booking status</span><select name="booking_status" value={stay.booking_status} onChange={(event) => change("booking_status", event.target.value)} className={fieldClassName}><option value="not_booked">Not booked</option><option value="booked">Booked</option></select></label>
-            <details open={editor.focus === "address" || undefined} className="text-base text-foreground"><summary className="min-h-11 cursor-pointer py-2">More details (optional)</summary>
+            <LocationPicker tripId={data.trip.id} heading="Where is the stay?" exactTarget={STAY_EXACT} value={stay.location ?? null}
+              initialQuery={editor.focus === "location" ? stay.address ?? "" : ""} onChange={(location) => update({ location })} onSaveLater={saveLocationLater} />
+            {input("address", "Address or location description", "text", false, 1000)}
+            <details className="text-base text-foreground"><summary className="min-h-11 cursor-pointer py-2">More details (optional)</summary>
               <div className="space-y-3">
                 <label className="block space-y-1"><span>Stay type</span><select name="type" value={stay.type ?? ""} onChange={(event) => change("type", event.target.value)} className={fieldClassName}><option value="">Not set</option>{["hotel", "rental", "hut", "campground", "other"].map((type) => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}</select></label>
-                {input("address", "Address or location description", "text", false, 1000)}
-                <p className="text-base text-muted-foreground">Save an address now. Exact location confirmation for drive times will follow.</p>
                 {input("property_url", "Property website", "url", false, 2000)}
                 {input("check_in_time", "Check-in time (property local time)", "time")}{input("check_out_time", "Check-out time (property local time)", "time")}
                 <label className="block space-y-1"><span>Notes shared with the crew</span><textarea name="notes" rows={3} maxLength={4000} className={cn(fieldClassName, "h-auto py-2")} value={stay.notes ?? ""} onChange={(event) => change("notes", event.target.value)} aria-invalid={errorField === "notes" || undefined} /></label>

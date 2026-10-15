@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TripStays, DayLodging } from "./TripStays";
 import { buildLodging, previewLodging } from "@/lib/trip-lodging";
 import { fakeTripApi, reply, sentBodies, TRIP, tripFull } from "@/test/tripApi";
-import type { TripLodgingAction, TripLodgingNight, TripStay, TripStayInput } from "@/types/trips";
+import type { TripLocation, TripLodgingAction, TripLodgingNight, TripStay, TripStayInput } from "@/types/trips";
 
 const hotel: TripStay = { id: "40f9f55e-0e74-4c4a-923f-d7a3f92468a0", trip_id: TRIP.id, name: "Hotel", check_in: "2026-10-09", check_out: "2026-10-11", type: null, address: null, property_url: "https://example.com", check_in_time: null, check_out_time: null, notes: "Meet in lobby", booking_status: "booked", created_at: TRIP.created_at, updated_at: TRIP.updated_at };
 const assigned: TripLodgingNight[] = ["2026-10-09", "2026-10-10"].map((date) => ({ trip_id: TRIP.id, date, stay_id: hotel.id, status: "assigned" }));
@@ -147,6 +147,70 @@ describe("Crew stays editor", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Choose both dates");
     expect(screen.getByLabelText("Check-out")).toHaveFocus();
     expect(screen.getByLabelText("Check-out")).toHaveAttribute("aria-invalid", "true");
+  });
+  describe("stay locations (#208)", () => {
+    const topnotch: TripLocation = { label: "Topnotch Resort", address: "4000 Mountain Road, Stowe, VT 05672, United States of America", latitude: 44.49391, longitude: -72.73918,
+      precision: "exact", time_zone: "America/New_York", source: "search", provider: "geoapify", provider_id: "51a8d60c", attribution: "© OpenStreetMap contributors" };
+    const rental = { ...hotel, address: "4000 Mountain Rd, Stowe" };
+    it("searches a stay's saved address from Set location and saves the confirmed place", async () => {
+      const existing = full([rental], assigned);
+      const api = fakeTripApi({ [`GET ${base}/locations`]: reply(200, { results: [topnotch] }), [`POST ${base}/stays/preview`]: previewRoute(existing), [`PATCH ${base}/stays/${hotel.id}`]: reply(200, { revision: 1 }) });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      render(<TripStays data={existing} canEdit onSaved={onSaved} />);
+      expect(screen.getByText("Booked · Location confirmation needed for drive times")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Set location for Hotel" }));
+      const dialog = screen.getByRole("dialog");
+      await waitFor(() => expect(within(dialog).getByRole("combobox", { name: "Search name or address" })).toHaveFocus());
+      expect(within(dialog).getByRole("combobox", { name: "Search name or address" })).toHaveValue("4000 Mountain Rd, Stowe");
+      await user.click(await within(dialog).findByRole("option", { name: /Topnotch Resort/ }));
+      await user.click(within(dialog).getByRole("button", { name: "Use this location" }));
+      // Choosing a place doesn't rewrite the address the organizer typed.
+      expect(within(dialog).getByLabelText("Address or location description")).toHaveValue("4000 Mountain Rd, Stowe");
+      await user.click(within(dialog).getByRole("button", { name: "Review nights" }));
+      await user.click(await within(dialog).findByRole("button", { name: "Save stay" }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
+      expect(sentBodies(api, `PATCH ${base}/stays/${hotel.id}`)[0]).toMatchObject({ stay: { location: topnotch, address: "4000 Mountain Rd, Stowe" } });
+    });
+    it("keeps a saved place through other edits, and sends null only when it's removed", async () => {
+      const existing = full([{ ...hotel, location: topnotch }], assigned);
+      const api = fakeTripApi({ [`POST ${base}/stays/preview`]: previewRoute(existing), [`PATCH ${base}/stays/${hotel.id}`]: reply(200, { revision: 1 }) });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      render(<TripStays data={existing} canEdit onSaved={onSaved} />);
+      expect(screen.getByText("Booked · Location set")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Set location/ })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Edit Hotel" }));
+      await user.type(screen.getByLabelText("Stay name"), " Annex");
+      await user.click(screen.getByRole("button", { name: "Review nights" }));
+      await user.click(await screen.findByRole("button", { name: "Save stay" }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
+      expect(sentBodies(api, `PATCH ${base}/stays/${hotel.id}`)[0]).toMatchObject({ stay: { name: "Hotel Annex", location: topnotch } });
+      await user.click(screen.getByRole("button", { name: "Edit Hotel" }));
+      await user.click(screen.getByRole("button", { name: "Remove location" }));
+      await user.click(screen.getByRole("button", { name: "Review nights" }));
+      await user.click(await screen.findByRole("button", { name: "Save stay" }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2));
+      expect(sentBodies(api, `PATCH ${base}/stays/${hotel.id}`)[1]).toMatchObject({ stay: { location: null } });
+    });
+    it("keeps the typed text as the address when search is unavailable", async () => {
+      vi.stubGlobal("fetch", fakeTripApi({ [`GET ${base}/locations`]: reply(503, { error: "Location search isn't available right now.", code: "unavailable" }) }));
+      const user = await openNew();
+      await user.type(screen.getByRole("combobox", { name: "Search name or address" }), "Cabin on Mountain Rd");
+      await user.click(await screen.findByRole("button", { name: "Save location later" }));
+      expect(screen.getByLabelText("Address or location description")).toHaveValue("Cabin on Mountain Rd");
+      await waitFor(() => expect(screen.getByLabelText("Address or location description")).toHaveFocus());
+    });
+    it("shows members the place in words with a map link and its credit", async () => {
+      const user = userEvent.setup();
+      render(<TripStays data={full([{ ...hotel, location: { ...topnotch, precision: "approximate", label: "Stowe" } }], assigned)} canEdit={false} onSaved={onSaved} />);
+      expect(screen.getByText("Booked · Approximate location")).toBeInTheDocument();
+      await user.click(screen.getByText("Stay details"));
+      expect(screen.getByText("Approximate area — choose the exact property for drive times.")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Open map (new tab)" })).toHaveAttribute("target", "_blank");
+      expect(screen.getByRole("link", { name: "Powered by Geoapify" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "© OpenStreetMap contributors" })).toBeInTheDocument();
+    });
   });
   it("shows today's origin separately from tonight's stay", () => {
     const hut = { ...hotel, id: "a682b8af-d26b-4213-a816-39de3eb155eb", name: "Hut" };
