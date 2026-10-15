@@ -70,8 +70,12 @@ const itinerary = async (request: TripItineraryRequest) => {
   if ("error" in preview) throw new Error(preview.error);
   return preview.options;
 };
-const editItinerary = (action: string, payload: unknown) =>
-  db.query("SELECT public.edit_trip_itinerary($1, 'user-1', $2, $3::jsonb)", [tripId, action, JSON.stringify(payload)]);
+/** Saves a reviewed itinerary option as the route does, with the access points its review saw. */
+const editItinerary = (action: string, payload: Record<string, unknown>) => {
+  const { access_points: accessPoints, ...rest } = payload;
+  return db.query("SELECT public.edit_trip_itinerary_reviewed($1, 'user-1', $2, $3::jsonb, $4::jsonb)",
+    [tripId, action, JSON.stringify(rest), JSON.stringify(accessPoints)]);
+};
 
 describe("Access points in Postgres", () => {
   beforeAll(async () => {
@@ -238,12 +242,42 @@ describe("Access points in Postgres", () => {
       const onlyThisDay = options.find((option) => option.key === "day")!;
       expect(onlyThisDay.changes[0].notes).toEqual(["Access point: Mountain Road lot → Not set."]);
     });
+
+    it("says nothing about the access point when only the activity changes", async () => {
+      const [assign] = await itinerary({ action: "assign_days", dates: ["2026-10-09", "2026-10-11"], activity: "Hiking" });
+      expect(assign.changes.map((change) => change.notes)).toEqual([undefined, undefined]);
+      const [copy] = await itinerary({ action: "copy_day", from: "2026-10-09", dates: ["2026-10-11"], kit: false });
+      expect(copy.changes[0].notes).toBeUndefined();
+    });
+
+    it("refuses a reviewed change when an access point changed since its review, and saves the review as it is now", async () => {
+      const [move] = await itinerary({ action: "assign_days", dates: ["2026-10-09"], stop_id: jay });
+      const [copy] = await itinerary({ action: "copy_day", from: "2026-10-12", dates: ["2026-10-11"], kit: false });
+      // The organizer changes Jay Peak's point in another tab.
+      const north = place("North lot", 44.9412, -72.5101);
+      await save("2026-10-12", north);
+      await expect(editItinerary("assign_days", move.payload)).rejects.toMatchObject({ code: "40001" });
+      await expect(editItinerary("copy_day", copy.payload)).rejects.toMatchObject({ code: "40001" });
+      expect(await points()).toMatchObject({ "2026-10-09": "Spruce Peak lot (day)", "2026-10-11": "Mountain Road lot" });
+
+      const [current] = await itinerary({ action: "assign_days", dates: ["2026-10-09"], stop_id: jay });
+      expect(current.changes[0].notes).toEqual(["Access point: Spruce Peak lot → North lot."]);
+      await editItinerary("assign_days", current.payload);
+      await editItinerary("copy_day", (await itinerary({ action: "copy_day", from: "2026-10-12", dates: ["2026-10-11"], kit: false }))[0].payload);
+      expect(await points()).toMatchObject({ "2026-10-09": "North lot", "2026-10-11": "North lot" });
+    });
   });
 
-  it("only service_role may run it", async () => {
+  it("only service_role may run its functions", async () => {
     const grants = (await db.query<{ role: string; allowed: boolean }>(
-      "SELECT r AS role, has_function_privilege(r, 'public.set_trip_access_point(uuid, text, jsonb)', 'EXECUTE') AS allowed FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r",
-    )).rows;
+      `SELECT r AS role, has_function_privilege(r, 'public.set_trip_access_point(uuid, text, jsonb)', 'EXECUTE')
+        AND has_function_privilege(r, 'public.trip_access_points(uuid)', 'EXECUTE')
+        AND has_function_privilege(r, 'public.edit_trip_itinerary_reviewed(uuid, text, text, jsonb, jsonb)', 'EXECUTE') AS allowed,
+        has_function_privilege(r, 'public.set_trip_access_point(uuid, text, jsonb)', 'EXECUTE')
+        OR has_function_privilege(r, 'public.trip_access_points(uuid)', 'EXECUTE')
+        OR has_function_privilege(r, 'public.edit_trip_itinerary_reviewed(uuid, text, text, jsonb, jsonb)', 'EXECUTE') AS any
+        FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r`,
+    )).rows.map(({ role, allowed, any }: { role: string; allowed: boolean; any?: boolean }) => ({ role, allowed: role === "service_role" ? allowed : !!any }));
     expect(grants).toEqual([{ role: "anon", allowed: false }, { role: "authenticated", allowed: false }, { role: "service_role", allowed: true }]);
   });
 });

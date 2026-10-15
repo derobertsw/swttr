@@ -259,10 +259,36 @@ function accessNote(full: TripFull, after: Itinerary, day: TripDay, place: Place
   const now = accessPointFor(after.stops, after.days.find((candidate) => candidate.date === day.date) ?? day);
   if (!was && !now) return undefined;
   if (was && now && sameLocation(was.location, now.location)) {
+    // Only a stop that moved to another place can leave its point behind; a
+    // change of activity alone keeps the day where it was.
     const stopBefore = full.stops.find((stop) => stop.id === day.stop_id) ?? full.stops[0];
-    return place && stopBefore?.id === place.id ? `Access point stays ${now.location.label}. Check it's right for ${place.name}.` : undefined;
+    return place && stopBefore?.id === place.id && !samePlace(stopBefore, place)
+      ? `Access point stays ${now.location.label}. Check it's right for ${place.name}.` : undefined;
   }
   return `Access point: ${was?.location.label ?? "Not set"} → ${now?.location.label ?? "Not set"}.`;
+}
+
+/**
+ * Every access point on the trip as a review saw it, keyed like
+ * trip_access_points() in migration 027 builds it. A reviewed save sends it
+ * back, so a change to any access point since the review refuses the save
+ * rather than leaving its access notes wrong.
+ */
+type AccessPointsCheck = { stops: Record<string, unknown>; days: Record<string, unknown> };
+function accessPointsCheck({ stops, days }: Itinerary): AccessPointsCheck {
+  return {
+    stops: Object.fromEntries(stops.flatMap((stop) => stop.access_point ? [[stop.id, stop.access_point]] : [])),
+    days: Object.fromEntries(days.flatMap((day) => day.access_point ? [[day.date, { point: day.access_point, stop_id: day.access_point_stop_id ?? null }]] : [])),
+  };
+}
+
+/** The access points a save says its review saw: undefined when it sends none, null when they're malformed. */
+export function parseAccessPointsCheck(body: unknown): AccessPointsCheck | null | undefined {
+  if (!isObject(body) || !("access_points" in body)) return undefined;
+  const check = body.access_points;
+  const entries = (value: unknown, max: number) => isObject(value) && Object.keys(value).length <= max && Object.values(value).every(isObject);
+  if (!isObject(check) || !entries(check.stops, MAX_STOPS) || !entries(check.days, MAX_DAYS)) return null;
+  return { stops: check.stops as Record<string, unknown>, days: check.days as Record<string, unknown> };
 }
 
 /** Each day's effective stop: its own, or the base (the first stop); null when the trip has none. */
@@ -329,7 +355,7 @@ function option(
         .filter((note): note is string => !!note);
       return { date: day.date, date_label: dateLabel(day.date), before: from, after: to, ...(notes.length > 0 ? { notes } : {}) };
     });
-  return { ...fields, changes, unchanged: days.length - changes.length };
+  return { ...fields, payload: { ...fields.payload, access_points: accessPointsCheck(full) }, changes, unchanged: days.length - changes.length };
 }
 
 const near = (a: number | null, b: number) => a !== null && Math.abs(a - b) <= 0.0001 + 1e-9;

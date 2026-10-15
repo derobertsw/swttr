@@ -356,7 +356,8 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_or_secret_key
 MPP_SECRET_KEY=...
 
 # Trip place search (optional; server-only). Without it, location search says
-# it's unavailable and stays save with an address. See docs/trip-locations.md.
+# it's unavailable, but stays can still be saved with an address or typed
+# coordinates. See docs/trip-locations.md.
 GEOAPIFY_API_KEY=...
 ```
 

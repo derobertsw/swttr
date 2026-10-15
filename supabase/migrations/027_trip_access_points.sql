@@ -91,3 +91,47 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.set_trip_access_point(uuid, text, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.set_trip_access_point(uuid, text, jsonb) TO service_role;
+
+-- Every access point on a trip, as previewItinerary (src/lib/trip-itinerary.ts)
+-- builds it for a review: {stops: {<id>: point}, days: {<date>: {point, stop_id}}},
+-- with only the stops and days that have one.
+CREATE FUNCTION public.trip_access_points(p_trip_id uuid) RETURNS jsonb
+LANGUAGE sql STABLE SET search_path = '' AS $$
+  SELECT jsonb_build_object(
+    'stops', coalesce((SELECT jsonb_object_agg(s.id, s.access_point) FROM public.trip_stops s
+      WHERE s.trip_id = p_trip_id AND s.access_point IS NOT NULL), '{}'::jsonb),
+    'days', coalesce((SELECT jsonb_object_agg(d.date, jsonb_build_object('point', d.access_point, 'stop_id', d.access_point_stop_id))
+      FROM public.trip_days d WHERE d.trip_id = p_trip_id AND d.access_point IS NOT NULL), '{}'::jsonb));
+$$;
+REVOKE ALL ON FUNCTION public.trip_access_points(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.trip_access_points(uuid) TO service_role;
+
+-- A reviewed itinerary edit (022) or copy (023). Its review says what happens
+-- to each changed day's access point, so the save is refused (40001) when any
+-- access point on the trip changed since; otherwise it runs the edit, which
+-- makes its own checks. The trip is locked first, as the edit locks it, so
+-- the check and the edit see the same trip.
+CREATE FUNCTION public.edit_trip_itinerary_reviewed(
+  p_trip_id uuid,
+  p_user_id text,
+  p_action text,
+  p_payload jsonb,
+  p_access_points jsonb
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.trips WHERE id = p_trip_id FOR UPDATE;
+  IF public.trip_access_points(p_trip_id) IS DISTINCT FROM p_access_points THEN
+    RAISE EXCEPTION 'Access points changed. Review the change again.' USING ERRCODE = '40001';
+  END IF;
+  IF p_action = 'copy_day' THEN
+    RETURN public.copy_trip_day(p_trip_id, p_user_id, p_payload);
+  END IF;
+  RETURN public.edit_trip_itinerary(p_trip_id, p_user_id, p_action, p_payload);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.edit_trip_itinerary_reviewed(uuid, text, text, jsonb, jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.edit_trip_itinerary_reviewed(uuid, text, text, jsonb, jsonb) TO service_role;
