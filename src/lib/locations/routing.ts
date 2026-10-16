@@ -19,7 +19,7 @@ export interface DriveLeg { seconds: number; meters: number }
 const MATRIX_URL = "https://api.geoapify.com/v1/routematrix";
 const TIMEOUT_MS = 8_000;
 /** A regular Route Matrix call covers up to 1,000 cells (sources × targets). */
-const MAX_CELLS = 1_000;
+export const MATRIX_MAX_CELLS = 1_000;
 
 const lonLat = (point: Point) => [point.longitude, point.latitude];
 const whole = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
@@ -40,7 +40,7 @@ export async function driveMatrix(sources: Point[], targets: Point[], avoid: Poi
   if (!sources.length || !targets.length) return sources.map(() => []);
   const key = process.env.GEOAPIFY_API_KEY;
   if (!key) throw new RoutingUnavailable("Drive estimates aren't configured.");
-  if (sources.length * targets.length > MAX_CELLS) throw new RoutingUnavailable("Too many places for one estimate.");
+  if (sources.length * targets.length > MATRIX_MAX_CELLS) throw new RoutingUnavailable("Too many places for one estimate.");
   const url = new URL(MATRIX_URL);
   url.searchParams.set("apiKey", key);
   const body = {
