@@ -317,6 +317,34 @@ describe("Your estimate", () => {
     expect(screen.getByRole("textbox", { name: "Hours" })).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByRole("textbox", { name: "Source or note (optional)" })).toHaveValue("Guess");
   });
+  it("keeps the entry when a conflict review finds the day has no drive to estimate now", async () => {
+    const full = driveTrip();
+    const removed = driveTrip();
+    removed.stops[0] = { ...removed.stops[0], access_point: null };
+    const [before, after] = await Promise.all([withManual(full, [], { matrix: failing }), withManual(removed, [], { matrix: failing })]);
+    vi.stubGlobal("fetch", fakeTripApi({
+      [`PUT ${ESTIMATE_URL}`]: reply(409, { error: "Your estimate or this day's drive changed since you opened it. Check it, then try again." }),
+      [`GET ${URL}`]: reply(200, after),
+    }));
+    const retry = vi.fn();
+    const { rerender } = render(<DayDrive data={full} date={SAT} dateLabel="Sat Jan 9" canEdit drive={state(before, { retry })} onSaved={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Add your estimate" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Minutes" }), "40");
+    await userEvent.type(screen.getByRole("textbox", { name: "Source or note (optional)" }), "Resort directions page");
+    await userEvent.click(screen.getByRole("button", { name: "Save your estimate" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("changed since you opened it");
+    await userEvent.click(screen.getByRole("button", { name: "Review saved estimate" }));
+    expect(await screen.findByText("This day has no drive to estimate now. Cancel to see why.")).toBeInTheDocument();
+    expect(retry).toHaveBeenCalled();
+    // The card refreshes to a day with no access point; the entry stays, and can't be saved.
+    rerender(<DayDrive data={removed} date={SAT} dateLabel="Sat Jan 9" canEdit drive={state(after, { retry })} onSaved={vi.fn()} />);
+    expect(screen.getByText("Choose the entrance or parking")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Minutes" })).toHaveValue("40");
+    expect(screen.getByRole("textbox", { name: "Source or note (optional)" })).toHaveValue("Resort directions page");
+    expect(screen.getByRole("button", { name: "Save your estimate" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Drive" })).toHaveFocus());
+  });
   it("is labeled as yours, with Edit and Remove, and the organizer's for everyone else", async () => {
     const full = driveTrip();
     const estimates = await withManual(full, [yours(SAT, 40)], { matrix: failing });

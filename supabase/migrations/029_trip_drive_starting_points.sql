@@ -3,9 +3,10 @@
 -- A day's own starting point is used instead of the crew stay of the night
 -- before: trip_days.origin, a place (is_trip_location). When it was picked
 -- from a saved stay, origin_stay_id names the stay, and the stay's current
--- name and place are used while it exists; origin keeps the place, under the
--- stay's name, for when the stay is removed. Either way it stays the day's
--- starting point until the organizer resets it. trip_days.no_drive is No
+-- name and place are used while it exists. origin is kept in step with the
+-- stay's name and place (the trigger below), so when the stay is removed the
+-- day keeps the place it was using. Either way it stays the day's starting
+-- point until the organizer resets it. trip_days.no_drive is No
 -- drive planned: the day keeps its starting point and gets no estimate.
 -- They're on the day, so moving the trip's dates (021) keeps them with it, as
 -- it keeps the day's access point (027).
@@ -16,6 +17,22 @@ ALTER TABLE public.trip_days
   ADD COLUMN no_drive boolean NOT NULL DEFAULT false,
   ADD CONSTRAINT trip_days_origin_stay CHECK (origin_stay_id IS NULL OR origin IS NOT NULL);
 CREATE INDEX trip_days_origin_stay_id_idx ON public.trip_days (origin_stay_id) WHERE origin_stay_id IS NOT NULL;
+
+-- A stay's new name or place reaches the days that start from it, so removing
+-- the stay later leaves them with what they were using. A stay whose place is
+-- removed keeps its days' last place, under its new name.
+CREATE FUNCTION public.sync_trip_day_stay_origins() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = '' AS $$
+BEGIN
+  UPDATE public.trip_days SET origin = jsonb_set(coalesce(NEW.location, origin), '{label}', to_jsonb(NEW.name))
+    WHERE trip_id = NEW.trip_id AND origin_stay_id = NEW.id;
+  RETURN NULL;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.sync_trip_day_stay_origins() FROM PUBLIC, anon, authenticated;
+CREATE TRIGGER sync_trip_day_stay_origins AFTER UPDATE OF name, location ON public.trip_stays
+  FOR EACH ROW WHEN (OLD.name IS DISTINCT FROM NEW.name OR OLD.location IS DISTINCT FROM NEW.location)
+  EXECUTE FUNCTION public.sync_trip_day_stay_origins();
 
 -- Your estimate: a one-way drive time the organizer entered for a day, for
 -- when routing has none. pair_key names the origin and access point

@@ -88,6 +88,22 @@ describe("Starting points and your own estimates in Postgres (029)", () => {
       await db.query("DELETE FROM trip_stays WHERE id = $1", [motel]);
       expect(await seen("2027-01-08")).toEqual({ origin: { ...MOTEL, label: "Stowe Motel" }, origin_stay_id: null, no_drive: false });
     });
+    it("keeps up with its stay's name and place, so removing the stay keeps the place the day was using", async () => {
+      await setOrigin({ date: "2027-01-08", origin: { stay_id: motel }, no_drive: false, expected: NONE });
+      const corrected = { ...MOTEL, latitude: 44.4881, longitude: -72.7255 };
+      // Saved as mutate_trip_lodging (025) saves a stay: an upsert on its id.
+      await db.query(`INSERT INTO trip_stays AS stay (id, trip_id, name, check_in, check_out, location)
+        VALUES ($1, $2, 'Stowe Motel & Snowdrift', '2027-01-08', '2027-01-10', $3::jsonb)
+        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, location = EXCLUDED.location`, [motel, tripId, JSON.stringify(corrected)]);
+      expect((await seen("2027-01-08")).origin).toEqual({ ...corrected, label: "Stowe Motel & Snowdrift" });
+      // A stay whose place is removed leaves the day its last place, under the new name.
+      await db.query("UPDATE trip_stays SET name = 'Snowdrift', location = NULL WHERE id = $1", [motel]);
+      expect((await seen("2027-01-08")).origin).toEqual({ ...corrected, label: "Snowdrift" });
+      await db.query("DELETE FROM trip_stays WHERE id = $1", [motel]);
+      expect(await seen("2027-01-08")).toEqual({ origin: { ...corrected, label: "Snowdrift" }, origin_stay_id: null, no_drive: false });
+      // Other days and other stays' days are untouched.
+      expect(await seen("2027-01-09")).toEqual(NONE);
+    });
     it("refuses an editor the day or the stay no longer matches, and changes nothing", async () => {
       await setOrigin({ date: "2027-01-09", origin: { location: CABIN }, no_drive: false, expected: NONE });
       const before = await seen("2027-01-09");
@@ -201,6 +217,9 @@ describe("Starting points and your own estimates in Postgres (029)", () => {
       { role: "authenticated", estimates: false, origin: false, estimate: false },
       { role: "service_role", estimates: true, origin: true, estimate: true },
     ]);
+    const { rows: sync } = await db.query(`SELECT r AS role, has_function_privilege(r, 'public.sync_trip_day_stay_origins()', 'EXECUTE') AS allowed
+      FROM unnest(ARRAY['anon', 'authenticated']) AS r`);
+    expect(sync).toEqual([{ role: "anon", allowed: false }, { role: "authenticated", allowed: false }]);
     expect((await db.query("SELECT relrowsecurity FROM pg_class WHERE relname = 'trip_drive_manual_estimates'")).rows).toEqual([{ relrowsecurity: true }]);
   });
 });

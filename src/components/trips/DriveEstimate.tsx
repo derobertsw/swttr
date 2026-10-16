@@ -160,14 +160,21 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
   const crewStay = data.lodging?.stays.find((stay) => stay.id === crewStayId);
   const day = drive.estimates?.days.find((candidate) => candidate.date === date);
   const [editing, setEditing] = useState<"origin" | "estimate" | "remove" | null>(null);
+  // The drive as it was when your estimate's editor opened. The editor keeps
+  // it, so a refresh that changes or removes the drive never drops an entry.
+  const [opened, setOpened] = useState<{ day: TripDriveDay; days: TripDriveDay[] } | null>(null);
   const [status, setStatus] = useState("");
   const [working, setWorking] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const headingId = `drive-${date}`, originId = `starting-point-${date}`, estimateId = `your-estimate-${date}`;
-  const focusSoon = (id: string) => setTimeout(() => document.getElementById(id)?.focus(), 0);
+  // The control, or the Drive heading when the card no longer has it.
+  const focusSoon = (id: string) => setTimeout(() => (document.getElementById(id) ?? document.getElementById(headingId))?.focus(), 0);
   const stays = <Link href={`/trips/${tripId}#trip-stays-heading`} className={linkClass}>Go to Stays</Link>;
 
-  const open = (next: NonNullable<typeof editing>) => { setEditing(next); setStatus(""); setActionError(null); };
+  const open = (next: NonNullable<typeof editing>) => {
+    setEditing(next); setStatus(""); setActionError(null);
+    setOpened(day && drive.estimates ? { day, days: drive.estimates.days } : null);
+  };
   const close = (focusId: string, message?: string) => {
     setEditing(null);
     if (message) setStatus(message);
@@ -288,13 +295,13 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
     <section aria-labelledby={headingId} className="mt-3 border-t border-border pt-3">
       <h3 id={headingId} tabIndex={-1} className="text-sm font-medium text-muted-foreground">Drive</h3>
       <div aria-live="polite" className="mt-1">{body}</div>
-      {editing === "estimate" && day?.pair_key && drive.estimates && (
-        <YourEstimateEditor tripId={tripId} day={day} days={drive.estimates.days}
+      {editing === "estimate" && opened && (
+        <YourEstimateEditor tripId={tripId} day={opened.day} days={opened.days}
           onCancel={() => close(estimateId)} onReviewed={drive.retry}
           onSaved={(message) => { drive.retry(); close(headingId, message); }} />
       )}
-      {editing === "remove" && day && drive.estimates && (
-        <RemoveYourEstimate tripId={tripId} day={day} days={drive.estimates.days}
+      {editing === "remove" && opened && (
+        <RemoveYourEstimate tripId={tripId} day={opened.day} days={opened.days}
           onCancel={() => close(estimateId)} onConflict={drive.retry}
           onRemoved={() => { drive.retry(); close(headingId, "Your estimate removed."); }} />
       )}
