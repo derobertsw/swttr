@@ -334,11 +334,11 @@ function StartingPointEditor({ data, day, dateLabel, nightLabel, crewStayId, onC
 }) {
   const stays = data.lodging?.stays ?? [];
   const crewStay = stays.find((stay) => stay.id === crewStayId);
-  // Saved stays with a place, other than the crew stay, which has its own choice.
-  const picks = stays.filter((stay) => stay.location && stay.id !== crewStayId);
+  // Saved stays with a place. The crew stay has its own choice, unless the day
+  // already starts from it as its own pick, which a lodging change must not undo.
+  const picks = stays.filter((stay) => stay.location && (stay.id !== crewStayId || stay.id === day.origin_stay_id));
   const [initial] = useState(() => {
     if (!day.origin) return crewStay ? "crew" : "";
-    if (day.origin_stay_id && day.origin_stay_id === crewStayId) return "crew";
     return day.origin_stay_id && picks.some((stay) => stay.id === day.origin_stay_id) ? `stay:${day.origin_stay_id}` : "place";
   });
   const [choice, setChoice] = useState(initial);
@@ -399,7 +399,8 @@ function StartingPointEditor({ data, day, dateLabel, nightLabel, crewStayId, onC
         <fieldset className="min-w-0 space-y-2">
           <legend className="text-base font-medium text-foreground">Start from</legend>
           {crewStay && option("crew", `Crew stay · ${crewStay.name}`, nightLabel ? `Where the crew stays ${nightLabel} night` : "Where the crew stays the night before")}
-          {picks.map((stay) => option(`stay:${stay.id}`, stay.name, stay.location?.precision === "approximate" ? "Saved stay · approximate area" : "Saved stay"))}
+          {picks.map((stay) => option(`stay:${stay.id}`, stay.name, stay.id === crewStayId ? "This day's own · kept if the crew stay changes"
+            : stay.location?.precision === "approximate" ? "Saved stay · approximate area" : "Saved stay"))}
           {option("place", "Another place", "Search for a place or enter coordinates")}
         </fieldset>
         {choice === "place" && <LocationPicker tripId={data.trip.id} heading="Where does the day start?" exactTarget="the exact place"

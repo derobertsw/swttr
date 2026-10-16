@@ -225,6 +225,20 @@ describe("Where the day starts", () => {
     expect(screen.queryByRole("link", { name: /Directions/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
+  it("keeps a day's own stay as its own when it's also the crew stay, so a later lodging change can't move it", async () => {
+    const fetchMock = fakeTripApi({ [`PUT ${ORIGIN_URL(SAT)}`]: reply(200, { ok: true }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const own = { origin: { ...MOTEL, label: "Stowe Motel" }, origin_stay_id: "stay-motel" };
+    const full = withDays({ date: SAT, ...own });
+    render(<DayDrive data={full} date={SAT} dateLabel="Sat Jan 9" canEdit drive={state(await estimatesFor(full))} onSaved={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Change starting point" }));
+    const form = screen.getByRole("form", { name: "Starting point for Sat Jan 9" });
+    expect(within(form).getByRole("radio", { name: /This day's own · kept if the crew stay changes/ })).toBeChecked();
+    expect(within(form).getByRole("radio", { name: /Crew stay · Stowe Motel/ })).not.toBeChecked();
+    await userEvent.click(within(form).getByRole("checkbox", { name: /No drive planned/ }));
+    await userEvent.click(within(form).getByRole("button", { name: "Save starting point" }));
+    expect(sentBodies(fetchMock, `PUT ${ORIGIN_URL(SAT)}`)).toEqual([{ origin: { stay_id: "stay-motel" }, no_drive: true, expected: { ...own, no_drive: false } }]);
+  });
   it("cancels without saving, and returns focus to Change starting point", async () => {
     const fetchMock = fakeTripApi({});
     vi.stubGlobal("fetch", fetchMock);
