@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { previewDateChange } from "@/lib/trip-dates";
-import type { Trip, TripDay, TripFull, TripMember, TripMemberDayKit, TripStop } from "@/types/trips";
+import type { Trip, TripDay, TripFull, TripMember, TripMemberDayKit, TripStop, TripTourPlanSummary } from "@/types/trips";
 
 const tripId = "a2eb3ecb-a7ac-4b6d-98e3-701c694d8563";
 const stowe = "5b7f1f7e-3c52-4c39-9d0e-0a3c1f0b6a11";
@@ -34,6 +34,7 @@ const loadFull = async (): Promise<TripFull> => {
     days: await rows<TripDay>("SELECT id, date::text, stop_id, activity FROM trip_days WHERE trip_id = $1"),
     kits: await rows<TripMemberDayKit>("SELECT k.id, k.trip_day_id, k.trip_member_id FROM trip_member_day_kits k JOIN trip_days d ON d.id = k.trip_day_id WHERE d.trip_id = $1"),
     gear: [],
+    tour_plans: await rows<TripTourPlanSummary>("SELECT id, trip_day_id, objective, revision FROM trip_day_tour_plans WHERE trip_id = $1"),
   };
 };
 const tripDates = async () => (await db.query<{ start_date: string; end_date: string; name: string }>(
@@ -46,6 +47,8 @@ describe("Trip date changes in Postgres", () => {
     await db.exec(await readFile("supabase/migrations/012_trips.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/017_trip_stays.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/021_trip_date_changes.sql", "utf8"));
+    // 026 replaces change_trip_dates to list removed days' tour plans; every test here runs against it.
+    await db.exec(await readFile("supabase/migrations/026_trip_tour_plans.sql", "utf8"));
   }, 20_000);
 
   // Friday–Sunday: Friday at Stowe skiing, Saturday at Smuggs hiking, Sunday
@@ -153,8 +156,14 @@ describe("Trip date changes in Postgres", () => {
     ["keep", "2026-10-12", "2026-10-14"],
     ["keep", "2026-10-07", "2026-10-09"],
   ] as const)("applies exactly the previewed %s plan for %s to %s", async (mode, start, end) => {
+    // Sunday has a tour plan, which a removal must list and a move takes along.
+    await db.query("SELECT public.mutate_trip_tour_plan($1, 'user-1', '2026-10-11', (SELECT id FROM trip_days WHERE trip_id = $1 AND date = '2026-10-11'), 0, gen_random_uuid(), 'save', '{\"objective\": \"Tuckerman\"}')", [tripId]);
     const plan = previewDateChange(await loadFull(), start, end).plans[mode]!;
     await change({ to: [start, end], mode, removed: plan.expected_removed });
+    const tourDates = (await db.query<{ date: string }>("SELECT d.date::text FROM trip_day_tour_plans t JOIN trip_days d ON d.id = t.trip_day_id")).rows.map((row) => row.date);
+    const listed = [...plan.moved, ...plan.removed].filter((day) => day.tour_plan === "Tuckerman");
+    expect(listed).toHaveLength(1);
+    expect(tourDates).toEqual(plan.removed.some((day) => day.tour_plan) ? [] : [listed[0].date]);
     const after = await days();
     const stopNames: Record<string, string> = { [stowe]: "Stowe", [smuggs]: "Smuggs" };
     const destination = (stopId: string | null) => stopId ? stopNames[stopId] : "Stowe (base)";

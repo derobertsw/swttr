@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 import { jsonError, requireUser, type AuthedContext } from "@/lib/api";
 import { loadLodging } from "@/lib/trip-lodging";
+import { loadTourPlans, summarizeTourPlans } from "@/lib/trip-tour-plans";
 import type {
   Trip,
   TripDay,
@@ -151,7 +152,7 @@ export async function loadTripFull(
   const tripId = trip.id;
 
   // Kits depend only on days; don't wait for stops, members or gear to start
-  // them. Accommodation is independent of all of these reads.
+  // them. Accommodation and tour plans are independent of all of these reads.
   const loadDaysAndKits = async () => {
     const { data } = await supabase
       .from("trip_days").select("*").eq("trip_id", tripId).order("date");
@@ -164,7 +165,7 @@ export async function loadTripFull(
     return { days, kits: (kits ?? []) as TripMemberDayKit[] };
   };
 
-  const [stopsRes, membersRes, { days, kits }, gearRes, lodging] = await Promise.all([
+  const [stopsRes, membersRes, { days, kits }, gearRes, lodging, tourPlans] = await Promise.all([
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("position"),
     supabase.from("trip_members").select("*").eq("trip_id", tripId),
     loadDaysAndKits(),
@@ -174,6 +175,7 @@ export async function loadTripFull(
       .eq("trip_id", tripId)
       .order("sort_order"),
     loadLodging(supabase, trip),
+    loadTourPlans(supabase, tripId),
   ]);
 
   return {
@@ -184,6 +186,7 @@ export async function loadTripFull(
     kits,
     gear: (gearRes.data ?? []) as TripGroupGear[],
     lodging,
+    tour_plans: summarizeTourPlans(tourPlans, days),
   };
 }
 
