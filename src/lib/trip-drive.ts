@@ -38,13 +38,19 @@ export interface StoredDriveEstimate {
 
 const coordinates = (location: TripLocation) => `${location.latitude},${location.longitude}`;
 
+/** The closures a drive avoids, with the exact points sent to the router, so a corrected point is a different key. */
+export function closureKey(closures: WinterClosure[]): string {
+  return closures.map((closure) => `${closure.id}@${closure.points.map((point) => `${point.latitude},${point.longitude}`).join(";")}`).join("+") || "none";
+}
+
 /**
  * Names the pair and the options an estimate was calculated for. Any change,
- * such as a new stay, a moved access point or a closure coming into season,
- * makes a new key, so the old estimate is never shown for the new pair.
+ * such as a new stay, a moved access point, a closure coming into season or
+ * a corrected closure point, makes a new key, so the old estimate is never
+ * shown for the new pair.
  */
 function routeKey(origin: TripLocation, destination: TripLocation, closures: WinterClosure[]): string {
-  return `drive|approximated|${coordinates(origin)}>${coordinates(destination)}|${closures.map((closure) => closure.id).join("+") || "none"}`;
+  return `drive|approximated|${coordinates(origin)}>${coordinates(destination)}|${closureKey(closures)}`;
 }
 
 /** Every trip day's drive, in date order. */

@@ -1,6 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
-import { distanceLabel, drivePlans, durationLabel, stayDepartures, type StoredDriveEstimate } from "@/lib/trip-drive";
+import { closureKey, distanceLabel, drivePlans, durationLabel, stayDepartures, type StoredDriveEstimate } from "@/lib/trip-drive";
+import { closuresOn } from "@/lib/locations/closures";
+import { buildLodging, shiftDate } from "@/lib/trip-lodging";
+import type { TripFull, TripLodgingNight } from "@/types/trips";
 import { tripDriveEstimates, type DriveEstimateStore } from "@/lib/trip-drive-estimates";
 import { RoutingUnavailable, type DriveLeg } from "@/lib/locations/routing";
 import { driveDayRow, driveStay, driveTrip, MOTEL, place, SMUGGS_LOT, SPRUCE_LOT } from "@/test/driveTrip";
@@ -35,7 +38,7 @@ describe("Which drive each day has", () => {
     // Checkout morning still starts from the motel.
     expect(sunday.origin).toMatchObject({ label: "Stowe Motel", stay_id: "stay-motel" });
     expect(sunday.destination).toMatchObject({ label: "Smuggs lot" });
-    expect(sunday.route_key).toBe(`drive|approximated|${MOTEL.latitude},${MOTEL.longitude}>${SMUGGS_LOT.latitude},${SMUGGS_LOT.longitude}|vt-108-smugglers-notch`);
+    expect(sunday.route_key).toBe(`drive|approximated|${MOTEL.latitude},${MOTEL.longitude}>${SMUGGS_LOT.latitude},${SMUGGS_LOT.longitude}|vt-108-smugglers-notch@44.5555,-72.7947`);
   });
   it("asks for the exact property or entrance rather than estimating from an area", () => {
     const approximate = driveTrip({ stays: [driveStay("stay-motel", "Stowe Motel", "2027-01-08", "2027-01-10", { ...MOTEL, precision: "approximate" })] });
@@ -51,6 +54,13 @@ describe("Which drive each day has", () => {
     const plans = drivePlans(full);
     expect(plans.find((plan) => plan.date === SAT)?.destination?.label).toBe("Barnes Camp");
     expect(plans.find((plan) => plan.date === SUN)?.state).toBe("no_destination");
+  });
+  it("keys an estimate to the exact closure points avoided, so a corrected point recalculates", () => {
+    const [notch] = closuresOn(SAT);
+    const moved = { ...notch, points: [{ latitude: 44.556, longitude: -72.7952 }] };
+    expect(closureKey([notch])).toBe("vt-108-smugglers-notch@44.5555,-72.7947");
+    expect(closureKey([moved])).not.toBe(closureKey([notch]));
+    expect(closureKey([])).toBe("none");
   });
   it("labels one-way time and distance without claiming precision", () => {
     expect([durationLabel(20), durationLabel(557), durationLabel(3600), durationLabel(4508)]).toEqual(["Under 1 min", "9 min", "1 hr", "1 hr 15 min"]);
@@ -128,6 +138,24 @@ describe("Drive estimates", () => {
     // Once it works, the new pair replaces the stored one.
     const fixed = await tripDriveEstimates(moved, store, { now: NOW + 120_000, matrix: fakeMatrix({ "44.528": { seconds: 600, meters: 8_500 } }) });
     expect(fixed.days.find((day) => day.date === SAT)).toMatchObject({ state: "available", previous: null, estimate: { duration_label: "10 min" } });
+  });
+  it("splits a call that would pass the provider's 1,000 cells, asking each only for its own days", async () => {
+    // 33 one-night stays, each the next morning's origin to that day's own lot: 33 × 33 = 1,089 cells in one call.
+    const base = driveTrip();
+    const start = "2027-01-01", end = shiftDate(start, 33);
+    const trip = { ...base.trip, start_date: start, end_date: end };
+    const stays = Array.from({ length: 33 }, (_, i) => driveStay(`stay-${i}`, `Stay ${i}`, shiftDate(start, i), shiftDate(start, i + 1), place(`Stay ${i}`, 44.4 + i / 1000, -72.7)));
+    const nights: TripLodgingNight[] = stays.map((saved) => ({ trip_id: trip.id, date: saved.check_in!, stay_id: saved.id, status: "assigned" }));
+    const days = Array.from({ length: 34 }, (_, i) => ({ ...driveDayRow(shiftDate(start, i), "stop-stowe"),
+      access_point: place(`Lot ${i}`, 44.52 + i / 1000, -72.78), access_point_stop_id: "stop-stowe" }));
+    const full: TripFull = { ...base, trip, days, lodging: buildLodging(trip, stays, nights) };
+    const matrix = vi.fn(async (sources: unknown[], targets: unknown[]) => {
+      expect(sources.length * targets.length).toBeLessThanOrEqual(1_000);
+      return sources.map(() => targets.map(() => ({ seconds: 900, meters: 12_000 })));
+    });
+    const result = await tripDriveEstimates(full, memoryStore(), { now: NOW, matrix });
+    expect(result.days.filter((day) => day.state === "available")).toHaveLength(33);
+    expect(matrix.mock.calls.map(([sources, targets]) => [sources.length, targets.length])).toEqual([[31, 31], [2, 2]]);
   });
   it("stores no road route as its own answer, never as zero", async () => {
     const store = memoryStore();

@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { driveMatrix } from "@/lib/locations/routing";
-import { DRIVE_ESTIMATE_MAX_AGE_MS, driveDay, drivePlans, stayDepartures, type DrivePlan, type StoredDriveEstimate } from "@/lib/trip-drive";
+import { driveMatrix, MATRIX_MAX_CELLS } from "@/lib/locations/routing";
+import { closureKey, DRIVE_ESTIMATE_MAX_AGE_MS, driveDay, drivePlans, stayDepartures, type DrivePlan, type StoredDriveEstimate } from "@/lib/trip-drive";
 import type { TripDriveEstimates, TripFull, TripLocation } from "@/types/trips";
 
 /** Where estimates are kept between visits: trip_drive_estimates (028). */
@@ -17,6 +17,29 @@ const pointKey = (location: TripLocation) => `${location.latitude},${location.lo
 /** Identical calculations requested at the same time share one provider call. */
 const matricesInFlight = new Map<string, ReturnType<Matrix>>();
 
+/**
+ * Splits days that avoid the same closures into calls within the provider's
+ * cell limit. Each call asks only for the stays and access points its own
+ * days use, with each stay's days kept together where they fit.
+ */
+function batches(plans: ReadyPlan[]): ReadyPlan[][] {
+  const result: ReadyPlan[][] = [];
+  let batch: ReadyPlan[] = [];
+  let origins = new Set<string>(), targets = new Set<string>();
+  const byOrigin = [...plans].sort((a, b) => pointKey(a.origin!.location!).localeCompare(pointKey(b.origin!.location!)));
+  for (const plan of byOrigin) {
+    const origin = pointKey(plan.origin!.location!), target = pointKey(plan.destination!.location);
+    const cells = (origins.size + (origins.has(origin) ? 0 : 1)) * (targets.size + (targets.has(target) ? 0 : 1));
+    if (batch.length && cells > MATRIX_MAX_CELLS) {
+      result.push(batch);
+      batch = []; origins = new Set(); targets = new Set();
+    }
+    batch.push(plan); origins.add(origin); targets.add(target);
+  }
+  if (batch.length) result.push(batch);
+  return result;
+}
+
 function sharedMatrix(matrix: Matrix, ...args: Parameters<Matrix>): ReturnType<Matrix> {
   const key = JSON.stringify(args);
   const existing = matricesInFlight.get(key);
@@ -29,7 +52,8 @@ function sharedMatrix(matrix: Matrix, ...args: Parameters<Matrix>): ReturnType<M
 /**
  * Every trip day's drive estimate and each stay's departures (#209).
  * Stored estimates for the same pair are reused for a week. The rest are
- * calculated, one provider call per set of winter closures, and stored. A
+ * calculated, one provider call per set of winter closures (more when a
+ * call would pass the provider's cell limit), and stored. A
  * failed calculation keeps a stale estimate for the same pair, or says the
  * estimate is unavailable; it's never replaced by another pair's.
  */
@@ -49,10 +73,10 @@ export async function tripDriveEstimates(full: TripFull, store: DriveEstimateSto
   const calculatedAt = new Date(now).toISOString();
   const groups = new Map<string, ReadyPlan[]>();
   for (const plan of due) {
-    const closures = plan.closures.map((closure) => closure.id).join("+");
+    const closures = closureKey(plan.closures);
     groups.set(closures, [...groups.get(closures) ?? [], plan]);
   }
-  await Promise.all([...groups.values()].map(async (group) => {
+  await Promise.all([...groups.values()].flatMap(batches).map(async (group) => {
     const origins = [...new Map(group.map((plan) => [pointKey(plan.origin!.location!), plan.origin!.location!])).values()];
     const targets = [...new Map(group.map((plan) => [pointKey(plan.destination!.location), plan.destination!.location])).values()];
     const avoid = group[0].closures.flatMap((closure) => closure.points);
