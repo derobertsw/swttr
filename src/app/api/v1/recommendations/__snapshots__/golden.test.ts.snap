@@ -6897,9 +6897,9 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       },
       "regional": {
         "min": {
-          "arms": 0.08,
-          "legs": 0.08,
-          "torso": 0.06,
+          "arms": 0.23,
+          "legs": 0.25,
+          "torso": 0.18,
         },
         "neutral": {
           "arms": 0.43,
@@ -6908,7 +6908,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
         },
       },
       "target_range": [
-        0.07,
+        0.21,
         0.4,
       ],
       "validation_buffer_clo": {
@@ -7003,7 +7003,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
         "neck_warmth": null,
       },
       "score": 98.9,
-      "thermal_comfort_score": 96.9,
+      "thermal_comfort_score": 95.5,
     },
     "warnings": [],
   },
@@ -7061,9 +7061,9 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       },
       "regional": {
         "min": {
-          "arms": 0.26,
-          "legs": 0.29,
-          "torso": 0.21,
+          "arms": 0.33,
+          "legs": 0.36,
+          "torso": 0.26,
         },
         "neutral": {
           "arms": 0.51,
@@ -7072,7 +7072,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
         },
       },
       "target_range": [
-        0.24,
+        0.3,
         0.47,
       ],
       "validation_buffer_clo": {
@@ -7217,7 +7217,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
         "neck_warmth": null,
       },
       "score": 97.8,
-      "thermal_comfort_score": 91,
+      "thermal_comfort_score": 94.7,
     },
     "warnings": [],
   },
@@ -8475,9 +8475,9 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       },
       "regional": {
         "min": {
-          "arms": 0.08,
-          "legs": 0.08,
-          "torso": 0.06,
+          "arms": 0.23,
+          "legs": 0.25,
+          "torso": 0.18,
         },
         "neutral": {
           "arms": 0.43,
@@ -8486,7 +8486,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
         },
       },
       "target_range": [
-        0.07,
+        0.21,
         0.4,
       ],
       "validation_buffer_clo": {
@@ -8581,7 +8581,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
         "neck_warmth": null,
       },
       "score": 98.9,
-      "thermal_comfort_score": 96.9,
+      "thermal_comfort_score": 95.5,
     },
     "warnings": [],
   },
@@ -8639,9 +8639,9 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       },
       "regional": {
         "min": {
-          "arms": 0.26,
-          "legs": 0.29,
-          "torso": 0.21,
+          "arms": 0.33,
+          "legs": 0.36,
+          "torso": 0.26,
         },
         "neutral": {
           "arms": 0.51,
@@ -8650,7 +8650,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
         },
       },
       "target_range": [
-        0.24,
+        0.3,
         0.47,
       ],
       "validation_buffer_clo": {
@@ -8795,7 +8795,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
         "neck_warmth": null,
       },
       "score": 98.9,
-      "thermal_comfort_score": 93.3,
+      "thermal_comfort_score": 97,
     },
     "warnings": [],
   },
@@ -14425,9 +14425,9 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'mi
       },
       "regional": {
         "min": {
-          "arms": 0.07,
-          "legs": 0.08,
-          "torso": 0.06,
+          "arms": 0.2,
+          "legs": 0.23,
+          "torso": 0.17,
         },
         "neutral": {
           "arms": 0.41,
@@ -14436,7 +14436,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'mi
         },
       },
       "target_range": [
-        0.07,
+        0.19,
         0.39,
       ],
       "validation_buffer_clo": {
@@ -14531,7 +14531,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'mi
         "neck_warmth": null,
       },
       "score": 99.9,
-      "thermal_comfort_score": 96.3,
+      "thermal_comfort_score": 97.4,
     },
     "warnings": [],
   },
@@ -14590,9 +14590,9 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ne
       },
       "regional": {
         "min": {
-          "arms": 0.27,
-          "legs": 0.31,
-          "torso": 0.23,
+          "arms": 0.32,
+          "legs": 0.37,
+          "torso": 0.27,
         },
         "neutral": {
           "arms": 0.51,
@@ -14601,7 +14601,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ne
         },
       },
       "target_range": [
-        0.26,
+        0.31,
         0.49,
       ],
       "validation_buffer_clo": {
@@ -14616,44 +14616,40 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ne
       "component_scores": {
         "breathability": 100,
         "coldProtection": 100,
-        "overheatPrevention": 97.6,
+        "overheatPrevention": 97.7,
         "weatherProtection": 100,
-        "weight": 100,
+        "weight": 80,
       },
       "ensemble_properties": {
-        "evap_potential": 0.566,
-        "permeability_index": 0.23,
+        "evap_potential": 0.312,
+        "permeability_index": 0.13,
         "regional_clo": {
-          "arms": 0.3,
+          "arms": 0.32,
           "legs": 0.5,
-          "torso": 0.42,
+          "torso": 0.4,
         },
-        "total_clo": 0.4087625,
+        "total_clo": 0.40647,
       },
       "garments": [
         {
           "category": "base_layer",
-          "coverage_arms": 1,
-          "coverage_legs": 0,
-          "coverage_torso": 1,
           "covers_arms": true,
           "covers_legs": false,
           "covers_torso": true,
-          "evap_potential": 0.45,
+          "evap_potential": 0.4,
           "garment_type": "top_long_sleeve",
-          "id": "9b7cc275-63d4-4eb5-b48e-263a2372a68c",
-          "name": "Patagonia Capilene Cool Lightweight",
-          "rcl": 0.22,
+          "id": "dd88c658-e737-425f-b55a-292af8e2113a",
+          "name": "32 Degrees Heat Lightweight Crew",
+          "rcl": 0.25,
           "rcl_arms": 0.25,
           "rcl_legs": 0,
-          "rcl_torso": 0.35,
-          "recl": 4,
+          "rcl_torso": 0.3,
+          "recl": 7,
           "thermal_data_status": "known",
           "thermal_provenance": {
-            "confidence_score": 0.7,
+            "confidence_score": 0.6,
             "estimation_method": "derived_from_similar",
           },
-          "usage": "either",
         },
         {
           "category": "base_layer",
@@ -14680,23 +14676,23 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ne
           "covers_arms": true,
           "covers_legs": false,
           "covers_torso": true,
-          "evap_potential": 0.5,
+          "evap_potential": 0.2,
           "garment_type": "jacket",
-          "id": "8708af12-086c-4c49-810b-18a636b5d0b7",
-          "name": "Patagonia Houdini Jacket",
+          "id": "f54b7b8d-0af7-4498-96a8-2161d2eef60e",
+          "name": "Norrøna Lofoten Gore-Tex Pro Jacket",
           "protection": {
-            "waterproof_mm": null,
-            "waterproof_rating": "DWR_only",
+            "waterproof_mm": 28000,
+            "waterproof_rating": "waterproof",
             "windproof_rating": "windproof",
           },
-          "rcl": 0.14,
-          "rcl_arms": 0.12,
+          "rcl": 0.12,
+          "rcl_arms": 0.15,
           "rcl_legs": 0,
-          "rcl_torso": 0.15,
-          "recl": 7,
+          "rcl_torso": 0.18,
+          "recl": 18.5,
           "thermal_data_status": "known",
           "thermal_provenance": {
-            "confidence_score": 0.8,
+            "confidence_score": 0.75,
             "estimation_method": "derived_from_similar",
           },
         },
@@ -14745,8 +14741,8 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ne
         "helmet": null,
         "neck_warmth": null,
       },
-      "score": 99.1,
-      "thermal_comfort_score": 95.8,
+      "score": 98.1,
+      "thermal_comfort_score": 99.2,
     },
     "warnings": [],
   },
@@ -15932,9 +15928,9 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'mi
       },
       "regional": {
         "min": {
-          "arms": 0.07,
-          "legs": 0.08,
-          "torso": 0.06,
+          "arms": 0.2,
+          "legs": 0.23,
+          "torso": 0.17,
         },
         "neutral": {
           "arms": 0.41,
@@ -15943,7 +15939,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'mi
         },
       },
       "target_range": [
-        0.07,
+        0.19,
         0.39,
       ],
       "validation_buffer_clo": {
@@ -16038,7 +16034,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'mi
         "neck_warmth": null,
       },
       "score": 99.9,
-      "thermal_comfort_score": 96.3,
+      "thermal_comfort_score": 97.4,
     },
     "warnings": [],
   },
@@ -16097,9 +16093,9 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ne
       },
       "regional": {
         "min": {
-          "arms": 0.27,
-          "legs": 0.31,
-          "torso": 0.23,
+          "arms": 0.32,
+          "legs": 0.37,
+          "torso": 0.27,
         },
         "neutral": {
           "arms": 0.51,
@@ -16108,7 +16104,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ne
         },
       },
       "target_range": [
-        0.26,
+        0.31,
         0.49,
       ],
       "validation_buffer_clo": {
@@ -16123,44 +16119,40 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ne
       "component_scores": {
         "breathability": 100,
         "coldProtection": 100,
-        "overheatPrevention": 96,
+        "overheatPrevention": 95.6,
         "weatherProtection": 75,
         "weight": 100,
       },
       "ensemble_properties": {
-        "evap_potential": 0.72,
-        "permeability_index": 0.33,
+        "evap_potential": 0.554,
+        "permeability_index": 0.26,
         "regional_clo": {
-          "arms": 0.3,
+          "arms": 0.35,
           "legs": 0.72,
           "torso": 0.42,
         },
-        "total_clo": 0.46402,
+        "total_clo": 0.476155,
       },
       "garments": [
         {
           "category": "base_layer",
-          "coverage_arms": 1,
-          "coverage_legs": 0,
-          "coverage_torso": 1,
           "covers_arms": true,
           "covers_legs": false,
           "covers_torso": true,
-          "evap_potential": 0.45,
+          "evap_potential": 0.4,
           "garment_type": "top_long_sleeve",
-          "id": "9b7cc275-63d4-4eb5-b48e-263a2372a68c",
-          "name": "Patagonia Capilene Cool Lightweight",
-          "rcl": 0.22,
+          "id": "dd88c658-e737-425f-b55a-292af8e2113a",
+          "name": "32 Degrees Heat Lightweight Crew",
+          "rcl": 0.25,
           "rcl_arms": 0.25,
           "rcl_legs": 0,
-          "rcl_torso": 0.35,
-          "recl": 4,
+          "rcl_torso": 0.3,
+          "recl": 7,
           "thermal_data_status": "known",
           "thermal_provenance": {
-            "confidence_score": 0.7,
+            "confidence_score": 0.6,
             "estimation_method": "derived_from_similar",
           },
-          "usage": "either",
         },
         {
           "category": "base_layer",
@@ -16200,28 +16192,28 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ne
           "usage": "standalone",
         },
         {
-          "category": "hard_shell",
+          "category": "soft_shell",
           "covers_arms": true,
           "covers_legs": false,
           "covers_torso": true,
-          "evap_potential": 0.5,
+          "evap_potential": 0.38,
           "garment_type": "jacket",
-          "id": "8708af12-086c-4c49-810b-18a636b5d0b7",
-          "name": "Patagonia Houdini Jacket",
+          "id": "36d0f5d2-c338-4161-b8d3-240d5a39c338",
+          "name": "Lululemon Pace Breaker Jacket",
           "protection": {
             "waterproof_mm": null,
             "waterproof_rating": "DWR_only",
-            "windproof_rating": "windproof",
+            "windproof_rating": "wind_resistant",
           },
-          "rcl": 0.14,
-          "rcl_arms": 0.12,
+          "rcl": 0.19,
+          "rcl_arms": 0.18,
           "rcl_legs": 0,
-          "rcl_torso": 0.15,
-          "recl": 7,
+          "rcl_torso": 0.2,
+          "recl": 11,
           "thermal_data_status": "known",
           "thermal_provenance": {
-            "confidence_score": 0.8,
-            "estimation_method": "derived_from_similar",
+            "confidence_score": 0.6,
+            "estimation_method": "calculated_from_materials",
           },
         },
         {
@@ -16273,8 +16265,8 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ne
         "helmet": null,
         "neck_warmth": null,
       },
-      "score": 95.9,
-      "thermal_comfort_score": 88.9,
+      "score": 95.7,
+      "thermal_comfort_score": 90.5,
     },
     "warnings": [],
   },
