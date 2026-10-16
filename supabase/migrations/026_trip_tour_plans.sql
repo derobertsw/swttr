@@ -149,8 +149,9 @@ REVOKE ALL ON FUNCTION public.mutate_trip_tour_plan(uuid, text, date, uuid, inte
 GRANT EXECUTE ON FUNCTION public.mutate_trip_tour_plan(uuid, text, date, uuid, integer, uuid, text, jsonb) TO service_role;
 
 -- change_trip_dates (021) as before, except that a removed day with a tour plan
--- carries its plan's id, so a plan added after the review isn't deleted
--- unseen. Days without one compare exactly as they did before this migration.
+-- carries its plan's id and revision, so a plan added or changed after the
+-- review isn't deleted unseen. Days without one compare exactly as they did
+-- before this migration.
 CREATE OR REPLACE FUNCTION public.change_trip_dates(
   p_trip_id uuid,
   p_user_id text,
@@ -216,7 +217,7 @@ BEGIN
   SELECT coalesce(jsonb_agg(jsonb_build_object(
       'date', d.date, 'stop_id', d.stop_id, 'activity', d.activity,
       'kit_ids', coalesce((SELECT jsonb_agg(k.id) FROM public.trip_member_day_kits k WHERE k.trip_day_id = d.id), '[]'::jsonb)
-    ) || coalesce((SELECT jsonb_build_object('tour_plan_id', t.id) FROM public.trip_day_tour_plans t WHERE t.trip_day_id = d.id), '{}'::jsonb)
+    ) || coalesce((SELECT jsonb_build_object('tour_plan_id', t.id, 'tour_plan_revision', t.revision) FROM public.trip_day_tour_plans t WHERE t.trip_day_id = d.id), '{}'::jsonb)
     ), '[]'::jsonb)
     INTO removed
     FROM public.trip_days d

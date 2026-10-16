@@ -123,7 +123,13 @@ describe("Tour plan transactions in Postgres", () => {
     const { rows: [sundayPlan] } = await db.query<{ id: string }>("SELECT id FROM trip_day_tour_plans WHERE trip_day_id = $1", [day.id]);
     await expect(change(["2026-10-09", "2026-10-10"], "keep", [removed])).rejects.toMatchObject({ code: "40001" });
     expect(await saved()).toHaveLength(2);
-    await change(["2026-10-09", "2026-10-10"], "keep", [{ ...removed, tour_plan_id: sundayPlan.id }]);
+    // A plan changed since the review (same id, newer revision) isn't removed either.
+    const reviewed = { ...removed, tour_plan_id: sundayPlan.id, tour_plan_revision: 1 };
+    await mutate({ date: "2026-10-11", revision: 1, payload: plan({ backup_plan: "Added after the review" }) });
+    await expect(change(["2026-10-09", "2026-10-10"], "keep", [reviewed])).rejects.toMatchObject({ code: "40001" });
+    await expect(change(["2026-10-09", "2026-10-10"], "keep", [{ ...removed, tour_plan_id: sundayPlan.id }])).rejects.toMatchObject({ code: "40001" });
+    expect(await saved()).toHaveLength(2);
+    await change(["2026-10-09", "2026-10-10"], "keep", [{ ...reviewed, tour_plan_revision: 2 }]);
     expect((await saved()).map((entry) => entry.date)).toEqual(["2026-10-10"]);
   });
 

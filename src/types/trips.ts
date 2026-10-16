@@ -243,8 +243,9 @@ export interface TripRemovedDayCheck {
   stop_id: string | null;
   activity: string | null;
   kit_ids: string[];
-  /** Present only when the day has a tour plan. */
+  /** Present only when the day has a tour plan: its id and the revision the review showed. */
   tour_plan_id?: string;
+  tour_plan_revision?: number;
 }
 
 export interface TripDateChangePlan {

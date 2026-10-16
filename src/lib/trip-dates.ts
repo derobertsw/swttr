@@ -99,7 +99,7 @@ function planFor(full: TripFull, start: string, end: string, mode: TripDateChang
     expected_removed: removed.map((day) => {
       const plan = tourPlanOn(day);
       return { date: day.date, stop_id: day.stop_id, activity: day.activity, kit_ids: kitsOn(day).map((kit) => kit.id),
-        ...(plan ? { tour_plan_id: plan.id } : {}) };
+        ...(plan ? { tour_plan_id: plan.id, tour_plan_revision: plan.revision } : {}) };
     }),
   };
 }

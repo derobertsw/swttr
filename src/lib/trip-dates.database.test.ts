@@ -34,7 +34,7 @@ const loadFull = async (): Promise<TripFull> => {
     days: await rows<TripDay>("SELECT id, date::text, stop_id, activity FROM trip_days WHERE trip_id = $1"),
     kits: await rows<TripMemberDayKit>("SELECT k.id, k.trip_day_id, k.trip_member_id FROM trip_member_day_kits k JOIN trip_days d ON d.id = k.trip_day_id WHERE d.trip_id = $1"),
     gear: [],
-    tour_plans: await rows<TripTourPlanSummary>("SELECT id, trip_day_id, objective FROM trip_day_tour_plans WHERE trip_id = $1"),
+    tour_plans: await rows<TripTourPlanSummary>("SELECT id, trip_day_id, objective, revision FROM trip_day_tour_plans WHERE trip_id = $1"),
   };
 };
 const tripDates = async () => (await db.query<{ start_date: string; end_date: string; name: string }>(

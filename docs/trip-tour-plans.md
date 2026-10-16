@@ -19,7 +19,7 @@ A Backcountry day can have a **Tour plan**: the route, when to meet, a backup pl
 - **Read first.** The day page shows the plan as labeled text after My kit: Route, Meet, Backup plan, Return target, the check-in plan, and access notes, which stay visible. Figures, the approach and pickup notes open under More tour details. When the plan has a meet time, the day's starting point and stay card shows it too ("Crew stay and meet").
 - **Another activity keeps the plan.** When a day with a plan changes to another activity, the plan isn't deleted or shown as current: it sits behind "Saved tour plan · <route>", with Restore, which sets the day back to Backcountry and moves focus to the plan.
 - **Save only on confirmation.** The editor closes after the server confirms. A failure keeps the input and the save identity, so a retry can't save twice. A plan changed elsewhere since the editor opened, or a date change that put another day on this date, is a `409`; Review saved plan shows what's saved for the date now while keeping the typed text, and saving then replaces that on purpose. Cancel, Escape and Back ask before discarding edits. Removing asks first and says the day keeps its activity.
-- **Date changes list plans.** The date-change review lists each day's plan ("Tour plan: Tuckerman Ravine"), and `change_trip_dates` refuses to remove a day whose plan wasn't in the review.
+- **Date changes list plans.** The date-change review lists each day's plan ("Tour plan: Tuckerman Ravine"), and `change_trip_dates` refuses to remove a day whose plan wasn't in the review, or changed since.
 - **Planning, not safety.** Check-in notes are labeled crew notes; SWTTR doesn't send messages or watch for check-ins. The app doesn't assess the backup plan or the route.
 
 ## API
@@ -37,7 +37,7 @@ Both are organizer only (`403` for members, `404` for anyone not on the trip). E
 
 - `trip_day_tour_plans`: one row per day (`trip_day_id` unique), with a composite foreign key to `trip_days(trip_id, id)` so a plan can't point at another trip's day, and checks for lengths, unit pairs, day offsets and a return after the meet. It records `revision`, `created_by`, `updated_by` and timestamps.
 - `mutate_trip_tour_plan(p_trip_id, p_user_id, p_date, p_day_id, p_expected_revision, p_request_id, p_action, p_payload)` locks the trip, checks the organizer, that `p_day_id` still holds the date and the revision (each `40001`), then saves or removes the plan and stores a receipt in `trip_tour_plan_mutations`. A retry with the same identity returns the first result; the stored time zone is left out of that comparison, since a retry's lookup may differ.
-- `change_trip_dates` is replaced: a removed day with a plan carries `tour_plan_id`, which the review must include. Days without a plan compare exactly as before.
+- `change_trip_dates` is replaced: a removed day with a plan carries `tour_plan_id` and `tour_plan_revision`, which the review must match. Days without a plan compare exactly as before.
 - RLS is on with no browser policies; only `service_role` can use the tables and functions.
 
 ## Deployment and validation
