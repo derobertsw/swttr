@@ -41,6 +41,16 @@ function SettingsForm({ trip, onSaved }: { trip: Trip; onSaved: () => Promise<bo
   const [name, setName] = useState(trip.name);
   const [start, setStart] = useState(trip.start_date);
   const [end, setEnd] = useState(trip.end_date);
+  // The trip the fields started from. The form can open on shared data that a
+  // background check then replaces: fields left as they were follow the newer
+  // trip, and fields being edited keep what was typed.
+  const [shown, setShown] = useState(trip);
+  if (trip !== shown) {
+    setShown(trip);
+    if (name === shown.name) setName(trip.name);
+    if (start === shown.start_date) setStart(trip.start_date);
+    if (end === shown.end_date) setEnd(trip.end_date);
+  }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ message: string; field: string | null } | null>(null);
   const [review, setReview] = useState<TripDateChangeRequest | null>(null);

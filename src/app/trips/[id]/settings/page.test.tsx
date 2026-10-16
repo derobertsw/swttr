@@ -5,12 +5,15 @@ import { toast } from "sonner";
 import { previewDateChange } from "@/lib/trip-dates";
 import { ORGANIZER, SAM, STOWE_STOP, TRIP, fakeTripApi, reply, sentBodies, tripFull } from "@/test/tripApi";
 import type { TripFull } from "@/types/trips";
+import { TripProvider } from "@/components/trips/TripProvider";
+import { useTrip } from "@/hooks/useTrip";
 import TripSettingsPage from "./page";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush }) }));
 vi.mock("@/components/PageLayout", () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: "user-1", sessionId: "session-1", isLoaded: true }) }));
 const params = Promise.resolve({ id: TRIP.id });
 
 // Saturday–Monday at Stowe, touring on Saturday, with Sam's kit on Monday.
@@ -48,6 +51,34 @@ describe("Trip settings", () => {
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/trips/trip-1"));
     expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")).toEqual([{ name: "Leaf peeping" }]);
     expect(toast.success).toHaveBeenCalledWith("Trip renamed.");
+  });
+
+  it("follows a newer trip from a background check in the fields left alone, and keeps what was typed", async () => {
+    let now = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    let answer!: (value: ReturnType<typeof reply>) => void;
+    let loads = 0;
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": () => ++loads === 1 ? reply(200, full) : new Promise((resolve) => { answer = resolve; }),
+    }));
+    function Overview() {
+      const { data } = useTrip(TRIP.id);
+      return <p>{data?.trip.name}</p>;
+    }
+    const { rerender } = await act(async () => render(<TripProvider tripId={TRIP.id}><Overview /></TripProvider>));
+    await screen.findByText(TRIP.name);
+    // A minute later, settings opens on the shared data while it's checked again.
+    now = 61_000;
+    await act(async () => { rerender(<TripProvider tripId={TRIP.id}><TripSettingsPage params={params} /></TripProvider>); });
+    expect(screen.getByRole("textbox", { name: "Trip name" })).toHaveValue(TRIP.name);
+    fireEvent.change(screen.getByRole("textbox", { name: "Trip name" }), { target: { value: "My edit" } });
+    await act(async () => answer(reply(200, { ...full, trip: { ...TRIP, name: "Renamed elsewhere", start_date: "2026-10-17", end_date: "2026-10-19" } })));
+    expect(screen.getByRole("textbox", { name: "Trip name" })).toHaveValue("My edit");
+    expect(screen.getByLabelText("Start date")).toHaveValue("2026-10-17");
+    expect(screen.getByLabelText("End date")).toHaveValue("2026-10-19");
+    // Only the name is a change now, so saving needs no date review.
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    vi.restoreAllMocks();
   });
 
   it("stays on settings with a reload when the trip can't be reloaded after a save", async () => {
