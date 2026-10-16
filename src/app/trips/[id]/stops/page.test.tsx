@@ -4,12 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { fakeTripApi, reply, sentBodies, STOWE_PLACE, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
 import { previewItinerary } from "@/lib/trip-itinerary";
+import { TripProvider } from "@/components/trips/TripProvider";
+import { useTrip } from "@/hooks/useTrip";
 import type { TripDay, TripFull, TripItineraryRequest } from "@/types/trips";
 import TripStopsPage from "./page";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/PageLayout", () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: "user-1", sessionId: "session-1", isLoaded: true }) }));
 const params = Promise.resolve({ id: TRIP.id });
 const second = { ...STOWE_STOP, id: "stop-2", position: 1, name: "Burlington" };
 const ITINERARY = "POST /api/v1/trips/trip-1/itinerary";
@@ -50,6 +53,29 @@ describe("Destinations after creation", () => {
     expect(sentBodies(fetchMock, "POST /api/v1/trips/trip-1/stops")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH")).toHaveLength(0);
   });
+  it("gives the trip's other pages a stop added here, without waiting for their next check", async () => {
+    let saved = [STOWE_STOP];
+    const fetchMock = fakeTripApi({
+      "GET /api/v1/trips/trip-1": () => reply(200, tripFull({ stops: saved })),
+      "GET /api/geocode": reply(200, { results: [STOWE_PLACE] }),
+      "POST /api/v1/trips/trip-1/stops": () => { saved = [...saved, second]; return reply(201, { stop: second }); },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    function Overview() {
+      const { data } = useTrip(TRIP.id);
+      return <p>Overview: {data?.stops.map((stop) => stop.name).join(", ")}</p>;
+    }
+    const user = userEvent.setup();
+    const { rerender } = await act(async () => render(<TripProvider tripId={TRIP.id}><TripStopsPage params={params} /></TripProvider>));
+    await user.type(await screen.findByRole("combobox", { name: "Destination" }), "Stowe");
+    await user.click(await within(await screen.findByRole("listbox")).findByRole("option", { name: /Stowe/ }));
+    await user.click(screen.getByRole("button", { name: "Add stop" }));
+    expect(await screen.findByText("Burlington", { selector: "p" })).toBeInTheDocument();
+    // Back to the overview within a minute, which reuses the shared data.
+    rerender(<TripProvider tripId={TRIP.id}><Overview /></TripProvider>);
+    expect(await screen.findByText("Overview: Stowe, Vermont, Burlington")).toBeInTheDocument();
+  });
+
   it("saves the stop, then reviews the days picked for it, keeping them after a failed save", async () => {
     let attempts = 0;
     const { fetchMock } = stopDays(["2026-10-10", "2026-10-11", "2026-10-12"].map(() => STOWE_STOP.id), () => ++attempts === 1 ? reply(500, { error: "Save failed" }) : reply(200, { stop: second }));
