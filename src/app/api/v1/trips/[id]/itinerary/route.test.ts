@@ -82,14 +82,27 @@ describe("Reviewing and saving itinerary changes", () => {
   it("saves the chosen option with only its validated fields", async () => {
     const response = await post({
       action: "assign_days", dates: ["2026-10-11"], activity: " Hiking ", owner_user_id: "user-9",
-      expected: [{ date: "2026-10-11", stop_id: JAY.id.toUpperCase(), activity: null, extra: true }],
+      expected: [{ date: "2026-10-11", stop_id: JAY.id.toUpperCase(), activity: null, extra: true }], access_points: { stops: {}, days: {} },
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary", {
-      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "assign_days",
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary_reviewed", {
+      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "assign_days", p_access_points: { stops: {}, days: {} },
       p_payload: { dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }] },
     });
+  });
+
+  it("reviews again a reviewed change that doesn't say which access points its review saw", async () => {
+    const response = await post({ action: "assign_days", dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }] });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: "The trip changed since you reviewed it. Review the changes again.",
+      options: [{ payload: { access_points: { stops: {}, days: {} } } }],
+    });
+    expect(rpc).not.toHaveBeenCalled();
+    // Reordering has no review, so it saves without one.
+    expect((await post({ action: "reorder_stops", order: [JAY.id, STOWE.id], expected: [STOWE.id, JAY.id] })).status).toBe(200);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary", expect.objectContaining({ p_action: "reorder_stops" }));
   });
 
   it("previews a copy as the signed-in member and saves it through its own transaction", async () => {
