@@ -197,7 +197,7 @@ export default function DayDetailPage({
             <DayLodging data={data} date={date} meet={activity === TOUR_ACTIVITY ? tourPlan?.meet_label : null} />
 
             <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()}>
-              <DayDrive tripId={id} date={date} drive={drive} canEdit={data.trip.owner_user_id === userId} />
+              <DayDrive data={data} date={date} dateLabel={dateLabel} drive={drive} canEdit={data.trip.owner_user_id === userId} onSaved={refresh} />
             </DayAccessPoint>
 
             <ActivityPicker

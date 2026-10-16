@@ -1,13 +1,30 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { driveMatrix } from "@/lib/locations/routing";
-import { DRIVE_ESTIMATE_MAX_AGE_MS, driveDay, drivePlans, stayDepartures, type DrivePlan, type StoredDriveEstimate } from "@/lib/trip-drive";
+import {
+  DRIVE_ESTIMATE_MAX_AGE_MS, driveDay, drivePlans, stayDepartures,
+  type DrivePlan, type StoredDriveEstimate, type StoredManualEstimate,
+} from "@/lib/trip-drive";
 import type { TripDriveEstimates, TripFull, TripLocation } from "@/types/trips";
 
-/** Where estimates are kept between visits: trip_drive_estimates (028). */
+/** Your estimate as trip_drive_manual_estimates (029) keeps it: with its day, which can move to another date. */
+export type ManualEstimateRow = Omit<StoredManualEstimate, "date"> & { trip_day_id: string };
+
+/** Where estimates are kept between visits: trip_drive_estimates (028), and your own in 029's table. */
 export interface DriveEstimateStore {
   read(): Promise<StoredDriveEstimate[]>;
   write(rows: StoredDriveEstimate[]): Promise<void>;
+  /** Your own estimates; none before migration 029. */
+  manual?(): Promise<ManualEstimateRow[]>;
+}
+
+/** Your estimates by their day's current date. */
+async function manualEstimates(full: TripFull, store: DriveEstimateStore): Promise<StoredManualEstimate[]> {
+  const rows = await (store.manual?.() ?? Promise.resolve([])).catch(() => []);
+  return rows.flatMap(({ trip_day_id: dayId, ...row }) => {
+    const day = full.days.find((candidate) => candidate.id === dayId);
+    return day ? [{ ...row, date: day.date }] : [];
+  });
 }
 
 type ReadyPlan = Extract<DrivePlan, { state: "ready" }>;
@@ -37,7 +54,8 @@ export async function tripDriveEstimates(full: TripFull, store: DriveEstimateSto
   const now = options.now ?? Date.now();
   const matrix = options.matrix ?? driveMatrix;
   const plans = drivePlans(full);
-  const stored = new Map((await store.read().catch(() => [])).map((row) => [row.date, row]));
+  const [storedRows, manual] = await Promise.all([store.read().catch(() => []), manualEstimates(full, store)]);
+  const stored = new Map(storedRows.map((row) => [row.date, row]));
   const due = plans.filter((plan): plan is ReadyPlan => {
     if (plan.state !== "ready") return false;
     const row = stored.get(plan.date);
@@ -78,17 +96,18 @@ export async function tripDriveEstimates(full: TripFull, store: DriveEstimateSto
   if (calculated.size) await store.write([...calculated.values()]).catch(() => undefined);
 
   return {
-    days: plans.map((plan) => driveDay(plan, calculated.get(plan.date) ?? stored.get(plan.date), failed.has(plan.date), now)),
-    stays: stayDepartures(full, now),
+    days: plans.map((plan) => driveDay(plan, calculated.get(plan.date) ?? stored.get(plan.date), failed.has(plan.date), now, { plans, manual })),
+    stays: stayDepartures(full, now, plans),
   };
 }
 
 const COLUMNS = "date, route_key, origin_label, destination_label, status, duration_seconds, distance_meters, calculated_at";
+const MANUAL_COLUMNS = "trip_day_id, pair_key, origin_label, destination_label, duration_seconds, note, use_calculated, entered_at";
 
 /**
- * trip_drive_estimates through the server's client. Before migration 028 the
- * table is missing: reads find nothing and writes are skipped, so estimates
- * are still calculated, just not kept.
+ * trip_drive_estimates and trip_drive_manual_estimates through the server's
+ * client. Before migration 028 the first is missing: reads find nothing and
+ * writes are skipped, so estimates are still calculated, just not kept.
  */
 export function supabaseDriveStore(supabase: SupabaseClient, tripId: string): DriveEstimateStore {
   return {
@@ -99,6 +118,11 @@ export function supabaseDriveStore(supabase: SupabaseClient, tripId: string): Dr
     async write(rows) {
       await supabase.from("trip_drive_estimates")
         .upsert(rows.map((row) => ({ ...row, trip_id: tripId, provider: "geoapify" })), { onConflict: "trip_id,date" });
+    },
+    // Before migration 029 the table is missing, and there are none.
+    async manual() {
+      const { data, error } = await supabase.from("trip_drive_manual_estimates").select(MANUAL_COLUMNS).eq("trip_id", tripId);
+      return error ? [] : (data ?? []) as ManualEstimateRow[];
     },
   };
 }
