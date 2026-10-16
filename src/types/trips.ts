@@ -87,6 +87,63 @@ export interface TripFull {
   gear: TripGroupGear[];
   /** Optional for older cached trip responses; the API always supplies it. */
   lodging?: TripLodging;
+  /** Backcountry days' tour plans (#210); optional like `lodging`. */
+  tour_plans?: TripTourPlanSummary[];
+}
+
+/** A Backcountry day's tour plan as the organizer enters it: see docs/trip-tour-plans.md. */
+export interface TripTourPlanInput {
+  objective: string;
+  route_url: string | null;
+  /** "HH:MM" on the destination's clock. */
+  meet_time: string | null;
+  /** -1 meets the evening before. */
+  meet_day_offset: -1 | 0;
+  distance: number | null;
+  distance_unit: "km" | "mi" | null;
+  ascent: number | null;
+  ascent_unit: "m" | "ft" | null;
+  duration_minutes: number | null;
+  /** Where the distance, ascent and duration come from; null is the crew's own estimate. */
+  metrics_source: string | null;
+  metrics_source_url: string | null;
+  approach_notes: string | null;
+  access_notes: string | null;
+  access_url: string | null;
+  backup_plan: string | null;
+  return_time: string | null;
+  /** 1 returns the day after. */
+  return_day_offset: 0 | 1;
+  checkin_notes: string | null;
+  pickup_notes: string | null;
+}
+
+export interface TripTourPlan extends TripTourPlanInput {
+  id: string;
+  trip_id: string;
+  trip_day_id: string;
+  /** The destination's IANA time zone when the plan was saved, if it could be found. */
+  time_zone: string | null;
+  revision: number;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A saved tour plan with the server's labels for it. */
+export interface TripTourPlanSummary extends TripTourPlan {
+  date: string;
+  /** e.g. "6:30 AM MDT · Sat Oct 10", or with ", the day before". */
+  meet_label: string | null;
+  return_label: string | null;
+  /** e.g. "14.2 km · 1,200 m ascent · 6 h 30 min". */
+  metrics_label: string | null;
+  /** "Crew estimate" or "Source: …", when there are figures. */
+  metrics_source_label: string | null;
+  /** Says whose clock the times use; null without times. */
+  time_zone_label: string | null;
+  updated_label: string;
 }
 
 export type TripStayType = "hotel" | "rental" | "hut" | "campground" | "other";
@@ -176,6 +233,8 @@ export interface TripDateChangeDay {
   activity: string | null;
   /** Names of the crew with a kit on this day. */
   kits: string[];
+  /** The objective of the day's tour plan, if it has one. */
+  tour_plan?: string | null;
 }
 
 /** A removed day as the server last saw it; sent back to confirm the removal. */
@@ -184,6 +243,9 @@ export interface TripRemovedDayCheck {
   stop_id: string | null;
   activity: string | null;
   kit_ids: string[];
+  /** Present only when the day has a tour plan: its id and the revision the review showed. */
+  tour_plan_id?: string;
+  tour_plan_revision?: number;
 }
 
 export interface TripDateChangePlan {
