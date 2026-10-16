@@ -8,6 +8,7 @@ import { SectionLabel } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { LocationPicker, LocationSummary } from "@/components/trips/LocationPicker";
+import { StayDepartures, useDriveEstimates } from "@/components/trips/DriveEstimate";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { useTripEditorHistory } from "@/hooks/useTripEditorHistory";
 import { errorMessage, timedTripRequest as lodgingRequest, TripRequestError } from "@/lib/trip-requests";
@@ -22,6 +23,8 @@ export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit:
   const [status, setStatus] = useState("");
   const focus = useReturnFocus();
   const lodging = data.lodging;
+  // Drive times only matter once a stay has nights, and each call can cost provider credits.
+  const drive = useDriveEstimates(data, !!lodging?.stays.some((stay) => stay.assigned_nights.length));
   const open = (next: Editor) => {
     focus.remember(() => document.getElementById("trip-stays-heading"));
     setEditor(next);
@@ -43,6 +46,7 @@ export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit:
             <p className="mt-1 text-base text-foreground">{stay.date_label}</p>
             <p className="text-base text-muted-foreground">{stay.booking_status === "booked" ? "Booked" : "Not booked"} · {stay.location ? stay.location.precision === "exact" ? "Location set" : "Approximate location" : stay.address ? "Location confirmation needed for drive times" : "Location not set"}</p>
             {stay.check_in && <p className="mt-1 text-sm text-muted-foreground">Assigned crew nights: {stay.assigned_nights.length ? stay.assigned_nights.join(", ") : "None"}</p>}
+            {!!stay.assigned_nights.length && <StayDepartures tripId={data.trip.id} stayId={stay.id} drive={drive} />}
             {!!stay.review_dates.length && <p className="mt-2 text-base text-warning">Review dates outside the itinerary: {stay.review_dates.join(", ")}. Stay dates and bookings have been kept.</p>}
             <details className="mt-2 text-base text-foreground">
               <summary className="min-h-11 cursor-pointer py-2">Stay details</summary>
