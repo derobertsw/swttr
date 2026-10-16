@@ -26,7 +26,12 @@ export default function TripStopsPage({ params }: { params: Promise<{ id: string
     {loading && !data && <p role="status">Loading destinations…</p>}
     {error && <div role="alert"><p>{error}</p><Button variant="outline" onClick={() => void refresh()}>Retry</Button></div>}
     {data && stops && (
-      <TripStopsEditor trip={data.trip} stops={stops} onStopsChange={(action) => setEditedStops((current) => typeof action === "function" ? action(current ?? data.stops) : action)} onItineraryChange={() => void reload()} onBack={overview} onNext={overview} backLabel="Overview" nextLabel="Done">
+      <TripStopsEditor trip={data.trip} stops={stops} onStopsChange={(action) => {
+        setEditedStops((current) => typeof action === "function" ? action(current ?? data.stops) : action);
+        // The overview and day pages share this trip's data, and reuse it for a
+        // minute, so a saved stop must reach it too. This page keeps its own list.
+        void refresh();
+      }} onItineraryChange={() => void reload()} onBack={overview} onNext={overview} backLabel="Overview" nextLabel="Done">
         <TripDaysEditor tripId={id} stops={stops} days={data.days} onSaved={() => void reload()} />
       </TripStopsEditor>
     )}
