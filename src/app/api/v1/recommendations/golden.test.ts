@@ -189,6 +189,46 @@ describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST, s
   });
 });
 
+describe.each([
+  { sport: 'running', activity: 'running', POST: running, easyRate: 254.2 },
+  { sport: 'xc', activity: 'xc_skiing', POST: xc, easyRate: 266.0 },
+])('POST /api/v1/recommendations/$sport (calibration contract)', ({ POST, activity, easyRate }) => {
+  it('uses sustained moderate effort and reference body metrics when omitted', async () => {
+    useDatabase(null, []);
+    const { status, body } = await callRoute(POST, {
+      weather: { temperature: 56, wind_speed: 8, humidity: 50 },
+    });
+    expect(status).toBe(200);
+    expect(body.ireq.policy).toMatchObject({ activity, phase: 'sustained', effort: 'moderate' });
+    expect(body.ireq.policy.metabolicRateWm2).toBeCloseTo(395.2, 0);
+    expect(body.ireq.target_range[0]).toBe(0.03);
+    expect(body.ireq.extremity).toEqual({ min: { hands: 0, head: 0 }, neutral: { hands: 0, head: 0 } });
+    expect(body.ireq.validation_source).toBe('coweda_inspired_unvalidated_swttr_margin');
+    expect(body.guidance).toEqual(expect.arrayContaining(body.ireq.policy.assumptions));
+  });
+
+  it('keeps the same body-specific heat-balance floor with clothing or a targets-only response', async () => {
+    const request = {
+      weather: { temperature: 50, wind_speed: 8, humidity: 50 },
+      exertion: 'easy', height_inches: 62, weight_lbs: 110,
+    };
+    useDatabase(null, []);
+    const full = await callRoute(POST, request);
+    expect(full.status).toBe(200);
+    expect(full.body.recommendation.garments.length).toBeGreaterThan(0);
+    expect(full.body.ireq.policy.metabolicRateWm2).toBeCloseTo(easyRate, 0);
+    expect(full.body.ireq.min).toBeGreaterThan(0.25);
+    expect(full.body.ireq.target_range[0]).toBeGreaterThanOrEqual(full.body.ireq.min);
+
+    useDatabase(USER_ID, []);
+    const empty = await callRoute(POST, { ...request, use_wardrobe_only: true });
+    expect(empty.status).toBe(200);
+    expect(empty.body.recommendation).toBeUndefined();
+    expect(empty.body.ireq).toEqual(full.body.ireq);
+    expect(empty.body.recommendations.guidance).toEqual(expect.arrayContaining(empty.body.ireq.policy.assumptions));
+  });
+});
+
 describe("POST /api/v1/recommendations/alpine (golden, comfort)", () => {
   it.each(MODES)("does not warn about regional insulation at 45°F with $name gear", async (mode) => {
     useDatabase(mode.userId, mode.wardrobe);
