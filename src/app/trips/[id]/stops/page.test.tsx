@@ -16,6 +16,8 @@ vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: "user-1", sessionId:
 const params = Promise.resolve({ id: TRIP.id });
 const second = { ...STOWE_STOP, id: "stop-2", position: 1, name: "Burlington" };
 const ITINERARY = "POST /api/v1/trips/trip-1/itinerary";
+/** What a review of a trip without access points sends back with its save (#208). */
+const NO_ACCESS_POINTS = { stops: {}, days: {} };
 
 /**
  * A trip with Stowe and Burlington over Saturday–Monday, each day at the stop
@@ -236,7 +238,7 @@ describe("Changing the itinerary from Destinations", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(stopRows()).toEqual(["Stowe, Vermont", "Jay Peak"]);
     expect(screen.getByText("Burlington removed.")).toBeInTheDocument();
-    expect(sentBodies(fetchMock, ITINERARY).at(-1)).toEqual({ action: "remove_stop", stop_id: second.id, reassign_to: jay.id, expected: ["2026-10-11"] });
+    expect(sentBodies(fetchMock, ITINERARY).at(-1)).toEqual({ action: "remove_stop", stop_id: second.id, reassign_to: jay.id, expected: ["2026-10-11"], access_points: NO_ACCESS_POINTS });
     // The days reload with the stops.
     expect(screen.getByRole("checkbox", { name: /Oct 11.*Jay Peak/ })).toBeInTheDocument();
   });
@@ -319,6 +321,7 @@ describe("Changing the itinerary from Destinations", () => {
     expect(sentBodies(fetchMock, ITINERARY).at(-1)).toEqual({
       action: "assign_days", dates: ["2026-10-10", "2026-10-12"], stop_id: second.id, activity: null,
       expected: [{ date: "2026-10-10", stop_id: null, activity: "Hike" }, { date: "2026-10-12", stop_id: jay.id, activity: null }],
+      access_points: NO_ACCESS_POINTS,
     });
     expect(screen.getByText("Days saved.")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /Oct 10/ })).not.toBeChecked();

@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { errorMessage, timedTripRequest, TripRequestError } from "@/lib/trip-requests";
-import type { TripItineraryOption, TripItineraryPreview, TripItineraryRequest } from "@/types/trips";
+import type { TripAccessPointRequest, TripItineraryOption, TripItineraryPreview, TripItineraryRequest } from "@/types/trips";
 
 const isPreview = (value: unknown): value is TripItineraryPreview =>
   Array.isArray((value as TripItineraryPreview | null)?.options) && (value as TripItineraryPreview).options.length > 0;
 
-function unchangedText({ changes, unchanged }: TripItineraryOption) {
+function itineraryUnchanged({ changes, unchanged }: TripItineraryOption) {
   if (changes.length === 0) return "Every day keeps its destination and activity.";
   return unchanged === 1 ? "1 other day keeps its destination and activity." : `${unchanged} other days keep their destination and activity.`;
 }
@@ -20,9 +20,13 @@ function unchangedText({ changes, unchanged }: TripItineraryOption) {
  * refuses a save that no longer matches the review. When the change can go
  * more than one way, nothing is chosen until the person picks an option.
  */
-export function ItineraryChangeSheet({ tripId, change, title, description, question, saveLabel, onSaved, onClose, onCloseAutoFocus }: {
+export function ItineraryChangeSheet({ tripId, change, url = `/api/v1/trips/${tripId}/itinerary`, unchangedText = itineraryUnchanged, title, description, question, saveLabel, onSaved, onClose, onCloseAutoFocus }: {
   tripId: string;
-  change: TripItineraryRequest;
+  change: TripItineraryRequest | TripAccessPointRequest;
+  /** The route that reviews and saves the change; the itinerary's by default. */
+  url?: string;
+  /** Says what the days the option doesn't list keep. */
+  unchangedText?: (option: TripItineraryOption) => string;
   title: string;
   description: string;
   /** The legend for the options, when there's more than one. */
@@ -41,7 +45,6 @@ export function ItineraryChangeSheet({ tripId, change, title, description, quest
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const reviewRef = useRef<HTMLHeadingElement>(null);
-  const url = `/api/v1/trips/${tripId}/itinerary`;
 
   useEffect(() => {
     let cancelled = false;

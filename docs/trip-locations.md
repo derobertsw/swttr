@@ -1,6 +1,6 @@
 # Precise trip locations (#208)
 
-Stays now have a confirmed place, separate from any activity's weather location. A destination's parking or meeting point, with a day-only override, follows in the next #208 change and reuses the same picker and location shape. Drive times (#209) and maps (#222) read these places later.
+Stays and destinations' access points (where the crew parks or meets) have confirmed places, separate from any activity's weather location. Both use the same picker and location shape. Drive times (#209), the tour plan's trailhead and meeting point (#210) and maps (#222) read these places.
 
 ## Provider
 
@@ -24,7 +24,7 @@ Only `src/lib/locations/provider.ts` knows the provider. It keeps the key server
 
 ## Location shape
 
-`TripLocation` in `src/types/trips.ts` is stored as `trip_stays.location` (jsonb). `public.is_trip_location` checks the same rules in the database as `parseTripLocation` does in `src/lib/trip-location.ts`.
+`TripLocation` in `src/types/trips.ts` is stored as jsonb in `trip_stays.location`, `trip_stops.access_point` and `trip_days.access_point`. `public.is_trip_location` checks the same rules in the database as `parseTripLocation` does in `src/lib/trip-location.ts`.
 
 | Field | Meaning |
 |---|---|
@@ -40,7 +40,7 @@ A stay save that omits `location` keeps the saved place, so an editor opened bef
 
 ## Picker
 
-`LocationPicker` (`src/components/trips/LocationPicker.tsx`) has a role-specific heading, "Where is the stay?", and starts from Search name or address. Choosing a result shows Check this location with its name, address, precision, Open map (OpenStreetMap, new tab) and the credit. Only Use this location hands the place to the editor, and the editor saves it with the stay. Back to results keeps the query and results without searching again.
+`LocationPicker` (`src/components/trips/LocationPicker.tsx`) has a role-specific heading, "Where is the stay?" or "Where will you park or meet?", and starts from Search name or address. Choosing a result shows Check this location with its name, address, precision, Open map (OpenStreetMap, new tab) and the credit. Only Use this location hands the place to the editor, and the editor saves it with the stay. Back to results keeps the query and results without searching again.
 
 - Searches start 350 ms after typing stops, from 3 characters. Each new query aborts the last request, so an older answer never replaces newer results or the place being checked.
 - The search field is a combobox with an inline list: arrow keys move, Enter checks a place and never submits the form. Status is announced: Searching…, places found, No matches, or search unavailable.
@@ -48,13 +48,36 @@ A stay save that omits `location` keeps the saved place, so an editor opened bef
 - Set location on a stay with an address and no place searches that address straight away.
 - "Powered by Geoapify" and "© OpenStreetMap contributors" appear wherever results or a saved Geoapify place appear, including for members.
 
+## Access points
+
+An access point is where the crew parks or meets for a day at a destination: a trailhead lot, a resort entrance, a meeting spot. It's never the destination's weather location, which stays in the stop's own coordinates.
+
+- **It belongs to the destination (trip stop).** Every day at the stop shares it, including days without a stop of their own that go to the base (the first stop).
+- **A day can have its own instead.** It's saved with the stop it was set for (`trip_days.access_point_stop_id`) and applies only while the day is still at that stop. When an itinerary edit moves the day to another destination, the day uses that destination's point; if it moves back, its own point applies again. Moving the trip's dates keeps it with its day. `accessPointFor` in `src/lib/trip-location.ts` resolves a day's point.
+- **Changing one asks which days.** As in #176's edit contract, picking a place opens a review built by the server: **Only Sat Oct 10** or **All days at Stowe, Vermont (2 days)**, with the dates, and each day that changes, before and after. Nothing is chosen until the organizer picks. When the day is the only one at its stop, the point is saved with the stop, so days added there later get it. "All days" also replaces those days' own points.
+- **Removing.** A day's own point can be removed from just that day, which then uses its stop's again, or from every day at the stop. A day can't go without its stop's point on its own; set a different one for it instead.
+- **Itinerary reviews say what happens to it.** When a day's destination changes, the review notes "Access point: Spruce Peak lot → Tram lot." When a stop moves to a new place it keeps its point, and the review says "Access point stays Mountain Road lot. Check it's right for Burlington, Vermont." A change of activity alone says nothing about it. Each reviewed option carries every access point on the trip as the review saw it, and `edit_trip_itinerary_reviewed` (027) refuses the save with `40001` when any of them changed since, so the notes can't go stale. A reviewed save that doesn't carry them, from a review opened before this change, gets the current review back (409) instead of saving. Reordering stops saves without a review and never changes a day's point.
+- **Who.** The organizer, like every logistics edit. Members see the point, its precision, Open map and the credit, with "Managed by the organizer".
+
+The day page's **Getting there** card (`src/components/trips/DayAccessPoint.tsx`) shows the point and whether it's for every day at the stop or only this day, with Set, Change and Remove access point. The review reuses `ItineraryChangeSheet`.
+
 ## API
 
 `GET /api/v1/trips/:id/locations?q=` returns `{results: TripLocation[]}`; an empty list means no matches. Only the organizer can search, because only the organizer edits logistics. Members get 403, and other trips get 404. A query must be 3–200 characters. Each person can search 30 times a minute (per server instance; 429, `code: "rate_limited"`). A missing key, provider failure or spent quota returns 503 with `code: "unavailable"` and no provider details.
 
 Stay saves (`POST`/`PATCH /api/v1/trips/:id/stays…`, [trip-stays.md](trip-stays.md)) accept `stay.location`. An invalid place returns 400 with `field: "location"`.
 
+`POST /api/v1/trips/:id/access-points` is organizer only (403 otherwise).
+
+| Request | Response |
+|---|---|
+| `preview: true`, `date` and `location` (a place, or `null` to remove) | `{ options: [{ key, label, detail, changes: [{date, date_label, before, after}], unchanged, payload }] }`: `day` and `stop`, or one option. `400` for an invalid place (`field: "location"`), a day with no destination or no point to remove; `404` for a date the trip doesn't have. |
+| The chosen option's `payload`: `date`, `scope` (`day` or `stop`), `location` and `expected` | Saves through `set_trip_access_point` and returns `{ ok: true }`. `409` with the error and the current review when the trip changed since the review; `503` with `field: "location"` before migration 027. |
+
+`previewAccessPoint` (`src/lib/trip-access-points.ts`) builds the review, and the save is rebuilt from validated fields only. `set_trip_access_point` (`supabase/migrations/027_trip_access_points.sql`) locks the trip, checks the organizer, and compares `expected` (the day's stop, that stop's point, and each day at the stop with the own point that applies) with the trip; a mismatch raises `40001` and changes nothing. A PGlite test runs each previewed option through the function and checks that exactly the days its review lists changed.
+
 ## Deployment
 
 1. Apply `supabase/migrations/025_trip_stay_locations.sql` by hand, after 017. It adds the column and replaces `mutate_trip_lodging` with a version that saves the location. As with the other trip migrations, apply this file on its own rather than pushing the folder. Until it's applied, a stay save with a location returns 503 (`field: "location"`) rather than saving the stay without its place; saves without one work as before.
-2. Set `GEOAPIFY_API_KEY` in Vercel. Without it, search says it's unavailable and stays still save with an address or typed coordinates.
+2. Apply `supabase/migrations/027_trip_access_points.sql` by hand, after 025 (it uses `is_trip_location`) and on its own; 026 is #210's tour plans. It adds the access point columns, `set_trip_access_point`, and `trip_access_points` with `edit_trip_itinerary_reviewed`, which checks a reviewed itinerary change's access points before running 022's or 023's function. Until it's applied, saving an access point returns 503, day pages show none, and itinerary changes save through 022/023 directly.
+3. Set `GEOAPIFY_API_KEY` in Vercel. Without it, search says it's unavailable and stays still save with an address or typed coordinates.

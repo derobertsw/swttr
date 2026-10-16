@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError, readJson } from "@/lib/api";
-import { parseItineraryEdit, parseItineraryRequest, previewItinerary, requestFor } from "@/lib/trip-itinerary";
+import { parseAccessPointsCheck, parseItineraryEdit, parseItineraryRequest, previewItinerary, requestFor } from "@/lib/trip-itinerary";
 import { loadTripFull, requireTripAccess } from "@/lib/trips";
 import type { TripItineraryRequest } from "@/types/trips";
 
@@ -37,18 +37,31 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
 
   const edit = parseItineraryEdit(body);
   if ("error" in edit) return jsonError(edit.error, 400);
+  const accessPoints = parseAccessPointsCheck(body);
+  if (accessPoints === null) return jsonError("Reload the trip and try again.", 400);
   // Copying a day can bring the user's kit, so it has its own function.
-  const { error } = edit.action === "copy_day"
-    ? await supabase.rpc("copy_trip_day", { p_trip_id: id, p_user_id: userId, p_payload: edit.payload })
-    : await supabase.rpc("edit_trip_itinerary", { p_trip_id: id, p_user_id: userId, p_action: edit.action, p_payload: edit.payload });
-  if (error?.code === "40001") {
-    // Something changed since the review. Show the change as it would be now.
+  const unchecked = () => edit.action === "copy_day"
+    ? supabase.rpc("copy_trip_day", { p_trip_id: id, p_user_id: userId, p_payload: edit.payload })
+    : supabase.rpc("edit_trip_itinerary", { p_trip_id: id, p_user_id: userId, p_action: edit.action, p_payload: edit.payload });
+  // Something changed since the review. Show the change as it would be now.
+  const reviewAgain = async () => {
     const current = await preview(requestFor(edit)).catch(() => null);
     return NextResponse.json({
       error: "The trip changed since you reviewed it. Review the changes again.",
       ...(current && !("error" in current) ? current : {}),
     }, { status: 409 });
-  }
+  };
+  // A reviewed change is refused when an access point it noted changed since
+  // (#208), and one whose review didn't record them (from before #208) is
+  // reviewed again. Reordering saves without a review and never changes a
+  // day's access point, so it sends none. Before migration 027 there are no
+  // access points, and no function to check them.
+  if (!accessPoints && edit.action !== "reorder_stops") return reviewAgain();
+  let { error } = accessPoints
+    ? await supabase.rpc("edit_trip_itinerary_reviewed", { p_trip_id: id, p_user_id: userId, p_action: edit.action, p_payload: edit.payload, p_access_points: accessPoints })
+    : await unchecked();
+  if (accessPoints && (error?.code === "PGRST202" || error?.code === "42883")) ({ error } = await unchecked());
+  if (error?.code === "40001") return reviewAgain();
   if (error?.code === "42501") return jsonError("Not found", 404);
   if (error?.code === "P0002") return jsonError("That stop or day isn't on this trip anymore. Reload the trip.", 404);
   if (error?.code === "22023") return jsonError("Check the change and try again.", 400);

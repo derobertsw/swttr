@@ -40,7 +40,7 @@ describe("Reviewing and saving itinerary changes", () => {
         { date: "2026-10-10", date_label: "Sat Oct 10", before: "Stowe, Vermont (base) · Ski touring", after: "Jay Peak · Ski touring" },
         { date: "2026-10-12", date_label: "Mon Oct 12", before: "Stowe, Vermont · No activity", after: "Jay Peak · No activity" },
       ],
-      payload: { stop_id: STOWE.id, reassign_to: JAY.id, expected: ["2026-10-10", "2026-10-12"] },
+      payload: { stop_id: STOWE.id, reassign_to: JAY.id, expected: ["2026-10-10", "2026-10-12"], access_points: { stops: {}, days: {} } },
     }]);
     expect(requireTripAccess).toHaveBeenCalledWith(TRIP.id);
     expect(rpc).not.toHaveBeenCalled();
@@ -82,14 +82,27 @@ describe("Reviewing and saving itinerary changes", () => {
   it("saves the chosen option with only its validated fields", async () => {
     const response = await post({
       action: "assign_days", dates: ["2026-10-11"], activity: " Hiking ", owner_user_id: "user-9",
-      expected: [{ date: "2026-10-11", stop_id: JAY.id.toUpperCase(), activity: null, extra: true }],
+      expected: [{ date: "2026-10-11", stop_id: JAY.id.toUpperCase(), activity: null, extra: true }], access_points: { stops: {}, days: {} },
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary", {
-      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "assign_days",
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary_reviewed", {
+      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "assign_days", p_access_points: { stops: {}, days: {} },
       p_payload: { dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }] },
     });
+  });
+
+  it("reviews again a reviewed change that doesn't say which access points its review saw", async () => {
+    const response = await post({ action: "assign_days", dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }] });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: "The trip changed since you reviewed it. Review the changes again.",
+      options: [{ payload: { access_points: { stops: {}, days: {} } } }],
+    });
+    expect(rpc).not.toHaveBeenCalled();
+    // Reordering has no review, so it saves without one.
+    expect((await post({ action: "reorder_stops", order: [JAY.id, STOWE.id], expected: [STOWE.id, JAY.id] })).status).toBe(200);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary", expect.objectContaining({ p_action: "reorder_stops" }));
   });
 
   it("previews a copy as the signed-in member and saves it through its own transaction", async () => {
@@ -106,8 +119,8 @@ describe("Reviewing and saving itinerary changes", () => {
 
     rpc.mockResolvedValue({ data: { action: "copy_day" }, error: null });
     expect((await post({ action: "copy_day", ...preview.options[0].payload, extra: 1 })).status).toBe(200);
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("copy_trip_day", {
-      p_trip_id: TRIP.id, p_user_id: "user-2",
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary_reviewed", {
+      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "copy_day", p_access_points: { stops: {}, days: {} },
       p_payload: {
         from: "2026-10-10", dates: ["2026-10-12"], kit: "none",
         expected: {
@@ -126,6 +139,31 @@ describe("Reviewing and saving itinerary changes", () => {
     });
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ options: [{ key: "copy", payload: { expected: { from: { activity: "Ski touring" } } } }] });
+  });
+
+  it("checks a reviewed save's access points, falls back before migration 027, and refuses a malformed check", async () => {
+    const LOT = { label: "Mountain Road lot", address: null, latitude: 44.528, longitude: -72.7853, precision: "exact", time_zone: null, source: "manual", provider: null, provider_id: null, attribution: null };
+    const accessPoints = { stops: { [JAY.id]: LOT }, days: {} };
+    const body = { action: "assign_days", dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }], access_points: accessPoints };
+    const payload = { dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }] };
+    expect((await post(body)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary_reviewed", {
+      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "assign_days", p_payload: payload, p_access_points: accessPoints,
+    });
+
+    rpc.mockClear();
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "missing" } });
+    expect((await post(body)).status).toBe(200);
+    expect(rpc).toHaveBeenLastCalledWith("edit_trip_itinerary", { p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "assign_days", p_payload: payload });
+
+    rpc.mockClear();
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "40001", message: "Access points changed." } });
+    expect((await post(body)).status).toBe(409);
+
+    rpc.mockClear();
+    expect((await post({ ...body, access_points: { stops: [] } })).status).toBe(400);
+    expect((await post({ ...body, access_points: { stops: { [JAY.id]: "lot" }, days: {} } })).status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("rejects a malformed save before calling the transaction", async () => {

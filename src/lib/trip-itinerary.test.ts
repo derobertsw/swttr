@@ -48,7 +48,7 @@ describe("Itinerary previews", () => {
     const unused = { ...JAY, id: "stop-unused", position: 2, name: "Smuggs" };
     expect(options(previewItinerary({ ...full, stops: [...full.stops, unused] }, { action: "remove_stop", stop_id: unused.id }))).toEqual([{
       key: "remove", label: "No day uses Smuggs", detail: "Every day keeps its destination.", changes: [], unchanged: 3,
-      payload: { stop_id: unused.id, reassign_to: STOWE_STOP.id, expected: [] },
+      payload: { stop_id: unused.id, reassign_to: STOWE_STOP.id, expected: [], access_points: { stops: {}, days: {} } },
     }]);
   });
 

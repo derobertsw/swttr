@@ -325,6 +325,7 @@ describe("Trip day page", () => {
       expect(sentBodies(fetchMock, ITINERARY).at(-1)).toEqual({
         action: "set_day_place", date: "2026-10-10", place: { name: "Jay, Vermont", latitude: 44.94, longitude: -72.5 },
         scope: "day", expected: { stop_id: STOWE_STOP.id, stop: { name: STOWE_STOP.name, latitude: 44.47, longitude: -72.69 }, dates: ["2026-10-10"] },
+        access_points: { stops: {}, days: {} },
       });
       // The trip reloads after the save.
       expect(sentBodies(fetchMock, "GET /api/v1/trips/trip-1")).toHaveLength(2);
@@ -774,7 +775,9 @@ describe("Trip day page", () => {
       }));
       await renderPage();
       expect(await screen.findByText("Lower snowfields")).toBeInTheDocument();
-      expect(screen.getByText("Managed by the organizer")).toBeInTheDocument();
+      // Getting there (#208) says the same for its access point.
+      const tourPlan = screen.getByRole("heading", { name: "Tour plan" }).closest<HTMLElement>('[data-slot="card"]')!;
+      expect(within(tourPlan).getByText("Managed by the organizer")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Change tour plan" })).not.toBeInTheDocument();
     });
 

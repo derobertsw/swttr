@@ -27,6 +27,8 @@ export interface TripStop {
   longitude: number | null;
   activities: string[];
   created_at: string;
+  /** Where the crew parks or meets on days here (#208); missing before migration 027. Not the weather location. */
+  access_point?: TripLocation | null;
 }
 
 export interface TripMember {
@@ -46,6 +48,9 @@ export interface TripDay {
   stop_id: string | null;
   date: string;
   activity: string | null;
+  /** This day's own access point (#208), used instead of its stop's while the day is at `access_point_stop_id`. */
+  access_point?: TripLocation | null;
+  access_point_stop_id?: string | null;
 }
 
 export interface TripMemberDayKit {
@@ -149,7 +154,7 @@ export interface TripTourPlanSummary extends TripTourPlan {
 export type TripStayType = "hotel" | "rental" | "hut" | "campground" | "other";
 
 /**
- * A confirmed place for trip logistics (#208): a stay now, access points next.
+ * A confirmed place for trip logistics (#208): a stay, or a destination's access point.
  * It is never an activity's weather location. See docs/trip-locations.md.
  */
 export interface TripLocation {
@@ -292,6 +297,13 @@ export type TripItineraryRequest =
   | { action: "set_day_place"; date: string; place: TripPlace }
   /** Gives `dates` the destination and activity of `from`, and with `kit` the signed-in member's kit too. */
   | { action: "copy_day"; from: string; dates: string[]; kit: boolean };
+
+/** Sets or removes a day's access point (#208); the review asks whether it's for the day or every day at its stop. */
+export interface TripAccessPointRequest {
+  action: "set_access_point";
+  date: string;
+  location: TripLocation | null;
+}
 
 /** A day's destination and activity before and after, each as "<stop>[ (base)] · <activity|No activity>". */
 export interface TripItineraryChange {
