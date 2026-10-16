@@ -31,6 +31,7 @@ import { canEditMemberKit } from "@/lib/trip-permissions";
 import { kitAdvice, kitWear } from "@/lib/trip-saved-kits";
 import { DayLodging } from "@/components/trips/TripStays";
 import { DayAccessPoint } from "@/components/trips/DayAccessPoint";
+import { DayDrive, useDriveEstimates } from "@/components/trips/DriveEstimate";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
@@ -55,6 +56,7 @@ export default function DayDetailPage({
   const { id, date } = use(params);
   const { data, loading, error, refresh } = useTrip(id);
   const userId = useUserId();
+  const drive = useDriveEstimates(data);
   const [weatherAttempt, setWeatherAttempt] = useState(0);
   const [weatherResult, setWeatherResult] = useState<{
     key: string;
@@ -190,7 +192,9 @@ export default function DayDetailPage({
 
             <DayLodging data={data} date={date} />
 
-            <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()} />
+            <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()}>
+              <DayDrive tripId={id} date={date} drive={drive} canEdit={data.trip.owner_user_id === userId} />
+            </DayAccessPoint>
 
             <ActivityPicker
               tripId={id}

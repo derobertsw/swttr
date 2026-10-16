@@ -6,7 +6,7 @@ Stays and destinations' access points (where the crew parks or meets) have confi
 
 Search uses Geoapify Address Autocomplete on the free plan: 3,000 credits a day, commercial use allowed with attribution, and results we may store. Each search costs 1 credit. Maps will use MapLibre with OpenFreeMap tiles, and weather search stays on Open-Meteo. The comparison with Google, Mapbox, Apple, Stadia, LocationIQ and openrouteservice is in the [provider decision](https://github.com/derobertsw/swttr/issues/208#issuecomment-6134840726). The [pilot](https://github.com/derobertsw/swttr/issues/208#issuecomment-6135105504) covered ten endpoint types in Vermont, New York and Massachusetts and passed 9 of 10. The pricing and terms were checked on October 12, 2026. Recheck them before relying on any change, and reassess after launch in #283.
 
-Still open with Geoapify: a written answer on free-plan production limits, and on storing Route Matrix and Routing results. #209 needs that answer. Search results may already be stored.
+Still open with Geoapify: a written answer on free-plan production limits, and on storing Route Matrix and Routing results. Search results may already be stored. Drive estimates are stored too, by the user's decision of October 15, 2026 ([#209](https://github.com/derobertsw/swttr/issues/209#issuecomment-6205805246)); if Geoapify says no, `trip_drive_estimates` becomes a short cache.
 
 Only `src/lib/locations/provider.ts` knows the provider. It keeps the key server-side (`GEOAPIFY_API_KEY`, never `NEXT_PUBLIC_`), times out after 6 seconds, and logs counts only, never the query or a place:
 
@@ -61,6 +61,31 @@ An access point is where the crew parks or meets for a day at a destination: a t
 
 The day page's **Getting there** card (`src/components/trips/DayAccessPoint.tsx`) shows the point and whether it's for every day at the stop or only this day, with Set, Change and Remove access point. The review reuses `ItineraryChangeSheet`.
 
+## Drive times (#209)
+
+A day's drive goes from its morning origin, the stay of the night before, to its access point. Checkout morning counts; arrival day doesn't. The server calculates every day's drive with Geoapify's Route Matrix (`src/lib/locations/routing.ts`): by car, with `traffic=approximated` (typical traffic, not live; free-flow was optimistic in the pilot). `src/lib/trip-drive.ts` decides each day's state and labels, and `src/lib/trip-drive-estimates.ts` calculates, stores and reuses them.
+
+| State | Shown as |
+|---|---|
+| `available` | Stowe Motel → Spruce Peak lot · About 12 min drive · 5.6 mi · one way, Directions, Estimate details |
+| `stale` | The same with "Not updated: calculated … and checking again failed" and Retry |
+| `unavailable` | Drive estimate unavailable, or "Route changed — couldn't update the estimate" when the day had an estimate for another pair, with Retry and Directions |
+| `no_route` | No road route found (a hut or a summit; the matrix returns null), with no time and no Directions |
+| `missing_origin` | Choose where you're starting: no crew stay is set for the night before (Go to Stays) |
+| `origin_not_located`, `approximate_origin` | The stay has no location, or only a town or area (Go to Stays) |
+| `missing_access_point` | Choose the entrance or parking |
+| `approximate_access_point`, `no_destination` | Nothing extra: the Getting there card already says what's missing |
+
+- **Stored per trip day.** `trip_drive_estimates` (028) keeps one row per day with its `route_key`: the origin and access point coordinates, the routing options and the winter closures avoided. A changed stay, night, access point or closure season makes a new key, so the day is recalculated and an estimate is never shown against another pair. The row's labels let Estimate details show the earlier estimate with its own pair. Estimates older than 7 days are recalculated; if that fails, a same-pair estimate is shown as stale. A failure is a state on the day, never zero minutes. Rows go with the trip.
+- **One call per closure set.** Days that need an estimate are grouped by the closures they avoid, and each group is one matrix call over its distinct origins and access points. Identical calls at the same time share one request. Credits per call: max(sources, targets) × min(sources, targets, 10), plus 1 for up to 20 avoided points. Logs are counts only: `{"event":"drive_matrix","provider":"geoapify","outcome":"ok","cells":4,"no_route":1}`.
+- **Winter closures** (`src/lib/locations/closures.ts`). Geoapify routes through roads closed for the winter: Spruce Peak to Smugglers' Notch Resort comes back as 9 minutes through the closed Notch instead of the 75 minute detour. A day in a closure's usual season avoids its points when they're near the drive (inside an ellipse around the two ends, so a Vermont drive doesn't mention Mount Greylock). Today: VT 108 at Smugglers' Notch (November to mid-May) and Mount Greylock's Summit, Rockwell and Notch roads (late October to mid-May). Estimate details name each closure and always say to check road conditions. Check a new road against the state's notices, and reverse-geocode each point onto the closed stretch.
+- **Approximate places get no estimate.** A town or area for the stay or the access point asks for the exact property, entrance or parking instead.
+- **Directions** open Apple Maps on iPhone, iPad and Mac (the Maps app in the iOS shell) and Google Maps elsewhere, between the exact points, in a new tab, so the day stays put.
+- **Where it shows.** The day page's Getting there card ends with the Drive row (`DayDrive` in `src/components/trips/DriveEstimate.tsx`); only that row waits for the estimate. Overview's stays show the next departure and **View access times**, each morning linking to its day (`StayDepartures`). Both read the same response. The page fetches again only when a stay, night, destination or access point changes, and keeps each answer with the plan it was fetched for, so a late answer can't show against a newer plan.
+- **Units:** miles, like the app's mph and °F, until #172.
+
+Still to come in #209's second change: Change starting point and Use crew stay again, Set starting point on the first day, No drive planned, and Your estimate (a manual duration).
+
 ## API
 
 `GET /api/v1/trips/:id/locations?q=` returns `{results: TripLocation[]}`; an empty list means no matches. Only the organizer can search, because only the organizer edits logistics. Members get 403, and other trips get 404. A query must be 3–200 characters. Each person can search 30 times a minute (per server instance; 429, `code: "rate_limited"`). A missing key, provider failure or spent quota returns 503 with `code: "unavailable"` and no provider details.
@@ -68,6 +93,8 @@ The day page's **Getting there** card (`src/components/trips/DayAccessPoint.tsx`
 Stay saves (`POST`/`PATCH /api/v1/trips/:id/stays…`, [trip-stays.md](trip-stays.md)) accept `stay.location`. An invalid place returns 400 with `field: "location"`.
 
 `POST /api/v1/trips/:id/access-points` is organizer only (403 otherwise).
+
+`GET /api/v1/trips/:id/drive-estimates` returns `TripDriveEstimates`: `days` (each with `state`, `origin`, `destination`, `estimate`, `previous`, `closures` and `directions`) and `stays` (each stay's departure dates and the next one from today in its time zone). Every member can read it, 30 times a minute per person (429, `code: "rate_limited"`). A provider failure is a day's state, not an error.
 
 | Request | Response |
 |---|---|
@@ -80,4 +107,5 @@ Stay saves (`POST`/`PATCH /api/v1/trips/:id/stays…`, [trip-stays.md](trip-stay
 
 1. Apply `supabase/migrations/025_trip_stay_locations.sql` by hand, after 017. It adds the column and replaces `mutate_trip_lodging` with a version that saves the location. As with the other trip migrations, apply this file on its own rather than pushing the folder. Until it's applied, a stay save with a location returns 503 (`field: "location"`) rather than saving the stay without its place; saves without one work as before.
 2. Apply `supabase/migrations/027_trip_access_points.sql` by hand, after 025 (it uses `is_trip_location`) and on its own; 026 is #210's tour plans. It adds the access point columns, `set_trip_access_point`, and `trip_access_points` with `edit_trip_itinerary_reviewed`, which checks a reviewed itinerary change's access points before running 022's or 023's function. Until it's applied, saving an access point returns 503, day pages show none, and itinerary changes save through 022/023 directly.
-3. Set `GEOAPIFY_API_KEY` in Vercel. Without it, search says it's unavailable and stays still save with an address or typed coordinates.
+3. Apply `supabase/migrations/028_trip_drive_estimates.sql` by hand, on its own. It adds `trip_drive_estimates`, readable only by the service role. Until it's applied, estimates are still calculated, just not kept, so every visit uses credits.
+4. Set `GEOAPIFY_API_KEY` in Vercel. Without it, search says it's unavailable and stays still save with an address or typed coordinates, and drive estimates say they're unavailable.

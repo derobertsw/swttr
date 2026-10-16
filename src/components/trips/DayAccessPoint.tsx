@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { sectionLabelClassName } from "@/components/trips/trip-primitives";
@@ -18,13 +18,15 @@ const ACCESS_EXACT = "the exact entrance or parking";
  * The organizer picks a place, then a review asks whether it's only for this
  * day or for every day at the stop, with their dates, before saving.
  */
-export function DayAccessPoint({ data, day, dateLabel, canEdit, onSaved }: {
+export function DayAccessPoint({ data, day, dateLabel, canEdit, onSaved, children }: {
   data: TripFull;
   day: TripDay;
   dateLabel: string;
   /** The organizer manages logistics; everyone else reads them. */
   canEdit: boolean;
   onSaved: () => void;
+  /** The drive to the access point (#209), at the end of the card. */
+  children?: ReactNode;
 }) {
   const stop = data.stops.find((candidate) => candidate.id === day.stop_id) ?? data.stops[0];
   const point = accessPointFor(data.stops, day);
@@ -105,6 +107,7 @@ export function DayAccessPoint({ data, day, dateLabel, canEdit, onSaved }: {
           onCloseAutoFocus={reviewFocus.restore}
         />
       )}
+      {children}
     </Card>
   );
 }

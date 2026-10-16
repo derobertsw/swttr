@@ -219,6 +219,64 @@ export interface TripLodgingPreview {
   date_label: string;
 }
 
+/**
+ * A day's drive from its morning origin to its access point (#209), or why
+ * there's no estimate. See docs/trip-locations.md.
+ * - available: calculated for this origin and access point.
+ * - stale: calculated for them over a week ago, and recalculating failed.
+ * - unavailable: recalculating failed and there's no estimate for them.
+ * - no_route: the provider found no road route (a hut, a summit).
+ * - missing_origin: no stay the night before, or No stay needed.
+ * - origin_not_located / approximate_origin: that stay has no location, or only a town or area.
+ * - missing_access_point / approximate_access_point: the same for the day's access point.
+ * - no_destination: no day plan or destination yet.
+ */
+export type TripDriveState =
+  | "available" | "stale" | "unavailable" | "no_route"
+  | "missing_origin" | "origin_not_located" | "approximate_origin"
+  | "missing_access_point" | "approximate_access_point" | "no_destination";
+
+export interface TripDriveEstimate {
+  /** One way, by road: "35 min", "1 hr 5 min". */
+  duration_label: string;
+  /** "14 mi", "0.4 mi". */
+  distance_label: string;
+  calculated_at: string;
+}
+
+export interface TripDriveDay {
+  date: string;
+  date_label: string;
+  /** The night whose stay the day starts from: "Fri Jan 9". */
+  night_label: string;
+  state: TripDriveState;
+  /** The stay of the night before, when there is one. */
+  origin: { label: string; stay_id: string } | null;
+  /** The day's access point, when there is one. */
+  destination: { label: string } | null;
+  estimate: TripDriveEstimate | null;
+  /** An earlier estimate for a different origin or access point: only for Estimate details, with its own pair. */
+  previous: (TripDriveEstimate & { origin_label: string; destination_label: string }) | null;
+  /** Winter closures the estimate avoids: "VT 108 through Smugglers' Notch, usually closed November to mid-May". */
+  closures: string[];
+  /** Directions with both exact endpoints, when there's a road route to expect. */
+  directions: { apple: string; google: string } | null;
+}
+
+export interface TripStayDepartures {
+  stay_id: string;
+  /** Mornings that start from the stay, checkout morning included, in date order. */
+  dates: string[];
+  /** The first of them from today on, in the stay's time zone; null once they've all passed. */
+  next: string | null;
+}
+
+/** GET /api/v1/trips/:id/drive-estimates. Overview stays and day pages share it. */
+export interface TripDriveEstimates {
+  days: TripDriveDay[];
+  stays: TripStayDepartures[];
+}
+
 /** A searched place: its display name and coordinates. */
 export interface TripPlace {
   name: string;
