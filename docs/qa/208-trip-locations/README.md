@@ -1,6 +1,6 @@
 # Precise trip locations: completion review (#208)
 
-Reviewed October 17, 2026. The stay implementation is in commit `b3008d8`; destination access points and reviewed edit scope shipped in [#296](https://github.com/derobertsw/swttr/pull/296). Drive estimates subsequently shipped in [#297](https://github.com/derobertsw/swttr/pull/297) and [#299](https://github.com/derobertsw/swttr/pull/299). This completion changes documentation only.
+Reviewed October 17, 2026. The stay implementation is in commit `b3008d8`; destination access points and reviewed edit scope shipped in [#296](https://github.com/derobertsw/swttr/pull/296). Drive estimates subsequently shipped in [#297](https://github.com/derobertsw/swttr/pull/297) and [#299](https://github.com/derobertsw/swttr/pull/299). This completion changes documentation and two code comments only.
 
 ## Provider and reuse decision
 
@@ -11,12 +11,12 @@ Official pages checked October 17, 2026:
 | Concern | Published evidence and implementation rule |
 |---|---|
 | Commercial production | [Pricing FAQ](https://www.geoapify.com/pricing/): free commercial production is allowed within credits, rate/feature limits and attribution requirements. Free: 3,000 credits/day, up to 5 requests/second across the account, no credit card. API 10 is currently $59/month for 10,000 credits/day; prices are assumptions to recheck in #283. |
-| Cache, storage and export | [Platform services statement](https://www.geoapify.com/products-and-services/), under Open data and permissive conditions, permits caching, storing and redistributing service results. This is the published basis for keeping Route Matrix distances/times, alongside saved search results. [Routing](https://www.geoapify.com/routing-api/) explicitly permits storing and redistributing its calculated routes, including geometry. Offline reuse/export must retain attribution. |
+| Cache, storage and export | [Platform services statement](https://www.geoapify.com/products-and-services/), under Open data and permissive conditions, permits caching, storing and redistributing service results. This is the published basis for keeping Route Matrix distances/times, alongside saved search results. [Routing](https://www.geoapify.com/routing-api/) says its results can be stored and redistributed; it doesn't mention geometry by name, so keeping route geometry rests on the platform statement. Offline reuse/export must retain attribution. |
 | Attribution | [Terms](https://www.geoapify.com/terms-and-conditions/), Attribution: OpenStreetMap credit always; Geoapify credit on free; additional source credits where required. Keep returned source credit with saved places and show Powered by Geoapify with a follow link. Carry credits into offline/exported views. |
 | Production wording | The terms still refer to production limitations and contacting Geoapify. The more specific current pricing FAQ identifies quota, rate, feature and attribution conditions. On October 17 the user chose to use the official published documentation to resolve the issue's written-confirmation requirement. No private vendor response is asserted. |
-| Routing limits | [Matrix API](https://apidocs.geoapify.com/docs/route-matrix/): synchronous requests default to 1,000 cells; each pair returns distance/time, with nulls when no route exists. The adapter and batch splitter enforce that bound. Typical traffic is estimated, not live. Seasonally closed roads need the curated avoids and the check-road-conditions warning described in [trip-locations.md](../../trip-locations.md). |
+| Routing limits | [Matrix API](https://apidocs.geoapify.com/docs/route-matrix/): a regular (synchronous) request supports at most 1,000 cells (sources × targets), a hard cap rather than a default; each pair returns distance/time, with nulls when no route exists. The adapter and batch splitter enforce that bound. Typical traffic is estimated, not live. Seasonally closed roads need the curated avoids and the check-road-conditions warning described in [trip-locations.md](../../trip-locations.md). |
 
-The 30-searches/minute per-person API limit is separate from the provider's account-wide 5 requests/second limit. It is per server instance, not a distributed quota guarantee. Provider rejections become sanitized unavailable states. Counts-only usage logs support the #283 capacity review. A drive estimate's 7-day refresh is for freshness, not a storage restriction.
+The 30-searches/minute per-person API limit is separate from the provider's account-wide 5 requests/second limit. It is per server instance, not a distributed quota guarantee. Provider rejections become sanitized unavailable states. Counts-only usage logs support the #283 capacity review, but an `http_429` can mean either the daily credits or the 5 requests/second limit, so check its timing before treating it as quota. A drive estimate's 7-day refresh is for freshness, not a storage restriction.
 
 ## Pilot evidence
 
@@ -35,7 +35,7 @@ The [original live pilot](https://github.com/derobertsw/swttr/issues/208#issueco
 | Closure | Smugglers' Notch routes through the winter closure without an avoid; the avoid produces the detour. |
 | Broad locality | Lake Placid NY/FL are town matches; the picker labels them approximate and automatic estimates require precise endpoints. |
 
-Exact precision means a specific mapped place, not road accessibility. Only a successful routing pair establishes a calculated road estimate. No new live-provider calls or production trip edits were needed for this documentation completion. Trimmed captured responses are in `src/test/fixtures/geoapify-pilot.json`; routing fixtures are in `src/lib/locations/routing.test.ts`.
+Exact precision means a specific mapped place, not road accessibility. Only a successful routing pair establishes a calculated road estimate. No new live-provider calls or production trip edits were needed for this documentation completion. `src/test/fixtures/geoapify-pilot.json` keeps trimmed Address Autocomplete answers for five of the pilot's searches: the street address (Topnotch), "Hotel Jay", Johns Brook Lodge, Lake Placid and Jay Peak Nordic Center. The INN, K-1, Jiminy Peak, Mount Greylock, Adirondak Loj, Stowe and Smugglers' Notch evidence is only in the two linked issue comments. `src/lib/locations/routing.test.ts` has the October 15 Route Matrix answers (Spruce Peak and Lake Placid to Smugglers' Notch Resort and Johns Brook Lodge).
 
 ## Acceptance coverage
 
@@ -51,7 +51,21 @@ Exact precision means a specific mapped place, not road accessibility. Only a su
 
 ## Verification
 
-- Focused acceptance run on the isolated branch from `origin/main`: **15 files, 246 tests passed**, using `NODE_OPTIONS=--no-experimental-webstorage npx vitest run` for the picker, stays/access-point components and APIs, provider/routing, lodging/access-point/itinerary Postgres tests, drive-estimate persistence and trip access suites. The Node flag avoids experimental global storage shadowing jsdom storage.
+- Focused acceptance run, repeated October 17 on this branch: **21 files, 352 tests passed**. The Node flag avoids experimental global storage shadowing jsdom storage. The first run on the isolated branch reported 15 files and 246 tests but didn't record which files, so this list replaces it:
+
+  ```bash
+  NODE_OPTIONS=--no-experimental-webstorage npx vitest run \
+    src/components/trips/LocationPicker.test.tsx src/components/trips/TripStays.test.tsx \
+    src/components/trips/DayAccessPoint.test.tsx src/components/trips/DriveEstimate.test.tsx \
+    src/lib/trip-lodging-api.test.ts 'src/app/api/v1/trips/[id]/locations/route.test.ts' \
+    'src/app/api/v1/trips/[id]/access-points/route.test.ts' 'src/app/api/v1/trips/[id]/itinerary/route.test.ts' \
+    'src/app/api/v1/trips/[id]/drive-estimates/route.test.ts' 'src/app/api/v1/trips/[id]/days/[date]/drive-estimate/route.test.ts' \
+    src/lib/locations/provider.test.ts src/lib/locations/routing.test.ts \
+    src/lib/trip-lodging.database.test.ts src/lib/trip-access-points.database.test.ts \
+    src/lib/trip-itinerary.database.test.ts src/lib/trip-drive-estimates.database.test.ts \
+    src/lib/trip-drive-starting-points.database.test.ts \
+    src/lib/trip-lodging.test.ts src/lib/trip-itinerary.test.ts src/lib/trip-drive.test.ts src/lib/trips.test.ts
+  ```
 - `npm run build` attempted normally and with sandbox escalation in the original checkout: Turbopack's PostCSS worker cannot bind its port (`Operation not permitted`). In the isolated worktree, Turbopack instead rejects the reused `node_modules` symlink outside its filesystem root.
 - `node node_modules/next/dist/bin/next build --webpack`: passed compilation, TypeScript, static generation (37 pages) and tracing. Existing optional `mppx` MCP SDK resolution warning remains.
 - `npm run lint` and `git diff --check`: passed on the isolated branch.

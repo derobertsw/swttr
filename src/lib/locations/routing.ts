@@ -64,7 +64,8 @@ export async function driveMatrix(sources: Point[], targets: Point[], avoid: Poi
     throw new RoutingUnavailable("Drive estimates didn't respond.");
   }
   if (!response.ok) {
-    // 401/403: key problem. 429: the free plan's daily credits are spent.
+    // 401/403: key problem. 429: the free plan's daily credits are spent, or the
+    // account passed its 5 requests a second.
     logUsage(`http_${response.status}`);
     throw new RoutingUnavailable(`Drive estimates failed (${response.status}).`);
   }

@@ -126,7 +126,8 @@ export async function searchLocations(query: string, near: Point[]): Promise<Tri
     throw new LocationSearchUnavailable("Location search didn't respond.");
   }
   if (!response.ok) {
-    // 401/403: key problem. 429: the free plan's daily credits are spent.
+    // 401/403: key problem. 429: the free plan's daily credits are spent, or the
+    // account passed its 5 requests a second.
     logUsage(`http_${response.status}`);
     throw new LocationSearchUnavailable(`Location search failed (${response.status}).`);
   }
