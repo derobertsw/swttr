@@ -154,7 +154,28 @@ export interface RecommendedHeadwear {
   neck_warmth: RecommendedHeadwearItem | null;
 }
 
+export type ClothingRequirementStatus = 'owned_match' | 'generic_suggestion' | 'missing' | 'not_needed';
+
+/** A suitable-clothing requirement, separate from any wardrobe item. Stable
+ * `id` (`<activity>:<region>`) associates edits/explanations across calls. */
+export interface ClothingRequirement {
+  id: string;
+  region: 'torso' | 'legs' | 'hands' | 'head';
+  label: string;
+  status: ClothingRequirementStatus;
+  /** Ideal regional clo; a missing requirement is never scored as 0 clo worn. */
+  target_clo?: number;
+  matched_garment_id?: string;
+  matched_garment_name?: string;
+  matched_is_owned?: boolean;
+  generic_suggestion?: { label: string; estimated_clo?: number; generic_estimate: true; owned: false };
+  message: string;
+}
+
 export interface BiophysicsRecommendation {
+  /** Requirement-first flow (running/XC only): what the activity needs,
+   * before wardrobe matching. Absent for other sports. */
+  requirements?: ClothingRequirement[];
   /** The request's conditions, echoed as sent (°F, mph). */
   conditions: {
     temperature: string;
