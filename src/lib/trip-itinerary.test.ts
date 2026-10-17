@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseItineraryEdit, previewItinerary, requestFor } from "@/lib/trip-itinerary";
 import { ORGANIZER, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
-import type { TripDay, TripMember, TripMemberDayKit } from "@/types/trips";
+import type { TripDay, TripItineraryRequest, TripMember, TripMemberDayKit, TripTourPlanSummary } from "@/types/trips";
 
 const JAY = { ...STOWE_STOP, id: "stop-jay", position: 1, name: "Jay Peak, Vermont", latitude: 44.9379, longitude: -72.5045 };
 const day = (date: string, stop_id: string | null, activity: string | null = null): TripDay => ({ id: `day-${date}`, trip_id: TRIP.id, date, stop_id, activity });
@@ -48,7 +48,7 @@ describe("Itinerary previews", () => {
     const unused = { ...JAY, id: "stop-unused", position: 2, name: "Smuggs" };
     expect(options(previewItinerary({ ...full, stops: [...full.stops, unused] }, { action: "remove_stop", stop_id: unused.id }))).toEqual([{
       key: "remove", label: "No day uses Smuggs", detail: "Every day keeps its destination.", changes: [], unchanged: 3,
-      payload: { stop_id: unused.id, reassign_to: STOWE_STOP.id, expected: [], access_points: { stops: {}, days: {} } },
+      payload: { stop_id: unused.id, reassign_to: STOWE_STOP.id, expected: [], access_points: { stops: {}, days: {} }, tour_plans: {} },
     }]);
   });
 
@@ -158,6 +158,105 @@ describe("Kits in itinerary reviews", () => {
   });
 });
 
+describe("Tour plans in itinerary reviews (#210)", () => {
+  const TUCKERMAN = "11111111-1111-4111-8111-111111111111";
+  const JAY_CLOUD = "22222222-2222-4222-8222-222222222222";
+  const plan = (id: string, date: string, objective: string, revision = 1) =>
+    ({ id, trip_day_id: `day-${date}`, date, objective, revision }) as TripTourPlanSummary;
+  // Saturday and Sunday touring at Stowe, Saturday with a plan; Monday hiking
+  // at Jay Peak, with a plan kept from when it was a touring day.
+  const touring = tripFull({
+    stops: [STOWE_STOP, JAY],
+    days: [day("2026-10-10", STOWE_STOP.id, "Backcountry"), day("2026-10-11", STOWE_STOP.id, "Backcountry"), day("2026-10-12", JAY.id, "Hike")],
+    tour_plans: [plan(TUCKERMAN, "2026-10-10", "Tuckerman Ravine", 3), plan(JAY_CLOUD, "2026-10-12", "Jay Cloud")],
+  });
+  const notes = (option: { changes: Array<{ date: string; notes?: string[] }> }) => option.changes.map((change) => [change.date, change.notes]);
+
+  it("says when a day's plan goes out of use or back in use, and sends the plans the review saw", () => {
+    const [hike] = options(previewItinerary(touring, { action: "assign_days", dates: ["2026-10-10"], activity: "Hike" }, "user-2"));
+    expect(notes(hike)).toEqual([["2026-10-10", ["Tour plan kept, not in use: Tuckerman Ravine. Restore it on the day page."]]]);
+    expect(hike.payload.tour_plans).toEqual({ [TUCKERMAN]: 3, [JAY_CLOUD]: 1 });
+    const [tour] = options(previewItinerary(touring, { action: "assign_days", dates: ["2026-10-12"], activity: "Backcountry" }, "user-2"));
+    expect(notes(tour)).toEqual([["2026-10-12", ["Saved tour plan in use again: Jay Cloud."]]]);
+  });
+
+  it("asks to check a plan that stays in use at another place", () => {
+    const [move] = options(previewItinerary(touring, { action: "assign_days", dates: ["2026-10-10", "2026-10-11"], stop_id: JAY.id }, "user-2"));
+    expect(notes(move)).toEqual([
+      ["2026-10-10", ["Tour plan stays: Tuckerman Ravine. Check it's right for Jay Peak, Vermont."]],
+      ["2026-10-11", undefined],
+    ]);
+  });
+
+  it("judges a day without its own activity by its stop's first, as the day page does", () => {
+    const backcountryStowe = { ...STOWE_STOP, activities: ["Backcountry", "Hike"] };
+    const trip = { ...touring, stops: [backcountryStowe, JAY], days: [day("2026-10-10", STOWE_STOP.id), ...touring.days.slice(1)] };
+    const [hike] = options(previewItinerary(trip, { action: "assign_days", dates: ["2026-10-10"], activity: "Hike" }, "user-2"));
+    expect(notes(hike)).toEqual([["2026-10-10", ["Tour plan kept, not in use: Tuckerman Ravine. Restore it on the day page."]]]);
+    // A new stop for only this day has no activities, while the stop that moves keeps them.
+    const [onlyThisDay, everyDay] = options(previewItinerary(trip, { action: "set_day_place", date: "2026-10-10", place: { name: "Pinkham Notch", latitude: 44.26, longitude: -71.25 } }, "user-2"));
+    expect(notes(onlyThisDay)).toEqual([["2026-10-10", ["Tour plan kept, not in use: Tuckerman Ravine. Restore it on the day page."]]]);
+    expect(notes(everyDay)[0]).toEqual(["2026-10-10", ["Tour plan stays: Tuckerman Ravine. Check it's right for Pinkham Notch."]]);
+  });
+
+  it("copies the tour plan only for the organizer, and only one that's there", () => {
+    expect(previewItinerary(touring, { action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: false, plan: true }, "user-2"))
+      .toEqual({ error: "Only the organizer can copy the tour plan.", status: 403 });
+    expect(previewItinerary(touring, { action: "copy_day", from: "2026-10-11", dates: ["2026-10-10"], kit: false, plan: true }, "user-1"))
+      .toEqual({ error: "There's no tour plan on Sun Oct 11 to copy.", status: 400 });
+  });
+
+  it("copies the tour plan to days without one", () => {
+    const [copy] = options(previewItinerary(touring, { action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: false, plan: true }, "user-1"));
+    expect(copy).toMatchObject({
+      key: "copy", label: "Copy Sat Oct 10 and its tour plan to 1 day",
+      detail: "Stowe, Vermont · Backcountry, and its tour plan (Tuckerman Ravine).",
+      changes: [{ date: "2026-10-11", before: "Stowe, Vermont · Backcountry", after: "Stowe, Vermont · Backcountry", notes: ["Gets the tour plan from Sat Oct 10: Tuckerman Ravine."] }],
+      payload: { kit: "none", plan: "replace", tour_plans: { [TUCKERMAN]: 3, [JAY_CLOUD]: 1 } },
+    });
+  });
+
+  it("asks whether to replace or keep a tour plan already on a day", () => {
+    const [replace, keep] = options(previewItinerary(touring, { action: "copy_day", from: "2026-10-10", dates: ["2026-10-11", "2026-10-12"], kit: false, plan: true }, "user-1"));
+    expect(replace).toMatchObject({
+      key: "replace", label: "Replace the tour plan on Mon Oct 12",
+      detail: "Every day gets Stowe, Vermont · Backcountry and its tour plan (Tuckerman Ravine).",
+      payload: { kit: "none", plan: "replace" },
+    });
+    expect(notes(replace)).toEqual([
+      ["2026-10-11", ["Gets the tour plan from Sat Oct 10: Tuckerman Ravine."]],
+      ["2026-10-12", ["Its tour plan, Jay Cloud, is replaced with Tuckerman Ravine from Sat Oct 10."]],
+    ]);
+    expect(keep).toMatchObject({
+      key: "keep", label: "Keep the tour plan on Mon Oct 12",
+      detail: "Every day gets Stowe, Vermont · Backcountry. What's already there stays (the tour plan on Mon Oct 12), and the rest comes from Sat Oct 10.",
+      payload: { plan: "keep" },
+    });
+    // Monday's own plan is back in use, at Stowe now.
+    expect(notes(keep)).toEqual([
+      ["2026-10-11", ["Gets the tour plan from Sat Oct 10: Tuckerman Ravine."]],
+      ["2026-10-12", ["Saved tour plan in use again: Jay Cloud. Check it's right for Stowe, Vermont."]],
+    ]);
+  });
+
+  it("asks once for your kit and the tour plan, naming the days of each", () => {
+    const kit = (date: string): TripMemberDayKit => ({
+      id: `kit-${date}`, trip_day_id: `day-${date}`, trip_member_id: ORGANIZER.id, effort: "steady", items: ["shell"], note: null, state: "ok",
+      updated_at: `${date}T08:00:00.000000+00:00`, outfit: null, outfit_saved_at: null,
+    });
+    const request: TripItineraryRequest = { action: "copy_day", from: "2026-10-10", dates: ["2026-10-11", "2026-10-12"], kit: true, plan: true };
+    const [replace, keep] = options(previewItinerary({ ...touring, kits: [kit("2026-10-10"), kit("2026-10-11")] }, request, "user-1"));
+    expect([replace.label, keep.label]).toEqual(["Replace your kit on Sun Oct 11 and the tour plan on Mon Oct 12", "Keep your kit on Sun Oct 11 and the tour plan on Mon Oct 12"]);
+    expect(replace.payload).toMatchObject({ kit: "replace", plan: "replace" });
+    expect(notes(keep)).toEqual([
+      ["2026-10-11", ["Gets the tour plan from Sat Oct 10: Tuckerman Ravine."]],
+      ["2026-10-12", ["Gets your checklist from Sat Oct 10.", "Saved tour plan in use again: Jay Cloud. Check it's right for Stowe, Vermont."]],
+    ]);
+    const both = options(previewItinerary({ ...touring, kits: [kit("2026-10-10"), kit("2026-10-12")] }, request, "user-1"));
+    expect(both.map((option) => option.label)).toEqual(["Replace your kit and the tour plan on Mon Oct 12", "Keep your kit and the tour plan on Mon Oct 12"]);
+  });
+});
+
 describe("Saved itinerary changes", () => {
   it("keeps a cleared activity distinct from an unchanged one, and maps back to the preview request", () => {
     const stopId = "5b7f1f7e-3c52-4c39-9d0e-0a3c1f0b6a11";
@@ -174,14 +273,18 @@ describe("Saved itinerary changes", () => {
     const expected = { from: { stop_id: stopId.toUpperCase(), activity: "Hike", stop: { ...place, extra: true }, kit: "2026-10-08T12:00:00+00:00", extra: true }, days: [{ date: "2026-10-11", stop_id: null, activity: null, stop: null, kit: null }] };
     const copy = parseItineraryEdit({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11", "2026-10-11"], kit: "keep", expected, sneaky: 1 });
     expect(copy).toEqual({ action: "copy_day", payload: {
-      from: "2026-10-10", dates: ["2026-10-11"], kit: "keep",
+      from: "2026-10-10", dates: ["2026-10-11"], kit: "keep", plan: "none",
       expected: {
         from: { stop_id: stopId, activity: "Hike", stop: { ...place, id: stopId }, kit: "2026-10-08T12:00:00+00:00" },
         days: [{ date: "2026-10-11", stop_id: null, activity: null, stop: null, kit: null }],
       },
     } });
-    expect("error" in copy ? null : requestFor(copy)).toEqual({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: true });
-    for (const bad of [{ kit: "merge" }, { kit: undefined }, { from: "2026-02-30" }, { dates: [] }, { expected: { ...expected, days: [{ date: "2026-10-11", kit: "yesterday" }] } }, { expected: { days: [] } },
+    expect("error" in copy ? null : requestFor(copy)).toEqual({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: true, plan: false });
+    // A tour plan copy (#210) says how; a review from before it doesn't, and copies none.
+    const withPlan = parseItineraryEdit({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: "none", plan: "replace", expected });
+    expect(withPlan).toMatchObject({ payload: { kit: "none", plan: "replace" } });
+    expect("error" in withPlan ? null : requestFor(withPlan)).toMatchObject({ kit: false, plan: true });
+    for (const bad of [{ kit: "merge" }, { kit: undefined }, { plan: "merge" }, { plan: true }, { from: "2026-02-30" }, { dates: [] }, { expected: { ...expected, days: [{ date: "2026-10-11", kit: "yesterday" }] } }, { expected: { days: [] } },
       { expected: { ...expected, days: [{ date: "2026-10-11", stop: { ...place, latitude: "44.47" } }] } }, { expected: { ...expected, from: { stop: { name: "Stowe" } } } }]) {
       expect(parseItineraryEdit({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: "keep", expected, ...bad })).toHaveProperty("error");
     }

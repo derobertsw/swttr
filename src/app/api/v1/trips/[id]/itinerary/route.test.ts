@@ -40,7 +40,7 @@ describe("Reviewing and saving itinerary changes", () => {
         { date: "2026-10-10", date_label: "Sat Oct 10", before: "Stowe, Vermont (base) · Ski touring", after: "Jay Peak · Ski touring" },
         { date: "2026-10-12", date_label: "Mon Oct 12", before: "Stowe, Vermont · No activity", after: "Jay Peak · No activity" },
       ],
-      payload: { stop_id: STOWE.id, reassign_to: JAY.id, expected: ["2026-10-10", "2026-10-12"], access_points: { stops: {}, days: {} } },
+      payload: { stop_id: STOWE.id, reassign_to: JAY.id, expected: ["2026-10-10", "2026-10-12"], access_points: { stops: {}, days: {} }, tour_plans: {} },
     }]);
     expect(requireTripAccess).toHaveBeenCalledWith(TRIP.id);
     expect(rpc).not.toHaveBeenCalled();
@@ -120,9 +120,9 @@ describe("Reviewing and saving itinerary changes", () => {
     rpc.mockResolvedValue({ data: { action: "copy_day" }, error: null });
     expect((await post({ action: "copy_day", ...preview.options[0].payload, extra: 1 })).status).toBe(200);
     expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary_reviewed", {
-      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "copy_day", p_access_points: { stops: {}, days: {} },
+      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "copy_day", p_access_points: { stops: {}, days: {} }, p_tour_plans: {},
       p_payload: {
-        from: "2026-10-10", dates: ["2026-10-12"], kit: "none",
+        from: "2026-10-10", dates: ["2026-10-12"], kit: "none", plan: "none",
         expected: {
           from: { stop_id: null, activity: "Ski touring", stop: AT_STOWE, kit: null },
           days: [{ date: "2026-10-12", stop_id: STOWE.id, activity: null, stop: AT_STOWE, kit: null }],
@@ -164,6 +164,54 @@ describe("Reviewing and saving itinerary changes", () => {
     expect((await post({ ...body, access_points: { stops: [] } })).status).toBe(400);
     expect((await post({ ...body, access_points: { stops: { [JAY.id]: "lot" }, days: {} } })).status).toBe(400);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("checks a reviewed save's tour plans from migration 030, and before it refuses only a tour plan copy", async () => {
+    const PLAN = "11111111-1111-4111-8111-111111111111";
+    const body = { action: "assign_days", dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }], access_points: { stops: {}, days: {} }, tour_plans: { [PLAN]: 2 } };
+    const payload = { dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }] };
+    expect((await post(body)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary_reviewed", {
+      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "assign_days", p_payload: payload, p_access_points: { stops: {}, days: {} }, p_tour_plans: { [PLAN]: 2 },
+    });
+
+    // Before 030, the change falls back to 027's check.
+    rpc.mockClear();
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "missing" } });
+    expect((await post(body)).status).toBe(200);
+    expect(rpc).toHaveBeenLastCalledWith("edit_trip_itinerary_reviewed", {
+      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "assign_days", p_payload: payload, p_access_points: { stops: {}, days: {} },
+    });
+
+    rpc.mockClear();
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "40001", message: "Tour plans changed." } });
+    expect((await post(body)).status).toBe(409);
+
+    // A copy of the tour plan can't go through a function that would drop it.
+    const copy = {
+      action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: "none", plan: "replace", access_points: { stops: {}, days: {} }, tour_plans: { [PLAN]: 2 },
+      expected: { from: { stop_id: null, activity: "Ski touring", stop: null, kit: null }, days: [{ date: "2026-10-12", stop_id: STOWE.id, activity: null, stop: null, kit: null }] },
+    };
+    rpc.mockClear();
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "missing" } });
+    const refused = await post(copy);
+    expect([refused.status, await refused.json()]).toEqual([503, { error: "Copying a tour plan isn't available yet. Nothing was changed." }]);
+    expect(rpc).toHaveBeenCalledOnce();
+    // Nor without a review that saw the trip's tour plans.
+    rpc.mockClear();
+    expect((await post({ ...copy, tour_plans: undefined })).status).toBe(409);
+    expect(rpc).not.toHaveBeenCalled();
+
+    for (const tourPlans of [[], { "plan-1": 1 }, { [PLAN]: 0 }, { [PLAN]: "2" }]) {
+      expect((await post({ ...body, tour_plans: tourPlans })).status).toBe(400);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("previews copying the tour plan only for the organizer", async () => {
+    const response = await post({ preview: true, action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: false, plan: true });
+    expect([response.status, await response.json()]).toEqual([403, { error: "Only the organizer can copy the tour plan." }]);
+    expect((await post({ preview: true, action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: false, plan: "yes" })).status).toBe(400);
   });
 
   it("rejects a malformed save before calling the transaction", async () => {

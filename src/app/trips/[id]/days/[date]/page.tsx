@@ -32,7 +32,9 @@ import { kitAdvice, kitWear } from "@/lib/trip-saved-kits";
 import { DayLodging } from "@/components/trips/TripStays";
 import { DayAccessPoint } from "@/components/trips/DayAccessPoint";
 import { DayDrive, useDriveEstimates } from "@/components/trips/DriveEstimate";
-import { DayTourPlan, TOUR_ACTIVITY } from "@/components/trips/TourPlan";
+import { DayTourPlan } from "@/components/trips/TourPlan";
+import { TOUR_ACTIVITY } from "@/lib/trip-activities";
+import { accessPointFor } from "@/lib/trip-location";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
@@ -138,6 +140,9 @@ export default function DayDetailPage({
   // The activity the header shows: the day's own, or its stop's first.
   const activity = day?.activity ?? effectiveStop?.activities[0] ?? null;
   const tourPlan = data?.tour_plans?.find((plan) => plan.date === date);
+  const isOrganizer = !!userId && data?.trip.owner_user_id === userId;
+  // The tour plan's meeting point is the day's access point (#208, #210).
+  const meetingPoint = data && day ? accessPointFor(data.stops, day)?.location.label ?? null : null;
   const fitOf = (kit: TripMemberDayKit | undefined) =>
     kit?.outfit && day ? outfitMismatches(kit.outfit, { date, activity: day.activity, stop: effectiveStop ?? null }) : [];
 
@@ -194,7 +199,7 @@ export default function DayDetailPage({
               )}
             </header>
 
-            <DayLodging data={data} date={date} meet={activity === TOUR_ACTIVITY ? tourPlan?.meet_label : null} />
+            <DayLodging data={data} date={date} meet={activity === TOUR_ACTIVITY ? tourPlan?.meet_label : null} meetingPoint={meetingPoint} />
 
             <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()}>
               <DayDrive tripId={id} date={date} drive={drive} canEdit={data.trip.owner_user_id === userId} />
@@ -270,6 +275,7 @@ export default function DayDetailPage({
               stops={data.stops}
               days={data.days}
               kit={myKit?.outfit ? "outfit" : myKit && myKit.items.length > 0 ? "checklist" : null}
+              tourPlan={isOrganizer && activity === TOUR_ACTIVITY ? tourPlan?.objective ?? null : null}
               onSaved={() => void refresh()}
             />
 
