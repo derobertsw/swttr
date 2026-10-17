@@ -8,7 +8,7 @@ This audit checks the gear catalog's thermal values for internal consistency. Th
 2. **Light synthetic insulation scale.** The lab-tested Nano-Air Hoody (torso 2.34 clo) and the derived Atom LT, Micro Puff and Odin Light (1.10–1.15) have about the same fill, but they sit on two different scales. Base layers and fleece follow the lab scale. Shells, insulated outerwear and most puffies follow a scale roughly 0.25–0.5× of it. The ensemble model and the targets assume the lab scale, but the IREQ side leaves out the wind-and-motion correction that would make lab values usable for active sports. Recalibrating only the puffies makes things less consistent, not more. The coherent fix is a separate calibration project.
 3. **Usage and coverage.** 89 of 100 garments have `usage` and all three `coverage_*` fractions unreviewed (NULL), with the same semantics as migration 022. Nothing in recommendation selection reads them yet, so there is no behavior change today, but they block #247 and #248.
 
-**Decision (2026-10-17): option C.** Fix the whole-body values and recalibrate the 16 puffies to the lab scale. `supabase/migrations/035_catalog_whole_body_and_puffy_clo.sql` does both. The golden fixture and snapshots carry the same values, and `catalog-thermal-audit.database.test.ts` checks the migration against the fixture. The audit had recommended option B (whole-body only). The rest of the calibration — shells, insulated outerwear and the wind-and-motion correction — is still open, and so are the inversions option C introduces (see "Decision and what's still open").
+**Decision (2026-10-17): option C.** Fix the whole-body values and recalibrate the 16 puffies to the lab scale. `supabase/migrations/035_catalog_whole_body_and_puffy_clo.sql` does both. It also moves the FP Movement Happy Trails Poncho, which migration 034 added after the audit on the old scale (see "Puffy recalibration"). The golden fixture and snapshots carry the same values, and `catalog-thermal-audit.database.test.ts` checks the migration against the fixture. The audit had recommended option B (whole-body only). The rest of the calibration — shells, insulated outerwear and the wind-and-motion correction — is still open, and so are the inversions option C introduces (see "Decision and what's still open").
 
 ## How this was checked
 
@@ -43,7 +43,7 @@ The three `lab_tested` rows are in the last group: Nano-Air 1.65 vs 1.68, DAS Pa
 
 ### Whole-body correction (migration 035, step 2)
 
-Rule: for every garment whose stored whole-body value differs from the formula by more than 0.02 clo (or 0.5 m²Pa/W for Ret), store the formula value rounded to two decimals the way Postgres `ROUND` does. That gives 58 rows: 54 clo and 43 Ret changes. Rows are sorted by the size of the clo change. The table shows the values from the current regional values. For the 16 puffies, step 1 of the migration re-derives the regional values first, so their final whole-body values are the ones in "Puffy recalibration" below.
+Rule: for every garment whose stored whole-body value differs from the formula by more than 0.02 clo (or 0.5 m²Pa/W for Ret), store the formula value rounded to two decimals the way Postgres `ROUND` does. That gives 58 rows: 54 clo and 43 Ret changes. Rows are sorted by the size of the clo change. The table shows the values from the current regional values. For the 16 puffies, step 1 of the migration re-derives the regional values first, so their final whole-body values are the ones in "Puffy recalibration" below. The migration's list also includes the Happy Trails Poncho, for 59 rows.
 
 | Garment | Category | Seeded in | Torso / arms / legs clo | Whole-body clo | Whole-body Ret | Pattern | In fixture |
 |---|---|---|---|---|---|---|---|
@@ -186,6 +186,9 @@ A row changes only while every field this step replaces still has its audit-time
 | Norrøna Lyngen Down850 Hood Jacket | 2.8 / 2.2 | **4.45 / 3.5** | 71.52 / 63.64 | 3.1 / 51.67 | fill unpublished; ×1.6 (mean factor of its heavy peers) | low | yes |
 | Rab Nebitron Pro Insulated | 2.4 / 1.9 | **4.7 / 2.95** | 78.33 / 55.89 | 3.09 / 53.14 | 279 g PrimaLoft Silver (M) ≈ DAS Parka fill | low | no |
 | Rab Neutrino Pro | 3.2 / 2.6 | **5.5 / 3.5** | 82.5 / 56.54 | 3.63 / 55.39 | 212 g 800FP (M) ≈ 1.25× DAS PrimaLoft-equivalent | low | no |
+| FP Movement Happy Trails Poncho (added by 034) | 0.95 / 0.18 | **2.00 / 0.38** | 37.89 / 8.42 | 1.1 / 21.05 | PrimaLoft, fill unpublished; seeded at Columbia Powder Lite Vest's 0.95 and moves with it (× 2.105) | low (0.4, unchanged) | no |
+
+**Happy Trails Poncho (step 1b).** Migration 034 (#312) added this poncho after the audit. It was calibrated against the pre-035 puffies, at Columbia Powder Lite Vest's 0.95 torso, and its seed notes give about 2.0 for lab scaling. Step 1b scales its clo and Ret by the same factor as Powder Lite Vest (0.95 → 2.00). It keeps its existing `data_source` with a note appended, and its `uncertainty_clo` goes from 1.05, which spanned the scale gap, to 0.6. The guard covers every field it replaces, including an md5 match on the seeded `data_source`.
 
 ## 3. Usage and coverage are unreviewed for 89 garments
 
@@ -297,11 +300,11 @@ Then check it:
 SELECT
   count(*) FILTER (WHERE abs(rcl_whole_body - (0.5 * coalesce(rcl_torso, 0) + 0.25 * coalesce(rcl_arms, 0) + 0.25 * coalesce(rcl_legs, 0))) > 0.02) AS clo_off_weighting,
   count(*) FILTER (WHERE abs(recl_whole_body - (0.5 * coalesce(recl_torso, 0) + 0.25 * coalesce(recl_arms, 0) + 0.25 * coalesce(recl_legs, 0))) > 0.5) AS ret_off_weighting,
-  count(*) FILTER (WHERE data_source = 'docs/catalog-thermal-audit.md#puffy-recalibration') AS recalibrated_puffies
+  count(*) FILTER (WHERE data_source LIKE '%docs/catalog-thermal-audit.md#puffy-recalibration') AS recalibrated_puffies
 FROM garment_thermal_properties;
 ```
 
-Expect 0, 0 and 14. The two garments migration 033 added (FP Movement Lift Love Jacket and Bib) already follow the weighting. Garments added later can add to the first two counts.
+Expect 0, 0 and 15 (14 puffies plus the poncho). The 16 garments migrations 033 and 034 added already follow the weighting, checked against the live catalog on 2026-10-17. Garments added later can add to the first two counts.
 
 **The add-wardrobe-item skill's guide needs the new scale.** `.claude/skills/add-wardrobe-item/references/thermal-estimation.md` (#311) still describes the pre-035 catalog. Its "Catalog scale" table puts light synthetics at 0.80–1.15 torso clo and belay puffies at 1.90–3.20, and its "Known inconsistency" paragraph says to store the peer-consistent low value. After 035, puffy peers are on the lab scale (light synthetics 1.35–2.45, belay puffies 4.15–5.50), while insulated outerwear stays on the low scale.
 

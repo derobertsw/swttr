@@ -1,6 +1,7 @@
 -- Gear catalog thermal audit, option C (docs/catalog-thermal-audit.md).
--- Checked the live catalog read-only on 2026-10-17 (100 garments). Replaying
--- 001, 002, 006–009, 011 and 022 reproduces its thermal values exactly.
+-- Checked the live catalog read-only on 2026-10-17 (100 garments at the audit,
+-- 116 after 033 and 034). Replaying 001, 002, 006–009, 011, 022, 033 and 034
+-- reproduces its thermal values exactly.
 -- No production mutation is performed by preparing this migration.
 
 -- 1. Puffy recalibration: re-derive 14 derived puffies on the lab scale, a
@@ -44,9 +45,30 @@ WHERE t.garment_id = g.id
   AND t.confidence_score = v.old_confidence
   AND t.data_source IS NULL AND t.uncertainty_clo IS NULL;
 
+-- 1b. FP Movement Happy Trails Poncho (034, added after the audit) was estimated
+--     at Columbia Powder Lite Vest's 0.95 torso clo, with about 2.0 noted for lab
+--     scaling. It moves with that peer, 0.95 -> 2.00 (clo and Ret x2.105), keeps
+--     its provenance with a note appended, and drops the uncertainty that
+--     spanned the scale gap to the 0.6 used for other unpublished fills.
+--     Guarded on every field it replaces, like step 1.
+UPDATE garment_thermal_properties t
+SET rcl_torso = 2.00,
+    rcl_arms = 0.38,
+    recl_torso = 37.89,
+    recl_arms = 8.42,
+    uncertainty_clo = 0.60,
+    data_source = t.data_source || ' ; 035: recalibrated to the lab scale with its peer Columbia Powder Lite Vest (torso 0.95 -> 2.00, clo and Ret x2.105); see docs/catalog-thermal-audit.md#puffy-recalibration'
+FROM garments g
+WHERE t.garment_id = g.id
+  AND g.brand = 'FP Movement' AND g.model_name = 'Happy Trails Poncho'
+  AND t.rcl_torso = 0.95 AND t.rcl_arms = 0.18
+  AND t.recl_torso = 18.00 AND t.recl_arms = 4.00
+  AND t.confidence_score = 0.40 AND t.uncertainty_clo = 1.05
+  AND md5(t.data_source) = '4ad73941265d602fe3e47baa862fd00d';
+
 -- 2. Whole-body clo and Ret follow REGIONAL_WEIGHTS (0.5 torso, 0.25 arms,
 --    0.25 legs; an uncovered region counts as zero), as predictEnsembleThermal
---    computes them. 58 audited rows, each updated only while it is off by
+--    computes them. 59 audited rows, each updated only while it is off by
 --    more than 0.02 clo or 0.5 m²Pa/W. Regional values are not changed here.
 UPDATE garment_thermal_properties t
 SET rcl_whole_body = CASE WHEN ABS(t.rcl_whole_body - w.clo) > 0.02 THEN ROUND(w.clo, 2) ELSE t.rcl_whole_body END,
@@ -115,7 +137,8 @@ FROM (
     ('Lululemon', 'Pace Breaker Jacket'),
     ('Patagonia', 'R1 Pullover'),
     ('32 Degrees', 'Heat Midweight Crew'),
-    ('Patagonia', 'Nano-Air Hoody')
+    ('Patagonia', 'Nano-Air Hoody'),
+    ('FP Movement', 'Happy Trails Poncho')
   ) AS a(brand, model_name) ON a.brand = g.brand AND a.model_name = g.model_name
 ) w
 WHERE t.garment_id = w.garment_id

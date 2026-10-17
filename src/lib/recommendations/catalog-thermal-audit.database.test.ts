@@ -6,11 +6,12 @@ import catalog from '@/test/fixtures/gear-catalog.json';
 import { REGIONAL_WEIGHTS } from '@/lib/biophysics/constants';
 
 // Replaying the catalog's seed history reproduces production's thermal values
-// (checked against the live catalog on 2026-10-17), so 035 runs on the same rows.
+// (checked against the live catalog on 2026-10-17, 116 garments), so 035 runs on
+// the same rows.
 const SEED_HISTORY = [
   '001_schema.sql', '002_seed_garments.sql', '006_seed_new_items.sql', '007_item_media_urls.sql',
   '008_seed_media_asset_urls.sql', '009_fix_arm_clo_values.sql', '011_seed_ogl_recommended_items.sql',
-  '022_running_xc_clothing_semantics.sql',
+  '022_running_xc_clothing_semantics.sql', '033_seed_fp_movement_lift_love.sql', '034_seed_fp_ski_collection.sql',
 ];
 const COLUMNS = [
   'rcl_torso', 'rcl_arms', 'rcl_legs', 'rcl_whole_body', 'recl_torso', 'recl_arms', 'recl_legs', 'recl_whole_body',
@@ -51,7 +52,7 @@ describe('catalog thermal audit migration (035) in Postgres', () => {
 
   it('puts every garment on the regional weighting and matches the golden fixture', async () => {
     const rows = await thermalRows(db);
-    expect(rows).toHaveLength(100);
+    expect(rows).toHaveLength(116);
     const offWeighting = rows.filter(row =>
       Math.abs(Number(row.rcl_whole_body) - weighted(row, 'rcl')) > 0.02 + 1e-9
       || Math.abs(Number(row.recl_whole_body) - weighted(row, 'recl')) > 0.5 + 1e-9);
@@ -77,6 +78,13 @@ describe('catalog thermal audit migration (035) in Postgres', () => {
       rcl_torso: 2.35, rcl_arms: 2.05, rcl_whole_body: 1.69, uncertainty_clo: 0.3, confidence_score: 0.75,
       data_source: 'docs/catalog-thermal-audit.md#puffy-recalibration',
     });
+    // Added after the audit at Powder Lite Vest's old 0.95; it moves with that peer.
+    expect(rows.get('FP Movement Happy Trails Poncho')).toMatchObject({
+      rcl_torso: 2, rcl_arms: 0.38, recl_torso: 37.89, recl_arms: 8.42, rcl_whole_body: 1.1, recl_whole_body: 21.05,
+      uncertainty_clo: 0.6, confidence_score: 0.4,
+      data_source: expect.stringMatching(/^https:\/\/www\.freepeople\.com\/.* ; 035: recalibrated to the lab scale/),
+    });
+    expect(rows.get('Columbia Powder Lite Vest')).toMatchObject({ rcl_torso: 2 });
     // Unpublished fill: low confidence and a wider allowance.
     expect(rows.get('Helly Hansen Odin Stretch Hooded Light Insulator 2.0')).toMatchObject({ uncertainty_clo: 0.6, confidence_score: 0.5 });
   });
