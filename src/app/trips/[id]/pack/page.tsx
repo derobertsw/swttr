@@ -11,11 +11,16 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BackLink, SectionLabel, TripError } from "@/components/trips/trip-primitives";
 import {
-  ManualItems, OlderChecklists, PackingChanges, PackingItems, PackingSuggestions, packingDay,
+  EquipmentItems, ManualItems, OlderChecklists, PackingChanges, PackingItems, PackingSuggestions, packingDay,
 } from "@/components/trips/TripPacking";
+import { EquipmentTemplateSheet } from "@/components/trips/TouringEquipment";
+import { useReturnFocus } from "@/hooks/useReturnFocus";
+import { equipmentKey, withEquipmentChoices } from "@/lib/touring-equipment";
 import { errorMessage, timedTripRequest, tripRequest, TripRequestError } from "@/lib/trip-requests";
 import type { TripDayCoverage } from "@/types/trip-coverage";
-import type { PackingChange, PackingCheckChange, PackingChoices, PackingItem, PackingManualItem, TripPackResponse } from "@/types/trip-packing";
+import type {
+  PackingChange, PackingCheckChange, PackingChoices, PackingEquipmentItem, PackingItem, PackingManualItem, TripPackResponse,
+} from "@/types/trip-packing";
 
 const COVERAGE_ACTION_LABEL: Record<TripDayCoverage["action"], string> = {
   set_location: "Choose location", set_activity: "Choose activity", plan_manually: "Plan kit manually",
@@ -59,6 +64,9 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   // A hand-added item keeps its identity until it's saved, so a retry adds it once.
   const pendingAdd = useRef<{ id: string; name: string } | null>(null);
   const listHeading = useRef<HTMLHeadingElement>(null);
+  const equipmentHeading = useRef<HTMLHeadingElement>(null);
+  const [addingEquipment, setAddingEquipment] = useState(false);
+  const templateFocus = useReturnFocus();
   // Saves in flight and finished, so a list read while one saved isn't shown
   // over it; and whether to read the list again once they're done.
   const saves = useRef({ inFlight: 0, finished: 0, refreshAfter: false });
@@ -157,7 +165,8 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
       if (!current) return current;
       const next = apply(current, typeof result === "string" ? previous : saved(result));
       if (typeof result !== "string") {
-        const checkKey = change.op === "item_quantity" ? `manual:${change.id}` : key;
+        const checkKey = change.op === "item_quantity" ? `manual:${change.id}`
+          : change.op === "equipment_quantity" ? equipmentKey(change.id) : key;
         const checks = { ...current.checks };
         if (result.checks?.[checkKey]) checks[checkKey] = result.checks[checkKey];
         else delete checks[checkKey];
@@ -178,6 +187,48 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
     { op: "item_quantity", id: item.id, quantity }, item.name, item.quantity, quantity,
     (current, value) => ({ ...current, manual: current.manual.map((entry) => entry.id === item.id ? { ...entry, quantity: value } : entry) }),
     (choices) => choices.manual.find((entry) => entry.id === item.id)?.quantity ?? quantity);
+
+  const equipmentQuantity = (item: PackingEquipmentItem, quantity: number) => void setQuantity(item.key,
+    { op: "equipment_quantity", id: item.id, quantity }, item.name, item.quantity, quantity,
+    (current, value) => ({ ...current, equipment: { ...current.equipment,
+      items: current.equipment.items.map((entry) => entry.id === item.id ? { ...entry, quantity: value } : entry) } }),
+    (choices) => choices.equipment[item.id]?.quantity ?? quantity);
+
+  /** Shows saved equipment choices, and the checks the change cleared or kept. */
+  const showEquipment = (choices: PackingChoices) => setData((current) => {
+    if (!current) return current;
+    const checks = { ...current.checks };
+    for (const option of current.equipment.template) {
+      const key = equipmentKey(option.id);
+      if (choices.checks[key]) checks[key] = choices.checks[key];
+      else delete checks[key];
+    }
+    return { ...current, checks, equipment: withEquipmentChoices(current.equipment, choices.equipment) };
+  });
+
+  const addEquipment = async (ids: string[]): Promise<string | null> => {
+    try {
+      const choices = await track(() => tripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST",
+        { op: "add_equipment", ids } satisfies PackingChange));
+      showEquipment(choices);
+      setStatus(`Added ${ids.length === 1 ? "1 item" : `${ids.length} items`} to your touring equipment`);
+      return null;
+    } catch (err) {
+      return `Couldn't add the items: ${errorMessage(err)}`;
+    }
+  };
+
+  const removeEquipment = async (item: PackingEquipmentItem) => {
+    markBusy(item.key, true);
+    const result = await save({ op: "remove_equipment", id: item.id }, `Couldn't remove ${item.name}`);
+    if (typeof result !== "string") {
+      showEquipment(result);
+      // The row goes, so focus moves to the section it was in.
+      equipmentHeading.current?.focus();
+      setStatus(`Removed ${item.name} from your list`);
+    }
+    markBusy(item.key, false);
+  };
 
   // Keep only this row's response: other rows can finish in a different order.
   const saveCheck = async (change: PackingCheckChange, name: string) => {
@@ -362,6 +413,20 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
               </Card>
             )}
           </section>
+        )}
+
+        {data && (data.equipment.dates.length > 0 || data.equipment.items.length > 0) && (
+          <section aria-labelledby="pack-equipment-heading" className="flex flex-col gap-2.5">
+            <h2 id="pack-equipment-heading" ref={equipmentHeading} tabIndex={-1} className="text-xl font-semibold text-foreground">Touring equipment</h2>
+            <EquipmentItems equipment={data.equipment} busy={busy} onQuantity={equipmentQuantity}
+              onRemove={(item) => void removeEquipment(item)}
+              onAdd={() => { templateFocus.remember(() => equipmentHeading.current); setAddingEquipment(true); }}
+              checks={data.checks} onCheck={setPacked} />
+          </section>
+        )}
+        {data && addingEquipment && (
+          <EquipmentTemplateSheet equipment={data.equipment} onAdd={addEquipment}
+            onClosed={() => setAddingEquipment(false)} onCloseAutoFocus={templateFocus.restore} />
         )}
 
         {data && (

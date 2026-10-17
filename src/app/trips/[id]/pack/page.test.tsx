@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { fakeTripApi, reply, sentBodies, TRIP } from "@/test/tripApi";
 import { buildPackingListFromDays } from "@/lib/packingList";
+import { buildTouringEquipment } from "@/lib/touring-equipment";
 import type { TripDayCoverage } from "@/types/trip-coverage";
 import type { PackingCheckChange, PackingChecks, PackingItem, TripPackResponse } from "@/types/trip-packing";
 import PackListPage from "./page";
@@ -37,7 +38,7 @@ const LAMP = { id: "0b4b6a7e-9c1d-4f53-a8b2-2f6c1d9e7a10", name: "Headlamp", qua
 const pack = (coverage: TripDayCoverage[], overrides: Partial<TripPackResponse> = {}): TripPackResponse => ({
   trip: TRIP, totalDays: coverage.length, coverage, items: [], removed: [], kitVersions: {}, checklists: [], manual: [], checks: {}, editable: true,
   suggestions: buildPackingListFromDays([], new Map(), []), suggestedDays: coverage.filter((day) => day.advice === "available").length,
-  skipped: [], groupGear: [], ...overrides,
+  skipped: [], groupGear: [], equipment: { dates: [], items: [], template: [], editable: true }, ...overrides,
 });
 async function renderPage() {
   await act(async () => { render(<Suspense fallback={null}><PackListPage params={Promise.resolve({ id: TRIP.id })} /></Suspense>); });
@@ -492,5 +493,123 @@ describe("Private persistent packing checks", () => {
     await user.click(screen.getByRole("button", { name: "Refresh pack list" }));
     expect(await screen.findByText(/Packing checks can't be loaded/)).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+});
+
+describe("Touring equipment", () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+  const version = "fd037a5d-b4d4-4b2e-8d6a-624ca9c8503b";
+  const touring = (saved: Parameters<typeof buildTouringEquipment>[0]["saved"] = {}, editable = true) =>
+    buildTouringEquipment({ dates: ["2026-10-11"], saved, names: [], editable });
+  const choices = (equipment: Record<string, { status: "added" | "removed"; quantity: number }>, checks: PackingChecks = {}) =>
+    ({ manual: [], quantities: {}, checks, equipment });
+
+  it("isn't shown for a trip without Backcountry days or equipment", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({ [PACK]: reply(200, pack([saved("2026-10-10")])) }));
+    await renderPage();
+    await screen.findByRole("heading", { name: "From your saved outfits" });
+    expect(screen.queryByRole("heading", { name: "Touring equipment" })).not.toBeInTheDocument();
+  });
+
+  it("lists equipment for the Backcountry days and checks it like any item", async () => {
+    const fetchMock = fakeTripApi({
+      [PACK]: reply(200, pack([saved("2026-10-10"), saved("2026-10-11")], { equipment: touring({ transceiver: { status: "added", quantity: 1 } }) })),
+      [CHANGE]: (body) => reply(200, choices({ transceiver: { status: "added", quantity: 1 } },
+        { "equipment:transceiver": { packed: true, quantity: 1, version: (body as PackingCheckChange).mutation } })),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    const section = (await screen.findByRole("heading", { name: "Touring equipment" })).closest("section")!;
+    expect(within(section).getByText("For your Backcountry days: Sun Oct 11.")).toBeInTheDocument();
+    await user.click(within(section).getByText("What it's for"));
+    expect(within(section).getByText(/find someone buried in an avalanche/)).toBeVisible();
+    const checkbox = within(section).getByRole("checkbox", { name: "Packed Avalanche transceiver" });
+    await user.click(checkbox);
+    expect(sentBodies(fetchMock, CHANGE)[0]).toMatchObject({ op: "set_packed", key: "equipment:transceiver", quantity: 1, packed: true, expected: null });
+    await waitFor(() => expect(checkbox).toBeChecked());
+  });
+
+  it("adds the selected template items, keeping the selection when a save fails", async () => {
+    let attempt = 0;
+    const fetchMock = fakeTripApi({
+      [PACK]: reply(200, pack([saved("2026-10-11")], { equipment: touring() })),
+      [CHANGE]: (body) => ++attempt === 1 ? reply(500, { error: "Couldn't save the change. Try again." })
+        : reply(200, choices(Object.fromEntries((body as { ids: string[] }).ids.map((id) => [id, { status: "added" as const, quantity: 1 }])))),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    expect(await screen.findByText(/Add the touring equipment you're bringing/)).toBeInTheDocument();
+    const open = screen.getByRole("button", { name: "Add touring equipment" });
+    await user.click(open);
+    const dialog = await screen.findByRole("dialog", { name: "Touring equipment" });
+    // The suggested additions start selected; optional items don't.
+    for (const name of ["Avalanche transceiver", "Avalanche probe", "Avalanche shovel", "Climbing skins"]) {
+      expect(within(dialog).getByRole("checkbox", { name })).toBeChecked();
+    }
+    expect(within(dialog).getByRole("checkbox", { name: "Helmet" })).not.toBeChecked();
+    expect(within(dialog).getByRole("group", { name: "Optional" })).toBeInTheDocument();
+    expect(within(dialog).getByText(/not a complete safety assessment/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("checkbox", { name: "Climbing skins" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "Helmet" }));
+
+    await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Couldn't add the items: Couldn't save the change. Try again.");
+    expect(within(dialog).getByRole("checkbox", { name: "Helmet" })).toBeChecked();
+
+    await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(sentBodies(fetchMock, CHANGE).at(-1)).toEqual({ op: "add_equipment", ids: ["transceiver", "probe", "shovel", "helmet"] });
+    const section = screen.getByRole("heading", { name: "Touring equipment" }).closest("section")!;
+    expect(within(section).getAllByRole("checkbox").map((box) => box.getAttribute("aria-label"))).toEqual([
+      "Packed Avalanche transceiver", "Packed Avalanche probe", "Packed Avalanche shovel", "Packed Helmet",
+    ]);
+    expect(screen.getByRole("status")).toHaveTextContent("Added 4 items to your touring equipment");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add more touring equipment" })).toHaveFocus());
+  });
+
+  it("asks for a selection before adding", async () => {
+    const fetchMock = fakeTripApi({ [PACK]: reply(200, pack([saved("2026-10-11")], { equipment: touring() })) });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("button", { name: "Add touring equipment" }));
+    const dialog = await screen.findByRole("dialog", { name: "Touring equipment" });
+    for (const name of ["Avalanche transceiver", "Avalanche probe", "Avalanche shovel", "Climbing skins"]) {
+      await user.click(within(dialog).getByRole("checkbox", { name }));
+    }
+    await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Select at least one item to add.");
+    expect(sentBodies(fetchMock, CHANGE)).toEqual([]);
+  });
+
+  it("removes an item, which the template then offers again under You removed", async () => {
+    const fetchMock = fakeTripApi({
+      [PACK]: reply(200, pack([saved("2026-10-11")], { equipment: touring({ transceiver: { status: "added", quantity: 1 }, probe: { status: "added", quantity: 1 } }),
+        checks: { "equipment:transceiver": { packed: true, quantity: 1, version } } })),
+      [CHANGE]: reply(200, choices({ transceiver: { status: "removed", quantity: 1 }, probe: { status: "added", quantity: 1 } })),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("button", { name: "Remove Avalanche transceiver from your list" }));
+    expect(sentBodies(fetchMock, CHANGE)).toEqual([{ op: "remove_equipment", id: "transceiver" }]);
+    await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Packed Avalanche transceiver" })).not.toBeInTheDocument());
+    expect(screen.getByRole("heading", { name: "Touring equipment" })).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("Removed Avalanche transceiver from your list");
+
+    await user.click(screen.getByRole("button", { name: "Add more touring equipment" }));
+    const dialog = await screen.findByRole("dialog", { name: "Touring equipment" });
+    const removed = within(dialog).getByRole("group", { name: "You removed" });
+    expect(within(removed).getByRole("checkbox", { name: "Avalanche transceiver" })).not.toBeChecked();
+    expect(within(dialog).getByText("Avalanche probe").closest("section")).toHaveTextContent("Already in your list");
+  });
+
+  it("offers no equipment changes before they can be saved", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({ [PACK]: reply(200, pack([saved("2026-10-11")], { equipment: touring({}, false) })) }));
+    await renderPage();
+    expect(await screen.findByText(/Touring equipment can't be changed right now/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /touring equipment/ })).not.toBeInTheDocument();
   });
 });
