@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, fieldClassName } from "@/components/ui/input";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
-import { TOUR_ACTIVITY } from "@/components/trips/TourPlan";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { useTripEditorHistory } from "@/hooks/useTripEditorHistory";
+import { TOUR_ACTIVITY } from "@/lib/trip-activities";
 import { errorMessage, timedTripRequest, TripRequestError } from "@/lib/trip-requests";
 import { cn } from "@/lib/utils";
 import type {

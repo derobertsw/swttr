@@ -13,10 +13,12 @@ const plural = (count: number) => `${count} ${count === 1 ? "day" : "days"}`;
 
 /**
  * Copy this day (#176): gives the days picked this day's destination and
- * activity, and with "Also copy my kit" the member's own kit. The server
- * reviews the copy first, with each day's kits; crew kits are never copied.
+ * activity, with "Also copy my kit" the member's own kit, and for the
+ * organizer with "Also copy the tour plan" the day's tour plan (#210). The
+ * server reviews the copy first, with each day's kits and tour plan; crew kits
+ * are never copied.
  */
-export function CopyDayCard({ tripId, day, dayLabel, stops, days, kit, onSaved }: {
+export function CopyDayCard({ tripId, day, dayLabel, stops, days, kit, tourPlan = null, onSaved }: {
   tripId: string;
   day: TripDay;
   dayLabel: string;
@@ -25,11 +27,14 @@ export function CopyDayCard({ tripId, day, dayLabel, stops, days, kit, onSaved }
   days: TripDay[];
   /** The member's kit on this day, which they can copy too; null when they have none. */
   kit: "outfit" | "checklist" | null;
+  /** The route of this day's tour plan when the organizer can copy it; null otherwise. */
+  tourPlan?: string | null;
   onSaved: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [withKit, setWithKit] = useState(false);
+  const [withPlan, setWithPlan] = useState(false);
   const [reviewing, setReviewing] = useState<Extract<TripItineraryRequest, { action: "copy_day" }> | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const reviewFocus = useReturnFocus();
@@ -42,13 +47,14 @@ export function CopyDayCard({ tripId, day, dayLabel, stops, days, kit, onSaved }
   // Days removed by a reload drop out of the selection.
   const chosen = selected.filter((date) => others.some((candidate) => candidate.date === date)).sort();
   const copyKit = withKit && kit !== null;
+  const copyPlan = withPlan && tourPlan !== null;
   if (others.length === 0) return null;
 
   const review = () => {
     if (chosen.length === 0) return;
     setAnnouncement("");
     reviewFocus.remember(() => document.getElementById(`${formId}-review`));
-    setReviewing({ action: "copy_day", from: day.date, dates: chosen, kit: copyKit });
+    setReviewing({ action: "copy_day", from: day.date, dates: chosen, kit: copyKit, plan: copyPlan });
   };
 
   return (
@@ -75,6 +81,15 @@ export function CopyDayCard({ tripId, day, dayLabel, stops, days, kit, onSaved }
               </span>
             </label>
           )}
+          {tourPlan !== null && (
+            <label className="mt-2 flex min-h-11 cursor-pointer items-start gap-3 border-t border-border pt-2 text-sm">
+              <input type="checkbox" checked={withPlan} onChange={(event) => setWithPlan(event.target.checked)} className="mt-0.5 size-5 shrink-0" />
+              <span className="min-w-0">
+                <span className="block font-medium text-foreground">Also copy the tour plan</span>
+                <span className="block break-words text-muted-foreground">{tourPlan}, with its times and notes.</span>
+              </span>
+            </label>
+          )}
           <Button id={`${formId}-review`} type="button" className="mt-3" disabled={chosen.length === 0} onClick={review}>
             Review copy{chosen.length > 0 ? ` to ${plural(chosen.length)}` : ""}
           </Button>
@@ -88,7 +103,9 @@ export function CopyDayCard({ tripId, day, dayLabel, stops, days, kit, onSaved }
           change={reviewing}
           title={`Copy ${dayLabel}`}
           description={`${plural(reviewing.dates.length)} selected. Nothing changes until you save.`}
-          question="Replace or keep the kit you already have there?"
+          question={reviewing.plan
+            ? reviewing.kit ? "Replace or keep what's already there?" : "Replace or keep the tour plan already there?"
+            : "Replace or keep the kit you already have there?"}
           saveLabel="Copy day"
           onSaved={() => {
             saved.current = true;
@@ -96,6 +113,7 @@ export function CopyDayCard({ tripId, day, dayLabel, stops, days, kit, onSaved }
             setAnnouncement(`Copied to ${plural(reviewing.dates.length)}.`);
             setSelected([]);
             setWithKit(false);
+            setWithPlan(false);
             setOpen(false);
             onSaved();
           }}

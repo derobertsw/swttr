@@ -461,8 +461,11 @@ export type TripItineraryRequest =
   /** A present key sets that field on every date; `activity: null` clears it. */
   | { action: "assign_days"; dates: string[]; stop_id?: string; activity?: string | null }
   | { action: "set_day_place"; date: string; place: TripPlace }
-  /** Gives `dates` the destination and activity of `from`, and with `kit` the signed-in member's kit too. */
-  | { action: "copy_day"; from: string; dates: string[]; kit: boolean };
+  /**
+   * Gives `dates` the destination and activity of `from`, with `kit` the
+   * signed-in member's kit too, and with `plan` its tour plan (#210, organizer only).
+   */
+  | { action: "copy_day"; from: string; dates: string[]; kit: boolean; plan?: boolean };
 
 /** Sets or removes a day's access point (#208); the review asks whether it's for the day or every day at its stop. */
 export interface TripAccessPointRequest {
@@ -477,7 +480,10 @@ export interface TripItineraryChange {
   date_label: string;
   before: string;
   after: string;
-  /** What happens to kits on the day: a copied kit, and the kits that stay as saved when its plan changes. */
+  /**
+   * What happens on the day: a copied kit or tour plan, the kits that stay as
+   * saved when its plan changes, and its access point and tour plan.
+   */
   notes?: string[];
 }
 

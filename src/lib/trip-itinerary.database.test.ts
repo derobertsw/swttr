@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { dayLabels, previewItinerary } from "@/lib/trip-itinerary";
-import type { Trip, TripDay, TripFull, TripItineraryRequest, TripMember, TripMemberDayKit, TripStop } from "@/types/trips";
+import type { Trip, TripDay, TripFull, TripItineraryRequest, TripMember, TripMemberDayKit, TripStop, TripTourPlanSummary } from "@/types/trips";
 
 const tripId = "a2eb3ecb-a7ac-4b6d-98e3-701c694d8563";
 const stowe = "5b7f1f7e-3c52-4c39-9d0e-0a3c1f0b6a11";
@@ -24,7 +24,7 @@ const loadFull = async (): Promise<TripFull> => {
   const rows = async <T,>(sql: string) => (await db.query<T>(sql, [tripId])).rows;
   return {
     trip: (await rows<Trip>("SELECT id, owner_user_id, name, start_date::text, end_date::text, status FROM trips WHERE id = $1"))[0],
-    stops: await rows<TripStop>("SELECT id, position, name, latitude::float8 AS latitude, longitude::float8 AS longitude FROM trip_stops WHERE trip_id = $1 ORDER BY position"),
+    stops: await rows<TripStop>("SELECT id, position, name, latitude::float8 AS latitude, longitude::float8 AS longitude, activities FROM trip_stops WHERE trip_id = $1 ORDER BY position"),
     days: await rows<TripDay>("SELECT id, date::text, stop_id, activity FROM trip_days WHERE trip_id = $1 ORDER BY date"),
     members: await rows<TripMember>("SELECT id, trip_id, user_id, display_name, role, status FROM trip_members WHERE trip_id = $1 ORDER BY created_at, display_name"),
     // Timestamps as the API sends them (ISO 8601), so reviews carry them that way.
@@ -32,8 +32,26 @@ const loadFull = async (): Promise<TripFull> => {
       to_json(k.updated_at) #>> '{}' AS updated_at, to_json(k.outfit_saved_at) #>> '{}' AS outfit_saved_at
       FROM trip_member_day_kits k JOIN trip_days d ON d.id = k.trip_day_id WHERE d.trip_id = $1`),
     gear: [],
+    tour_plans: await rows<TripTourPlanSummary>(`SELECT t.id, t.trip_day_id, d.date::text AS date, t.objective, t.revision
+      FROM trip_day_tour_plans t JOIN trip_days d ON d.id = t.trip_day_id WHERE t.trip_id = $1`),
   };
 };
+/** A reviewed save, as the API sends it from migration 030 on: the edit with the access points and tour plans its review saw. */
+const reviewedEdit = async (action: string, payload: Record<string, unknown>, user = "user-1") =>
+  (await db.query<{ result: unknown }>("SELECT public.edit_trip_itinerary_reviewed($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb) AS result",
+    [tripId, user, action, JSON.stringify(payload), JSON.stringify(payload.access_points), JSON.stringify(payload.tour_plans)])).rows[0].result;
+/** Adds a tour plan on a date, by the organizer. */
+const addPlan = async (date: string, objective: string, extra: Record<string, unknown> = {}) => {
+  const fields = { objective, meet_time: null, meet_day_offset: 0, backup_plan: null, time_zone: null, ...extra };
+  await db.query(`INSERT INTO trip_day_tour_plans (trip_id, trip_day_id, objective, meet_time, meet_day_offset, backup_plan, time_zone, created_by, updated_by)
+    SELECT $1, d.id, $3, $4::time, $5, $6, $7, 'user-1', 'user-1' FROM trip_days d WHERE d.trip_id = $1 AND d.date = $2`,
+  [tripId, date, fields.objective, fields.meet_time, fields.meet_day_offset, fields.backup_plan, fields.time_zone]);
+};
+/** Each day's tour plan: what it says, and its row id, revision and authors. */
+const plansByDay = async () => Object.fromEntries((await db.query<Record<string, unknown> & { date: string }>(
+  `SELECT d.date::text AS date, t.id, t.revision, t.created_by, t.updated_by, t.objective, t.meet_time::text, t.meet_day_offset, t.backup_plan, t.time_zone
+    FROM trip_day_tour_plans t JOIN trip_days d ON d.id = t.trip_day_id WHERE t.trip_id = $1`, [tripId])).rows.map(({ date, ...plan }) => [date, plan]));
+const planFields = ({ objective, meet_time, meet_day_offset, backup_plan, time_zone }: Record<string, unknown>) => ({ objective, meet_time, meet_day_offset, backup_plan, time_zone });
 const labels = async () => Object.fromEntries(dayLabels(await loadFull()));
 /** Each day's stop after following NULL to the base, which must survive reordering. */
 const effectiveStops = async () => {
@@ -69,7 +87,8 @@ describe("Itinerary edits in Postgres", () => {
   beforeAll(async () => {
     db = await PGlite.create();
     await db.exec("CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS; CREATE FUNCTION public.update_updated_at_column() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END $$;");
-    for (const migration of ["012_trips", "016_atomic_trip_creation", "018_trip_saved_kits", "022_trip_itinerary_edits", "023_trip_copy_day"]) {
+    for (const migration of ["012_trips", "016_atomic_trip_creation", "017_trip_stays", "018_trip_saved_kits", "021_trip_date_changes", "022_trip_itinerary_edits",
+      "023_trip_copy_day", "025_trip_stay_locations", "026_trip_tour_plans", "027_trip_access_points", "030_trip_copy_tour_plans"]) {
       await db.exec(await readFile(`supabase/migrations/${migration}.sql`, "utf8"));
     }
   }, 20_000);
@@ -368,6 +387,91 @@ describe("Itinerary edits in Postgres", () => {
     });
   });
 
+  describe("tour plans (#210)", () => {
+    const copy = (dates: string[], plan = true, kit = false): TripItineraryRequest => ({ action: "copy_day", from: "2026-10-09", dates, kit, plan });
+    const TUCKERMAN = { meet_time: "06:30", meet_day_offset: -1, backup_plan: "Hillman's Highway", time_zone: "America/New_York" };
+
+    it("copies every field of the day's plan, keeping or replacing a plan already there, and nobody's kit", async () => {
+      await addPlan("2026-10-09", "Tuckerman Ravine", TUCKERMAN);
+      await addPlan("2026-10-11", "Jay Cloud");
+      await addKit("2026-10-09", "user-1", { items: ["shell"] });
+      const before = await plansByDay();
+      await db.exec("BEGIN");
+      await reviewedEdit("copy_day", await reviewed(copy(["2026-10-10", "2026-10-11"]), "keep"));
+      let after = await plansByDay();
+      expect(planFields(after["2026-10-10"])).toEqual(planFields(before["2026-10-09"]));
+      expect(after["2026-10-10"]).toMatchObject({ revision: 1, created_by: "user-1", updated_by: "user-1" });
+      expect(after["2026-10-11"]).toEqual(before["2026-10-11"]);
+      expect(Object.keys(await kitsByDay())).toEqual(["2026-10-09 user-1"]);
+      await db.exec("ROLLBACK");
+      await reviewedEdit("copy_day", await reviewed(copy(["2026-10-10", "2026-10-11"]), "replace"));
+      after = await plansByDay();
+      // A replaced plan keeps its row, at the next revision, so an open editor sees it changed.
+      expect(after["2026-10-11"]).toEqual({ ...before["2026-10-11"], ...planFields(before["2026-10-09"]), revision: 2 });
+      expect(after["2026-10-09"]).toEqual(before["2026-10-09"]);
+      expect(planFields(after["2026-10-10"])).toEqual(planFields(before["2026-10-09"]));
+    });
+
+    it("copies a tour plan only for the organizer, only one that's there, and none for a payload from before 030", async () => {
+      await addPlan("2026-10-09", "Tuckerman Ravine");
+      const payload = await reviewed(copy(["2026-10-12"]));
+      await expect(reviewedEdit("copy_day", payload, "user-2")).rejects.toMatchObject({ code: "22023" });
+      await expect(edit("copy_day", { ...payload, plan: "merge" })).rejects.toMatchObject({ code: "22023" });
+      const noPlan = await reviewed({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: false });
+      await expect(edit("copy_day", { ...noPlan, plan: "replace" })).rejects.toMatchObject({ code: "22023" });
+      const older = { ...payload };
+      delete older.plan;
+      await edit("copy_day", older, "user-2");
+      expect(Object.keys(await plansByDay())).toEqual(["2026-10-09"]);
+      expect((await labels())["2026-10-12"]).toBe("Stowe, Vermont (base) · Ski touring");
+    });
+
+    it("refuses a reviewed save when a tour plan was added, changed or removed since the review", async () => {
+      await addPlan("2026-10-09", "Tuckerman Ravine");
+      await addPlan("2026-10-11", "Jay Cloud");
+      for (const [request, change] of [
+        [copy(["2026-10-10"]), "UPDATE trip_day_tour_plans SET objective = 'Gulf of Slides', revision = revision + 1 WHERE objective = 'Tuckerman Ravine'"],
+        [copy(["2026-10-10"]), `INSERT INTO trip_day_tour_plans (trip_id, trip_day_id, objective, created_by, updated_by) SELECT trip_id, id, 'Mt Mansfield', 'user-1', 'user-1' FROM trip_days WHERE date = '2026-10-10'`],
+        [{ action: "assign_days", dates: ["2026-10-12"], activity: "Hike" }, "DELETE FROM trip_day_tour_plans WHERE objective = 'Jay Cloud'"],
+      ] as Array<[TripItineraryRequest, string]>) {
+        const payload = await reviewed(request);
+        await db.exec("BEGIN");
+        try {
+          await db.exec(change);
+          await expect(reviewedEdit(request.action, payload)).rejects.toMatchObject({ code: "40001" });
+        } finally {
+          await db.exec("ROLLBACK");
+        }
+      }
+      // Moving the trip's dates keeps every plan's id and revision but puts
+      // them on other dates, so a review from before the move is stale too:
+      // here every day reads the same, so nothing else tells them apart.
+      await db.exec("BEGIN");
+      try {
+        await db.query("UPDATE trip_days SET stop_id = NULL, activity = 'Backcountry'");
+        await db.exec("DELETE FROM trip_day_tour_plans");
+        for (const [date, objective] of [["2026-10-09", "Gulf of Slides"], ["2026-10-10", "Tuckerman Ravine"], ["2026-10-11", "Hillman's Highway"], ["2026-10-12", "Ammonoosuc"]]) {
+          await addPlan(date, objective);
+        }
+        const beforeMove = await reviewed({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: false, plan: true }, "replace");
+        await db.query("SELECT public.change_trip_dates($1, 'user-1', '2026-10-09', '2026-10-12', '2026-10-10', '2026-10-13', 'move', 'planning', NULL, NULL, '[]')", [tripId]);
+        await db.exec("SAVEPOINT stale");
+        await expect(reviewedEdit("copy_day", beforeMove)).rejects.toMatchObject({ code: "40001" });
+        await db.exec("ROLLBACK TO SAVEPOINT stale");
+        // Saturday's plan, now on Oct 11, is still there.
+        expect((await plansByDay())["2026-10-11"]).toMatchObject({ objective: "Tuckerman Ravine", revision: 1 });
+      } finally {
+        await db.exec("ROLLBACK");
+      }
+
+      // Access points are still checked first.
+      const payload = await reviewed({ action: "assign_days", dates: ["2026-10-12"], activity: "Hike" });
+      await expect(reviewedEdit("assign_days", { ...payload, access_points: { stops: { [jay]: {} }, days: {} } })).rejects.toMatchObject({ code: "40001" });
+      await reviewedEdit("assign_days", payload);
+      expect((await labels())["2026-10-12"]).toBe("Jay Peak, Vermont · Hike");
+    });
+  });
+
   it("lets the owner and joined members edit, but not someone who left or isn't on the trip", async () => {
     const assign = async (user: string) => edit("assign_days", { dates: ["2026-10-12"], activity: user, expected: [{ date: "2026-10-12", stop_id: jay, activity: (await loadFull()).days[3].activity }] }, user);
     await expect(assign("user-3")).rejects.toMatchObject({ code: "42501" });
@@ -386,6 +490,12 @@ describe("Itinerary edits in Postgres", () => {
         FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r`
     )).rows;
     expect(grants).toEqual([{ role: "anon", allowed: false, any: false }, { role: "authenticated", allowed: false, any: false }, { role: "service_role", allowed: true, any: true }]);
+    const tourPlanGrants = (await db.query<{ role: string; reviewed: boolean; revisions: boolean }>(
+      `SELECT r AS role, has_function_privilege(r, 'public.edit_trip_itinerary_reviewed(uuid, text, text, jsonb, jsonb, jsonb)', 'EXECUTE') AS reviewed,
+        has_function_privilege(r, 'public.trip_tour_plan_snapshot(uuid)', 'EXECUTE') AS revisions
+        FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r`
+    )).rows;
+    expect(tourPlanGrants).toEqual([{ role: "anon", reviewed: false, revisions: false }, { role: "authenticated", reviewed: false, revisions: false }, { role: "service_role", reviewed: true, revisions: true }]);
   });
 
   describe("applies exactly what the review previewed", () => {
@@ -393,13 +503,14 @@ describe("Itinerary edits in Postgres", () => {
       const full = await loadFull();
       const before = dayLabels(full);
       const kitsBefore = await kitsByDay();
+      const plansBefore = await plansByDay();
       const preview = previewItinerary(full, request, "user-1");
       if ("error" in preview) throw new Error(preview.error);
       expect(preview.options.length).toBeGreaterThan(0);
       for (const option of preview.options) {
         await db.exec("BEGIN");
         try {
-          await edit(request.action, option.payload);
+          await reviewedEdit(request.action, option.payload);
           const after = dayLabels(await loadFull());
           const changed = new Map(option.changes.map((change) => [change.date, change.after]));
           for (const [date, label] of after) expect([option.key, date, label]).toEqual([option.key, date, changed.get(date) ?? before.get(date)]);
@@ -412,6 +523,13 @@ describe("Itinerary edits in Postgres", () => {
             const [date, user] = key.split(" ");
             const expected = user === "user-1" && copiedTo.includes(date) ? { ...source, note: kitsBefore[key]?.note ?? null } : kitsBefore[key];
             expect([option.key, key, kitsAfter[key]]).toEqual([option.key, key, expected]);
+          }
+          // Only the days whose review says they get the tour plan do; every other plan stays as it was.
+          const planTo = option.changes.filter((change) => change.notes?.some((note) => /^(Gets the tour plan|Its tour plan, .* is replaced)/.test(note))).map((change) => change.date);
+          const plansAfter = await plansByDay();
+          for (const date of new Set([...Object.keys(plansBefore), ...Object.keys(plansAfter)])) {
+            const expected = planTo.includes(date) && request.action === "copy_day" ? planFields(plansBefore[request.from]) : plansBefore[date];
+            expect([option.key, date, planTo.includes(date) ? planFields(plansAfter[date]) : plansAfter[date]]).toEqual([option.key, date, expected]);
           }
         } finally {
           await db.exec("ROLLBACK");
@@ -442,6 +560,18 @@ describe("Itinerary edits in Postgres", () => {
       await check({ action: "copy_day", from: "2026-10-09", dates: ["2026-10-11", "2026-10-12"], kit: true });
       await check({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-09", "2026-10-11"], kit: false });
       await check({ action: "copy_day", from: "2026-10-11", dates: ["2026-10-12"], kit: false });
+    });
+
+    it("for copies with and without the tour plan, onto days with and without plans, and changes to days with plans", async () => {
+      await addPlan("2026-10-09", "Tuckerman Ravine", { meet_time: "06:30", backup_plan: "Hillman's Highway", time_zone: "America/New_York" });
+      await addPlan("2026-10-11", "Jay Cloud");
+      await addKit("2026-10-09", "user-1", { items: ["shell"] });
+      await addKit("2026-10-10", "user-1", { items: ["jacket"] });
+      await check({ action: "copy_day", from: "2026-10-09", dates: ["2026-10-10", "2026-10-11", "2026-10-12"], kit: true, plan: true });
+      await check({ action: "copy_day", from: "2026-10-09", dates: ["2026-10-11", "2026-10-12"], kit: false, plan: true });
+      await check({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-09", "2026-10-11"], kit: false });
+      await check({ action: "assign_days", dates: ["2026-10-09", "2026-10-11"], stop_id: jay, activity: "Hike" });
+      await check({ action: "set_day_place", date: "2026-10-09", place: BURLINGTON });
     });
 
     it("for the last stop, a stop no day uses, and a trip without stops", async () => {

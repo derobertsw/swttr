@@ -17,7 +17,7 @@ import { previewItinerary } from "@/lib/trip-itinerary";
 import { planDayKits } from "@/lib/trip-saved-kits";
 import { buildLodging } from "@/lib/trip-lodging";
 import { buildTourPlanSummary } from "@/lib/trip-tour-plans";
-import type { TripDay, TripFull, TripItineraryRequest, TripMember, TripMemberDayKit } from "@/types/trips";
+import type { TripDay, TripFull, TripItineraryRequest, TripLocation, TripMember, TripMemberDayKit, TripTourPlan } from "@/types/trips";
 import { savedOutfit, savedPlan } from "@/test/savedKit";
 import DayDetailPage from "./page";
 import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
@@ -325,7 +325,7 @@ describe("Trip day page", () => {
       expect(sentBodies(fetchMock, ITINERARY).at(-1)).toEqual({
         action: "set_day_place", date: "2026-10-10", place: { name: "Jay, Vermont", latitude: 44.94, longitude: -72.5 },
         scope: "day", expected: { stop_id: STOWE_STOP.id, stop: { name: STOWE_STOP.name, latitude: 44.47, longitude: -72.69 }, dates: ["2026-10-10"] },
-        access_points: { stops: {}, days: {} },
+        access_points: { stops: {}, days: {} }, tour_plans: {},
       });
       // The trip reloads after the save.
       expect(sentBodies(fetchMock, "GET /api/v1/trips/trip-1")).toHaveLength(2);
@@ -717,6 +717,7 @@ describe("Trip day page", () => {
       await renderPage();
       await user.click(await screen.findByRole("button", { name: "Copy to other days" }));
       expect(screen.queryByRole("checkbox", { name: /Also copy my/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("checkbox", { name: /Also copy the tour plan/ })).not.toBeInTheDocument();
       await user.click(screen.getByRole("checkbox", { name: /Mon, Oct 12/ }));
       await user.click(screen.getByRole("button", { name: "Review copy to 1 day" }));
       const dialog = await screen.findByRole("dialog", { name: "Copy Sat, Oct 10" });
@@ -729,6 +730,52 @@ describe("Trip day page", () => {
       expect(screen.getByRole("checkbox", { name: /Mon, Oct 12/ })).toBeChecked();
       expect(screen.getByRole("button", { name: "Review copy to 1 day" })).toHaveFocus();
       expect(sentBodies(fetchMock, ITINERARY).at(-1)).toMatchObject({ action: "copy_day", kit: "none" });
+    });
+
+    describe("with a tour plan (#210)", () => {
+      const tourPlan = (day: TripDay, objective: string, extra: Partial<TripTourPlan> = {}) => buildTourPlanSummary({
+        id: `plan-${day.id}`, trip_id: TRIP.id, trip_day_id: day.id, objective, route_url: null, meet_time: null, meet_day_offset: 0,
+        distance: null, distance_unit: null, ascent: null, ascent_unit: null, duration_minutes: null, metrics_source: null,
+        metrics_source_url: null, approach_notes: null, access_notes: null, access_url: null, backup_plan: null, return_time: null,
+        return_day_offset: 0, checkin_notes: null, pickup_notes: null, time_zone: null, revision: 1, created_by: "user-1",
+        updated_by: "user-1", created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z", ...extra,
+      }, day.date);
+      const touring = [{ ...days[0], activity: "Backcountry" }, days[1], days[2]];
+      const withPlans = tripFull({ stops: [STOWE_STOP, JAY], days: touring, tour_plans: [tourPlan(touring[0], "Tuckerman Ravine"), tourPlan(touring[1], "Jay Cloud")] });
+
+      it("lets the organizer copy it, asking about a plan already on a day", async () => {
+        const fetchMock = copyTrip(withPlans, () => reply(200, { ok: true }));
+        const user = userEvent.setup();
+        await renderPage();
+        await user.click(await screen.findByRole("button", { name: "Copy to other days" }));
+        await user.click(screen.getByRole("checkbox", { name: "Select all days" }));
+        await user.click(screen.getByRole("checkbox", { name: /Also copy the tour plan.*Tuckerman Ravine, with its times and notes/ }));
+        await user.click(screen.getByRole("button", { name: "Review copy to 2 days" }));
+
+        const dialog = await screen.findByRole("dialog", { name: "Copy Sat, Oct 10" });
+        expect(await within(dialog).findByRole("group", { name: "Replace or keep the tour plan already there?" })).toBeInTheDocument();
+        await user.click(within(dialog).getByRole("radio", { name: /Replace the tour plan on Sun Oct 11/ }));
+        expect(within(dialog).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+          "Sun Oct 11Jay Peak, Vermont · No activity → Stowe, Vermont · BackcountryIts tour plan, Jay Cloud, is replaced with Tuckerman Ravine from Sat Oct 10.",
+          "Mon Oct 12Stowe, Vermont (base) · Hike → Stowe, Vermont · BackcountryGets the tour plan from Sat Oct 10: Tuckerman Ravine.",
+        ]);
+        await user.click(within(dialog).getByRole("button", { name: "Copy day" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+        expect(sentBodies(fetchMock, ITINERARY).at(-1)).toMatchObject({ action: "copy_day", kit: "none", plan: "replace", tour_plans: { "plan-day-1": { date: "2026-10-10", revision: 1 }, "plan-day-2": { date: "2026-10-11", revision: 1 } } });
+        // The option is cleared with the rest of the form.
+        await user.click(screen.getByRole("button", { name: "Copy to other days" }));
+        expect(screen.getByRole("checkbox", { name: /Also copy the tour plan/ })).not.toBeChecked();
+      });
+
+      it("isn't offered to a member", async () => {
+        mockAuth.userId = "user-2";
+        const member: TripMember = { ...ORGANIZER, id: "member-sam", user_id: "user-2", display_name: "Sam", role: "member" };
+        copyTrip({ ...withPlans, members: [ORGANIZER, member] }, () => reply(200, { ok: true }));
+        const user = userEvent.setup();
+        await renderPage();
+        await user.click(await screen.findByRole("button", { name: "Copy to other days" }));
+        expect(screen.queryByRole("checkbox", { name: /Also copy the tour plan/ })).not.toBeInTheDocument();
+      });
     });
 
     it("isn't offered on a one-day trip", async () => {
@@ -764,6 +811,21 @@ describe("Trip day page", () => {
       expect(screen.getAllByText("6:30 AM EDT · Sat Oct 10 · Meeting point not set")).toHaveLength(2);
       expect(screen.getByRole("heading", { name: "My kit" }).compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(screen.getByRole("button", { name: "Change tour plan" })).toBeInTheDocument();
+    });
+
+    it("meets at the day's access point, in the day's start and the plan", async () => {
+      const LOT: TripLocation = { label: "Pinkham Notch lot", address: null, latitude: 44.2571, longitude: -71.2531, precision: "exact",
+        time_zone: "America/New_York", source: "manual", provider: null, provider_id: null, attribution: null };
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({
+          stops: [{ ...STOWE_STOP, access_point: LOT }], days: [tourDay], members: [ORGANIZER], lodging: buildLodging(TRIP, [], []), tour_plans: [plan],
+        })),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      await screen.findByRole("heading", { name: "Tour plan" });
+      expect(screen.getAllByText("6:30 AM EDT · Sat Oct 10 · Pinkham Notch lot")).toHaveLength(2);
+      expect(screen.queryByText(/Meeting point not set/)).not.toBeInTheDocument();
     });
 
     it("shows a member the plan without organizer actions", async () => {

@@ -238,7 +238,7 @@ describe("Changing the itinerary from Destinations", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(stopRows()).toEqual(["Stowe, Vermont", "Jay Peak"]);
     expect(screen.getByText("Burlington removed.")).toBeInTheDocument();
-    expect(sentBodies(fetchMock, ITINERARY).at(-1)).toEqual({ action: "remove_stop", stop_id: second.id, reassign_to: jay.id, expected: ["2026-10-11"], access_points: NO_ACCESS_POINTS });
+    expect(sentBodies(fetchMock, ITINERARY).at(-1)).toEqual({ action: "remove_stop", stop_id: second.id, reassign_to: jay.id, expected: ["2026-10-11"], access_points: NO_ACCESS_POINTS, tour_plans: {} });
     // The days reload with the stops.
     expect(screen.getByRole("checkbox", { name: /Oct 11.*Jay Peak/ })).toBeInTheDocument();
   });
@@ -321,7 +321,7 @@ describe("Changing the itinerary from Destinations", () => {
     expect(sentBodies(fetchMock, ITINERARY).at(-1)).toEqual({
       action: "assign_days", dates: ["2026-10-10", "2026-10-12"], stop_id: second.id, activity: null,
       expected: [{ date: "2026-10-10", stop_id: null, activity: "Hike" }, { date: "2026-10-12", stop_id: jay.id, activity: null }],
-      access_points: NO_ACCESS_POINTS,
+      access_points: NO_ACCESS_POINTS, tour_plans: {},
     });
     expect(screen.getByText("Days saved.")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /Oct 10/ })).not.toBeChecked();
