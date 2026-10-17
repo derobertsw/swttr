@@ -80,7 +80,7 @@ export async function requireTripAccess(
 }
 
 /** Keep invitation placeholders and managed guests distinct from accounts. */
-export function countTripCrew(members: { status: string }[]): TripCrewCounts {
+function countTripCrew(members: { status: string }[]): TripCrewCounts {
   return {
     joined: members.filter((m) => m.status === "joined").length,
     pending: members.filter((m) => m.status === "invited").length,
