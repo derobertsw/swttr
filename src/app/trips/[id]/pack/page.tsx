@@ -194,23 +194,25 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
       items: current.equipment.items.map((entry) => entry.id === item.id ? { ...entry, quantity: value } : entry) } }),
     (choices) => choices.equipment[item.id]?.quantity ?? quantity);
 
-  /** Shows saved equipment choices, and the checks the change cleared or kept. */
-  const showEquipment = (choices: PackingChoices) => setData((current) => {
+  /**
+   * Shows a saved change to the equipment `ids`, and the checks it cleared or
+   * kept. Only those items: other rows' saves can answer in any order.
+   */
+  const showEquipment = (choices: PackingChoices, ids: string[]) => setData((current) => {
     if (!current) return current;
     const checks = { ...current.checks };
-    for (const option of current.equipment.template) {
-      const key = equipmentKey(option.id);
+    for (const key of ids.map(equipmentKey)) {
       if (choices.checks[key]) checks[key] = choices.checks[key];
       else delete checks[key];
     }
-    return { ...current, checks, equipment: withEquipmentChoices(current.equipment, choices.equipment) };
+    return { ...current, checks, equipment: withEquipmentChoices(current.equipment, choices.equipment, ids) };
   });
 
   const addEquipment = async (ids: string[]): Promise<string | null> => {
     try {
       const choices = await track(() => tripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST",
         { op: "add_equipment", ids } satisfies PackingChange));
-      showEquipment(choices);
+      showEquipment(choices, ids);
       setStatus(`Added ${ids.length === 1 ? "1 item" : `${ids.length} items`} to your touring equipment`);
       return null;
     } catch (err) {
@@ -222,7 +224,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
     markBusy(item.key, true);
     const result = await save({ op: "remove_equipment", id: item.id }, `Couldn't remove ${item.name}`);
     if (typeof result !== "string") {
-      showEquipment(result);
+      showEquipment(result, [item.id]);
       // The row goes, so focus moves to the section it was in.
       equipmentHeading.current?.focus();
       setStatus(`Removed ${item.name} from your list`);

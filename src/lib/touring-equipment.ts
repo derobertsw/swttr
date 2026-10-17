@@ -116,16 +116,24 @@ function itemsIn(saved: PackingEquipmentChoices): PackingEquipmentItem[] {
 }
 
 /**
- * The equipment after a saved change: `choices` is what the server returned.
- * Template items keep their place and their other names; a page uses this to
- * show a saved change without reading the whole list again.
+ * The equipment after a saved change to the template items `ids`: `choices`
+ * is what the server returned. Only those items change. A response holds the
+ * whole row as that change saved it, so a response to an earlier change that
+ * arrives late can't undo a later one to other items. Template items keep
+ * their place and their other names; a page uses this to show a saved change
+ * without reading the whole list again.
  */
-export function withEquipmentChoices(equipment: TouringEquipment, choices: PackingEquipmentChoices): TouringEquipment {
+export function withEquipmentChoices(equipment: TouringEquipment, choices: PackingEquipmentChoices, ids: readonly string[]): TouringEquipment {
+  const touched = new Set(ids);
   const template = equipment.template.map((option): EquipmentTemplateOption => {
+    if (!touched.has(option.id)) return option;
     const status = choices[option.id]?.status;
     if (status === "added") return { ...option, state: "added" };
     if (option.listedAs) return { ...option, state: "listed" };
     return { ...option, state: status === "removed" ? "removed" : "available" };
   });
-  return { ...equipment, items: itemsIn(choices), template };
+  const kept = Object.fromEntries(equipment.items.filter((item) => !touched.has(item.id))
+    .map((item) => [item.id, { status: "added" as const, quantity: item.quantity }]));
+  const saved = Object.fromEntries(ids.flatMap((id) => choices[id] ? [[id, choices[id]]] : []));
+  return { ...equipment, items: itemsIn({ ...kept, ...saved }), template };
 }

@@ -204,9 +204,13 @@ export function DayEquipment({ tripId, gear, memberId }: {
         { op: "add_equipment", ids } satisfies PackingChange);
       setData((current) => {
         if (!current) return current;
-        const equipment = withEquipmentChoices(current.equipment, choices.equipment);
-        const keys = equipment.items.map((item) => item.key);
-        return { equipment, checks: Object.fromEntries(keys.flatMap((key) => choices.checks[key] ? [[key, choices.checks[key]]] : [])) };
+        // Only the items this added: the day reads the rest from its own load.
+        const checks = { ...current.checks };
+        for (const key of ids.map(equipmentKey)) {
+          if (choices.checks[key]) checks[key] = choices.checks[key];
+          else delete checks[key];
+        }
+        return { equipment: withEquipmentChoices(current.equipment, choices.equipment, ids), checks };
       });
       setStatus(`Added ${ids.length === 1 ? "1 item" : `${ids.length} items`} to your touring equipment`);
       return null;

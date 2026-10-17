@@ -606,6 +606,26 @@ describe("Touring equipment", () => {
     expect(within(dialog).getByText("Avalanche probe").closest("section")).toHaveTextContent("Already in your list");
   });
 
+  it("keeps both removals when an earlier one answers last", async () => {
+    let releaseFirst!: () => void;
+    const fetchMock = fakeTripApi({
+      [PACK]: reply(200, pack([saved("2026-10-11")], { equipment: touring({ transceiver: { status: "added", quantity: 1 }, probe: { status: "added", quantity: 1 } }) })),
+      [CHANGE]: (body) => (body as { id: string }).id === "transceiver"
+        // Saved first, so its row still has the probe; it answers last.
+        ? new Promise((resolve) => { releaseFirst = () => resolve(reply(200, choices({ transceiver: { status: "removed", quantity: 1 }, probe: { status: "added", quantity: 1 } }))); })
+        : reply(200, choices({ transceiver: { status: "removed", quantity: 1 }, probe: { status: "removed", quantity: 1 } })),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("button", { name: "Remove Avalanche transceiver from your list" }));
+    await user.click(screen.getByRole("button", { name: "Remove Avalanche probe from your list" }));
+    await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Packed Avalanche probe" })).not.toBeInTheDocument());
+    await act(async () => releaseFirst());
+    expect(screen.queryByRole("checkbox", { name: "Packed Avalanche transceiver" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Packed Avalanche probe" })).not.toBeInTheDocument();
+  });
+
   it("offers no equipment changes before they can be saved", async () => {
     vi.stubGlobal("fetch", fakeTripApi({ [PACK]: reply(200, pack([saved("2026-10-11")], { equipment: touring({}, false) })) }));
     await renderPage();

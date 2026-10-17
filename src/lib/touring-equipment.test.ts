@@ -38,10 +38,24 @@ describe("touring equipment", () => {
 
   it("shows a saved change without reading the list again", () => {
     const before = buildTouringEquipment({ dates: [], saved: {}, names: ["Probe"], editable: true });
-    const after = withEquipmentChoices(before, { transceiver: { status: "added", quantity: 1 }, probe: { status: "added", quantity: 1 }, shovel: { status: "removed", quantity: 1 } });
+    const after = withEquipmentChoices(before, { transceiver: { status: "added", quantity: 1 }, probe: { status: "added", quantity: 1 }, shovel: { status: "removed", quantity: 1 } },
+      ["transceiver", "probe", "shovel"]);
     expect(after.items.map((item) => item.id)).toEqual(["transceiver", "probe"]);
     expect(states(after)).toMatchObject({ transceiver: "added", probe: "added:Probe", shovel: "removed", skins: "available" });
     // Removed again, an item they have under another name shows as listed.
-    expect(states(withEquipmentChoices(after, { probe: { status: "removed", quantity: 1 } }))).toMatchObject({ probe: "listed:Probe", transceiver: "available" });
+    expect(states(withEquipmentChoices(after, { probe: { status: "removed", quantity: 1 } }, ["probe"])))
+      .toMatchObject({ probe: "listed:Probe", transceiver: "added" });
+  });
+
+  it("changes only the items a response is for, so a late response can't undo a later change", () => {
+    const both = buildTouringEquipment({ dates: [], names: [], editable: true,
+      saved: { transceiver: { status: "added", quantity: 1 }, probe: { status: "added", quantity: 2 } } });
+    // Probe's removal answered first, with transceiver already removed.
+    const probeRemoved = withEquipmentChoices(both, { transceiver: { status: "removed", quantity: 1 }, probe: { status: "removed", quantity: 2 } }, ["probe"]);
+    expect(probeRemoved.items.map((item) => item.id)).toEqual(["transceiver"]);
+    // Transceiver's removal answers last, from before probe was removed.
+    const bothRemoved = withEquipmentChoices(probeRemoved, { transceiver: { status: "removed", quantity: 1 }, probe: { status: "added", quantity: 2 } }, ["transceiver"]);
+    expect(bothRemoved.items).toEqual([]);
+    expect(states(bothRemoved)).toMatchObject({ transceiver: "removed", probe: "removed" });
   });
 });
