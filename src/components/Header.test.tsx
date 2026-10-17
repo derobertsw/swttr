@@ -129,7 +129,7 @@ describe("Header settings entry points", () => {
     expect(avatar()).toHaveFocus();
   });
 
-  it("returns focus to Sign In when the account signs out while Settings is open", async () => {
+  it("returns focus to Sign in when the account signs out while Settings is open", async () => {
     const user = userEvent.setup();
     const { rerender } = render(chrome());
 
@@ -142,7 +142,7 @@ describe("Header settings entry points", () => {
     fireEvent.click(within(drawer).getByRole("button", { name: "Done" }));
 
     await closeDrawer();
-    expect(screen.getByRole("link", { name: "Sign In" })).toHaveFocus();
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveFocus();
   });
 
   it("leaves the avatar out of the mobile menu and lists Settings first", async () => {
@@ -157,7 +157,7 @@ describe("Header settings entry points", () => {
     expect(Array.from(menu.children, (item) => item.textContent)).toEqual(["Settings", "FAQ", "Feedback", "Share"]);
   });
 
-  it("lists Sign In and then Settings in the mobile menu for guests", async () => {
+  it("lists Sign in and then Settings in the mobile menu for guests", async () => {
     fakeClerkState.signedIn = false;
     const user = userEvent.setup();
     render(chrome());
@@ -166,7 +166,7 @@ describe("Header settings entry points", () => {
 
     const menu = screen.getByRole("navigation", { name: "Menu" });
     expect(Array.from(menu.children, (item) => item.textContent)).toEqual([
-      "Sign In",
+      "Sign in",
       "Settings",
       "FAQ",
       "Feedback",

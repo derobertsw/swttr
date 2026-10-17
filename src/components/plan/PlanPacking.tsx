@@ -61,15 +61,15 @@ function WardrobeNote({
 }) {
   if (wardrobe === "signedOut") {
     return (
-      <div className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+      <div className="flex flex-col items-start gap-1 text-sm text-muted-foreground">
         {/* Back to this plan's packing list afterwards, matched to the account's wardrobe. */}
         <Link
           href={signInHref(RESUME_PACKING_PATH)}
-          className="inline-flex min-h-11 items-center rounded-control font-medium text-primary underline underline-offset-4"
+          className="inline-flex min-h-11 max-w-full items-center rounded-control py-2 font-medium text-primary underline underline-offset-4"
         >
-          Sign in
+          Sign in to match these to your wardrobe
         </Link>
-        <span>to match these to your wardrobe. You&apos;ll come back to this plan.</span>
+        <p>You&apos;ll come back to this plan.</p>
       </div>
     );
   }

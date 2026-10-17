@@ -319,7 +319,7 @@ describe("MultiDayPlanDisplay", () => {
 
       await screen.findByRole("region", { name: "Upper body" });
       // Back to this plan's packing list afterwards: the address names the view, never the outing.
-      expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: "Sign in to match these to your wardrobe" })).toHaveAttribute(
         "href",
         "/sign-in?redirect_url=%2F%3Fresume%3Dpacking"
       );

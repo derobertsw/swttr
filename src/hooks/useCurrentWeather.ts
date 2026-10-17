@@ -44,7 +44,7 @@ export async function fetchWeatherAt(
 ): Promise<PlaceWeatherResult> {
   const fallbackError = localDateTime
     ? "Couldn't get the forecast for this place. Try again."
-    : "Could not get weather for this location.";
+    : "Couldn't get the weather. Try again.";
   const query = `lat=${location.latitude}&lon=${location.longitude}`;
   if (localDateTime !== undefined && !isLocalDateTime(localDateTime)) {
     return { data: null, error: "Choose a valid date and time for the forecast." };
