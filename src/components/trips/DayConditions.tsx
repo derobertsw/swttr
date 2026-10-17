@@ -66,7 +66,10 @@ export function DayConditions({ data, date, dateLabel, activity, userId, onSaved
   const [reviewing, setReviewing] = useState<{ sourceId: string; mode: ReviewMode } | null>(null);
   const [status, setStatus] = useState("");
   const focus = useReturnFocus();
-  if (activity !== TOUR_ACTIVITY && sources.length === 0) return null;
+  // An open editor, or the result it announced, keeps the section on the page:
+  // removing another activity's last source would otherwise unmount the sheet
+  // before it can close, return focus and say what happened.
+  if (activity !== TOUR_ACTIVITY && sources.length === 0 && !editing && !reviewing && !status) return null;
 
   const weekday = new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { weekday: "long" });
   const mine = (source: TripDayConditionsSource) => source.reviews.find((review) => review.user_id === userId);

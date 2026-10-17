@@ -42,7 +42,11 @@ export function parseReviewNote(value: unknown): string | null | FieldError {
   return value.trim() || null;
 }
 
-/** The day's plan and the source as they are now, which a review records and goes stale against. */
+/**
+ * The day's plan and the source as they are now, which a review records and
+ * goes stale against. record_trip_conditions_review (migration 031) builds the
+ * same shape under the trip lock to check it, so change both together.
+ */
 export function conditionsContext(
   full: Pick<TripFull, "stops" | "tour_plans">,
   day: TripDay,

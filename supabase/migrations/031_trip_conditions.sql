@@ -14,9 +14,10 @@
 -- corrects or withdraws a review for anyone else.
 --
 -- All writes run through two service-only transactions, serialised on the trip
--- row, with replay receipts like mutate_trip_tour_plan (026). Needs 012 and
--- 026, whose unique (trip_id, id) on trip_days the attachments and reviews use
--- to prove their day belongs to the same trip.
+-- row, with replay receipts like mutate_trip_tour_plan (026). Needs 012, 026,
+-- whose unique (trip_id, id) on trip_days the attachments and reviews use to
+-- prove their day belongs to the same trip, and 027 for the access points a
+-- review's context includes.
 
 CREATE TABLE public.trip_conditions_sources (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -173,7 +174,12 @@ GRANT EXECUTE ON FUNCTION public.mutate_trip_conditions_source(uuid, text, date,
 -- when they started, null for none; a mismatch is 40001, so a second window
 -- can't undo the first's change unseen. p_action:
 -- - 'reviewed' records a review now, with p_note and p_context, the day's plan
---   as the app read it.
+--   as the app read it. Under the lock the plan is read again in the same
+--   shape as the app's conditionsContext (src/lib/trip-conditions.ts), and a
+--   plan that changed since the app read it is 40001, so a change that lands
+--   while a review is being recorded is a conflict rather than a review that's
+--   stale as soon as it's saved. The day and its stop are locked against
+--   edits that don't take the trip lock, like the day's activity.
 -- - 'corrected' replaces the current review's note; 'withdrawn' withdraws it.
 --   Both keep the review's time and context, and need a current review.
 -- The source must be on the day. The context is left out of the replay
@@ -185,6 +191,8 @@ CREATE FUNCTION public.record_trip_conditions_review(
 DECLARE
   current_trip public.trips;
   v_day public.trip_days;
+  v_stop public.trip_stops;
+  v_context jsonb;
   latest public.trip_conditions_reviews;
   saved public.trip_conditions_reviews;
   prior public.trip_conditions_mutations;
@@ -211,7 +219,7 @@ BEGIN
     RAISE EXCEPTION 'Invalid review change' USING ERRCODE = '22000';
   END IF;
 
-  SELECT * INTO v_day FROM public.trip_days WHERE trip_id = p_trip_id AND date = p_date;
+  SELECT * INTO v_day FROM public.trip_days WHERE trip_id = p_trip_id AND date = p_date FOR SHARE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Day not found' USING ERRCODE = 'P0002'; END IF;
   IF p_day_id IS NULL OR v_day.id <> p_day_id OR NOT EXISTS (
     SELECT 1 FROM public.trip_day_conditions_sources WHERE trip_day_id = v_day.id AND source_id = p_source_id
@@ -226,6 +234,26 @@ BEGIN
   END IF;
 
   IF p_action = 'reviewed' THEN
+    -- The day's stop, or the base (the first stop) without one.
+    SELECT * INTO v_stop FROM public.trip_stops WHERE trip_id = p_trip_id
+      ORDER BY (id = v_day.stop_id) DESC NULLS LAST, position LIMIT 1 FOR SHARE;
+    v_context := jsonb_build_object(
+      'date', v_day.date::text,
+      'stop', CASE WHEN v_stop.id IS NOT NULL
+        THEN jsonb_build_object('id', v_stop.id, 'latitude', v_stop.latitude, 'longitude', v_stop.longitude) END,
+      'activity', coalesce(v_day.activity, v_stop.activities[1]),
+      -- The day's own access point while it's at the stop it was set for, otherwise the stop's.
+      'access_point', (SELECT jsonb_build_object('latitude', point->'latitude', 'longitude', point->'longitude')
+        FROM (SELECT CASE WHEN v_day.access_point IS NOT NULL AND v_day.access_point_stop_id = v_stop.id
+          THEN v_day.access_point ELSE v_stop.access_point END AS point) applied
+        WHERE point IS NOT NULL),
+      'route', (SELECT jsonb_build_object('objective', t.objective, 'route_url', t.route_url)
+        FROM public.trip_day_tour_plans t WHERE t.trip_day_id = v_day.id),
+      'source', (SELECT jsonb_build_object('url', s.url, 'region', s.region)
+        FROM public.trip_conditions_sources s WHERE s.id = p_source_id));
+    IF p_context IS DISTINCT FROM v_context THEN
+      RAISE EXCEPTION 'The day''s plan or the source changed. Check it again.' USING ERRCODE = '40001';
+    END IF;
     INSERT INTO public.trip_conditions_reviews (trip_id, trip_day_id, source_id, user_id, action, note, reviewed_at, context)
       VALUES (p_trip_id, v_day.id, p_source_id, p_user_id, 'reviewed', p_note, now(), p_context)
       RETURNING * INTO saved;

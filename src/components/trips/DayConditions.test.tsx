@@ -107,6 +107,21 @@ describe("Day conditions", () => {
     expect(sentBodies(api, `POST ${sourcesRoute}`)[0]).toEqual({ action: "remove", day_id: "day-1", source_id: "source-1", expected_revision: 2, mutation_id: expect.any(String) });
   });
 
+  it("stays on another activity's day after removing its last source, to say so and take focus back", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({ [`POST ${sourcesRoute}`]: reply(200, { source_id: "source-1", revision: 0 }) }));
+    const user = userEvent.setup();
+    const view = renderConditions({ activity: "Alpine", conditions: [source()] });
+    onSaved.mockImplementationOnce(async () => {
+      view.rerender(<DayConditions data={data([])} date={DATE} dateLabel="Sat Oct 10" activity="Alpine" userId="user-1" onSaved={onSaved} />);
+    });
+    await user.click(screen.getByRole("button", { name: "Edit source Mount Washington Avalanche Center" }));
+    await user.click(screen.getByRole("button", { name: "Remove from this day" }));
+    await user.click(screen.getByRole("button", { name: "Remove source" }));
+    expect(await screen.findByText("Source removed from Sat Oct 10. Reviews recorded for it are kept.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Conditions" })).toHaveFocus());
+  });
+
   it("gives members the sources without organizer actions", () => {
     renderConditions({ conditions: [source()], userId: "user-2" });
     expect(screen.getByText("Sources are managed by the organizer. You record your own reviews.")).toBeInTheDocument();
