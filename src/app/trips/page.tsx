@@ -12,6 +12,7 @@ import {
   SectionLabel,
   TripError,
   formatDateRange,
+  formatCrewCounts,
   daysBetween,
 } from "@/components/trips/trip-primitives";
 import type { TripSummary } from "@/types/trips";
@@ -128,7 +129,7 @@ function TripRow({ trip, next = false }: { trip: TripSummary; next?: boolean }) 
             <p className="truncate text-base font-semibold text-foreground">{trip.name}</p>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {formatDateRange(trip.start_date, trip.end_date)} · {total}{" "}
-              {total === 1 ? "day" : "days"} · {trip.crew_counts ? `${trip.crew_counts.joined} joined · ${trip.crew_counts.pending} pending invitations · ${trip.crew_counts.guests} managed guests` : `${trip.member_count} crew entries`}
+              {total === 1 ? "day" : "days"} · {trip.crew_counts ? formatCrewCounts(trip.crew_counts) : `${trip.member_count} crew entries`}
             </p>
             <div className="mt-2 flex items-center gap-2">
               <Badge size="sm" variant={next ? "primary" : "outline"}>

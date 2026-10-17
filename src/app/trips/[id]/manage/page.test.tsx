@@ -93,6 +93,27 @@ describe("Manage crew page", () => {
     expect(within(dialog).getByRole("button", { name: "Remove Sam" })).toBeEnabled();
   });
 
+  it.each([
+    { status: "guest", token: null, effect: null },
+    { status: "invited", token: "invite-sam", effect: "disable their pending invitation link" },
+    { status: "invited", token: null, effect: null },
+    { status: "joined", token: null, effect: "remove their trip access and disable any invitation link" },
+    { status: "left", token: null, effect: null },
+  ] as const)("describes actual removal effects for $status with token $token", async ({ status, token, effect }) => {
+    const member: TripMember = { ...SAM, status, invite_token: token };
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull({ members: [ORGANIZER, member] })),
+    }));
+    await renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Remove Sam" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Remove Sam from trip" }));
+    expect(dialog.getByText("delete their kits for this trip")).toBeInTheDocument();
+    expect(dialog.getByText("delete their saved packing checks for this trip")).toBeInTheDocument();
+    if (effect) expect(dialog.getByText(effect)).toBeInTheDocument();
+    else expect(dialog.queryByText(/trip access|invitation link/)).not.toBeInTheDocument();
+    if (status !== "joined") expect(dialog.queryByText(/trip access/)).not.toBeInTheDocument();
+  });
+
   describe("the remove dialog", () => {
     it("takes focus, keeps it, and hides the page behind it", async () => {
       vi.stubGlobal(
@@ -267,7 +288,7 @@ describe("Invitation controls", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     await renderPage();
-    expect(await screen.findByText("1 joined · 1 pending invitations · 1 managed guests")).toBeInTheDocument();
+    expect(await screen.findByText("1 joined · 1 pending invitation · 1 managed guest")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
     expect(screen.getByText(/No message is sent/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Revoke link" }));

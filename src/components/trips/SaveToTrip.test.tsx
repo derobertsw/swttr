@@ -74,7 +74,7 @@ describe("Save to trip", () => {
     expect(within(dialog).getByText("Alpine Skiing · Moderate effort")).toBeInTheDocument();
     expect(within(dialog).getByText("Personalized")).toBeInTheDocument();
     const whistler = await within(dialog).findByRole("radio", { name: /Whistler/ });
-    expect(within(dialog).getByText("Day 2 · Fri, Oct 9 – Mon, Oct 12 · 1 joined · 1 pending invitations · 1 managed guests")).toBeInTheDocument();
+    expect(within(dialog).getByText("Day 2 · Fri, Oct 9 – Mon, Oct 12 · 1 joined · 1 pending invitation · 1 managed guest")).toBeInTheDocument();
     expect(within(dialog).queryByRole("radio", { name: /Spring break/ })).not.toBeInTheDocument();
     expect(within(dialog).getByText("1 of your trips doesn't include Sat, Oct 10.")).toBeInTheDocument();
 
@@ -306,7 +306,7 @@ describe("Save a multi-day plan to a trip", () => {
     expect(within(dialog).getByText("A kit for each of 2 days, with that day's forecast.")).toBeInTheDocument();
     expect(await within(dialog).findByText("Mon, Oct 12 has no layers in this plan, so it isn't saved.")).toBeInTheDocument();
     expect(within(dialog).getByText("Stowe, Vermont, United States · Sat, Oct 10 – Sun, Oct 11")).toBeInTheDocument();
-    expect(within(dialog).getByText("Days 2–3 · Fri, Oct 9 – Mon, Oct 12 · 1 joined · 1 pending invitations · 1 managed guests")).toBeInTheDocument();
+    expect(within(dialog).getByText("Days 2–3 · Fri, Oct 9 – Mon, Oct 12 · 1 joined · 1 pending invitation · 1 managed guest")).toBeInTheDocument();
     expect(within(dialog).queryByRole("radio", { name: /Saturday only/ })).not.toBeInTheDocument();
     expect(within(dialog).getByText("1 of your trips doesn't include all of Sat, Oct 10 – Sun, Oct 11.")).toBeInTheDocument();
     expect(within(dialog).getByText("Sat, Oct 10 – Mon, Oct 12 at Stowe, Vermont")).toBeInTheDocument();

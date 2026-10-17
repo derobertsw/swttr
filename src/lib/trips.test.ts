@@ -160,6 +160,7 @@ describe("Trip loading", () => {
     const pending = GET(new NextRequest(`http://localhost/api/v1/trips/${TRIP.id}`), { params: Promise.resolve({ id: TRIP.id }) });
     await vi.runAllTimersAsync();
     const result = await (await pending).json();
+    expect(result).toMatchObject({ crew_counts: { joined: 1, pending: 1, guests: 0 }, conditions: [] });
     expect(result.members.find((m: { id: string }) => m.id === ORGANIZER.id).invite_token).toBeNull();
     expect(result.members.find((m: { id: string }) => m.id === SAM.id).invite_token).toBe(owner ? SAM.invite_token : null);
   });

@@ -11,6 +11,7 @@ import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   BackLink,
+  formatCrewCounts,
   InviteLinkButton,
   MemberAvatar,
   SectionLabel,
@@ -141,7 +142,7 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
 
         {data && (
           <>
-            {data.crew_counts && <p className="text-sm text-muted-foreground">{data.crew_counts.joined} joined · {data.crew_counts.pending} pending invitations · {data.crew_counts.guests} managed guests</p>}
+            {data.crew_counts && <p className="text-sm text-muted-foreground">{formatCrewCounts(data.crew_counts)}</p>}
             {!canManage && <p className="text-sm text-muted-foreground">The organizer manages invitations and guests.</p>}
             <div className="flex flex-col gap-2">
               {data.members.map((m) => (
@@ -283,7 +284,8 @@ function RemoveConfirmSheet({
     "delete their kits for this trip",
     "unassign their group gear",
     "drop them from roll call",
-    "remove their trip access and disable their invitation link",
+    ...(member.status === "joined" ? ["remove their trip access and disable any invitation link"] : []),
+    ...(member.status === "invited" && member.invite_token ? ["disable their pending invitation link"] : []),
     "delete their saved packing checks for this trip",
   ];
 

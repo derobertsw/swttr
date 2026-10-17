@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   BackLink,
+  formatCrewCounts,
   MemberAvatar,
   SectionLabel,
   Spine,
@@ -80,7 +81,7 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
             )}
 
             <Card>
-              {data.crew_counts && <p className="mb-3 text-sm text-muted-foreground">{data.crew_counts.joined} joined · {data.crew_counts.pending} pending invitations · {data.crew_counts.guests} managed guests</p>}
+              {data.crew_counts && <p className="mb-3 text-sm text-muted-foreground">{formatCrewCounts(data.crew_counts)}</p>}
               <div className="flex flex-wrap items-center gap-2">
                 {data.members
                   .filter((m) => m.status !== "left")

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCrewCounts } from "@/components/trips/trip-primitives";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { ACTIVITIES } from "@/data/activities";
 import { EXERTION_LABELS } from "@/lib/biophysics/exertion";
@@ -405,7 +406,7 @@ function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocu
                 <span className="block text-sm text-muted-foreground">
                   {daySpan > 1 ? `Days ${trip.day_number}–${(trip.day_number ?? 0) + daySpan - 1}` : `Day ${trip.day_number}`}
                   {" "}· {formatRange(trip.start_date, trip.end_date)}
-                  {trip.crew_counts ? ` · ${trip.crew_counts.joined} joined · ${trip.crew_counts.pending} pending invitations · ${trip.crew_counts.guests} managed guests` : trip.member_count > 1 && ` · ${trip.member_count} crew entries`}
+                  {trip.crew_counts ? ` · ${formatCrewCounts(trip.crew_counts)}` : trip.member_count > 1 && ` · ${trip.member_count} crew entries`}
                 </span>
               </TargetOption>
             ))}

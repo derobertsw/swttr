@@ -34,3 +34,11 @@ The automated checks do not establish live Clerk OAuth/provider behavior, native
 - `npx tsc --noEmit`: passed.
 - `npm run build`: attempted, but Turbopack's PostCSS worker cannot bind a port in this execution sandbox, including on an elevated retry.
 - `node node_modules/next/dist/bin/next build --webpack`: passed compilation, TypeScript, static-page generation and build tracing. It reports an existing optional `mppx` dependency warning for `@modelcontextprotocol/sdk/types.js`.
+
+## Review follow-up (2026-10-17)
+
+- Resolved the merge with main by retaining conditions loading/summaries alongside crew counts and invitation-token redaction.
+- Shared crew-count formatting now uses singular invitation/guest labels for one across all four summaries.
+- Removal confirmations distinguish joined access from pending links; guests, former members and revoked invitations have no access/link effect claimed.
+- Full suite: 159 files and 2,302 tests passed, including five removal-status regression cases and merged conditions/privacy assertions. Lint, knip and the webpack production build passed.
+- The standard Turbopack build was attempted but rejects the isolated worktree's shared `node_modules` symlink; webpack completed using those same dependencies.

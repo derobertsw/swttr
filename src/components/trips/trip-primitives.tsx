@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { TripCrewCounts } from "@/types/trips";
 
 const WEATHER_ICONS: Record<string, typeof Sun> = {
   snow: Snowflake,
@@ -158,6 +159,10 @@ export function daysBetween(startISO: string, endISO: string): number {
   const start = new Date(`${startISO}T00:00:00Z`).getTime();
   const end = new Date(`${endISO}T00:00:00Z`).getTime();
   return Math.round((end - start) / 86400000) + 1;
+}
+
+export function formatCrewCounts({ joined, pending, guests }: TripCrewCounts): string {
+  return `${joined} joined · ${pending} pending ${pending === 1 ? "invitation" : "invitations"} · ${guests} managed ${guests === 1 ? "guest" : "guests"}`;
 }
 
 function buildInviteUrl(token: string): string {
