@@ -18,7 +18,8 @@
 -- Calibrated against Columbia Joy Peak Lite Hooded (1.15/1.00), Spyder Challenger
 -- (1.20/1.05) and Mountain Hardwear Stretch Ozonic (1.20/1.05); placed at the
 -- light end per the reviews. Water-resistant, not waterproof, until taped seams
--- are confirmed.
+-- are confirmed. Wind-resistant: FP's ski guide lists the matching bib (same
+-- shell) as "waterproof + wind-resistant" (https://www.freepeople.com/ski-clothing-guide/).
 
 INSERT INTO garments (brand, model_name, year_released, msrp_usd, category, garment_type,
   covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams,
@@ -46,10 +47,10 @@ ON CONFLICT (garment_id) DO NOTHING;
 INSERT INTO garment_protection (garment_id, windproof_rating, air_permeability_cfm,
   waterproof_rating, waterproof_mm, breathability_mvtr, breathability_ret,
   membrane_type, seam_construction, data_source, generic_estimate)
-SELECT id, 'windproof', NULL,
+SELECT id, 'wind_resistant', NULL,
   'water_resistant', NULL, NULL, NULL,
   NULL, NULL,
-  'https://www.freepeople.com/fpmovement/shop/lift-love-jacket/ ("fully waterproof"; no waterproof rating or seam construction published)', false
+  'https://www.freepeople.com/fpmovement/shop/lift-love-jacket/ ("fully waterproof"; no waterproof rating or seam construction published); https://www.freepeople.com/ski-clothing-guide/ (matching bib, same shell: "waterproof + wind-resistant")', false
 FROM garments WHERE brand = 'FP Movement' AND model_name = 'Lift Love Jacket'
 ON CONFLICT (garment_id) DO NOTHING;
 
@@ -91,7 +92,8 @@ WHERE g.brand = 'FP Movement' AND g.model_name = 'Lift Love Jacket'
 -- Legs calibrated against Helly Hansen Legendary Insulated Ski Pants (1.00) and
 -- Patagonia Insulated Powder Bowl Pants (1.10). The bib bodice is probably a lined
 -- shell over about half the torso, so torso sits between HH Sogn Bib (0.15) and
--- Patagonia Snowdrifter Bibs (0.60). Water-resistant until taped seams are confirmed.
+-- Patagonia Snowdrifter Bibs (0.60). Water-resistant until taped seams are confirmed;
+-- wind-resistant per FP's ski guide ("waterproof + wind-resistant").
 
 INSERT INTO garments (brand, model_name, year_released, msrp_usd, category, garment_type,
   covers_torso, covers_arms, covers_legs, covers_head, hood_type, weight_grams,
@@ -119,10 +121,10 @@ ON CONFLICT (garment_id) DO NOTHING;
 INSERT INTO garment_protection (garment_id, windproof_rating, air_permeability_cfm,
   waterproof_rating, waterproof_mm, breathability_mvtr, breathability_ret,
   membrane_type, seam_construction, data_source, generic_estimate)
-SELECT id, 'windproof', NULL,
+SELECT id, 'wind_resistant', NULL,
   'water_resistant', NULL, NULL, NULL,
   NULL, NULL,
-  'https://www.freepeople.com/fpmovement/shop/lift-love-bib/ ("waterproof fabrication"; no waterproof rating or seam construction published)', false
+  'https://www.freepeople.com/fpmovement/shop/lift-love-bib/ ("waterproof fabrication"; no waterproof rating or seam construction published); https://www.freepeople.com/ski-clothing-guide/ ("waterproof + wind-resistant")', false
 FROM garments WHERE brand = 'FP Movement' AND model_name = 'Lift Love Bib'
 ON CONFLICT (garment_id) DO NOTHING;
 
