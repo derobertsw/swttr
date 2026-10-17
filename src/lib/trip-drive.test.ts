@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { closureKey, distanceLabel, drivePlans, durationLabel, stayDepartures, type StoredDriveEstimate } from "@/lib/trip-drive";
 import { closuresOn } from "@/lib/locations/closures";
 import { buildLodging, shiftDate } from "@/lib/trip-lodging";
-import type { TripFull, TripLodgingNight } from "@/types/trips";
-import { tripDriveEstimates, type DriveEstimateStore } from "@/lib/trip-drive-estimates";
+import type { TripDay, TripFull, TripLodgingNight } from "@/types/trips";
+import { tripDriveEstimates, type DriveEstimateStore, type ManualEstimateRow } from "@/lib/trip-drive-estimates";
 import { RoutingUnavailable, type DriveLeg } from "@/lib/locations/routing";
 import { driveDayRow, driveStay, driveTrip, MOTEL, place, SMUGGS_LOT, SPRUCE_LOT } from "@/test/driveTrip";
 
@@ -19,15 +19,23 @@ const LEGS: Record<string, DriveLeg | null> = {
 };
 const fakeMatrix = (legs = LEGS) => vi.fn(async (sources: Array<{ latitude: number }>, targets: Array<{ latitude: number }>) =>
   sources.map(() => targets.map((target) => legs[`${target.latitude}`] ?? null)));
-function memoryStore(rows: StoredDriveEstimate[] = []) {
+function memoryStore(rows: StoredDriveEstimate[] = [], manual: ManualEstimateRow[] = []) {
   const saved = new Map(rows.map((row) => [row.date, row]));
   const store: DriveEstimateStore & { saved: typeof saved } = {
     saved,
     read: vi.fn(async () => [...saved.values()]),
     write: vi.fn(async (written: StoredDriveEstimate[]) => { written.forEach((row) => saved.set(row.date, row)); }),
+    manual: async () => manual,
   };
   return store;
 }
+const CABIN = place("Ridge cabin", 44.51, -72.75);
+const SPRUCE_PAIR = `drive|${MOTEL.latitude},${MOTEL.longitude}>${SPRUCE_LOT.latitude},${SPRUCE_LOT.longitude}`;
+/** Your estimate as 029 stores it, on the fixture's day for `date`. */
+const yours = (date: string, minutes: number, overrides: Partial<ManualEstimateRow> = {}): ManualEstimateRow => ({
+  trip_day_id: `day-${date}`, pair_key: SPRUCE_PAIR, origin_label: "Stowe Motel", destination_label: "Spruce Peak lot",
+  duration_seconds: minutes * 60, note: "Resort directions page", use_calculated: false, entered_at: "2027-01-04T12:00:00.000Z", ...overrides,
+});
 
 describe("Which drive each day has", () => {
   it("drives from the stay of the night before to the day's access point", () => {
@@ -180,3 +188,95 @@ describe("Drive estimates", () => {
     expect(second.days).toEqual(first.days);
   });
 });
+
+describe("Starting points (#209)", () => {
+  const withDays = (...days: Array<Partial<TripDay> & { date: string }>) => {
+    const full = driveTrip();
+    full.days = full.days.map((day) => ({ ...day, ...days.find((own) => own.date === day.date) }));
+    return full;
+  };
+
+  it("starts the first day from its own place, and only that day", () => {
+    const plans = drivePlans(withDays({ date: "2027-01-08", origin: CABIN }));
+    expect(plans[0]).toMatchObject({
+      state: "ready", origin: { label: "Ridge cabin", stay_id: null, own: true }, crew_stay: null,
+      pair_key: `drive|${CABIN.latitude},${CABIN.longitude}>${SPRUCE_LOT.latitude},${SPRUCE_LOT.longitude}`,
+    });
+    expect(plans[0].route_key).toContain(`${CABIN.latitude},${CABIN.longitude}>`);
+    expect(plans[1].origin).toMatchObject({ label: "Stowe Motel", own: false });
+  });
+  it("follows a saved stay picked as the starting point, and keeps its place once the stay is gone", () => {
+    const picked = { date: "2027-01-11", origin: { ...MOTEL, label: "Stowe Motel" }, origin_stay_id: "stay-motel" };
+    const monday = drivePlans(withDays(picked))[3];
+    expect(monday).toMatchObject({ state: "ready", origin: { label: "Stowe Motel", stay_id: "stay-motel", own: true }, crew_stay: { label: "Village Inn", stay_id: "stay-inn" } });
+    // The stay's place changes: the day follows it.
+    const moved = withDays(picked);
+    moved.lodging!.stays[0] = { ...moved.lodging!.stays[0], name: "Stowe Motel & Snowdrift", location: { ...MOTEL, precision: "approximate" } };
+    expect(drivePlans(moved)[3]).toMatchObject({ state: "approximate_origin", origin: { label: "Stowe Motel & Snowdrift" } });
+    // The stay is removed: the day still starts there until the organizer resets it.
+    const removed = withDays(picked);
+    removed.lodging!.stays = removed.lodging!.stays.filter((stay) => stay.id !== "stay-motel");
+    expect(drivePlans(removed)[3]).toMatchObject({ state: "ready", origin: { label: "Stowe Motel", stay_id: null, own: true } });
+  });
+  it("plans no drive when the organizer says so, keeping the starting point, even with no origin", () => {
+    const plans = drivePlans(withDays({ date: SAT, no_drive: true }, { date: "2027-01-08", no_drive: true }));
+    expect(plans[1]).toMatchObject({ state: "no_drive", origin: { label: "Stowe Motel" }, destination: { label: "Spruce Peak lot" }, route_key: null });
+    expect(plans[0]).toMatchObject({ state: "no_drive", origin: null });
+  });
+  it("lists a morning under the stay it starts from, own starting points included", () => {
+    const full = withDays({ date: SUN, origin: CABIN }, { date: "2027-01-11", origin: { ...MOTEL, label: "Stowe Motel" }, origin_stay_id: "stay-motel" });
+    expect(stayDepartures(full, NOW)).toEqual([
+      { stay_id: "stay-motel", dates: [SAT, "2027-01-11"], next: SAT },
+      { stay_id: "stay-inn", dates: [], next: null },
+    ]);
+  });
+});
+
+describe("Your estimate (#209)", () => {
+  const failing = () => vi.fn(async () => { throw new RoutingUnavailable("429"); });
+  const day = async (store: DriveEstimateStore, date = SAT, matrix: ReturnType<typeof fakeMatrix> = failing(), full = driveTrip()) =>
+    (await tripDriveEstimates(full, store, { now: NOW, matrix })).days.find((candidate) => candidate.date === date)!;
+
+  it("is the day's estimate when routing has none, with the days it was saved for", async () => {
+    const saturday = await day(memoryStore([], [yours(SAT, 40)]));
+    expect(saturday).toMatchObject({
+      state: "manual", estimate: null, pair_key: SPRUCE_PAIR, same_drive_dates: [SAT],
+      manual: { duration_label: "40 min", duration_seconds: 2400, note: "Resort directions page", current: true, use_calculated: false, dates: [SAT] },
+    });
+    expect(saturday.directions?.google).toContain("origin=44.4875,-72.7262");
+    // A hut with no road route can still have your own estimate.
+    expect(await day(memoryStore([], [yours(SAT, 40)]), SAT, fakeMatrix({}))).toMatchObject({ state: "manual", estimate: null });
+  });
+  it("offers a calculated estimate for the same pair separately, and uses it only when chosen", async () => {
+    const offered = await day(memoryStore([], [yours(SAT, 40)]), SAT, fakeMatrix());
+    expect(offered).toMatchObject({ state: "manual", estimate: { duration_label: "12 min" }, manual: { duration_label: "40 min" } });
+    const chosen = await day(memoryStore([], [yours(SAT, 40, { use_calculated: true })]), SAT, fakeMatrix());
+    expect(chosen).toMatchObject({ state: "available", estimate: { duration_label: "12 min" }, manual: { duration_label: "40 min", use_calculated: true } });
+    // Chosen, but routing has none now: yours is shown rather than nothing.
+    expect(await day(memoryStore([], [yours(SAT, 40, { use_calculated: true })]))).toMatchObject({ state: "manual" });
+  });
+  it("is only for review once the day's drive is another pair", async () => {
+    const full = driveTrip({ days: [driveDayRow("2027-01-08", "stop-stowe"), { ...driveDayRow(SAT, "stop-stowe"), origin: CABIN }] });
+    const saturday = await day(memoryStore([], [yours(SAT, 40)]), SAT, fakeMatrix(), full);
+    expect(saturday).toMatchObject({ state: "available", manual: { current: false, origin_label: "Stowe Motel", dates: [] } });
+    // Not for a day with no drive to estimate.
+    const noDrive = driveTrip({ days: [driveDayRow("2027-01-08", "stop-stowe"), { ...driveDayRow(SAT, "stop-stowe"), no_drive: true }] });
+    expect(await day(memoryStore([], [yours(SAT, 40)]), SAT, fakeMatrix(), noDrive)).toMatchObject({ state: "no_drive", manual: null });
+  });
+  it("groups the days it was saved for together, and lists the days with the same drive", async () => {
+    // Sunday also drives from the motel to Spruce Peak lot.
+    const full = driveTrip();
+    full.stops[1] = { ...full.stops[1], access_point: SPRUCE_LOT };
+    const store = memoryStore([], [yours(SAT, 40), yours(SUN, 40), yours("2027-01-11", 40)]);
+    const saturday = await day(store, SAT, failing(), full);
+    expect(saturday).toMatchObject({ same_drive_dates: [SAT, SUN], manual: { dates: [SAT, SUN] } });
+    const edited = memoryStore([], [yours(SAT, 40), yours(SUN, 40, { entered_at: "2027-01-04T13:00:00.000Z" })]);
+    expect((await day(edited, SAT, failing(), full)).manual?.dates).toEqual([SAT]);
+  });
+  it("ignores your estimates before migration 029", async () => {
+    const store = memoryStore();
+    store.manual = async () => { throw new Error("relation does not exist"); };
+    expect(await day(store)).toMatchObject({ state: "unavailable", manual: null });
+  });
+});
+

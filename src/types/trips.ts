@@ -51,6 +51,15 @@ export interface TripDay {
   /** This day's own access point (#208), used instead of its stop's while the day is at `access_point_stop_id`. */
   access_point?: TripLocation | null;
   access_point_stop_id?: string | null;
+  /**
+   * This day's own starting point (#209), used instead of the crew stay of the
+   * night before. `origin_stay_id` is the saved stay it was picked from, while
+   * that stay exists; `origin` keeps the place under the stay's name.
+   */
+  origin?: TripLocation | null;
+  origin_stay_id?: string | null;
+  /** No drive planned: the day starts on foot or skis, or the crew meets there. */
+  no_drive?: boolean;
 }
 
 export interface TripMemberDayKit {
@@ -288,13 +297,15 @@ export interface TripLodgingPreview {
  * - stale: calculated for them over a week ago, and recalculating failed.
  * - unavailable: recalculating failed and there's no estimate for them.
  * - no_route: the provider found no road route (a hut, a summit).
- * - missing_origin: no stay the night before, or No stay needed.
- * - origin_not_located / approximate_origin: that stay has no location, or only a town or area.
+ * - manual: the organizer's own estimate for this pair is in use.
+ * - no_drive: the organizer chose No drive planned.
+ * - missing_origin: no stay the night before, or No stay needed, and no starting point of the day's own.
+ * - origin_not_located / approximate_origin: the starting stay has no location, or only a town or area.
  * - missing_access_point / approximate_access_point: the same for the day's access point.
  * - no_destination: no day plan or destination yet.
  */
 export type TripDriveState =
-  | "available" | "stale" | "unavailable" | "no_route"
+  | "available" | "stale" | "unavailable" | "no_route" | "manual" | "no_drive"
   | "missing_origin" | "origin_not_located" | "approximate_origin"
   | "missing_access_point" | "approximate_access_point" | "no_destination";
 
@@ -306,19 +317,48 @@ export interface TripDriveEstimate {
   calculated_at: string;
 }
 
+/** The organizer's own one-way estimate for a day (#209), kept with the pair it was entered for. */
+export interface TripDriveManualEstimate {
+  duration_label: string;
+  duration_seconds: number;
+  /** Where the time comes from, in the organizer's words. */
+  note: string | null;
+  entered_at: string;
+  origin_label: string;
+  destination_label: string;
+  /** False when the day's drive is now another pair: shown for review, never as the day's estimate. */
+  current: boolean;
+  /** The organizer chose the calculated estimate for the same pair instead. */
+  use_calculated: boolean;
+  /** The days it was saved for together, this one included, while they're still that pair. */
+  dates: string[];
+}
+
 export interface TripDriveDay {
   date: string;
   date_label: string;
   /** The night whose stay the day starts from: "Fri Jan 9". */
   night_label: string;
   state: TripDriveState;
-  /** The stay of the night before, when there is one. */
-  origin: { label: string; stay_id: string } | null;
+  /**
+   * Where the day starts: the crew stay of the night before, or the day's own
+   * starting point (`own`), which may be a saved stay or any place.
+   */
+  origin: { label: string; stay_id: string | null; own: boolean } | null;
+  /** The crew stay of the night before, when there is one, even while the day starts elsewhere. */
+  crew_stay: { label: string; stay_id: string } | null;
   /** The day's access point, when there is one. */
   destination: { label: string } | null;
+  /** The calculated estimate for this pair, when there is one: the day's estimate, or the one offered instead of yours. */
   estimate: TripDriveEstimate | null;
+  /** The organizer's own estimate for the day, when there is one and the day has a drive to estimate. */
+  manual: TripDriveManualEstimate | null;
   /** An earlier estimate for a different origin or access point: only for Estimate details, with its own pair. */
   previous: (TripDriveEstimate & { origin_label: string; destination_label: string }) | null;
+  /** Names this origin, access point and mode, so a save can say which drive it was for; null without one. */
+  pair_key: string | null;
+  /** Days with the same drive, this one included, that your estimate can be saved for together. */
+  same_drive_dates: string[];
   /** Winter closures the estimate avoids: "VT 108 through Smugglers' Notch, usually closed November to mid-May". */
   closures: string[];
   /** Directions with both exact endpoints, when there's a road route to expect. */

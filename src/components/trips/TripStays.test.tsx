@@ -212,6 +212,17 @@ describe("Crew stays editor", () => {
       expect(screen.getByRole("link", { name: "© OpenStreetMap contributors" })).toBeInTheDocument();
     });
   });
+  it("shows departures for a stay that only starts a day as its own starting point", async () => {
+    const lodge = { ...hotel, check_in: null, check_out: null };
+    const data = { ...full([lodge]), days: [{ id: "day-11", trip_id: TRIP.id, stop_id: null, date: "2026-10-11", activity: null, origin: null, origin_stay_id: lodge.id, no_drive: true }] };
+    const day = { date: "2026-10-11", date_label: "Sun Oct 11", night_label: "Sat Oct 10", state: "no_drive", origin: { label: "Hotel", stay_id: lodge.id, own: true },
+      crew_stay: null, destination: null, estimate: null, manual: null, previous: null, pair_key: null, same_drive_dates: [], closures: [], directions: null };
+    const api = fakeTripApi({ [`GET ${base}/drive-estimates`]: reply(200, { days: [day], stays: [{ stay_id: lodge.id, dates: ["2026-10-11"], next: "2026-10-11" }] }) });
+    vi.stubGlobal("fetch", api);
+    render(<TripStays data={data} canEdit onSaved={onSaved} />);
+    expect(await screen.findByText("Next departure · Sun Oct 11: No drive planned")).toBeInTheDocument();
+    expect(api).toHaveBeenCalledTimes(1);
+  });
   it("shows today's origin separately from tonight's stay", () => {
     const hut = { ...hotel, id: "a682b8af-d26b-4213-a816-39de3eb155eb", name: "Hut" };
     const data = full([hotel, hut], [...assigned, { trip_id: TRIP.id, date: "2026-10-11", stay_id: hut.id, status: "assigned" }]);

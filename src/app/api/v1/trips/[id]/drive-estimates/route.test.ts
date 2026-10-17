@@ -20,10 +20,11 @@ describe("GET drive estimates", () => {
   const fetchMock = vi.fn();
   const upsert = vi.fn();
   let stored: unknown[];
+  let manual: unknown[];
   let tableError: { code: string } | null;
   beforeEach(() => {
     vi.clearAllMocks();
-    stored = []; tableError = null;
+    stored = []; manual = []; tableError = null;
     vi.stubGlobal("fetch", fetchMock);
     vi.stubEnv("GEOAPIFY_API_KEY", "test-key");
     vi.spyOn(console, "info").mockImplementation(() => {});
@@ -31,6 +32,7 @@ describe("GET drive estimates", () => {
     upsert.mockResolvedValue({ error: null });
     const supabase = {
       from: (table: string) => {
+        if (table === "trip_drive_manual_estimates") return { select: () => ({ eq: async () => ({ data: manual, error: tableError }) }) };
         expect(table).toBe("trip_drive_estimates");
         return { select: () => ({ eq: async () => ({ data: tableError ? null : stored, error: tableError }) }), upsert };
       },
@@ -58,6 +60,12 @@ describe("GET drive estimates", () => {
     expect(response.status).toBe(200);
     expect((await response.json() as TripDriveEstimates).days.map((day) => day.state)).toEqual(["missing_origin", "unavailable", "unavailable", "origin_not_located"]);
     expect(upsert).not.toHaveBeenCalled();
+  });
+  it("uses the organizer's own estimate on its day, offering the calculated one beside it", async () => {
+    manual = [{ trip_day_id: "day-2027-01-09", pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", origin_label: "Stowe Motel",
+      destination_label: "Spruce Peak lot", duration_seconds: 2400, note: null, use_calculated: false, entered_at: "2027-01-04T12:00:00+00:00" }];
+    const body = await (await get()).json() as TripDriveEstimates;
+    expect(body.days[1]).toMatchObject({ state: "manual", manual: { duration_label: "40 min", current: true }, estimate: { duration_label: "12 min" } });
   });
   it("still calculates before migration 028, without storing", async () => {
     tableError = { code: "PGRST205" };
