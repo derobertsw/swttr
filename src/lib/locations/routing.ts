@@ -24,7 +24,7 @@ export const MATRIX_MAX_CELLS = 1_000;
 const lonLat = (point: Point) => [point.longitude, point.latitude];
 const whole = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
 
-/** Counts only: no coordinates. Shows how close we run to the free daily credits. */
+/** Counts only: no coordinates. `cells` is sources × targets, not credits (see docs/trip-locations.md). */
 function logUsage(outcome: string, cells = 0, noRoute = 0) {
   console.info(JSON.stringify({ event: "drive_matrix", provider: "geoapify", outcome, cells, no_route: noRoute }));
 }
@@ -33,8 +33,8 @@ function logUsage(outcome: string, cells = 0, noRoute = 0) {
  * Drives from every source to every target: `result[source][target]` is a
  * leg, or null when there's no road route. Avoids the given points, such as
  * roads closed for the winter. Throws RoutingUnavailable when the key is
- * missing, the provider fails or the daily quota is spent, so the caller can
- * say so and keep an earlier estimate.
+ * missing or the provider fails or refuses the call, so the caller can say so
+ * and keep an earlier estimate.
  */
 export async function driveMatrix(sources: Point[], targets: Point[], avoid: Point[] = []): Promise<Array<Array<DriveLeg | null>>> {
   if (!sources.length || !targets.length) return sources.map(() => []);
@@ -64,8 +64,8 @@ export async function driveMatrix(sources: Point[], targets: Point[], avoid: Poi
     throw new RoutingUnavailable("Drive estimates didn't respond.");
   }
   if (!response.ok) {
-    // 401/403: key problem. 429: the free plan's daily credits are spent, or the
-    // account passed its 5 requests a second.
+    // 401/403: key problem. 429: Geoapify limited the account (see Provider in
+    // docs/trip-locations.md).
     logUsage(`http_${response.status}`);
     throw new RoutingUnavailable(`Drive estimates failed (${response.status}).`);
   }
