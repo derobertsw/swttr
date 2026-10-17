@@ -413,6 +413,9 @@ const LayerDisplay = ({
   const shownDecision = shownComfortEvaluation?.decision;
   const phaseLabel = showDescent ? (shownPhase === "climb" ? "Climb" : "Descent") : undefined;
   const guidance = biophysicsData?.guidance ?? [];
+  const missingRequirements = biophysicsData?.requirements?.filter((r) => r.status === 'missing') ?? [];
+  const missingMessages = new Set(missingRequirements.map((r) => r.message));
+  const visibleGuidance = guidance.filter((line) => !missingMessages.has(line));
 
   const shownLayers = phaseLayers(shownPhase);
   const focusWear = useCallback(() => wearHeadingRef.current?.focus(), []);
@@ -617,10 +620,21 @@ const LayerDisplay = ({
                 />
               )}
 
-              {guidance.length > 0 && (
+              {missingRequirements.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-sm font-semibold text-foreground">Not in your wardrobe</p>
+                  <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-foreground">
+                    {missingRequirements.map((r) => (
+                      <li key={r.id}>{r.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {visibleGuidance.length > 0 && (
                 <ResultDisclosure title="Why these layers?">
                   <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-foreground">
-                    {guidance.map((line) => (
+                    {visibleGuidance.map((line) => (
                       <li key={line}>{line}</li>
                     ))}
                   </ul>

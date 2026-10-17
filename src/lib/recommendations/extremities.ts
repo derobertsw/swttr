@@ -5,7 +5,7 @@ import type { HandwearRow, HeadwearRow, HeadwearRecommendations } from './types'
 
 // Headwear type categories
 const HELMET_TYPES = ['ski_helmet'];
-const HEAD_WARMTH_TYPES = ['liner_beanie', 'midweight_beanie', 'heavy_beanie', 'balaclava_light', 'balaclava_heavy', 'headband'];
+export const HEAD_WARMTH_TYPES = ['liner_beanie', 'midweight_beanie', 'heavy_beanie', 'balaclava_light', 'balaclava_heavy', 'headband'];
 const NECK_WARMTH_TYPES = ['buff_thin', 'buff_heavy', 'facemask'];
 
 /**

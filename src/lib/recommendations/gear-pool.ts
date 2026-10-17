@@ -4,7 +4,7 @@
  */
 import type { GarmentActivityRatingProps, GarmentRow, CategorizedGarments, HandwearRow, HeadwearRow } from './types';
 import type { RecommendationRequest } from './request';
-import { getUserWardrobeGarmentIds, fetchGarmentsWithDetails, fetchUserHandwear, fetchUserHeadwear } from './database';
+import { getUserWardrobeGarmentIds, getUserWardrobeItemIds, fetchGarmentsWithDetails, fetchUserHandwear, fetchUserHeadwear } from './database';
 import { categorizeGarments } from './categorization';
 import { hasUsableThermalData } from './garment-semantics';
 
@@ -20,9 +20,13 @@ export interface CatalogFilter {
 export interface GearPool {
   /** True when garments come from the user's wardrobe rather than the catalog. */
   usingWardrobe: boolean;
+  garments?: GarmentRow[];
   categorized: CategorizedGarments;
   handwear: HandwearRow[];
   headwear: HeadwearRow[];
+  /** Whether handwear/headwear came from the user's wardrobe (tracked per kind). */
+  handwearOwned?: boolean;
+  headwearOwned?: boolean;
 }
 
 type GearPoolResult =
@@ -58,18 +62,23 @@ export async function loadGearPool(
     return { status: 'empty' };
   }
 
-  const [handwear, headwear] = await Promise.all([
+  const [handwear, headwear, handwearIds, headwearIds] = await Promise.all([
     fetchUserHandwear(supabase, userId),
     fetchUserHeadwear(supabase, userId),
+    getUserWardrobeItemIds(supabase, userId, 'handwear'),
+    getUserWardrobeItemIds(supabase, userId, 'headwear'),
   ]);
 
   return {
     status: 'ok',
     pool: {
       usingWardrobe,
+      garments,
       categorized: categorizeGarments(garments),
       handwear,
       headwear,
+      handwearOwned: Boolean(handwearIds?.length),
+      headwearOwned: Boolean(headwearIds?.length),
     },
   };
 }
