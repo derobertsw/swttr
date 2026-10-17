@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
 import { requireUser } from "@/lib/api";
 import { GET } from "@/app/api/v1/trips/[id]/route";
-import { ORGANIZER, STOWE_STOP, TRIP } from "@/test/tripApi";
+import { ORGANIZER, SAM, STOWE_STOP, TRIP } from "@/test/tripApi";
 import { listTripsForUser, loadTripFull } from "./trips";
 
 vi.mock("@/lib/api", async (original) => ({
@@ -114,10 +114,22 @@ describe("Trip loading", () => {
     const pending = listTripsForUser(supabase, ORGANIZER.user_id!);
     await vi.runAllTimersAsync();
     expect(await pending).toEqual([
-      { ...shared, member_count: 1, stop_count: 0 },
-      { ...TRIP, member_count: 1, stop_count: 1 },
+      { ...shared, member_count: 1, stop_count: 0, crew_counts: { joined: 1, pending: 0, guests: 0 } },
+      { ...TRIP, member_count: 1, stop_count: 1, crew_counts: { joined: 1, pending: 0, guests: 0 } },
     ]);
     expect(Date.now() - started).toBe(300);
+  });
+
+  it("counts accounts, invitations and managed guests separately, omitting left members", async () => {
+    const { supabase } = database({
+      trips: [{ ...TRIP }], trip_members: [{ ...ORGANIZER },
+        { ...ORGANIZER, id: "pending", user_id: null, status: "invited" },
+        { ...ORGANIZER, id: "guest", user_id: null, status: "guest" },
+        { ...ORGANIZER, id: "left", user_id: "left-user", status: "left" }],
+    });
+    expect((await listTripsForUser(supabase, ORGANIZER.user_id!))[0]).toMatchObject({
+      member_count: 3, crew_counts: { joined: 1, pending: 1, guests: 1 },
+    });
   });
 
   it.each(["owner", "member", "left", "outsider"])("keeps GET access checks for %s users before reading related data", async (kind) => {
@@ -134,6 +146,20 @@ describe("Trip loading", () => {
     if (kind === "left" || kind === "outsider") {
       expect(requests.every((r) => ["trips", "trip_members"].includes(r.table))).toBe(true);
     }
+  });
+
+  it.each([true, false])("never exposes used recovery tokens, and scopes pending tokens to the owner (%s)", async (owner) => {
+    vi.useFakeTimers();
+    const trip = { ...TRIP, owner_user_id: owner ? ORGANIZER.user_id! : "other-owner" };
+    const { supabase } = database({
+      trips: [trip], trip_members: [{ ...ORGANIZER, invite_token: "used-recovery-token" }, { ...SAM }],
+    });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, userId: ORGANIZER.user_id! });
+    const pending = GET(new NextRequest(`http://localhost/api/v1/trips/${TRIP.id}`), { params: Promise.resolve({ id: TRIP.id }) });
+    await vi.runAllTimersAsync();
+    const result = await (await pending).json();
+    expect(result.members.find((m: { id: string }) => m.id === ORGANIZER.id).invite_token).toBeNull();
+    expect(result.members.find((m: { id: string }) => m.id === SAM.id).invite_token).toBe(owner ? SAM.invite_token : null);
   });
 
   it("returns the existing error response when accommodation fails in parallel", async () => {

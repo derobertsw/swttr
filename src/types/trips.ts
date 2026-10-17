@@ -87,12 +87,20 @@ export interface TripGroupGear {
   created_at: string;
 }
 
+export interface TripCrewCounts {
+  joined: number;
+  pending: number;
+  guests: number;
+}
+
 export interface TripSummary extends Trip {
+  crew_counts?: TripCrewCounts;
   member_count: number;
   stop_count: number;
 }
 
 export interface TripFull {
+  crew_counts?: TripCrewCounts;
   trip: Trip;
   stops: TripStop[];
   members: TripMember[];

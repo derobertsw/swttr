@@ -405,7 +405,7 @@ function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocu
                 <span className="block text-sm text-muted-foreground">
                   {daySpan > 1 ? `Days ${trip.day_number}–${(trip.day_number ?? 0) + daySpan - 1}` : `Day ${trip.day_number}`}
                   {" "}· {formatRange(trip.start_date, trip.end_date)}
-                  {trip.member_count > 1 && ` · ${trip.member_count} people`}
+                  {trip.crew_counts ? ` · ${trip.crew_counts.joined} joined · ${trip.crew_counts.pending} pending invitations · ${trip.crew_counts.guests} managed guests` : trip.member_count > 1 && ` · ${trip.member_count} crew entries`}
                 </span>
               </TargetOption>
             ))}
