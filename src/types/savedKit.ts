@@ -6,7 +6,7 @@ import type { ThermalDecision } from "@/types/biophysics";
 import type { LaterTime, Outing, PersonalizationGap } from "@/types/outing";
 import type { DailyLayerPlan, DaypartId, LayerChanges } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
-import type { Trip, TripMemberDayKit } from "@/types/trips";
+import type { Trip, TripCrewCounts, TripMemberDayKit } from "@/types/trips";
 import type { WeatherData, WeatherProvenance } from "@/types/weather";
 
 /** A ski tour has a climb and a descent; every other outing has one outfit. */
@@ -142,5 +142,5 @@ export interface SaveKitOptions {
   /** What a new trip's destination will be called. */
   destination: string;
   /** The user's trips; `day_number` is the day of the first date, or null when a trip doesn't include every date. */
-  trips: Array<{ id: string; name: string; start_date: string; end_date: string; member_count: number; day_number: number | null }>;
+  trips: Array<{ id: string; name: string; start_date: string; end_date: string; member_count: number; crew_counts?: TripCrewCounts; day_number: number | null }>;
 }
