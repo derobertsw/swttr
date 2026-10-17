@@ -1,6 +1,6 @@
 /**
  * Thermal targets shared by every sport: metabolic rate, IREQ, the activity
- * target range widened by the CoWEDA validation buffer, the regional targets
+ * target range widened by CoWEDA-inspired heuristic margins, the regional targets
  * that split that range across the body, and the extremity targets.
  */
 import { calculateExtremityIreq, calculateIreq } from '@/lib/biophysics/ireq';
@@ -52,7 +52,7 @@ export function phaseIreq(conditions: Conditions, windMs: number, metabolicRate:
  * Target clo range and regional/extremity targets for one activity phase.
  *
  * `baseline` is the IREQ the phase is designed against, `metabolicRate` sizes
- * the CoWEDA validation buffer, and `windMs` is the phase's effective wind
+ * the CoWEDA-inspired margin, and `windMs` is the phase's effective wind
  * speed. `extremityBaseline` is the IREQ the hands and head follow, when it
  * differs from `baseline`.
  */
@@ -89,8 +89,15 @@ export function phaseTargets(
     coldRisk: round2(rawBuffer.coldRisk * exposure),
     extremity: round2(rawBuffer.extremity * exposure),
   } : rawBuffer;
+  // Taper only the activity allowance above heat balance. The calculated
+  // minimum can remain positive in mild air for easy efforts and smaller
+  // bodies. Local extremity targets below are wholly heuristic
+  // (IREQ supplies no local heat balance), so their full bands still taper.
+  const minimum = policy
+    ? round2(baseline.ireqMin + Math.max(0, range.min - baseline.ireqMin) * exposure)
+    : range.min;
   const adjustedRange = applyCowedaBufferToTargetRange(
-    policy ? { min: round2(range.min * exposure), max: range.max } : range,
+    { min: minimum, max: range.max },
     validationBuffer,
   );
   const targetRange: [number, number] = [adjustedRange.min, adjustedRange.max];
