@@ -8,7 +8,7 @@ const tripId = "2d6b6e38-77b6-46bc-8d6c-906fbb40d633";
 const otherTrip = "a2eb3ecb-a7ac-4b6d-98e3-701c694d8563";
 let db: PGlite;
 
-type Row = { trip_member_id: string; trip_id: string; items: Array<{ id: string; name: string; quantity: number }>; quantities: Record<string, number>; seen: object | null; checks: Record<string, { packed: boolean; quantity: number; version: string }> };
+type Row = { trip_member_id: string; trip_id: string; items: Array<{ id: string; name: string; quantity: number }>; quantities: Record<string, number>; seen: object | null; checks: Record<string, { packed: boolean; quantity: number; version: string }>; equipment: Record<string, { status: string; quantity: number }> };
 
 async function update(op: object, user = "user-1", trip = tripId): Promise<Row> {
   const result = await db.query<{ row: Row }>("SELECT public.update_trip_packing($1, $2, $3) AS row", [trip, user, JSON.stringify(op)]);
@@ -30,6 +30,8 @@ describe("A member's own packing choices in Postgres", () => {
     await db.exec(await readFile("supabase/migrations/018_trip_saved_kits.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/024_trip_packing.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/20261016231848_trip_personal_packing_checks.sql", "utf8"));
+    // Every test here runs against 032's function, which replaces 20261016231848's.
+    await db.exec(await readFile("supabase/migrations/032_trip_touring_equipment.sql", "utf8"));
   }, 20_000);
   beforeEach(async () => {
     await db.exec("TRUNCATE trips CASCADE;");
@@ -254,6 +256,69 @@ describe("A member's own packing choices in Postgres", () => {
     { packed: "true" }, { expected: "invalid" }, { mutation: null }, { quantity: 0 }, { key: "" }, { kits: [] }, { aliases: null },
   ])("rejects an invalid packing check %j", async (overrides) => {
     expect(await code(check("item:g-3", overrides))).toBe("22023");
+  });
+
+  it("adds touring equipment once, however often it's added", async () => {
+    await update({ op: "add_equipment", ids: ["transceiver", "probe", "transceiver"] });
+    const row = await update({ op: "add_equipment", ids: ["transceiver", "shovel"] });
+    expect(row.equipment).toEqual({
+      transceiver: { status: "added", quantity: 1 }, probe: { status: "added", quantity: 1 }, shovel: { status: "added", quantity: 1 },
+    });
+    // Another member's list is their own.
+    expect((await update({ op: "add_equipment", ids: ["airbag"] }, "user-2")).equipment).toEqual({ airbag: { status: "added", quantity: 1 } });
+    expect((await db.query<Row>("SELECT * FROM trip_member_packing WHERE trip_member_id = $1", [await memberId("Ana")])).rows[0].equipment)
+      .toEqual(row.equipment);
+  });
+
+  it("checks equipment by its exact key, resets on quantity change, and drops the check when it's removed", async () => {
+    await update({ op: "add_equipment", ids: ["transceiver"] });
+    const key = "equipment:transceiver";
+    expect((await check(key)).checks[key]).toMatchObject({ packed: true, quantity: 1 });
+    // A stale quantity is refused, and a new one needs a fresh check.
+    expect(await code(check(key, { quantity: 2 }))).toBe("P0409");
+    const changed = await update({ op: "equipment_quantity", id: "transceiver", quantity: 2 });
+    expect(changed.equipment.transceiver).toEqual({ status: "added", quantity: 2 });
+    expect(changed.checks[key]).toMatchObject({ packed: false, quantity: 2 });
+    expect((await check(key, { quantity: 2, expected: changed.checks[key].version })).checks[key].packed).toBe(true);
+    // An unchanged quantity keeps the check.
+    expect((await update({ op: "equipment_quantity", id: "transceiver", quantity: 2 })).checks[key].packed).toBe(true);
+
+    const removed = await update({ op: "remove_equipment", id: "transceiver" });
+    expect(removed.equipment.transceiver).toEqual({ status: "removed", quantity: 2 });
+    expect(removed.checks).toEqual({});
+    expect(await code(check(key))).toBe("P0002");
+    expect(await code(update({ op: "equipment_quantity", id: "transceiver", quantity: 1 }))).toBe("P0002");
+    // Removing again, or removing one that was never added, changes nothing.
+    expect((await update({ op: "remove_equipment", id: "transceiver" })).equipment).toEqual(removed.equipment);
+    expect((await update({ op: "remove_equipment", id: "probe" })).equipment).toEqual(removed.equipment);
+
+    // Added back, it starts again at one, unchecked.
+    const back = await update({ op: "add_equipment", ids: ["transceiver"] });
+    expect(back.equipment.transceiver).toEqual({ status: "added", quantity: 1 });
+    expect(back.checks).toEqual({});
+  });
+
+  it("refuses a check for equipment that was never added", async () => {
+    expect(await code(check("equipment:probe"))).toBe("P0002");
+  });
+
+  it.each([
+    { op: "add_equipment" }, { op: "add_equipment", ids: [] }, { op: "add_equipment", ids: "transceiver" },
+    { op: "add_equipment", ids: ["Transceiver"] }, { op: "add_equipment", ids: [1] }, { op: "add_equipment", ids: ["a b"] },
+    { op: "add_equipment", ids: Array.from({ length: 21 }, (_, index) => `item_${index}`) },
+    { op: "equipment_quantity", id: "transceiver", quantity: 0 }, { op: "equipment_quantity", id: "../x", quantity: 1 },
+    { op: "remove_equipment", id: "" }, { op: "remove_equipment", id: "x".repeat(41) },
+  ])("refuses an invalid equipment change %j", async (op) => {
+    expect(await code(update(op))).toBe("22023");
+  });
+
+  it("caps touring equipment at 50 kinds of item", async () => {
+    for (let start = 0; start < 50; start += 10) {
+      await update({ op: "add_equipment", ids: Array.from({ length: 10 }, (_, index) => `item_${start + index}`) });
+    }
+    expect(await code(update({ op: "add_equipment", ids: ["one_more"] }))).toBe("22023");
+    // Adding one that's in the list already is still fine.
+    expect(Object.keys((await update({ op: "add_equipment", ids: ["item_0"] })).equipment)).toHaveLength(50);
   });
 
   it("is only for the service role", async () => {
