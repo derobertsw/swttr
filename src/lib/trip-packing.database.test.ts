@@ -8,7 +8,7 @@ const tripId = "2d6b6e38-77b6-46bc-8d6c-906fbb40d633";
 const otherTrip = "a2eb3ecb-a7ac-4b6d-98e3-701c694d8563";
 let db: PGlite;
 
-type Row = { trip_member_id: string; trip_id: string; items: Array<{ id: string; name: string; quantity: number }>; quantities: Record<string, number>; seen: object | null };
+type Row = { trip_member_id: string; trip_id: string; items: Array<{ id: string; name: string; quantity: number }>; quantities: Record<string, number>; seen: object | null; checks: Record<string, { packed: boolean; quantity: number; version: string }> };
 
 async function update(op: object, user = "user-1", trip = tripId): Promise<Row> {
   const result = await db.query<{ row: Row }>("SELECT public.update_trip_packing($1, $2, $3) AS row", [trip, user, JSON.stringify(op)]);
@@ -29,6 +29,7 @@ describe("A member's own packing choices in Postgres", () => {
     await db.exec(await readFile("supabase/migrations/012_trips.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/018_trip_saved_kits.sql", "utf8"));
     await db.exec(await readFile("supabase/migrations/024_trip_packing.sql", "utf8"));
+    await db.exec(await readFile("supabase/migrations/20261016231848_trip_personal_packing_checks.sql", "utf8"));
   }, 20_000);
   beforeEach(async () => {
     await db.exec("TRUNCATE trips CASCADE;");
@@ -153,6 +154,76 @@ describe("A member's own packing choices in Postgres", () => {
     await update({ op: "add_item", id: randomUUID(), name: "Thermos", quantity: 1 }, "user-2");
     await db.query("DELETE FROM trips WHERE id = $1", [tripId]);
     expect((await db.query("SELECT count(*)::int AS n FROM trip_member_packing")).rows[0]).toEqual({ n: 0 });
+  });
+
+  const check = async (key = "item:g-3", overrides: Record<string, unknown> = {}, user = "user-1") => update({
+    op: "set_packed", key, packed: true, quantity: 1, expected: null, mutation: randomUUID(),
+    kits: await kitVersions(await memberId(user === "user-1" ? "Ana" : "You")), aliases: [], ...overrides,
+  }, user);
+
+  it("persists checks for a fresh read and merges different items from two sessions", async () => {
+    await Promise.all([check("item:g-3"), check("carry:snacks")]);
+    const row = (await db.query<Row>("SELECT * FROM trip_member_packing WHERE trip_member_id = $1", [await memberId("Ana")])).rows[0];
+    expect(row.checks).toEqual({ "item:g-3": { packed: true, quantity: 1, version: expect.any(String) },
+      "carry:snacks": { packed: true, quantity: 1, version: expect.any(String) } });
+    // Regenerated labels/order and an acknowledgement never rewrite checks.
+    await db.query("UPDATE trip_member_day_kits SET outfit = '{\"version\":1,\"renamed\":true}' WHERE trip_member_id = $1", [await memberId("Ana")]);
+    expect((await update({ op: "acknowledge", seen: {}, kits: await kitVersions(await memberId("Ana")) })).checks).toEqual(row.checks);
+    await check("item:g-3", {}, "user-2");
+    const other = (await db.query<Row>("SELECT * FROM trip_member_packing WHERE trip_member_id = $1", [await memberId("You")])).rows[0];
+    expect(Object.keys(other.checks)).toEqual(["item:g-3"]);
+  });
+
+  it("replays a lost response but refuses stale edits and ABA updates to the same item", async () => {
+    const mutation = randomUUID();
+    const first = await check("item:g-3", { mutation });
+    expect((await check("item:g-3", { mutation })).checks).toEqual(first.checks);
+    expect(await code(check("item:g-3", { packed: false }))).toBe("P0409");
+    const unchecked = await check("item:g-3", { packed: false, expected: mutation });
+    expect(unchecked.checks["item:g-3"].packed).toBe(false);
+    expect(await code(check("item:g-3", { expected: mutation }))).toBe("P0409");
+    expect(await code(check("item:g-3", { mutation }))).toBe("P0409");
+    expect(await code(check("item:g-3", { mutation: unchecked.checks["item:g-3"].version, packed: true }))).toBe("22023");
+  });
+
+  it("requires a fresh check after quantities change, even if the old quantity returns", async () => {
+    const first = await check();
+    const changed = await update({ op: "quantity", key: "item:g-3", quantity: 2 });
+    expect(changed.checks["item:g-3"]).toMatchObject({ packed: false, quantity: 2 });
+    expect(changed.checks["item:g-3"].version).not.toBe(first.checks["item:g-3"].version);
+    expect(await code(check("item:g-3", { expected: first.checks["item:g-3"].version }))).toBe("P0409");
+    await update({ op: "quantity", key: "item:g-3", quantity: 1 });
+    const current = (await db.query<Row>("SELECT * FROM trip_member_packing")).rows[0];
+    expect(current.checks["item:g-3"].packed).toBe(false);
+    await check("item:g-3", { expected: current.checks["item:g-3"].version });
+    await update({ op: "quantity", key: "general:torso:outer:shell", quantity: 3 });
+    expect(await code(check("item:new", { aliases: ["general:torso:outer:shell"] }))).toBe("P0409");
+    expect((await check("item:new", { aliases: ["general:torso:outer:shell"], quantity: 3 })).checks["item:new"].packed).toBe(true);
+  });
+
+  it("checks all of a personal addition, resets on quantity change, and removes its check with it", async () => {
+    const id = randomUUID();
+    await update({ op: "add_item", id, name: "Socks", quantity: 2 });
+    const row = await check(`manual:${id}`, { quantity: 2 });
+    expect(row.checks[`manual:${id}`].packed).toBe(true);
+    expect((await update({ op: "item_quantity", id, quantity: 3 })).checks[`manual:${id}`]).toMatchObject({ packed: false, quantity: 3 });
+    expect((await update({ op: "remove_item", id })).checks).toEqual({});
+    expect(await code(check(`manual:${id}`))).toBe("P0002");
+    await update({ op: "add_item", id, name: "Socks", quantity: 1 });
+    expect((await db.query<Row>("SELECT * FROM trip_member_packing")).rows[0].checks).toEqual({});
+  });
+
+  it("rejects a check when an outfit changed since it was shown", async () => {
+    const kits = await kitVersions(await memberId("Ana"));
+    await db.query("UPDATE trip_member_day_kits SET outfit = '{\"changed\": true}' WHERE id = $1", [Object.keys(kits)[0]]);
+    expect(await code(check("item:g-3", { kits }))).toBe("40001");
+    expect((await db.query("SELECT count(*)::int AS n FROM trip_member_packing")).rows[0]).toEqual({ n: 0 });
+  });
+
+  it.each([
+    { packed: "true" }, { expected: "invalid" }, { mutation: null }, { quantity: 0 }, { key: "" }, { kits: [] }, { aliases: null },
+  ])("rejects an invalid packing check %j", async (overrides) => {
+    expect(await code(check("item:g-3", overrides))).toBe("22023");
   });
 
   it("is only for the service role", async () => {

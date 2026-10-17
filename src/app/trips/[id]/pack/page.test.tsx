@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { fakeTripApi, reply, sentBodies, TRIP } from "@/test/tripApi";
 import { buildPackingListFromDays } from "@/lib/packingList";
 import type { TripDayCoverage } from "@/types/trip-coverage";
-import type { PackingItem, TripPackResponse } from "@/types/trip-packing";
+import type { PackingCheckChange, PackingChecks, PackingItem, TripPackResponse } from "@/types/trip-packing";
 import PackListPage from "./page";
 
 vi.mock("@/components/PageLayout", () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
@@ -35,7 +35,7 @@ const SNACKS: PackingItem = { ...SHELL, key: "carry:snacks", name: "Snacks", bod
 const LAMP = { id: "0b4b6a7e-9c1d-4f53-a8b2-2f6c1d9e7a10", name: "Headlamp", quantity: 1 };
 
 const pack = (coverage: TripDayCoverage[], overrides: Partial<TripPackResponse> = {}): TripPackResponse => ({
-  trip: TRIP, totalDays: coverage.length, coverage, items: [], removed: [], kitVersions: {}, checklists: [], manual: [], editable: true,
+  trip: TRIP, totalDays: coverage.length, coverage, items: [], removed: [], kitVersions: {}, checklists: [], manual: [], checks: {}, editable: true,
   suggestions: buildPackingListFromDays([], new Map(), []), suggestedDays: coverage.filter((day) => day.advice === "available").length,
   skipped: [], groupGear: [], ...overrides,
 });
@@ -121,7 +121,7 @@ describe("Packing from saved outfits", () => {
     expect(within(torso).getByText("Not in your wardrobe")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Head & neck" })).getByText("General item")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Carry" })).getByText("Snacks")).toBeInTheDocument();
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(4);
   });
 
   it("shows what changed until the person acknowledges it", async () => {
@@ -359,5 +359,138 @@ describe("Packing from saved outfits", () => {
     expect(within(suggestions).getByText("Spare gloves")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Group gear (yours)" })).getByText("Stove")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "From your saved outfits" })).queryByText("Midweight base layer")).not.toBeInTheDocument();
+  });
+});
+
+
+describe("Private persistent packing checks", () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+  const version = "3e045e88-53ca-4686-912a-e88c3f95461c";
+  const checked = (quantity = 1): PackingChecks => ({ [SHELL.key]: { packed: true, quantity, version } });
+  const choices = (checks: PackingChecks) => ({ manual: [], quantities: {}, checks });
+
+  it("saves with Space and shows only confirmed state while saving, then survives a second page session", async () => {
+    let release!: () => void;
+    let checks: PackingChecks = {};
+    const fetchMock = fakeTripApi({
+      [PACK]: () => reply(200, pack([saved("2026-10-10")], { items: [SHELL], checks })),
+      [CHANGE]: (body) => new Promise((resolve) => { release = () => {
+        const change = body as PackingCheckChange;
+        checks = { [change.key]: { packed: change.packed, quantity: change.quantity, version: change.mutation } };
+        resolve(reply(200, choices(checks)));
+      }; }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    const checkbox = await screen.findByRole("checkbox", { name: "Packed Ski shell" });
+    checkbox.focus();
+    await user.keyboard(" ");
+    expect(checkbox).not.toBeChecked();
+    expect(checkbox).toHaveAttribute("aria-busy", "true");
+    expect(checkbox).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("Saving packing check");
+    await act(async () => release());
+    expect(checkbox).toBeChecked();
+    expect(checkbox).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("Ski shell: packed, saved");
+    expect(sentBodies(fetchMock, CHANGE)[0]).toMatchObject({ op: "set_packed", key: SHELL.key, expected: null, quantity: 1, kits: {}, packed: true });
+    // A new mount reads the account's server state, without client storage.
+    const { cleanup } = await import("@testing-library/react");
+    cleanup();
+    await renderPage();
+    expect(await screen.findByRole("checkbox", { name: "Packed Ski shell" })).toBeChecked();
+  });
+
+  it("keeps the last confirmed state on failure and retries the identical mutation", async () => {
+    let attempt = 0;
+    const fetchMock = fakeTripApi({
+      [PACK]: reply(200, pack([saved("2026-10-10")], { items: [SHELL], checks: checked() })),
+      [CHANGE]: (body) => ++attempt === 1 ? reply(500, { error: "Connection lost" })
+        : reply(200, choices({ [SHELL.key]: { packed: false, quantity: 1, version: (body as PackingCheckChange).mutation } })),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    const checkbox = await screen.findByRole("checkbox", { name: "Packed Ski shell" });
+    await user.click(checkbox);
+    expect(await screen.findByRole("alert")).toHaveTextContent("wasn't confirmed");
+    expect(checkbox).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Retry packing check for Ski shell" }));
+    await waitFor(() => expect(checkbox).not.toBeChecked());
+    expect(sentBodies(fetchMock, CHANGE)).toEqual([sentBodies(fetchMock, CHANGE)[0], sentBodies(fetchMock, CHANGE)[0]]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("reloads a same-item conflict and asks the person to review before another edit", async () => {
+    let loads = 0;
+    const fetchMock = fakeTripApi({
+      [PACK]: () => reply(200, pack([saved("2026-10-10")], { items: [SHELL], checks: ++loads > 1 ? checked() : {} })),
+      [CHANGE]: reply(409, { error: "This item changed in another session. Review its saved state and try again.", code: "packing_changed" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("checkbox", { name: "Packed Ski shell" }));
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Packed Ski shell" })).toBeChecked());
+    expect(screen.getByRole("alert")).toHaveTextContent("another session");
+    await user.click(screen.getByRole("button", { name: "Review saved list" }));
+    expect(sentBodies(fetchMock, CHANGE)).toHaveLength(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("retains both checks when different-item responses arrive out of order", async () => {
+    let release!: () => void;
+    const fetchMock = fakeTripApi({
+      [PACK]: reply(200, pack([saved("2026-10-10")], { items: [SHELL, FLEECE] })),
+      [CHANGE]: (body) => {
+        const change = body as PackingCheckChange;
+        const result = reply(200, choices({ [change.key]: { packed: true, quantity: 1, version: change.mutation } }));
+        return change.key === SHELL.key ? new Promise((resolve) => { release = () => resolve(result); }) : result;
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("checkbox", { name: "Packed Ski shell" }));
+    await user.click(screen.getByRole("checkbox", { name: "Packed Fleece" }));
+    expect(screen.getByRole("checkbox", { name: "Packed Fleece" })).toBeChecked();
+    await act(async () => release());
+    expect(screen.getAllByRole("checkbox").every((input) => (input as HTMLInputElement).checked)).toBe(true);
+  });
+
+  it("preserves checks for exact identities through removal and return, and leaves replacements unchecked", async () => {
+    let loads = 0;
+    const replacement = { ...SHELL, key: "item:new-shell", name: "A very long renamed replacement Ski shell for a winter weekend with the crew" };
+    vi.stubGlobal("fetch", fakeTripApi({ [PACK]: () => reply(200, pack([saved("2026-10-10")], {
+      checks: checked(), items: ++loads === 1 ? [FLEECE, { ...SHELL, name: "Renamed shell" }]
+        : loads === 2 ? [replacement, FLEECE] : [SHELL, FLEECE],
+    })) }));
+    const user = userEvent.setup();
+    await renderPage();
+    expect(await screen.findByRole("checkbox", { name: "Packed Renamed shell" })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Refresh pack list" }));
+    expect(await screen.findByRole("checkbox", { name: `Packed ${replacement.name}` })).not.toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Refresh pack list" }));
+    expect(await screen.findByRole("checkbox", { name: "Packed Ski shell" })).toBeChecked();
+  });
+
+  it("checks personal additions separately from assigned group gear, and hides all checks without persistence", async () => {
+    let editable = true;
+    vi.stubGlobal("fetch", fakeTripApi({ [PACK]: () => reply(200, pack([entry("2026-10-10")], {
+      items: [SHELL], manual: [LAMP], groupGear: ["Crew stove"], editable,
+      checks: { [`manual:${LAMP.id}`]: { packed: true, quantity: 1, version } },
+    })) }));
+    const user = userEvent.setup();
+    await renderPage();
+    expect(await screen.findByRole("checkbox", { name: "Packed Headlamp" })).toBeChecked();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
+    const gear = screen.getByRole("region", { name: "Group gear (yours)" });
+    expect(within(gear).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Days to review" }).compareDocumentPosition(screen.getByRole("heading", { name: "From your saved outfits" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    editable = false;
+    await user.click(screen.getByRole("button", { name: "Refresh pack list" }));
+    expect(await screen.findByText(/Packing checks can't be loaded/)).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 });

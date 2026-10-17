@@ -33,7 +33,7 @@ export interface PackingItem {
   /**
    * The other keys the same item can be saved under, from its name, body area
    * and layer: a catalog item's general key (a plan's item named as it) and a
-   * worn item's carry key. A quantity or acknowledgement saved under one
+   * worn item's carry key. A quantity saved under one
    * applies to it, whether or not an outfit still names it that way.
    */
   aliases?: string[];
@@ -72,8 +72,22 @@ export type PackingSeen = Record<string, {
   slots: string[];
 }>;
 
+/** Exact item identities only; aliases never transfer a physical packing check. */
+export type PackingChecks = Record<string, { packed: boolean; quantity: number; version: string }>;
+
+export type PackingCheckChange = {
+  op: "set_packed";
+  key: string;
+  packed: boolean;
+  quantity: number;
+  expected: string | null;
+  mutation: string;
+  kits: Record<string, string>;
+};
+
 /** What POST /api/v1/trips/:id/pack takes: one change to the person's own list. */
 export type PackingChange =
+  | PackingCheckChange
   | { op: "add_item"; id: string; name: string; quantity: number }
   | { op: "item_quantity"; id: string; quantity: number }
   | { op: "remove_item"; id: string }
@@ -84,6 +98,7 @@ export type PackingChange =
 export interface PackingChoices {
   manual: PackingManualItem[];
   quantities: Record<string, number>;
+  checks: PackingChecks;
 }
 
 export interface TripPackResponse {
@@ -97,6 +112,7 @@ export interface TripPackResponse {
   kitVersions: Record<string, string>;
   checklists: PackingChecklist[];
   manual: PackingManualItem[];
+  checks: PackingChecks;
   /** False when the person's own additions can't be read, so they can't be changed either. */
   editable: boolean;
   /** General guidance for the days without a saved outfit, from activity and weather. */

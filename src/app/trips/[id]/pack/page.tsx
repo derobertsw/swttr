@@ -13,9 +13,9 @@ import { BackLink, SectionLabel, TripError } from "@/components/trips/trip-primi
 import {
   ManualItems, OlderChecklists, PackingChanges, PackingItems, PackingSuggestions, packingDay,
 } from "@/components/trips/TripPacking";
-import { errorMessage, tripRequest, TripRequestError } from "@/lib/trip-requests";
+import { errorMessage, timedTripRequest, tripRequest, TripRequestError } from "@/lib/trip-requests";
 import type { TripDayCoverage } from "@/types/trip-coverage";
-import type { PackingChange, PackingChoices, PackingItem, PackingManualItem, TripPackResponse } from "@/types/trip-packing";
+import type { PackingChange, PackingCheckChange, PackingChoices, PackingItem, PackingManualItem, TripPackResponse } from "@/types/trip-packing";
 
 const COVERAGE_ACTION_LABEL: Record<TripDayCoverage["action"], string> = {
   set_location: "Choose location", set_activity: "Choose activity", plan_manually: "Plan kit manually",
@@ -54,6 +54,8 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   });
   const [acknowledging, setAcknowledging] = useState(false);
   const [status, setStatus] = useState("");
+  const [checkErrors, setCheckErrors] = useState<Record<string, { change: PackingCheckChange; name: string; message: string; conflict: boolean }>>({});
+  const checking = useRef(new Set<string>());
   // A hand-added item keeps its identity until it's saved, so a retry adds it once.
   const pendingAdd = useRef<{ id: string; name: string } | null>(null);
   const listHeading = useRef<HTMLHeadingElement>(null);
@@ -151,7 +153,18 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
     // Shown at once, and put back if the save fails.
     setData((current) => current && apply(current, next));
     const result = await save(change, `Couldn't change how many ${name}`);
-    setData((current) => current && apply(current, typeof result === "string" ? previous : saved(result)));
+    setData((current) => {
+      if (!current) return current;
+      const next = apply(current, typeof result === "string" ? previous : saved(result));
+      if (typeof result !== "string") {
+        const checkKey = change.op === "item_quantity" ? `manual:${change.id}` : key;
+        const checks = { ...current.checks };
+        if (result.checks?.[checkKey]) checks[checkKey] = result.checks[checkKey];
+        else delete checks[checkKey];
+        next.checks = checks;
+      }
+      return next;
+    });
     if (typeof result !== "string") setStatus(`${name}: ${next}`);
     markBusy(key, false);
   };
@@ -165,6 +178,38 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
     { op: "item_quantity", id: item.id, quantity }, item.name, item.quantity, quantity,
     (current, value) => ({ ...current, manual: current.manual.map((entry) => entry.id === item.id ? { ...entry, quantity: value } : entry) }),
     (choices) => choices.manual.find((entry) => entry.id === item.id)?.quantity ?? quantity);
+
+  // Keep only this row's response: other rows can finish in a different order.
+  const saveCheck = async (change: PackingCheckChange, name: string) => {
+    if (checking.current.has(change.key)) return;
+    checking.current.add(change.key);
+    const rowKey = change.key.startsWith("manual:") ? change.key.slice(7) : change.key;
+    markBusy(rowKey, true);
+    setStatus(`Saving packing check for ${name}`);
+    setCheckErrors((current) => { const next = { ...current }; delete next[change.key]; return next; });
+    try {
+      const choices = await track(() => timedTripRequest<PackingChoices>(`/api/v1/trips/${id}/pack`, "POST", change));
+      const confirmed = choices.checks[change.key];
+      if (!confirmed) throw new Error("The server didn't confirm this packing check. Try again.");
+      setData((current) => current && { ...current, checks: { ...current.checks, [change.key]: confirmed } });
+      setStatus(`${name}: ${confirmed.packed ? "packed" : "not packed"}, saved`);
+    } catch (err) {
+      const conflict = err instanceof TripRequestError && (err.status === 404 || err.status === 409);
+      const message = errorMessage(err);
+      setCheckErrors((current) => ({ ...current, [change.key]: { change, name, message, conflict } }));
+      setStatus(`Packing check for ${name} wasn't confirmed. ${message}`);
+      if (conflict) void refresh();
+    } finally {
+      checking.current.delete(change.key);
+      markBusy(rowKey, false);
+    }
+  };
+
+  const setPacked = (key: string, name: string, quantity: number, packed: boolean) => {
+    if (!data) return;
+    void saveCheck({ op: "set_packed", key, packed, quantity, expected: data.checks[key]?.version ?? null,
+      mutation: crypto.randomUUID(), kits: data.kitVersions }, name);
+  };
 
   const addItem = async (name: string): Promise<string | null> => {
     const pending = pendingAdd.current?.name === name ? pendingAdd.current : { id: crypto.randomUUID(), name };
@@ -242,9 +287,27 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
           </Button>
         </header>
         <p role="status" className="sr-only">{status}</p>
+        {busy.size > 0 && <p aria-hidden="true" className="text-sm text-muted-foreground">Saving packing changes…</p>}
 
         {loading && <Skeleton className="h-48 w-full rounded-card" />}
         {error && <TripError>{error}</TripError>}
+
+        {Object.entries(checkErrors).map(([key, failure]) => (
+          <Card key={key} role="alert">
+            <p className="break-words text-sm font-medium">Packing check for {failure.name} wasn&apos;t confirmed.</p>
+            <p className="mt-1 text-sm text-muted-foreground">{failure.message} The checkbox shows the last confirmed state.</p>
+            <Button type="button" variant="outline" className="mt-3" disabled={busy.has(key.startsWith("manual:") ? key.slice(7) : key)}
+              aria-label={failure.conflict ? undefined : `Retry packing check for ${failure.name}`}
+              onClick={() => {
+                if (failure.conflict) {
+                  void refresh();
+                  setCheckErrors((current) => { const next = { ...current }; delete next[key]; return next; });
+                } else void saveCheck(failure.change, failure.name);
+              }}>
+              {failure.conflict ? "Review saved list" : "Retry"}
+            </Button>
+          </Card>
+        ))}
 
         {data && changed && (
           <PackingChanges items={data.items} removed={data.removed} editable={data.editable}
@@ -284,8 +347,13 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
         {data && (
           <section aria-labelledby="pack-kits-heading" className="flex flex-col gap-2.5">
             <h2 id="pack-kits-heading" ref={listHeading} tabIndex={-1} className="text-xl font-semibold text-foreground">From your saved outfits</h2>
+            <p className="text-sm text-muted-foreground">
+              {data.editable
+                ? "Check an item when you've packed its full quantity. Checks are private to you on this trip. New items start unchecked; returning items keep their previous check."
+                : "Packing checks can't be loaded right now. Refresh to try again."}
+            </p>
             {data.items.length > 0 ? (
-              <PackingItems items={data.items} editable={data.editable} busy={busy} onQuantity={itemQuantity} />
+              <PackingItems items={data.items} editable={data.editable} busy={busy} onQuantity={itemQuantity} checks={data.checks} onCheck={setPacked} />
             ) : (
               <Card>
                 <p className="text-sm text-foreground">
@@ -300,7 +368,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
           <section aria-labelledby="pack-own-heading" className="flex flex-col gap-2.5">
             <h2 id="pack-own-heading" className="text-xl font-semibold text-foreground">Your own items</h2>
             <ManualItems items={data.manual} editable={data.editable} busy={busy}
-              onAdd={addItem} onQuantity={manualQuantity} onRemove={(item) => void removeItem(item)} />
+              onAdd={addItem} onQuantity={manualQuantity} onRemove={(item) => void removeItem(item)} checks={data.checks} onCheck={setPacked} />
           </section>
         )}
 
