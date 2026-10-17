@@ -15,6 +15,9 @@ export const TRIP_ACTIVITY_OPTIONS = [
 
 type TripActivity = (typeof TRIP_ACTIVITY_OPTIONS)[number];
 
+/** The trip activity a tour plan belongs to (#210). */
+export const TOUR_ACTIVITY: TripActivity = "Backcountry";
+
 // Map the trip chip label to the activity key used by the biophysics
 // activity identifiers. Individual callers must check their own engine's
 // capabilities: Trips uses the static table, which has no Run/Bike/Backcountry

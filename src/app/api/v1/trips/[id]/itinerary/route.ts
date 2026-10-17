@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError, readJson } from "@/lib/api";
-import { parseAccessPointsCheck, parseItineraryEdit, parseItineraryRequest, previewItinerary, requestFor } from "@/lib/trip-itinerary";
+import { parseAccessPointsCheck, parseItineraryEdit, parseItineraryRequest, parseTourPlansCheck, previewItinerary, requestFor, type TourPlansCheck } from "@/lib/trip-itinerary";
 import { loadTripFull, requireTripAccess } from "@/lib/trips";
 import type { TripItineraryRequest } from "@/types/trips";
 
@@ -38,7 +38,9 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
   const edit = parseItineraryEdit(body);
   if ("error" in edit) return jsonError(edit.error, 400);
   const accessPoints = parseAccessPointsCheck(body);
-  if (accessPoints === null) return jsonError("Reload the trip and try again.", 400);
+  const tourPlans = parseTourPlansCheck(body);
+  if (accessPoints === null || tourPlans === null) return jsonError("Reload the trip and try again.", 400);
+  const copiesPlan = edit.action === "copy_day" && edit.payload.plan !== "none";
   // Copying a day can bring the user's kit, so it has its own function.
   const unchecked = () => edit.action === "copy_day"
     ? supabase.rpc("copy_trip_day", { p_trip_id: id, p_user_id: userId, p_payload: edit.payload })
@@ -57,10 +59,27 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
   // day's access point, so it sends none. Before migration 027 there are no
   // access points, and no function to check them.
   if (!accessPoints && edit.action !== "reorder_stops") return reviewAgain();
-  let { error } = accessPoints
-    ? await supabase.rpc("edit_trip_itinerary_reviewed", { p_trip_id: id, p_user_id: userId, p_action: edit.action, p_payload: edit.payload, p_access_points: accessPoints })
-    : await unchecked();
-  if (accessPoints && (error?.code === "PGRST202" || error?.code === "42883")) ({ error } = await unchecked());
+  // A copy of a tour plan (#210) needs a review that saw the trip's tour plans.
+  if (copiesPlan && !tourPlans) return reviewAgain();
+  const missing = (code: string | undefined) => code === "PGRST202" || code === "42883";
+  const reviewed = (plans?: TourPlansCheck) => supabase.rpc("edit_trip_itinerary_reviewed", {
+    p_trip_id: id, p_user_id: userId, p_action: edit.action, p_payload: edit.payload, p_access_points: accessPoints,
+    ...(plans ? { p_tour_plans: plans } : {}),
+  });
+  // The review noted tour plans too (#210), so they're checked from migration
+  // 030 on. Before it, a copy can't bring a tour plan; anything else falls
+  // back to 027's check of access points, and before 027 to none.
+  const save = async () => {
+    if (!accessPoints) return unchecked();
+    if (tourPlans) {
+      const result = await reviewed(tourPlans);
+      if (!missing(result.error?.code) || copiesPlan) return result;
+    }
+    const result = await reviewed();
+    return missing(result.error?.code) ? unchecked() : result;
+  };
+  const { error } = await save();
+  if (copiesPlan && missing(error?.code)) return jsonError("Copying a tour plan isn't available yet. Nothing was changed.", 503);
   if (error?.code === "40001") return reviewAgain();
   if (error?.code === "42501") return jsonError("Not found", 404);
   if (error?.code === "P0002") return jsonError("That stop or day isn't on this trip anymore. Reload the trip.", 404);

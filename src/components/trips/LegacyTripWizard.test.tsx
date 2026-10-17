@@ -428,7 +428,7 @@ describe("New trip wizard", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.queryByText("Stowe, Vermont", { selector: "p" })).not.toBeInTheDocument();
     expect(sentBodies(fetchMock, "POST /api/v1/trips/trip-1/itinerary").slice(1)).toEqual(Array(2).fill(
-      { action: "remove_stop", stop_id: STOWE_STOP.id, reassign_to: null, expected: ["2026-10-11"], access_points: { stops: {}, days: {} } }
+      { action: "remove_stop", stop_id: STOWE_STOP.id, reassign_to: null, expected: ["2026-10-11"], access_points: { stops: {}, days: {} }, tour_plans: {} }
     ));
   });
 
