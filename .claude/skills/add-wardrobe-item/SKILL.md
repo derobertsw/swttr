@@ -93,11 +93,11 @@ git worktree add "$MAIN/.claude/worktrees/seed-<slug>" -b seed/<slug> origin/mai
 
 Run later commands from that worktree (prefix each with `cd "$MAIN/.claude/worktrees/seed-<slug>" &&`, since the shell's directory resets). Both scripts work there without `npm ci`: Node finds PGlite in the main checkout's `node_modules` further up.
 
-**Migration number.** Files are `0NN_name.sql`. Take the highest number on `origin/main` *and* in open PRs, plus one, because other PRs often hold the next numbers:
+**Migration number.** Files are `0NN_name.sql`. Take the highest three-digit number on `origin/main` *and* in open PRs, plus one, because other PRs often hold the next numbers. Ignore timestamp-named files such as `20261016231848_…`; they aren't part of the sequence.
 
 ```bash
-git ls-tree --name-only origin/main supabase/migrations/ | sort | tail -3
-gh pr list --state open --json number,files --jq '.[] | .number as $n | .files[].path | select(startswith("supabase/migrations/")) | "\($n) \(.)"'
+git ls-tree --name-only origin/main supabase/migrations/ | grep -E '/[0-9]{3}_' | sort | tail -3
+gh pr list --state open --json number,files --jq '.[] | .number as $n | .files[].path | select(test("^supabase/migrations/[0-9]{3}_")) | "\($n) \(.)"'
 ```
 
 Write `supabase/migrations/0NN_seed_<slug>.sql` using `references/sql-templates.md`. It is idempotent: guarded by `ON CONFLICT`/`NOT EXISTS`, safe to re-run, and it never overwrites existing rows. Header comment: date, what is added and why, and that you ran a duplicate check against the live catalog (with the row counts `gaps` printed). Above each item, put 2–4 comment lines with the construction facts and source URLs, the way `011_seed_ogl_recommended_items.sql` does.

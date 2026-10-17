@@ -10,7 +10,7 @@
 //                                                             "handwear", "mitten", "headwear"
 //   node catalog-lookup.mjs gaps                              counts per category/type
 //
-// Add --json to any command for the raw rows. Credentials come from the first
+// Add --json to any command for the raw rows (find returns { exact, near }). Credentials come from the first
 // .env.local found walking up from the current directory (worktrees under
 // .claude/worktrees/ reach the main checkout's file).
 
@@ -189,6 +189,11 @@ async function main() {
       const query = rest.join(' ');
       if (!query) throw new Error('find needs brand and/or model words');
       const { exact, near } = find(catalog, query);
+      if (json) {
+        const rows = (items) => items.map(i => ({ kind: i.kind, ...i.row }));
+        console.log(JSON.stringify({ exact: rows(exact), near: rows(near) }, null, 2));
+        break;
+      }
       console.log(`== Matches for "${query}" ==`);
       print(exact, json, '(none)');
       console.log(`\n== Near matches (same brand + shared model words, or shared model words) ==`);
