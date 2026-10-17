@@ -6,7 +6,7 @@ import catalog from '@/test/fixtures/gear-catalog.json';
 import { REGIONAL_WEIGHTS } from '@/lib/biophysics/constants';
 
 // Replaying the catalog's seed history reproduces production's thermal values
-// (checked against the live catalog on 2026-10-17), so 034 runs on the same rows.
+// (checked against the live catalog on 2026-10-17), so 035 runs on the same rows.
 const SEED_HISTORY = [
   '001_schema.sql', '002_seed_garments.sql', '006_seed_new_items.sql', '007_item_media_urls.sql',
   '008_seed_media_asset_urls.sql', '009_fix_arm_clo_values.sql', '011_seed_ogl_recommended_items.sql',
@@ -41,9 +41,9 @@ const weighted = (row: Row, prefix: 'rcl' | 'recl') =>
   + REGIONAL_WEIGHTS.arm * Number(row[`${prefix}_arms`] ?? 0)
   + REGIONAL_WEIGHTS.leg * Number(row[`${prefix}_legs`] ?? 0);
 
-describe('catalog thermal audit migration (034) in Postgres', () => {
+describe('catalog thermal audit migration (035) in Postgres', () => {
   beforeAll(async () => {
-    migration = await readFile('supabase/migrations/034_catalog_whole_body_and_puffy_clo.sql', 'utf8');
+    migration = await readFile('supabase/migrations/035_catalog_whole_body_and_puffy_clo.sql', 'utf8');
     db = await seededCatalog();
     await db.exec(migration);
   }, 30_000);
