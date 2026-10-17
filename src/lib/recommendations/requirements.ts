@@ -7,7 +7,8 @@
  */
 import type { ClothingRequirement } from '@/types/biophysics';
 import type { GarmentRow, HandwearRow, HeadwearRow } from './types';
-import { hasUsableThermalData } from './garment-semantics';
+import { garmentCapabilities, hasUsableThermalData } from './garment-semantics';
+import { HEAD_WARMTH_TYPES } from './extremities';
 import type { PhaseTargets } from './thermal-targets';
 
 const CLO_MARGIN = 0.15;
@@ -30,9 +31,21 @@ const LABELS: Record<string, Record<string, { light: string; standard: string }>
 
 type Region = 'torso' | 'legs';
 
-export function isSuitableForRegion(garment: GarmentRow, region: Region, targets: PhaseTargets['regional']): boolean {
+export interface FunctionalNeeds {
+  /** Breathability the requirement labels promise, when set. */
+  minEvapPotential?: number;
+  /** The torso requirement includes a wind layer. */
+  torsoWind?: boolean;
+}
+
+export function isSuitableForRegion(garment: GarmentRow, region: Region, targets: PhaseTargets['regional'], functional?: FunctionalNeeds): boolean {
   if (!garment[`covers_${region}`] || garment.usage === 'underlayer') return false;
   if (!hasUsableThermalData(garment)) return false;
+  if (functional?.minEvapPotential !== undefined) {
+    const evap = garment.garment_thermal_properties?.evap_potential;
+    if (typeof evap !== 'number' || evap < functional.minEvapPotential) return false;
+  }
+  if (region === 'torso' && functional?.torsoWind && !garmentCapabilities(garment).wind) return false;
   const clo = garment.garment_thermal_properties?.[`rcl_${region}`];
   if (typeof clo !== 'number') return false;
   const { min, neutral } = targets;
@@ -63,7 +76,9 @@ export interface RequirementPool {
   garments: GarmentRow[];
   handwear: HandwearRow[];
   headwear: HeadwearRow[];
-  usingWardrobe: boolean;
+  /** Ownership is tracked per item kind: owning gloves does not imply owning garments. */
+  ownership: { garments: boolean; handwear: boolean; headwear: boolean };
+  functional?: FunctionalNeeds;
   selectedIds?: ReadonlySet<string>;
 }
 
@@ -77,17 +92,21 @@ export function buildClothingRequirements(
 
   for (const region of ['torso', 'legs'] as const) {
     const neutral = targets.regional.neutral[region];
-    const label = labels[region][neutral < 0.2 ? 'light' : 'standard'];
-    const candidates = pool.garments.filter((g) => isSuitableForRegion(g, region, targets.regional));
+    let label = labels[region][neutral < 0.2 ? 'light' : 'standard'];
+    if (activity === 'xc_skiing' && region === 'torso' && !pool.functional?.torsoWind) label = 'Breathable Nordic top';
+    const candidates = pool.garments.filter((g) => isSuitableForRegion(g, region, targets.regional, pool.functional));
     const matched = candidates.find((g) => pool.selectedIds?.has(g.id)) ?? candidates[0];
-    requirements.push(requirement(activity, region, label, neutral, matched, pool.usingWardrobe));
+    requirements.push(requirement(activity, region, label, neutral, matched, pool.ownership.garments));
   }
 
-  const extremity: Array<['hands' | 'head', number, HandwearRow[] | HeadwearRow[]]> = [
-    ['hands', targets.extremity.neutral.hands, pool.handwear],
-    ['head', targets.extremity.neutral.head, pool.headwear],
+  // Only head-warmth items satisfy a head requirement; helmets, buffs and
+  // neck warmers serve different requirements.
+  const headWarmth = pool.headwear.filter((h) => HEAD_WARMTH_TYPES.includes(h.headwear_type));
+  const extremity: Array<['hands' | 'head', number, HandwearRow[] | HeadwearRow[], boolean]> = [
+    ['hands', targets.extremity.neutral.hands, pool.handwear, pool.ownership.handwear],
+    ['head', targets.extremity.neutral.head, headWarmth, pool.ownership.headwear],
   ];
-  for (const [region, neutral, items] of extremity) {
+  for (const [region, neutral, items, owned] of extremity) {
     const label = labels[region][neutral < 0.2 ? 'light' : 'standard'];
     if (neutral < EXTREMITY_NEEDED_CLO) {
       requirements.push({
@@ -100,7 +119,7 @@ export function buildClothingRequirements(
       && item.rcl_clo <= neutral + CLO_MARGIN;
     const matched = items.find((item) => pool.selectedIds?.has(item.id) && inRange(item)) ?? items.find(inRange);
     requirements.push(requirement(activity, region, label, neutral,
-      matched ? { id: matched.id, name: `${matched.brand} ${matched.model_name}` } : undefined, pool.usingWardrobe));
+      matched ? { id: matched.id, name: `${matched.brand} ${matched.model_name}` } : undefined, owned));
   }
   return requirements;
 }

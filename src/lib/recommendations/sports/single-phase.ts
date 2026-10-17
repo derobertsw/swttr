@@ -40,6 +40,8 @@ interface SinglePhaseSportConfig {
   protect?(ensemble: GarmentRow[], categorized: CategorizedGarments, targets: SinglePhaseTargets): { ensemble: GarmentRow[]; warnings: string[] };
   /** Requirement-first flow: report suitable-clothing needs separately from wardrobe matches. */
   requirementFirst?: boolean;
+  /** Whether the torso requirement includes a wind layer for this request. */
+  windTorsoRequirement?(request: RecommendationRequest): boolean;
 }
 
 /** Compose one-phase targets, outfit/protection selection, and response evaluation for a sport. */
@@ -64,7 +66,7 @@ export function createSinglePhaseSport(
       return {
         ireq: targets.policy ? formatSinglePhaseIreq(targets.ireq, targets) : { min: targets.ireq.ireqMin, neutral: targets.ireq.ireqNeutral },
         ...(config.requirementFirst ? {
-          requirements: buildClothingRequirements(config.activity, targets, { garments: [], handwear: [], headwear: [], usingWardrobe: false }),
+          requirements: buildClothingRequirements(config.activity, targets, { garments: [], handwear: [], headwear: [], ownership: { garments: false, handwear: false, headwear: false } }),
         } : {}),
         recommendations: {
           target_clo_range: targets.targetRange,
@@ -117,7 +119,9 @@ export function createSinglePhaseSport(
       const requirements = config.requirementFirst
         ? buildClothingRequirements(config.activity, targets, {
           garments: pool.garments ?? Object.values(pool.categorized).flat(),
-          handwear: pool.handwear, headwear: pool.headwear, usingWardrobe: pool.usingWardrobe,
+          handwear: pool.handwear, headwear: pool.headwear,
+          ownership: { garments: pool.usingWardrobe, handwear: pool.handwearOwned ?? false, headwear: pool.headwearOwned ?? false },
+          functional: { minEvapPotential: config.minEvapPotential, torsoWind: config.windTorsoRequirement?.(request) ?? false },
           selectedIds: new Set([...ensemble.map((g) => g.id), handwear?.id, headwear.headWarmth?.id, headwear.neckWarmth?.id].filter((id): id is string => Boolean(id))),
         })
         : undefined;

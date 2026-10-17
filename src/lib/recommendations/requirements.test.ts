@@ -39,7 +39,7 @@ const tee = garment({
 describe('buildClothingRequirements', () => {
   it('reports running shorts as missing instead of matching thermal bottoms in a wardrobe', () => {
     const requirements = buildClothingRequirements('running', MILD, {
-      garments: [thermalBottoms, tee], handwear: [], headwear: [], usingWardrobe: true,
+      garments: [thermalBottoms, tee], handwear: [], headwear: [], ownership: { garments: true, handwear: true, headwear: true },
       selectedIds: new Set(['thermal-bottoms', 'tee']),
     });
     const legs = requirements.find((r) => r.region === 'legs')!;
@@ -53,18 +53,18 @@ describe('buildClothingRequirements', () => {
 
   it('matches owned shorts and never marks catalog suggestions as owned', () => {
     const owned = buildClothingRequirements('running', MILD, {
-      garments: [shorts, tee], handwear: [], headwear: [], usingWardrobe: true, selectedIds: new Set(['shorts']),
+      garments: [shorts, tee], handwear: [], headwear: [], ownership: { garments: true, handwear: true, headwear: true }, selectedIds: new Set(['shorts']),
     });
     expect(owned.find((r) => r.region === 'legs')).toMatchObject({ status: 'owned_match', matched_garment_id: 'shorts', matched_is_owned: true });
 
     const catalog = buildClothingRequirements('running', MILD, {
-      garments: [shorts, tee], handwear: [], headwear: [], usingWardrobe: false,
+      garments: [shorts, tee], handwear: [], headwear: [], ownership: { garments: false, handwear: false, headwear: false },
     });
     expect(catalog.find((r) => r.region === 'legs')).toMatchObject({ status: 'generic_suggestion', matched_is_owned: false });
   });
 
   it('keeps not-needed distinct from missing and covers empty pools and unknown thermal data', () => {
-    const mild = buildClothingRequirements('running', MILD, { garments: [], handwear: [], headwear: [], usingWardrobe: true });
+    const mild = buildClothingRequirements('running', MILD, { garments: [], handwear: [], headwear: [], ownership: { garments: true, handwear: true, headwear: true } });
     expect(mild.find((r) => r.region === 'hands')?.status).toBe('not_needed');
     expect(mild.find((r) => r.region === 'legs')?.status).toBe('missing');
 
@@ -72,13 +72,43 @@ describe('buildClothingRequirements', () => {
     expect(isSuitableForRegion(unknown, 'legs', MILD.regional)).toBe(false);
   });
 
+  it('does not let helmets or neck warmers satisfy a head requirement', () => {
+    const helmet = { id: 'helmet', brand: 'Test', model_name: 'Ski Helmet', headwear_type: 'ski_helmet', rcl_clo: 0.24 };
+    const buff = { id: 'buff', brand: 'Test', model_name: 'Buff', headwear_type: 'buff_thin', rcl_clo: 0.22 };
+    const requirements = buildClothingRequirements('running', COLD, {
+      garments: [tee], handwear: [], headwear: [helmet, buff], ownership: { garments: true, handwear: true, headwear: true },
+      selectedIds: new Set(['helmet', 'buff']),
+    });
+    expect(requirements.find((r) => r.region === 'head')?.status).toBe('missing');
+  });
+
+  it('requires the breathability and wind protection its labels promise', () => {
+    const shell = garment({
+      id: 'shell', model_name: 'Rain Shell', usage: 'standalone', covers_torso: true,
+      garment_protection: { windproof_rating: 'windproof', waterproof_rating: 'waterproof' },
+      garment_thermal_properties: { rcl_whole_body: 0.3, rcl_torso: 0.45, rcl_arms: 0.3, rcl_legs: 0, recl_whole_body: 2, recl_torso: 4, recl_arms: 2, recl_legs: 0, evap_potential: 0.1 },
+    });
+    expect(isSuitableForRegion(shell, 'torso', COLD.regional, { minEvapPotential: 0.3 })).toBe(false);
+    expect(isSuitableForRegion(shell, 'torso', COLD.regional, { minEvapPotential: 0.05, torsoWind: true })).toBe(true);
+    expect(isSuitableForRegion(tee, 'torso', COLD.regional, { torsoWind: true })).toBe(false);
+  });
+
+  it('tracks extremity ownership independently from garment ownership', () => {
+    const glove = { id: 'gloves', brand: 'Test', model_name: 'Gloves', handwear_type: 'gloves', rcl_clo: 0.28 };
+    const requirements = buildClothingRequirements('running', COLD, {
+      garments: [], handwear: [glove], headwear: [], ownership: { garments: false, handwear: true, headwear: false },
+    });
+    expect(requirements.find((r) => r.region === 'hands')).toMatchObject({ status: 'owned_match', matched_is_owned: true });
+    expect(requirements.find((r) => r.region === 'torso')?.status).toBe('missing');
+  });
+
   it('matches cold-weather gloves as owned and leaves them missing without them', () => {
     const glove = { id: 'gloves', brand: 'Test', model_name: 'Gloves', handwear_type: 'gloves', rcl_clo: 0.28 };
     const withGloves = buildClothingRequirements('running', COLD, {
-      garments: [tee], handwear: [glove], headwear: [], usingWardrobe: true,
+      garments: [tee], handwear: [glove], headwear: [], ownership: { garments: true, handwear: true, headwear: true },
     });
     expect(withGloves.find((r) => r.region === 'hands')).toMatchObject({ status: 'owned_match', matched_garment_id: 'gloves' });
-    const without = buildClothingRequirements('running', COLD, { garments: [tee], handwear: [], headwear: [], usingWardrobe: true });
+    const without = buildClothingRequirements('running', COLD, { garments: [tee], handwear: [], headwear: [], ownership: { garments: true, handwear: true, headwear: true } });
     expect(without.find((r) => r.region === 'hands')?.status).toBe('missing');
   });
 });

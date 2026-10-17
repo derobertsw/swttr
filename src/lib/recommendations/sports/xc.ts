@@ -78,6 +78,7 @@ function getXCGuidance(tempC: number, ireq: { ireqMin: number; ireqNeutral: numb
 
 export const xc = createSinglePhaseSport({
   requirementFirst: true,
+  windTorsoRequirement: (request) => needsWindLayer(request),
   activity: 'xc_skiing',
   profile: { name: 'XC Skiing', windExposure: 'normal' },
   minEvapPotential: MIN_EVAP_POTENTIAL,
