@@ -149,7 +149,7 @@ describe("packingWithChanges", () => {
     const { items, removed } = packingWithChanges(after, {}, seen);
     expect(items.find((item) => item.name === "Rain shell")?.change).toEqual({ kind: "replaced", replaces: ["Ski shell"] });
     expect(items.filter((item) => item.change)).toHaveLength(1);
-    expect(removed).toEqual([]);
+    expect(removed).toEqual([{ key: "item:g-3", name: "Ski shell", dates: [SAT, SUN] }]);
   });
 
   it("lists items that left without a replacement, and new items as added", () => {
@@ -164,7 +164,7 @@ describe("packingWithChanges", () => {
     expect(find(items, "Ski shell")?.quantity).toBe(2);
   });
 
-  it("keeps a quantity and acknowledgement saved under an item that joined another", () => {
+  it("keeps alias quantities but flags the new exact identities for packing review", () => {
     const general: Recommendation = { ...WEAR, torso: { base: [{ name: "Merino crew" }], outer: [] } };
     const planOnly = [planDayKit(SUN, { baseline: { ...planDay(SUN).baseline, recommendation: general }, dayparts: [], carryItems: ["Ski shell"] })];
     const seenBefore = packingSeen(packingFromOutfits(planOnly));
@@ -175,10 +175,10 @@ describe("packingWithChanges", () => {
 
     const { items, removed } = packingWithChanges(joined, quantities, seenBefore);
     expect(find(items, "Merino crew")).toMatchObject({ quantity: 3 });
-    expect(find(items, "Merino crew")?.change).toBeUndefined();
+    expect(find(items, "Merino crew")?.change).toEqual({ kind: "replaced", replaces: ["Merino crew"] });
     expect(find(items, "Ski shell")).toMatchObject({ quantity: 2 });
-    expect(find(items, "Ski shell")?.change).toBeUndefined();
-    expect(removed).toEqual([]);
+    expect(find(items, "Ski shell")?.change).toEqual({ kind: "added" });
+    expect(removed.map((item) => item.key)).toEqual(["general:torso:base:merino crew", "carry:ski shell"]);
     // A quantity chosen for the item it joined wins, one included.
     expect(find(packingWithChanges(joined, { ...quantities, "item:g-1": 1 }, null).items, "Merino crew")?.quantity).toBe(1);
   });
@@ -190,8 +190,8 @@ describe("packingWithChanges", () => {
     const seenBefore = packingSeen(packingFromOutfits(plan, new Set(["torso:base:Merino crew"])));
     const replaced = packingWithChanges(packingFromOutfits([day(SAT)]), { "general:torso:base:merino crew": 3 }, seenBefore);
     expect(find(replaced.items, "Merino crew")).toMatchObject({ key: "item:g-1", quantity: 3 });
-    expect(find(replaced.items, "Merino crew")?.change).toBeUndefined();
-    expect(replaced.removed).toEqual([]);
+    expect(find(replaced.items, "Merino crew")?.change).toEqual({ kind: "replaced", replaces: ["Merino crew"] });
+    expect(replaced.removed.map((item) => item.key)).toEqual(["general:torso:base:merino crew"]);
 
     // A shell only carried, set to 2, is replaced by an outfit that wears and carries it.
     const carried = [planDayKit(SUN, { baseline: { ...planDay(SUN).baseline, recommendation: general }, dayparts: [], carryItems: ["Ski shell"] })];
@@ -204,9 +204,9 @@ describe("packingWithChanges", () => {
     }) } satisfies DayOutfit;
     const { items, removed } = packingWithChanges(packingFromOutfits([tour]), { "carry:ski shell": 2 }, packingSeen(packingFromOutfits(carried)));
     expect(find(items, "Ski shell")).toMatchObject({ key: "item:g-3", quantity: 2 });
-    expect(find(items, "Ski shell")?.change).toBeUndefined();
-    // The catalog Merino crew is the plan's general one too, so nothing left.
-    expect(removed).toEqual([]);
+    expect(find(items, "Ski shell")?.change).toEqual({ kind: "added" });
+    // Name aliases retain quantities, but physical identities must be reviewed.
+    expect(removed.map((item) => item.key)).toEqual(["general:torso:base:merino crew", "carry:ski shell"]);
   });
 
   it("doesn't give a general item a catalog item's quantity", () => {
