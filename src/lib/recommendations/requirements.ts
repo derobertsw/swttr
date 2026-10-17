@@ -31,7 +31,7 @@ const LABELS: Record<string, Record<string, { light: string; standard: string }>
 
 type Region = 'torso' | 'legs';
 
-export interface FunctionalNeeds {
+interface FunctionalNeeds {
   /** Breathability the requirement labels promise, when set. */
   minEvapPotential?: number;
   /** The torso requirement includes a wind layer. */
@@ -72,7 +72,7 @@ export function filterUnsuitableEnsemble(ensemble: GarmentRow[], targets: PhaseT
   }));
 }
 
-export interface RequirementPool {
+interface RequirementPool {
   garments: GarmentRow[];
   handwear: HandwearRow[];
   headwear: HeadwearRow[];
