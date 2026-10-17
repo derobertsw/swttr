@@ -318,10 +318,13 @@ describe("Home Page", () => {
       expect(geolocation.getCurrentPosition).toHaveBeenCalledTimes(1);
     });
 
-    it("says why when the weather for the device's location fails, and keeps the place", async () => {
+    it.each(["service", "network"])("says why when the first weather request has a %s failure, and keeps the place", async (failure) => {
       const { toast } = await import("sonner");
       const geolocation = mockGeolocation();
-      mockOutingApis(() => respond(502, { error: "Bad gateway" }));
+      mockOutingApis(() => {
+        if (failure === "network") throw new TypeError("Failed to fetch");
+        return respond(502, { error: "Bad gateway" });
+      });
       const user = userEvent.setup();
       render(<Home />);
 
@@ -329,7 +332,9 @@ describe("Home Page", () => {
       await geolocation.answer(40.7128, -74.006);
       await user.click(gearUpButton());
 
-      await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not get weather for this location."));
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn't get the weather. Try again."));
+      expect(screen.getByRole("alert")).toHaveTextContent("Couldn't get your layers");
+      expect(screen.queryByText("Outing update failed")).not.toBeInTheDocument();
       expect(placeField()).toHaveValue("Your location");
       expect(gearUpButton()).toBeEnabled();
     });
@@ -743,7 +748,7 @@ describe("Home Page", () => {
         mockOutingApis(() => respond(502, { error: "Bad gateway" }));
         render(<Home />);
 
-        await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not get weather for this location."));
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn't get the weather. Try again."));
         await waitFor(() => expect(onResultsEntry()).toBe(false));
         expect(screen.queryByText("Current conditions")).not.toBeInTheDocument();
         expect(within(activity()).getByRole("radio", { name: /xc skiing/i })).toBeChecked();
@@ -1152,6 +1157,7 @@ describe("Home Page", () => {
 
       await switchActivity(user, "Alpine Skiing", "Running");
       const notice = await screen.findByRole("alert");
+      expect(notice).toHaveTextContent("Outing update failed");
       expect(notice).toHaveTextContent("Running");
       expect(notice).toHaveTextContent("Still showing the previous result: Alpine Skiing");
 

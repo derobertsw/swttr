@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, type Ref, type RefObject, useEffect, useRef, useSyncExternalStore } from "react";
+import { type FormEvent, type Ref, type RefObject, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { format } from "date-fns";
 import { CalendarIcon, Minus, Plus } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
@@ -145,6 +145,7 @@ export function GearUpForm({
   );
   const dateButtonRef = useRef<HTMLButtonElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const [dateOpen, setDateOpen] = useState(false);
 
   const later = inputMode === "later";
   const severalDays = later && durationDays > 1;
@@ -250,7 +251,7 @@ export function GearUpForm({
                     <p id="start-date-label" className="text-sm font-medium text-foreground">
                       Start date
                     </p>
-                    <Popover>
+                    <Popover open={dateOpen} onOpenChange={setDateOpen}>
                       <PopoverTrigger asChild>
                         <Button
                           ref={dateButtonRef}
@@ -271,7 +272,10 @@ export function GearUpForm({
                         <Calendar
                           mode="single"
                           selected={date}
-                          onSelect={onDateChange}
+                          onSelect={(selectedDate) => {
+                            onDateChange(selectedDate);
+                            if (selectedDate) setDateOpen(false);
+                          }}
                           // Today at the place, which may not be the device's today.
                           today={toPickerDate(zonedNow(selectedLocation?.timeZone).slice(0, 10))}
                           autoFocus

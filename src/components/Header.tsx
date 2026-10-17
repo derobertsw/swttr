@@ -74,7 +74,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   };
 
   const menuButton = useCallback(() => document.getElementById(menuButtonId), [menuButtonId]);
-  // The avatar when signed in, or the Sign In link after a sign-out.
+  // The avatar when signed in, or the Sign in link after a sign-out.
   const accountControl = useCallback(() => accountAreaRef.current?.querySelector<HTMLElement>("a[href], button") ?? null, []);
 
   const openPreferencesFromMenu = useCallback(() => {
@@ -135,7 +135,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
 
       <div className="flex items-center gap-4">
         {/* The avatar shows at every width. Below md, and in the native shell,
-            Sign In is in the menu instead. */}
+            Sign in is in the menu instead. */}
         <div ref={accountAreaRef} className="flex items-center gap-4">
           <SignedIn>
             <AccountMenu ref={accountMenuRef} onOpenSettings={openPreferencesFromAvatar} onShare={handleShare} />
@@ -148,7 +148,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
                 !isNativeShell && "md:inline-flex"
               )}
             >
-              Sign In
+              Sign in
             </Link>
           </SignedOut>
         </div>
@@ -183,7 +183,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
                     href="/sign-in"
                     className={MENU_ITEM_CLASS}
                   >
-                    Sign In
+                    Sign in
                   </Link>
                 </SheetClose>
               </SignedOut>

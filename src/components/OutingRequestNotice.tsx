@@ -23,10 +23,15 @@ export function OutingRequestNotice({ request, shownOuting, onRetry }: {
 }) {
   if (request.status === "idle") return null;
   const loading = request.status === "loading";
+  const errorTitle = shownOuting
+    ? "Outing update failed"
+    : request.outing.when.mode === "later" && request.outing.when.durationDays > 1
+      ? "Couldn't build your plan"
+      : "Couldn't get your layers";
   return (
     <div className="flex w-full flex-col gap-3 rounded-control border border-border bg-card px-4 py-3 text-sm text-foreground">
       <div role={loading ? "status" : "alert"} aria-atomic="true" className="space-y-2 break-words">
-        <p className="font-medium">{loading ? "Updating outing…" : "Outing update failed"}</p>
+        <p className="font-medium">{loading ? "Updating outing…" : errorTitle}</p>
         <p>{describeOuting(request.outing)}</p>
         {request.status === "error" && <p>{request.message}</p>}
         {shownOuting && <p className="text-muted-foreground">Still showing the previous result: {describeOuting(shownOuting)}.</p>}
