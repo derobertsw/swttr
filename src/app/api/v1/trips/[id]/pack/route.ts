@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { jsonError, readJson } from "@/lib/api";
 import { requireTripAccess, loadTripFull, enumerateDates } from "@/lib/trips";
 import { buildMultiDayLayerPlan } from "@/lib/planAhead";
@@ -11,16 +10,19 @@ import { tripActivityToRecommendationKey } from "@/lib/trip-activities";
 import { fetchTripForecast, hasTripCoordinates, resolveTripStop, tripDayForecast, tripForecastDateOutsideWindow } from "@/lib/trip-forecast";
 import { outfitMismatches } from "@/lib/trip-kit-fit";
 import {
-  kitVersions, packingFromOutfits, packingSeen, packingWithChanges, parsePackingChange,
-  readManualItems, readPackingChecks, readQuantities, readSeen, sameKitVersions, type DayOutfit,
+  kitVersions, packingSeen, packingWithChanges, parsePackingChange,
+  readManualItems, readPackingChecks, readQuantities, readSeen, sameKitVersions,
 } from "@/lib/trip-packing";
+import {
+  itemsFromKits, mappedNames, myKits, myMemberOf, readMappings, readMemberPacking, touringDates, updatePacking, type MappingRow,
+} from "@/lib/trip-member-packing";
+import { buildTouringEquipment, equipmentKey, isTemplateId, readEquipment } from "@/lib/touring-equipment";
 import layerRecommendations from "@/data/layerRecommendations.json";
 import type { DailyLayerPlan } from "@/types/plan";
 import type { Recommendation } from "@/types/recommendations";
 import type { TemperatureSensitivity } from "@/types/preferences";
 import type { TripDayCoverage } from "@/types/trip-coverage";
 import type { PackingChoices, PackingChange, PackingChecklist, TripPackResponse } from "@/types/trip-packing";
-import type { TripFull } from "@/types/trips";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -33,45 +35,6 @@ function makeRecommendationFor(activity: string, sensitivity: TemperatureSensiti
     if (!legacy) return null;
     return convertLegacyRecommendation(legacy as LegacyRecommendation);
   };
-}
-
-/** The member's own row on the trip, which their packing list belongs to. */
-function myMemberOf(full: TripFull, userId: string) {
-  return full.members.find((member) => member.user_id === userId && member.status !== "left");
-}
-
-/** The member's kits on the trip's days, each with its date. */
-function myKits(full: TripFull, memberId: string | undefined) {
-  const dates = new Set(enumerateDates(full.trip.start_date, full.trip.end_date));
-  return full.kits.flatMap((kit) => {
-    const day = full.days.find((candidate) => candidate.id === kit.trip_day_id);
-    return memberId && kit.trip_member_id === memberId && day && dates.has(day.date) ? [{ date: day.date, kit }] : [];
-  });
-}
-
-type MappingRow = { body_part: string; layer_type: string; standard_option: string; custom_name: string };
-
-function readMappings(supabase: SupabaseClient, userId: string) {
-  return supabase
-    .from("user_item_mappings")
-    .select("body_part, layer_type, standard_option, custom_name")
-    .eq("user_id", userId);
-}
-
-/** "bodyPart:layerType:name" for each name the user gave one of their own items. */
-function mappedNames(rows: MappingRow[]): Set<string> {
-  return new Set(rows.map((row) => `${row.body_part}:${row.layer_type}:${String(row.custom_name).trim()}`));
-}
-
-/** The member's outfits as packing items, with the person's own item names. */
-function itemsFromKits(kits: ReturnType<typeof myKits>, mapped: Set<string>) {
-  const outfits: DayOutfit[] = kits.flatMap(({ date, kit }) => kit.outfit ? [{ date, outfit: kit.outfit, savedAt: kit.outfit_saved_at ?? null }] : []);
-  return packingFromOutfits(outfits, mapped);
-}
-
-/** Calls update_trip_packing, which applies one change to the member's own list. */
-function updatePacking(supabase: SupabaseClient, tripId: string, userId: string, op: Record<string, unknown>) {
-  return supabase.rpc("update_trip_packing", { p_trip_id: tripId, p_user_id: userId, p_op: op });
 }
 
 export async function GET(_request: NextRequest, ctx: RouteContext) {
@@ -203,17 +166,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
 
   // The person's own choices: a list that can't be read (before its
   // migration) still shows, without them, and can't be changed.
-  let editable = !!myMember;
-  let saved: { items?: unknown; quantities?: unknown; seen?: unknown; checks?: unknown } | null = null;
-  if (myMember) {
-    const { data, error } = await supabase
-      .from("trip_member_packing")
-      .select("items, quantities, seen, checks")
-      .eq("trip_member_id", myMember.id)
-      .maybeSingle();
-    if (error) editable = false;
-    else saved = data;
-  }
+  const packing = myMember ? await readMemberPacking(supabase, myMember.id) : { saved: null, readable: false, equipment: false };
+  const editable = packing.readable;
+  const saved = packing.saved;
   const derived = itemsFromKits(kits, mappedNames(mappingRows));
   const versions = kitVersions(kits.map(({ kit }) => kit));
   const seen = readSeen(saved?.seen);
@@ -250,6 +205,12 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     manual: readManualItems(saved?.items),
     checks: readPackingChecks(saved?.checks),
     editable,
+    equipment: buildTouringEquipment({
+      dates: touringDates(full),
+      saved: readEquipment(saved?.equipment),
+      names: [...derived.map((item) => item.name), ...readManualItems(saved?.items).map((item) => item.name)],
+      editable: editable && packing.equipment,
+    }),
     suggestions,
     suggestedDays: dailyPlans.length,
     skipped,
@@ -270,6 +231,10 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
 
   const change = parsePackingChange(await readJson(request));
   if (typeof change === "string") return jsonError(change, 400);
+  if ((change.op === "add_equipment" && !change.ids.every(isTemplateId))
+    || ((change.op === "equipment_quantity" || change.op === "remove_equipment") && !isTemplateId(change.id))) {
+    return jsonError("That item isn't in the touring equipment list.", 400);
+  }
 
   let op: Record<string, unknown> = change;
   if (change.op === "acknowledge" || change.op === "set_packed") {
@@ -286,7 +251,8 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
       // A caller cannot create checks for another person's kit, group gear,
       // decorative suggestions, or an item that has left their outfits.
       const item = derived.find((item) => item.key === change.key);
-      if (!item && !/^manual:[0-9a-f-]{36}$/.test(change.key)) return jsonError("That item is no longer in your list. Refresh and try again.", 404);
+      const equipment = change.key.startsWith(equipmentKey("")) && isTemplateId(change.key.slice(equipmentKey("").length));
+      if (!item && !equipment && !/^manual:[0-9a-f-]{36}$/.test(change.key)) return jsonError("That item is no longer in your list. Refresh and try again.", 404);
       op = { ...change, aliases: item?.aliases ?? [] };
     }
   }
@@ -297,6 +263,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     manual: readManualItems(data?.items),
     quantities: readQuantities(data?.quantities),
     checks: readPackingChecks(data?.checks),
+    equipment: readEquipment(data?.equipment),
   } satisfies PackingChoices, { headers: { "Cache-Control": "private, no-store" } });
 }
 
@@ -310,7 +277,13 @@ function packingError(error: { code?: string; message?: string }, change: Packin
     case "P0002": return jsonError("That item was removed in another session. Reload your list.", 404);
     case "40001": return kitsChanged();
     case "P0409": return NextResponse.json({ error: "This item changed in another session. Review its saved state and try again.", code: "packing_changed" }, { status: 409 });
-    case "22023": return jsonError(change.op === "add_item" ? "You can add up to 50 items. Remove one first." : "Check the change and try again.", 400);
+    case "22023":
+      // The template's ids are checked here, so a refused equipment change
+      // means the function doesn't know it yet (before migration 032).
+      if (change.op === "add_equipment" || change.op === "equipment_quantity" || change.op === "remove_equipment") {
+        return jsonError("Touring equipment can't be saved yet. Try again later.", 503);
+      }
+      return jsonError(change.op === "add_item" ? "You can add up to 50 items. Remove one first." : "Check the change and try again.", 400);
     // Before its migration, the list's choices can't be saved.
     case "42883": case "42P01": case "42703": case "PGRST202": return jsonError("Packing changes can't be saved yet. Try again later.", 503);
     default: return jsonError("Couldn't save the change. Try again.", 500);

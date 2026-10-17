@@ -99,8 +99,8 @@ function logUsage(outcome: string, results = 0) {
 
 /**
  * Searches names and addresses near the trip's destinations. Throws
- * LocationSearchUnavailable when the key is missing, the provider fails or
- * the daily quota is spent, so the caller can say so and offer manual entry.
+ * LocationSearchUnavailable when the key is missing or the provider fails or
+ * refuses the search, so the caller can say so and offer manual entry.
  */
 export async function searchLocations(query: string, near: Point[]): Promise<TripLocation[]> {
   const key = process.env.GEOAPIFY_API_KEY;
@@ -126,7 +126,8 @@ export async function searchLocations(query: string, near: Point[]): Promise<Tri
     throw new LocationSearchUnavailable("Location search didn't respond.");
   }
   if (!response.ok) {
-    // 401/403: key problem. 429: the free plan's daily credits are spent.
+    // 401/403: key problem. 429: Geoapify limited the account (see Provider in
+    // docs/trip-locations.md).
     logUsage(`http_${response.status}`);
     throw new LocationSearchUnavailable(`Location search failed (${response.status}).`);
   }

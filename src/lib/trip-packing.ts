@@ -21,6 +21,8 @@ import type { TripMemberDayKit } from "@/types/trips";
 type Fields = Record<string, unknown>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** A touring template item's id, as migration 032 checks it. */
+const EQUIPMENT_ID = /^[a-z][a-z0-9_]{0,39}$/;
 const OWNERSHIP_RANK: Record<PackingOwnership, number> = { general: 0, suggested: 1, owned: 2 };
 const USES: PackingUse[] = ["wear", "carry"];
 export const MAX_QUANTITY = 20;
@@ -36,7 +38,7 @@ const isStrings = (value: unknown): value is string[] => Array.isArray(value) &&
  * script so 手袋 and 帽子 stay two items. A name with no letters or numbers
  * keeps its own text.
  */
-function identityText(value: string): string {
+export function identityText(value: string): string {
   const folded = value.normalize("NFKC").toLowerCase();
   return folded.replace(/[^\p{L}\p{N}\p{M}]+/gu, " ").trim() || folded.trim();
 }
@@ -310,6 +312,16 @@ export function parsePackingChange(body: unknown): PackingChange | string {
         return "Reload your list and try again.";
       }
       return { op: "acknowledge", kits: body.kits as Record<string, string> };
+    // Touring equipment (#212): the route checks the ids are the template's.
+    case "add_equipment":
+      if (!Array.isArray(body.ids) || body.ids.length === 0 || body.ids.length > 20
+        || !body.ids.every((entry) => typeof entry === "string" && EQUIPMENT_ID.test(entry))) return "Choose the items to add.";
+      return { op: "add_equipment", ids: [...new Set(body.ids as string[])] };
+    case "equipment_quantity":
+      if (!EQUIPMENT_ID.test(id)) return "Invalid item.";
+      return checkQuantity() ?? { op: "equipment_quantity", id, quantity: quantity as number };
+    case "remove_equipment":
+      return EQUIPMENT_ID.test(id) ? { op: "remove_equipment", id } : "Invalid item.";
     default:
       return "Nothing to change.";
   }

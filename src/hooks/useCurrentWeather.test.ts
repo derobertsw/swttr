@@ -71,6 +71,16 @@ describe("fetchWeatherAt", () => {
     });
   });
 
+  it.each(["service", "network"])("asks to retry current weather after a %s failure", async (failure) => {
+    if (failure === "service") mockFetch(new Response("Bad gateway", { status: 502 }));
+    else vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    expect(await fetchWeatherAt(STOWE)).toEqual({
+      data: null,
+      error: "Couldn't get the weather. Try again.",
+    });
+  });
+
   it.each([
     {}, { temperature: null, windSpeed: 7 }, { temperature: 30, windSpeed: null },
     { temperature: "30", windSpeed: 7 }, { temperature: 30 },
