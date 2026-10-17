@@ -82,6 +82,16 @@ describe('buildClothingRequirements', () => {
     expect(requirements.find((r) => r.region === 'head')?.status).toBe('missing');
   });
 
+  it('drops a functionally unsuitable garment from the presented ensemble', () => {
+    const shell = garment({
+      id: 'shell', model_name: 'Rain Shell', usage: 'standalone', covers_torso: true,
+      garment_thermal_properties: { rcl_whole_body: 0.12, rcl_torso: 0.14, rcl_arms: 0.1, rcl_legs: 0, recl_whole_body: 2, recl_torso: 4, recl_arms: 2, recl_legs: 0, evap_potential: 0.1 },
+    });
+    expect(filterUnsuitableEnsemble([shell, shorts], MILD.regional, { minEvapPotential: 0.3 }).map((g) => g.id)).toEqual(['shorts']);
+    // A breathable layer for the same region keeps the shell in a layered outfit.
+    expect(filterUnsuitableEnsemble([shell, tee], MILD.regional, { minEvapPotential: 0.3 }).map((g) => g.id)).toContain('shell');
+  });
+
   it('requires the breathability and wind protection its labels promise', () => {
     const shell = garment({
       id: 'shell', model_name: 'Rain Shell', usage: 'standalone', covers_torso: true,

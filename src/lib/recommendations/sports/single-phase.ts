@@ -80,7 +80,10 @@ export function createSinglePhaseSport(
       const built = config.buildEnsemble(pool.categorized, targets, request);
       const protectedOutfit = config.protect?.(built, pool.categorized, targets);
       const builtEnsemble = protectedOutfit?.ensemble ?? built;
-      const ensemble = config.requirementFirst ? filterUnsuitableEnsemble(builtEnsemble, targets.regional) : builtEnsemble;
+      const functional = config.requirementFirst
+        ? { minEvapPotential: config.minEvapPotential, torsoWind: config.windTorsoRequirement?.(request) ?? false }
+        : undefined;
+      const ensemble = functional ? filterUnsuitableEnsemble(builtEnsemble, targets.regional, functional) : builtEnsemble;
       const handwear = selectHandwear(
         pool.handwear,
         request.tempC,
@@ -121,7 +124,7 @@ export function createSinglePhaseSport(
           garments: pool.garments ?? Object.values(pool.categorized).flat(),
           handwear: pool.handwear, headwear: pool.headwear,
           ownership: { garments: pool.usingWardrobe, handwear: pool.handwearOwned ?? false, headwear: pool.headwearOwned ?? false },
-          functional: { minEvapPotential: config.minEvapPotential, torsoWind: config.windTorsoRequirement?.(request) ?? false },
+          functional,
           selectedIds: new Set([...ensemble.map((g) => g.id), handwear?.id, headwear.headWarmth?.id, headwear.neckWarmth?.id].filter((id): id is string => Boolean(id))),
         })
         : undefined;

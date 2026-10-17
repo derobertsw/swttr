@@ -42,8 +42,12 @@ export function isSuitableForRegion(garment: GarmentRow, region: Region, targets
   if (!garment[`covers_${region}`] || garment.usage === 'underlayer') return false;
   if (!hasUsableThermalData(garment)) return false;
   if (functional?.minEvapPotential !== undefined) {
+    // A wind shell's breathability comes from the layers under it; when a
+    // wind layer is required, shells are judged on wind protection instead.
+    const windShell = region === 'torso' && functional.torsoWind
+      && ['soft_shell', 'hard_shell', 'windbreaker'].includes(garment.category);
     const evap = garment.garment_thermal_properties?.evap_potential;
-    if (typeof evap !== 'number' || evap < functional.minEvapPotential) return false;
+    if (!windShell && (typeof evap !== 'number' || evap < functional.minEvapPotential)) return false;
   }
   if (region === 'torso' && functional?.torsoWind && !garmentCapabilities(garment).wind) return false;
   const clo = garment.garment_thermal_properties?.[`rcl_${region}`];
@@ -60,9 +64,16 @@ export function isSuitableForRegion(garment: GarmentRow, region: Region, targets
 /** Drop garments presented alone for a region they cannot suit: an
  * underlayer with nothing over it, or a warm full-coverage layer for a
  * light need. Layered cold outfits are left to ensemble scoring. */
-export function filterUnsuitableEnsemble(ensemble: GarmentRow[], targets: PhaseTargets['regional']): GarmentRow[] {
+export function filterUnsuitableEnsemble(ensemble: GarmentRow[], targets: PhaseTargets['regional'], functional?: FunctionalNeeds): GarmentRow[] {
   return ensemble.filter((g) => !(['torso', 'legs'] as const).some((region) => {
     if (!g[`covers_${region}`]) return false;
+    // A garment the requirement matching rejects on breathability must not
+    // be presented while its requirement reads missing. A missing wind
+    // layer is a gap for an additional layer, so it never drops the top
+    // underneath it.
+    const breathability = functional ? { ...functional, torsoWind: false } : undefined;
+    if (breathability && isSuitableForRegion(g, region, targets) && !isSuitableForRegion(g, region, targets, breathability)
+      && !ensemble.some((other) => other.id !== g.id && isSuitableForRegion(other, region, targets, breathability))) return true;
     if (ensemble.some((other) => other.id !== g.id && isSuitableForRegion(other, region, targets))) return false;
     if (g.usage === 'underlayer' && !ensemble.some((other) => other.id !== g.id && other[`covers_${region}`])) return true;
     const coverage = g[`coverage_${region}`];
