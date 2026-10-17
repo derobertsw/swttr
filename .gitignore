@@ -49,6 +49,8 @@ ios/App/App.xcworkspace/xcuserdata/
 
 # Claude
 CLAUDE.md
+# Linked worktrees that sessions create inside the checkout
+.claude/worktrees/
 
 # Native Swift packages and generated Mac project
 apple/**/.build/
