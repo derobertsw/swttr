@@ -92,12 +92,67 @@ export type PackingChange =
   | { op: "item_quantity"; id: string; quantity: number }
   | { op: "remove_item"; id: string }
   | { op: "quantity"; key: string; quantity: number }
-  | { op: "acknowledge"; kits: Record<string, string> };
+  | { op: "acknowledge"; kits: Record<string, string> }
+  | { op: "add_equipment"; ids: string[] }
+  | { op: "equipment_quantity"; id: string; quantity: number }
+  | { op: "remove_equipment"; id: string };
+
+/**
+ * `trip_member_packing.equipment`: each touring template item the person
+ * added, or took out again, by template id (#212).
+ */
+export type PackingEquipmentChoices = Record<string, { status: "added" | "removed"; quantity: number }>;
 
 /** What POST /api/v1/trips/:id/pack returns: the person's saved choices. */
 export interface PackingChoices {
   manual: PackingManualItem[];
   quantities: Record<string, number>;
+  checks: PackingChecks;
+  equipment: PackingEquipmentChoices;
+}
+
+/** One item of the touring equipment template (#212). */
+export interface EquipmentTemplateItem {
+  /** Its identity in the template; it's never reused for another item. */
+  id: string;
+  name: string;
+  /** Suggested additions start selected; optional items don't. */
+  tier: "suggested" | "optional";
+  /** Why it's on the list, shown as optional detail. */
+  purpose: string;
+}
+
+/** A template item in the person's packing list, checked under `key` ("equipment:<id>"). */
+export interface PackingEquipmentItem extends EquipmentTemplateItem {
+  key: string;
+  quantity: number;
+}
+
+/** A template item as the person's list stands now, for the Add touring equipment preview. */
+export interface EquipmentTemplateOption extends EquipmentTemplateItem {
+  /**
+   * added: in their touring equipment. listed: not added, but an item of
+   * theirs has its name (`listedAs`). removed: they took it out of their list.
+   * available: none of these.
+   */
+  state: "added" | "listed" | "removed" | "available";
+  listedAs?: string;
+}
+
+/** The person's touring equipment (#212). See docs/trip-touring-prep.md. */
+export interface TouringEquipment {
+  /** The trip's Backcountry days, which the equipment is for. */
+  dates: string[];
+  items: PackingEquipmentItem[];
+  template: EquipmentTemplateOption[];
+  /** False when the person's equipment can't be read or changed (before migration 032). */
+  editable: boolean;
+}
+
+/** What GET /api/v1/trips/:id/pack/equipment returns, for a trip day. */
+export interface TripEquipmentResponse {
+  equipment: TouringEquipment;
+  /** The person's packing checks for their equipment, by key. */
   checks: PackingChecks;
 }
 
@@ -121,4 +176,5 @@ export interface TripPackResponse {
   suggestedDays: number;
   skipped: { date: string; reason: string }[];
   groupGear: string[];
+  equipment: TouringEquipment;
 }

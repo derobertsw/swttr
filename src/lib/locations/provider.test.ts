@@ -102,7 +102,7 @@ describe("Searching Geoapify", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it.each([
-    ["the daily quota is spent", () => Promise.resolve(new Response("{}", { status: 429 }))],
+    ["Geoapify limits the account", () => Promise.resolve(new Response("{}", { status: 429 }))],
     ["the key is rejected", () => Promise.resolve(new Response("{}", { status: 401 }))],
     ["the provider times out", () => Promise.reject(new DOMException("timed out", "TimeoutError"))],
     ["the answer isn't JSON", () => Promise.resolve(new Response("<html>"))],

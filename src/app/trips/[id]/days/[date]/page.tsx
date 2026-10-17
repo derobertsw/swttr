@@ -34,6 +34,7 @@ import { DayAccessPoint } from "@/components/trips/DayAccessPoint";
 import { DayDrive, useDriveEstimates } from "@/components/trips/DriveEstimate";
 import { DayTourPlan } from "@/components/trips/TourPlan";
 import { DayConditions } from "@/components/trips/DayConditions";
+import { DayEquipment } from "@/components/trips/TouringEquipment";
 import { TOUR_ACTIVITY } from "@/lib/trip-activities";
 import { accessPointFor } from "@/lib/trip-location";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
@@ -237,6 +238,8 @@ export default function DayDetailPage({
                 <MemberKitRow tripId={id} date={date} member={me} kit={myKit} editable onSaved={refresh} />
               </section>
             ))}
+
+            {me && activity === TOUR_ACTIVITY && <DayEquipment tripId={id} gear={data.gear} memberId={me.id} />}
 
             <DayTourPlan
               data={data}

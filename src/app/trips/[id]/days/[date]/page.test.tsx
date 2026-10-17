@@ -17,6 +17,7 @@ import { previewItinerary } from "@/lib/trip-itinerary";
 import { planDayKits } from "@/lib/trip-saved-kits";
 import { buildLodging } from "@/lib/trip-lodging";
 import { buildTourPlanSummary } from "@/lib/trip-tour-plans";
+import { buildTouringEquipment } from "@/lib/touring-equipment";
 import type { TripDay, TripFull, TripItineraryRequest, TripLocation, TripMember, TripMemberDayKit, TripTourPlan } from "@/types/trips";
 import { savedOutfit, savedPlan } from "@/test/savedKit";
 import DayDetailPage from "./page";
@@ -783,6 +784,96 @@ describe("Trip day page", () => {
       await renderPage();
       await screen.findByRole("heading", { name: "My kit" });
       expect(screen.queryByRole("heading", { name: "Copy this day" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("My equipment (#212)", () => {
+    const tourDay: TripDay = { ...DAY, activity: "Backcountry" };
+    const EQUIPMENT = "GET /api/v1/trips/trip-1/pack/equipment";
+    const version = "fd037a5d-b4d4-4b2e-8d6a-624ca9c8503b";
+    const equipment = (saved: Parameters<typeof buildTouringEquipment>[0]["saved"], editable = true) =>
+      buildTouringEquipment({ dates: [DAY.date], saved, names: [], editable });
+    const trip = (day: TripDay) => reply(200, tripFull({
+      stops: [STOWE_STOP], days: [day], members: [ORGANIZER, SAM],
+      gear: [
+        { id: "gear-1", trip_id: TRIP.id, description: "Group shelter", assignee_member_id: ORGANIZER.id, sort_order: 0, created_at: "" },
+        { id: "gear-2", trip_id: TRIP.id, description: "Stove", assignee_member_id: SAM.id, sort_order: 1, created_at: "" },
+      ],
+    }));
+
+    it("shows what's packed for the trip from the packing list, and the shared items assigned to you", async () => {
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": trip(tourDay),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        [EQUIPMENT]: reply(200, {
+          equipment: equipment({ transceiver: { status: "added", quantity: 1 }, probe: { status: "added", quantity: 2 } }),
+          checks: { "equipment:transceiver": { packed: true, quantity: 1, version } },
+        }),
+      }));
+      await renderPage();
+      const section = (await screen.findByRole("heading", { name: "My equipment" })).closest("section")!;
+      const rows = await within(section).findAllByRole("listitem");
+      expect(rows.map((row) => row.textContent)).toEqual([
+        "Avalanche transceiverPacked", "Avalanche probe ×2Not packed yet", "Group shelterAssigned",
+      ]);
+      // No checkbox here: packing is checked on the packing list.
+      expect(within(section).queryByRole("checkbox")).not.toBeInTheDocument();
+      expect(within(section).getByRole("link", { name: "Open my packing list" })).toHaveAttribute("href", "/trips/trip-1/pack");
+      expect(within(section).getByRole("link", { name: "Open shared gear" })).toHaveAttribute("href", "/trips/trip-1/gear");
+      expect(within(section).queryByText("Stove")).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "My equipment" }).compareDocumentPosition(screen.getByRole("heading", { name: "Tour plan" }))
+        & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("adds touring equipment from the day", async () => {
+      const api = fakeTripApi({
+        "GET /api/v1/trips/trip-1": trip(tourDay),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        [EQUIPMENT]: reply(200, { equipment: equipment({}), checks: {} }),
+        "POST /api/v1/trips/trip-1/pack": reply(200, { manual: [], quantities: {}, checks: {}, equipment: {
+          transceiver: { status: "added", quantity: 1 }, probe: { status: "added", quantity: 1 },
+          shovel: { status: "added", quantity: 1 }, skins: { status: "added", quantity: 1 },
+        } }),
+      });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      await renderPage();
+      expect(await screen.findByText("No touring equipment in your packing list yet.")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Add touring equipment" }));
+      const dialog = await screen.findByRole("dialog", { name: "Touring equipment" });
+      await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(sentBodies(api, "POST /api/v1/trips/trip-1/pack")).toEqual([{ op: "add_equipment", ids: ["transceiver", "probe", "shovel", "skins"] }]);
+      const section = screen.getByRole("heading", { name: "My equipment" }).closest("section")!;
+      expect(within(section).getAllByText("Not packed yet")).toHaveLength(4);
+    });
+
+    it("says when it can't load, and retries", async () => {
+      let attempt = 0;
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": trip(tourDay),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        [EQUIPMENT]: () => ++attempt === 1 ? reply(500, { error: "Database unavailable" })
+          : reply(200, { equipment: equipment({ shovel: { status: "added", quantity: 1 } }), checks: {} }),
+      }));
+      const user = userEvent.setup();
+      await renderPage();
+      const section = (await screen.findByRole("heading", { name: "My equipment" })).closest("section")!;
+      expect(await within(section).findByRole("alert")).toHaveTextContent("Couldn't load your touring equipment.Database unavailable");
+      await user.click(within(section).getByRole("button", { name: "Retry" }));
+      expect(await within(section).findByText("Avalanche shovel")).toBeInTheDocument();
+    });
+
+    it("isn't shown on a day that isn't Backcountry", async () => {
+      const api = fakeTripApi({
+        "GET /api/v1/trips/trip-1": trip({ ...DAY, activity: "Alpine" }),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      });
+      vi.stubGlobal("fetch", api);
+      await renderPage();
+      await screen.findByRole("heading", { name: "My kit" });
+      expect(screen.queryByRole("heading", { name: "My equipment" })).not.toBeInTheDocument();
+      expect(sentBodies(api, EQUIPMENT)).toEqual([]);
     });
   });
 

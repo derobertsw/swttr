@@ -14,7 +14,9 @@ import { BODY_PART_LABELS, LAYER_LABELS } from "@/lib/layers";
 import { BODY_PART_ORDER, LAYER_TYPE_ORDER, type PackingListData } from "@/lib/packingList";
 import { MAX_NAME, MAX_QUANTITY } from "@/lib/trip-packing";
 import { cn } from "@/lib/utils";
-import type { PackingChecks, PackingChecklist, PackingItem, PackingManualItem, PackingRemovedItem } from "@/types/trip-packing";
+import type {
+  PackingChecks, PackingChecklist, PackingEquipmentItem, PackingItem, PackingManualItem, PackingRemovedItem, TouringEquipment,
+} from "@/types/trip-packing";
 
 type CheckControls = {
   checks: PackingChecks;
@@ -262,6 +264,75 @@ export function ManualItems({ items, editable, busy, onAdd, onQuantity, onRemove
         </form>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">Your own items can&apos;t be changed right now. Try again later.</p>
+      )}
+    </Card>
+  );
+}
+
+/** "Sat Oct 10, Sun Oct 11", or what to say when the plan has no Backcountry days. */
+function touringDaysLabel(dates: string[]): string {
+  return dates.length > 0
+    ? `For your Backcountry days: ${dates.map(packingDay).join(", ")}.`
+    : "No Backcountry days in the plan now.";
+}
+
+/**
+ * The touring equipment the person added from the template (#212), checked
+ * like everything else in their list.
+ */
+export function EquipmentItems({ equipment, busy, onQuantity, onRemove, onAdd, checks, onCheck }: CheckControls & {
+  equipment: TouringEquipment;
+  busy: ReadonlySet<string>;
+  onQuantity: (item: PackingEquipmentItem, quantity: number) => void;
+  onRemove: (item: PackingEquipmentItem) => void;
+  /** Opens the template. */
+  onAdd: () => void;
+}) {
+  const { items, editable } = equipment;
+  return (
+    <Card>
+      <p className="text-sm text-muted-foreground">{touringDaysLabel(equipment.dates)}</p>
+      {items.length > 0 ? (
+        <ul className="mt-2 flex flex-col divide-y divide-border">
+          {items.map((item) => (
+            <li key={item.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 last:pb-0">
+              <div className="flex min-w-0 flex-1 basis-40 items-start gap-1">
+                {editable && <PackingCheck itemKey={item.key} name={item.name} quantity={item.quantity} checks={checks} busy={busy.has(item.key)} onCheck={onCheck} />}
+                <div className="min-w-0 self-center">
+                  <p className="break-words text-base font-medium text-foreground">{item.name}</p>
+                  <details className="text-sm text-muted-foreground">
+                    <summary className="inline-flex min-h-11 cursor-pointer items-center underline underline-offset-2">
+                      What it&apos;s for<span className="sr-only">: {item.name}</span>
+                    </summary>
+                    <p className="pb-1">{item.purpose}</p>
+                  </details>
+                </div>
+              </div>
+              {editable ? (
+                <div className="ml-auto flex items-center gap-1">
+                  <QuantityStepper name={item.name} value={item.quantity} busy={busy.has(item.key)} onChange={(next) => onQuantity(item, next)} />
+                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${item.name} from your list`}
+                    aria-disabled={busy.has(item.key) || undefined}
+                    onClick={() => { if (!busy.has(item.key)) onRemove(item); }}>
+                    <X aria-hidden="true" />
+                  </Button>
+                </div>
+              ) : item.quantity > 1 && <span className="text-base text-foreground">×{item.quantity}</span>}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-base text-foreground">
+          Nothing added yet. Add the touring equipment you&apos;re bringing, like your transceiver, probe and shovel.
+        </p>
+      )}
+      {editable ? (
+        <Button type="button" variant="outline" className="mt-3" onClick={onAdd}>
+          <Plus aria-hidden="true" />
+          {items.length > 0 ? "Add more touring equipment" : "Add touring equipment"}
+        </Button>
+      ) : (
+        <p className="mt-3 text-sm text-muted-foreground">Touring equipment can&apos;t be changed right now. Try again later.</p>
       )}
     </Card>
   );
