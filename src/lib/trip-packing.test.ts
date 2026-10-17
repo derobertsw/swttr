@@ -252,6 +252,9 @@ describe("parsePackingChange", () => {
     [{ op: "remove_item", id }, { op: "remove_item", id }],
     [{ op: "quantity", key: "item:g-1", quantity: 1 }, { op: "quantity", key: "item:g-1", quantity: 1 }],
     [{ op: "acknowledge", kits: { a: "2026-10-08T01:00:00Z" } }, { op: "acknowledge", kits: { a: "2026-10-08T01:00:00Z" } }],
+    [{ op: "add_equipment", ids: ["probe", "shovel", "probe"] }, { op: "add_equipment", ids: ["probe", "shovel"] }],
+    [{ op: "equipment_quantity", id: "probe", quantity: 2 }, { op: "equipment_quantity", id: "probe", quantity: 2 }],
+    [{ op: "remove_equipment", id: "ski_crampons" }, { op: "remove_equipment", id: "ski_crampons" }],
   ])("accepts %j", (body, expected) => {
     expect(parsePackingChange(body)).toEqual(expected);
   });
@@ -267,6 +270,12 @@ describe("parsePackingChange", () => {
     { op: "quantity", key: "", quantity: 2 },
     { op: "acknowledge", kits: { a: "yesterday" } },
     { op: "acknowledge", kits: [] },
+    { op: "add_equipment", ids: [] },
+    { op: "add_equipment", ids: "probe" },
+    { op: "add_equipment", ids: ["probe", 2] },
+    { op: "add_equipment", ids: Array.from({ length: 21 }, (_, index) => `item_${index}`) },
+    { op: "equipment_quantity", id: "probe", quantity: 0 },
+    { op: "remove_equipment", id: "../probe" },
   ])("refuses %j", (body) => {
     expect(typeof parsePackingChange(body)).toBe("string");
   });

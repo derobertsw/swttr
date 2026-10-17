@@ -23,6 +23,7 @@ A trip's **What to pack** page (`/trips/:id/pack`) lists what the signed-in memb
 - **Older checklists.** A day kit with category slots (shell, gloves) but no saved outfit is listed under Older day checklists. It names no particular items, so it isn't in the list, and no garment identity or thermal value is invented for it.
 - **Days to review.** Days without a saved outfit, days with an older checklist and saved outfits that no longer fit come first, each with a link to the day. A partial list never claims to be complete.
 - **Packing checks** (#171) persist privately for the signed-in person and trip; see the decisions below.
+- **Touring equipment** (#212) joins the list from a template on Backcountry days, under its own keys (`equipment:<id>`), and is checked the same way; see [trip-touring-prep.md](trip-touring-prep.md).
 
 ## How it works
 

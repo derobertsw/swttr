@@ -439,7 +439,11 @@ function kit(day: string, member: TripMember, outfit: SavedKit | null, items: st
 }
 
 /** A three-day trip at Stowe with the organizer and Ana, and a database client with `packing` rows and an rpc. */
-function mockKitTrip(options: { kits?: TripMemberDayKit[]; userId?: string; packing?: Record<string, unknown>[]; packingError?: boolean } = {}) {
+function mockKitTrip(options: {
+  kits?: TripMemberDayKit[]; userId?: string; packing?: Record<string, unknown>[]; packingError?: boolean;
+  /** Before migration 032: reading the equipment column fails. */
+  noEquipmentColumn?: boolean;
+} = {}) {
   const dates = ["2026-10-10", "2026-10-11", "2026-10-12"];
   const full: TripFull = {
     trip: { id: "trip-1", owner_user_id: "user-1", name: "Stowe", start_date: dates[0], end_date: dates[2], status: "planning", created_at: "", updated_at: "" },
@@ -449,10 +453,15 @@ function mockKitTrip(options: { kits?: TripMemberDayKit[]; userId?: string; pack
   };
   const fake = createFakeSupabase({ trip_member_packing: options.packing ?? [] });
   const rpc = vi.fn().mockResolvedValue({ data: { items: [], quantities: {} }, error: null });
+  const failing = (code: string) => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { code, message: "missing" } }) }) });
   const supabase = {
-    from: (table: string) => table === "trip_member_packing" && options.packingError
-      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { code: "42P01", message: "missing" } }) }) }) }
-      : fake.from(table),
+    from: (table: string) => {
+      if (table === "trip_member_packing" && options.packingError) return { select: () => failing("42P01") };
+      if (table === "trip_member_packing" && options.noEquipmentColumn) {
+        return { select: (columns: string) => columns.includes("equipment") ? failing("42703") : fake.from(table).select() };
+      }
+      return fake.from(table);
+    },
     rpc,
   };
   vi.mocked(loadTripFull).mockResolvedValue(full);
@@ -577,6 +586,57 @@ describe("GET /api/v1/trips/[id]/pack from saved outfits", () => {
   });
 });
 
+describe("GET /api/v1/trips/[id]/pack touring equipment", () => {
+  const originalFetch = global.fetch;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-08T12:00Z"));
+    vi.mocked(fetchUserWardrobeItems).mockResolvedValue([]);
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () =>
+      forecastFixture("America/New_York", "2026-10-08T04:00Z", 120, () => -4) });
+  });
+  afterEach(() => { global.fetch = originalFetch; vi.restoreAllMocks(); });
+
+  /** Alpine, then Backcountry, then a day with no activity of its own at a Backcountry-first stop. */
+  const touringTrip = (options: Parameters<typeof mockKitTrip>[0] = {}) => {
+    const mocked = mockKitTrip(options);
+    mocked.full.stops[0].activities = ["Backcountry", "Alpine"];
+    mocked.full.days[1].activity = "Backcountry";
+    mocked.full.days[2].activity = null;
+    return mocked;
+  };
+
+  it("lists the person's equipment for the Backcountry days, with the template as their list stands", async () => {
+    touringTrip({ packing: [{ trip_member_id: ORGANIZER.id, items: [{ id: "0b4b6a7e-9c1d-4f53-a8b2-2f6c1d9e7a10", name: "shovel", quantity: 1 }],
+      quantities: {}, equipment: { transceiver: { status: "added", quantity: 2 }, probe: { status: "removed", quantity: 1 }, rope: { status: "added", quantity: 1 } } }] });
+    const { equipment }: TripPackResponse = await (await getPack()).json();
+    expect(equipment.dates).toEqual(["2026-10-11", "2026-10-12"]);
+    expect(equipment.editable).toBe(true);
+    // Only the template's items: an unknown id isn't listed.
+    expect(equipment.items).toEqual([expect.objectContaining({ id: "transceiver", key: "equipment:transceiver", name: "Avalanche transceiver", quantity: 2 })]);
+    const states = Object.fromEntries(equipment.template.map((option) => [option.id, [option.state, option.listedAs]]));
+    expect(states).toMatchObject({
+      transceiver: ["added", undefined], probe: ["removed", undefined], shovel: ["listed", "shovel"], skins: ["available", undefined],
+    });
+  });
+
+  it("says when the plan has no Backcountry days, and shows the equipment the person added anyway", async () => {
+    mockKitTrip({ packing: [{ trip_member_id: ORGANIZER.id, items: [], quantities: {}, equipment: { shovel: { status: "added", quantity: 1 } } }] });
+    const { equipment }: TripPackResponse = await (await getPack()).json();
+    expect(equipment.dates).toEqual([]);
+    expect(equipment.items.map((item) => item.id)).toEqual(["shovel"]);
+  });
+
+  it("reads the rest of the list before migration 032, and offers no equipment changes", async () => {
+    const manual = [{ id: "0b4b6a7e-9c1d-4f53-a8b2-2f6c1d9e7a10", name: "Headlamp", quantity: 1 }];
+    touringTrip({ noEquipmentColumn: true, packing: [{ trip_member_id: ORGANIZER.id, items: manual, quantities: {} }] });
+    const data: TripPackResponse = await (await getPack()).json();
+    expect(data.editable).toBe(true);
+    expect(data.manual).toEqual(manual);
+    expect(data.equipment).toMatchObject({ editable: false, items: [], dates: ["2026-10-11", "2026-10-12"] });
+  });
+});
+
 describe("POST /api/v1/trips/[id]/pack", () => {
   beforeEach(() => { vi.clearAllMocks(); });
   const id = "0b4b6a7e-9c1d-4f53-a8b2-2f6c1d9e7a10";
@@ -586,7 +646,7 @@ describe("POST /api/v1/trips/[id]/pack", () => {
     rpc.mockResolvedValueOnce({ data: { items: [{ id, name: "Headlamp", quantity: 2 }], quantities: { "item:g-1": 3 } }, error: null });
     const response = await postPack({ op: "add_item", id, name: " Headlamp ", quantity: 2 });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ manual: [{ id, name: "Headlamp", quantity: 2 }], quantities: { "item:g-1": 3 }, checks: {} });
+    expect(await response.json()).toEqual({ manual: [{ id, name: "Headlamp", quantity: 2 }], quantities: { "item:g-1": 3 }, checks: {}, equipment: {} });
     expect(rpc).toHaveBeenCalledWith("update_trip_packing", { p_trip_id: "trip-1", p_user_id: "user-1", p_op: { op: "add_item", id, name: "Headlamp", quantity: 2 } });
   });
 
@@ -631,6 +691,35 @@ describe("POST /api/v1/trips/[id]/pack", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it("adds template equipment once each and returns the saved equipment", async () => {
+    const { rpc } = mockKitTrip();
+    rpc.mockResolvedValueOnce({ data: { items: [], quantities: {}, checks: {}, equipment: { transceiver: { status: "added", quantity: 1 } } }, error: null });
+    const response = await postPack({ op: "add_equipment", ids: ["transceiver", "transceiver"] });
+    expect(response.status).toBe(200);
+    expect((await response.json()).equipment).toEqual({ transceiver: { status: "added", quantity: 1 } });
+    expect(rpc).toHaveBeenCalledWith("update_trip_packing", { p_trip_id: "trip-1", p_user_id: "user-1", p_op: { op: "add_equipment", ids: ["transceiver"] } });
+  });
+
+  it.each([
+    { op: "add_equipment", ids: ["transceiver", "rope"] },
+    { op: "equipment_quantity", id: "rope", quantity: 2 },
+    { op: "remove_equipment", id: "rope" },
+    { op: "add_equipment", ids: [] },
+    { op: "remove_equipment", id: "Transceiver!" },
+  ])("refuses equipment that isn't the template's %j", async (change) => {
+    const { rpc } = mockKitTrip();
+    expect((await postPack(change)).status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("says equipment can't be saved yet before migration 032", async () => {
+    const { rpc } = mockKitTrip();
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "22023", message: "Invalid change" } });
+    const response = await postPack({ op: "equipment_quantity", id: "probe", quantity: 2 });
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toMatch(/can't be saved yet/);
+  });
+
   it("preserves the trip authorization error", async () => {
     vi.mocked(requireTripAccess).mockResolvedValue(NextResponse.json({ error: "Not found" }, { status: 404 }));
     expect((await postPack({ op: "remove_item", id })).status).toBe(404);
@@ -666,6 +755,18 @@ describe("Private packing check API", () => {
     const { rpc } = mockKitTrip();
     expect((await postPack(body({ key: `manual:${mutation}`, kits: {} }))).status).toBe(200);
     expect(rpc).toHaveBeenCalledWith("update_trip_packing", expect.objectContaining({ p_op: expect.objectContaining({ aliases: [] }) }));
+  });
+
+  it("allows template equipment through to the transaction's check, and refuses other equipment keys", async () => {
+    const { rpc } = mockKitTrip();
+    expect((await postPack(body({ key: "equipment:transceiver", kits: {} }))).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("update_trip_packing", expect.objectContaining({
+      p_op: expect.objectContaining({ key: "equipment:transceiver", aliases: [] }) }));
+    rpc.mockClear();
+    for (const key of ["equipment:rope", "equipment:", "equipment:transceiver:x"]) {
+      expect((await postPack(body({ key, kits: {} }))).status).toBe(404);
+    }
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("refuses an outfit revision that changed before the request and maps transaction conflicts", async () => {
