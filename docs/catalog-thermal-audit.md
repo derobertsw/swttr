@@ -1,6 +1,6 @@
 # Gear catalog thermal audit (2026-10-17)
 
-This audit checks the gear catalog's thermal values for internal consistency. It is research only. Nothing was written to production, no migration was applied, and the corrected fixtures used for the golden runs were thrown away afterwards.
+This audit checks the gear catalog's thermal values for internal consistency. The audit itself was research only: nothing was written to production, and the corrected fixtures used for its golden runs were thrown away afterwards. On 2026-10-17 option C was chosen. Migration 034 implements it, and it has not been applied to production yet (see "Applying migration 034").
 
 ## Summary
 
@@ -8,7 +8,7 @@ This audit checks the gear catalog's thermal values for internal consistency. It
 2. **Light synthetic insulation scale.** The lab-tested Nano-Air Hoody (torso 2.34 clo) and the derived Atom LT, Micro Puff and Odin Light (1.10–1.15) have about the same fill, but they sit on two different scales. Base layers and fleece follow the lab scale. Shells, insulated outerwear and most puffies follow a scale roughly 0.25–0.5× of it. The ensemble model and the targets assume the lab scale, but the IREQ side leaves out the wind-and-motion correction that would make lab values usable for active sports. Recalibrating only the puffies makes things less consistent, not more. The coherent fix is a separate calibration project.
 3. **Usage and coverage.** 89 of 100 garments have `usage` and all three `coverage_*` fractions unreviewed (NULL), with the same semantics as migration 022. Nothing in recommendation selection reads them yet, so there is no behavior change today, but they block #247 and #248.
 
-**Recommendation:** fix the whole-body values now (Option B below). Don't recalibrate the puffies on their own. Open a calibration issue that covers the scale and the wind-and-motion correction together.
+**Decision (2026-10-17): option C.** Fix the whole-body values and recalibrate the 16 puffies to the lab scale. `supabase/migrations/034_catalog_whole_body_and_puffy_clo.sql` does both. The golden fixture and snapshots carry the same values, and `catalog-thermal-audit.database.test.ts` checks the migration against the fixture. The audit had recommended option B (whole-body only). The rest of the calibration — shells, insulated outerwear and the wind-and-motion correction — is still open, and so are the inversions option C introduces (see "Decision and what's still open").
 
 ## How this was checked
 
@@ -41,9 +41,9 @@ The three `lab_tested` rows are in the last group: Nano-Air 1.65 vs 1.68, DAS Pa
 - The API's per-garment `rcl`/`recl`, and the clo shown in the wardrobe (`getClo`, `GarmentDetails`).
 - Not used by alpine, by XC (both use the regional search), by the comfort score (regional), or by `hasUsableThermalData`, which only checks that a number is present. All 100 rows have one.
 
-### Proposed correction (Option B)
+### Whole-body correction (migration 034, step 2)
 
-Rule: for every garment whose stored whole-body value differs from the formula by more than 0.02 clo (or 0.5 m²Pa/W for Ret), store the formula value rounded to two decimals the way Postgres `ROUND` does. Regional values are untouched. That gives 58 rows: 54 clo and 43 Ret changes. Rows are sorted by the size of the clo change.
+Rule: for every garment whose stored whole-body value differs from the formula by more than 0.02 clo (or 0.5 m²Pa/W for Ret), store the formula value rounded to two decimals the way Postgres `ROUND` does. That gives 58 rows: 54 clo and 43 Ret changes. Rows are sorted by the size of the clo change. The table shows the values from the current regional values. For the 16 puffies, step 1 of the migration re-derives the regional values first, so their final whole-body values are the ones in "Puffy recalibration" below.
 
 | Garment | Category | Seeded in | Torso / arms / legs clo | Whole-body clo | Whole-body Ret | Pattern | In fixture |
 |---|---|---|---|---|---|---|---|
@@ -158,9 +158,15 @@ The seed's calibration rows have a problem of their own. Four of them are the sa
 
 **Conclusion.** The lab Nano-Air value is the right number for that garment. The targets are consistent with the lab scale for low-output alpine. Running, biking and ski touring only look right because the catalog's low scale is standing in for the missing correction. No single catalog scale is consistent with every sport until the model gains that correction.
 
-### Proposed recalibration (Option C only)
+### Puffy recalibration
 
-These are the values used for the "B" golden run: every puffy on the lab curve, with Ret scaled by the same factor as clo so each garment keeps its permeability index. Confidence is low wherever the fill weight isn't published. This table is the input to a calibration project, not a migration on its own.
+Step 1 of migration 034 applies these values, the same ones used for the "B" golden run. Every puffy goes on the lab curve, with Ret scaled by the same factor as clo so each garment keeps its permeability index. The two lab rows keep their regional values. Each of the 14 re-derived rows also gets:
+
+- `data_source` pointing at this section;
+- `uncertainty_clo` of 0.3 where the fill weight is published, or 0.6 where it is unpublished or estimated;
+- for the low-confidence rows, `confidence_score` capped at 0.5.
+
+A row changes only while it still has the torso and arms clo it had at audit time, so a value edited by hand since is left alone.
 
 | Garment | Torso / arms clo now | Proposed torso / arms | Proposed Ret torso / arms | Whole-body clo / Ret | Basis | Confidence | In fixture |
 |---|---|---|---|---|---|---|---|
@@ -261,7 +267,39 @@ All 62 failures are snapshot mismatches. Every invariant assertion still passes 
 
 - **A. Leave as is.** No work. Whole-body numbers stay inconsistent: wardrobe shows Macro Puff at 1.58 clo and Atom LT at 1.10, where their own regional values give 1.19 and 0.83. Running, biking and ski touring keep budgeting with values off by up to 0.5 clo, and the puffies keep their 2× spread at equal fill.
 - **B. Fix whole-body only (recommended).** One hand-applied migration for the 58 rows in section 1, plus the same values in the fixture and a reviewed snapshot update. This removes a clear data error without changing the calibration. Golden impact is limited to 13 running, biking and ski-touring scenarios, mostly small; alpine and XC are unchanged. The shell-pick sensitivity (item 4 above) shows up in review and may deserve its own fix.
-- **C. Fix whole-body and recalibrate the puffies to the lab scale.** Section 2's 16-row table on top of B. It makes the puffies consistent with each other and with the measured Nano-Air. But it widens the split between puffies and the rest of the catalog: puffy plus wind shell beats insulated jackets. It doesn't help alpine scores, because legs still bind. And it makes air-permeable puffies look warmer in wind than they are. I'd only do it inside a calibration project that also moves shells and outerwear to the T21-03 scale and adds the ISO 9920 dynamic correction to the model, with its own golden review.
+- **C. Fix whole-body and recalibrate the puffies to the lab scale (chosen 2026-10-17).** Section 2's 16-row table on top of B. It makes the puffies consistent with each other and with the measured Nano-Air. But it widens the split between puffies and the rest of the catalog: puffy plus wind shell beats insulated jackets. It doesn't help alpine scores, because legs still bind. And it makes air-permeable puffies look warmer in wind than they are. I'd only do it inside a calibration project that also moves shells and outerwear to the T21-03 scale and adds the ISO 9920 dynamic correction to the model, with its own golden review.
+
+## Decision and what's still open
+
+Option C was chosen on 2026-10-17. Migration 034 uses variant B's values, and the golden snapshots updated with it reproduce the B run in "Golden-test impact" exactly: 30 of 60 scenarios change, and no invariant fails. What it leaves open:
+
+- **Puffies now out-insulate insulated outerwear.** Micro Puff (2.45 torso) is warmer than Firefall/2 (1.50), and alpine picks a puffy plus a wind shell over an insulated parka at 25°F and 18°F. Insulated jackets and pants, and shells, are still on the low scale.
+- **Alpine scores don't improve**, because legs (insulated pants, still on the low scale) bind.
+- **Air-permeable puffies look warmer in wind than they are.** The lab values are static, and `ireq.ts` has no wind/motion correction.
+- **The rest of the calibration.** Shells and insulated outerwear still need to move to T21-03 values, and the model needs ISO 9920's dynamic correction. That needs its own golden review (see variant C), plus items 1, 2 and 4 under "Other things found".
+
+## Applying migration 034
+
+Migrations are applied by hand in the Supabase SQL editor. 034 doesn't depend on 033 (PR #310), so either can go first. Paste this as one script:
+
+```sql
+BEGIN;
+-- contents of supabase/migrations/034_catalog_whole_body_and_puffy_clo.sql
+INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('034', 'catalog_whole_body_and_puffy_clo');
+COMMIT;
+```
+
+Then check it:
+
+```sql
+SELECT
+  count(*) FILTER (WHERE abs(rcl_whole_body - (0.5 * coalesce(rcl_torso, 0) + 0.25 * coalesce(rcl_arms, 0) + 0.25 * coalesce(rcl_legs, 0))) > 0.02) AS clo_off_weighting,
+  count(*) FILTER (WHERE abs(recl_whole_body - (0.5 * coalesce(recl_torso, 0) + 0.25 * coalesce(recl_arms, 0) + 0.25 * coalesce(recl_legs, 0))) > 0.5) AS ret_off_weighting,
+  count(*) FILTER (WHERE data_source = 'docs/catalog-thermal-audit.md#puffy-recalibration') AS recalibrated_puffies
+FROM garment_thermal_properties;
+```
+
+Expect 0, 0 and 14. Garments added after 2026-10-17 can add to the first two counts.
 
 ## Sources
 
@@ -282,7 +320,3 @@ All 62 failures are snapshot mismatches. Every invariant assertion still passes 
   - Neutrino Pro 212 g 800FP — [Trekkit](https://trekkit.in/rab-neutrino-pro-down-jacket.html)
   - Firefall/2 100 / 80 g/m² — [evo](https://www.evo.com/products/175709-mountain-hardwear-firefall-2-insulated-jacket)
 - Code: `src/lib/biophysics/constants.ts` (`REGIONAL_WEIGHTS`, `ENSEMBLE_REGRESSION`), `src/lib/biophysics/ensemble.ts`, `src/lib/biophysics/ireq.ts`, `src/lib/biophysics/targets.ts`, `src/lib/recommendations/sorting.ts`, `src/lib/recommendations/sports/breathable-ensemble.ts`, `src/lib/recommendations/sports/ski-touring.ts`, `src/lib/recommendations/sports/running-protection.ts`, `src/lib/recommendations/garment-semantics.ts`; `supabase/migrations/002_seed_garments.sql`, `009_fix_arm_clo_values.sql`, `022_running_xc_clothing_semantics.sql`.
-
-## Decision needed
-
-Which option should go ahead: **A** (leave as is), **B** (whole-body fix only, then a separate calibration issue), or **C** (whole-body fix plus puffy recalibration)?
