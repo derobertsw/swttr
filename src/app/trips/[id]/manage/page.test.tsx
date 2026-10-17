@@ -15,6 +15,8 @@ const ALEX: TripMember = {
   invite_token: null,
 };
 
+vi.mock("@/hooks/useUserId", () => ({ useUserId: () => "user-1" }));
+
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 // These tests cover the page, not the app chrome around it.
@@ -55,7 +57,7 @@ describe("Manage crew page", () => {
 
     const nameInput = await screen.findByPlaceholderText("Display name");
     await user.type(nameInput, "Sam");
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Create invite link" }));
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith("Couldn't add Sam", {
@@ -89,6 +91,27 @@ describe("Manage crew page", () => {
     );
     expect(screen.getByRole("dialog", { name: "Remove Sam from trip" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Remove Sam" })).toBeEnabled();
+  });
+
+  it.each([
+    { status: "guest", token: null, effect: null },
+    { status: "invited", token: "invite-sam", effect: "disable their pending invitation link" },
+    { status: "invited", token: null, effect: null },
+    { status: "joined", token: null, effect: "remove their trip access and disable any invitation link" },
+    { status: "left", token: null, effect: null },
+  ] as const)("describes actual removal effects for $status with token $token", async ({ status, token, effect }) => {
+    const member: TripMember = { ...SAM, status, invite_token: token };
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull({ members: [ORGANIZER, member] })),
+    }));
+    await renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Remove Sam" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Remove Sam from trip" }));
+    expect(dialog.getByText("delete their kits for this trip")).toBeInTheDocument();
+    expect(dialog.getByText("delete their saved packing checks for this trip")).toBeInTheDocument();
+    if (effect) expect(dialog.getByText(effect)).toBeInTheDocument();
+    else expect(dialog.queryByText(/trip access|invitation link/)).not.toBeInTheDocument();
+    if (status !== "joined") expect(dialog.queryByText(/trip access/)).not.toBeInTheDocument();
   });
 
   describe("the remove dialog", () => {
@@ -247,5 +270,39 @@ describe("Manage crew page", () => {
       await waitFor(() => expect(screen.queryByText("Sam")).not.toBeInTheDocument());
       expect(screen.getByRole("heading", { name: "Manage crew" })).toHaveFocus();
     });
+  });
+});
+
+describe("Invitation controls", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("distinguishes joined people, pending links and managed guests and revokes without removing", async () => {
+    let sam = { ...SAM };
+    const fetchMock = fakeTripApi({
+      "GET /api/v1/trips/trip-1": () => reply(200, tripFull({ members: [ORGANIZER, sam, ALEX], crew_counts: { joined: 1, pending: 1, guests: 1 } })),
+      "PATCH /api/v1/trips/trip-1/members/member-sam": (body) => {
+        expect(body).toEqual({ invite_action: "revoke", invite_token: "invite-sam" });
+        sam = { ...sam, invite_token: null };
+        return reply(200, { member: sam });
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await renderPage();
+    expect(await screen.findByText("1 joined · 1 pending invitation · 1 managed guest")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
+    expect(screen.getByText(/No message is sent/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Revoke link" }));
+    expect(await screen.findByRole("button", { name: "Create new link" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove Sam" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy link" })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
+  });
+
+  it("explains an account-free managed guest before adding one", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": reply(200, tripFull()) }));
+    await renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Managed guest" }));
+    expect(screen.getByText("A guest has no account or trip access. The organizer manages their kits and gear.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add guest" })).toBeInTheDocument();
   });
 });

@@ -23,6 +23,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   try {
     const full = await loadTripFull(supabase, auth.trip);
     if (!full) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (auth.userId !== auth.trip.owner_user_id) {
+      full.members = full.members.map((m) => ({ ...m, invite_token: null }));
+    }
     return NextResponse.json(full);
   } catch {
     return NextResponse.json({ error: "Couldn't load the trip. Try again." }, { status: 500 });

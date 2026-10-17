@@ -11,6 +11,7 @@ import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   BackLink,
+  formatCrewCounts,
   InviteLinkButton,
   MemberAvatar,
   SectionLabel,
@@ -20,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
+import { useUserId } from "@/hooks/useUserId";
 import { useTrip } from "@/hooks/useTrip";
 import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import type { TripMember } from "@/types/trips";
@@ -34,6 +36,9 @@ function removeButtonId(memberId: string) {
 export default function ManageCrewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data, loading, error, refresh } = useTrip(id);
+  const userId = useUserId();
+  const canManage = !!data && data.trip.owner_user_id === userId;
+  const [changingLink, setChangingLink] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"invite" | "guest">("invite");
@@ -76,6 +81,20 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
     } finally {
       setAdding(false);
     }
+  };
+
+  const changeLink = async (member: TripMember, action: "revoke" | "replace") => {
+    setChangingLink(member.id);
+    try {
+      await tripRequest(`/api/v1/trips/${id}/members/${member.id}`, "PATCH", {
+        invite_action: action, invite_token: member.invite_token,
+      });
+      toast.success(action === "revoke" ? "Invite link revoked" : "New invite link created");
+      await refresh();
+    } catch (err) {
+      toast.error("Couldn't change the invite link", { description: errorMessage(err) });
+      await refresh();
+    } finally { setChangingLink(null); }
   };
 
   const remove = async () => {
@@ -123,6 +142,8 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
 
         {data && (
           <>
+            {data.crew_counts && <p className="text-sm text-muted-foreground">{formatCrewCounts(data.crew_counts)}</p>}
+            {!canManage && <p className="text-sm text-muted-foreground">The organizer manages invitations and guests.</p>}
             <div className="flex flex-col gap-2">
               {data.members.map((m) => (
                 <Card key={m.id}>
@@ -144,18 +165,22 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
                         {m.display_name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {m.role} · {m.status === "left" ? "left" : m.status}
+                        {m.role} · {m.status === "guest" ? "organizer-managed guest" : m.status === "invited" ? m.invite_token || !canManage ? "invitation pending" : "invitation pending · link revoked" : m.status}
                       </p>
                     </div>
-                    <div className="ml-auto flex items-center gap-1.5">
-                      {m.status === "invited" && m.invite_token && (
+                    <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                      {canManage && m.status === "invited" && m.invite_token && (
                         <InviteLinkButton
                           token={m.invite_token}
                           recipientName={m.display_name}
                           tripName={data.trip.name}
                         />
                       )}
-                      {m.role !== "organizer" && (
+                      {canManage && m.status === "invited" && <>
+                        {m.invite_token && <Button variant="outline" size="sm" disabled={changingLink === m.id} onClick={() => changeLink(m, "revoke")}>Revoke link</Button>}
+                        <Button variant="outline" size="sm" disabled={changingLink === m.id} onClick={() => changeLink(m, "replace")}>{m.invite_token ? "Replace link" : "Create new link"}</Button>
+                      </>}
+                      {canManage && m.role !== "organizer" && (
                         <Button
                           type="button"
                           variant="outline"
@@ -174,11 +199,11 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
               ))}
             </div>
 
-            <Card>
+            {canManage && <Card>
               <label htmlFor="add-member-name" className={cn(sectionLabelClassName, "mb-2 block")}>
                 Add member
               </label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Input
                   id="add-member-name"
                   type="text"
@@ -194,7 +219,7 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
                   disabled={!name.trim() || adding}
                 >
                   {adding ? <Loader2 className="animate-spin" /> : <UserPlus />}
-                  Add
+                  {kind === "invite" ? "Create invite link" : "Add guest"}
                 </Button>
               </div>
               <div
@@ -210,11 +235,12 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
                     aria-pressed={kind === k}
                     className={segmentedItemClassName}
                   >
-                    {k === "invite" ? "Send invite" : "Guest (no signup)"}
+                    {k === "invite" ? "Invite link" : "Managed guest"}
                   </button>
                 ))}
               </div>
-            </Card>
+              <p className="mt-3 text-sm text-muted-foreground">{kind === "invite" ? "Create a link, then copy or share it yourself. No message is sent. Replacing or revoking a pending link disables the old link without deleting the person's prepared kits." : "A guest has no account or trip access. The organizer manages their kits and gear."}</p>
+            </Card>}
 
             <p className="text-center text-sm text-muted-foreground">
               Removing someone also deletes their kits for this trip.
@@ -258,6 +284,9 @@ function RemoveConfirmSheet({
     "delete their kits for this trip",
     "unassign their group gear",
     "drop them from roll call",
+    ...(member.status === "joined" ? ["remove their trip access and disable any invitation link"] : []),
+    ...(member.status === "invited" && member.invite_token ? ["disable their pending invitation link"] : []),
+    "delete their saved packing checks for this trip",
   ];
 
   return (

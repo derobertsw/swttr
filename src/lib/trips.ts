@@ -8,6 +8,7 @@ import { loadConditions, summarizeConditions } from "@/lib/trip-conditions";
 import type {
   Trip,
   TripDay,
+  TripCrewCounts,
   TripFull,
   TripGroupGear,
   TripMember,
@@ -79,6 +80,15 @@ export async function requireTripAccess(
   return { ...auth, trip };
 }
 
+/** Keep invitation placeholders and managed guests distinct from accounts. */
+function countTripCrew(members: { status: string }[]): TripCrewCounts {
+  return {
+    joined: members.filter((m) => m.status === "joined").length,
+    pending: members.filter((m) => m.status === "invited").length,
+    guests: members.filter((m) => m.status === "guest").length,
+  };
+}
+
 export async function listTripsForUser(
   supabase: SupabaseClient,
   userId: string
@@ -133,6 +143,7 @@ export async function listTripsForUser(
       ...t,
       stop_count: stopCount.get(t.id) ?? 0,
       member_count: memberCount.get(t.id) ?? 0,
+      crew_counts: countTripCrew((members ?? []).filter((m) => m.trip_id === t.id)),
     }))
     .sort((a, b) => a.start_date.localeCompare(b.start_date));
 }
@@ -185,7 +196,10 @@ export async function loadTripFull(
   return {
     trip,
     stops,
-    members: (membersRes.data ?? []) as TripMember[],
+    members: ((membersRes.data ?? []) as TripMember[]).map((m) => ({
+      ...m, invite_token: m.status === "invited" ? m.invite_token : null,
+    })),
+    crew_counts: countTripCrew((membersRes.data ?? []) as TripMember[]),
     days,
     kits,
     gear: (gearRes.data ?? []) as TripGroupGear[],
