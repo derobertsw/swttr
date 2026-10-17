@@ -797,5 +797,28 @@ describe("Trip day page", () => {
       expect(await screen.findByRole("heading", { name: "Tour plan" })).toBeInTheDocument();
       expect(sentBodies(api, "PATCH /api/v1/trips/trip-1/days/2026-10-10")).toEqual([{ activity: "Backcountry" }]);
     });
+
+    it("lists conditions after the plan, where a member records only their own review", async () => {
+      mockAuth.userId = "user-2";
+      const member: TripMember = { ...SAM, user_id: "user-2", status: "joined" };
+      const source = { id: "source-1", trip_id: TRIP.id, category: "avalanche" as const, name: "Mount Washington Avalanche Center", region: null,
+        url: "https://www.mountwashingtonavalanchecenter.org/", revision: 1, created_by: "user-1", updated_by: "user-1",
+        created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z", date: DAY.date, trip_day_id: DAY.id, context_key: "key-1",
+        reviews: [{ user_id: "user-1", stale_reasons: [], history: [],
+          current: { id: "entry-1", action: "reviewed" as const, note: null, reviewed_at: "2026-10-09T22:00:00Z", created_at: "2026-10-09T22:00:00Z" } }] };
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP], days: [tourDay], members: [ORGANIZER, member],
+          lodging: buildLodging(TRIP, [], []), tour_plans: [plan], conditions: [source] })),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      const conditions = await screen.findByRole("heading", { name: "Conditions" });
+      expect(screen.getByRole("heading", { name: "Tour plan" }).compareDocumentPosition(conditions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      // The organizer's review is theirs, not the member's.
+      expect(screen.getByText("No review recorded")).toBeInTheDocument();
+      expect(screen.getByText("Crew reviews (1)")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Record my review of Mount Washington Avalanche Center" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add source" })).not.toBeInTheDocument();
+    });
   });
 });

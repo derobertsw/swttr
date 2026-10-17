@@ -33,6 +33,7 @@ import { DayLodging } from "@/components/trips/TripStays";
 import { DayAccessPoint } from "@/components/trips/DayAccessPoint";
 import { DayDrive, useDriveEstimates } from "@/components/trips/DriveEstimate";
 import { DayTourPlan, TOUR_ACTIVITY } from "@/components/trips/TourPlan";
+import { DayConditions } from "@/components/trips/DayConditions";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
@@ -244,6 +245,8 @@ export default function DayDetailPage({
                 await refresh();
               }}
             />
+
+            <DayConditions data={data} date={date} dateLabel={dateLabel} activity={activity} userId={userId} onSaved={refresh} />
 
             {crew.length > 0 && (
               <section className="flex flex-col gap-2.5">
