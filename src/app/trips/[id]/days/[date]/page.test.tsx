@@ -761,7 +761,7 @@ describe("Trip day page", () => {
         ]);
         await user.click(within(dialog).getByRole("button", { name: "Copy day" }));
         await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-        expect(sentBodies(fetchMock, ITINERARY).at(-1)).toMatchObject({ action: "copy_day", kit: "none", plan: "replace", tour_plans: { "plan-day-1": 1, "plan-day-2": 1 } });
+        expect(sentBodies(fetchMock, ITINERARY).at(-1)).toMatchObject({ action: "copy_day", kit: "none", plan: "replace", tour_plans: { "plan-day-1": { date: "2026-10-10", revision: 1 }, "plan-day-2": { date: "2026-10-11", revision: 1 } } });
         // The option is cleared with the rest of the form.
         await user.click(screen.getByRole("button", { name: "Copy to other days" }));
         expect(screen.getByRole("checkbox", { name: /Also copy the tour plan/ })).not.toBeChecked();

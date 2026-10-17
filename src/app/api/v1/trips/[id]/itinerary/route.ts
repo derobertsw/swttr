@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError, readJson } from "@/lib/api";
-import { parseAccessPointsCheck, parseItineraryEdit, parseItineraryRequest, parseTourPlansCheck, previewItinerary, requestFor } from "@/lib/trip-itinerary";
+import { parseAccessPointsCheck, parseItineraryEdit, parseItineraryRequest, parseTourPlansCheck, previewItinerary, requestFor, type TourPlansCheck } from "@/lib/trip-itinerary";
 import { loadTripFull, requireTripAccess } from "@/lib/trips";
 import type { TripItineraryRequest } from "@/types/trips";
 
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
   // A copy of a tour plan (#210) needs a review that saw the trip's tour plans.
   if (copiesPlan && !tourPlans) return reviewAgain();
   const missing = (code: string | undefined) => code === "PGRST202" || code === "42883";
-  const reviewed = (plans?: Record<string, number>) => supabase.rpc("edit_trip_itinerary_reviewed", {
+  const reviewed = (plans?: TourPlansCheck) => supabase.rpc("edit_trip_itinerary_reviewed", {
     p_trip_id: id, p_user_id: userId, p_action: edit.action, p_payload: edit.payload, p_access_points: accessPoints,
     ...(plans ? { p_tour_plans: plans } : {}),
   });

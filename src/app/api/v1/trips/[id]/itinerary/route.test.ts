@@ -168,11 +168,12 @@ describe("Reviewing and saving itinerary changes", () => {
 
   it("checks a reviewed save's tour plans from migration 030, and before it refuses only a tour plan copy", async () => {
     const PLAN = "11111111-1111-4111-8111-111111111111";
-    const body = { action: "assign_days", dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }], access_points: { stops: {}, days: {} }, tour_plans: { [PLAN]: 2 } };
+    const SEEN = { date: "2026-10-12", revision: 2 };
+    const body = { action: "assign_days", dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }], access_points: { stops: {}, days: {} }, tour_plans: { [PLAN]: SEEN } };
     const payload = { dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }] };
     expect((await post(body)).status).toBe(200);
     expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary_reviewed", {
-      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "assign_days", p_payload: payload, p_access_points: { stops: {}, days: {} }, p_tour_plans: { [PLAN]: 2 },
+      p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "assign_days", p_payload: payload, p_access_points: { stops: {}, days: {} }, p_tour_plans: { [PLAN]: SEEN },
     });
 
     // Before 030, the change falls back to 027's check.
@@ -189,7 +190,7 @@ describe("Reviewing and saving itinerary changes", () => {
 
     // A copy of the tour plan can't go through a function that would drop it.
     const copy = {
-      action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: "none", plan: "replace", access_points: { stops: {}, days: {} }, tour_plans: { [PLAN]: 2 },
+      action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: "none", plan: "replace", access_points: { stops: {}, days: {} }, tour_plans: { [PLAN]: SEEN },
       expected: { from: { stop_id: null, activity: "Ski touring", stop: null, kit: null }, days: [{ date: "2026-10-12", stop_id: STOWE.id, activity: null, stop: null, kit: null }] },
     };
     rpc.mockClear();
@@ -202,7 +203,7 @@ describe("Reviewing and saving itinerary changes", () => {
     expect((await post({ ...copy, tour_plans: undefined })).status).toBe(409);
     expect(rpc).not.toHaveBeenCalled();
 
-    for (const tourPlans of [[], { "plan-1": 1 }, { [PLAN]: 0 }, { [PLAN]: "2" }]) {
+    for (const tourPlans of [[], { "plan-1": SEEN }, { [PLAN]: 2 }, { [PLAN]: { ...SEEN, revision: 0 } }, { [PLAN]: { ...SEEN, date: "Oct 12" } }, { [PLAN]: { ...SEEN, day: "day-12" } }]) {
       expect((await post({ ...body, tour_plans: tourPlans })).status).toBe(400);
     }
     expect(rpc).not.toHaveBeenCalled();

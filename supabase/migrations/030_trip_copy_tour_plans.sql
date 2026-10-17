@@ -3,17 +3,22 @@
 -- docs/trip-tour-plans.md. Needs 023, 026 and 027.
 
 -- Every tour plan on a trip as previewItinerary (src/lib/trip-itinerary.ts)
--- builds it for a review: {<plan id>: revision}.
-CREATE FUNCTION public.trip_tour_plan_revisions(p_trip_id uuid) RETURNS jsonb
+-- builds it for a review: {<plan id>: {date, revision}}. The date matters:
+-- moving the trip's dates (021) keeps each plan's id and revision but puts it
+-- on another date, so a review from before the move must not match.
+CREATE FUNCTION public.trip_tour_plan_snapshot(p_trip_id uuid) RETURNS jsonb
 LANGUAGE sql STABLE SET search_path = '' AS $$
-  SELECT coalesce(jsonb_object_agg(t.id, t.revision), '{}'::jsonb) FROM public.trip_day_tour_plans t WHERE t.trip_id = p_trip_id;
+  SELECT coalesce(jsonb_object_agg(t.id, jsonb_build_object('date', d.date, 'revision', t.revision)), '{}'::jsonb)
+    FROM public.trip_day_tour_plans t JOIN public.trip_days d ON d.id = t.trip_day_id
+    WHERE t.trip_id = p_trip_id;
 $$;
-REVOKE ALL ON FUNCTION public.trip_tour_plan_revisions(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.trip_tour_plan_revisions(uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.trip_tour_plan_snapshot(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.trip_tour_plan_snapshot(uuid) TO service_role;
 
 -- A reviewed itinerary edit or copy whose review also said what happens to
 -- each changed day's tour plan, so the save is refused (40001) when any tour
--- plan on the trip was added, changed or removed since. Then it's 027's
+-- plan on the trip was added, changed, removed or moved to another date since.
+-- Then it's 027's
 -- reviewed edit, which checks access points and runs the edit. It's an
 -- overload: PostgREST picks it by the extra p_tour_plans argument, and an app
 -- that sends none still gets 027's.
@@ -31,7 +36,7 @@ SET search_path = ''
 AS $$
 BEGIN
   PERFORM 1 FROM public.trips WHERE id = p_trip_id FOR UPDATE;
-  IF public.trip_tour_plan_revisions(p_trip_id) IS DISTINCT FROM p_tour_plans THEN
+  IF public.trip_tour_plan_snapshot(p_trip_id) IS DISTINCT FROM p_tour_plans THEN
     RAISE EXCEPTION 'Tour plans changed. Review the change again.' USING ERRCODE = '40001';
   END IF;
   RETURN public.edit_trip_itinerary_reviewed(p_trip_id, p_user_id, p_action, p_payload, p_access_points);

@@ -175,7 +175,7 @@ describe("Tour plans in itinerary reviews (#210)", () => {
   it("says when a day's plan goes out of use or back in use, and sends the plans the review saw", () => {
     const [hike] = options(previewItinerary(touring, { action: "assign_days", dates: ["2026-10-10"], activity: "Hike" }, "user-2"));
     expect(notes(hike)).toEqual([["2026-10-10", ["Tour plan kept, not in use: Tuckerman Ravine. Restore it on the day page."]]]);
-    expect(hike.payload.tour_plans).toEqual({ [TUCKERMAN]: 3, [JAY_CLOUD]: 1 });
+    expect(hike.payload.tour_plans).toEqual({ [TUCKERMAN]: { date: "2026-10-10", revision: 3 }, [JAY_CLOUD]: { date: "2026-10-12", revision: 1 } });
     const [tour] = options(previewItinerary(touring, { action: "assign_days", dates: ["2026-10-12"], activity: "Backcountry" }, "user-2"));
     expect(notes(tour)).toEqual([["2026-10-12", ["Saved tour plan in use again: Jay Cloud."]]]);
   });
@@ -212,7 +212,7 @@ describe("Tour plans in itinerary reviews (#210)", () => {
       key: "copy", label: "Copy Sat Oct 10 and its tour plan to 1 day",
       detail: "Stowe, Vermont · Backcountry, and its tour plan (Tuckerman Ravine).",
       changes: [{ date: "2026-10-11", before: "Stowe, Vermont · Backcountry", after: "Stowe, Vermont · Backcountry", notes: ["Gets the tour plan from Sat Oct 10: Tuckerman Ravine."] }],
-      payload: { kit: "none", plan: "replace", tour_plans: { [TUCKERMAN]: 3, [JAY_CLOUD]: 1 } },
+      payload: { kit: "none", plan: "replace", tour_plans: { [TUCKERMAN]: { date: "2026-10-10", revision: 3 }, [JAY_CLOUD]: { date: "2026-10-12", revision: 1 } } },
     });
   });
 

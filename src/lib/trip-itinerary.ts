@@ -299,22 +299,25 @@ export function parseAccessPointsCheck(body: unknown): AccessPointsCheck | null 
 }
 
 /**
- * Every tour plan on the trip as a review saw it, its id and revision, as
- * trip_tour_plan_revisions() in migration 030 builds it. Reviews say what
- * happens to tour plans (#210), so a reviewed save is refused when one was
- * added, changed or removed since, and a copy can't replace a plan unseen.
+ * Every tour plan on the trip as a review saw it, its id with its date and
+ * revision, as trip_tour_plan_snapshot() in migration 030 builds it. Reviews
+ * say what happens to tour plans (#210), so a reviewed save is refused when one
+ * was added, changed, removed or moved to another date since, and a copy can't
+ * replace a plan unseen. Moving the trip's dates keeps ids and revisions, so
+ * the date is what catches that.
  */
-type TourPlansCheck = Record<string, number>;
+export type TourPlansCheck = Record<string, { date: string; revision: number }>;
 const tourPlansCheck = (full: TripFull): TourPlansCheck =>
-  Object.fromEntries((full.tour_plans ?? []).map((plan) => [plan.id, plan.revision]));
+  Object.fromEntries((full.tour_plans ?? []).map((plan) => [plan.id, { date: plan.date, revision: plan.revision }]));
 
 /** The tour plans a save says its review saw: undefined when it sends none, null when they're malformed. */
 export function parseTourPlansCheck(body: unknown): TourPlansCheck | null | undefined {
   if (!isObject(body) || !("tour_plans" in body)) return undefined;
   const check = body.tour_plans;
   if (!isObject(check) || Object.keys(check).length > MAX_DAYS) return null;
-  return Object.entries(check).every(([id, revision]) => isUuid(id) && Number.isInteger(revision) && (revision as number) > 0)
-    ? check as TourPlansCheck : null;
+  const valid = Object.entries(check).every(([id, seen]) => isUuid(id) && isObject(seen) && Object.keys(seen).length === 2
+    && isCalendarDate(seen.date) && Number.isInteger(seen.revision) && (seen.revision as number) > 0);
+  return valid ? check as TourPlansCheck : null;
 }
 
 const tourPlanFor = (full: TripFull, day: Pick<TripDay, "id">) => full.tour_plans?.find((plan) => plan.trip_day_id === day.id);

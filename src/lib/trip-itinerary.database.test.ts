@@ -443,6 +443,27 @@ describe("Itinerary edits in Postgres", () => {
           await db.exec("ROLLBACK");
         }
       }
+      // Moving the trip's dates keeps every plan's id and revision but puts
+      // them on other dates, so a review from before the move is stale too:
+      // here every day reads the same, so nothing else tells them apart.
+      await db.exec("BEGIN");
+      try {
+        await db.query("UPDATE trip_days SET stop_id = NULL, activity = 'Backcountry'");
+        await db.exec("DELETE FROM trip_day_tour_plans");
+        for (const [date, objective] of [["2026-10-09", "Gulf of Slides"], ["2026-10-10", "Tuckerman Ravine"], ["2026-10-11", "Hillman's Highway"], ["2026-10-12", "Ammonoosuc"]]) {
+          await addPlan(date, objective);
+        }
+        const beforeMove = await reviewed({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: false, plan: true }, "replace");
+        await db.query("SELECT public.change_trip_dates($1, 'user-1', '2026-10-09', '2026-10-12', '2026-10-10', '2026-10-13', 'move', 'planning', NULL, NULL, '[]')", [tripId]);
+        await db.exec("SAVEPOINT stale");
+        await expect(reviewedEdit("copy_day", beforeMove)).rejects.toMatchObject({ code: "40001" });
+        await db.exec("ROLLBACK TO SAVEPOINT stale");
+        // Saturday's plan, now on Oct 11, is still there.
+        expect((await plansByDay())["2026-10-11"]).toMatchObject({ objective: "Tuckerman Ravine", revision: 1 });
+      } finally {
+        await db.exec("ROLLBACK");
+      }
+
       // Access points are still checked first.
       const payload = await reviewed({ action: "assign_days", dates: ["2026-10-12"], activity: "Hike" });
       await expect(reviewedEdit("assign_days", { ...payload, access_points: { stops: { [jay]: {} }, days: {} } })).rejects.toMatchObject({ code: "40001" });
@@ -471,7 +492,7 @@ describe("Itinerary edits in Postgres", () => {
     expect(grants).toEqual([{ role: "anon", allowed: false, any: false }, { role: "authenticated", allowed: false, any: false }, { role: "service_role", allowed: true, any: true }]);
     const tourPlanGrants = (await db.query<{ role: string; reviewed: boolean; revisions: boolean }>(
       `SELECT r AS role, has_function_privilege(r, 'public.edit_trip_itinerary_reviewed(uuid, text, text, jsonb, jsonb, jsonb)', 'EXECUTE') AS reviewed,
-        has_function_privilege(r, 'public.trip_tour_plan_revisions(uuid)', 'EXECUTE') AS revisions
+        has_function_privilege(r, 'public.trip_tour_plan_snapshot(uuid)', 'EXECUTE') AS revisions
         FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r`
     )).rows;
     expect(tourPlanGrants).toEqual([{ role: "anon", reviewed: false, revisions: false }, { role: "authenticated", reviewed: false, revisions: false }, { role: "service_role", reviewed: true, revisions: true }]);
