@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DayAccessPoint } from "@/components/trips/DayAccessPoint";
 import { DayDrive, StayDepartures, useDriveEstimates, type DriveEstimatesState } from "@/components/trips/DriveEstimate";
 import { tripDriveEstimates } from "@/lib/trip-drive-estimates";
 import { RoutingUnavailable } from "@/lib/locations/routing";
@@ -390,6 +391,61 @@ describe("Your estimate", () => {
     const seen = { entered_at: "2027-01-04T12:00:00.000Z", use_calculated: false };
     expect(sentBodies(fetchMock, `DELETE ${ESTIMATE_URL}`)).toEqual([{ dates: [SAT, SUN], expected: [{ date: SAT, ...seen }, { date: SUN, ...seen }] }]);
     expect(await screen.findByText("Your estimate removed.")).toBeInTheDocument();
+  });
+  it("reviews what's saved after a removal conflict, then removes against it", async () => {
+    const full = driveTrip();
+    const [before, after] = await Promise.all([
+      withManual(full, [yours(SAT, 40)], { matrix: failing }),
+      withManual(full, [yours(SAT, 45, { entered_at: "2027-01-05T09:00:00.000Z", note: "Front desk" })], { matrix: failing }),
+    ]);
+    let attempt = 0;
+    const fetchMock = fakeTripApi({
+      [`DELETE ${ESTIMATE_URL}`]: () => ++attempt === 1
+        ? reply(409, { error: "Your estimate or this day's drive changed since you opened it. Check it, then try again." }) : reply(200, { ok: true }),
+      [`GET ${URL}`]: reply(200, after),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const retry = vi.fn();
+    render(<DayDrive data={full} date={SAT} dateLabel="Sat Jan 9" canEdit drive={state(before, { retry })} onSaved={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Remove your estimate" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove your estimate" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("changed since you opened it");
+    expect(retry).toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Remove your estimate" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Review saved estimate" }));
+    const question = await screen.findByText("Saved now: about 45 min · Front desk. Remove your estimate from Sat Jan 9? Any calculated estimate stays.");
+    expect(question).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: "Remove your estimate" }));
+    expect(sentBodies(fetchMock, `DELETE ${ESTIMATE_URL}`)[1]).toEqual({ dates: [SAT], expected: [{ date: SAT, entered_at: "2027-01-05T09:00:00.000Z", use_calculated: false }] });
+    expect(await screen.findByText("Your estimate removed.")).toBeInTheDocument();
+  });
+  it("keeps an open entry when the day's last destination is removed, then returns focus to Getting there", async () => {
+    const full = driveTrip();
+    const gone = driveTrip({ stops: [] });
+    const [before, after] = await Promise.all([withManual(full, [], { matrix: failing }), withManual(gone, [], { matrix: failing })]);
+    vi.stubGlobal("fetch", fakeTripApi({
+      [`PUT ${ESTIMATE_URL}`]: reply(409, { error: "Your estimate or this day's drive changed since you opened it. Check it, then try again." }),
+      [`GET ${URL}`]: reply(200, after),
+    }));
+    const card = (data: TripFull, estimates: TripDriveEstimates) => (
+      <DayAccessPoint data={data} day={data.days[1]} dateLabel="Sat Jan 9" canEdit onSaved={vi.fn()}>
+        <DayDrive data={data} date={SAT} dateLabel="Sat Jan 9" canEdit drive={state(estimates)} onSaved={vi.fn()} />
+      </DayAccessPoint>
+    );
+    const { rerender } = render(card(full, before));
+    await userEvent.click(screen.getByRole("button", { name: "Add your estimate" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Minutes" }), "40");
+    await userEvent.click(screen.getByRole("button", { name: "Save your estimate" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Review saved estimate" }));
+    expect(await screen.findByText("This day has no drive to estimate now. Cancel to see why.")).toBeInTheDocument();
+    rerender(card(gone, after));
+    expect(screen.getByText("Choose a destination first")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Minutes" })).toHaveValue("40");
+    expect(screen.getByRole("button", { name: "Save your estimate" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /starting point/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("region", { name: "Drive" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Getting there" })).toHaveFocus());
   });
   it("edits the days it was saved for, removing it from a day that's unticked", async () => {
     const fetchMock = fakeTripApi({ [`PUT ${ESTIMATE_URL}`]: reply(200, { ok: true }) });

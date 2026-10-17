@@ -167,8 +167,10 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
   const [working, setWorking] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const headingId = `drive-${date}`, originId = `starting-point-${date}`, estimateId = `your-estimate-${date}`;
-  // The control, or the Drive heading when the card no longer has it.
-  const focusSoon = (id: string) => setTimeout(() => (document.getElementById(id) ?? document.getElementById(headingId))?.focus(), 0);
+  // The control, or the Drive heading when the card no longer has it, or the
+  // Getting there heading once the day has no destination and no Drive row.
+  const focusSoon = (id: string) => setTimeout(() => [id, headingId, `getting-there-${date}`]
+    .map((candidate) => document.getElementById(candidate)).find(Boolean)?.focus(), 0);
   const stays = <Link href={`/trips/${tripId}#trip-stays-heading`} className={linkClass}>Go to Stays</Link>;
 
   const open = (next: NonNullable<typeof editing>) => {
@@ -217,7 +219,8 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
       <Button type="button" size="sm" variant="outline" onClick={drive.retry}>Retry</Button>
     </div>;
   } else if (day.state === "no_destination") {
-    return null;
+    // Nothing to drive to, so no Drive row, unless an editor is open: it keeps its entry.
+    if (!editing) return null;
   } else if (day.state === "approximate_access_point" || day.state === "no_drive") {
     // The card already says what's missing about the access point.
     if (!startLine && !canEdit) return null;
@@ -311,7 +314,7 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
         <StartingPointEditor data={data} day={tripDay} dateLabel={dateLabel} nightLabel={day?.night_label} crewStayId={crewStayId}
           onCancel={() => close(originId)}
           onSaved={async (message) => { await onSaved(); close(originId, message); }} />
-      ) : (
+      ) : day?.state !== "no_destination" && (
         <div className="mt-2 flex flex-wrap gap-2">
           <Button id={originId} type="button" size="sm" variant={day?.state === "missing_origin" ? "default" : "outline"} onClick={() => open("origin")}>
             {tripDay.origin || crewStay ? "Change starting point" : "Set starting point"}
@@ -561,40 +564,65 @@ function YourEstimateEditor({ tripId, day, days, onCancel, onSaved, onReviewed }
   );
 }
 
-/** Asks before removing your estimate from the day and the days that share it. */
+/**
+ * Asks before removing your estimate from the day and the days that share it.
+ * After a conflict, Review saved estimate shows what's saved now and removes
+ * against that.
+ */
 function RemoveYourEstimate({ tripId, day, days, onCancel, onRemoved, onConflict }: {
   tripId: string;
   day: TripDriveDay;
   days: TripDriveDay[];
   onCancel: () => void;
   onRemoved: () => void;
+  /** Fetches the estimates again after a conflict, so the card matches. */
   onConflict: () => void;
 }) {
-  const dates = day.manual?.current ? day.manual.dates : [day.date];
+  const [seen, setSeen] = useState({ day, days });
+  const saved = seen.day.manual;
+  const dates = !saved ? [] : saved.current ? saved.dates : [seen.day.date];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState(false);
+  const [reviewed, setReviewed] = useState(false);
   const question = useRef<HTMLParagraphElement>(null);
   useEffect(() => question.current?.focus(), []);
+  const labels = listed(dates.map((date) => seen.days.find((candidate) => candidate.date === date)?.date_label ?? date));
   const remove = async () => {
     setBusy(true); setError(null);
     try {
-      await timedTripRequest(`/api/v1/trips/${tripId}/days/${day.date}/drive-estimate`, "DELETE", { dates, expected: seenEstimates(days, dates) });
+      await timedTripRequest(`/api/v1/trips/${tripId}/days/${seen.day.date}/drive-estimate`, "DELETE", { dates, expected: seenEstimates(seen.days, dates) });
       onRemoved();
     } catch (err) {
       setError(errorMessage(err));
-      if (err instanceof TripRequestError && err.status === 409) onConflict();
+      if (err instanceof TripRequestError && err.status === 409) { setConflict(true); onConflict(); }
     } finally { setBusy(false); }
+  };
+  const review = async () => {
+    setBusy(true); setError(null);
+    try {
+      const current = await timedTripRequest<TripDriveEstimates>(`/api/v1/trips/${tripId}/drive-estimates`, "GET");
+      const now = current.days.find((candidate) => candidate.date === seen.day.date);
+      if (!now) throw new Error("This day isn't on the trip anymore. Reload the trip.");
+      setSeen({ day: now, days: current.days }); setConflict(false); setReviewed(true);
+      question.current?.focus();
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusy(false); }
   };
   return (
     <div role="group" aria-labelledby={`remove-estimate-${day.date}`} className="mt-3 space-y-2 border-t border-border pt-3">
       <p id={`remove-estimate-${day.date}`} ref={question} tabIndex={-1} className="break-words text-base text-foreground">
-        Remove your estimate from {listed(dates.map((date) => days.find((candidate) => candidate.date === date)?.date_label ?? date))}? Any calculated estimate stays.
+        {!saved ? "There's no saved estimate for this day now."
+          : <>{reviewed && `Saved now: about ${saved.duration_label}${saved.note ? ` · ${saved.note}` : ""}. `}Remove your estimate from {labels}? Any calculated estimate stays.</>}
       </p>
       {error && <p role="alert" className="text-base text-destructive">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="destructive" loading={busy} onClick={() => void remove()}>Remove your estimate</Button>
-        <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>Keep it</Button>
+        {conflict
+          ? <Button type="button" loading={busy} onClick={() => void review()}>Review saved estimate</Button>
+          : saved && <Button type="button" variant="destructive" loading={busy} onClick={() => void remove()}>Remove your estimate</Button>}
+        <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>{saved ? "Keep it" : "Close"}</Button>
       </div>
+      {busy && <p role="status" className="text-base text-muted-foreground">{conflict ? "Loading the saved estimate…" : "Removing your estimate…"}</p>}
     </div>
   );
 }
