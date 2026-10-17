@@ -60,16 +60,32 @@ describe("Drive estimates from Geoapify's Route Matrix", () => {
     await expect(driveMatrix([SPRUCE_PEAK], [SMUGGS])).rejects.toBeInstanceOf(RoutingUnavailable);
     expect(fetchMock).not.toHaveBeenCalled();
   });
-  it.each([
+  it.each<[string, () => Promise<Response>]>([
     ["Geoapify limits the account", () => Promise.resolve(new Response("{}", { status: 429 }))],
     ["the key is rejected", () => Promise.resolve(new Response("{}", { status: 401 }))],
     ["the provider times out", () => Promise.reject(new DOMException("timed out", "TimeoutError"))],
     ["the answer isn't JSON", () => Promise.resolve(new Response("<html>"))],
     ["a pair is missing", () => Promise.resolve(new Response(JSON.stringify({ sources_to_targets: [[LIVE_ANSWER.sources_to_targets[0][0]]] })))],
     ["an index is out of range", () => Promise.resolve(new Response(JSON.stringify({ sources_to_targets: [[{ distance: 1, time: 1, source_index: 3, target_index: 0 }]] })))],
+    ...[
+      { time: -1, distance: 10 },
+      { time: "720", distance: 9000 },
+      { distance: 9000 },
+      { time: null, distance: 9000 },
+      { time: 720, distance: null },
+      { time: null },
+    ].map((values) => ["a pair has malformed or incomplete figures", () => Promise.resolve(new Response(JSON.stringify({ sources_to_targets: [[
+      { ...values, source_index: 0, target_index: 0 }, LIVE_ANSWER.sources_to_targets[0][1],
+    ]] })))] as [string, () => Promise<Response>]),
   ])("is unavailable when %s", async (_, answer) => {
     fetchMock.mockImplementation(answer);
     await expect(driveMatrix([SPRUCE_PEAK], [SMUGGS, JOHNS_BROOK])).rejects.toBeInstanceOf(RoutingUnavailable);
+  });
+  it("rejects duplicate and fractional pair indices instead of accepting a partial answer", async () => {
+    for (const cell of [LIVE_ANSWER.sources_to_targets[0][0], { ...LIVE_ANSWER.sources_to_targets[0][0], target_index: 0.5 }]) {
+      fetchMock.mockResolvedValue(new Response(JSON.stringify({ sources_to_targets: [[...LIVE_ANSWER.sources_to_targets[0], cell]] })));
+      await expect(driveMatrix([SPRUCE_PEAK], [SMUGGS, JOHNS_BROOK])).rejects.toBeInstanceOf(RoutingUnavailable);
+    }
   });
 });
 

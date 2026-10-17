@@ -919,6 +919,24 @@ describe("Trip day page", () => {
       expect(screen.queryByText(/Meeting point not set/)).not.toBeInTheDocument();
     });
 
+    it("keeps the ski or walk approach visible separately while the road estimate loads", async () => {
+      const approach = "Ski 90 minutes from the parking lot to the hut.";
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({
+          stops: [STOWE_STOP], days: [tourDay], members: [ORGANIZER], lodging: buildLodging(TRIP, [], []),
+          tour_plans: [{ ...plan, approach_notes: approach }],
+        })),
+        "GET /api/v1/trips/trip-1/drive-estimates": () => new Promise(() => {}),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      const gettingThere = (await screen.findByRole("heading", { name: "Getting there" })).closest<HTMLElement>('[data-slot="card"]')!;
+      expect(within(gettingThere).getByRole("heading", { name: "Approach (ski or walk)" })).toBeVisible();
+      expect(within(gettingThere).getByText(approach)).toBeVisible();
+      expect(within(gettingThere).getByRole("status")).toHaveTextContent("Checking the drive time…");
+      expect(within(gettingThere).queryByText(/About .* drive/)).not.toBeInTheDocument();
+    });
+
     it("shows a member the plan without organizer actions", async () => {
       mockAuth.userId = "user-2";
       const member: TripMember = { ...SAM, user_id: "user-2", status: "joined" };
