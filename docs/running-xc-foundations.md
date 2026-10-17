@@ -28,11 +28,32 @@ The cold-exposure applicability factor is the maximum of:
 - `clamp((effective_wind_m_s − 4) / 8, 0, 1)`;
 - `0.7` when precipitation is present.
 
-This continuous taper is an **unvalidated engineering assumption**, chosen to remove positive local floors in mild dry exercise while retaining allowances at freezing, in wet conditions and in strong wind. It is not a physiological threshold. It scales the whole-body minimum and the CoWEDA-inspired buffers, as well as both extremity bands. Regional minima still average back to the whole-body minimum. The upper range remains a comfort allowance above raw neutral IREQ; XC's base allowance decreases from 0.24 to 0.12 clo. Zero thermal targets allow exposed arms/lower legs and no thermal accessories; they do not waive body coverage, wind/wet protection, pole grip or sport safety equipment.
+This continuous taper is an **unvalidated engineering assumption**, chosen to remove positive local floors in mild dry exercise while retaining allowances at freezing, in wet conditions and in strong wind. It is not a physiological threshold. It scales only the activity allowance above the whole-body heat-balance minimum and the CoWEDA-inspired buffers, as well as both extremity bands. The minimum before adding the tapered CoWEDA-inspired margin is `raw_ireq_min + max(0, activity_min − raw_ireq_min) × exposure_factor`, rounded to 0.01 clo. The heat-balance minimum itself is never tapered: smaller bodies and easy efforts can still require insulation in mild air. Local hand/head bands are wholly heuristic, since IREQ supplies no local heat-balance calculation, and may taper to zero independently. Regional minima still average back to the whole-body minimum. The upper range remains a comfort allowance above raw neutral IREQ; XC's base allowance decreases from 0.24 to 0.12 clo. Zero thermal targets allow exposed arms/lower legs and no thermal accessories; they do not waive body coverage, wind/wet protection, pole grip or sport safety equipment.
 
 The [ISO 11079 scope](https://www.iso.org/standard/38900.html) concerns cold exposure and excludes specific precipitation effects. SWTTR handles wet protection separately. Published CoWEDA skin-temperature errors do not validate SWTTR, and converting them to clo is not a measured safety bound. Running/XC therefore report `coweda_inspired_unvalidated_swttr_margin` as the margin source. Other phase policies retain their prior behavior pending separate review.
 
-The dry 56°F / 8 mph / moderate reference case now has zero regional minima and zero hand/head thermal targets. The generic shirt/shorts estimates pass the existing server comfort evaluation without accessories. This is a regression calculation, not evidence that every runner should wear an identical outfit.
+The dry 56°F / 8 mph / moderate reference run has a 0.03–0.23 clo whole-body band and zero hand/head thermal targets. The generic shirt/shorts estimates pass the existing server comfort evaluation against the actual regional minima without accessories. This is a regression calculation, not evidence that every runner should wear an identical outfit.
+
+### Reference calculations (#245)
+
+The following deterministic calculations use 50% humidity when dry, 95% when wet, 8 mph wind (3.57632 m/s) unless shown otherwise, and the 69 in / 170 lb reference body except for the smaller-body rows. They are model checks, not observed physiological measurements.
+
+| Sport and conditions | Heat flux W/m² | Raw IREQ min–neutral, clo | Final whole-body band, clo | Hand / head minimum, clo |
+| --- | ---: | --- | --- | --- |
+| Running, 56°F, moderate, dry | 395.2 | 0.03–0.11 | 0.03–0.23 | 0 / 0 |
+| XC, 56°F, moderate, dry | 395.2 | 0.03–0.11 | 0.03–0.25 | 0 / 0 |
+| Running, 10°C, easy, dry, 62 in / 110 lb | 254.2 | 0.32–0.43 | 0.32–0.55 | 0 / 0 |
+| XC, 10°C, easy, dry, 62 in / 110 lb | 266.0 | 0.29–0.40 | 0.29–0.54 | 0 / 0 |
+| Running, 0°C, moderate, wet | 395.2 | 0.30–0.37 | 0.35–0.52 | 0.35 / 0.31 |
+| XC, 0°C, moderate, wet | 395.2 | 0.30–0.37 | 0.36–0.54 | 0.36 / 0.31 |
+| Running, −15°C, hard, dry, 8 m/s wind | 511.4 | 0.50–0.56 | 0.58–0.90 | 0.72 / 0.63 |
+| XC, −15°C, hard, dry, 8 m/s wind | 525.3 | 0.49–0.54 | 0.57–0.90 | 0.74 / 0.62 |
+| Running, 20°C, hard, dry | 511.4 | 0–0 | 0–0.12 | 0 / 0 |
+| XC, 20°C, hard, dry | 525.3 | 0–0 | 0–0.14 | 0 / 0 |
+
+The earlier implementation multiplied the entire whole-body minimum by the exposure factor. That incorrectly turned the smaller runner's 0.32 clo heat-balance requirement into zero at 10°C. Regression tests now preserve that requirement and verify the shirt/shorts case using the server evaluator. Sensitivity checks cover both sports, all three efforts, three body sizes, wet/dry conditions, temperatures from −25°C to 25°C, and wind around the 4 and 12 m/s taper boundaries. Both regional bands average back to their whole-body band within rounding tolerance, and warmer weather or greater effort never raises a thermal target in that matrix.
+
+Golden review of this correction changes eight running/XC responses: easy effort at 45°F and near-freezing rain, in both catalog and wardrobe modes. Whole-body and regional minima rise to retain heat balance; upper bands and accessory targets stay unchanged. Running's garments stay unchanged. XC's rain outfits change to reduce arm shortfalls: catalog arm clo rises from 0.30 to 0.35, and wardrobe arm clo from 0.30 to 0.32, against a 0.32 minimum. Those choices trade breathability for the corrected regional budget and still use the existing selector; full wet/standalone suitability remains #248's responsibility. All 45 cycling, alpine and touring golden responses remain byte-for-byte unchanged, preserving chairlift and climb/descent behavior.
 
 ## Garment semantics
 

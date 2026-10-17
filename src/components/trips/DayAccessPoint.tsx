@@ -62,7 +62,7 @@ export function DayAccessPoint({ data, day, dateLabel, canEdit, onSaved, childre
 
   return (
     <Card>
-      <h2 className={sectionLabelClassName}>Getting there</h2>
+      <h2 id={`getting-there-${day.date}`} tabIndex={-1} className={sectionLabelClassName}>Getting there</h2>
       {point ? <div className="mt-1 space-y-2">
         <p className="text-sm text-muted-foreground">{point.scope === "day" ? `Only ${dateLabel}` : `Every day at ${stop?.name}`}</p>
         <LocationSummary location={point.location} exactTarget={ACCESS_EXACT} />

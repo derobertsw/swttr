@@ -14,7 +14,26 @@ import { BODY_PART_LABELS, LAYER_LABELS } from "@/lib/layers";
 import { BODY_PART_ORDER, LAYER_TYPE_ORDER, type PackingListData } from "@/lib/packingList";
 import { MAX_NAME, MAX_QUANTITY } from "@/lib/trip-packing";
 import { cn } from "@/lib/utils";
-import type { PackingChecklist, PackingItem, PackingManualItem, PackingRemovedItem } from "@/types/trip-packing";
+import type { PackingChecks, PackingChecklist, PackingItem, PackingManualItem, PackingRemovedItem } from "@/types/trip-packing";
+
+type CheckControls = {
+  checks: PackingChecks;
+  onCheck: (key: string, name: string, quantity: number, packed: boolean) => void;
+};
+
+function PackingCheck({ itemKey, name, quantity, checks, busy, onCheck }: CheckControls & {
+  itemKey: string; name: string; quantity: number; busy: boolean;
+}) {
+  const checked = checks[itemKey]?.packed === true && checks[itemKey]?.quantity === quantity;
+  return (
+    <label className="flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center self-start rounded-md focus-within:ring-2 focus-within:ring-ring">
+      <input type="checkbox" className="size-5 accent-primary" checked={checked}
+        aria-label={`Packed ${name}${quantity > 1 ? ` (all ${quantity})` : ""}`}
+        aria-disabled={busy || undefined} aria-busy={busy || undefined}
+        onChange={() => { if (!busy) onCheck(itemKey, name, quantity, !checked); }} />
+    </label>
+  );
+}
 
 /** "Sat Oct 10" for a "yyyy-MM-dd" date. */
 export const packingDay = (date: string) => format(new Date(`${date}T00:00:00`), "EEE MMM d");
@@ -107,7 +126,7 @@ export function PackingChanges({ items, removed, editable, acknowledging, onAckn
   );
 }
 
-function ItemRow({ item, editable, busy, onQuantity }: {
+function ItemRow({ item, editable, busy, onQuantity, checks, onCheck }: CheckControls & {
   item: PackingItem;
   editable: boolean;
   busy: boolean;
@@ -115,20 +134,23 @@ function ItemRow({ item, editable, busy, onQuantity }: {
 }) {
   const label = item.brand && !item.name.startsWith(item.brand) ? `${item.brand} ${item.name}` : item.name;
   return (
-    // The quantity stays beside the name; the details run the full width below.
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 py-3 first:pt-0 last:pb-0">
-      <p className="self-center break-words text-base font-medium text-foreground">{label}</p>
+    // On phones the quantity gets its own line so long names stay readable.
+    <li className="grid grid-cols-1 items-start gap-x-3 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="flex min-w-0 items-start gap-1">
+        {editable && <PackingCheck itemKey={item.key} name={item.name} quantity={item.quantity} checks={checks} busy={busy} onCheck={onCheck} />}
+        <p className="min-w-0 self-center break-words text-base font-medium text-foreground">{label}</p>
+      </div>
       {editable
-        ? <QuantityStepper name={item.name} value={item.quantity} busy={busy} onChange={(next) => onQuantity(item, next)} />
+        ? <div className="ml-12 w-fit sm:ml-0"><QuantityStepper name={item.name} value={item.quantity} busy={busy} onChange={(next) => onQuantity(item, next)} /></div>
         : <span className="self-center text-base text-foreground">{item.quantity > 1 && `×${item.quantity}`}</span>}
-      <div className="col-span-2 mt-1 flex flex-wrap items-center gap-1.5">
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 sm:col-span-2">
         {item.change?.kind === "added" && <Badge size="sm" variant="primary">New</Badge>}
-        {item.change?.kind === "replaced" && <Badge size="sm" variant="primary">Replaces {item.change.replaces.join(", ")}</Badge>}
+        {item.change?.kind === "replaced" && <Badge size="sm" variant="primary" className="max-w-full whitespace-normal [overflow-wrap:anywhere]">Replaces {item.change.replaces.join(", ")}</Badge>}
         {item.ownership === "owned"
           ? <span className="text-sm text-muted-foreground">{OWNERSHIP_LABEL.owned}</span>
           : <Badge size="sm" variant="outline">{OWNERSHIP_LABEL[item.ownership]}</Badge>}
       </div>
-      <p className="col-span-2 mt-1 text-sm text-muted-foreground">
+      <p className="mt-1 text-sm text-muted-foreground sm:col-span-2">
         {item.layerType && `${LAYER_LABELS[item.layerType]} · `}{usesLabel(item.days)}
       </p>
     </li>
@@ -136,7 +158,7 @@ function ItemRow({ item, editable, busy, onQuantity }: {
 }
 
 /** Everything the person's saved outfits call for, by body area, then what's only carried. */
-export function PackingItems({ items, editable, busy, onQuantity }: {
+export function PackingItems({ items, editable, busy, onQuantity, checks, onCheck }: CheckControls & {
   items: PackingItem[];
   editable: boolean;
   busy: ReadonlySet<string>;
@@ -156,7 +178,7 @@ export function PackingItems({ items, editable, busy, onQuantity }: {
           </h3>
           <ul className="mt-2 flex flex-col divide-y divide-border">
             {group.items.map((item) => (
-              <ItemRow key={item.key} item={item} editable={editable} busy={busy.has(item.key)} onQuantity={onQuantity} />
+              <ItemRow key={item.key} item={item} editable={editable} busy={busy.has(item.key)} onQuantity={onQuantity} checks={checks} onCheck={onCheck} />
             ))}
           </ul>
         </section>
@@ -166,7 +188,7 @@ export function PackingItems({ items, editable, busy, onQuantity }: {
 }
 
 /** Items the person added by hand, and the form to add one. */
-export function ManualItems({ items, editable, busy, onAdd, onQuantity, onRemove }: {
+export function ManualItems({ items, editable, busy, onAdd, onQuantity, onRemove, checks, onCheck }: CheckControls & {
   items: PackingManualItem[];
   editable: boolean;
   busy: ReadonlySet<string>;
@@ -204,7 +226,10 @@ export function ManualItems({ items, editable, busy, onAdd, onQuantity, onRemove
         <ul className="flex flex-col divide-y divide-border">
           {items.map((item) => (
             <li key={item.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 first:pt-0">
-              <p className="min-w-0 flex-1 basis-28 break-words text-base font-medium text-foreground">{item.name}</p>
+              <div className="flex min-w-0 flex-1 basis-28 items-start gap-1">
+                {editable && <PackingCheck itemKey={`manual:${item.id}`} name={item.name} quantity={item.quantity} checks={checks} busy={busy.has(item.id)} onCheck={onCheck} />}
+                <p className="min-w-0 self-center break-words text-base font-medium text-foreground">{item.name}</p>
+              </div>
               {editable ? (
                 <div className="ml-auto flex items-center gap-1">
                   <QuantityStepper name={item.name} value={item.quantity} busy={busy.has(item.id)} onChange={(next) => onQuantity(item, next)} />

@@ -558,7 +558,10 @@ describe("GET /api/v1/trips/[id]/pack from saved outfits", () => {
     expect(data.items.find((item) => item.name === "Rain shell")?.change).toEqual({ kind: "replaced", replaces: ["Ski shell"] });
     expect(data.items.find((item) => item.name === "Insulated gloves")?.change).toEqual({ kind: "replaced", replaces: ["Old gloves"] });
     expect(data.items.find((item) => item.name === "Merino crew")).toMatchObject({ quantity: 3, change: { kind: "added" } });
-    expect(data.removed).toEqual([]);
+    expect(data.removed).toEqual([
+      { key: "item:g-3", name: "Ski shell", dates: ["2026-10-10"] },
+      { key: "item:old", name: "Old gloves", dates: ["2026-10-10"] },
+    ]);
     expect(data.manual).toEqual(manual);
     expect(data.editable).toBe(true);
     expect(rpc).not.toHaveBeenCalled();
@@ -583,7 +586,7 @@ describe("POST /api/v1/trips/[id]/pack", () => {
     rpc.mockResolvedValueOnce({ data: { items: [{ id, name: "Headlamp", quantity: 2 }], quantities: { "item:g-1": 3 } }, error: null });
     const response = await postPack({ op: "add_item", id, name: " Headlamp ", quantity: 2 });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ manual: [{ id, name: "Headlamp", quantity: 2 }], quantities: { "item:g-1": 3 } });
+    expect(await response.json()).toEqual({ manual: [{ id, name: "Headlamp", quantity: 2 }], quantities: { "item:g-1": 3 }, checks: {} });
     expect(rpc).toHaveBeenCalledWith("update_trip_packing", { p_trip_id: "trip-1", p_user_id: "user-1", p_op: { op: "add_item", id, name: "Headlamp", quantity: 2 } });
   });
 
@@ -631,5 +634,64 @@ describe("POST /api/v1/trips/[id]/pack", () => {
   it("preserves the trip authorization error", async () => {
     vi.mocked(requireTripAccess).mockResolvedValue(NextResponse.json({ error: "Not found" }, { status: 404 }));
     expect((await postPack({ op: "remove_item", id })).status).toBe(404);
+  });
+});
+
+describe("Private packing check API", () => {
+  const mutation = "fd037a5d-b4d4-4b2e-8d6a-624ca9c8503b";
+  const body = (overrides: Record<string, unknown> = {}) => ({ op: "set_packed", key: "item:g-3", packed: true,
+    quantity: 1, expected: null, mutation, kits: { "kit-member-you-2026-10-10": "2026-10-10T01:00:00+00:00" }, ...overrides });
+  const checks = { "item:g-3": { packed: true, quantity: 1, version: mutation } };
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it("validates the member's item and supplies only server-derived aliases to the RPC", async () => {
+    const { rpc } = mockKitTrip({ kits: [kit("2026-10-10", ORGANIZER, outfitWith())] });
+    rpc.mockResolvedValueOnce({ data: { items: [], quantities: {}, checks }, error: null });
+    const response = await postPack(body({ aliases: ["another-user-item"], userId: "user-2", memberId: ANA.id }));
+    expect(response.status).toBe(200);
+    expect((await response.json()).checks).toEqual(checks);
+    expect(rpc).toHaveBeenCalledWith("update_trip_packing", { p_trip_id: "trip-1", p_user_id: "user-1", p_op: {
+      ...body(), aliases: ["general:torso:outer:ski shell", "carry:ski shell"],
+    } });
+  });
+
+  it.each(["item:g-9", "group:stove", "general:imaginary", "manual:not-a-uuid"])("refuses a check for an absent or nonpersonal item %s", async (key) => {
+    const { rpc } = mockKitTrip({ kits: [kit("2026-10-10", ORGANIZER, outfitWith()), kit("2026-10-10", ANA, outfitWith(RAIN_SHELL))] });
+    const response = await postPack(body({ key }));
+    expect(response.status).toBe(404);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("allows manual identities through to the transaction's ownership and existence check", async () => {
+    const { rpc } = mockKitTrip();
+    expect((await postPack(body({ key: `manual:${mutation}`, kits: {} }))).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("update_trip_packing", expect.objectContaining({ p_op: expect.objectContaining({ aliases: [] }) }));
+  });
+
+  it("refuses an outfit revision that changed before the request and maps transaction conflicts", async () => {
+    const { rpc } = mockKitTrip({ kits: [kit("2026-10-10", ORGANIZER, outfitWith())] });
+    expect((await postPack(body({ kits: {} }))).status).toBe(409);
+    expect(rpc).not.toHaveBeenCalled();
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "P0409", message: "private database detail" } });
+    const response = await postPack(body());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "This item changed in another session. Review its saved state and try again.", code: "packing_changed" });
+  });
+
+  it.each([{ packed: "true" }, { expected: "old" }, { mutation: "x" }, { quantity: 0 }, { quantity: 21 }, { kits: { id: "invalid-time" } }])("refuses malformed checks %j", async (invalid) => {
+    const { rpc } = mockKitTrip();
+    expect((await postPack(body(invalid))).status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("reads only the current member's checks on reload, including removed identities for later return", async () => {
+    vi.mocked(fetchUserWardrobeItems).mockResolvedValue([]);
+    const { full } = mockKitTrip({ kits: [kit("2026-10-10", ORGANIZER, outfitWith()), kit("2026-10-10", ANA, outfitWith())], packing: [
+      { trip_member_id: ORGANIZER.id, checks, seen: {}, items: [], quantities: {} },
+      { trip_member_id: ANA.id, checks: { "carry:other-person": { packed: true, quantity: 1, version: mutation } }, seen: {}, items: [], quantities: {} },
+    ] });
+    full.trip.end_date = "2026-10-10";
+    const response = await getPack();
+    expect((await response.json()).checks).toEqual(checks);
   });
 });

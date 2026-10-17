@@ -12,7 +12,7 @@ import { fetchTripForecast, hasTripCoordinates, resolveTripStop, tripDayForecast
 import { outfitMismatches } from "@/lib/trip-kit-fit";
 import {
   kitVersions, packingFromOutfits, packingSeen, packingWithChanges, parsePackingChange,
-  readManualItems, readQuantities, readSeen, sameKitVersions, type DayOutfit,
+  readManualItems, readPackingChecks, readQuantities, readSeen, sameKitVersions, type DayOutfit,
 } from "@/lib/trip-packing";
 import layerRecommendations from "@/data/layerRecommendations.json";
 import type { DailyLayerPlan } from "@/types/plan";
@@ -204,11 +204,11 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   // The person's own choices: a list that can't be read (before its
   // migration) still shows, without them, and can't be changed.
   let editable = !!myMember;
-  let saved: { items?: unknown; quantities?: unknown; seen?: unknown } | null = null;
+  let saved: { items?: unknown; quantities?: unknown; seen?: unknown; checks?: unknown } | null = null;
   if (myMember) {
     const { data, error } = await supabase
       .from("trip_member_packing")
-      .select("items, quantities, seen")
+      .select("items, quantities, seen, checks")
       .eq("trip_member_id", myMember.id)
       .maybeSingle();
     if (error) editable = false;
@@ -248,12 +248,13 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     kitVersions: versions,
     checklists,
     manual: readManualItems(saved?.items),
+    checks: readPackingChecks(saved?.checks),
     editable,
     suggestions,
     suggestedDays: dailyPlans.length,
     skipped,
     groupGear: myGear,
-  } satisfies TripPackResponse);
+  } satisfies TripPackResponse, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 /**
@@ -271,7 +272,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
   if (typeof change === "string") return jsonError(change, 400);
 
   let op: Record<string, unknown> = change;
-  if (change.op === "acknowledge") {
+  if (change.op === "acknowledge" || change.op === "set_packed") {
     const full = await loadTripFull(supabase, id);
     if (!full) return jsonError("Not found", 404);
     const kits = myKits(full, myMemberOf(full, userId)?.id);
@@ -279,7 +280,15 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     if (!sameKitVersions(versions, change.kits)) return kitsChanged();
     const { data: mappings } = await readMappings(supabase, userId);
     const derived = itemsFromKits(kits, mappedNames((mappings ?? []) as MappingRow[]));
-    op = { op: "acknowledge", seen: packingSeen(derived), kits: versions };
+    if (change.op === "acknowledge") {
+      op = { op: "acknowledge", seen: packingSeen(derived), kits: versions };
+    } else {
+      // A caller cannot create checks for another person's kit, group gear,
+      // decorative suggestions, or an item that has left their outfits.
+      const item = derived.find((item) => item.key === change.key);
+      if (!item && !/^manual:[0-9a-f-]{36}$/.test(change.key)) return jsonError("That item is no longer in your list. Refresh and try again.", 404);
+      op = { ...change, aliases: item?.aliases ?? [] };
+    }
   }
 
   const { data, error } = await updatePacking(supabase, id, userId, op);
@@ -287,7 +296,8 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
   return NextResponse.json({
     manual: readManualItems(data?.items),
     quantities: readQuantities(data?.quantities),
-  } satisfies PackingChoices);
+    checks: readPackingChecks(data?.checks),
+  } satisfies PackingChoices, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 function kitsChanged() {
@@ -299,9 +309,10 @@ function packingError(error: { code?: string; message?: string }, change: Packin
     case "42501": return jsonError("Not found", 404);
     case "P0002": return jsonError("That item was removed in another session. Reload your list.", 404);
     case "40001": return kitsChanged();
+    case "P0409": return NextResponse.json({ error: "This item changed in another session. Review its saved state and try again.", code: "packing_changed" }, { status: 409 });
     case "22023": return jsonError(change.op === "add_item" ? "You can add up to 50 items. Remove one first." : "Check the change and try again.", 400);
     // Before its migration, the list's choices can't be saved.
-    case "42883": case "42P01": case "PGRST202": return jsonError("Packing changes can't be saved yet. Try again later.", 503);
+    case "42883": case "42P01": case "42703": case "PGRST202": return jsonError("Packing changes can't be saved yet. Try again later.", 503);
     default: return jsonError("Couldn't save the change. Try again.", 500);
   }
 }

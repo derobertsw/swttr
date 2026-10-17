@@ -8,6 +8,7 @@ import { kitWear } from "@/lib/trip-saved-kits";
 import type { SavedKit } from "@/types/savedKit";
 import type {
   PackingChange,
+  PackingChecks,
   PackingItem,
   PackingManualItem,
   PackingOwnership,
@@ -106,7 +107,7 @@ function only(drafts: Draft[]): Draft | undefined {
  *   their own items, which a multi-day plan's items carry.
  * - Names come from the latest save.
  * - `aliases` lists the other keys the same item can be saved under (see
- *   aliasesOf), so a quantity or acknowledgement saved under one still
+ *   aliasesOf), so a quantity saved under one still
  *   applies after an outfit names the item another way.
  */
 export function packingFromOutfits(outfits: DayOutfit[], mapped: ReadonlySet<string> = new Set()): DerivedItem[] {
@@ -205,28 +206,25 @@ export function packingSeen(items: DerivedItem[]): PackingSeen {
  * acknowledged their list: an item that's new where an item that left was
  * worn (the same day, body area and layer) replaces it, another new item is
  * added, and items that left without being replaced are listed as removed.
- * Nothing is flagged before the first acknowledgement. An item saved under
- * one of an item's aliases is that item, so it hasn't left, and its quantity
- * applies until one is chosen under the item's own key.
+ * Nothing is flagged before the first acknowledgement. Quantities can follow
+ * aliases, but changes use exact identities, like physical packing checks.
  */
 export function packingWithChanges(items: DerivedItem[], quantities: Record<string, number>, seen: PackingSeen | null): {
   items: PackingItem[];
   removed: PackingRemovedItem[];
 } {
-  const current = new Set(items.flatMap((item) => [item.key, ...(item.aliases ?? [])]));
+  const current = new Set(items.map((item) => item.key));
   const gone = seen ? Object.entries(seen).filter(([key]) => !current.has(key)) : [];
-  const replaced = new Set<string>();
   const result = items.map((item): PackingItem => {
     const quantity = [item.key, ...(item.aliases ?? [])].map((key) => quantities[key]).find((value) => value !== undefined);
     const withQuantity = { ...item, quantity: quantity ?? 1 };
-    if (!seen || [item.key, ...(item.aliases ?? [])].some((key) => seen[key])) return withQuantity;
+    if (!seen || seen[item.key]) return withQuantity;
     const slots = new Set(packingSeen([item])[item.key].slots);
     const replaces = gone.filter(([, before]) => before.slots.some((slot) => slots.has(slot)));
     if (replaces.length === 0) return { ...withQuantity, change: { kind: "added" } };
-    replaces.forEach(([key]) => replaced.add(key));
     return { ...withQuantity, change: { kind: "replaced", replaces: replaces.map(([, before]) => before.name) } };
   });
-  const removed = gone.filter(([key]) => !replaced.has(key)).map(([key, before]) => ({ key, name: before.name, dates: before.dates }));
+  const removed = gone.map(([key, before]) => ({ key, name: before.name, dates: before.dates }));
   return { items: result, removed };
 }
 
@@ -268,6 +266,15 @@ export function readQuantities(value: unknown): Record<string, number> {
   return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, number] => isQuantity(entry[1])));
 }
 
+/** Read confirmed checks, retaining unchecked versions for conflict detection. */
+export function readPackingChecks(value: unknown): PackingChecks {
+  if (!isObject(value)) return {};
+  return Object.fromEntries(Object.entries(value).flatMap(([key, entry]) =>
+    isObject(entry) && typeof entry.packed === "boolean" && isQuantity(entry.quantity)
+      && typeof entry.version === "string" && UUID.test(entry.version)
+      ? [[key, { packed: entry.packed, quantity: entry.quantity, version: entry.version }]] : []));
+}
+
 /** Checks a change to the person's list; a string says what's wrong with it. */
 export function parsePackingChange(body: unknown): PackingChange | string {
   if (!isObject(body)) return "Nothing to change.";
@@ -275,6 +282,15 @@ export function parsePackingChange(body: unknown): PackingChange | string {
   const quantity = body.quantity;
   const checkQuantity = () => isQuantity(quantity) ? null : `Choose a quantity from 1 to ${MAX_QUANTITY}.`;
   switch (body.op) {
+    case "set_packed":
+      if (typeof body.key !== "string" || !body.key || body.key.length > 300
+        || typeof body.packed !== "boolean" || typeof body.mutation !== "string" || !UUID.test(body.mutation)
+        || !(body.expected === null || (typeof body.expected === "string" && UUID.test(body.expected)))
+        || !isObject(body.kits) || !Object.values(body.kits).every((at) => typeof at === "string" && Number.isFinite(Date.parse(at)))) {
+        return "Reload your list and try again.";
+      }
+      return checkQuantity() ?? { op: "set_packed", key: body.key, packed: body.packed, quantity: quantity as number,
+        expected: body.expected, mutation: body.mutation, kits: body.kits as Record<string, string> };
     case "add_item": {
       const name = typeof body.name === "string" ? body.name.trim() : "";
       if (!UUID.test(id)) return "Invalid item.";

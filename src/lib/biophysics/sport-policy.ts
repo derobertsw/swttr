@@ -13,7 +13,8 @@ export interface SustainedSportPolicy {
   phase: 'sustained';
   effort: ExertionLevel;
   metabolicRateWm2: number;
-  /** Applicability of cold-exposure heuristics, not a probability or safety bound. */
+  /** Applicability of added cold margins and local heuristics; never scales
+   * whole-body heat balance. Not a probability or a measured safety bound. */
   coldExposureFactor: number;
   protection: { wind: boolean; wet: boolean; poleGrip: boolean };
   assumptions: string[];
