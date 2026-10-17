@@ -3,8 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DayTourPlan } from "./TourPlan";
 import { buildTourPlanSummary } from "@/lib/trip-tour-plans";
-import { fakeTripApi, reply, sentBodies, TRIP, tripFull } from "@/test/tripApi";
-import type { TripTourPlan, TripTourPlanSummary } from "@/types/trips";
+import { fakeTripApi, reply, sentBodies, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
+import type { TripLocation, TripTourPlan, TripTourPlanSummary } from "@/types/trips";
 
 const DATE = "2026-10-10";
 const route = `/api/v1/trips/${TRIP.id}/days/${DATE}/tour-plan`;
@@ -116,6 +116,19 @@ describe("Day tour plan", () => {
     expect(screen.getByText(/9.5 km · 1,100 m ascent · 6 h/)).toBeVisible();
     expect(screen.getByText("Crew estimate")).toBeVisible();
     expect(screen.getByText("Times are local to the destination (America/New_York).")).toBeInTheDocument();
+  });
+
+  it("meets at the day's access point from Getting there, its own or its stop's", () => {
+    const lot = (label: string): TripLocation => ({ label, address: null, latitude: 44.2571, longitude: -71.2531, precision: "exact",
+      time_zone: null, source: "manual", provider: null, provider_id: null, attribution: null });
+    const stop = { ...STOWE_STOP, access_point: lot("Pinkham Notch lot") };
+    const { rerender } = render(<DayTourPlan data={tripFull({ stops: [stop], days: DAYS, tour_plans: [saved()] })} date={DATE} dateLabel="Sat Oct 10"
+      activity="Backcountry" canEdit onSaved={onSaved} onRestore={onRestore} />);
+    expect(screen.getByText("6:30 AM EDT · Sat Oct 10 · Pinkham Notch lot")).toBeInTheDocument();
+    const own = [{ ...DAYS[0], access_point: lot("Cog Railway base"), access_point_stop_id: STOWE_STOP.id }];
+    rerender(<DayTourPlan data={tripFull({ stops: [stop], days: own, tour_plans: [saved({ meet_time: null })] })} date={DATE} dateLabel="Sat Oct 10"
+      activity="Backcountry" canEdit onSaved={onSaved} onRestore={onRestore} />);
+    expect(screen.getByText("Time not set · Cog Railway base")).toBeInTheDocument();
   });
 
   it("gives members the plan without organizer actions", () => {
