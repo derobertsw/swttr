@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       const index = first >= trip.start_date && last <= trip.end_date
         ? enumerateDates(trip.start_date, first).length
         : null;
-      return { id: trip.id, name: trip.name, start_date: trip.start_date, end_date: trip.end_date, member_count: trip.member_count, day_number: index };
+      return { id: trip.id, name: trip.name, start_date: trip.start_date, end_date: trip.end_date, member_count: trip.member_count, crew_counts: trip.crew_counts, day_number: index };
     }),
   };
   return NextResponse.json(options);

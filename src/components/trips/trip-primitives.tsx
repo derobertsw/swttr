@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { TripCrewCounts } from "@/types/trips";
 
 const WEATHER_ICONS: Record<string, typeof Sun> = {
   snow: Snowflake,
@@ -160,6 +161,10 @@ export function daysBetween(startISO: string, endISO: string): number {
   return Math.round((end - start) / 86400000) + 1;
 }
 
+export function formatCrewCounts({ joined, pending, guests }: TripCrewCounts): string {
+  return `${joined} joined · ${pending} pending ${pending === 1 ? "invitation" : "invitations"} · ${guests} managed ${guests === 1 ? "guest" : "guests"}`;
+}
+
 function buildInviteUrl(token: string): string {
   if (typeof window === "undefined") return `/trips/invite/${token}`;
   return `${window.location.origin}/trips/invite/${token}`;
@@ -176,6 +181,13 @@ export function InviteLinkButton({
   tripName?: string;
   className?: string;
 }) {
+  const handleCopy = async () => {
+    const url = buildInviteUrl(token);
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Invite link copied");
+    } catch { window.prompt("Copy this invite link:", url); }
+  };
   const handleShare = async () => {
     const url = buildInviteUrl(token);
     const shareData: ShareData = {
@@ -193,28 +205,22 @@ export function InviteLinkButton({
         await navigator.share(shareData);
         return;
       } catch (err) {
-        // User cancelled — fall through to clipboard.
-        if (err instanceof Error && err.name === "AbortError") return;
+        // Cancellation does not mean the link was sent or copied.
+        if (err && typeof err === "object" && "name" in err && err.name === "AbortError") return;
       }
     }
 
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Invite link copied");
-    } catch {
-      // Final fallback — show the URL so the user can copy manually.
-      window.prompt("Copy this invite link:", url);
-    }
+    await handleCopy();
   };
 
   return (
-    <Button type="button" variant="outline" size="sm" onClick={handleShare} className={className}>
-      {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
-        <Share2 />
-      ) : (
-        <Copy />
-      )}
-      Send invite
-    </Button>
+    <div className={cn("flex flex-wrap gap-1.5", className)}>
+      <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
+        <Copy />Copy link
+      </Button>
+      <Button type="button" variant="outline" size="sm" onClick={handleShare}>
+        <Share2 />Share link
+      </Button>
+    </div>
   );
 }
