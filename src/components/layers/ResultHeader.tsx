@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronDown, CloudRain, CloudSnow, Loader2, MapPin, Pencil } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ACTIVITIES } from "@/data/activities";
@@ -104,6 +104,7 @@ function ActivityControl({
   loading,
 }: Pick<ResultHeaderProps, "activity" | "onActivityChange" | "loading">) {
   const [open, setOpen] = useState(false);
+  const selectedActivityRef = useRef<HTMLButtonElement>(null);
   const selected = ACTIVITIES.find((candidate) => candidate.value === activity);
   if (!selected) return null;
 
@@ -132,11 +133,22 @@ function ActivityControl({
           <ChevronDown className="opacity-70" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-1" align="start">
+      <PopoverContent
+        className="w-56 p-1"
+        align="start"
+        onOpenAutoFocus={(event) => {
+          if (selectedActivityRef.current) {
+            event.preventDefault();
+            selectedActivityRef.current.focus();
+          }
+        }}
+      >
         {ACTIVITIES.map((option) => (
           <button
             key={option.value}
             type="button"
+            ref={option.value === activity ? selectedActivityRef : undefined}
+            aria-pressed={option.value === activity}
             className={cn(
               "flex min-h-9 w-full items-center gap-2.5 rounded-[calc(var(--radius)-4px)] px-3 py-2 text-base transition-colors hover:bg-accent hover:text-accent-foreground max-md:min-h-11 pointer-coarse:min-h-11 md:text-sm",
               option.value === activity && "font-semibold"
@@ -148,9 +160,9 @@ function ActivityControl({
               }
             }}
           >
-            <option.icon className="size-4 shrink-0 text-muted-foreground" />
+            <option.icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="flex-1 text-left">{option.name}</span>
-            {option.value === activity && <Check className="size-4 text-primary" />}
+            {option.value === activity && <Check className="size-4 text-primary" aria-hidden="true" />}
           </button>
         ))}
       </PopoverContent>

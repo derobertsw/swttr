@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ResultHeader } from "./ResultHeader";
 
@@ -127,5 +127,22 @@ describe("ResultHeader", () => {
 
     expect(screen.getByText("Running")).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("exposes the selected activity and focuses it when opened with the keyboard", async () => {
+    const onActivityChange = vi.fn(async () => {});
+    const user = userEvent.setup();
+    render(<ResultHeader activity="xc_skiing" temperature={30} windspeed={5} onActivityChange={onActivityChange} />);
+    const trigger = screen.getByRole("button", { name: "XC Skiing, change activity" });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+
+    const selected = screen.getByRole("button", { name: "XC Skiing", pressed: true });
+    await waitFor(() => expect(selected).toHaveFocus());
+    expect(screen.getAllByRole("button", { pressed: false })).toHaveLength(5);
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(onActivityChange).not.toHaveBeenCalled();
   });
 });
