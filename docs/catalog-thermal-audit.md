@@ -280,7 +280,9 @@ Option C was chosen on 2026-10-17. Migration 034 uses variant B's values, and th
 
 ## Applying migration 034
 
-Migrations are applied by hand in the Supabase SQL editor. 034 doesn't depend on 033 (PR #310), so either can go first. Paste this as one script:
+**Check first.** Since 2026-10-17, merged migrations have shown up in prod's history within about a minute of the merge, under a timestamp version. That is probably Supabase's GitHub integration, but it's unconfirmed. After merging, check the migration history (MCP `list_migrations`). If `catalog_whole_body_and_puffy_clo` is already there, skip the paste and only run the check query. 034 doesn't depend on 033.
+
+Otherwise, apply it by hand in the Supabase SQL editor. Paste this as one script:
 
 ```sql
 BEGIN;
@@ -299,7 +301,9 @@ SELECT
 FROM garment_thermal_properties;
 ```
 
-Expect 0, 0 and 14. Garments added after 2026-10-17 can add to the first two counts.
+Expect 0, 0 and 14. The two garments migration 033 added (FP Movement Lift Love Jacket and Bib) already follow the weighting. Garments added later can add to the first two counts.
+
+**The add-wardrobe-item skill's guide needs the new scale.** `.claude/skills/add-wardrobe-item/references/thermal-estimation.md` (#311) still describes the pre-034 catalog. Its "Catalog scale" table puts light synthetics at 0.80–1.15 torso clo and belay puffies at 1.90–3.20, and its "Known inconsistency" paragraph says to store the peer-consistent low value. After 034, puffy peers are on the lab scale (light synthetics 1.35–2.45, belay puffies 4.15–5.50), while insulated outerwear stays on the low scale.
 
 ## Sources
 
