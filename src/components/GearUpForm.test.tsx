@@ -1,6 +1,6 @@
 import { createRef, useState, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GearUpForm } from "./GearUpForm";
 import type { InputMode } from "@/lib/gearUp";
@@ -59,6 +59,7 @@ function baseProps(overrides: Partial<Props> = {}): Props {
 function StatefulForm(overrides: Partial<Props>) {
   const [inputMode, setInputMode] = useState<InputMode>(overrides.inputMode ?? "now");
   const [durationDays, setDurationDays] = useState(overrides.durationDays ?? 1);
+  const [date, setDate] = useState(overrides.date);
   return (
     <GearUpForm
       {...baseProps(overrides)}
@@ -66,6 +67,8 @@ function StatefulForm(overrides: Partial<Props>) {
       onInputModeChange={setInputMode}
       durationDays={durationDays}
       onDurationDaysChange={setDurationDays}
+      date={date}
+      onDateChange={setDate}
     />
   );
 }
@@ -172,6 +175,24 @@ describe("GearUpForm's start date calendar", () => {
         })}
       />
     );
+
+  it.each(["pointer", "keyboard"])("closes after a %s selection and returns focus to Start date", async (input) => {
+    const user = userEvent.setup();
+    render(<StatefulForm inputMode="later" />);
+    await user.click(screen.getByRole("button", { name: "Start date Pick a date" }));
+    const day = screen.getByRole("button", { name: "Thursday, October 8th, 2026" });
+
+    if (input === "pointer") await user.click(day);
+    else {
+      act(() => day.focus());
+      await user.keyboard("{Enter}");
+    }
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start date Oct 8, 2026" })).toHaveFocus());
+    await user.click(screen.getByRole("button", { name: "Start date Oct 8, 2026" }));
+    expect(screen.getByRole("gridcell", { selected: true })).toHaveTextContent("8");
+  });
 
   it("marks today at the chosen place", async () => {
     const user = userEvent.setup();
