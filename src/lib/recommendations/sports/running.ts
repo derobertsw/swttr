@@ -57,6 +57,7 @@ function getRunningGuidance(
 }
 
 export const running = createSinglePhaseSport({
+  requirementFirst: true,
   activity: 'running',
   profile: { name: 'Running', windExposure: 'normal' },
   minEvapPotential: MIN_EVAP_POTENTIAL,

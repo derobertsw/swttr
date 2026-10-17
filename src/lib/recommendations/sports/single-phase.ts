@@ -14,6 +14,7 @@ import { metabolicRateFor, phaseIreq, phaseTargets, type PhaseTargets } from '..
 import { selectHandwear, selectHeadwearByCategory } from '../extremities';
 import { buildScoredRecommendation } from '../response-builder';
 import { formatConditions, formatSinglePhaseIreq } from '../formatting';
+import { buildClothingRequirements, filterUnsuitableEnsemble } from '../requirements';
 
 interface SinglePhaseTargets extends PhaseTargets {
   metabolicRate: number;
@@ -37,6 +38,8 @@ interface SinglePhaseSportConfig {
   guidance(request: RecommendationRequest, ireq: IreqResult): string[];
   /** Retain functional protection when a calibrated budget changes. */
   protect?(ensemble: GarmentRow[], categorized: CategorizedGarments, targets: SinglePhaseTargets): { ensemble: GarmentRow[]; warnings: string[] };
+  /** Requirement-first flow: report suitable-clothing needs separately from wardrobe matches. */
+  requirementFirst?: boolean;
 }
 
 /** Compose one-phase targets, outfit/protection selection, and response evaluation for a sport. */
@@ -60,6 +63,9 @@ export function createSinglePhaseSport(
     emptyResponse(request, targets) {
       return {
         ireq: targets.policy ? formatSinglePhaseIreq(targets.ireq, targets) : { min: targets.ireq.ireqMin, neutral: targets.ireq.ireqNeutral },
+        ...(config.requirementFirst ? {
+          requirements: buildClothingRequirements(config.activity, targets, { garments: [], handwear: [], headwear: [], usingWardrobe: false }),
+        } : {}),
         recommendations: {
           target_clo_range: targets.targetRange,
           min_evap_potential: config.minEvapPotential,
@@ -71,7 +77,8 @@ export function createSinglePhaseSport(
     recommend(request, targets, pool) {
       const built = config.buildEnsemble(pool.categorized, targets, request);
       const protectedOutfit = config.protect?.(built, pool.categorized, targets);
-      const ensemble = protectedOutfit?.ensemble ?? built;
+      const builtEnsemble = protectedOutfit?.ensemble ?? built;
+      const ensemble = config.requirementFirst ? filterUnsuitableEnsemble(builtEnsemble, targets.regional) : builtEnsemble;
       const handwear = selectHandwear(
         pool.handwear,
         request.tempC,
@@ -107,6 +114,15 @@ export function createSinglePhaseSport(
         headwear
       );
 
+      const requirements = config.requirementFirst
+        ? buildClothingRequirements(config.activity, targets, {
+          garments: pool.garments ?? Object.values(pool.categorized).flat(),
+          handwear: pool.handwear, headwear: pool.headwear, usingWardrobe: pool.usingWardrobe,
+          selectedIds: new Set([...ensemble.map((g) => g.id), handwear?.id, headwear.headWarmth?.id, headwear.neckWarmth?.id].filter((id): id is string => Boolean(id))),
+        })
+        : undefined;
+      const missingGuidance = requirements?.filter((r) => r.status === 'missing').map((r) => r.message) ?? [];
+
       return {
         conditions: {
           ...formatConditions(request.weather),
@@ -114,9 +130,10 @@ export function createSinglePhaseSport(
           ...config.conditions(request),
         },
         ireq: formatSinglePhaseIreq(targets.ireq, targets),
+        ...(requirements ? { requirements } : {}),
         recommendation,
         warnings: [...warnings, ...(protectedOutfit?.warnings ?? [])],
-        guidance: [...config.guidance(request, targets.ireq), ...(targets.policy?.assumptions ?? [])],
+        guidance: [...config.guidance(request, targets.ireq), ...missingGuidance, ...(targets.policy?.assumptions ?? [])],
       };
     },
   };

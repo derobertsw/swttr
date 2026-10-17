@@ -20,6 +20,7 @@ export interface CatalogFilter {
 export interface GearPool {
   /** True when garments come from the user's wardrobe rather than the catalog. */
   usingWardrobe: boolean;
+  garments?: GarmentRow[];
   categorized: CategorizedGarments;
   handwear: HandwearRow[];
   headwear: HeadwearRow[];
@@ -67,6 +68,7 @@ export async function loadGearPool(
     status: 'ok',
     pool: {
       usingWardrobe,
+      garments,
       categorized: categorizeGarments(garments),
       handwear,
       headwear,

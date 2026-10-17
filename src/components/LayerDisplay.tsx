@@ -617,6 +617,17 @@ const LayerDisplay = ({
                 />
               )}
 
+              {(biophysicsData?.requirements?.some((r) => r.status === 'missing') ?? false) && (
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-sm font-semibold text-foreground">Not in your wardrobe</p>
+                  <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-foreground">
+                    {biophysicsData!.requirements!.filter((r) => r.status === 'missing').map((r) => (
+                      <li key={r.id}>{r.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {guidance.length > 0 && (
                 <ResultDisclosure title="Why these layers?">
                   <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-foreground">

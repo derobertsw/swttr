@@ -56,7 +56,8 @@ graph TD
     F --> P[Load Gear Pool:<br/>wardrobe, or catalog filtered by activity score]
     P -->|No usable garments| T[Targets-only response]
     P --> G[Ensemble Building]
-    G --> H[Ensemble Scoring]
+    G --> R[Running/XC only: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
+    R --> H[Ensemble Scoring]
     H --> I[Comfort Evaluation:<br/>shortfalls below each minimum]
 
     subgraph "Shared Biophysics Core — thermal-targets.ts"
