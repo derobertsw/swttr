@@ -111,6 +111,8 @@ export interface TripFull {
   lodging?: TripLodging;
   /** Backcountry days' tour plans (#210); optional like `lodging`. */
   tour_plans?: TripTourPlanSummary[];
+  /** Each day's conditions sources with the crew's reviews (#211); optional like `lodging`. */
+  conditions?: TripDayConditionsSource[];
 }
 
 /** A Backcountry day's tour plan as the organizer enters it: see docs/trip-tour-plans.md. */
@@ -166,6 +168,72 @@ export interface TripTourPlanSummary extends TripTourPlan {
   /** Says whose clock the times use; null without times. */
   time_zone_label: string | null;
   updated_label: string;
+}
+
+export type TripConditionsCategory = "avalanche" | "weather" | "access";
+
+/** An official conditions source as the organizer enters it: see docs/trip-conditions.md. */
+export interface TripConditionsSourceInput {
+  category: TripConditionsCategory;
+  name: string;
+  /** The forecast zone or area it covers. */
+  region: string | null;
+  url: string;
+}
+
+export interface TripConditionsSource extends TripConditionsSourceInput {
+  id: string;
+  trip_id: string;
+  revision: number;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * What a review was recorded against: the day's plan and the source as they
+ * were. A review goes stale when any of it changes.
+ */
+export interface TripConditionsContext {
+  date: string;
+  /** The destination, with its weather location. */
+  stop: { id: string; latitude: number | null; longitude: number | null } | null;
+  activity: string | null;
+  access_point: { latitude: number; longitude: number } | null;
+  route: { objective: string; route_url: string | null } | null;
+  source: { url: string; region: string | null };
+}
+
+/** One entry in a person's review history. */
+export interface TripConditionsReviewEntry {
+  id: string;
+  action: "reviewed" | "corrected" | "withdrawn";
+  note: string | null;
+  /** When the review was recorded; a correction or withdrawal keeps it. */
+  reviewed_at: string;
+  /** When this entry was saved. */
+  created_at: string;
+}
+
+/** A person's review of a source on a day. */
+export interface TripConditionsReview {
+  user_id: string;
+  /** Their latest entry: the review, or its withdrawal. */
+  current: TripConditionsReviewEntry;
+  /** What changed since the review was recorded, e.g. "Route changed"; empty while it matches the plan. */
+  stale_reasons: string[];
+  /** Earlier entries, newest first. */
+  history: TripConditionsReviewEntry[];
+}
+
+/** A source on a day, with everyone's reviews of it for that day. */
+export interface TripDayConditionsSource extends TripConditionsSource {
+  date: string;
+  trip_day_id: string;
+  /** The day's plan and this source as the server reads them now; recording a review sends it back. */
+  context_key: string;
+  reviews: TripConditionsReview[];
 }
 
 export type TripStayType = "hotel" | "rental" | "hut" | "campground" | "other";

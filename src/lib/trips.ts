@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { jsonError, requireUser, type AuthedContext } from "@/lib/api";
 import { loadLodging } from "@/lib/trip-lodging";
 import { loadTourPlans, summarizeTourPlans } from "@/lib/trip-tour-plans";
+import { loadConditions, summarizeConditions } from "@/lib/trip-conditions";
 import type {
   Trip,
   TripDay,
@@ -163,7 +164,7 @@ export async function loadTripFull(
   const tripId = trip.id;
 
   // Kits depend only on days; don't wait for stops, members or gear to start
-  // them. Accommodation and tour plans are independent of all of these reads.
+  // them. Accommodation, tour plans and conditions are independent of all of these reads.
   const loadDaysAndKits = async () => {
     const { data } = await supabase
       .from("trip_days").select("*").eq("trip_id", tripId).order("date");
@@ -176,7 +177,7 @@ export async function loadTripFull(
     return { days, kits: (kits ?? []) as TripMemberDayKit[] };
   };
 
-  const [stopsRes, membersRes, { days, kits }, gearRes, lodging, tourPlans] = await Promise.all([
+  const [stopsRes, membersRes, { days, kits }, gearRes, lodging, tourPlans, conditions] = await Promise.all([
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("position"),
     supabase.from("trip_members").select("*").eq("trip_id", tripId),
     loadDaysAndKits(),
@@ -187,11 +188,14 @@ export async function loadTripFull(
       .order("sort_order"),
     loadLodging(supabase, trip),
     loadTourPlans(supabase, tripId),
+    loadConditions(supabase, tripId),
   ]);
 
+  const stops = (stopsRes.data ?? []) as TripStop[];
+  const tour_plans = summarizeTourPlans(tourPlans, days);
   return {
     trip,
-    stops: (stopsRes.data ?? []) as TripStop[],
+    stops,
     members: ((membersRes.data ?? []) as TripMember[]).map((m) => ({
       ...m, invite_token: m.status === "invited" ? m.invite_token : null,
     })),
@@ -200,7 +204,8 @@ export async function loadTripFull(
     kits,
     gear: (gearRes.data ?? []) as TripGroupGear[],
     lodging,
-    tour_plans: summarizeTourPlans(tourPlans, days),
+    tour_plans,
+    conditions: summarizeConditions(conditions, { stops, days, tour_plans }),
   };
 }
 

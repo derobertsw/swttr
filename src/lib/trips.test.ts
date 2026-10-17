@@ -68,7 +68,9 @@ describe("Trip loading", () => {
     expect(requests.map((r) => r.table)).not.toContain("trips");
     // Tour plans (#210) start with the first stage rather than waiting for days.
     expect(requests.find((r) => r.table === "trip_day_tour_plans")?.started).toBe(started);
-    expect(full).toMatchObject({ trip: TRIP, days: [day], kits: [kit], members: [ORGANIZER], stops: [STOWE_STOP], lodging: { stays: [], assignments: [] }, tour_plans: [] });
+    // So do conditions sources and reviews (#211).
+    expect(requests.filter((r) => r.table.includes("conditions")).map((r) => r.started)).toEqual([started, started, started]);
+    expect(full).toMatchObject({ trip: TRIP, days: [day], kits: [kit], members: [ORGANIZER], stops: [STOWE_STOP], lodging: { stays: [], assignments: [] }, tour_plans: [], conditions: [] });
   });
 
   it("starts kits as soon as days load even when another trip query is slow", async () => {
