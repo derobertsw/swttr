@@ -213,6 +213,36 @@ describe("A member's own packing choices in Postgres", () => {
     expect((await db.query<Row>("SELECT * FROM trip_member_packing")).rows[0].checks).toEqual({});
   });
 
+  it.each([false, true])("rejects a stale first check after a quantity cycle (manual: %s)", async (manual) => {
+    const id = randomUUID();
+    const key = manual ? `manual:${id}` : "item:g-3";
+    if (manual) await update({ op: "add_item", id, name: "Socks", quantity: 1 });
+    const quantity = (value: number) => update(manual
+      ? { op: "item_quantity", id, quantity: value }
+      : { op: "quantity", key, quantity: value });
+    // Session A saw an untouched, unchecked item at quantity 1.
+    const stale = { expected: null, mutation: randomUUID(), quantity: 1 };
+    // Session B changes the quantity and then restores it before A saves.
+    const changed = await quantity(2);
+    expect(changed.checks[key]).toMatchObject({ packed: false, quantity: 2, version: expect.any(String) });
+    const restored = await quantity(1);
+    expect(restored.checks[key]).toMatchObject({ packed: false, quantity: 1, version: expect.any(String) });
+    expect(restored.checks[key].version).not.toBe(changed.checks[key].version);
+    expect(await code(check(key, stale))).toBe("P0409");
+    expect((await check(key, { expected: restored.checks[key].version })).checks[key].packed).toBe(true);
+  });
+
+  it.each([false, true])("keeps an untouched item's version absent when its quantity is unchanged (manual: %s)", async (manual) => {
+    const id = randomUUID();
+    if (manual) await update({ op: "add_item", id, name: "Socks", quantity: 1 });
+    const row = await update(manual ? { op: "item_quantity", id, quantity: 1 } : { op: "quantity", key: "item:g-3", quantity: 1 });
+    expect(row.checks).toEqual({});
+    const key = manual ? `manual:${id}` : "item:g-3";
+    const checked = await check(key);
+    const unchanged = await update(manual ? { op: "item_quantity", id, quantity: 1 } : { op: "quantity", key, quantity: 1 });
+    expect(unchanged.checks).toEqual(checked.checks);
+  });
+
   it("rejects a check when an outfit changed since it was shown", async () => {
     const kits = await kitVersions(await memberId("Ana"));
     await db.query("UPDATE trip_member_day_kits SET outfit = '{\"changed\": true}' WHERE id = $1", [Object.keys(kits)[0]]);

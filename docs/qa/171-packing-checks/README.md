@@ -25,6 +25,8 @@ This fixture exercises the real UI with intercepted network data. It does **not*
 
 The initial full-suite run on host Node 26 suffered long timeouts and worker failures across unrelated pages. The Node 24 rerun passed the complete suite.
 
+PR review follow-up: four additional Postgres cases cover quantity changes before an item's first check, for both outfit items and personal additions. A 1 → 2 → 1 cycle advances the unchecked version and rejects an older session's `expected: null`; saving an unchanged quantity preserves the existing version. The two cycle regressions fail before the fix. All 172 focused packing tests pass after it.
+
 ## Deployment/device acceptance still required
 
 1. Apply `supabase/migrations/20261016231848_trip_personal_packing_checks.sql` after migration 024, registering the migration in the same transaction; deploy API/UI after the migration.

@@ -122,8 +122,7 @@ BEGIN
       RAISE EXCEPTION 'Item not found' USING ERRCODE = 'P0002';
     END IF;
     -- A quantity change needs a fresh physical packing confirmation.
-    IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_row.items) e WHERE e->>'id' = p_op->>'id' AND (e->>'quantity')::int <> v_quantity)
-      AND v_row.checks ? ('manual:' || (p_op->>'id')) THEN
+    IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_row.items) e WHERE e->>'id' = p_op->>'id' AND (e->>'quantity')::int <> v_quantity) THEN
       v_row.checks := jsonb_set(v_row.checks, ARRAY['manual:' || (p_op->>'id')],
         jsonb_build_object('packed', false, 'quantity', v_quantity, 'version', gen_random_uuid()::text));
     END IF;
@@ -139,7 +138,9 @@ BEGIN
     IF NOT v_row.quantities ? v_key AND (SELECT count(*) FROM jsonb_object_keys(v_row.quantities)) >= 300 THEN
       RAISE EXCEPTION 'Too many quantities' USING ERRCODE = '22023';
     END IF;
-    IF v_row.checks ? v_key AND (v_row.checks->v_key->>'quantity')::int <> v_quantity THEN
+    -- Record quantity history even before the first physical check, so an
+    -- old expected:null cannot survive a quantity change and restoration.
+    IF coalesce((v_row.checks->v_key->>'quantity')::int, (v_row.quantities->>v_key)::int, 1) <> v_quantity THEN
       v_row.checks := jsonb_set(v_row.checks, ARRAY[v_key],
         jsonb_build_object('packed', false, 'quantity', v_quantity, 'version', gen_random_uuid()::text));
     END IF;
