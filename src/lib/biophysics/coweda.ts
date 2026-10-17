@@ -121,7 +121,7 @@ export function calculateCowedaValidationBuffer(input: CowedaBufferInput): Cowed
 }
 
 /**
- * Applies CoWEDA validation-derived safety margins to an activity target range.
+ * Adds unvalidated SWTTR clo allowances inspired by published CoWEDA errors.
  */
 export function applyCowedaBufferToTargetRange(
   range: TargetRange,
