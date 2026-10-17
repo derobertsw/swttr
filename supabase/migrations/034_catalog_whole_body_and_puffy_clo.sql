@@ -8,8 +8,10 @@
 --    DAS Parka): torso = 0.70 + 0.0522 * fill^0.842 (fill in g/m²), arms at
 --    Nano-Air's 0.87 of torso. Ret scales with clo so each garment keeps its
 --    permeability index. Fill weights and per-row reasoning are in the audit.
---    A row changes only while it still has the audited torso and arms clo, so a
---    replay, or a value edited by hand since, is left alone.
+--    A row changes only while every field this step replaces still has its
+--    audited value (clo, Ret and confidence as audited; no data_source or
+--    uncertainty_clo yet), so a replay, or any value edited by hand since, is
+--    left alone.
 UPDATE garment_thermal_properties t
 SET rcl_torso = v.rcl_torso,
     rcl_arms = v.rcl_arms,
@@ -20,24 +22,27 @@ SET rcl_torso = v.rcl_torso,
     confidence_score = LEAST(t.confidence_score, v.max_confidence)
 FROM garments g,
 (VALUES
-  ('Patagonia', 'Nano-Air Light Vest', 0.85, 0.00, 1.85, 0.00, 30.47, 0.00, 0.30, 1.00),
-  ('Patagonia', 'Macro Puff Hoody', 1.65, 1.45, 3.95, 2.60, 67.03, 44.83, 0.30, 1.00),
-  ('Patagonia', 'Micro Puff Hoody', 1.10, 0.95, 2.45, 2.15, 44.55, 40.74, 0.30, 1.00),
-  ('Arc''teryx', 'Atom LT Hoody', 1.15, 1.00, 2.35, 2.05, 44.96, 41.00, 0.30, 1.00),
-  ('Norrøna', 'Lyngen Down850 Hood Jacket', 2.80, 2.20, 4.45, 3.50, 71.52, 63.64, 0.60, 0.50),
-  ('Rab', 'Nebitron Pro Insulated', 2.40, 1.90, 4.70, 2.95, 78.33, 55.89, 0.60, 0.50),
-  ('Patagonia', 'Nano-Air Ultralight Full-Zip Hoody', 0.80, 0.60, 1.35, 1.20, 20.25, 20.00, 0.30, 1.00),
-  ('Mountain Hardwear', 'Ghost Whisperer/2 Jacket', 1.45, 1.30, 2.55, 2.25, 38.69, 34.62, 0.60, 0.50),
-  ('Patagonia', 'DAS Light Hoody', 2.00, 1.60, 2.45, 2.15, 46.55, 45.69, 0.30, 1.00),
-  ('The North Face', 'Summit Breithorn Hoodie', 2.60, 2.10, 4.15, 3.35, 67.04, 60.62, 0.60, 0.50),
-  ('Rab', 'Neutrino Pro', 3.20, 2.60, 5.50, 3.50, 82.50, 56.54, 0.60, 0.50),
-  ('Columbia', 'Powder Lite Vest', 0.95, 0.00, 2.00, 0.00, 33.68, 0.00, 0.60, 0.50),
-  ('Helly Hansen', 'Odin Stretch Hooded Light Insulator 2.0', 1.15, 1.00, 2.35, 2.05, 44.96, 41.00, 0.60, 0.50),
-  ('Helly Hansen', 'Odin Stretch Hooded Insulator 2.0', 1.55, 1.35, 2.80, 2.45, 50.58, 45.37, 0.60, 0.50)
-) AS v(brand, model_name, old_torso, old_arms, rcl_torso, rcl_arms, recl_torso, recl_arms, uncertainty_clo, max_confidence)
+  ('Patagonia', 'Nano-Air Light Vest', 0.85, 0.00, 14.00, 0.00, 0.75, 1.85, 0.00, 30.47, 0.00, 0.30, 1.00),
+  ('Patagonia', 'Macro Puff Hoody', 1.65, 1.45, 28.00, 25.00, 0.70, 3.95, 2.60, 67.03, 44.83, 0.30, 1.00),
+  ('Patagonia', 'Micro Puff Hoody', 1.10, 0.95, 20.00, 18.00, 0.70, 2.45, 2.15, 44.55, 40.74, 0.30, 1.00),
+  ('Arc''teryx', 'Atom LT Hoody', 1.15, 1.00, 22.00, 20.00, 0.75, 2.35, 2.05, 44.96, 41.00, 0.30, 1.00),
+  ('Norrøna', 'Lyngen Down850 Hood Jacket', 2.80, 2.20, 45.00, 40.00, 0.75, 4.45, 3.50, 71.52, 63.64, 0.60, 0.50),
+  ('Rab', 'Nebitron Pro Insulated', 2.40, 1.90, 40.00, 36.00, 0.65, 4.70, 2.95, 78.33, 55.89, 0.60, 0.50),
+  ('Patagonia', 'Nano-Air Ultralight Full-Zip Hoody', 0.80, 0.60, 12.00, 10.00, 0.65, 1.35, 1.20, 20.25, 20.00, 0.30, 1.00),
+  ('Mountain Hardwear', 'Ghost Whisperer/2 Jacket', 1.45, 1.30, 22.00, 20.00, 0.70, 2.55, 2.25, 38.69, 34.62, 0.60, 0.50),
+  ('Patagonia', 'DAS Light Hoody', 2.00, 1.60, 38.00, 34.00, 0.65, 2.45, 2.15, 46.55, 45.69, 0.30, 1.00),
+  ('The North Face', 'Summit Breithorn Hoodie', 2.60, 2.10, 42.00, 38.00, 0.70, 4.15, 3.35, 67.04, 60.62, 0.60, 0.50),
+  ('Rab', 'Neutrino Pro', 3.20, 2.60, 48.00, 42.00, 0.70, 5.50, 3.50, 82.50, 56.54, 0.60, 0.50),
+  ('Columbia', 'Powder Lite Vest', 0.95, 0.00, 16.00, 0.00, 0.65, 2.00, 0.00, 33.68, 0.00, 0.60, 0.50),
+  ('Helly Hansen', 'Odin Stretch Hooded Light Insulator 2.0', 1.15, 1.00, 22.00, 20.00, 0.65, 2.35, 2.05, 44.96, 41.00, 0.60, 0.50),
+  ('Helly Hansen', 'Odin Stretch Hooded Insulator 2.0', 1.55, 1.35, 28.00, 25.00, 0.65, 2.80, 2.45, 50.58, 45.37, 0.60, 0.50)
+) AS v(brand, model_name, old_torso, old_arms, old_recl_torso, old_recl_arms, old_confidence, rcl_torso, rcl_arms, recl_torso, recl_arms, uncertainty_clo, max_confidence)
 WHERE t.garment_id = g.id
   AND g.brand = v.brand AND g.model_name = v.model_name
-  AND t.rcl_torso = v.old_torso AND t.rcl_arms = v.old_arms;
+  AND t.rcl_torso = v.old_torso AND t.rcl_arms = v.old_arms
+  AND t.recl_torso = v.old_recl_torso AND t.recl_arms = v.old_recl_arms
+  AND t.confidence_score = v.old_confidence
+  AND t.data_source IS NULL AND t.uncertainty_clo IS NULL;
 
 -- 2. Whole-body clo and Ret follow REGIONAL_WEIGHTS (0.5 torso, 0.25 arms,
 --    0.25 legs; an uncovered region counts as zero), as predictEnsembleThermal

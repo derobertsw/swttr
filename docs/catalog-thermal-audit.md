@@ -166,7 +166,7 @@ Step 1 of migration 034 applies these values, the same ones used for the "B" gol
 - `uncertainty_clo` of 0.3 where the fill weight is published, or 0.6 where it is unpublished or estimated;
 - for the low-confidence rows, `confidence_score` capped at 0.5.
 
-A row changes only while it still has the torso and arms clo it had at audit time, so a value edited by hand since is left alone.
+A row changes only while every field this step replaces still has its audit-time value: torso and arms clo and Ret, confidence, and an empty `data_source` and `uncertainty_clo`. Any of them edited by hand since leaves the row alone.
 
 | Garment | Torso / arms clo now | Proposed torso / arms | Proposed Ret torso / arms | Whole-body clo / Ret | Basis | Confidence | In fixture |
 |---|---|---|---|---|---|---|---|

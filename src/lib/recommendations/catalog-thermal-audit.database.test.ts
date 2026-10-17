@@ -87,13 +87,25 @@ describe('catalog thermal audit migration (034) in Postgres', () => {
     expect(await thermalRows(db)).toEqual(before);
   });
 
-  it('leaves a puffy alone once its clo was edited by hand, but still fixes its whole body', async () => {
+  it('leaves a puffy alone once any field it replaces was edited by hand, but still fixes its whole body', async () => {
     const edited = await seededCatalog();
+    const edit = (model: string, set: string) => edited.exec(
+      `UPDATE garment_thermal_properties SET ${set} FROM garments g WHERE garment_id = g.id AND g.model_name = '${model}'`);
     try {
-      await edited.exec("UPDATE garment_thermal_properties SET rcl_torso = 1.30 FROM garments g WHERE garment_id = g.id AND g.model_name = 'Atom LT Hoody'");
+      await edit('Atom LT Hoody', 'rcl_torso = 1.30');
+      await edit('Micro Puff Hoody', 'recl_torso = 25');
+      await edit('Macro Puff Hoody', 'confidence_score = 0.60');
+      await edit('Ghost Whisperer/2 Jacket', "data_source = 'hand-checked'");
+      await edit('Nano-Air Light Vest', 'uncertainty_clo = 0.20');
       await edited.exec(migration);
-      const row = (await thermalRows(edited)).find(r => r.model_name === 'Atom LT Hoody')!;
-      expect(values(row)).toMatchObject({ rcl_torso: 1.3, rcl_arms: 1, recl_torso: 22, data_source: null, rcl_whole_body: 0.9 });
+      const rows = new Map((await thermalRows(edited)).map(row => [row.model_name, values(row)]));
+      expect(rows.get('Atom LT Hoody')).toMatchObject({ rcl_torso: 1.3, rcl_arms: 1, recl_torso: 22, data_source: null, rcl_whole_body: 0.9 });
+      expect(rows.get('Micro Puff Hoody')).toMatchObject({ rcl_torso: 1.1, recl_torso: 25, data_source: null });
+      expect(rows.get('Macro Puff Hoody')).toMatchObject({ rcl_torso: 1.65, confidence_score: 0.6, data_source: null });
+      expect(rows.get('Ghost Whisperer/2 Jacket')).toMatchObject({ rcl_torso: 1.45, data_source: 'hand-checked', uncertainty_clo: null });
+      expect(rows.get('Nano-Air Light Vest')).toMatchObject({ rcl_torso: 0.85, uncertainty_clo: 0.2, data_source: null });
+      // Untouched puffies are still recalibrated.
+      expect(rows.get('DAS Light Hoody')).toMatchObject({ rcl_torso: 2.45 });
     } finally {
       await edited.close();
     }
