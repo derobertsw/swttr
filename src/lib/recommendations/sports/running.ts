@@ -6,6 +6,7 @@ import type { CategorizedGarments, GarmentRow } from '../types';
 import { createSinglePhaseSport } from './single-phase';
 import { buildBreathableEnsemble } from './breathable-ensemble';
 import { retainRunningProtection } from './running-protection';
+import { OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
 
 const MIN_EVAP_POTENTIAL = 0.3;
 
@@ -60,6 +61,11 @@ export const running = createSinglePhaseSport({
   requirementFirst: true,
   activity: 'running',
   profile: { name: 'Running', windExposure: 'normal' },
+  // Matches retainRunningProtection: a rain shell when wet, a wind shell when
+  // freezing or windy, otherwise the base or mid layer is outermost.
+  outerAirPermeability: ({ precipitation, tempC, windMs }) => precipitation
+    ? OUTER_AIR_PERMEABILITY.membrane
+    : tempC <= 0 || windMs > 8 ? OUTER_AIR_PERMEABILITY.windproof : OUTER_AIR_PERMEABILITY.open,
   minEvapPotential: MIN_EVAP_POTENTIAL,
   protect: (ensemble, categorized, targets) => targets.policy
     ? retainRunningProtection(ensemble, categorized, targets.policy.protection)
@@ -67,7 +73,7 @@ export const running = createSinglePhaseSport({
   buildEnsemble: (categorized, targets, request) =>
     buildRunningEnsemble(
       categorized,
-      targets.ireq,
+      targets.basicIreq,
       targets.targetRange[1],
       MIN_EVAP_POTENTIAL,
       request.precipitation

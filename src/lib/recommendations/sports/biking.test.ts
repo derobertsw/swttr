@@ -187,4 +187,20 @@ describe("buildBikingEnsemble", () => {
     const ids = ensemble.map((g) => g.id);
     expect(ids).toEqual(["dual-base"]);
   });
+
+  it("adds the wind shell as protection even when it doesn't fit the clo budget", () => {
+    const base = createGarment({
+      id: "torso-base", category: "base_layer", covers_torso: true,
+      garment_thermal_properties: { rcl_whole_body: 0.3, evap_potential: 0.35 },
+    });
+    // A thin shell alone on the manikin is about 0.5 whole-body clo (USARIEM T21-03).
+    const shell = createGarment({
+      id: "wind-shell", category: "hard_shell", covers_torso: true, covers_arms: true,
+      garment_thermal_properties: { rcl_whole_body: 0.49, evap_potential: 0.5 },
+    });
+    const categorized: CategorizedGarments = { baseLayers: [base], midLayers: [], insulation: [], shells: [shell] };
+
+    const ids = buildBikingEnsemble(categorized, { ireqMin: 0.3, ireqNeutral: 0.5 }, 0.6, 0.25).map((g) => g.id);
+    expect(ids).toEqual(["torso-base", "wind-shell"]);
+  });
 });

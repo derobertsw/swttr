@@ -43,22 +43,32 @@ Spend your care where the engine looks. Columns not listed (garment temperature 
 
 ## Lab anchors
 
-USARIEM T21-03 single-garment manikin results, also in the `calibration_reference` table. These are the only measured anchors. Patagonia Capilene Midweight, Nano-Air Hoody and DAS Parka in the catalog carry these values as `lab_tested`.
+USARIEM T21-03 single-garment manikin results (Tables 4–13: each garment alone on a standing manikin, 20°C, 0.4 m/s air). These are the only measured anchors; the seeded ones are also in the `calibration_reference` table (corrected in migration 036). The catalog's Nano-Air Hoody and DAS Parka carry their values as `lab_tested`. The catalog's "lab-tested" Capilene Midweight matches no T21-03 garment; the closest is the SOF MW Quarter Zip below.
 
-| Garment | Torso clo | Arm clo | Torso Ret | Arm Ret | Weight |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| SOF Lightweight Crew (synthetic knit) | 0.55 | 0.34 | 12.3 | 12.2 | 150 g |
-| ECWCS Lightweight Undershirt | 0.55 | 0.36 | 9.9 | 9.4 | 180 g |
-| ECWCS Midweight Shirt (grid fleece) | 0.69 | 0.55 | 13.0 | 13.2 | 220 g |
-| ECWCS Fleece Jacket (Polartec) | 1.05 | 0.94 | 14.2 | 14.6 | 400 g |
-| SOF Nano-Air Hoody (60 g/m² FullRange) | 2.34 | 2.04 | 35.6 | 38.5 | 336 g |
-| ECWCS ECW Parka (synthetic) | 3.69 | 2.38 | 75.6 | 60.5 | 900 g |
-| CAF CADPAT IECS Parka | 4.68 | 3.20 | 82.5 | 68.3 | 1200 g |
-| SOF DAS Jacket (PrimaLoft) | 4.70 | 2.94 | 82.4 | 63.9 | 539 g |
+| Garment (T21-03 system) | Torso clo | Arm clo | Leg clo | Torso Ret | Arm Ret | Leg Ret |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| LW Long Sleeve Crew (SOF) | 0.59 | 0.43 | – | 12.3 | 12.4 | – |
+| MW Quarter Zip (SOF, Patagonia Capilene MW) | 0.66 | 0.36 | – | 12.9 | 10.5 | – |
+| Lightweight Undershirt (ECWCS) | 0.55 | 0.41 | – | 9.9 | 6.5 | – |
+| Midweight Shirt (ECWCS, grid fleece) | 0.69 | 0.68 | – | 13.0 | 13.3 | – |
+| Fleece Jacket (ECWCS, Polartec) | 1.05 | 1.32 | – | 14.2 | 21.7 | – |
+| Wind Jacket (ECWCS) | 0.70 | 0.55 | – | 13.6 | 16.3 | – |
+| Soft Shell Jacket (ECWCS) | 0.95 | 0.65 | – | 46.1 | 55.9 | – |
+| Extreme Cold/Wet Weather Jacket (ECWCS, 3L membrane) | 0.88 | 0.69 | – | 34.3 | 31.8 | – |
+| Stem Shell Jacket (SOF, Patagonia hard shell) | 0.69 | 0.50 | – | 27.9 | 28.3 | – |
+| Lightweight Exposure Suit Jacket / Trousers (USMC) | 0.68 | 0.67 | 0.58 | 15.1 | 32.5 | 33.4 |
+| Extreme Cold/Wet Weather Trouser (ECWCS) | – | – | 0.70 | – | – | 39.4 |
+| Nano-Air Hoody (SOF, 60 g/m² FullRange) | 2.34 | 2.04 | – | 35.6 | 38.5 | – |
+| Nano-Air Vest (SOF, 60 g/m²) | 2.00 | – | – | 27.6 | – | – |
+| Nano-Air Bottom (SOF, 60 g/m² FullRange) | – | – | 1.75 | – | – | 35.9 |
+| DAS Jacket (SOF, 133 g/m² PrimaLoft + 40 g core) | 4.70 | 2.94 | – | 82.4 | 63.9 | – |
+| DAS Pants (SOF, 100 g PrimaLoft One) | – | – | 2.60 | – | – | 53.7 |
+| Extreme Cold Weather Parka / Trouser (ECWCS) | 3.69 | 2.94 | 2.50 | 65.9 | 65.4 | 69.1 |
+| CADPAT IECS Parka (CAF) | 4.68 | 3.03 | – | 78.5 | 80.7 | – |
 
 ## Catalog scale
 
-Orientation only, from the live catalog on 2026-10-17 (torso unless noted). Always pull analogues for the specific item.
+Orientation only, from the live catalog on 2026-10-18 after migration 036 (torso unless noted). Since 036, every category sits on T21-03's single-garment scale. Always pull analogues for the specific item.
 
 | Kind | Torso clo | Arms ÷ torso | Torso Ret | evap_potential |
 | --- | --- | --- | --- | --- |
@@ -67,29 +77,26 @@ Orientation only, from the live catalog on 2026-10-17 (torso unless noted). Alwa
 | Merino 175 / 200 / 250–260 | 0.50 / 0.62–0.68 / 0.75–0.90 | 0.82–0.85 | 11 / 12–15 / 16–19 | 0.35 / 0.29–0.34 / 0.24–0.28 |
 | Base bottoms (legs) | 0.30 light – 0.80 merino 260 | — | 7–18 | 0.26–0.42 |
 | Grid/air fleece mid (R1, R1 Air) | 0.80–0.95 | 0.84–0.88 | 11–16 | 0.38 |
-| Wind shirt (Houdini, Pace Breaker) | 0.15–0.20 | 0.80–0.90 | 8–12 | 0.38–0.50 |
-| Softshell jacket | 0.55–1.20 | 0.80–0.87 | 12–22 | 0.25–0.42 |
-| Active/light synthetic (Nano-Air UL, Atom LT, Micro Puff) | 0.80–1.15 | 0.75–0.87 | 12–22 | 0.30–0.35 |
-| Belay puffy, synthetic or down | 1.90–3.20 | 0.78–0.81 | 38–48 | 0.12–0.16 |
-| 3L hardshell jacket | 0.15–0.28 | 0.79–0.83 | 22–32 | 0.15–0.22 |
-| 2.5L rain shell (Helium) | 0.12 | 0.83 | 40 | 0.07 |
-| Insulated ski jacket | 1.15–1.80 (parka 2.2) | 0.70–0.87 | 26–45 | 0.15–0.28 |
-| Shell pants/bibs (legs) | 0.20–0.25 | — | 25–28 | 0.18–0.20 |
+| Softshell jacket (thin woven to fleece-backed) | 0.70–1.20 | 0.79–0.86 | 12–24 | 0.25–0.42 |
+| Light/active synthetic puffy (20–80 g/m²) | 1.35–2.80 | 0.87–0.89 | 20–51 | 0.30–0.35 |
+| Belay puffy, synthetic or down | 3.95–5.50 | 0.64–0.81 | 67–83 | 0.12–0.16 |
+| Puffy vest | 1.60–1.70 | — | 26–32 | 0.30–0.45 |
+| Hard-shell jacket (wind shirt to 3L) | 0.75 | 0.80 | 8–40 (by membrane) | 0.07–0.50 |
+| Insulated ski jacket (60–100 g/m², parka) | 2.40–3.25 | 0.67–0.74 | 50–81 | 0.15–0.28 |
+| 3-in-1 (shell + fleece liner) | 1.50 | 1.03 | 35 | 0.18 |
+| Shell pants (legs) / shell bib (torso) | 0.65 / 0.35–0.45 | — | 25–32 | 0.18–0.22 |
 | Softshell / wind pants (legs) | 0.50–1.00 | — | 11–20 | 0.25–0.42 |
-| Insulated ski pants (legs) | 1.00–1.40 | — | 32–40 | 0.16–0.22 |
-
-**Known inconsistency: light synthetic insulation.** The lab-tested Nano-Air Hoody (60 g/m² FullRange) has 2.34 torso clo. Derived light puffies with similar fill (Atom LT at about 60 g/m² Coreloft, Micro Puff, Odin Light) sit at 1.10–1.15, while the derived DAS Light Hoody sits at 2.0. When you add light insulation, compute both a peer-consistent value (scaled from the closest derived peers) and a lab-scaled value (scaled from Nano-Air). Store the peer-consistent value so the item ranks fairly against what's already there. Size `uncertainty_clo` to reflect the gap, and put both numbers in the item card and PR. Recalibrating the whole category is a separate decision for the user, not something to do one item at a time.
+| Insulated ski pants (legs, 40–60 g/m²) | 1.45–1.80 | — | 36–65 | 0.16–0.22 |
 
 ## Scaling method
 
 1. **Pick the closest analogue.** Same category, garment type and insulation or fabric family; prefer `lab_tested`, then rows with stated specs (`calculated_from_materials`). Two or three analogues that bracket the new item are better than one.
-2. **Scale the insulation layer, not the whole garment.** Treat a jacket's torso clo as a base (shell + lining + trapped air, about 0.3–0.4 clo for a light jacket) plus an insulation term proportional to fill weight in g/m² within one insulation family:
-   `clo_new ≈ base + (clo_ref − base) × fill_new / fill_ref`.
+2. **Scale the insulation layer, not the whole garment.** On the T21-03 scale a garment alone on the manikin traps air under its shell, so a jacket's torso clo is a base plus an insulation term. Bases: 0.70 for a puffy's thin face and liner (T21-03 wind jacket), 0.75 for a ski jacket's shell and lining (T21-03 thin-shell mean), 0.65 legs for pants. The insulation term for premium synthetic fill (FullRange, PrimaLoft Gold, Coreloft) is `inc(f) = 0.0522 × f^0.842` torso clo at f g/m², fitted through Nano-Air and DAS; arms take 0.87 × inc(sleeve fill), legs 0.70 × inc(fill). Vests are about 0.85 × a jacket of the same fill (T21-03 Nano-Air Vest 2.00 against the Hoody's 2.34). Above ~120 g/m² the curve may read high; T21-03's heavy parkas scatter from 3.4 to 7.0 at unknown fill.
    Across families, scale by `material_reference.clo_per_oz_sqyd`: PrimaLoft Gold 0.84, Climashield APEX 0.78, FullRange 0.70, Alpha Direct 0.65, 800 FP down 1.1, 850 FP down 1.2. g/m² ÷ 33.9 = oz/yd². For a family that isn't listed, scale from the nearest listed one and say so. For down, scale by fill weight × fill power relative to a down analogue. If only total fill grams are published, convert using a comparable jacket's area, or scale from an analogue's total fill, and widen the uncertainty.
 3. **Fabric layers scale with weight and structure.** Within a family, clo rises with gsm (see the merino row above). Grid, waffle and brushed knits run warmer and more breathable than flat knits of the same weight. Wool has higher Ret than synthetics at equal clo.
 4. **Arms:** full sleeves are usually 0.80–0.88 × torso. Scale down for lighter sleeve fill (e.g. 60/40 g/m² body/sleeves). Approximate values: ¾ sleeves ≈ 0.75 × full sleeves, short sleeves 0.02–0.05, vests 0.
-5. **Legs:** full-length 1.0; boot-length or ¾ tights about 0.8–0.9 of full; shorts 0.06–0.10. Bibs also get a torso value (shell bib about 0.15, insulated bib about 0.6).
-6. **Ret follows construction.** Within a family, Ret rises with insulation: synthetic jackets run about 15–19 m²Pa/W of torso Ret per torso clo. Air-permeable insulation and shells (Alpha Direct, Pertex Quantum Air, "active" insulation) sit well below that. Membrane shells have a floor of about 22–32 (3L), with 2.5L near 40. Arms Ret is about 0.85–0.9 × torso.
+5. **Legs:** full-length 1.0; boot-length or ¾ tights about 0.8–0.9 of full; shorts 0.06–0.10. Bibs also get a torso value (shell bib about 0.35–0.45, insulated bib about 0.45).
+6. **Ret follows construction.** Within a family, Ret rises with insulation: synthetic puffies run about 15–19 m²Pa/W of torso Ret per torso clo, insulated ski jackets with membranes about 22–25. Air-permeable insulation and shells (Alpha Direct, Pertex Quantum Air, "active" insulation) sit well below that. A shell's Ret comes from its membrane, not its clo: 3L about 22–32, 2.5L near 40, a wind shirt 8–14 (T21-03: 3L jacket 34, wind jacket 14). Arms Ret is about 0.85–0.9 × torso.
 7. **Cross-check.** Compare the result with the brand's intended use, comparable items' temperature ratings, and the weight (two jackets at the same weight and fill family shouldn't differ by 2×). If checks disagree, prefer the analogue-scaled value and widen the uncertainty.
 
 ## Breathability (evap_potential)

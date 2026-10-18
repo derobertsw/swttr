@@ -36,18 +36,31 @@ interface FunctionalNeeds {
   minEvapPotential?: number;
   /** The torso requirement includes a wind layer. */
   torsoWind?: boolean;
+  /** Wind or wet protection the sport's policy requires for torso and legs. */
+  protection?: { wind: boolean; wet: boolean };
+}
+
+const OUTER_CATEGORIES = ['soft_shell', 'hard_shell', 'windbreaker', 'outer_insulated'];
+
+/** An outer layer that supplies protection the region requires. */
+function isProtectiveOuter(garment: GarmentRow, region: Region, functional: FunctionalNeeds): boolean {
+  if (!OUTER_CATEGORIES.includes(garment.category)) return false;
+  const capability = garmentCapabilities(garment);
+  const { wind = false, wet = false } = functional.protection ?? {};
+  if (region === 'torso' && functional.torsoWind) return true;
+  return (wind || wet) && (!wind || capability.wind) && (!wet || capability.wet);
 }
 
 export function isSuitableForRegion(garment: GarmentRow, region: Region, targets: PhaseTargets['regional'], functional?: FunctionalNeeds): boolean {
   if (!garment[`covers_${region}`] || garment.usage === 'underlayer') return false;
   if (!hasUsableThermalData(garment)) return false;
   if (functional?.minEvapPotential !== undefined) {
-    // A wind shell's breathability comes from the layers under it; when a
-    // wind layer is required, shells are judged on wind protection instead.
-    const windShell = region === 'torso' && functional.torsoWind
-      && ['soft_shell', 'hard_shell', 'windbreaker'].includes(garment.category);
+    // An outer layer's breathability comes from the layers under it; when the
+    // region needs a wind layer or wind/wet protection, outers are judged on
+    // that protection instead.
     const evap = garment.garment_thermal_properties?.evap_potential;
-    if (!windShell && (typeof evap !== 'number' || evap < functional.minEvapPotential)) return false;
+    if (!isProtectiveOuter(garment, region, functional)
+      && (typeof evap !== 'number' || evap < functional.minEvapPotential)) return false;
   }
   if (region === 'torso' && functional?.torsoWind && !garmentCapabilities(garment).wind) return false;
   const clo = garment.garment_thermal_properties?.[`rcl_${region}`];

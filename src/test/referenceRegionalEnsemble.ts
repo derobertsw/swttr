@@ -1,4 +1,7 @@
-/** Frozen pre-#154 search and ranking, used only as a behavioral/performance reference. */
+/**
+ * Frozen pre-#154 search and ranking, used only as a behavioral/performance
+ * reference, plus XC's rule against leaving a region in underwear alone.
+ */
 /**
  * Ensemble builder shared by alpine and XC skiing: compares complete
  * base + optional mid + outer outfits for each body region, and each sport
@@ -179,9 +182,10 @@ export function referenceXCEnsemble(
   return buildRegionalEnsemble(categorized, (outer) => outer.category !== 'outer_insulated', (candidate, scoredRegions) => {
     const missingCoverage = missingLayers(candidate, scoredRegions, 'base') +
       (windLayer ? missingLayers(candidate, scoredRegions, 'outer') : 0);
+    const underwearOnly = scoredRegions.filter((r) => !candidate.some((g) => occupies(g, r) && g.usage !== 'underlayer')).length;
     const { excess, deficit, surplus } = targetFit(candidate, targets, scoredRegions);
     const unbreathable = candidate.filter((g) => evapPotential(g) < breathableFrom[layer(g)]).length;
     const breathability = candidate.reduce((sum, g) => sum + evapPotential(g), 0);
-    return [missingCoverage, deficit + excess, unbreathable, candidate.length, -breathability, surplus];
+    return [missingCoverage, underwearOnly, deficit + excess, unbreathable, candidate.length, -breathability, surplus];
   });
 }

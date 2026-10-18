@@ -2,14 +2,14 @@
  * Alpine (resort) skiing: insulation first, sized for a whole cycle of
  * descents and chairlift rides.
  */
-import { METABOLIC_RATES } from '@/lib/biophysics/constants';
+import { METABOLIC_RATES, OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
 import { COWEDA_VALIDATION_SOURCE } from '@/lib/biophysics/coweda';
 import { DLE_ESTIMATION_METHOD } from '@/lib/biophysics/ireq';
 import { applyBodySizeMetabolicAdjustment } from '@/lib/biophysics/bodyMetrics';
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import type { IreqResult } from '@/types/garments';
 import type { SportRecommender } from '../handler';
-import { metabolicRateFor, phaseIreq, phaseTargets, type PhaseTargets } from '../thermal-targets';
+import { metabolicRateFor, phaseExposure, phaseIreq, phaseTargets, type PhaseTargets } from '../thermal-targets';
 import { buildAlpineEnsemble, alpineRegionalCapacity } from './alpine-ensemble';
 import { selectHandwear, selectHeadwearByCategory } from '../extremities';
 import { buildScoredRecommendation } from '../response-builder';
@@ -52,7 +52,8 @@ export const alpine: SportRecommender<AlpineTargets> = {
     // the static ride. Hands and head follow the skiing phase: their alpine
     // multipliers already add the chairlift and wind exposure.
     const blendedRate = (skiingRate * SKIING_WEIGHT) + (chairliftRate * CHAIRLIFT_WEIGHT);
-    const cycle = phaseIreq(conditions, windMs + SKIING_SPEED_WIND_MS * SKIING_WEIGHT, blendedRate);
+    const cycleWind = windMs + SKIING_SPEED_WIND_MS * SKIING_WEIGHT;
+    const cycle = phaseIreq(conditions, cycleWind, blendedRate);
     const baseline: IreqResult = {
       ireqMin: cycle.ireqMin,
       ireqNeutral: cycle.ireqNeutral,
@@ -64,7 +65,9 @@ export const alpine: SportRecommender<AlpineTargets> = {
       chairliftRate,
       skiing,
       chairlift,
-      ...phaseTargets('alpine_skiing', baseline, blendedRate, conditions, windMs, skiing),
+      // Alpine outfits always end in a waterproof, windproof outer layer.
+      ...phaseTargets('alpine_skiing', baseline, blendedRate, conditions, windMs, skiing, undefined,
+        phaseExposure(cycleWind, blendedRate, OUTER_AIR_PERMEABILITY.membrane)),
     };
   },
 

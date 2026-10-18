@@ -28,4 +28,14 @@ describe('running protection independent of a smaller insulation budget', () => 
     expect(result.ensemble).toEqual([shirt, shorts]);
     expect(result.warnings).toHaveLength(2);
   });
+  it('adds a torso shell over a protective bib, since the bib sits under the jacket', () => {
+    const needs = { wind: true, wet: true, poleGrip: false };
+    const bib = garments.find(g => g.garment_type === 'bib' && garmentCapabilities(g).wind && garmentCapabilities(g).wet)!;
+    const result = retainRunningProtection([shirt, bib], pool, needs);
+
+    expect(result.warnings).toEqual([]);
+    expect(result.ensemble).toContain(bib);
+    expect(result.ensemble.some(g => g.id !== bib.id && g.covers_torso && g.garment_type !== 'bib'
+      && garmentCapabilities(g).wind && garmentCapabilities(g).wet)).toBe(true);
+  });
 });

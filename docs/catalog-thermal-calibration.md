@@ -1,6 +1,6 @@
 # Gear catalog thermal calibration, part 2 (2026-10-18)
 
-**Status: approved 2026-10-18, being implemented** (see "Decisions"). Nothing has been written to production yet. This picks up where [catalog-thermal-audit.md](catalog-thermal-audit.md) ("Decision and what's still open") stops after migration 035: shells and insulated outerwear are still on the low scale, and the model has no wind/motion correction. Everything below was measured on main at `af861c4` (035 merged and applied in production; 116 live garments). USARIEM T21-03 itself was read from the user's copy (DTIC was still down), so every analogue and seeded reference row below is checked against the report, not only CoWEDA's excerpt.
+**Status: approved 2026-10-18 and implemented** in two stacked PRs: PR A (alpine targets, #317) and PR B (model, catalog, builders; migration 036). Merge them together. 036 is not applied in production yet; see "Applying migration 036". This picks up where [catalog-thermal-audit.md](catalog-thermal-audit.md) ("Decision and what's still open") stops after migration 035: shells and insulated outerwear are still on the low scale, and the model has no wind/motion correction. Everything below was measured on main at `af861c4` (035 merged and applied in production; 116 live garments). USARIEM T21-03 itself was read from the user's copy (DTIC was still down), so every analogue and seeded reference row below is checked against the report, not only CoWEDA's excerpt.
 
 ## Summary
 
@@ -51,8 +51,7 @@ Displayed targets move to basic clo, so a user can compare a garment's clo with 
 
 | Phase | v (relative air speed) | w | Outer fabric p, l/(m²·s) |
 |---|---|---|---|
-| Alpine skiing (60 %) | wind + 5 m/s | ISO default ≈ 0.45 | 1 (waterproof membrane: every alpine outer) |
-| Chairlift (40 %) | wind | 0 (seated) | 1 |
+| Alpine (60/40 ski-and-lift cycle, as its IREQ since PR A) | wind + 3 m/s | ISO default at the time-weighted rate ≈ 0.3 | 1 (waterproof membrane: every alpine outer) |
 | Touring climb / descent / transition | 0.3 × wind / wind + 5 / 1.5 × wind | ISO default ≈ 0.9 / 0.45 / 0.2 | 1 |
 | Running | wind | 1.2 (cap) | 1 when wet, 5 when ≤ 0°C or wind > 8 m/s (the protection policy adds a shell), else 1000 |
 | Biking | wind | 1.2 | 5 (always a wind shell) |
@@ -128,9 +127,9 @@ Values are rounded to 0.05 clo, and whole-body values follow the 0.5 / 0.25 / 0.
 
 **High fill is the least certain.** T21-03's heavy garments scatter widely at unknown fill, from 3.41 (NAF cold weather jacket) and 3.69 (ECW parka) to 4.68 (CAF IECS parka) and 7.03 (Canada Goose Snow Mantra). A civilian ECW-parka copy is [listed at 200 g/m²](https://laced.com.au/products/wild-things-monster-parka-black), where the curve gives 5.2. Every consumer jacket here is 40–100 g/m², between the two lab anchors.
 
-### Per-garment values (48 live rows)
+### Per-garment values
 
-Fill sources: [evo Firefall/2](https://www.evo.com/products/175709-mountain-hardwear-firefall-2-insulated-jacket), [REI Stretch Ozonic](https://www.rei.com/product/C07588/mountain-hardwear-stretch-ozonic-insulated-jacket-mens), [Spyder EU Leader](https://spyder.eu/products/leader-jacket-concrete), [REI Alpha 4.0](https://www.rei.com/product/229857), [evo Alpha LifaLoft](https://evo.com/insulated-jackets/helly-hansen-alpha-lifaloft-jacket), [evo Snowcrew](https://www.evo.com/products/207231-outdoor-research-snowcrew-jacket-men-s), [Obermeyer Raze](https://obermeyer.com/products/raze-jacket), [Altitude Sports Lofoten insulated](https://www.altitude-sports.com/p/norrona-lofoten-goretex-insulated-jacket-mens-nor-1001-18), [Switchback Jackson Glacier](https://www.switchbacktravel.com/reviews/patagonia-jackson-glacier-parka), [REI Bugaboo IV liner](https://www.rei.com/product/C08548/columbia-bugaboo-iv-interchange-3-in-1-jacket-mens), [evo Powder Bowl](https://www.evo.com/products/136074-patagonia-insulated-powder-bowl-pants), [Altitude Sports Bugaboo II](https://www.altitude-sports.com/products/columbia-bugaboo-ii-pant-womens-llll-col-2085941), [Cotswold Legendary](https://www.cotswoldoutdoor.com/p/helly-hansen-mens-legendary-insulated-pant-H1214262.html), [Miya Lofoten insulated pants](https://store.miyaradventures.com/products/norrona-lofoten-gore-tex-insulated-pants-mens), [Bob's Rossignol](https://www.bobssportschalet.com/rossignol/rossignol-insulated-ski-pants-169947), and Snowdrifter construction from [Switchback](https://switchbacktravel.com/reviews/patagonia-snowdrifter) and [evo](https://evo.com/shell-pants/patagonia-snowdrifter-bibs-womens-20). Rows marked "low" get `uncertainty_clo` 0.6 and confidence capped at 0.5 (035's convention); "medium" rows get 0.3; analogue rows get 0.15.
+48 live rows. Fill sources: [evo Firefall/2](https://www.evo.com/products/175709-mountain-hardwear-firefall-2-insulated-jacket), [REI Stretch Ozonic](https://www.rei.com/product/C07588/mountain-hardwear-stretch-ozonic-insulated-jacket-mens), [Spyder EU Leader](https://spyder.eu/products/leader-jacket-concrete), [REI Alpha 4.0](https://www.rei.com/product/229857), [evo Alpha LifaLoft](https://evo.com/insulated-jackets/helly-hansen-alpha-lifaloft-jacket), [evo Snowcrew](https://www.evo.com/products/207231-outdoor-research-snowcrew-jacket-men-s), [Obermeyer Raze](https://obermeyer.com/products/raze-jacket), [Altitude Sports Lofoten insulated](https://www.altitude-sports.com/p/norrona-lofoten-goretex-insulated-jacket-mens-nor-1001-18), [Switchback Jackson Glacier](https://www.switchbacktravel.com/reviews/patagonia-jackson-glacier-parka), [REI Bugaboo IV liner](https://www.rei.com/product/C08548/columbia-bugaboo-iv-interchange-3-in-1-jacket-mens), [evo Powder Bowl](https://www.evo.com/products/136074-patagonia-insulated-powder-bowl-pants), [Altitude Sports Bugaboo II](https://www.altitude-sports.com/products/columbia-bugaboo-ii-pant-womens-llll-col-2085941), [Cotswold Legendary](https://www.cotswoldoutdoor.com/p/helly-hansen-mens-legendary-insulated-pant-H1214262.html), [Miya Lofoten insulated pants](https://store.miyaradventures.com/products/norrona-lofoten-gore-tex-insulated-pants-mens), [Bob's Rossignol](https://www.bobssportschalet.com/rossignol/rossignol-insulated-ski-pants-169947), and Snowdrifter construction from [Switchback](https://switchbacktravel.com/reviews/patagonia-snowdrifter) and [evo](https://evo.com/shell-pants/patagonia-snowdrifter-bibs-womens-20). Rows marked "low" get `uncertainty_clo` 0.6 and confidence capped at 0.5 (035's convention); "medium" rows get 0.3; analogue rows get 0.15.
 
 | Garment | Type | Torso / arms / legs clo | Whole-body clo | Ret torso / arms / legs | Basis | Confidence | In fixture |
 |---|---|---|---|---|---|---|---|
@@ -267,21 +266,65 @@ The time-weighted target removes the steady-state lift ride, about −40 % in co
 
 ## Implementation
 
-- **Migration 036**, applied by hand in the SQL editor:
-  - the 48 rows above, in 035's style: explicit `(brand, model_name, old values…)` guards on every replaced field, `data_source` pointing here, and `uncertainty_clo` / confidence caps;
-  - the two `category` moves;
-  - the six `calibration_reference` corrections, plus Capilene Midweight if chosen.
-- **Same values in `gear-catalog.json`** (38 fixture rows), reviewed golden snapshot updates, and a PGlite replay test like `catalog-thermal-audit.database.test.ts`.
-- **Code:**
-  - `requiredBasicInsulation` and exposures in `ireq.ts` / `thermal-targets.ts`, never converting below the resultant value;
-  - converted IREQ for builders and display (`ireq.min`/`neutral` stay resultant, with basic `target_range`);
-  - the scorer's outfit permeability;
-  - alpine T + L;
-  - builder B for running/biking;
-  - the filter fix;
-  - unit tests against hand-computed Annex A values;
-  - removal of the prototype switches.
-- **`references/thermal-estimation.md`** in the add-wardrobe-item skill moves to the new scale in the same PR. Rows added since 035 (FP Movement, Rossignol) were seeded from low-scale analogues and are in the table.
+**PR A** (`claude/alpine-time-weighted-targets`, #317):
+- Alpine IREQ at the time-weighted cycle (T).
+- Alpine legs multiplier 1.0 (L).
+
+**PR B** (stacked on PR A):
+- **Model.**
+  - `requiredBasicInsulation` (`ireq.ts`): ISO 11079 Annex A, floored at the resultant value.
+  - `phaseExposure` and `basicIreq` (`thermal-targets.ts`); `phaseTargets` converts the whole-body and regional bands when given an exposure.
+  - `OUTER_AIR_PERMEABILITY` (`constants.ts`).
+  - Per-sport outer permeability, an alpine cycle exposure, touring climb/descent/transition exposures, and the scorer's `outfitAirPermeability`.
+  - API `ireq.min`/`neutral` stay resultant IREQ. `target_range`, `regional` and builder budgets are basic clo.
+- **Builders.**
+  - Running and biking add protective shells outside the clo budget.
+  - `retainRunningProtection` no longer counts a bib as torso protection, and breaks ties between equally warm shells by breathability, then weight. Since 036 all thin shells are equally warm, so the old "lowest clo" pick fell to catalog order.
+- **Requirement filter.** An outer layer that supplies the policy's required wind/wet protection, or the XC torso wind layer, is judged on that protection rather than breathability. XC's regional search no longer leaves a region in underwear alone (`missingWearable`).
+- **Catalog.**
+  - Migration 036 (48 rows, the two Snowdrifter moves with corrected notes and weights, and six reference rows).
+  - The same values in `gear-catalog.json` (38 rows).
+  - `catalog-thermal-calibration.database.test.ts` replays 001–036 in PGlite; 035's test keeps its own checks but not the fixture comparison.
+- **Skill guide.** `references/thermal-estimation.md` and the SKILL.md example card are on the new scale.
+
+**Golden result of PR B** (60 scenarios; mean comfort alpine / biking / running / touring / XC):
+
+| State | Scores |
+|---|---|
+| Today | 52.3 / 64.4 / 76.9 / 65.2 / 97.3 |
+| PR A | 74.9 / 64.4 / 76.9 / 65.2 / 97.3 |
+| PR A + B | 75.2 / 67.2 / 71.1 / 65.0 / 94.5 |
+
+71 of 83 golden tests change, all snapshots; no assertion fails.
+
+**Running stays below today's 76.9.** Its builder sizes mid layers before the protection safeguard adds shells, and lab-scale shells add about 0.5 clo. So cold and wet runs overdress: 25°F 1.27 clo against 0.56–0.93, and 36°F rain 0.86 against 0.30–0.47 with a rain jacket and pants. The earlier upper bound of 77.5 hid this: its running outfits wore a rain bib and no jacket. The complete running selector (#247) should choose shells first and size insulation around them.
+
+## Applying migration 036
+
+**Check first,** as for 035: merged migrations have shown up in prod's history within about a minute of a merge. After merging, check the migration history (MCP `list_migrations`). If `catalog_outerwear_t2103_scale` is there, only run the check query. 036 needs 035 applied (its guards expect 035's values), which production has had since 2026-10-18.
+
+Otherwise, paste this as one script in the Supabase SQL editor:
+
+```sql
+BEGIN;
+-- contents of supabase/migrations/036_catalog_outerwear_t2103_scale.sql
+INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('036', 'catalog_outerwear_t2103_scale');
+COMMIT;
+```
+
+Then check it:
+
+```sql
+SELECT
+  (SELECT count(*) FROM garment_thermal_properties
+    WHERE abs(rcl_whole_body - (0.5 * coalesce(rcl_torso, 0) + 0.25 * coalesce(rcl_arms, 0) + 0.25 * coalesce(rcl_legs, 0))) > 0.02
+       OR abs(recl_whole_body - (0.5 * coalesce(recl_torso, 0) + 0.25 * coalesce(recl_arms, 0) + 0.25 * coalesce(recl_legs, 0))) > 0.5) AS off_weighting,
+  (SELECT count(*) FROM garment_thermal_properties WHERE data_source LIKE '%docs/catalog-thermal-calibration.md#per-garment-values%') AS recalibrated,
+  (SELECT count(*) FROM garments WHERE brand = 'Patagonia' AND model_name LIKE 'Snowdrifter%' AND category = 'hard_shell') AS snowdrifter_shells,
+  (SELECT count(*) FROM calibration_reference WHERE garment_description = 'ECWCS Fleece Jacket' AND measured_rcl_arm = 1.32) AS reference_fixed;
+```
+
+Expect 0, 48, 2 and 1. 035's check query then counts 12 recalibrated puffies instead of 15: 036 appends to the three vests' `data_source`. Garments added after 2026-10-18 that follow the old guide can add to the first count.
 
 ## Sources
 

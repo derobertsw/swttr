@@ -1,9 +1,9 @@
 // Ensemble Scoring Function
 // Scores ensembles for given weather conditions and activities
 
-import { calculateIreq } from './ireq';
+import { calculateIreq, requiredBasicInsulation, walkingSpeedFromMetabolicRate } from './ireq';
 import { predictEnsembleThermal } from './ensemble';
-import { ACTIVITY_WEIGHTS, type ActivityType } from './constants';
+import { ACTIVITY_WEIGHTS, OUTER_AIR_PERMEABILITY, type ActivityType } from './constants';
 import type { EnsembleScore } from '@/types/garments';
 
 /** Wind speed (m/s) above which an ensemble without a shell loses weather protection. */
@@ -66,13 +66,24 @@ export function scoreEnsemble(
   };
   const effectiveWind = weather.windSpeed * windFactor[activity.windExposure];
 
-  // Calculate required insulation
-  const ireq = calculateIreq({
+  // Calculate required insulation, then convert it to the basic clo the
+  // ensemble is rated in, for this wind, motion and outer fabric.
+  const resultantIreq = calculateIreq({
     airTemp: weather.temperature,
     windSpeed: effectiveWind,
     relativeHumidity: weather.humidity,
     metabolicRate: activity.metabolicRate,
   });
+  const exposure = {
+    relativeAirSpeedMs: effectiveWind,
+    walkingSpeedMs: walkingSpeedFromMetabolicRate(activity.metabolicRate),
+    airPermeability: outfitAirPermeability(garments),
+  };
+  const ireq = {
+    ...resultantIreq,
+    ireqMin: Math.round(requiredBasicInsulation(resultantIreq.ireqMin, exposure) * 100) / 100,
+    ireqNeutral: Math.round(requiredBasicInsulation(resultantIreq.ireqNeutral, exposure) * 100) / 100,
+  };
 
   // Get scoring weights for activity
   const weights = ACTIVITY_WEIGHTS[activityType];
@@ -192,6 +203,18 @@ export function scoreEnsemble(
     warnings,
     recommendations,
   };
+}
+
+/**
+ * Air permeability of an outfit's least permeable layer, in l/(m²·s), from
+ * protection ratings. Wind reaches the layers under it only through it.
+ */
+export function outfitAirPermeability(garments: Pick<GarmentWithProtection, 'windproofRating' | 'waterproofRating'>[]): number {
+  return garments.reduce<number>((lowest, g) => Math.min(lowest,
+    g.waterproofRating === 'waterproof' ? OUTER_AIR_PERMEABILITY.membrane
+      : g.windproofRating === 'windproof' ? OUTER_AIR_PERMEABILITY.windproof
+        : g.windproofRating === 'wind_resistant' ? OUTER_AIR_PERMEABILITY.windResistant
+          : OUTER_AIR_PERMEABILITY.open), OUTER_AIR_PERMEABILITY.open);
 }
 
 /**

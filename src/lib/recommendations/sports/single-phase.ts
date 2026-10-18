@@ -10,7 +10,14 @@ import type { SportRecommender } from '../handler';
 import type { CatalogFilter } from '../gear-pool';
 import type { RecommendationRequest } from '../request';
 import type { CategorizedGarments, GarmentRow } from '../types';
-import { metabolicRateFor, phaseIreq, phaseTargets, type PhaseTargets } from '../thermal-targets';
+import {
+  basicIreq,
+  metabolicRateFor,
+  phaseExposure,
+  phaseIreq,
+  phaseTargets,
+  type PhaseTargets,
+} from '../thermal-targets';
 import { selectHandwear, selectHeadwearByCategory } from '../extremities';
 import { buildScoredRecommendation } from '../response-builder';
 import { formatConditions, formatSinglePhaseIreq } from '../formatting';
@@ -18,7 +25,10 @@ import { buildClothingRequirements, filterUnsuitableEnsemble } from '../requirem
 
 interface SinglePhaseTargets extends PhaseTargets {
   metabolicRate: number;
+  /** IREQ: the resultant insulation required in this wind and motion. */
   ireq: IreqResult;
+  /** The same IREQ in the basic clo garments are rated in. */
+  basicIreq: IreqResult;
 }
 
 interface SinglePhaseSportConfig {
@@ -38,6 +48,8 @@ interface SinglePhaseSportConfig {
   guidance(request: RecommendationRequest, ireq: IreqResult): string[];
   /** Retain functional protection when a calibrated budget changes. */
   protect?(ensemble: GarmentRow[], categorized: CategorizedGarments, targets: SinglePhaseTargets): { ensemble: GarmentRow[]; warnings: string[] };
+  /** Air permeability of the outer layer this sport dresses in these conditions, l/(m²·s). */
+  outerAirPermeability(request: RecommendationRequest): number;
   /** Requirement-first flow: report suitable-clothing needs separately from wardrobe matches. */
   requirementFirst?: boolean;
   /** Whether the torso requirement includes a wind layer for this request. */
@@ -55,10 +67,12 @@ export function createSinglePhaseSport(
       const conditions = { tempC: request.tempC, humidity: request.humidity, precipitation: request.precipitation };
       const metabolicRate = metabolicRateFor(config.activity, request.exertion, request.bodyMetrics);
       const ireq = phaseIreq(conditions, request.windMs, metabolicRate);
+      const exposure = phaseExposure(request.windMs, metabolicRate, config.outerAirPermeability(request));
       return {
         metabolicRate,
         ireq,
-        ...phaseTargets(config.activity, ireq, metabolicRate, conditions, request.windMs, ireq, request.exertion),
+        basicIreq: basicIreq(ireq, exposure),
+        ...phaseTargets(config.activity, ireq, metabolicRate, conditions, request.windMs, ireq, request.exertion, exposure),
       };
     },
 
@@ -71,7 +85,7 @@ export function createSinglePhaseSport(
         recommendations: {
           target_clo_range: targets.targetRange,
           min_evap_potential: config.minEvapPotential,
-          guidance: [...config.guidance(request, targets.ireq), ...(targets.policy?.assumptions ?? [])],
+          guidance: [...config.guidance(request, targets.basicIreq), ...(targets.policy?.assumptions ?? [])],
         },
       };
     },
@@ -81,7 +95,11 @@ export function createSinglePhaseSport(
       const protectedOutfit = config.protect?.(built, pool.categorized, targets);
       const builtEnsemble = protectedOutfit?.ensemble ?? built;
       const functional = config.requirementFirst
-        ? { minEvapPotential: config.minEvapPotential, torsoWind: config.windTorsoRequirement?.(request) ?? false }
+        ? {
+          minEvapPotential: config.minEvapPotential,
+          torsoWind: config.windTorsoRequirement?.(request) ?? false,
+          protection: targets.policy?.protection,
+        }
         : undefined;
       const ensemble = functional ? filterUnsuitableEnsemble(builtEnsemble, targets.regional, functional) : builtEnsemble;
       const handwear = selectHandwear(
@@ -140,7 +158,7 @@ export function createSinglePhaseSport(
         ...(requirements ? { requirements } : {}),
         recommendation,
         warnings: [...warnings, ...(protectedOutfit?.warnings ?? [])],
-        guidance: [...config.guidance(request, targets.ireq), ...missingGuidance, ...(targets.policy?.assumptions ?? [])],
+        guidance: [...config.guidance(request, targets.basicIreq), ...missingGuidance, ...(targets.policy?.assumptions ?? [])],
       };
     },
   };

@@ -205,6 +205,58 @@ export function calculateIreq(input: IreqInput): IreqResult {
   };
 }
 
+/** Wind, body motion and outer-fabric air permeability for one activity phase. */
+export interface DynamicExposure {
+  /** Relative air speed at the body, in m/s. */
+  relativeAirSpeedMs: number;
+  /** Walking (or equivalent limb-motion) speed, in m/s. */
+  walkingSpeedMs: number;
+  /** Air permeability of the outer fabric, in l/(m²·s). */
+  airPermeability: number;
+}
+
+/** Still-air insulation of the boundary layer in ISO 11079 Annex A, in m²K/W. */
+const STATIC_AIR_INSULATION = 0.085;
+
+/**
+ * ISO 11079's walking speed when none is given: 0.0052 × (M − 58) m/s,
+ * capped at the 1.2 m/s the ISO 9920 correction was fitted to.
+ */
+export function walkingSpeedFromMetabolicRate(metabolicRate: number): number {
+  return Math.max(0, Math.min(1.2, 0.0052 * (metabolicRate - 58)));
+}
+
+/**
+ * Basic (static manikin) clothing insulation that delivers a resultant
+ * insulation in wind and motion, in clo: ISO 11079 Annex A's ICL from IREQ,
+ * with ISO 9920's correction for relative air speed, walking speed and the
+ * outer fabric's air permeability. Catalog garments are rated in basic clo
+ * (USARIEM T21-03 measured them standing, at 0.4 m/s), IREQ is resultant.
+ *
+ * `fclReferenceClo` sets the clothing area factor, so regional targets can
+ * share the whole-body one. Never returns less than `resultantClo`: for a few
+ * hundredths of a clo in light wind the formula falls below it (the static
+ * air layer clothing carries outweighs the requirement), and a positive
+ * heat-balance minimum must stay positive.
+ */
+export function requiredBasicInsulation(
+  resultantClo: number,
+  { relativeAirSpeedMs, walkingSpeedMs, airPermeability }: DynamicExposure,
+  fclReferenceClo: number = resultantClo,
+): number {
+  // ISO 11079 Annex A validity: 0.4–18 m/s relative air speed, ≤ 1.2 m/s walking.
+  const v = Math.max(0.4, Math.min(18, relativeAirSpeedMs));
+  const w = Math.max(0, Math.min(1.2, walkingSpeedMs));
+  const p = Math.max(1, Math.min(1000, airPermeability));
+  const motion = Math.exp(-0.15 * v - 0.22 * w);
+  const resultantAir = 0.092 * motion - 0.0045;
+  // Resultant over static total insulation.
+  const correction = 0.54 * motion * Math.pow(p, 0.075) - 0.06 * Math.log(p) + 0.5;
+  const fcl = 1 + 1.197 * Math.max(0, fclReferenceClo) * CLO_TO_M2KW;
+  const basic = (resultantClo * CLO_TO_M2KW + resultantAir / fcl) / correction - STATIC_AIR_INSULATION / fcl;
+  return Math.max(resultantClo, basic / CLO_TO_M2KW);
+}
+
 interface ExtremityIreq {
   hands: number;
   head: number;

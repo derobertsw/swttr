@@ -69,14 +69,14 @@ Before writing files, show one compact card per item (the values below are illus
 ```
 Acme Alpine Active Hoody — insulation_synthetic / jacket (hood: helmet_compatible), 340 g, $250
 Facts: 60 g/m² synthetic body, 40 g/m² sleeves (spec sheet); air-permeable ripstop shell
-clo  torso 1.15 · arms 0.90 · legs 0 → whole 0.80   (±0.25)
-Ret  torso 20 · arms 17 · legs 0 → whole 14.3        evap_potential 0.33 · im 0.53
-Calibrated against: Arc'teryx Atom LT Hoody (1.15/1.00, peer), Patagonia Nano-Air Hoody (lab 2.34/2.04 at the same fill → lab-scaled ≈2.3)
+clo  torso 2.35 · arms 1.60 · legs 0 → whole 1.58   (±0.30)
+Ret  torso 35.7 · arms 30 · legs 0 → whole 25.4      evap_potential 0.33 · im 0.53
+Calibrated against: Patagonia Nano-Air Hoody (lab 2.34/2.04 at 60 g/m²), Arc'teryx Atom LT Hoody (2.35/2.05, 60 g/m² on the fill curve)
 Protection: wind_resistant, DWR_only · vents: none · factor 1.0
 Scores xc/up/down/alpine 7/8/6/5 · usage either · coverage 1/1/0 · activities: all
 Method derived_from_similar · confidence 0.70
 Sports it now qualifies for: running ✓ (0.33, gate 0.30: 0.29 would drop it), biking ✓, XC ✓ (score 7), touring ✓ (up 8), alpine ✓ (5)
-Open questions: stored the peer-consistent 1.15, not the lab-scaled 2.3 (see the light-insulation note).
+Open questions: sleeve fill from the spec sheet's 40 g/m²; arms on the fill curve (0.87 × (0.70 + inc(40))).
 ```
 
 The "sports it qualifies for" line matters: it is where a value choice turns into product behaviour (see the gates table in the reference). Let the user adjust numbers here; they know this gear.

@@ -274,6 +274,8 @@ All 62 failures are snapshot mismatches. Every invariant assertion still passes 
 
 ## Decision and what's still open
 
+The open items below are resolved by part 2: [catalog-thermal-calibration.md](catalog-thermal-calibration.md) (migration 036 and the ISO 11079 wind/motion correction).
+
 Option C was chosen on 2026-10-17. Migration 035 uses variant B's values, and the golden snapshots updated with it reproduce the B run in "Golden-test impact" exactly: 30 of 60 scenarios change, and no invariant fails. What it leaves open:
 
 - **Puffies now out-insulate insulated outerwear.** Micro Puff (2.45 torso) is warmer than Firefall/2 (1.50), and alpine picks a puffy plus a wind shell over an insulated parka at 25°F and 18°F. Insulated jackets and pants, and shells, are still on the low scale.
