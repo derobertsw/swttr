@@ -17,6 +17,8 @@ export interface DriveEstimatesState {
   /** Why the estimates couldn't load at all; a day's own failure is its state. */
   error: string | null;
   loading: boolean;
+  /** A changed plan is loading; no old pair's duration is shown meanwhile. */
+  routeChanged: boolean;
   /** Checking again for the same plan, after Retry or a change to your estimate; the last estimates still show. */
   refreshing: boolean;
   retry: () => void;
@@ -30,7 +32,7 @@ export interface DriveEstimatesState {
  */
 export function useDriveEstimates(data: TripFull | null | undefined, enabled = true): DriveEstimatesState {
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ plan: string; attempt: number; estimates: TripDriveEstimates | null; error: string | null } | null>(null);
+  const [result, setResult] = useState<{ tripId: string; plan: string; attempt: number; estimates: TripDriveEstimates | null; error: string | null } | null>(null);
   const plan = useMemo(() => data && JSON.stringify({
     trip: [data.trip.id, data.trip.start_date, data.trip.end_date, data.lodging?.revision],
     stops: data.stops.map((stop) => [stop.id, stop.access_point]),
@@ -44,8 +46,8 @@ export function useDriveEstimates(data: TripFull | null | undefined, enabled = t
     const controller = new AbortController();
     const requested = attempt;
     tripRequest<TripDriveEstimates>(`/api/v1/trips/${tripId}/drive-estimates`, "GET", undefined, { signal: controller.signal })
-      .then((estimates) => { if (!controller.signal.aborted) setResult({ plan: key, attempt: requested, estimates, error: null }); })
-      .catch((err) => { if (!controller.signal.aborted) setResult({ plan: key, attempt: requested, estimates: null, error: errorMessage(err) }); });
+      .then((estimates) => { if (!controller.signal.aborted) setResult({ tripId, plan: key, attempt: requested, estimates, error: null }); })
+      .catch((err) => { if (!controller.signal.aborted) setResult({ tripId, plan: key, attempt: requested, estimates: null, error: errorMessage(err) }); });
     return () => controller.abort();
   }, [key, tripId, attempt]);
 
@@ -55,6 +57,7 @@ export function useDriveEstimates(data: TripFull | null | undefined, enabled = t
   return {
     estimates: current?.estimates ?? null, error: current?.error ?? null,
     loading: !!key && !current, refreshing: !!current && current.attempt !== attempt,
+    routeChanged: !!key && !!result && result.tripId === tripId && result.plan !== key,
     retry: () => setAttempt((n) => n + 1),
   };
 }
@@ -72,9 +75,9 @@ const calculatedLabel = (iso: string) =>
 function driveSummary(day: TripDriveDay, canEdit: boolean): string {
   const to = day.destination ? ` to ${day.destination.label}` : "";
   switch (day.state) {
-    case "available": return `About ${day.estimate!.duration_label}${to} · ${day.estimate!.distance_label}`;
-    case "stale": return `About ${day.estimate!.duration_label}${to} · ${day.estimate!.distance_label} · not updated`;
-    case "manual": return `About ${day.manual!.duration_label}${to} · ${canEdit ? "your" : "the organizer's"} estimate`;
+    case "available": return `About ${day.estimate!.duration_label} drive${to} · ${day.estimate!.distance_label} · one way`;
+    case "stale": return `About ${day.estimate!.duration_label} drive${to} · ${day.estimate!.distance_label} · one way · not updated`;
+    case "manual": return `About ${day.manual!.duration_label} drive${to} · one way · ${canEdit ? "your" : "the organizer's"} estimate`;
     case "no_route": return `No road route${to}`;
     case "unavailable": return "Drive estimate unavailable";
     case "no_drive": return "No drive planned";
@@ -87,6 +90,7 @@ function driveSummary(day: TripDriveDay, canEdit: boolean): string {
   }
 }
 
+/** Opens maps for the exact endpoints while keeping the current day open. */
 function Directions({ day }: { day: TripDriveDay }) {
   const apple = useAppleMaps();
   if (!day.directions || !day.origin || !day.destination) return null;
@@ -101,22 +105,28 @@ function Directions({ day }: { day: TripDriveDay }) {
   );
 }
 
+/** Visible provider and map-data credits for the routing results shown. */
+function RoutingAttribution() {
+  return <p className="text-sm text-muted-foreground">
+    <a href={GEOAPIFY_CREDIT.url} target="_blank" rel="noopener noreferrer" className={linkClass}>{GEOAPIFY_CREDIT.label}</a>
+    {" · "}
+    <a href={OSM_CREDIT.url} target="_blank" rel="noopener noreferrer" className={linkClass}>{OSM_CREDIT.label}</a>
+  </p>;
+}
+
+/** Traffic assumptions and previous-route figures, separate from the current duration. */
 function EstimateDetails({ day }: { day: TripDriveDay }) {
+  if (!day.estimate && !day.previous) return null;
   return (
     <details className="text-sm text-muted-foreground">
       <summary className="min-h-11 cursor-pointer py-2 text-base text-foreground">Estimate details</summary>
       <div className="space-y-1.5 break-words pb-2">
         {day.estimate && <p>Calculated {calculatedLabel(day.estimate.calculated_at)} from the starting point to the access point, by car.</p>}
-        <p>Typical traffic, not live. Check road conditions before you drive.</p>
+        <p>Typical traffic, not live. No departure time is used. Check road conditions before you drive.</p>
         {day.closures.map((closure) => <p key={closure}>Avoids {closure}.</p>)}
         {day.previous && (
           <p>Earlier estimate, for {day.previous.origin_label} → {day.previous.destination_label}: about {day.previous.duration_label} · {day.previous.distance_label} (calculated {calculatedLabel(day.previous.calculated_at)}).</p>
         )}
-        <p>
-          <a href={GEOAPIFY_CREDIT.url} target="_blank" rel="noopener noreferrer" className={linkClass}>{GEOAPIFY_CREDIT.label}</a>
-          {" · "}
-          <a href={OSM_CREDIT.url} target="_blank" rel="noopener noreferrer" className={linkClass}>{OSM_CREDIT.label}</a>
-        </p>
       </div>
     </details>
   );
@@ -212,7 +222,12 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
   );
   let body: ReactNode = null;
   if (drive.loading) {
-    body = <div role="status"><span className="sr-only">Checking the drive time…</span><Skeleton className="h-5 w-56" /></div>;
+    body = <div role="status">
+      <span className={drive.routeChanged ? "text-sm text-muted-foreground" : "sr-only"}>
+        {drive.routeChanged ? "Route changed — updating estimate" : "Checking the drive time…"}
+      </span>
+      <Skeleton className="h-5 w-56 max-w-full" />
+    </div>;
   } else if (drive.error || !day) {
     body = <div className="space-y-2">
       <p className="text-base text-foreground">Drive times couldn&apos;t load.</p>
@@ -261,6 +276,9 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
       {(day.state === "available" || day.state === "stale") && <p className="text-base font-medium text-foreground">
         About {day.estimate!.duration_label} drive · {day.estimate!.distance_label} · one way
       </p>}
+      {(day.state === "available" || day.state === "stale") && <p className="text-sm text-muted-foreground">
+        Calculated {day.estimate!.age_label} · <time dateTime={day.estimate!.calculated_at}>{calculatedLabel(day.estimate!.calculated_at)}</time>
+      </p>}
       {day.state === "stale" && <p className="text-sm text-warning">Not updated: calculated {calculatedLabel(day.estimate!.calculated_at)}, and checking again failed.</p>}
       {day.state === "unavailable" && <p className="text-base text-foreground">{changed ? "Route changed — couldn't update the estimate" : "Drive estimate unavailable"}</p>}
       {day.state === "no_route" && <Missing title="No road route found">
@@ -268,7 +286,7 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
       </Missing>}
       {/* The other estimate for the same drive is kept, and offered separately. */}
       {day.state === "manual" && day.estimate && <div className="space-y-1">
-        <p className="break-words text-sm text-foreground">Calculated estimate: about {day.estimate.duration_label} · {day.estimate.distance_label} (calculated {calculatedLabel(day.estimate.calculated_at)})</p>
+        <p className="break-words text-sm text-foreground">Calculated estimate: about {day.estimate.duration_label} · {day.estimate.distance_label} · one way (calculated {day.estimate.age_label}){day.estimate.stale ? " · not updated" : ""}</p>
         {canEdit && <Button type="button" size="sm" variant="outline" disabled={working} onClick={() => void prefer(true)}>Use calculated estimate</Button>}
       </div>}
       {day.state !== "manual" && yours?.current && <div className="space-y-1">
@@ -291,6 +309,7 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
       </div>
       {drive.refreshing && <p className="text-sm text-muted-foreground">Checking the drive time…</p>}
       <EstimateDetails day={day} />
+      {(day.estimate || day.previous || day.state === "no_route") && <RoutingAttribution />}
     </div>;
   }
 
@@ -641,9 +660,14 @@ export function StayDepartures({ tripId, stayId, drive, canEdit = false }: { tri
   if (!departures?.dates.length) return null;
   const dayOf = (date: string) => drive.estimates!.days.find((day) => day.date === date);
   const next = departures.next ? dayOf(departures.next) : undefined;
+  const hasCalculated = departures.dates.some((date) => {
+    const day = dayOf(date);
+    return day?.estimate || day?.state === "no_route";
+  });
   return (
     <div className="mt-1">
       {next && <p className="break-words text-base text-foreground">Next departure · {next.date_label}: {driveSummary(next, canEdit)}</p>}
+      {next?.estimate && next.state !== "manual" && <p className="text-sm text-muted-foreground">Calculated {next.estimate.age_label}</p>}
       <details className="text-base text-foreground">
         <summary className="min-h-11 cursor-pointer py-2">View access times</summary>
         <ul className="space-y-1.5 break-words pb-2">
@@ -651,11 +675,12 @@ export function StayDepartures({ tripId, stayId, drive, canEdit = false }: { tri
             const day = dayOf(date);
             return day && <li key={date}>
               <Link href={`/trips/${tripId}/days/${date}`} className={linkClass}>{day.date_label}</Link>
-              <span className="text-muted-foreground"> · {driveSummary(day, canEdit)}</span>
+              <span className="text-muted-foreground"> · {driveSummary(day, canEdit)}{day.estimate && day.state !== "manual" ? ` · calculated ${day.estimate.age_label}` : ""}</span>
             </li>;
           })}
         </ul>
       </details>
+      {hasCalculated && <RoutingAttribution />}
     </div>
   );
 }

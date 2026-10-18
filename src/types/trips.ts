@@ -391,6 +391,10 @@ export interface TripDriveEstimate {
   /** "14 mi", "0.4 mi". */
   distance_label: string;
   calculated_at: string;
+  /** Age when the server returned the estimate, e.g. "2 days ago". */
+  age_label: string;
+  /** Also labels an old calculated estimate offered alongside a manual one. */
+  stale: boolean;
 }
 
 /** The organizer's own one-way estimate for a day (#209), kept with the pair it was entered for. */

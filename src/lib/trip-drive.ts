@@ -151,9 +151,22 @@ function directionsUrls(origin: TripLocation, destination: TripLocation): { appl
   };
 }
 
-const estimateOf = (row: StoredDriveEstimate): TripDriveEstimate | null =>
+/** Age at response time; the browser displays it without calculating freshness. */
+function estimateAge(calculatedAt: string, now: number): string {
+  const minutes = Math.max(0, Math.floor((now - Date.parse(calculatedAt)) / 60_000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} ${days === 1 ? "day" : "days"} ago`;
+}
+
+/** Formats road figures with response-time freshness; no-route rows have no figures. */
+const estimateOf = (row: StoredDriveEstimate, now: number): TripDriveEstimate | null =>
   row.status === "ok" && row.duration_seconds !== null && row.distance_meters !== null
-    ? { duration_label: durationLabel(row.duration_seconds), distance_label: distanceLabel(row.distance_meters), calculated_at: row.calculated_at }
+    ? { duration_label: durationLabel(row.duration_seconds), distance_label: distanceLabel(row.distance_meters), calculated_at: row.calculated_at,
+      age_label: estimateAge(row.calculated_at, now), stale: now - Date.parse(row.calculated_at) > DRIVE_ESTIMATE_MAX_AGE_MS }
     : null;
 
 /** The same estimate, saved for several days together: one entry, one entered time. */
@@ -195,10 +208,13 @@ export function driveDay(plan: DrivePlan, row: StoredDriveEstimate | undefined, 
   let calculated: TripDriveDay;
   if (row?.route_key === plan.route_key) {
     const stale = now - Date.parse(row.calculated_at) > DRIVE_ESTIMATE_MAX_AGE_MS;
-    calculated = row.status === "no_route" ? { ...day, state: "no_route", directions: null }
-      : { ...day, state: stale && failed ? "stale" : "available", estimate: estimateOf(row) };
+    // An expired no-route answer isn't proof there's still no road route
+    // when refreshing fails. Keep Directions, Retry and manual recovery available.
+    calculated = row.status === "no_route" ? { ...day, state: stale && failed ? "unavailable" : "no_route",
+      directions: stale && failed ? directions : null }
+      : { ...day, state: stale && failed ? "stale" : "available", estimate: estimateOf(row, now) };
   } else {
-    const earlier = row && estimateOf(row);
+    const earlier = row && estimateOf(row, now);
     calculated = {
       ...day, state: "unavailable",
       previous: earlier ? { ...earlier, origin_label: row.origin_label, destination_label: row.destination_label } : null,
