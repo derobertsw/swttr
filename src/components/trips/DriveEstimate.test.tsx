@@ -105,6 +105,7 @@ describe("The day's drive", () => {
     expect(screen.getByRole("link", { name: "Powered by Geoapify" })).toBeVisible();
     await userEvent.click(screen.getByText("Estimate details"));
     expect(screen.getByText(/Earlier estimate, for Stowe Motel → Mountain Road lot: about 10 min/)).toBeVisible();
+    expect(screen.getByText(/Typical traffic, not live. No departure time is used/)).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(retry).toHaveBeenCalled();
   });
@@ -410,6 +411,9 @@ describe("Your estimate", () => {
     expect(screen.getByRole("button", { name: "Edit your estimate" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove your estimate" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add your estimate" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Estimate details")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Typical traffic/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No departure time is used/)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Powered by Geoapify" })).not.toBeInTheDocument();
     rerender(<DayDrive data={full} date={SAT} dateLabel="Sat Jan 9" canEdit={false} drive={state(estimates)} onSaved={vi.fn()} />);
     expect(screen.getByText(/^Organizer's estimate · entered/)).toBeInTheDocument();
@@ -441,6 +445,8 @@ describe("Your estimate", () => {
     render(<DayDrive data={full} date={SAT} dateLabel="Day" onSaved={vi.fn()} canEdit drive={state(estimates)} />);
     expect(screen.getByText("About 40 min drive · one way")).toBeVisible();
     expect(screen.getByText("Calculated estimate: about 12 min · 5.6 mi · one way (calculated 8 days ago) · not updated")).toBeVisible();
+    await userEvent.click(screen.getByText("Estimate details"));
+    expect(screen.getByText(/Typical traffic, not live. No departure time is used/)).toBeVisible();
   });
   it("asks which days before removing it, and removes it from all of them", async () => {
     const fetchMock = fakeTripApi({ [`DELETE ${ESTIMATE_URL}`]: reply(200, { ok: true }) });

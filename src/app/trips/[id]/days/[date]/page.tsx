@@ -53,6 +53,7 @@ const KIT_SLOTS = ["shirt", "midlayer", "jacket", "shell", "pants", "gloves"] as
 const EFFORT_OPTIONS: TripEffort[] = ["easy", "steady", "hard"];
 const KIT_STATE_LABEL: Record<TripKitState, string> = { ok: "OK", warn: "Needs help", missing: "Missing" };
 
+/** The saved day plan, including access, conditions, crew kits and touring notes. */
 export default function DayDetailPage({
   params,
 }: {

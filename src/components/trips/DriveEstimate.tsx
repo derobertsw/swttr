@@ -116,6 +116,7 @@ function RoutingAttribution() {
 
 /** Traffic assumptions and previous-route figures, separate from the current duration. */
 function EstimateDetails({ day }: { day: TripDriveDay }) {
+  if (!day.estimate && !day.previous) return null;
   return (
     <details className="text-sm text-muted-foreground">
       <summary className="min-h-11 cursor-pointer py-2 text-base text-foreground">Estimate details</summary>

@@ -71,6 +71,7 @@ export async function driveMatrix(sources: Point[], targets: Point[], avoid: Poi
   }
   const rows = ((await response.json().catch(() => null)) as { sources_to_targets?: unknown } | null)?.sources_to_targets;
   const result: Array<Array<DriveLeg | null | undefined>> = sources.map(() => targets.map(() => undefined));
+  /** Rejects an unreadable matrix before any cells can be cached as no-route results. */
   const badResponse = (): never => {
     logUsage("bad_response");
     throw new RoutingUnavailable("Drive estimates sent an unreadable answer.");
