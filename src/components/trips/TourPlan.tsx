@@ -95,7 +95,7 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
   if (!active && !plan && !editorSession) return null;
 
   const open = () => {
-    focus.remember(() => document.getElementById("tour-plan-heading"));
+    focus.remember(() => document.getElementById("tour-plan-heading") ?? document.getElementById("trip-day-heading"));
     setEditorSession({ plan, dayId: day?.id });
   };
   const restore = async () => {
@@ -230,6 +230,8 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, meetingPoint, on
   const [conflict, setConflict] = useState(false);
   // The plan saved now, after a conflict: null when there's none any more.
   const [savedPlan, setSavedPlan] = useState<TripTourPlanSummary | null | undefined>(undefined);
+  // Conflict review advances the mutation baseline; actions must describe that plan.
+  const currentPlan = savedPlan === undefined ? plan : savedPlan;
   const [discarding, setDiscarding] = useState(false);
   const [closed, setClosed] = useState(false);
   // One identity per input, so a retry of an uncertain save replays rather than saving twice.
@@ -287,6 +289,7 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, meetingPoint, on
     void send("PUT", { plan: planBody(draft) }, "Tour plan saved.");
   };
   const remove = () => {
+    if (!currentPlan || revision < 1) return;
     if (!removing) { mutationId.current = null; setRemoving(true); return; }
     void send("DELETE", {}, "Tour plan removed.");
   };
@@ -295,7 +298,7 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, meetingPoint, on
     try {
       const current = await timedTripRequest<TripFull>(`/api/v1/trips/${tripId}`, "GET");
       const saved = current.tour_plans?.find((entry) => entry.date === date) ?? null;
-      setSavedPlan(saved); setRevision(saved?.revision ?? 0); setConflict(false);
+      setSavedPlan(saved); setRevision(saved?.revision ?? 0); setConflict(false); setRemoving(false);
       setDay(current.days.find((entry) => entry.date === date)?.id);
       mutationId.current = null;
     } catch (err) { showError(err); }
@@ -330,7 +333,7 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, meetingPoint, on
     </label>
   );
 
-  const title = discarding ? "Discard changes?" : removing ? "Remove tour plan?" : plan ? "Change tour plan" : "Add tour plan";
+  const title = discarding ? "Discard changes?" : removing ? "Remove tour plan?" : currentPlan ? "Change tour plan" : "Add tour plan";
   return (
     <TripSheet open={!closed} busy={busy} onClose={requestClose} className="sm:max-w-xl"
       onCloseAutoFocus={(event) => { onCloseAutoFocus(event); onClose(); }}
@@ -350,7 +353,7 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, meetingPoint, on
       </> : <>
         <Button type="submit" form="tour-plan-form" loading={busy}>Save tour plan</Button>
         <Button type="button" variant="outline" disabled={busy} onClick={requestClose}>Cancel</Button>
-        {plan && revision > 0 && <Button type="button" variant="ghost" disabled={busy} onClick={remove}>Remove tour plan</Button>}
+        {currentPlan && revision > 0 && <Button type="button" variant="ghost" disabled={busy} onClick={remove}>Remove tour plan</Button>}
       </>}
     >
       {!discarding && <div className="space-y-4">
@@ -363,7 +366,7 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, meetingPoint, on
         {error && <p id="tour-plan-error" role="alert" className="text-base text-destructive">{error}</p>}
         {removing ? (
           <p className="break-words text-base text-foreground">
-            The route, times and notes for {dateLabel} ({plan?.objective}) will be deleted for everyone on the trip. The day keeps its activity.
+            The route, times and notes for {dateLabel} ({currentPlan?.objective}) will be deleted for everyone on the trip. The day keeps its activity.
           </p>
         ) : (
           <form id="tour-plan-form" ref={form} onSubmit={save} className="space-y-4" aria-busy={busy}>

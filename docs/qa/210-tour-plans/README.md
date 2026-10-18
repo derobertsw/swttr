@@ -1,6 +1,6 @@
 # Tour-day planning acceptance review (#210)
 
-Reviewed October 18, 2026, against `origin/main` at `af861c4`. The persisted plan shipped in [#295](https://github.com/derobertsw/swttr/pull/295); plan copying and itinerary reviews shipped in [#301](https://github.com/derobertsw/swttr/pull/301). The recorded product decisions are in [trip-tour-plans.md](../../trip-tour-plans.md), including retaining **Backcountry** as the activity label.
+Reviewed October 18, 2026, against `origin/main` at `41da6b9`, including #314's drive estimates. The initial review used `af861c4`; final integration checks use `41da6b9`. The persisted plan shipped in [#295](https://github.com/derobertsw/swttr/pull/295); plan copying and itinerary reviews shipped in [#301](https://github.com/derobertsw/swttr/pull/301). The recorded product decisions are in [trip-tour-plans.md](../../trip-tour-plans.md), including retaining **Backcountry** as the activity label.
 
 This follow-up fixes draft loss during background trip refreshes. Returning to the browser can reload the trip through `TripProvider`. Previously, a newer plan revision remounted the editor, resetting typed text; changing to another activity removed the editor entirely. The editor now retains the plan and day it opened against until it closes. The existing server conflict check still requires reviewing a newer saved plan before replacing it. The editor also shows the canonical meeting point, including a day-specific override, or explicitly says **Meeting point not set**. Focus can return to the saved-plan disclosure after an activity change.
 
@@ -20,6 +20,7 @@ This follow-up fixes draft loss during background trip refreshes. Returning to t
 
 - Full suite: **163 files, 2,399 tests passed** with `NODE_OPTIONS=--no-experimental-webstorage npm test -- --run` after integrating `main` at `41da6b9` (#314 drive estimates). The earlier run against `af861c4` passed 2,380 tests. Existing jsdom external-navigation notices do not fail tests.
 - Focused plan/itinerary/API/day-page suite: **8 files, 217 tests passed**.
+- Review follow-up: **3 files, 102 tests passed** across TourPlan, the day page and the tour-plan API. Six added cases cover removal of the inspected plan (including a different day at the same date and an initially empty draft), absence after save/delete conflicts, and focus return to the saved disclosure or day heading. Removal confirmation uses the inspected plan's objective and requires a fresh confirmation after review; it does not use the pending draft or original plan's name. Build, lint and diff checks were repeated successfully.
 - `npm run build`: passed, including TypeScript and prerendering, with Next.js 16.4.0.
 - `npm run lint`, `npm run knip` and `git diff --check`: passed. Knip reports its existing two configuration hints for `apple/**` and `macos/**`.
 
