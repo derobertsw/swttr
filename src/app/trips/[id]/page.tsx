@@ -3,6 +3,7 @@
 import { use } from "react";
 import Link from "next/link";
 import { ChevronRight, Package, Settings, ShieldCheck, Users } from "lucide-react";
+import { SharedGearAttention } from "@/components/trips/SharedGear";
 import PageLayout from "@/components/PageLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
 
         {data && (
           <>
+            <SharedGearAttention tripId={id} gear={data.gear} />
             <header>
               <p role="status" className="mb-2 text-sm text-success">Saved trip</p>
               <SectionLabel>

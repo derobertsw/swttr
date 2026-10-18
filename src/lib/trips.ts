@@ -191,6 +191,7 @@ export async function loadTripFull(
     loadConditions(supabase, tripId),
   ]);
 
+  if (gearRes.error) throw new Error("Couldn't load shared gear. Try again.");
   const stops = (stopsRes.data ?? []) as TripStop[];
   const tour_plans = summarizeTourPlans(tourPlans, days);
   return {
