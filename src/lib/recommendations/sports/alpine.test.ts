@@ -121,3 +121,29 @@ describe('alpine regional warnings', () => {
     expect(regionalWarnings(result)).toEqual([]);
   });
 });
+
+describe('alpine targets', () => {
+  const request = (tempC: number, windMs: number): RecommendationRequest => ({
+    supabase: createFakeSupabase({}) as unknown as RecommendationRequest['supabase'],
+    userId: null, weather: { temperature: tempC * 9 / 5 + 32, wind_speed: windMs / 0.44704, precipitation: false },
+    tempC, windMs, humidity: 50, precipitation: false, exertion: 'moderate',
+    bodyMetrics: DEFAULT_BODY_METRICS, useWardrobeOnly: false, prioritizeLightPack: false,
+  });
+
+  it.each([[-4, 5.4], [-15, 8.9], [-26, 4.5]])('sizes the range for the ski-and-lift cycle at %s°C, not the seated lift ride', (tempC, windMs) => {
+    const targets = alpine.computeTargets(request(tempC, windMs));
+
+    // Steady-state sitting on the lift needs far more than a cycle of runs
+    // and rides; the range sits between the two phases' neutral IREQ.
+    expect(targets.targetRange[1]).toBeLessThan(targets.chairlift.ireqNeutral);
+    expect(targets.targetRange[0]).toBeGreaterThan(targets.skiing.ireqMin);
+  });
+
+  it('asks every region for the same share of the whole-body range', () => {
+    const { regional, targetRange } = alpine.computeTargets(request(-4, 5.4));
+
+    expect(regional.min.legs).toBe(regional.min.torso);
+    expect(regional.min.arms).toBe(regional.min.torso);
+    expect(regional.min.torso).toBeCloseTo(targetRange[0], 2);
+  });
+});

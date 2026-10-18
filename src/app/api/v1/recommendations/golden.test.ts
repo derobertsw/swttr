@@ -244,7 +244,9 @@ describe("POST /api/v1/recommendations/alpine (golden, comfort)", () => {
 
   it("scores an outfit inside the target range as comfortable", async () => {
     useDatabase(null, []);
-    const { body } = await callRoute(alpine, CONDITIONS[0].body);
+    // 25°F: the catalog outfit also covers the hands and head. At 45°F its
+    // helmet and liner beanie (0.95 clo) fall short of the 1.42 head minimum.
+    const { body } = await callRoute(alpine, CONDITIONS[1].body);
     const [min, max] = body.ireq.target_range;
     const totalClo = body.recommendation.ensemble_properties.total_clo;
 

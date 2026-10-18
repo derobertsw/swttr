@@ -1,6 +1,6 @@
-# Gear catalog thermal calibration, part 2 (proposal, 2026-10-18)
+# Gear catalog thermal calibration, part 2 (2026-10-18)
 
-**Status: proposal, waiting for decisions.** Nothing has been written to production. This picks up where [catalog-thermal-audit.md](catalog-thermal-audit.md) ("Decision and what's still open") stops after migration 035: shells and insulated outerwear are still on the low scale, and the model has no wind/motion correction. Everything below was measured on main at `af861c4` (035 merged and applied in production; 116 live garments). USARIEM T21-03 itself was read from the user's copy (DTIC was still down), so every analogue and seeded reference row below is checked against the report, not only CoWEDA's excerpt.
+**Status: approved 2026-10-18, being implemented** (see "Decisions"). Nothing has been written to production yet. This picks up where [catalog-thermal-audit.md](catalog-thermal-audit.md) ("Decision and what's still open") stops after migration 035: shells and insulated outerwear are still on the low scale, and the model has no wind/motion correction. Everything below was measured on main at `af861c4` (035 merged and applied in production; 116 live garments). USARIEM T21-03 itself was read from the user's copy (DTIC was still down), so every analogue and seeded reference row below is checked against the report, not only CoWEDA's excerpt.
 
 ## Summary
 
@@ -11,11 +11,13 @@
    - Alpine asks legs for 1.2× the whole-body target.
    - Running and biking budget protective shells against the clo cap.
    - #306's requirement filter drops layers the regional search or protection policy chose, once shells carry realistic clo.
-4. **The alpine target fixes are independent of the scale question.** Computing alpine IREQ at the time-weighted ski/lift metabolic rate (ISO 8996), with legs at 1.0, lifts alpine from 52.3 to 74.9 on today's catalog. Only 12 scenarios change, and no other sport changes.
+4. **The alpine target fixes do most of the alpine work.** Computing alpine IREQ at the time-weighted ski/lift metabolic rate (ISO 8996), with legs at 1.0, lifts alpine from 52.3 to 74.9 on today's catalog. Only 12 scenarios change, and no other sport changes. They still shouldn't ship without the correction (item 6).
 5. **With all of it plus a filter fix,** mean comfort is 74.9 / 67.2 / 77.5 / 65.0 / 94.7 (alpine / biking / running / touring / XC), against 52.3 / 64.4 / 76.9 / 65.2 / 97.3 today. The only remaining assertion failures are the running/XC contract's near-zero minimum, which needs a one-line floor.
-6. **Recommendation: two PRs.**
-   - PR A, now: the alpine target fixes.
-   - PR B: model, catalog (migration 036), shells outside the running/biking budget, and the requirement-filter fix. See "Decisions".
+6. **Plan: two PRs, merged together.**
+   - PR A: the alpine target fixes.
+   - PR B, stacked on PR A: model, catalog (migration 036), shells outside the running/biking budget, and the requirement-filter fix.
+
+   PR A alone would under-dress cold, windy days until the correction lands (see "Decisions").
 7. **T21-03 checks:**
    - the regression coefficients in `constants.ts` match it;
    - 6 of the 8 seeded `calibration_reference` rows have wrong arm values (and some Ret);
@@ -245,25 +247,25 @@ Proposal: correct the six rows in migration 036. T21-03's whole-body values coul
 
 **Whole-body clo means something different in T21-03.** T21-03 averages zones with the parallel method, and its whole-body value spans all six regions, head, hands and feet included. That's why the Nano-Air Hoody is 0.34 clo whole-body against 2.34 torso. The code's whole-body value is a 0.5 / 0.25 / 0.25 serial mean of torso, arms and legs, and those weights aren't from T21-03. Comparing either with whole-body IREQ is a modeling choice that deserves its own review (audit "Other things found" item 6). Not part of this proposal.
 
-## Decisions needed
+## Decisions (2026-10-18)
 
-1. **Model:** ISO 11079 Annex A conversion on the requirement side, with the permeability classes and per-phase inputs above (recommended), or on the ensemble side.
-2. **Catalog:**
-   - the T21-03 analogue rules and the 48-row table, including moving Snowdrifter Jacket and Bibs to `hard_shell` and scaling 035's vests by the lab vest/hoody ratio;
-   - whether Capilene Midweight moves to the SOF MW Quarter Zip values.
-3. **Alpine targets:**
-   - T, time-weighted IREQ: recommended.
-   - L, legs multiplier 1.0: recommended. Another value is possible if you'd rather keep a leg bias.
-4. **Builders:**
-   - B, shells outside the running/biking budget: recommended.
-   - The filter fix (`requirements.ts` exemptions, XC standalone legwear): needed in PR B, or XC regresses and breaks an invariant.
-   - The touring climb leaving its hard shell in the pack when dry and calm: separate, later.
-5. **Sequencing:**
-   - Recommended: PR A (T + L, no migration) now, then PR B (M + K + B + filter fix + migration 036 + skill-guide update).
-   - Or one PR.
-   - Or PR B after the complete running/XC selectors (#247/#248).
+The user approved every recommended option:
+- **Model:** the requirement-side ISO 11079 Annex A correction, with the permeability classes and per-phase inputs above.
+- **Catalog:** the 48-row T21-03 table, including moving Snowdrifter Jacket and Bibs to `hard_shell` and scaling 035's vests.
+- **Alpine targets:** the time-weighted cycle IREQ (T) and legs at 1.0 (L).
+- **Builders:** protective shells outside the running/biking clo budget (B), and the requirement-filter fix.
+- **Sequencing:** PR A (T + L), then PR B (everything else, migration 036).
 
-## Implementation after approval
+Still open: the Capilene Midweight lab row, and the touring climb's hard-shell rule.
+
+**Merge PR A together with PR B, not on its own.** Shipping the alpine target fixes before the wind/motion correction under-dresses cold, windy days. At 5°F with 20 mph wind:
+- today's catalog outfit has a down jacket under a Gore-Tex Pro shell (Lyngen Down850);
+- PR A alone swaps it for a light synthetic insulator and a featherweight shell, at 2.95 clo against a 2.68–3.37 target;
+- PR A + B brings the down jacket back (4.34 against 4.26–5.46).
+
+The time-weighted target removes the steady-state lift ride, about −40 % in cold wind. The correction in PR B adds 30–60 % back in that same wind. PR B is stacked on PR A so they can merge together.
+
+## Implementation
 
 - **Migration 036**, applied by hand in the SQL editor:
   - the 48 rows above, in 035's style: explicit `(brand, model_name, old values…)` guards on every replaced field, `data_source` pointing here, and `uncertainty_clo` / confidence caps;
