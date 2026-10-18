@@ -74,7 +74,12 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
   const day = data.days.find((candidate) => candidate.date === date);
   // Where the crew meets is the day's access point (#208), set under Getting there.
   const meetingPoint = day ? accessPointFor(data.stops, day)?.location.label ?? null : null;
-  const [editing, setEditing] = useState(false);
+  // Keep the opened plan/day as the editor's baseline across trip refreshes.
+  // New revisions must go through conflict review, never reset a pending draft.
+  const [editorSession, setEditorSession] = useState<{
+    plan: TripTourPlanSummary | undefined;
+    dayId: string | undefined;
+  } | null>(null);
   const [status, setStatus] = useState("");
   const [restoring, setRestoring] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
@@ -87,11 +92,11 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
     focusAfterRestore.current = false;
     document.getElementById("tour-plan-heading")?.focus();
   }, [active]);
-  if (!active && !plan) return null;
+  if (!active && !plan && !editorSession) return null;
 
   const open = () => {
     focus.remember(() => document.getElementById("tour-plan-heading"));
-    setEditing(true);
+    setEditorSession({ plan, dayId: day?.id });
   };
   const restore = async () => {
     setRestoring(true); setRestoreError(null);
@@ -100,16 +105,16 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
     catch (err) { focusAfterRestore.current = false; setRestoreError(errorMessage(err)); }
     finally { setRestoring(false); }
   };
-  const editor = editing && <TourPlanEditor key={plan?.revision ?? 0} tripId={data.trip.id} date={date} dateLabel={dateLabel} plan={plan}
-    dayId={day?.id} meetingPoint={meetingPoint}
-    onClose={() => setEditing(false)} onCloseAutoFocus={focus.restore}
+  const editor = editorSession && <TourPlanEditor tripId={data.trip.id} date={date} dateLabel={dateLabel} plan={editorSession.plan}
+    dayId={editorSession.dayId} meetingPoint={meetingPoint}
+    onClose={() => setEditorSession(null)} onCloseAutoFocus={focus.restore}
     onSaved={async (message) => { setStatus(message); await onSaved(); }} />;
 
   if (!active && plan) {
-    return (
+    return (<>
       <Card>
         <details>
-          <summary className="min-h-11 cursor-pointer py-2 text-base font-semibold text-foreground">Saved tour plan · {plan.objective}</summary>
+          <summary id="tour-plan-heading" className="min-h-11 cursor-pointer py-2 text-base font-semibold text-foreground">Saved tour plan · {plan.objective}</summary>
           <p className="mt-1 text-base text-foreground">
             This day&apos;s activity is {activity ?? "not set"}, so the tour plan isn&apos;t in use. It&apos;s kept as saved.
           </p>
@@ -122,11 +127,12 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
         </details>
         <p aria-live="polite" className="text-sm text-success">{status}</p>
       </Card>
-    );
+      {editor}
+    </>);
   }
 
-  return (
-    <Card>
+  return (<>
+    {active && <Card>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="tour-plan-heading" tabIndex={-1} className="text-title font-semibold text-foreground">Tour plan</h2>
         {canEdit && <Button type="button" variant="outline" onClick={open}>{plan ? "Change tour plan" : "Add tour plan"}</Button>}
@@ -138,9 +144,9 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
           No tour plan yet.{canEdit ? " Add the route, when to meet and a backup plan; everything but the route is optional." : ""}
         </p>
       )}
-      {editor}
-    </Card>
-  );
+    </Card>}
+    {editor}
+  </>);
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -367,7 +373,11 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, meetingPoint, on
                 {field("meet_time", "Meet time (destination time)", { type: "time" })}
                 {select("meet_day_offset", "Meet on", [["0", dateLabel], ["-1", "The day before"]])}
               </div>
-              <p className="text-sm text-muted-foreground">The meeting point and trailhead come from the destination&apos;s access point.</p>
+              <div className="min-w-0 text-base">
+                <p className="text-muted-foreground">Meeting point</p>
+                <p className="break-words text-foreground">{meetingPoint ?? "Meeting point not set"}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Change the day&apos;s access point in Getting there.</p>
+              </div>
               <details className="text-base text-foreground">
                 <summary className="min-h-11 cursor-pointer py-2">Route link, distance and time (optional)</summary>
                 <div className="space-y-3">
