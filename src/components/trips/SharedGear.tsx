@@ -110,7 +110,7 @@ export function SharedGearAttention({ tripId, gear }: { tripId: string; gear: Tr
   return <Card><h2 className="text-base font-semibold">Shared gear needs attention</h2>
     <ul className="mt-2 space-y-2">{unresolved.map((g) => <li key={g.id} className="break-words text-sm">
       {g.description} · {g.assignee_member_id ? "Awaiting acceptance" : "Unassigned"}{" "}
-      <Link className="inline-flex min-h-11 items-center font-semibold text-primary underline" href={`/trips/${tripId}/gear#shared-${g.id}`}>{g.assignee_member_id ? "Review request" : "Assign item"}</Link>
+      <Link className="inline-flex min-h-11 items-center font-semibold text-primary underline" href={`/trips/${tripId}/gear#shared-${g.id}`}>{g.assignee_member_id ? "View request" : "View item"}</Link>
     </li>)}</ul>
   </Card>;
 }

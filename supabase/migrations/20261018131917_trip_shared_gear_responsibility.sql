@@ -48,7 +48,9 @@ BEGIN
   IF TG_OP = 'UPDATE' THEN
     IF NEW.status <> 'left' OR OLD.status = 'left' THEN RETURN NEW; END IF;
   END IF;
-  SELECT owner_user_id INTO actor FROM public.trips WHERE id = OLD.trip_id FOR UPDATE;
+  -- DELETE/UPDATE already holds the member row. Never take a parent lock
+  -- here: gear/packing writers hold the trip before waiting for this member.
+  SELECT owner_user_id INTO actor FROM public.trips WHERE id = OLD.trip_id;
   UPDATE public.trip_group_gear SET
     assignee_member_id = NULL, accepted_at = NULL, accepted_by = NULL,
     packed_at = NULL, packed_by = NULL, revision = gen_random_uuid(),
@@ -78,12 +80,25 @@ DECLARE
   can_confirm boolean := false;
 BEGIN
   SELECT owner_user_id INTO owner_id FROM public.trips WHERE id = p_trip FOR UPDATE;
-  IF owner_id IS NULL OR p_user IS NULL OR (owner_id <> p_user AND NOT EXISTS (
-    SELECT 1 FROM public.trip_members WHERE trip_id = p_trip AND user_id = p_user AND status = 'joined'
-  )) THEN RAISE EXCEPTION 'Not found' USING ERRCODE = 'P0002'; END IF;
+  IF owner_id IS NULL OR p_user IS NULL THEN RAISE EXCEPTION 'Not found' USING ERRCODE = 'P0002'; END IF;
   IF action IS NULL OR action NOT IN ('create', 'assign', 'accept', 'decline', 'pack', 'unpack', 'delete') THEN
     RAISE EXCEPTION 'Choose a shared gear action' USING ERRCODE = '22023';
   END IF;
+  -- Read only to find the involved members, then lock members before gear.
+  -- Member removal (including an older API's direct DELETE) already holds
+  -- its member lock when the release trigger updates gear. Taking the gear
+  -- lock first would invert that order. FOR SHARE also protects non-key
+  -- membership/status edits, which FOR KEY SHARE would allow through.
+  SELECT * INTO g FROM public.trip_group_gear WHERE id = p_id AND trip_id = p_trip;
+  IF action IN ('create', 'assign') THEN target := NULLIF(p_change->>'assignee_member_id', '')::uuid; END IF;
+  PERFORM id FROM public.trip_members WHERE trip_id = p_trip
+    AND (id = g.assignee_member_id OR id = target OR user_id = p_user)
+    ORDER BY id FOR SHARE;
+  IF owner_id <> p_user AND NOT EXISTS (
+    SELECT 1 FROM public.trip_members WHERE trip_id = p_trip AND user_id = p_user AND status = 'joined'
+  ) THEN RAISE EXCEPTION 'Not found' USING ERRCODE = 'P0002'; END IF;
+  -- Re-read after waiting: a removal/legacy assignment can have changed the
+  -- item. Its new revision must pass the same check as any other stale edit.
   SELECT * INTO g FROM public.trip_group_gear WHERE id = p_id AND trip_id = p_trip FOR UPDATE;
   IF action = 'create' THEN
     IF g.id IS NOT NULL THEN
@@ -102,9 +117,8 @@ BEGIN
   END IF;
 
   IF action IN ('create', 'assign') THEN
-    target := NULLIF(p_change->>'assignee_member_id', '')::uuid;
     IF target IS NOT NULL THEN
-      SELECT * INTO recipient FROM public.trip_members WHERE id = target AND trip_id = p_trip AND status <> 'left' FOR KEY SHARE;
+      SELECT * INTO recipient FROM public.trip_members WHERE id = target AND trip_id = p_trip AND status <> 'left';
       IF recipient.id IS NULL THEN RAISE EXCEPTION 'Choose a current trip member' USING ERRCODE = '22023'; END IF;
       self_assignment := recipient.user_id = p_user AND recipient.status = 'joined';
     END IF;
@@ -132,7 +146,7 @@ BEGIN
     DELETE FROM public.trip_group_gear WHERE id = p_id;
     RETURN jsonb_build_object('deleted', true);
   ELSE
-    SELECT * INTO recipient FROM public.trip_members WHERE id = g.assignee_member_id AND trip_id = p_trip AND status <> 'left' FOR KEY SHARE;
+    SELECT * INTO recipient FROM public.trip_members WHERE id = g.assignee_member_id AND trip_id = p_trip AND status <> 'left';
     can_confirm := recipient.id IS NOT NULL AND (
       (recipient.user_id = p_user AND recipient.status = 'joined') OR
       (owner_id = p_user AND recipient.user_id IS NULL AND recipient.role = 'guest' AND recipient.status = 'guest'));

@@ -71,6 +71,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   // Saves in flight and finished, so a list read while one saved isn't shown
   // over it; and whether to read the list again once they're done.
   const saves = useRef({ inFlight: 0, finished: 0, refreshAfter: false });
+  const afterSaves = useRef(new Set<() => void>());
 
   useEffect(() => {
     let cancelled = false;
@@ -103,8 +104,11 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
         const finished = saves.current.finished;
         const body = await fetchPackList(id);
         if (saves.current.inFlight > 0) {
-          saves.current.refreshAfter = true;
-          return false;
+          // A successful read made during a personal save is provisional.
+          // Keep this refresh pending until saves settle, then read again;
+          // shared gear must not mistake a deferred read for a failed save.
+          await new Promise<void>((resolve) => afterSaves.current.add(resolve));
+          continue;
         }
         if (saves.current.finished === finished) {
           setData(body);
@@ -127,6 +131,10 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
     } finally {
       saves.current.inFlight -= 1;
       saves.current.finished += 1;
+      if (saves.current.inFlight === 0) {
+        for (const resolve of afterSaves.current) resolve();
+        afterSaves.current.clear();
+      }
       if (saves.current.inFlight === 0 && saves.current.refreshAfter) {
         saves.current.refreshAfter = false;
         void refresh();

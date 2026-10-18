@@ -84,8 +84,8 @@ describe("Shared equipment controls", () => {
 
   it("returns declined and removed-member items to attention with direct links and no Ready verdict", () => {
     render(<SharedGearAttention tripId={TRIP.id} gear={[{ ...item, assignee_member_id: null }, { ...item, id: "tent", description: "Tent" }, { ...item, id: "packed", accepted_at: TRIP.created_at, packed_at: TRIP.created_at }]} />);
-    expect(screen.getByRole("link", { name: "Assign item" })).toHaveAttribute("href", "/trips/trip-1/gear#shared-stove");
-    expect(screen.getByRole("link", { name: "Review request" })).toHaveAttribute("href", "/trips/trip-1/gear#shared-tent");
+    expect(screen.getByRole("link", { name: "View item" })).toHaveAttribute("href", "/trips/trip-1/gear#shared-stove");
+    expect(screen.getByRole("link", { name: "View request" })).toHaveAttribute("href", "/trips/trip-1/gear#shared-tent");
     expect(screen.queryByText(/Ready/)).not.toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });

@@ -26,6 +26,7 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
   const [description, setDescription] = useState("");
   const [assignee, setAssignee] = useState<string>("");
   const [adding, setAdding] = useState(false);
+  const [addRecovery, setAddRecovery] = useState<string | null>(null);
   const userId = useUserId();
   const organizer = data?.trip.owner_user_id === userId;
   const members = data?.members ?? [];
@@ -46,10 +47,13 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
         description: item,
         assignee_member_id: assignee || (organizer ? null : me?.id),
       });
+      if (!await reload()) {
+        setAddRecovery(`${item} was saved, but the latest list couldn't be loaded. Reload shared gear to confirm it before adding another item.`);
+        return;
+      }
       setDescription("");
       setAssignee("");
       creation.current = null;
-      await reload();
     } catch (err) {
       // The form keeps the item and who's bringing it, so Add can be tried again.
       toast.error(`Couldn't add ${item}`, { description: errorMessage(err) });
@@ -90,10 +94,23 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
               <label htmlFor="add-gear-description" className={cn(sectionLabelClassName, "mb-2 block")}>
                 Add gear
               </label>
+              {addRecovery && <div role="alert" className="mb-3 break-words text-sm">
+                <p>{addRecovery}</p>
+                <Button variant="outline" className="mt-2" loading={adding} onClick={async () => {
+                  if (adding) return;
+                  setAdding(true);
+                  try {
+                    if (await reload()) {
+                      setAddRecovery(null); setDescription(""); setAssignee(""); creation.current = null;
+                    }
+                  } finally { setAdding(false); }
+                }}>Reload added item</Button>
+              </div>}
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Input
                   id="add-gear-description"
                   type="text"
+                  disabled={adding || !!addRecovery}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Tent, stove, first aid…"
@@ -101,6 +118,7 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                   className="sm:flex-1"
                 />
                 <select
+                  disabled={adding || !!addRecovery}
                   value={assignee || (organizer ? "" : me?.id ?? "")}
                   onChange={(e) => setAssignee(e.target.value)}
                   aria-label="Who's bringing it"
@@ -119,7 +137,7 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                   type="button"
                   variant="secondary"
                   onClick={addGear}
-                  disabled={!description.trim() || adding}
+                  disabled={!description.trim() || adding || !!addRecovery}
                 >
                   {adding ? <Loader2 className="animate-spin" /> : <Plus />}
                   Add
