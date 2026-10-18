@@ -7,6 +7,8 @@ import { ORGANIZER, SAM, TRIP, fakeTripApi, reply, sentBodies, tripFull } from "
 import type { TripGroupGear } from "@/types/trips";
 import GroupGearPage from "./page";
 
+vi.mock("@/hooks/useUserId", () => ({ useUserId: () => "user-1" }));
+
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 // These tests cover the page, not the app chrome around it.
@@ -15,6 +17,7 @@ vi.mock("@/components/PageLayout", () => ({
 }));
 
 const TENT: TripGroupGear = {
+  revision: "a171593c-5c29-4c09-96c4-c27e65b641e8",
   id: "gear-tent",
   trip_id: TRIP.id,
   description: "Tent",
@@ -64,7 +67,7 @@ describe("Group gear page", () => {
     expect(await screen.findByText("Stove")).toBeInTheDocument();
     expect(item).toHaveValue("");
     expect(sentBodies(fetchMock, "POST /api/v1/trips/trip-1/gear")).toEqual([
-      { description: "Stove", assignee_member_id: SAM.id },
+      { id: expect.any(String), description: "Stove", assignee_member_id: SAM.id },
     ]);
   });
 
@@ -114,7 +117,9 @@ describe("Group gear page", () => {
       })
     );
     expect(assignee).toHaveValue("");
-    expect(assignee).toBeEnabled();
+    expect(assignee).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Reload shared gear" }));
+    await waitFor(() => expect(assignee).toBeEnabled());
   });
 
   it("saves one row at a time, so another row's save can't re-enable it", async () => {

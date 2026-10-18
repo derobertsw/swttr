@@ -3,6 +3,7 @@
  * outfits saved to their trip days. See docs/trip-packing.md.
  */
 import type { PackingListData } from "@/lib/packingList";
+import type { TripGroupGear } from "@/types/trips";
 import type { TripDayCoverage } from "@/types/trip-coverage";
 import type { BodyPart, LayerType } from "@/types/wardrobe";
 
@@ -175,6 +176,6 @@ export interface TripPackResponse {
   /** How many days the suggestions are for. */
   suggestedDays: number;
   skipped: { date: string; reason: string }[];
-  groupGear: string[];
+  groupGear: TripGroupGear[];
   equipment: TouringEquipment;
 }

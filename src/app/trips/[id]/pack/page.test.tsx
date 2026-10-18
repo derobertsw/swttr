@@ -348,7 +348,7 @@ describe("Packing from saved outfits", () => {
       items: [SHELL],
       checklists: [{ date: "2026-10-12", items: ["shell", "gloves"] }],
       suggestions: buildPackingListFromDays([day], new Map(), []), suggestedDays: 1,
-      groupGear: ["Stove"],
+      groupGear: [{ id: "stove", trip_id: TRIP.id, description: "Stove", assignee_member_id: "member-you", sort_order: 0, created_at: TRIP.created_at }],
     })) }));
     await renderPage();
     const checklists = await screen.findByRole("region", { name: "Older day checklists" });
@@ -479,7 +479,7 @@ describe("Private persistent packing checks", () => {
   it("checks personal additions separately from assigned group gear, and hides all checks without persistence", async () => {
     let editable = true;
     vi.stubGlobal("fetch", fakeTripApi({ [PACK]: () => reply(200, pack([entry("2026-10-10")], {
-      items: [SHELL], manual: [LAMP], groupGear: ["Crew stove"], editable,
+      items: [SHELL], manual: [LAMP], groupGear: [{ id: "stove", trip_id: TRIP.id, description: "Crew stove", assignee_member_id: "member-you", sort_order: 0, created_at: TRIP.created_at }], editable,
       checks: { [`manual:${LAMP.id}`]: { packed: true, quantity: 1, version } },
     })) }));
     const user = userEvent.setup();

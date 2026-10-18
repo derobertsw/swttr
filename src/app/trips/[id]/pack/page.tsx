@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import Link from "next/link";
 import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { SharedGearList } from "@/components/trips/SharedGear";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -103,15 +104,16 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
         const body = await fetchPackList(id);
         if (saves.current.inFlight > 0) {
           saves.current.refreshAfter = true;
-          return;
+          return false;
         }
         if (saves.current.finished === finished) {
           setData(body);
-          return;
+          return true;
         }
       }
     } catch (err) {
       setError(errorMessage(err));
+      return false;
     } finally {
       setRefreshing(false);
     }
@@ -453,17 +455,12 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
           </section>
         )}
 
-        {groupGear.length > 0 && (
+        {data && (
           <section aria-labelledby="pack-gear-heading" className="flex flex-col gap-2.5">
             <h2 id="pack-gear-heading" className="text-xl font-semibold text-foreground">Group gear (yours)</h2>
-            <Card>
-              <p className="text-sm text-muted-foreground">Assigned to you on the trip&apos;s Gear list, apart from your own things.</p>
-              <ul className="mt-2 space-y-1.5">
-                {groupGear.map((g) => (
-                  <li key={g} className="break-words text-base text-foreground">{g}</li>
-                ))}
-              </ul>
-            </Card>
+            <p className="text-sm text-muted-foreground">Requests and accepted responsibilities are separate from your personal packing checks.</p>
+            {groupGear.length === 0 && <p className="text-sm text-muted-foreground">No shared gear is currently assigned to you.</p>}
+            <SharedGearList personal tripId={id} gear={groupGear} userId="self" onSaved={refresh} />
           </section>
         )}
 

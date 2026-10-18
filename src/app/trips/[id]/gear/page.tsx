@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, Plus, X } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,66 +16,45 @@ import {
 } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
 import { useTrip } from "@/hooks/useTrip";
-import { errorMessage, tripRequest } from "@/lib/trip-requests";
-import type { TripGroupGear } from "@/types/trips";
+import { errorMessage, timedTripRequest } from "@/lib/trip-requests";
+import { SharedGearList } from "@/components/trips/SharedGear";
+import { useUserId } from "@/hooks/useUserId";
 
 export default function GroupGearPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data, loading, error, refresh } = useTrip(id);
+  const { data, loading, error, reload } = useTrip(id);
   const [description, setDescription] = useState("");
   const [assignee, setAssignee] = useState<string>("");
   const [adding, setAdding] = useState(false);
-  // The gear row whose change is being saved. Every row stays disabled until
-  // that save and the reload after it finish, so saves never overlap.
-  const [savingId, setSavingId] = useState<string | null>(null);
-
+  const userId = useUserId();
+  const organizer = data?.trip.owner_user_id === userId;
   const members = data?.members ?? [];
+  const me = members.find((m) => m.user_id === userId && m.status === "joined");
+  const creation = useRef<{ name: string; assignee: string; id: string } | null>(null);
 
   const addGear = async () => {
     const item = description.trim();
     if (!item) return;
+    if (adding) return;
+    if (creation.current?.name !== item || creation.current?.assignee !== assignee) {
+      creation.current = { name: item, assignee, id: crypto.randomUUID() };
+    }
     setAdding(true);
     try {
-      await tripRequest(`/api/v1/trips/${id}/gear`, "POST", {
+      await timedTripRequest(`/api/v1/trips/${id}/gear`, "POST", {
+        id: creation.current.id,
         description: item,
-        assignee_member_id: assignee || null,
+        assignee_member_id: assignee || (organizer ? null : me?.id),
       });
       setDescription("");
       setAssignee("");
-      await refresh();
+      creation.current = null;
+      await reload();
     } catch (err) {
       // The form keeps the item and who's bringing it, so Add can be tried again.
       toast.error(`Couldn't add ${item}`, { description: errorMessage(err) });
     } finally {
       setAdding(false);
-    }
-  };
-
-  const updateAssignee = async (gear: TripGroupGear, memberId: string | null) => {
-    setSavingId(gear.id);
-    try {
-      await tripRequest(`/api/v1/trips/${id}/gear/${gear.id}`, "PATCH", {
-        assignee_member_id: memberId,
-      });
-      await refresh();
-    } catch (err) {
-      toast.error(`Couldn't change who's bringing ${gear.description}`, {
-        description: errorMessage(err),
-      });
-    } finally {
-      setSavingId(null);
-    }
-  };
-
-  const remove = async (gear: TripGroupGear) => {
-    setSavingId(gear.id);
-    try {
-      await tripRequest(`/api/v1/trips/${id}/gear/${gear.id}`, "DELETE");
-      await refresh();
-    } catch (err) {
-      toast.error(`Couldn't remove ${gear.description}`, { description: errorMessage(err) });
-    } finally {
-      setSavingId(null);
     }
   };
 
@@ -88,10 +67,12 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
           <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
             Who&apos;s bringing what?
           </h1>
+          <p className="mt-2 text-sm text-muted-foreground">Assignment asks someone to bring an item. Acceptance and packing are confirmed separately.</p>
+          <Button variant="outline" className="mt-3" onClick={() => void reload()}>Refresh shared gear</Button>
         </header>
 
         {loading && <Skeleton className="h-32 w-full rounded-card" />}
-        {error && <TripError>{error}</TripError>}
+        {error && <TripError>{error}<Button variant="outline" onClick={() => void reload()}>Reload shared gear</Button></TripError>}
 
         {data && (
           <>
@@ -101,56 +82,11 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                   <p className="text-sm text-muted-foreground">No group gear yet.</p>
                 </Card>
               )}
-              {data.gear.map((g) => {
-                const assigned = g.assignee_member_id
-                  ? members.find((m) => m.id === g.assignee_member_id)?.display_name
-                  : null;
-                const saving = savingId === g.id;
-                return (
-                  <Card key={g.id} className={cn(!assigned && "border-warning")}>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                      <p className="min-w-32 flex-1 break-words text-sm text-foreground">{g.description}</p>
-                      <div className="ml-auto flex items-center gap-2">
-                        {saving && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
-                        <select
-                          value={g.assignee_member_id ?? ""}
-                          onChange={(e) =>
-                            updateAssignee(g, e.target.value === "" ? null : e.target.value)
-                          }
-                          disabled={savingId !== null}
-                          aria-label={`Who's bringing ${g.description}`}
-                          className={cn(fieldClassName, "h-9 w-auto max-w-40 px-2 max-md:h-11 pointer-coarse:h-11")}
-                        >
-                          <option value="">unassigned</option>
-                          {members
-                            .filter((m) => m.status !== "left")
-                            .map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.display_name}
-                              </option>
-                            ))}
-                        </select>
-                        {!assigned && (
-                          <AlertTriangle className="size-4 shrink-0 text-warning" aria-label="Unassigned" />
-                        )}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => remove(g)}
-                          disabled={savingId !== null}
-                          aria-label={`Remove ${g.description}`}
-                        >
-                          <X />
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
+              <SharedGearList tripId={id} gear={data.gear} members={members} userId={userId}
+                ownerId={data.trip.owner_user_id} onSaved={reload} />
             </div>
 
-            <Card>
+            {(organizer || me) && <Card>
               <label htmlFor="add-gear-description" className={cn(sectionLabelClassName, "mb-2 block")}>
                 Add gear
               </label>
@@ -161,17 +97,18 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Tent, stove, first aid…"
+                  maxLength={200}
                   className="sm:flex-1"
                 />
                 <select
-                  value={assignee}
+                  value={assignee || (organizer ? "" : me?.id ?? "")}
                   onChange={(e) => setAssignee(e.target.value)}
                   aria-label="Who's bringing it"
                   className={cn(fieldClassName, "sm:w-auto")}
                 >
-                  <option value="">unassigned</option>
+                  {organizer && <option value="">unassigned</option>}
                   {members
-                    .filter((m) => m.status !== "left")
+                    .filter((m) => m.status !== "left" && (organizer || m.id === me?.id))
                     .map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.display_name}
@@ -188,7 +125,7 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
                   Add
                 </Button>
               </div>
-            </Card>
+            </Card>}
 
             <div className="h-24" />
           </>

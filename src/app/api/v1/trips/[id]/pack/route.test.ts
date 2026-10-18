@@ -87,6 +87,26 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     vi.unstubAllEnvs();
   });
 
+  it("returns only current personal shared responsibilities with stable identities and pending/packed states", async () => {
+    const full = mockTrip(["2026-10-08"]);
+    full.members = [ORGANIZER, SAM];
+    const gear = { id: "pending", trip_id: full.trip.id, description: "Stove", assignee_member_id: ORGANIZER.id, sort_order: 0, created_at: full.trip.created_at, revision: "v1", accepted_at: null, packed_at: null };
+    full.gear = [gear, { ...gear, id: "accepted", accepted_at: full.trip.created_at, accepted_by: "user-1", packed_at: full.trip.created_at, packed_by: "user-1" },
+      { ...gear, id: "other", assignee_member_id: SAM.id }, { ...gear, id: "unassigned", assignee_member_id: null }];
+    const result = await (await getPack()).json();
+    expect(result.groupGear.map((g: { id: string }) => g.id)).toEqual(["pending", "accepted"]);
+    expect(result.groupGear[0]).toMatchObject({ id: "pending", accepted_at: null, packed_at: null });
+    expect(result.groupGear[1]).toMatchObject({ id: "accepted", packed_by: "user-1" });
+  });
+
+  it("returns a recoverable error when shared responsibility state cannot be loaded", async () => {
+    mockTrip(["2026-10-08"]);
+    vi.mocked(loadTripFull).mockRejectedValue(new Error("Couldn't load shared gear"));
+    const response = await getPack();
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toMatch(/Reload/);
+  });
+
   it.each([
     {
       label: "Vermont, independent of the server's time zone",
