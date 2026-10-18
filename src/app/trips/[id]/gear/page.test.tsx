@@ -7,6 +7,8 @@ import { ORGANIZER, SAM, TRIP, fakeTripApi, reply, sentBodies, tripFull } from "
 import type { TripGroupGear } from "@/types/trips";
 import GroupGearPage from "./page";
 
+vi.mock("@/hooks/useUserId", () => ({ useUserId: () => "user-1" }));
+
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 // These tests cover the page, not the app chrome around it.
@@ -15,6 +17,7 @@ vi.mock("@/components/PageLayout", () => ({
 }));
 
 const TENT: TripGroupGear = {
+  revision: "a171593c-5c29-4c09-96c4-c27e65b641e8",
   id: "gear-tent",
   trip_id: TRIP.id,
   description: "Tent",
@@ -64,7 +67,7 @@ describe("Group gear page", () => {
     expect(await screen.findByText("Stove")).toBeInTheDocument();
     expect(item).toHaveValue("");
     expect(sentBodies(fetchMock, "POST /api/v1/trips/trip-1/gear")).toEqual([
-      { description: "Stove", assignee_member_id: SAM.id },
+      { id: expect.any(String), description: "Stove", assignee_member_id: SAM.id },
     ]);
   });
 
@@ -94,6 +97,36 @@ describe("Group gear page", () => {
     expect(screen.getByText("No group gear yet.")).toBeInTheDocument();
   });
 
+  it("keeps a saved addition blocked after a failed reload, then recovers by reading without adding again", async () => {
+    let reads = 0;
+    let created = false;
+    const api = fakeTripApi({
+      "GET /api/v1/trips/trip-1": () => {
+        reads += 1;
+        if (reads === 2 || reads === 3) return reply(503, { error: "Read failed" });
+        return reply(200, tripFull({ gear: created ? [{ ...TENT, description: "Stove" }] : [] }));
+      },
+      "POST /api/v1/trips/trip-1/gear": () => { created = true; return reply(201, { gear: { ...TENT, description: "Stove" } }); },
+    });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    await renderPage();
+    const input = await screen.findByPlaceholderText("Tent, stove, first aid…");
+    await user.type(input, "Stove");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    expect(await screen.findByText(/Stove was saved, but the latest list couldn't be loaded/)).toBeInTheDocument();
+    expect(input).toHaveValue("Stove");
+    expect(input).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Reload added item" }));
+    expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Reload added item" }));
+    expect(await screen.findByText("Stove")).toBeInTheDocument();
+    expect(input).toHaveValue("");
+    expect(input).toBeEnabled();
+    expect(sentBodies(api, "POST /api/v1/trips/trip-1/gear")).toHaveLength(1);
+  });
+
   it("says so when a new assignee can't be saved", async () => {
     vi.stubGlobal(
       "fetch",
@@ -114,7 +147,9 @@ describe("Group gear page", () => {
       })
     );
     expect(assignee).toHaveValue("");
-    expect(assignee).toBeEnabled();
+    expect(assignee).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Reload shared gear" }));
+    await waitFor(() => expect(assignee).toBeEnabled());
   });
 
   it("saves one row at a time, so another row's save can't re-enable it", async () => {

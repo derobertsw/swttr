@@ -118,7 +118,7 @@ describe("Day tour plan", () => {
     expect(screen.getByText("Times are local to the destination (America/New_York).")).toBeInTheDocument();
   });
 
-  it("meets at the day's access point from Getting there, its own or its stop's", () => {
+  it("meets at the day's access point from Getting there, its own or its stop's", async () => {
     const lot = (label: string): TripLocation => ({ label, address: null, latitude: 44.2571, longitude: -71.2531, precision: "exact",
       time_zone: null, source: "manual", provider: null, provider_id: null, attribution: null });
     const stop = { ...STOWE_STOP, access_point: lot("Pinkham Notch lot") };
@@ -129,6 +129,9 @@ describe("Day tour plan", () => {
     rerender(<DayTourPlan data={tripFull({ stops: [stop], days: own, tour_plans: [saved({ meet_time: null })] })} date={DATE} dateLabel="Sat Oct 10"
       activity="Backcountry" canEdit onSaved={onSaved} onRestore={onRestore} />);
     expect(screen.getByText("Time not set · Cog Railway base")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Change tour plan" }));
+    expect(within(screen.getByRole("dialog")).getByText("Cog Railway base")).toBeVisible();
+    expect(within(screen.getByRole("dialog")).getByText("Change the day's access point in Getting there.")).toBeVisible();
   });
 
   it("gives members the plan without organizer actions", () => {
@@ -166,6 +169,58 @@ describe("Day tour plan", () => {
     })).toEqual([["day-1", 3], ["day-2", 4]]);
   });
 
+  it.each(["new revision", "removed plan", "activity change", "removed inactive plan", "different day"] as const)(
+    "keeps an open draft and its original conflict baseline after a refresh: %s", async (change) => {
+      const api = fakeTripApi({ [`PUT ${route}`]: reply(409, { error: "Review the saved plan before saving again." }) });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      const view = renderPlan({ plans: [saved()] });
+      await user.click(screen.getByRole("button", { name: "Change tour plan" }));
+      const objective = screen.getByLabelText("Route or objective");
+      await user.clear(objective);
+      await user.type(objective, "Gulf of Slides");
+      await user.click(screen.getByText("Backup and return (optional)"));
+      await user.clear(screen.getByRole("textbox", { name: /^Backup plan/ }));
+      await user.type(screen.getByRole("textbox", { name: /^Backup plan/ }), "Stay below treeline");
+
+      const plans = change.includes("removed") ? [] : [saved({ revision: 4, objective: "Another saved route" })];
+      const days = change === "different day" ? [{ ...DAYS[0], id: "day-2" }] : DAYS;
+      view.rerender(<DayTourPlan data={tripFull({ days, tour_plans: plans })} date={DATE} dateLabel="Sat Oct 10"
+        activity={change.includes("inactive") || change === "activity change" ? "Alpine" : "Backcountry"}
+        canEdit onSaved={onSaved} onRestore={onRestore} />);
+
+      expect(screen.getByLabelText("Route or objective")).toHaveValue("Gulf of Slides");
+      expect(screen.getByRole("textbox", { name: /^Backup plan/ })).toHaveValue("Stay below treeline");
+      await user.click(screen.getByRole("button", { name: "Save tour plan" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Review the saved plan");
+      expect(sentBodies(api, `PUT ${route}`)[0]).toMatchObject({
+        day_id: "day-1", expected_revision: 3,
+        plan: { objective: "Gulf of Slides", backup_plan: "Stay below treeline" },
+      });
+      expect(onSaved).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Keep editing" }));
+      expect(screen.getByLabelText("Route or objective")).toHaveValue("Gulf of Slides");
+    },
+  );
+
+  it("keeps a name-only draft when another plan is added during a refresh", async () => {
+    const api = fakeTripApi({ [`PUT ${route}`]: reply(409, { error: "Review the saved plan before saving again." }) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    const view = renderPlan();
+    await user.click(screen.getByRole("button", { name: "Add tour plan" }));
+    await user.type(screen.getByLabelText("Route or objective"), "My hut approach");
+    view.rerender(<DayTourPlan data={tripFull({ days: DAYS, tour_plans: [saved()] })} date={DATE} dateLabel="Sat Oct 10"
+      activity="Backcountry" canEdit onSaved={onSaved} onRestore={onRestore} />);
+    expect(screen.getByLabelText("Route or objective")).toHaveValue("My hut approach");
+    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Remove tour plan" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save tour plan" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Review the saved plan");
+    expect(sentBodies(api, `PUT ${route}`)[0]).toMatchObject({ day_id: "day-1", expected_revision: 0, plan: { objective: "My hut approach" } });
+  });
+
   it("removes a plan only after confirming, at its revision", async () => {
     const api = fakeTripApi({ [`DELETE ${route}`]: reply(200, { revision: 0 }) });
     vi.stubGlobal("fetch", api);
@@ -178,6 +233,71 @@ describe("Day tour plan", () => {
     await user.click(screen.getByRole("button", { name: "Remove tour plan" }));
     expect(await screen.findByText("Tour plan removed.")).toBeInTheDocument();
     expect(sentBodies(api, `DELETE ${route}`)[0]).toMatchObject({ day_id: "day-1", expected_revision: 3 });
+  });
+
+  it.each([true, false])("confirms the inspected plan before deleting its current day and revision (opened with plan: %s)", async (hasPlan) => {
+    const newer = saved({ objective: "Current day's route", trip_day_id: "day-2", revision: 4 });
+    const api = fakeTripApi({
+      [`PUT ${route}`]: reply(409, { error: "Review the saved plan before saving again." }),
+      [`GET /api/v1/trips/${TRIP.id}`]: reply(200, tripFull({ days: [{ ...DAYS[0], id: "day-2" }], tour_plans: [newer] })),
+      [`DELETE ${route}`]: reply(200, { revision: 0 }),
+    });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    renderPlan({ plans: hasPlan ? [saved()] : [] });
+    await user.click(screen.getByRole("button", { name: hasPlan ? "Change tour plan" : "Add tour plan" }));
+    const objective = screen.getByLabelText("Route or objective");
+    await user.clear(objective);
+    await user.type(objective, "My pending route");
+    await user.click(screen.getByRole("button", { name: "Save tour plan" }));
+    await user.click(await screen.findByRole("button", { name: "Review saved plan" }));
+    expect(await within(screen.getByRole("dialog")).findByText("Current day's route")).toBeInTheDocument();
+    expect(screen.getByLabelText("Route or objective")).toHaveValue("My pending route");
+    await user.click(screen.getByRole("button", { name: "Remove tour plan" }));
+    const confirmation = screen.getByText(/will be deleted for everyone on the trip/);
+    expect(confirmation).toHaveTextContent("Current day's route");
+    expect(confirmation).not.toHaveTextContent("Tuckerman Ravine");
+    expect(confirmation).not.toHaveTextContent("My pending route");
+    expect(sentBodies(api, `DELETE ${route}`)).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "Remove tour plan" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
+    expect(sentBodies(api, `DELETE ${route}`)[0]).toMatchObject({ day_id: "day-2", expected_revision: 4 });
+  });
+
+  it.each(["PUT", "DELETE"])("offers no removal when conflict review finds no saved plan after a %s conflict", async (method) => {
+    const api = fakeTripApi({
+      [`${method} ${route}`]: reply(409, { error: "Review the saved plan before saving again." }),
+      [`GET /api/v1/trips/${TRIP.id}`]: reply(200, tripFull({ days: DAYS, tour_plans: [] })),
+    });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    renderPlan({ plans: [saved()] });
+    await user.click(screen.getByRole("button", { name: "Change tour plan" }));
+    if (method === "DELETE") {
+      await user.click(screen.getByRole("button", { name: "Remove tour plan" }));
+      await user.click(screen.getByRole("button", { name: "Remove tour plan" }));
+    } else {
+      await user.click(screen.getByRole("button", { name: "Save tour plan" }));
+    }
+    await user.click(await screen.findByRole("button", { name: "Review saved plan" }));
+    expect(await screen.findByText(/There's no saved tour plan for this day now/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove tour plan" })).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Add tour plan" })).toBeInTheDocument();
+  });
+
+  it.each([true, false])("returns focus after an activity refresh (saved plan remains: %s)", async (hasPlan) => {
+    const user = userEvent.setup();
+    const content = (inactive: boolean) => <main>
+      <h1 id="trip-day-heading" tabIndex={-1}>Sat Oct 10</h1>
+      <DayTourPlan data={tripFull({ days: DAYS, tour_plans: !inactive || hasPlan ? [saved()] : [] })}
+        date={DATE} dateLabel="Sat Oct 10" activity={inactive ? "Alpine" : "Backcountry"}
+        canEdit onSaved={onSaved} onRestore={onRestore} />
+    </main>;
+    const view = render(content(false));
+    await user.click(screen.getByRole("button", { name: "Change tour plan" }));
+    view.rerender(content(true));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(hasPlan ? screen.getByText("Saved tour plan · Tuckerman Ravine") : screen.getByRole("heading", { name: "Sat Oct 10" })).toHaveFocus());
   });
 
   it("asks before discarding edits", async () => {

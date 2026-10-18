@@ -58,12 +58,6 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext) {
     .eq("trip_id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Unassign any group gear held by this member.
-  await supabase
-    .from("trip_group_gear")
-    .update({ assignee_member_id: null })
-    .eq("trip_id", id)
-    .eq("assignee_member_id", memberId);
-
+  // The database trigger releases shared gear in the same transaction as removal.
   return NextResponse.json({ ok: true });
 }
