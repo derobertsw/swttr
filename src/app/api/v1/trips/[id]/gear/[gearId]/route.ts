@@ -1,43 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readJson } from "@/lib/api";
 import { requireTripAccess } from "@/lib/trips";
+import { changeSharedGear } from "@/lib/trip-shared-gear";
 
 type RouteContext = { params: Promise<{ id: string; gearId: string }> };
-
-export async function PATCH(request: NextRequest, ctx: RouteContext) {
+async function mutate(request: NextRequest, ctx: RouteContext, deleting = false) {
   const { id, gearId } = await ctx.params;
   const auth = await requireTripAccess(id);
   if (auth instanceof NextResponse) return auth;
-  const { supabase } = auth;
-
   const body = await readJson(request);
-  const update: Record<string, unknown> = {};
-  if (typeof body?.description === "string") update.description = body.description;
-  if (body?.assignee_member_id !== undefined)
-    update.assignee_member_id = body.assignee_member_id;
-
-  const { data, error } = await supabase
-    .from("trip_group_gear")
-    .update(update)
-    .eq("id", gearId)
-    .eq("trip_id", id)
-    .select("*")
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ gear: data });
+  const action = deleting ? "delete" : body?.action;
+  if (!deleting && !["assign", "accept", "decline", "pack", "unpack"].includes(action as string)) {
+    return NextResponse.json({ error: "Choose a shared gear action." }, { status: 400 });
+  }
+  return changeSharedGear(auth.supabase, id, auth.userId, gearId, { ...body, action });
 }
-
-export async function DELETE(_request: NextRequest, ctx: RouteContext) {
-  const { id, gearId } = await ctx.params;
-  const auth = await requireTripAccess(id);
-  if (auth instanceof NextResponse) return auth;
-  const { supabase } = auth;
-
-  const { error } = await supabase
-    .from("trip_group_gear")
-    .delete()
-    .eq("id", gearId)
-    .eq("trip_id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
-}
+export async function PATCH(request: NextRequest, ctx: RouteContext) { return mutate(request, ctx); }
+export async function DELETE(request: NextRequest, ctx: RouteContext) { return mutate(request, ctx, true); }

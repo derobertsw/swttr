@@ -43,8 +43,8 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   if (auth instanceof NextResponse) return auth;
   const { supabase, userId } = auth;
 
-  const full = await loadTripFull(supabase, auth.trip);
-  if (!full) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const full = await loadTripFull(supabase, auth.trip).catch(() => null);
+  if (!full) return jsonError("Couldn't load the packing list. Reload and try again.", 503);
 
   // Read sensitivity preference if it exists (best-effort).
   let sensitivity: TemperatureSensitivity = "neutral";
@@ -186,7 +186,6 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   const myGear = myMember
     ? full.gear
         .filter((g) => g.assignee_member_id === myMember.id)
-        .map((g) => g.description)
     : [];
 
   return NextResponse.json({

@@ -85,6 +85,22 @@ export interface TripGroupGear {
   assignee_member_id: string | null;
   sort_order: number;
   created_at: string;
+  /** Missing only in snapshots from before shared responsibility tracking. */
+  revision?: string;
+  accepted_at?: string | null;
+  accepted_by?: string | null;
+  packed_at?: string | null;
+  packed_by?: string | null;
+  assigned_at?: string | null;
+  assigned_by?: string | null;
+  events?: SharedGearEvent[];
+}
+
+export interface SharedGearEvent {
+  action: string;
+  actor: string | null;
+  at: string;
+  assignee: string | null;
 }
 
 export interface TripCrewCounts {

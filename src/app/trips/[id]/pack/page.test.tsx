@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { fakeTripApi, reply, sentBodies, TRIP } from "@/test/tripApi";
 import { buildPackingListFromDays } from "@/lib/packingList";
 import { buildTouringEquipment } from "@/lib/touring-equipment";
+import type { TripGroupGear } from "@/types/trips";
 import type { TripDayCoverage } from "@/types/trip-coverage";
 import type { PackingCheckChange, PackingChecks, PackingItem, TripPackResponse } from "@/types/trip-packing";
 import PackListPage from "./page";
@@ -264,6 +265,41 @@ describe("Packing from saved outfits", () => {
     expect(screen.getByRole("group", { name: "How many Ski shell" })).toHaveTextContent("2");
   });
 
+  it.each([false, true])("waits for personal saves after accepting shared gear, then reports only a real read failure (%s)", async (failRead) => {
+    let releaseSave = () => {};
+    let reads = 0;
+    let gear: TripGroupGear = { id: "stove", trip_id: TRIP.id, description: "Stove", assignee_member_id: "member-you", sort_order: 0, created_at: TRIP.created_at, revision: "pending" };
+    const fetchMock = fakeTripApi({
+      [PACK]: () => {
+        reads += 1;
+        if (reads === 3 && failRead) return reply(503, { error: "Packing read failed" });
+        return reply(200, pack([saved("2026-10-10")], { items: [{ ...SHELL, quantity: reads > 2 ? 2 : 1 }], groupGear: [gear] }));
+      },
+      [CHANGE]: () => new Promise((resolve) => { releaseSave = () => resolve(reply(200, { manual: [], quantities: { [SHELL.key]: 2 } })); }),
+      "PATCH /api/v1/trips/trip-1/gear/stove": () => {
+        gear = { ...gear, revision: "accepted", accepted_at: TRIP.created_at, accepted_by: "user-1" };
+        return reply(200, { gear });
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("button", { name: "One more Ski shell" }));
+    await user.click(screen.getByRole("button", { name: "Accept Stove" }));
+    await waitFor(() => expect(reads).toBe(2));
+    const shared = screen.getByRole("region", { name: "Group gear (yours)" });
+    expect(within(shared).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(shared).getByRole("button", { name: "Accept Stove" })).toHaveAttribute("aria-disabled", "true");
+    await act(async () => releaseSave());
+    if (failRead) {
+      expect(await within(shared).findByRole("alert")).toHaveTextContent("Saved, but the latest list couldn't be loaded");
+      await user.click(within(shared).getByRole("button", { name: "Reload shared gear" }));
+    }
+    expect(await within(shared).findByRole("button", { name: "Mark packed Stove" })).not.toHaveAttribute("aria-disabled");
+    expect(within(shared).queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "How many Ski shell" })).toHaveTextContent("2");
+  });
+
   it("adds an item by hand once across a retry, and removes it", async () => {
     let attempt = 0;
     const fetchMock = fakeTripApi({
@@ -348,7 +384,7 @@ describe("Packing from saved outfits", () => {
       items: [SHELL],
       checklists: [{ date: "2026-10-12", items: ["shell", "gloves"] }],
       suggestions: buildPackingListFromDays([day], new Map(), []), suggestedDays: 1,
-      groupGear: ["Stove"],
+      groupGear: [{ id: "stove", trip_id: TRIP.id, description: "Stove", assignee_member_id: "member-you", sort_order: 0, created_at: TRIP.created_at }],
     })) }));
     await renderPage();
     const checklists = await screen.findByRole("region", { name: "Older day checklists" });
@@ -479,7 +515,7 @@ describe("Private persistent packing checks", () => {
   it("checks personal additions separately from assigned group gear, and hides all checks without persistence", async () => {
     let editable = true;
     vi.stubGlobal("fetch", fakeTripApi({ [PACK]: () => reply(200, pack([entry("2026-10-10")], {
-      items: [SHELL], manual: [LAMP], groupGear: ["Crew stove"], editable,
+      items: [SHELL], manual: [LAMP], groupGear: [{ id: "stove", trip_id: TRIP.id, description: "Crew stove", assignee_member_id: "member-you", sort_order: 0, created_at: TRIP.created_at }], editable,
       checks: { [`manual:${LAMP.id}`]: { packed: true, quantity: 1, version } },
     })) }));
     const user = userEvent.setup();

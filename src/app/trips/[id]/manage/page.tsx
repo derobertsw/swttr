@@ -3,6 +3,7 @@
 import { use, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Trash2, UserPlus } from "lucide-react";
+import { SharedGearAttention } from "@/components/trips/SharedGear";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -142,6 +143,7 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
 
         {data && (
           <>
+            <SharedGearAttention tripId={id} gear={data.gear} />
             {data.crew_counts && <p className="text-sm text-muted-foreground">{formatCrewCounts(data.crew_counts)}</p>}
             {!canManage && <p className="text-sm text-muted-foreground">The organizer manages invitations and guests.</p>}
             <div className="flex flex-col gap-2">

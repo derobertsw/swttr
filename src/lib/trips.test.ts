@@ -73,6 +73,11 @@ describe("Trip loading", () => {
     expect(full).toMatchObject({ trip: TRIP, days: [day], kits: [kit], members: [ORGANIZER], stops: [STOWE_STOP], lodging: { stays: [], assignments: [] }, tour_plans: [], conditions: [] });
   });
 
+  it("does not turn failed shared gear reads into an empty confirmed list", async () => {
+    const { supabase } = database({}, {}, ["trip_group_gear"]);
+    await expect(loadTripFull(supabase, TRIP)).rejects.toThrow("Couldn't load shared gear");
+  });
+
   it("starts kits as soon as days load even when another trip query is slow", async () => {
     vi.useFakeTimers();
     const { supabase, requests } = database({ trip_days: [day], trip_member_day_kits: [kit] }, { trip_stops: 500 });
