@@ -191,7 +191,7 @@ export default function DayDetailPage({
                 Day {dayIndex + 1} of {data.days.length} ·{" "}
                 {activity ?? "no activity"}
               </SectionLabel>
-              <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
+              <h1 id="trip-day-heading" tabIndex={-1} className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
                 {dateLabel}
               </h1>
               {effectiveStop && (
