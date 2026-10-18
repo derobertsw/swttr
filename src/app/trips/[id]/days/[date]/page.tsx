@@ -53,6 +53,7 @@ const KIT_SLOTS = ["shirt", "midlayer", "jacket", "shell", "pants", "gloves"] as
 const EFFORT_OPTIONS: TripEffort[] = ["easy", "steady", "hard"];
 const KIT_STATE_LABEL: Record<TripKitState, string> = { ok: "OK", warn: "Needs help", missing: "Missing" };
 
+/** The saved day plan, including access, conditions, crew kits and touring notes. */
 export default function DayDetailPage({
   params,
 }: {
@@ -205,6 +206,10 @@ export default function DayDetailPage({
 
             <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()}>
               <DayDrive data={data} date={date} dateLabel={dateLabel} drive={drive} canEdit={data.trip.owner_user_id === userId} onSaved={refresh} />
+              {activity === TOUR_ACTIVITY && tourPlan?.approach_notes && <div className="mt-3 border-t border-border pt-3">
+                <h3 className="text-sm font-medium text-muted-foreground">Approach (ski or walk)</h3>
+                <p className="mt-1 whitespace-pre-wrap break-words text-base text-foreground">{tourPlan.approach_notes}</p>
+              </div>}
             </DayAccessPoint>
 
             <ActivityPicker

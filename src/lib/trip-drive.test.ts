@@ -131,6 +131,15 @@ describe("Drive estimates", () => {
     const result = await tripDriveEstimates(driveTrip(), store, { now: NOW + 8 * 86_400_000, matrix: failing });
     expect(result.days.find((day) => day.date === SAT)).toMatchObject({ state: "stale", estimate: { duration_label: "12 min", calculated_at: new Date(NOW).toISOString() } });
   });
+  it.each([
+    [0, "just now", false], [60_000, "1 min ago", false], [3_600_000, "1 hr ago", false],
+    [86_400_000, "1 day ago", false], [8 * 86_400_000, "8 days ago", true],
+  ])("returns the estimate's age and freshness after %i ms", async (elapsed, age, stale) => {
+    const store = memoryStore();
+    await tripDriveEstimates(driveTrip(), store, { now: NOW, matrix: fakeMatrix() });
+    const result = await tripDriveEstimates(driveTrip(), store, { now: NOW + elapsed, matrix: async () => { throw new RoutingUnavailable("timeout"); } });
+    expect(result.days.find((day) => day.date === SAT)?.estimate).toMatchObject({ age_label: age, stale });
+  });
   it("never shows another pair's estimate as current: it's only the earlier estimate", async () => {
     const store = memoryStore();
     await tripDriveEstimates(driveTrip(), store, { now: NOW, matrix: fakeMatrix() });
@@ -170,6 +179,26 @@ describe("Drive estimates", () => {
     const result = await tripDriveEstimates(driveTrip(), store, { now: NOW, matrix: fakeMatrix({}) });
     expect(result.days.find((day) => day.date === SAT)).toMatchObject({ state: "no_route", estimate: null, directions: null });
     expect(store.saved.get(SAT)).toMatchObject({ status: "no_route", duration_seconds: null, distance_meters: null });
+  });
+  it("offers recovery when an expired no-route result can't be checked again", async () => {
+    const store = memoryStore();
+    await tripDriveEstimates(driveTrip(), store, { now: NOW, matrix: fakeMatrix({}) });
+    const failing = vi.fn(async () => { throw new RoutingUnavailable("timeout"); });
+    const fresh = await tripDriveEstimates(driveTrip(), store, { now: NOW + 60_000, matrix: failing });
+    expect(fresh.days.find((day) => day.date === SAT)).toMatchObject({ state: "no_route", directions: null });
+    expect(failing).not.toHaveBeenCalled();
+    const expired = await tripDriveEstimates(driveTrip(), store, { now: NOW + 8 * 86_400_000, matrix: failing });
+    expect(expired.days.find((day) => day.date === SAT)).toMatchObject({
+      state: "unavailable", estimate: null,
+      directions: {
+        apple: "https://maps.apple.com/?saddr=44.4875,-72.7262&daddr=44.53,-72.7816&dirflg=d",
+        google: "https://www.google.com/maps/dir/?api=1&origin=44.4875,-72.7262&destination=44.53,-72.7816&travelmode=driving",
+      },
+    });
+    expect(failing).toHaveBeenCalled();
+    // A successful later check can establish the route without replacing a manual estimate.
+    const recovered = await tripDriveEstimates(driveTrip(), store, { now: NOW + 8 * 86_400_000, matrix: fakeMatrix() });
+    expect(recovered.days.find((day) => day.date === SAT)?.state).toBe("available");
   });
   it("still answers when the table is missing or a write fails", async () => {
     const store: DriveEstimateStore = { read: async () => { throw new Error("relation does not exist"); }, write: async () => { throw new Error("no table"); } };

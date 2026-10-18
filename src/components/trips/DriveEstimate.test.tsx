@@ -8,6 +8,7 @@ import { RoutingUnavailable } from "@/lib/locations/routing";
 import { driveTrip, MOTEL, place, SPRUCE_LOT } from "@/test/driveTrip";
 import { fakeTripApi, reply, sentBodies } from "@/test/tripApi";
 import type { ManualEstimateRow } from "@/lib/trip-drive-estimates";
+import type { StoredDriveEstimate } from "@/lib/trip-drive";
 import type { TripDay, TripDriveEstimates, TripFull } from "@/types/trips";
 
 const NOW = Date.parse("2027-01-05T15:00:00Z");
@@ -20,7 +21,7 @@ const matrix = async (sources: unknown[], targets: Array<{ latitude: number }>) 
 const estimatesFor = (full: TripFull, options: Parameters<typeof tripDriveEstimates>[2] = {}) =>
   tripDriveEstimates(full, memory(), { now: NOW, matrix, ...options });
 const state = (estimates: TripDriveEstimates | null, overrides: Partial<DriveEstimatesState> = {}): DriveEstimatesState =>
-  ({ estimates, error: null, loading: false, refreshing: false, retry: vi.fn(), ...overrides });
+  ({ estimates, error: null, loading: false, routeChanged: false, refreshing: false, retry: vi.fn(), ...overrides });
 
 function setUserAgent(value: string) {
   vi.spyOn(navigator, "userAgent", "get").mockReturnValue(value);
@@ -38,8 +39,12 @@ describe("The day's drive", () => {
     const directions = within(drive).getByRole("link", { name: "Directions from Stowe Motel to Smuggs lot (opens Google Maps)" });
     expect(directions).toHaveAttribute("href", expect.stringContaining("https://www.google.com/maps/dir/?api=1&origin=44.4875,-72.7262"));
     expect(directions).toHaveAttribute("target", "_blank");
+    // Age and the provider's credit remain visible with details collapsed.
+    expect(within(drive).getByText(/Calculated just now/)).toBeVisible();
+    expect(within(drive).getByRole("link", { name: "Powered by Geoapify" })).toBeVisible();
+    expect(within(drive).getByRole("link", { name: "© OpenStreetMap contributors" })).toBeVisible();
     await userEvent.click(within(drive).getByText("Estimate details"));
-    expect(within(drive).getByText("Typical traffic, not live. Check road conditions before you drive.")).toBeVisible();
+    expect(within(drive).getByText("Typical traffic, not live. No departure time is used. Check road conditions before you drive.")).toBeVisible();
     expect(within(drive).getByText("Avoids VT 108 through Smugglers' Notch, usually closed November to mid-May.")).toBeVisible();
     expect(within(drive).getByRole("link", { name: "Powered by Geoapify" })).toBeVisible();
   });
@@ -66,6 +71,29 @@ describe("The day's drive", () => {
     expect(screen.queryByText(/About/)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Directions/ })).not.toBeInTheDocument();
   });
+  it("keeps Directions, Retry and manual recovery after an expired no-route refresh fails", async () => {
+    setUserAgent("Mozilla/5.0 (X11; Linux x86_64)");
+    const full = driveTrip();
+    let rows: StoredDriveEstimate[] = [];
+    const store = { read: async () => rows, write: async (saved: StoredDriveEstimate[]) => { rows = saved; } };
+    await tripDriveEstimates(full, store, { now: NOW, matrix: async (sources, targets) => sources.map(() => targets.map(() => null)) });
+    const estimates = await tripDriveEstimates(full, store, { now: NOW + 8 * 86_400_000, matrix: async () => { throw new RoutingUnavailable("timeout"); } });
+    render(<DayDrive data={full} date={SAT} dateLabel="Day" onSaved={vi.fn()} canEdit drive={state(estimates)} />);
+    expect(screen.getByText("Drive estimate unavailable")).toBeVisible();
+    expect(screen.getByRole("link", { name: /Directions from Stowe Motel to Spruce Peak lot/ })).toHaveAttribute("href",
+      "https://www.google.com/maps/dir/?api=1&origin=44.4875,-72.7262&destination=44.53,-72.7816&travelmode=driving");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add your estimate" })).toBeVisible();
+    expect(screen.queryByText("No road route found")).not.toBeInTheDocument();
+    expect(screen.queryByText(/About .* drive/)).not.toBeInTheDocument();
+  });
+  it("doesn't credit a routing result when none is displayed", async () => {
+    const estimates = await estimatesFor(driveTrip(), { matrix: async () => { throw new RoutingUnavailable("timeout"); } });
+    render(<DayDrive data={driveTrip()} date={SAT} dateLabel="Day" onSaved={vi.fn()} canEdit drive={state(estimates)} />);
+    expect(screen.getByText("Drive estimate unavailable")).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Powered by Geoapify" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "© OpenStreetMap contributors" })).not.toBeInTheDocument();
+  });
   it("offers Retry when the estimate is unavailable, and keeps an earlier pair's estimate only in the details", async () => {
     const store = { read: async () => [{ date: SAT, route_key: "drive|approximated|old", origin_label: "Stowe Motel", destination_label: "Mountain Road lot",
       status: "ok" as const, duration_seconds: 600, distance_meters: 8_000, calculated_at: "2027-01-04T15:00:00.000Z" }], write: async () => undefined };
@@ -74,8 +102,10 @@ describe("The day's drive", () => {
     render(<DayDrive data={driveTrip()} date={SAT} dateLabel="Day" onSaved={vi.fn()} canEdit drive={state(failed, { retry })} />);
     expect(screen.getByText("Route changed — couldn't update the estimate")).toBeInTheDocument();
     expect(screen.queryByText(/About 10 min drive/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Powered by Geoapify" })).toBeVisible();
     await userEvent.click(screen.getByText("Estimate details"));
     expect(screen.getByText(/Earlier estimate, for Stowe Motel → Mountain Road lot: about 10 min/)).toBeVisible();
+    expect(screen.getByText(/Typical traffic, not live. No departure time is used/)).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(retry).toHaveBeenCalled();
   });
@@ -91,12 +121,14 @@ describe("The day's drive", () => {
 describe("A stay's departures on Overview", () => {
   it("shows the next departure and every morning that starts there, each linking to its day", async () => {
     render(<StayDepartures tripId="trip-drive" stayId="stay-motel" drive={state(await estimatesFor(driveTrip()))} />);
-    expect(screen.getByText("Next departure · Sat Jan 9: About 12 min to Spruce Peak lot · 5.6 mi")).toBeInTheDocument();
+    expect(screen.getByText("Next departure · Sat Jan 9: About 12 min drive to Spruce Peak lot · 5.6 mi · one way")).toBeInTheDocument();
+    expect(screen.getByText("Calculated just now")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Powered by Geoapify" })).toBeVisible();
     await userEvent.click(screen.getByText("View access times"));
     const items = screen.getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
-      "Sat Jan 9 · About 12 min to Spruce Peak lot · 5.6 mi",
-      "Sun Jan 10 · About 1 hr 14 min to Smuggs lot · 40 mi",
+      "Sat Jan 9 · About 12 min drive to Spruce Peak lot · 5.6 mi · one way · calculated just now",
+      "Sun Jan 10 · About 1 hr 14 min drive to Smuggs lot · 40 mi · one way · calculated just now",
     ]);
     expect(within(items[1]).getByRole("link", { name: "Sun Jan 10" })).toHaveAttribute("href", `/trips/trip-drive/days/${SUN}`);
   });
@@ -137,6 +169,30 @@ describe("Fetching the estimates", () => {
     vi.stubGlobal("fetch", fakeTripApi({ [`GET ${URL}`]: reply(500, { error: "Couldn't load drive times. Try again." }) }));
     render(<Probe data={driveTrip()} />);
     await waitFor(() => expect(screen.getByTestId("probe")).toHaveTextContent("Couldn't load drive times. Try again."));
+  });
+
+  it("announces a changed route while updating and hides the old pair's time", async () => {
+    function DayProbe({ data }: { data: TripFull }) {
+      const drive = useDriveEstimates(data);
+      return <DayDrive data={data} date={SAT} dateLabel="Day" drive={drive} canEdit onSaved={vi.fn()} />;
+    }
+    const before = driveTrip(), after = driveTrip();
+    after.stops[0] = { ...after.stops[0], access_point: place("Mountain Road lot", 44.528, -72.7853) };
+    const oldAnswer = await estimatesFor(before);
+    let release!: () => void;
+    const answers = [
+      () => reply(200, oldAnswer),
+      () => new Promise<ReturnType<typeof reply>>((resolve) => { release = () => resolve(reply(500, { error: "Try again." })); }),
+    ];
+    vi.stubGlobal("fetch", fakeTripApi({ [`GET ${URL}`]: () => answers.shift()!() }));
+    const { rerender } = render(<DayProbe data={before} />);
+    expect(await screen.findByText("About 12 min drive · 5.6 mi · one way")).toBeVisible();
+    rerender(<DayProbe data={after} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Route changed — updating estimate");
+    expect(screen.queryByText(/About 12 min/)).not.toBeInTheDocument();
+    await act(async () => release());
+    expect(screen.getByRole("button", { name: "Retry" })).toBeVisible();
+    expect(screen.queryByText(/About 12 min/)).not.toBeInTheDocument();
   });
 });
 
@@ -355,6 +411,10 @@ describe("Your estimate", () => {
     expect(screen.getByRole("button", { name: "Edit your estimate" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove your estimate" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add your estimate" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Estimate details")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Typical traffic/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No departure time is used/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Powered by Geoapify" })).not.toBeInTheDocument();
     rerender(<DayDrive data={full} date={SAT} dateLabel="Sat Jan 9" canEdit={false} drive={state(estimates)} onSaved={vi.fn()} />);
     expect(screen.getByText(/^Organizer's estimate · entered/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /estimate/ })).not.toBeInTheDocument();
@@ -375,6 +435,18 @@ describe("Your estimate", () => {
     expect(screen.getByText("About 12 min drive · 5.6 mi · one way")).toBeInTheDocument();
     expect(screen.getByText(/^Your estimate: about 40 min · entered/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Use your estimate" })).toBeInTheDocument();
+  });
+  it("labels a stale calculated alternative without changing the chosen manual estimate", async () => {
+    const full = driveTrip();
+    let rows: StoredDriveEstimate[] = [];
+    const store = { read: async () => rows, write: async (saved: StoredDriveEstimate[]) => { rows = saved; }, manual: async () => [yours(SAT, 40)] };
+    await tripDriveEstimates(full, store, { now: NOW, matrix });
+    const estimates = await tripDriveEstimates(full, store, { now: NOW + 8 * 86_400_000, matrix: failing });
+    render(<DayDrive data={full} date={SAT} dateLabel="Day" onSaved={vi.fn()} canEdit drive={state(estimates)} />);
+    expect(screen.getByText("About 40 min drive · one way")).toBeVisible();
+    expect(screen.getByText("Calculated estimate: about 12 min · 5.6 mi · one way (calculated 8 days ago) · not updated")).toBeVisible();
+    await userEvent.click(screen.getByText("Estimate details"));
+    expect(screen.getByText(/Typical traffic, not live. No departure time is used/)).toBeVisible();
   });
   it("asks which days before removing it, and removes it from all of them", async () => {
     const fetchMock = fakeTripApi({ [`DELETE ${ESTIMATE_URL}`]: reply(200, { ok: true }) });
@@ -475,7 +547,7 @@ describe("Overview summaries with starting points and your estimate", () => {
     render(<StayDepartures tripId="trip-drive" stayId="stay-motel" canEdit drive={state(await withManual(full, [yours(SAT, 40)], { matrix: failing }))} />);
     await userEvent.click(screen.getByText("View access times"));
     expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
-      "Sat Jan 9 · About 40 min to Spruce Peak lot · your estimate",
+      "Sat Jan 9 · About 40 min drive to Spruce Peak lot · one way · your estimate",
       "Sun Jan 10 · No drive planned",
     ]);
   });

@@ -71,19 +71,27 @@ export async function driveMatrix(sources: Point[], targets: Point[], avoid: Poi
   }
   const rows = ((await response.json().catch(() => null)) as { sources_to_targets?: unknown } | null)?.sources_to_targets;
   const result: Array<Array<DriveLeg | null | undefined>> = sources.map(() => targets.map(() => undefined));
+  /** Rejects an unreadable matrix before any cells can be cached as no-route results. */
+  const badResponse = (): never => {
+    logUsage("bad_response");
+    throw new RoutingUnavailable("Drive estimates sent an unreadable answer.");
+  };
   let noRoute = 0;
   if (Array.isArray(rows)) {
     for (const cell of rows.flat()) {
       const { source_index: i, target_index: j, time, distance } = (cell ?? {}) as Record<string, unknown>;
-      if (typeof i !== "number" || typeof j !== "number" || !result[i] || !(j >= 0 && j < targets.length) || result[i][j] !== undefined) continue;
+      if (typeof i !== "number" || !Number.isInteger(i) || typeof j !== "number" || !Number.isInteger(j)
+        || !result[i] || !(j >= 0 && j < targets.length) || result[i][j] !== undefined) return badResponse();
+      // Only the provider's explicit null pair means no road route. Missing,
+      // negative or malformed figures mean provider failure, never no route.
       const seconds = whole(time), meters = whole(distance);
+      if ((seconds === null || meters === null) && !(time === null && distance === null)) badResponse();
       result[i][j] = seconds === null || meters === null ? null : { seconds, meters };
       if (!result[i][j]) noRoute++;
     }
   }
   if (result.some((row) => row.some((cell) => cell === undefined))) {
-    logUsage("bad_response");
-    throw new RoutingUnavailable("Drive estimates sent an unreadable answer.");
+    badResponse();
   }
   logUsage("ok", sources.length * targets.length, noRoute);
   return result as Array<Array<DriveLeg | null>>;

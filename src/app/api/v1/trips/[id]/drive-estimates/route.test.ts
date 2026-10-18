@@ -61,6 +61,16 @@ describe("GET drive estimates", () => {
     expect((await response.json() as TripDriveEstimates).days.map((day) => day.state)).toEqual(["missing_origin", "unavailable", "unavailable", "origin_not_located"]);
     expect(upsert).not.toHaveBeenCalled();
   });
+  it("doesn't store malformed provider figures as proof of no road route", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ sources_to_targets: [[
+      { ...ANSWER.sources_to_targets[0][0], time: null }, ANSWER.sources_to_targets[0][1],
+    ]] })));
+    const response = await get();
+    expect(response.status).toBe(200);
+    const body = await response.json() as TripDriveEstimates;
+    expect(body.days[1]).toMatchObject({ state: "unavailable", estimate: null });
+    expect(upsert).not.toHaveBeenCalled();
+  });
   it("uses the organizer's own estimate on its day, offering the calculated one beside it", async () => {
     manual = [{ trip_day_id: "day-2027-01-09", pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", origin_label: "Stowe Motel",
       destination_label: "Spruce Peak lot", duration_seconds: 2400, note: null, use_calculated: false, entered_at: "2027-01-04T12:00:00+00:00" }];
