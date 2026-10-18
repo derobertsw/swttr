@@ -18,7 +18,7 @@ This follow-up fixes draft loss during background trip refreshes. Returning to t
 
 ## Verification
 
-- Full suite: **163 files, 2,380 tests passed** with `NODE_OPTIONS=--no-experimental-webstorage npm test -- --run`. Existing jsdom external-navigation notices do not fail tests.
+- Full suite: **163 files, 2,399 tests passed** with `NODE_OPTIONS=--no-experimental-webstorage npm test -- --run` after integrating `main` at `41da6b9` (#314 drive estimates). The earlier run against `af861c4` passed 2,380 tests. Existing jsdom external-navigation notices do not fail tests.
 - Focused plan/itinerary/API/day-page suite: **8 files, 217 tests passed**.
 - `npm run build`: passed, including TypeScript and prerendering, with Next.js 16.4.0.
 - `npm run lint`, `npm run knip` and `git diff --check`: passed. Knip reports its existing two configuration hints for `apple/**` and `macos/**`.
