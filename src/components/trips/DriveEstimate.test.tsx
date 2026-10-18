@@ -71,6 +71,29 @@ describe("The day's drive", () => {
     expect(screen.queryByText(/About/)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Directions/ })).not.toBeInTheDocument();
   });
+  it("keeps Directions, Retry and manual recovery after an expired no-route refresh fails", async () => {
+    setUserAgent("Mozilla/5.0 (X11; Linux x86_64)");
+    const full = driveTrip();
+    let rows: StoredDriveEstimate[] = [];
+    const store = { read: async () => rows, write: async (saved: StoredDriveEstimate[]) => { rows = saved; } };
+    await tripDriveEstimates(full, store, { now: NOW, matrix: async (sources, targets) => sources.map(() => targets.map(() => null)) });
+    const estimates = await tripDriveEstimates(full, store, { now: NOW + 8 * 86_400_000, matrix: async () => { throw new RoutingUnavailable("timeout"); } });
+    render(<DayDrive data={full} date={SAT} dateLabel="Day" onSaved={vi.fn()} canEdit drive={state(estimates)} />);
+    expect(screen.getByText("Drive estimate unavailable")).toBeVisible();
+    expect(screen.getByRole("link", { name: /Directions from Stowe Motel to Spruce Peak lot/ })).toHaveAttribute("href",
+      "https://www.google.com/maps/dir/?api=1&origin=44.4875,-72.7262&destination=44.53,-72.7816&travelmode=driving");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add your estimate" })).toBeVisible();
+    expect(screen.queryByText("No road route found")).not.toBeInTheDocument();
+    expect(screen.queryByText(/About .* drive/)).not.toBeInTheDocument();
+  });
+  it("doesn't credit a routing result when none is displayed", async () => {
+    const estimates = await estimatesFor(driveTrip(), { matrix: async () => { throw new RoutingUnavailable("timeout"); } });
+    render(<DayDrive data={driveTrip()} date={SAT} dateLabel="Day" onSaved={vi.fn()} canEdit drive={state(estimates)} />);
+    expect(screen.getByText("Drive estimate unavailable")).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Powered by Geoapify" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "© OpenStreetMap contributors" })).not.toBeInTheDocument();
+  });
   it("offers Retry when the estimate is unavailable, and keeps an earlier pair's estimate only in the details", async () => {
     const store = { read: async () => [{ date: SAT, route_key: "drive|approximated|old", origin_label: "Stowe Motel", destination_label: "Mountain Road lot",
       status: "ok" as const, duration_seconds: 600, distance_meters: 8_000, calculated_at: "2027-01-04T15:00:00.000Z" }], write: async () => undefined };
@@ -79,6 +102,7 @@ describe("The day's drive", () => {
     render(<DayDrive data={driveTrip()} date={SAT} dateLabel="Day" onSaved={vi.fn()} canEdit drive={state(failed, { retry })} />);
     expect(screen.getByText("Route changed — couldn't update the estimate")).toBeInTheDocument();
     expect(screen.queryByText(/About 10 min drive/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Powered by Geoapify" })).toBeVisible();
     await userEvent.click(screen.getByText("Estimate details"));
     expect(screen.getByText(/Earlier estimate, for Stowe Motel → Mountain Road lot: about 10 min/)).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
@@ -386,6 +410,7 @@ describe("Your estimate", () => {
     expect(screen.getByRole("button", { name: "Edit your estimate" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove your estimate" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add your estimate" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Powered by Geoapify" })).not.toBeInTheDocument();
     rerender(<DayDrive data={full} date={SAT} dateLabel="Sat Jan 9" canEdit={false} drive={state(estimates)} onSaved={vi.fn()} />);
     expect(screen.getByText(/^Organizer's estimate · entered/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /estimate/ })).not.toBeInTheDocument();

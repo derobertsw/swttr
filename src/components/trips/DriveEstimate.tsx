@@ -90,6 +90,7 @@ function driveSummary(day: TripDriveDay, canEdit: boolean): string {
   }
 }
 
+/** Opens maps for the exact endpoints while keeping the current day open. */
 function Directions({ day }: { day: TripDriveDay }) {
   const apple = useAppleMaps();
   if (!day.directions || !day.origin || !day.destination) return null;
@@ -104,6 +105,7 @@ function Directions({ day }: { day: TripDriveDay }) {
   );
 }
 
+/** Visible provider and map-data credits for the routing results shown. */
 function RoutingAttribution() {
   return <p className="text-sm text-muted-foreground">
     <a href={GEOAPIFY_CREDIT.url} target="_blank" rel="noopener noreferrer" className={linkClass}>{GEOAPIFY_CREDIT.label}</a>
@@ -112,6 +114,7 @@ function RoutingAttribution() {
   </p>;
 }
 
+/** Traffic assumptions and previous-route figures, separate from the current duration. */
 function EstimateDetails({ day }: { day: TripDriveDay }) {
   return (
     <details className="text-sm text-muted-foreground">
@@ -305,7 +308,7 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
       </div>
       {drive.refreshing && <p className="text-sm text-muted-foreground">Checking the drive time…</p>}
       <EstimateDetails day={day} />
-      <RoutingAttribution />
+      {(day.estimate || day.previous || day.state === "no_route") && <RoutingAttribution />}
     </div>;
   }
 

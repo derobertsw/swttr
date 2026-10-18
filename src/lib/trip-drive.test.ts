@@ -185,10 +185,16 @@ describe("Drive estimates", () => {
     await tripDriveEstimates(driveTrip(), store, { now: NOW, matrix: fakeMatrix({}) });
     const failing = vi.fn(async () => { throw new RoutingUnavailable("timeout"); });
     const fresh = await tripDriveEstimates(driveTrip(), store, { now: NOW + 60_000, matrix: failing });
-    expect(fresh.days.find((day) => day.date === SAT)?.state).toBe("no_route");
+    expect(fresh.days.find((day) => day.date === SAT)).toMatchObject({ state: "no_route", directions: null });
     expect(failing).not.toHaveBeenCalled();
     const expired = await tripDriveEstimates(driveTrip(), store, { now: NOW + 8 * 86_400_000, matrix: failing });
-    expect(expired.days.find((day) => day.date === SAT)).toMatchObject({ state: "unavailable", estimate: null, directions: null });
+    expect(expired.days.find((day) => day.date === SAT)).toMatchObject({
+      state: "unavailable", estimate: null,
+      directions: {
+        apple: "https://maps.apple.com/?saddr=44.4875,-72.7262&daddr=44.53,-72.7816&dirflg=d",
+        google: "https://www.google.com/maps/dir/?api=1&origin=44.4875,-72.7262&destination=44.53,-72.7816&travelmode=driving",
+      },
+    });
     expect(failing).toHaveBeenCalled();
     // A successful later check can establish the route without replacing a manual estimate.
     const recovered = await tripDriveEstimates(driveTrip(), store, { now: NOW + 8 * 86_400_000, matrix: fakeMatrix() });

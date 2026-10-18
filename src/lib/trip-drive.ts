@@ -162,6 +162,7 @@ function estimateAge(calculatedAt: string, now: number): string {
   return `${days} ${days === 1 ? "day" : "days"} ago`;
 }
 
+/** Formats road figures with response-time freshness; no-route rows have no figures. */
 const estimateOf = (row: StoredDriveEstimate, now: number): TripDriveEstimate | null =>
   row.status === "ok" && row.duration_seconds !== null && row.distance_meters !== null
     ? { duration_label: durationLabel(row.duration_seconds), distance_label: distanceLabel(row.distance_meters), calculated_at: row.calculated_at,
@@ -208,8 +209,9 @@ export function driveDay(plan: DrivePlan, row: StoredDriveEstimate | undefined, 
   if (row?.route_key === plan.route_key) {
     const stale = now - Date.parse(row.calculated_at) > DRIVE_ESTIMATE_MAX_AGE_MS;
     // An expired no-route answer isn't proof there's still no road route
-    // when refreshing fails. Keep Retry and manual recovery available.
-    calculated = row.status === "no_route" ? { ...day, state: stale && failed ? "unavailable" : "no_route", directions: null }
+    // when refreshing fails. Keep Directions, Retry and manual recovery available.
+    calculated = row.status === "no_route" ? { ...day, state: stale && failed ? "unavailable" : "no_route",
+      directions: stale && failed ? directions : null }
       : { ...day, state: stale && failed ? "stale" : "available", estimate: estimateOf(row, now) };
   } else {
     const earlier = row && estimateOf(row, now);
