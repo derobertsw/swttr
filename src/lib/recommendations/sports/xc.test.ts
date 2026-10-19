@@ -42,6 +42,14 @@ describe("buildXCEnsemble", () => {
     expect(recommend(garments, SNOWY, false)).toEqual(["leggings", "fleece-pants"]);
   });
 
+  it("does not leave the legs in underwear alone, even when it fits the band best", () => {
+    const thermalBottoms: GarmentRow = { ...garment("thermal-bottoms", "base_layer", "legs", 0.56, 0.38), usage: "underlayer" };
+    const tights = garment("tights", "base_layer", "legs", 0.4, 0.4);
+    expect(recommend([thermalBottoms, tights], MILD, false)).toEqual(["tights"]);
+    // Underwear under another layer is fine.
+    expect(recommend([thermalBottoms, shellPants], MILD, true)).toEqual(["thermal-bottoms", "shell-pants"]);
+  });
+
   it("chooses warmer shell pants over stacking a fleece under light ones", () => {
     const softshellPants = garment("softshell-pants", "soft_shell", "legs", 0.85, 0.28);
     expect(recommend([leggings, fleecePants, shellPants, softshellPants], SNOWY, true))

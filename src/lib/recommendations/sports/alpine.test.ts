@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BODY_METRICS } from '@/lib/biophysics/bodyMetrics';
+import { OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
+import { requiredBasicInsulation } from '@/lib/biophysics/ireq';
 import { createFakeSupabase } from '@/test/fakeSupabase';
 import { categorizeGarments } from '../categorization';
 import type { RecommendationRequest } from '../request';
-import type { PhaseTargets } from '../thermal-targets';
+import { phaseExposure, type PhaseTargets } from '../thermal-targets';
 import type { GarmentRow } from '../types';
 import { alpine } from './alpine';
 
@@ -130,12 +132,15 @@ describe('alpine targets', () => {
     bodyMetrics: DEFAULT_BODY_METRICS, useWardrobeOnly: false, prioritizeLightPack: false,
   });
 
-  it.each([[-4, 5.4], [-15, 8.9], [-26, 4.5]])('keeps a lift-based minimum until the wind/motion correction lands at %s°C', (tempC, windMs) => {
+  it.each([[-4, 5.4], [-15, 8.9], [-26, 4.5]])('sizes the range for the ski-and-lift cycle at %s°C, not the seated lift ride', (tempC, windMs) => {
     const targets = alpine.computeTargets(request(tempC, windMs));
+    // The range is in basic clo; the seated ride's steady state needs more,
+    // in the same units, than a whole cycle of runs and rides.
+    const seatedNeutral = requiredBasicInsulation(targets.chairlift.ireqNeutral,
+      phaseExposure(windMs, targets.chairliftRate, OUTER_AIR_PERMEABILITY.membrane, true));
 
-    // Without the correction, lowering targets to the cycle requirement
-    // removes heavy insulation in cold wind. Preserve the lift-based floor.
-    expect(targets.targetRange[0]).toBeGreaterThanOrEqual(targets.chairlift.ireqNeutral * 0.9);
+    expect(targets.targetRange[1]).toBeLessThan(seatedNeutral);
+    expect(targets.targetRange[0]).toBeGreaterThan(targets.skiing.ireqMin);
   });
 
   it('asks every region for the same share of the whole-body range', () => {

@@ -103,6 +103,22 @@ describe('buildClothingRequirements', () => {
     expect(isSuitableForRegion(tee, 'torso', COLD.regional, { torsoWind: true })).toBe(false);
   });
 
+  it('judges an outer layer the policy needs for protection on that protection, not breathability', () => {
+    const shellPants = garment({
+      id: 'shell-pants', model_name: 'Rain Pants', category: 'hard_shell', usage: 'standalone', covers_legs: true,
+      garment_protection: { windproof_rating: 'windproof', waterproof_rating: 'waterproof' },
+      garment_thermal_properties: { rcl_whole_body: 0.16, rcl_torso: 0, rcl_arms: 0, rcl_legs: 0.5, recl_whole_body: 7, recl_torso: 0, recl_arms: 0, recl_legs: 28, evap_potential: 0.18 },
+    });
+    const windShell = garment({ ...shellPants, id: 'wind-pants', garment_protection: { windproof_rating: 'windproof', waterproof_rating: 'none' } });
+    const wet = { minEvapPotential: 0.3, protection: { wind: true, wet: true } };
+
+    expect(isSuitableForRegion(shellPants, 'legs', COLD.regional, wet)).toBe(true);
+    expect(filterUnsuitableEnsemble([tee, shellPants], COLD.regional, wet).map((g) => g.id)).toContain('shell-pants');
+    // Without a protection need, or without the protection needed, breathability still decides.
+    expect(filterUnsuitableEnsemble([tee, shellPants], COLD.regional, { minEvapPotential: 0.3 }).map((g) => g.id)).not.toContain('shell-pants');
+    expect(isSuitableForRegion(windShell, 'legs', COLD.regional, wet)).toBe(false);
+  });
+
   it('tracks extremity ownership independently from garment ownership', () => {
     const glove = { id: 'gloves', brand: 'Test', model_name: 'Gloves', handwear_type: 'gloves', rcl_clo: 0.28 };
     const requirements = buildClothingRequirements('running', COLD, {

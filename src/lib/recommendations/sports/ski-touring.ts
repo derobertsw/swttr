@@ -13,7 +13,16 @@ import { COWEDA_VALIDATION_SOURCE } from '@/lib/biophysics/coweda';
 import type { IreqResult } from '@/types/garments';
 import type { SportRecommender } from '../handler';
 import type { CategorizedGarments, GarmentRow } from '../types';
-import { metabolicRateFor, phaseIreq, phaseTargets, type PhaseTargets } from '../thermal-targets';
+import { OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
+import { requiredBasicInsulation } from '@/lib/biophysics/ireq';
+import {
+  basicIreq,
+  metabolicRateFor,
+  phaseExposure,
+  phaseIreq,
+  phaseTargets,
+  type PhaseTargets,
+} from '../thermal-targets';
 import { sortByBreathability } from '../sorting';
 import { selectHandwear, selectHeadwearByCategory } from '../extremities';
 import {
@@ -30,6 +39,7 @@ import {
 // CONSTANTS
 // ============================================
 
+/** Cap on the climb outfit, in resultant clo; converted to basic for the climb's wind and motion. */
 const UPHILL_MAX_CLO = 1.8;
 const UPHILL_MIN_EVAP_POTENTIAL = 0.20;
 const UPHILL_WIND_FACTOR = 0.3;
@@ -64,6 +74,8 @@ interface SkiTouringTargets {
   uphillIreq: IreqResult;
   downhillIreq: IreqResult;
   transitionIreq: IreqResult;
+  /** The same IREQs, and the climb's clo cap, in the basic clo garments are rated in. */
+  basic: { uphill: IreqResult; downhill: IreqResult; transition: IreqResult; uphillMaxClo: number };
   uphill: PhaseTargets;
   downhill: PhaseTargets;
 }
@@ -103,7 +115,12 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
 
     const uphillIreq = phaseIreq(conditions, uphillWind, uphillRate);
     const downhillIreq = phaseIreq(conditions, downhillWind, downhillRate);
-    const transitionIreq = phaseIreq(conditions, windMs * TRANSITION_WIND_FACTOR, transitionRate);
+    const transitionWind = windMs * TRANSITION_WIND_FACTOR;
+    const transitionIreq = phaseIreq(conditions, transitionWind, transitionRate);
+    // The climb ends in a hard shell when it fits, and the descent always does.
+    const outer = OUTER_AIR_PERMEABILITY.membrane;
+    const uphillExposure = phaseExposure(uphillWind, uphillRate, outer);
+    const downhillExposure = phaseExposure(downhillWind, downhillRate, outer);
 
     return {
       uphillRate,
@@ -113,8 +130,14 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
       uphillIreq,
       downhillIreq,
       transitionIreq,
-      uphill: phaseTargets('ski_touring_uphill', uphillIreq, uphillRate, conditions, uphillWind),
-      downhill: phaseTargets('ski_touring_downhill', downhillIreq, downhillRate, conditions, downhillWind),
+      basic: {
+        uphill: basicIreq(uphillIreq, uphillExposure),
+        downhill: basicIreq(downhillIreq, downhillExposure),
+        transition: basicIreq(transitionIreq, phaseExposure(transitionWind, transitionRate, outer)),
+        uphillMaxClo: Math.round(requiredBasicInsulation(UPHILL_MAX_CLO, uphillExposure) * 100) / 100,
+      },
+      uphill: phaseTargets('ski_touring_uphill', uphillIreq, uphillRate, conditions, uphillWind, uphillIreq, undefined, uphillExposure),
+      downhill: phaseTargets('ski_touring_downhill', downhillIreq, downhillRate, conditions, downhillWind, downhillIreq, undefined, downhillExposure),
     };
   },
 
@@ -149,7 +172,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
 
     // Uphill Ensemble
     const uphillEnsemble = buildUphillEnsemble(
-      categorized, targets.uphillIreq.ireqMin, UPHILL_MAX_CLO, UPHILL_MIN_EVAP_POTENTIAL
+      categorized, targets.basic.uphill.ireqMin, targets.basic.uphillMaxClo, UPHILL_MIN_EVAP_POTENTIAL
     );
 
     const uphillThermalGarments = ensembleToThermalGarments(uphillEnsemble);
@@ -167,7 +190,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         );
     const uphillIds = new Set(uphillEnsemble.map((g) => g.id));
     const packShellCandidates = categorized.shells.filter((s) => !uphillIds.has(s.id));
-    const additionalCloNeeded = Math.max(0, targets.downhillIreq.ireqNeutral - uphillTotalClo);
+    const additionalCloNeeded = Math.max(0, targets.basic.downhill.ireqNeutral - uphillTotalClo);
     const packInsulationLayer = selectPackableInsulation(
       packInsulationCandidates, additionalCloNeeded, request.prioritizeLightPack
     );
@@ -203,7 +226,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
 
     // Transition Protocol
     const transitionProtocol = generateTransitionProtocol(
-      tempC, windMs, uphillTotalClo, targets.transitionIreq, packInsulationLayer
+      tempC, windMs, uphillTotalClo, targets.basic.transition, packInsulationLayer
     );
 
     // Pack Items Compilation

@@ -48,6 +48,16 @@ export const ENSEMBLE_REGRESSION = {
   },
 } as const;
 
+// Air permeability of an outer fabric, in l/(m²·s), by protection rating:
+// the input ISO 11079 Annex A's wind/motion correction needs. No catalog
+// garment has a measured value; 1 l/(m²·s) is about 0.2 CFM at 125 Pa.
+export const OUTER_AIR_PERMEABILITY = {
+  membrane: 1,       // waterproof membrane or coating
+  windproof: 5,      // dense wind shells, about 1 CFM
+  windResistant: 50, // soft shells and wind-resistant puffies, about 10 CFM
+  open: 1000,        // knits and fleece, 100–300 CFM
+} as const;
+
 // Regional IREQ multipliers by activity: each region's relative insulation
 // need. calculateRegionalTargets rescales them to an area-weighted mean of 1,
 // so only their ratios matter.

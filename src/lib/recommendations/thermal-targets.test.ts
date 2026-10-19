@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BODY_METRICS, metabolicHeatFluxFromMet } from '@/lib/biophysics/bodyMetrics';
 import { getMetabolicRateForActivity, type ExertionLevel } from '@/lib/biophysics/exertion';
-import { REGIONAL_WEIGHTS, type ActivityType } from '@/lib/biophysics/constants';
-import { metabolicRateFor, phaseIreq, phaseTargets } from './thermal-targets';
+import { OUTER_AIR_PERMEABILITY, REGIONAL_WEIGHTS, type ActivityType } from '@/lib/biophysics/constants';
+import { requiredBasicInsulation } from '@/lib/biophysics/ireq';
+import { basicIreq, metabolicRateFor, phaseExposure, phaseIreq, phaseTargets } from './thermal-targets';
 import { evaluatePhase } from './layer-evaluation';
 
 function targets(activity: ActivityType, tempC: number, windMs = 3.57632, exertion: ExertionLevel = 'moderate', precipitation = false, body = DEFAULT_BODY_METRICS) {
@@ -128,5 +129,45 @@ describe('running/XC calibrated policy', () => {
     expect(getMetabolicRateForActivity('ski_touring_downhill', 'moderate')).toBe(145.5);
     expect(targets('alpine_skiing', -5).policy).toBeUndefined();
     expect(targets('ski_touring_uphill', -5).policy).toBeUndefined();
+  });
+});
+
+describe('dynamic exposure', () => {
+  const conditions = { tempC: -4, humidity: 60 };
+  const rate = 145.5;
+  const ireq = phaseIreq(conditions, 10.4, rate);
+  const areaWeighted = (clo: { torso: number; arms: number; legs: number }) =>
+    clo.torso * REGIONAL_WEIGHTS.torso + clo.arms * REGIONAL_WEIGHTS.arm + clo.legs * REGIONAL_WEIGHTS.leg;
+
+  it('converts the whole-body and regional bands to basic clo, leaving hands and head alone', () => {
+    const resultant = phaseTargets('ski_touring_downhill', ireq, rate, conditions, 10.4);
+    const basic = phaseTargets('ski_touring_downhill', ireq, rate, conditions, 10.4, ireq, 'moderate',
+      phaseExposure(10.4, rate, OUTER_AIR_PERMEABILITY.membrane));
+
+    expect(basic.targetRange[0]).toBeCloseTo(requiredBasicInsulation(resultant.targetRange[0], phaseExposure(10.4, rate, 1)), 2);
+    expect(basic.targetRange[1]).toBeGreaterThan(resultant.targetRange[1] * 1.3);
+    expect(basic.extremity).toEqual(resultant.extremity);
+  });
+
+  it('keeps the converted regions averaging back to the converted whole-body band', () => {
+    const basic = phaseTargets('ski_touring_downhill', ireq, rate, conditions, 10.4, ireq, 'moderate',
+      phaseExposure(10.4, rate, OUTER_AIR_PERMEABILITY.membrane));
+
+    expect(Math.abs(areaWeighted(basic.regional.min) - basic.targetRange[0])).toBeLessThanOrEqual(0.01);
+    expect(Math.abs(areaWeighted(basic.regional.neutral) - basic.targetRange[1])).toBeLessThanOrEqual(0.01);
+  });
+
+  it('converts IREQ itself for the builders', () => {
+    const exposure = phaseExposure(10.4, rate, OUTER_AIR_PERMEABILITY.membrane);
+    expect(basicIreq(ireq, exposure)).toEqual({
+      ireqMin: Math.round(requiredBasicInsulation(ireq.ireqMin, exposure) * 100) / 100,
+      ireqNeutral: Math.round(requiredBasicInsulation(ireq.ireqNeutral, exposure) * 100) / 100,
+      dleHours: ireq.dleHours,
+    });
+  });
+
+  it('uses no walking speed for a seated phase', () => {
+    expect(phaseExposure(5, 70, 1, true).walkingSpeedMs).toBe(0);
+    expect(phaseExposure(5, 145.5, 1).walkingSpeedMs).toBeCloseTo(0.455, 3);
   });
 });

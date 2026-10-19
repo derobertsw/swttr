@@ -2,7 +2,6 @@
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import catalog from '@/test/fixtures/gear-catalog.json';
 import { REGIONAL_WEIGHTS } from '@/lib/biophysics/constants';
 
 // Replaying the catalog's seed history reproduces production's thermal values
@@ -50,21 +49,15 @@ describe('catalog thermal audit migration (035) in Postgres', () => {
   }, 30_000);
   afterAll(async () => { await db?.close(); });
 
-  it('puts every garment on the regional weighting and matches the golden fixture', async () => {
+  // The golden fixture now carries 036 too; catalog-thermal-calibration.database.test.ts
+  // checks it against 035 followed by 036.
+  it('puts every garment on the regional weighting', async () => {
     const rows = await thermalRows(db);
     expect(rows).toHaveLength(116);
     const offWeighting = rows.filter(row =>
       Math.abs(Number(row.rcl_whole_body) - weighted(row, 'rcl')) > 0.02 + 1e-9
       || Math.abs(Number(row.recl_whole_body) - weighted(row, 'recl')) > 0.5 + 1e-9);
     expect(offWeighting.map(row => `${row.brand} ${row.model_name}`)).toEqual([]);
-
-    const byName = new Map(rows.map(row => [`${row.brand} ${row.model_name}`, row]));
-    const actual = catalog.garments.map(g => ({ name: `${g.brand} ${g.model_name}`, ...values(byName.get(`${g.brand} ${g.model_name}`) ?? {}) }));
-    const expected = catalog.garments.map(g => ({
-      name: `${g.brand} ${g.model_name}`,
-      ...values(g.garment_thermal_properties as Record<string, unknown>),
-    }));
-    expect(actual).toEqual(expected);
   });
 
   it('keeps the lab rows and re-derives the puffies on the lab scale', async () => {

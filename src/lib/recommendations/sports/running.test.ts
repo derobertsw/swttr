@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildRunningEnsemble } from "./running";
+import { buildRunningEnsemble, running } from "./running";
 import type { CategorizedGarments, GarmentRow } from "../types";
+import { DEFAULT_BODY_METRICS } from "@/lib/biophysics/bodyMetrics";
+import { requiredBasicInsulation, walkingSpeedFromMetabolicRate } from "@/lib/biophysics/ireq";
+import { createFakeSupabase } from "@/test/fakeSupabase";
+import type { RecommendationRequest } from "../request";
 
 function createGarment(overrides: Partial<GarmentRow>): GarmentRow {
   return {
@@ -141,5 +145,34 @@ describe("buildRunningEnsemble", () => {
 
     const ids = ensemble.map((g) => g.id);
     expect(ids).toEqual(["dual-base"]);
+  });
+});
+
+describe("running exposure assumptions", () => {
+  const request = (tempC: number, windMs: number, precipitation: boolean): RecommendationRequest => ({
+    supabase: createFakeSupabase({}) as unknown as RecommendationRequest['supabase'],
+    userId: null, weather: { temperature: tempC * 9 / 5 + 32, wind_speed: windMs / 0.44704, precipitation },
+    tempC, windMs, humidity: 85, precipitation, exertion: 'easy',
+    bodyMetrics: DEFAULT_BODY_METRICS, useWardrobeOnly: false, prioritizeLightPack: false,
+  });
+
+  it.each([[2, 5], [-5, 5], [2, 9]])("does not assume a membrane for accepted water-resistant layers at %s°C / %s m/s", (tempC, windMs) => {
+    const input = request(tempC, windMs, true);
+    const targets = running.computeTargets(input);
+    const exposure = { relativeAirSpeedMs: windMs, walkingSpeedMs: walkingSpeedFromMetabolicRate(targets.metabolicRate) };
+    const membraneMinimum = requiredBasicInsulation(targets.ireq.ireqMin, { ...exposure, airPermeability: 1 });
+    const windResistantMinimum = requiredBasicInsulation(targets.ireq.ireqMin, { ...exposure, airPermeability: 50 });
+
+    expect(targets.basicIreq.ireqMin).toBeGreaterThan(membraneMinimum);
+    // Even a wind-resistant rain layer must not be built against a smaller
+    // membrane-only requirement. Allow for the API's two-decimal rounding.
+    expect(targets.basicIreq.ireqMin).toBeGreaterThanOrEqual(windResistantMinimum - 0.005);
+  });
+
+  it("does not infer wind resistance from wet protection alone", () => {
+    const wet = running.computeTargets(request(2, 5, true));
+    const open = running.computeTargets(request(2, 5, false));
+    expect(wet.policy?.protection).toMatchObject({ wind: false, wet: true });
+    expect(wet.basicIreq).toEqual(open.basicIreq);
   });
 });

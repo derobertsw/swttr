@@ -6,6 +6,8 @@ import {
   celsiusToFahrenheit,
   mphToMs,
   msToMph,
+  requiredBasicInsulation,
+  walkingSpeedFromMetabolicRate,
 } from './ireq';
 import { METABOLIC_RATES, getAlpineCloTargets, ALPINE_CLO_TARGETS } from './constants';
 
@@ -412,5 +414,44 @@ describe('getAlpineCloTargets', () => {
         expect(targets.hands.neutral).toBeGreaterThan(targets.hands.min);
       }
     });
+  });
+});
+
+describe('requiredBasicInsulation (ISO 11079 Annex A)', () => {
+  const exposure = (relativeAirSpeedMs: number, walkingSpeedMs: number, airPermeability: number) =>
+    ({ relativeAirSpeedMs, walkingSpeedMs, airPermeability });
+
+  it('matches the Annex A equations', () => {
+    // CORR 0.603, resultant air 0.0154 m²K/W, fcl 1.371: a skier in a shell
+    // at 25°F in 12 mph wind plus 5 m/s of skiing speed.
+    expect(requiredBasicInsulation(2.0, exposure(10.36, 0.45, 1))).toBeCloseTo(3.017, 3);
+    // A runner at the 1.2 m/s walking cap in 12 mph wind, open knit vs a wind shell.
+    expect(requiredBasicInsulation(1.0, exposure(5.36, 1.2, 1000))).toBeCloseTo(2.427, 3);
+    expect(requiredBasicInsulation(1.0, exposure(5.36, 1.2, 5))).toBeCloseTo(1.410, 3);
+  });
+
+  it('needs more basic insulation in more wind, more motion and more permeable fabric', () => {
+    const base = requiredBasicInsulation(2.0, exposure(4, 0.5, 5));
+    expect(requiredBasicInsulation(2.0, exposure(8, 0.5, 5))).toBeGreaterThan(base);
+    expect(requiredBasicInsulation(2.0, exposure(4, 1.0, 5))).toBeGreaterThan(base);
+    expect(requiredBasicInsulation(2.0, exposure(4, 0.5, 50))).toBeGreaterThan(base);
+  });
+
+  it('is close to identity standing in still air, and never below the resultant value', () => {
+    // The formula gives 1.966 here and -0.005 for the tiny requirement.
+    expect(requiredBasicInsulation(2.0, exposure(0.4, 0, 1))).toBe(2.0);
+    expect(requiredBasicInsulation(0.03, exposure(3.58, 1.2, 1000))).toBe(0.03);
+  });
+
+  it('clamps inputs to the Annex A validity range', () => {
+    expect(requiredBasicInsulation(2.0, exposure(30, 2, 5000))).toBe(requiredBasicInsulation(2.0, exposure(18, 1.2, 1000)));
+    expect(requiredBasicInsulation(2.0, exposure(0, 0, 0))).toBe(requiredBasicInsulation(2.0, exposure(0.4, 0, 1)));
+  });
+
+  it('caps inferred movement at 0.7 m/s separately from explicit walking inputs', () => {
+    expect(walkingSpeedFromMetabolicRate(58)).toBe(0);
+    expect(walkingSpeedFromMetabolicRate(145.5)).toBeCloseTo(0.455, 3);
+    expect(walkingSpeedFromMetabolicRate(232.8)).toBe(0.7);
+    expect(walkingSpeedFromMetabolicRate(400)).toBe(0.7);
   });
 });

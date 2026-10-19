@@ -1,14 +1,15 @@
 /**
- * Ensemble builder for high-output sports (running, biking): every layer is
- * picked by breathability within a whole-body clo budget.
+ * Ensemble builder for high-output sports (running, biking): insulating
+ * layers are picked by breathability within a whole-body clo budget, and
+ * shells are added for protection.
  */
 import type { CategorizedGarments, GarmentRow } from '../types';
 import { findBreathableGarment, getEnsembleClo, sortByBreathability } from '../sorting';
 
 /**
- * Selects base layers, then mid-layers while under the IREQ minimum, then
- * shells when `shouldAddShells` says so, for torso and legs independently and
- * without repeating a garment.
+ * Selects base layers, then mid-layers while under the IREQ minimum and within
+ * `maxClo`, then shells when `shouldAddShells` says so, for torso and legs
+ * independently and without repeating a garment.
  */
 export function buildBreathableEnsemble(
   categorized: CategorizedGarments,
@@ -62,26 +63,16 @@ export function buildBreathableEnsemble(
     }
   }
 
+  // Shells are protection, not insulation to budget: at single-garment
+  // (USARIEM T21-03) values a thin shell is about 0.5 clo, and capping it
+  // against maxClo dropped wind and rain shells exactly when they were wanted.
   if (categorized.shells.length > 0 && shouldAddShells(currentClo)) {
-    const torsoShells = sortByBreathability(categorized.shells.filter((s) => s.covers_torso));
-    for (const shell of torsoShells) {
-      const shellClo = shell.garment_thermal_properties?.rcl_whole_body ?? 0;
-      if (currentClo + shellClo <= maxClo) {
-        ensemble.push(shell);
-        currentClo += shellClo;
-        break;
-      }
-    }
+    const [torsoShell] = sortByBreathability(categorized.shells.filter((s) => s.covers_torso));
+    if (torsoShell) ensemble.push(torsoShell);
 
-    const legsShells = sortByBreathability(categorized.shells.filter((s) => s.covers_legs));
-    for (const shell of legsShells) {
-      if (ensemble.some((g) => g.id === shell.id)) continue;
-      const shellClo = shell.garment_thermal_properties?.rcl_whole_body ?? 0;
-      if (currentClo + shellClo <= maxClo) {
-        ensemble.push(shell);
-        break;
-      }
-    }
+    const legsShell = sortByBreathability(categorized.shells.filter((s) => s.covers_legs))
+      .find((shell) => !ensemble.some((g) => g.id === shell.id));
+    if (legsShell) ensemble.push(legsShell);
   }
 
   return ensemble;

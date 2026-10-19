@@ -45,7 +45,7 @@ Running/XC garment and sustained-effort policy contracts, calibration evidence, 
 
 ### 1. Recommendation Pipeline
 
-Every biophysics recommendation passes through the same pipeline, from metabolic rate lookup through final comfort classification. Multi-phase sports run the target steps once per phase: alpine blends the phase minima while retaining the chairlift neutral target and exposure limit, and ski touring computes uphill, downhill, and transition phases.
+Every biophysics recommendation passes through the same pipeline, from metabolic rate lookup through final comfort classification. Multi-phase sports run the target steps once per phase: alpine computes IREQ at the 60/40 ski-and-lift cycle metabolic rate and relative air speed, retaining chairlift DLE, and ski touring computes uphill, downhill, and transition phases.
 
 ```mermaid
 graph TD
@@ -53,12 +53,12 @@ graph TD
     B --> C[IREQ Calculation]
     C --> D[Activity Target Range<br/>Running/XC: retain heat-balance minimum<br/>Taper only added activity allowance]
     D --> E[CoWEDA-inspired heuristic buffer<br/>Running/XC: taper with cold, wind and wet exposure]
-    E --> F[Regional & Extremity Targets<br/>see Thermal Targets and Comfort]
+    E --> F[Regional & Extremity Targets<br/>Whole-body and regional bands converted to basic clo<br/>ISO 11079 wind and motion correction<br/>Inferred movement capped at 0.7 m/s<br/>Hands and head keep resultant IREQ]
     F --> P[Load Gear Pool:<br/>wardrobe, or catalog filtered by activity score]
     P -->|No usable garments| T[Targets-only response]
     P --> G[Ensemble Building]
     G --> R[Running/XC only: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
-    R --> H[Ensemble Scoring]
+    R --> H[Ensemble Scoring<br/>Least permeable covering layer per region<br/>Convert each regional requirement to basic clo<br/>Then combine with ensemble area weights]
     H --> I[Comfort Evaluation:<br/>shortfalls below each minimum]
 
     subgraph "Shared Biophysics Core — thermal-targets.ts"
@@ -132,7 +132,7 @@ graph TD
 
 ### 3. Ensemble Building Flow
 
-Other sports select base layers, then mid layers, then shells. Alpine and XC compare complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. They allow at most one item in each slot per covered region, including items that span multiple regions, so insulated outerwear takes the outer slot and no shell goes over it. Alpine puts a puffy only under a hard shell; XC allows one under any shell, but not under insulated outerwear. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. XC requires an outer layer on the torso and legs when it is freezing, windy, or wet, minimizes the same shortfall and excess, and then prefers breathable layers. Weather-protection scoring counts windbreakers and insulated outerwear as shells. When targets cannot be met, alpine returns the best available wearable combination. Regional warnings require both a shortfall and an available wearable alternative that could reduce it by more than 0.12 clo while preserving coverage and rain protection. The thermal comfort score and overall cold warnings still report cold conditions when regional targets are unreachable.
+Other sports select base layers, then mid layers, then shells. Alpine and XC compare complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. They allow at most one item in each slot per covered region, including items that span multiple regions, so insulated outerwear takes the outer slot and no shell goes over it. Alpine puts a puffy only under a hard shell; XC allows one under any shell, but not under insulated outerwear. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. XC requires an outer layer on the torso and legs when it is freezing, windy, or wet, minimizes the same shortfall and excess, and then prefers breathable layers. XC never leaves a region in underwear alone. Weather-protection scoring counts windbreakers and insulated outerwear as shells. When targets cannot be met, alpine returns the best available wearable combination. Regional warnings require both a shortfall and an available wearable alternative that could reduce it by more than 0.12 clo while preserving coverage and rain protection. The thermal comfort score and overall cold warnings still report cold conditions when regional targets are unreachable.
 
 ```mermaid
 graph TD
@@ -144,7 +144,7 @@ graph TD
     RANK -->|Alpine| REG[Preserve coverage and rain protection<br/>Minimize combined shortfall and excess, then layers]
     REG --> WARM[Search all compatible outfit combinations for regional maxima<br/>Keep selected coverage and rain protection]
     WARM --> WARN[Warn only when a regional shortfall<br/>can be reduced by more than 0.12 clo]
-    RANK -->|XC| XREG[Outer on torso and legs when freezing, windy, or wet<br/>Minimize combined shortfall and excess<br/>Then breathable and fewer layers]
+    RANK -->|XC| XREG[Outer on torso and legs when freezing, windy, or wet<br/>No underwear-only regions<br/>Minimize combined shortfall and excess<br/>Then breathable and fewer layers]
     SPORT -->|No| SORT[Sort Pool by Sport Strategy]
     SORT --> BASE[Select Base Layer]
     BASE --> MID[Select Mid Layer]
@@ -155,9 +155,9 @@ graph TD
 
     subgraph "Guards Applied at Each Step"
         G1{Garment already selected?}
-        G2{Current clo + garment clo within budget?}
+        G2{Insulating layers within budget?<br/>Running/biking shells bypass clo cap}
         G3{Covers required body region?}
-        G4{Meets breathability threshold?}
+        G4{Meets breathability threshold?<br/>Required protective outer layers qualify<br/>by wind/wet capability}
     end
 
     G1 -->|Duplicate| SKIP[Skip Garment]
@@ -185,14 +185,14 @@ graph TD
     subgraph "Running — shared breathable builder"
         RUN --> R1[Breathability-sorted at every layer]
         R1 --> R2[Shells conditional:<br/>clo deficit or precipitation]
-        R2 --> R3[Whole-body clo budget]
+        R2 --> R3[Basic clo budget for insulation<br/>Protective shells outside clo cap<br/>Targets assume wind-resistant protection only when required<br/>Wet protection alone implies no wind resistance]
         R3 --> R4[Retain actual wind/wet protection independently<br/>Warn when available clothing cannot provide it]
     end
 
     subgraph "Biking — shared breathable builder"
         BIKE --> B1[Breathability-sorted]
         B1 --> B2[Shells always processed]
-        B2 --> B3[Whole-body clo budget]
+        B2 --> B3[Basic clo budget for insulation<br/>Protective shells outside clo cap]
     end
 
     subgraph "Alpine Skiing"
@@ -200,12 +200,12 @@ graph TD
         A1 --> A2[One base + at most one mid/puffy<br/>+ one outer per region]
         A2 --> A3[Insulated outerwear occupies outer slot<br/>Puffies pair only with hard shells or no outer]
         A3 --> A4[Budget all layers by regional clo<br/>Balance shortfalls against excess warmth]
-        A4 --> A5[Conservative dual-phase targets:<br/>60/40 skiing and chairlift minimum<br/>Chairlift neutral IREQ and DLE<br/>Cycle targets deferred until wind/motion correction]
+        A4 --> A5[60/40 ski-and-lift cycle IREQ<br/>at time-weighted metabolism and relative wind<br/>Convert cycle target to basic clo<br/>Chairlift DLE retained]
     end
 
     subgraph "XC Skiing — regional builder shared with alpine"
         XC --> X1[Compare complete regional outfits:<br/>torso and legs independent]
-        X1 --> X2[Outer layer required on torso and legs<br/>when freezing, windy, or wet]
+        X1 --> X2[Outer layer required on torso and legs<br/>when freezing, windy, or wet<br/>Never leave a region in underwear alone]
         X2 --> X3[Insulated outerwear occupies outer slot<br/>Puffies fit under any shell, not insulated outerwear]
         X3 --> X4[Budget by regional clo, then prefer<br/>breathable and fewer layers]
     end
@@ -300,13 +300,15 @@ graph TD
 
 ### 7. Thermal Targets and Comfort
 
-Body-part targets are bands, like the whole-body target range. Running/XC taper added cold margins while preserving the calculated whole-body heat-balance minimum; mild air alone cannot erase a positive requirement for a smaller body or an easy effort. The torso, arms and legs split the whole-body range by the activity's regional multipliers, rescaled so their area-weighted mean is 1: an outfit with every region at its minimum sits exactly at the whole-body minimum. Alpine uses equal multipliers for torso, arms and legs, with no extra leg bias. Hands and head scale the whole-body IREQ of the phase they follow; alpine uses the skiing phase, since its extremity multipliers already add chairlift and wind exposure. These local targets are heuristics, so running/XC taper their full bands to permit zero thermal accessory requirements in suitable mild conditions. The comfort status, the body-part pills, and the comfort score all judge shortfalls against the bottom of each band, in `src/lib/biophysics/comfort.ts`.
+Body-part targets are bands, like the whole-body target range. Whole-body and regional bands are converted from resultant IREQ to basic garment clo using each phase’s wind, movement and assumed outer permeability; the conversion never lowers a positive resultant requirement. The scorer uses the least permeable covering layer separately for torso, arms and legs, converts before combining the regions with the ensemble’s area weights, and leaves uncovered regions at open permeability. Running targets assume only wind-resistant fabric when wind protection is required; a wet-only requirement accepts water-resistant fabrics with no known wind rating, so it cannot imply a membrane. These conservative targets stay independent of wardrobe ownership.
+
+Running/XC taper added cold margins while preserving the calculated whole-body heat-balance minimum; mild air alone cannot erase a positive requirement for a smaller body or an easy effort. The torso, arms and legs split the whole-body range by the activity's regional multipliers, rescaled so their area-weighted mean is 1: an outfit with every region at its minimum sits exactly at the whole-body minimum. Alpine uses equal multipliers for torso, arms and legs, with no extra leg bias. Hands and head scale the whole-body IREQ of the phase they follow; alpine uses the skiing phase, since its extremity multipliers already add chairlift and wind exposure. These local targets are heuristics, so running/XC taper their full bands to permit zero thermal accessory requirements in suitable mild conditions. The comfort status, the body-part pills, and the comfort score all judge shortfalls against the bottom of each band, in `src/lib/biophysics/comfort.ts`.
 
 ```mermaid
 graph TD
     BALANCE[Whole-body heat-balance minimum] --> RANGE[Whole-body target range<br/>Running/XC taper added margins only<br/>Minimum never below heat balance]
     RANGE --> SPLIT[Split across torso, arms and legs<br/>multipliers rescaled to an area-weighted mean of 1<br/>Alpine: equal torso, arm and leg targets]
-    SPLIT --> REG[Regional min and neutral targets]
+    SPLIT --> REG[Convert whole-body and regional bands to basic clo<br/>Phase-specific wind, motion and outer permeability<br/>Shared clothing area factor<br/>Never below resultant heat balance]
     PIREQ[Whole-body IREQ of the phase the hands and head follow<br/>alpine: skiing phase] --> EXT[Hand and head targets:<br/>activity multiplier × wind factor<br/>× temperature factor from 0.8 to 1<br/>+ CoWEDA-inspired extremity buffer<br/>Running/XC: taper both bands and buffer<br/>Allow zero thermal coverage in mild dry exercise]
 
     RANGE --> DEC{Comfort decision}

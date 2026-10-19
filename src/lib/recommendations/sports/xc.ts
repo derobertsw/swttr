@@ -9,6 +9,7 @@ import type { RecommendationRequest } from '../request';
 import type { CategorizedGarments, GarmentRow } from '../types';
 import { createSinglePhaseSport } from './single-phase';
 import { buildRegionalEnsemble } from './regional-ensemble';
+import { OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
 
 const MIN_EVAP_POTENTIAL = 0.25;
 /** Shells breathe less than base and mid layers, so they have a lower bar. */
@@ -33,9 +34,9 @@ export function needsWindLayer(
  * Pick a base, an optional mid and an outer layer for the torso, then the
  * legs. When `windLayer` is true every region gets an outer layer, and
  * insulated pants or jackets count as that layer, so no shell goes over them.
- * Then keep each region within its min–neutral band. Among equally close
- * outfits, prefer layers that meet the breathability bar, then fewer layers,
- * then the most breathable ones.
+ * Never leave a region in underwear alone. Then keep each region within its
+ * min–neutral band. Among equally close outfits, prefer layers that meet the
+ * breathability bar, then fewer layers, then the most breathable ones.
  */
 export function buildXCEnsemble(
   categorized: CategorizedGarments,
@@ -50,8 +51,8 @@ export function buildXCEnsemble(
     breathableFrom,
     rank: (candidate) => {
       const missingCoverage = candidate.missingBase + (windLayer ? candidate.missingOuter : 0);
-      const { excess, deficit, surplus, unbreathable, breathability, count } = candidate;
-      return [missingCoverage, deficit + excess, unbreathable, count, -breathability, surplus];
+      const { missingWearable, excess, deficit, surplus, unbreathable, breathability, count } = candidate;
+      return [missingCoverage, missingWearable, deficit + excess, unbreathable, count, -breathability, surplus];
     },
   });
 }
@@ -79,6 +80,8 @@ function getXCGuidance(tempC: number, ireq: { ireqMin: number; ireqNeutral: numb
 export const xc = createSinglePhaseSport({
   requirementFirst: true,
   windTorsoRequirement: (request) => needsWindLayer(request),
+  // XC wind layers are mostly soft shells.
+  outerAirPermeability: (request) => needsWindLayer(request) ? OUTER_AIR_PERMEABILITY.windResistant : OUTER_AIR_PERMEABILITY.open,
   activity: 'xc_skiing',
   profile: { name: 'XC Skiing', windExposure: 'normal' },
   minEvapPotential: MIN_EVAP_POTENTIAL,

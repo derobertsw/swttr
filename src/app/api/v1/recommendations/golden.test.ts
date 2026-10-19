@@ -253,16 +253,17 @@ describe("POST /api/v1/recommendations/alpine (golden, comfort)", () => {
     expect(body.recommendation.thermal_comfort_score).toBeGreaterThanOrEqual(85);
   });
 
-  it("reports regional shortfalls at 25°F even when whole-body clo is in range", async () => {
+  it("scores the corrected catalog outfit as comfortable at 25°F", async () => {
     useDatabase(null, []);
     const { body } = await callRoute(alpine, CONDITIONS[1].body);
     const { ensemble_properties: properties, thermal_comfort_score: score } = body.recommendation;
 
     expect(properties.total_clo).toBeGreaterThanOrEqual(body.ireq.target_range[0]);
     expect(properties.total_clo).toBeLessThanOrEqual(body.ireq.target_range[1]);
-    expect(properties.regional_clo.arms).toBeLessThan(body.ireq.regional.min.arms);
-    expect(score).toBeLessThan(85);
-    expect(body.warnings).toContainEqual(expect.stringMatching(/^Insufficient arms insulation:/));
+    expect(score).toBeGreaterThanOrEqual(85);
+    expect(body.warnings).not.toEqual(expect.arrayContaining([
+      expect.stringMatching(/^Insufficient (torso|arms|legs) insulation:/),
+    ]));
   });
 
   it("retains a down layer and protective shell at 5°F in 20 mph wind", async () => {

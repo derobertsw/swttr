@@ -1,16 +1,18 @@
 # Gear catalog thermal calibration, part 2 (2026-10-18)
 
-**Status: approved 2026-10-18, being implemented** (see "Decisions"). Nothing has been written to production yet. This picks up where [catalog-thermal-audit.md](catalog-thermal-audit.md) ("Decision and what's still open") stops after migration 035: shells and insulated outerwear are still on the low scale, and the model has no wind/motion correction. Everything below was measured on main at `af861c4` (035 merged and applied in production; 116 live garments). USARIEM T21-03 itself was read from the user's copy (DTIC was still down), so every analogue and seeded reference row below is checked against the report, not only CoWEDA's excerpt.
+**Status: approved 2026-10-18 and implemented** in two stacked PRs: PR A (equal alpine regional multipliers, #317) and PR B (corrected cycle targets, model, catalog, builders; #318, migration 036). PR A retains conservative targets; PR B introduces the lower cycle targets together with the correction. 036 is not applied in production yet; see "Applying migration 036". This picks up where [catalog-thermal-audit.md](catalog-thermal-audit.md) ("Decision and what's still open") stops after migration 035: shells and insulated outerwear are still on the low scale, and the model has no wind/motion correction. Everything below was measured on main at `af861c4` (035 merged and applied in production; 116 live garments). USARIEM T21-03 itself was read from the user's copy (DTIC was still down), so every analogue and seeded reference row below is checked against the report, not only CoWEDA's excerpt.
 
-## Implementation status after PR #317 review
+## Implementation status after PR #317 / #318 review
 
-PR A (#317) now retains the existing conservative alpine baseline: a 60/40 blend of the skiing and chairlift **minimums**, with **neutral IREQ and DLE from the chairlift**. It only removes the regional leg bias. The lower cycle-based baseline is deferred to PR B (#318), where it must land with the wind/motion correction. When updating the stacked PR, resolve `alpine.ts` by retaining PR B's corrected cycle calculation; do not carry the uncorrected conservative baseline into that model.
+PR A (#317) retains the existing conservative alpine baseline: a 60/40 blend of the skiing and chairlift **minimums**, with **neutral IREQ and DLE from the chairlift**. It only removes the regional leg bias. PR B (#318) is reconciled with that branch and introduces the **cycle-based IREQ together with the wind/motion correction**. Both the 45°F and 25°F catalog comfort checks score at least 85, and the 5°F / 20 mph regression retains down insulation plus a shell.
 
-The golden comparisons below describe the original calibration experiments, including the lower cycle targets; they are not the final PR A results after review. Retaining the conservative baseline restores the catalog's 45°F comfort check. At 25°F, regional arm insulation still falls below its minimum, so that case explicitly tests the shortfall instead of claiming a comfortable score from whole-body clo alone.
+Review fixes in PR B also cap inferred movement speed at 0.7 m/s, use each region’s actual covering layers for scorer permeability, and avoid assuming a membrane for running rain layers. Running targets remain wardrobe-independent: use p = 50 when wind protection is required (wind-resistant fabrics qualify), otherwise p = 1000. A wet-only requirement accepts water-resistant fabrics without a wind rating, so it cannot establish any lower permeability. This is deliberately conservative when a waterproof shell is available.
+
+The experimental comparisons below retain their original labels. The final reviewed results are in the implementation table.
 
 ## Summary
 
-1. **Model.** Add ISO 11079 Annex A's conversion from IREQ (the *resultant* insulation needed in wind and motion) to the *basic* insulation that garments are rated in, using ISO 9920's wind, walking-speed and outer-fabric air-permeability correction. Put it on the **requirement** side (`ireq.ts` / `thermal-targets.ts`). At 25°F with 12 mph wind, an alpine skier in a waterproof shell needs about 1.3–1.6× IREQ in basic clo, and a runner without a shell about 2.4×.
+1. **Model.** Add ISO 11079 Annex A's conversion from IREQ (the *resultant* insulation needed in wind and motion) to the *basic* insulation that garments are rated in, using ISO 9920's wind, walking-speed and outer-fabric air-permeability correction. Put it on the **requirement** side (`ireq.ts` / `thermal-targets.ts`). At 25°F with 12 mph wind, an alpine skier in a waterproof shell needs about 1.3–1.6× IREQ in basic clo, and a runner without a shell about 2.2× with the inferred movement cap.
 2. **Catalog.** Re-derive 48 live rows (38 in the golden fixture) onto T21-03's single-garment scale. Hard shells and soft shells take T21-03 analogues. Insulated jackets and pants add 035's fill-curve increment to the shell analogue, using published fill weights; T21-03's two lab pants with known fill check the pants rule within 7 %. 035's three vests drop by T21-03's lab vest/hoody ratio. Patagonia Snowdrifter Jacket and Bibs are uninsulated shells, so they move from `outer_insulated` to `hard_shell`. The puffy-versus-insulated-jacket inversion goes away.
 3. **Neither part improves golden results on its own, and together they make alpine worse** (52.3 → 44.3). Four target and builder heuristics were tuned to the low scale, and they bind before the physics does:
    - Alpine sizes its targets for a steady-state chairlift ride (5–6 clo at 5°F to −15°F before any correction).
@@ -48,8 +50,8 @@ The two placements are algebraically equivalent for one outfit in one exposure (
 
 - **ISO 11079 does it on this side.** Its clothing-selection output is ICL, the basic insulation to look for in tables and manikin data. The Annex's reverse direction, basic to resultant, is only used for DLE.
 - **Everything compares single garments or static sums with targets.** That covers the alpine/XC regional search, the running/biking/touring budgets, #306's requirement matching (`isSuitableForRegion`), the comfort score and the API's `target_clo_range` against `total_clo`. Converting the targets keeps all of them coherent without threading wind and motion through each builder. An ensemble-side correction would touch every one of them.
-- **Convert each target with the exposure it represents.** The planned alpine cycle target uses the time-weighted metabolic rate and relative air speed; convert that cycle IREQ with the cycle exposure. Touring converts each phase with its own exposure. The current conservative alpine baseline remains in place until that correction ships.
-- **The catalog has no measured air permeability.** 0 of 116 garments have `air_permeability_cfm`, and none of the 28 `garment_materials` rows has a permeability. Permeability can only come from protection ratings, in four classes. So the ensemble side's one advantage, per-outfit permeability, is coarse anyway. The proposal keeps it where it is cheap: the scorer uses the outfit's least-permeable layer.
+- **Convert each target with the exposure it represents.** The planned alpine cycle target uses the time-weighted metabolic rate and relative air speed; convert that cycle IREQ with the cycle exposure. Touring converts each phase with its own exposure. PR A keeps its conservative baseline; PR B introduces the cycle baseline and its correction together.
+- **The catalog has no measured air permeability.** 0 of 116 garments have `air_permeability_cfm`, and none of the 28 `garment_materials` rows has a permeability. Permeability can only come from protection ratings, in four classes. So the ensemble side's one advantage, per-outfit permeability, is coarse anyway. The proposal keeps it where it is cheap: the scorer uses the least-permeable covering layer independently for each region, then area-weights the converted requirements.
 
 Displayed targets move to basic clo, so a user can compare a garment's clo with the target, which they can't do today.
 
@@ -57,13 +59,12 @@ Displayed targets move to basic clo, so a user can compare a garment's clo with 
 
 | Phase | v (relative air speed) | w | Outer fabric p, l/(m²·s) |
 |---|---|---|---|
-| Alpine skiing (60 %) | wind + 5 m/s | ISO default ≈ 0.45 | 1 (waterproof membrane: every alpine outer) |
-| Chairlift (40 %) | wind | 0 (seated) | 1 |
+| Alpine (60/40 ski-and-lift cycle) | wind + 3 m/s | ISO default at the time-weighted rate ≈ 0.3 | 1 (waterproof membrane: every alpine outer) |
 | Touring climb / descent / transition | 0.3 × wind / wind + 5 / 1.5 × wind | ISO estimate capped at 0.7 / ≈ 0.45 / ≈ 0.2 | 1 |
-| Running | wind | 1.2 (cap) | 1 when wet, 5 when ≤ 0°C or wind > 8 m/s (the protection policy adds a shell), else 1000 |
-| Biking | wind | 1.2 | 5 (always a wind shell) |
-| XC | wind | 1.2 | 50 when a wind layer is needed (soft shells), else 1000 |
-| Scorer (`scoreEnsemble`) | its effective wind | from M | least-permeable layer of the outfit |
+| Running | wind | inferred from M, capped at 0.7 | 50 when ≤ 0°C or wind > 8 m/s (wind-resistant fabrics qualify), else 1000, including wet-only conditions |
+| Biking | wind | inferred from M, capped at 0.7 | 5 (always a wind shell) |
+| XC | wind | inferred from M, capped at 0.7 | 50 when a wind layer is needed (soft shells), else 1000 |
+| Scorer (`scoreEnsemble`) | its effective wind | inferred from M, capped at 0.7 | least-permeable covering layer per region; uncovered regions use 1000 |
 
 Air-permeability classes from protection ratings: waterproof membrane 1; windproof 5 (≈ 1 CFM); wind-resistant 50 (≈ 10 CFM); none or unknown 1000 (knits and fleece run 100–300 CFM).
 
@@ -75,9 +76,9 @@ Basic clo needed per resultant clo at 25°F with 12 mph wind:
 |---|---|---|---|---|
 | Alpine skiing, membrane | 0.60 | 1.31 | 3.02 | 4.71 |
 | Chairlift, membrane | 0.74 | 1.15 | 2.53 | 3.90 |
-| Running, no shell | 0.40 | 2.43 | 4.96 | 7.49 |
-| Running or biking, windproof shell | 0.61 | 1.41 | 3.07 | 4.73 |
-| XC, soft shell | 0.51 | 1.77 | 3.74 | 5.70 |
+| Running, open fabric | 0.43 | 2.23 | 4.55 | 6.87 |
+| Biking, windproof shell | 0.64 | 1.37 | 2.97 | 4.56 |
+| Running / XC, wind-resistant shell | 0.54 | 1.69 | 3.55 | 5.41 |
 | Touring climb, membrane | 0.86 | 1.06 | 2.23 | 3.40 |
 
 The touring-climb row uses `v = 0.3 × 12 mph = 1.609344 m/s`, `w = 0.7 m/s`, and `p = 1`; the uncapped ≈ 0.9 m/s metabolic estimate must not enter the correction. The default-estimate cap follows the [ISO 11079 implementation in Appendix B](https://pmc.ncbi.nlm.nih.gov/articles/PMC12385740/).
@@ -86,9 +87,9 @@ Regional targets are converted with the whole-body clothing area factor, so they
 
 ### Caveats
 
-- **Regions get the same correction.** ISO 9920 is whole-body only. [Lu et al. 2015, Part II](https://research.polyu.edu.hk/en/publications/clothing-resultant-thermal-insulation-determined-on-a-movable-the-2/) found that wind hits the chest, abdomen and pelvis hardest, while walking hits the forearm, thigh and lower leg hardest. Those effects roughly offset, so a uniform factor is a first approximation.
+- **Regional correction is a modeling approximation.** Target regions share a phase exposure; the scorer uses each region’s covering fabric before area-weighting converted requirements. ISO 9920 is whole-body only. [Lu et al. 2015, Part II](https://research.polyu.edu.hk/en/publications/clothing-resultant-thermal-insulation-determined-on-a-movable-the-2/) found that wind hits the chest, abdomen and pelvis hardest, while walking hits the forearm, thigh and lower leg hardest. Those effects roughly offset, so a uniform factor is a first approximation.
 - **Running, biking and XC still use ambient wind as v**, in IREQ and in the correction. A cyclist at 7 m/s through calm air is underestimated on both sides. That changes IREQ itself, so it is listed as a follow-up.
-- **The equations were fitted to walking at up to 1.2 m/s.** Running and biking are clamped there.
+- **Explicit walking speed and inferred movement have different limits.** The correction accepts explicit walking speeds up to 1.2 m/s; metabolic estimates are capped at 0.7 m/s for every sport.
 - **`targets.ts` adds its own wind margin (`windStress`).** With the correction in place, that margin partly double-counts and should be revisited.
 - **Very small requirements can convert to 0.** In mild air, a few hundredths of a clo can convert to 0, because the static air layer that clothing carries is worth more than the requirement. The running/XC contract (#249) deliberately keeps a positive heat-balance minimum, so the implementation should never convert below the resultant value. Those two contract tests are the only assertion failures left once the filter is fixed.
 
@@ -136,9 +137,9 @@ Values are rounded to 0.05 clo, and whole-body values follow the 0.5 / 0.25 / 0.
 
 **High fill is the least certain.** T21-03's heavy garments scatter widely at unknown fill, from 3.41 (NAF cold weather jacket) and 3.69 (ECW parka) to 4.68 (CAF IECS parka) and 7.03 (Canada Goose Snow Mantra). A civilian ECW-parka copy is [listed at 200 g/m²](https://laced.com.au/products/wild-things-monster-parka-black), where the curve gives 5.2. Every consumer jacket here is 40–100 g/m², between the two lab anchors.
 
-### Per-garment values (48 live rows)
+### Per-garment values
 
-Fill sources: [evo Firefall/2](https://www.evo.com/products/175709-mountain-hardwear-firefall-2-insulated-jacket), [REI Stretch Ozonic](https://www.rei.com/product/C07588/mountain-hardwear-stretch-ozonic-insulated-jacket-mens), [Spyder EU Leader](https://spyder.eu/products/leader-jacket-concrete), [REI Alpha 4.0](https://www.rei.com/product/229857), [evo Alpha LifaLoft](https://evo.com/insulated-jackets/helly-hansen-alpha-lifaloft-jacket), [evo Snowcrew](https://www.evo.com/products/207231-outdoor-research-snowcrew-jacket-men-s), [Obermeyer Raze](https://obermeyer.com/products/raze-jacket), [Altitude Sports Lofoten insulated](https://www.altitude-sports.com/p/norrona-lofoten-goretex-insulated-jacket-mens-nor-1001-18), [Switchback Jackson Glacier](https://www.switchbacktravel.com/reviews/patagonia-jackson-glacier-parka), [REI Bugaboo IV liner](https://www.rei.com/product/C08548/columbia-bugaboo-iv-interchange-3-in-1-jacket-mens), [evo Powder Bowl](https://www.evo.com/products/136074-patagonia-insulated-powder-bowl-pants), [Altitude Sports Bugaboo II](https://www.altitude-sports.com/products/columbia-bugaboo-ii-pant-womens-llll-col-2085941), [Cotswold Legendary](https://www.cotswoldoutdoor.com/p/helly-hansen-mens-legendary-insulated-pant-H1214262.html), [Miya Lofoten insulated pants](https://store.miyaradventures.com/products/norrona-lofoten-gore-tex-insulated-pants-mens), [Bob's Rossignol](https://www.bobssportschalet.com/rossignol/rossignol-insulated-ski-pants-169947), and Snowdrifter construction from [Switchback](https://switchbacktravel.com/reviews/patagonia-snowdrifter) and [evo](https://evo.com/shell-pants/patagonia-snowdrifter-bibs-womens-20). Rows marked "low" get `uncertainty_clo` 0.6 and confidence capped at 0.5 (035's convention); "medium" rows get 0.3; analogue rows get 0.15.
+48 live rows. Fill sources: [evo Firefall/2](https://www.evo.com/products/175709-mountain-hardwear-firefall-2-insulated-jacket), [REI Stretch Ozonic](https://www.rei.com/product/C07588/mountain-hardwear-stretch-ozonic-insulated-jacket-mens), [Spyder EU Leader](https://spyder.eu/products/leader-jacket-concrete), [REI Alpha 4.0](https://www.rei.com/product/229857), [evo Alpha LifaLoft](https://evo.com/insulated-jackets/helly-hansen-alpha-lifaloft-jacket), [evo Snowcrew](https://www.evo.com/products/207231-outdoor-research-snowcrew-jacket-men-s), [Obermeyer Raze](https://obermeyer.com/products/raze-jacket), [Altitude Sports Lofoten insulated](https://www.altitude-sports.com/p/norrona-lofoten-goretex-insulated-jacket-mens-nor-1001-18), [Switchback Jackson Glacier](https://www.switchbacktravel.com/reviews/patagonia-jackson-glacier-parka), [REI Bugaboo IV liner](https://www.rei.com/product/C08548/columbia-bugaboo-iv-interchange-3-in-1-jacket-mens), [evo Powder Bowl](https://www.evo.com/products/136074-patagonia-insulated-powder-bowl-pants), [Altitude Sports Bugaboo II](https://www.altitude-sports.com/products/columbia-bugaboo-ii-pant-womens-llll-col-2085941), [Cotswold Legendary](https://www.cotswoldoutdoor.com/p/helly-hansen-mens-legendary-insulated-pant-H1214262.html), [Miya Lofoten insulated pants](https://store.miyaradventures.com/products/norrona-lofoten-gore-tex-insulated-pants-mens), [Bob's Rossignol](https://www.bobssportschalet.com/rossignol/rossignol-insulated-ski-pants-169947), and Snowdrifter construction from [Switchback](https://switchbacktravel.com/reviews/patagonia-snowdrifter) and [evo](https://evo.com/shell-pants/patagonia-snowdrifter-bibs-womens-20). Rows marked "low" get `uncertainty_clo` 0.6 and confidence capped at 0.5 (035's convention); "medium" rows get 0.3; analogue rows get 0.15.
 
 | Garment | Type | Torso / arms / legs clo | Whole-body clo | Ret torso / arms / legs | Basis | Confidence | In fixture |
 |---|---|---|---|---|---|---|---|
@@ -272,25 +273,70 @@ Still open: the Capilene Midweight lab row, and the touring climb's hard-shell r
 - PR A alone swaps it for a light synthetic insulator and a featherweight shell, at 2.95 clo against a 2.68–3.37 target;
 - PR A + B brings the down jacket back (4.34 against 4.26–5.46).
 
-The time-weighted target removes the steady-state lift ride, about −40 % in cold wind. The correction in PR B adds 30–60 % back in that same wind. PR B must introduce both together when it is updated on PR A.
+The time-weighted target removes the steady-state lift ride, about −40 % in cold wind. The correction in PR B adds 30–60 % back in that same wind. The reconciled PR B introduces both together.
 
 ## Implementation
 
-- **Migration 036**, applied by hand in the SQL editor:
-  - the 48 rows above, in 035's style: explicit `(brand, model_name, old values…)` guards on every replaced field, `data_source` pointing here, and `uncertainty_clo` / confidence caps;
-  - the two `category` moves;
-  - the six `calibration_reference` corrections, plus Capilene Midweight if chosen.
-- **Same values in `gear-catalog.json`** (38 fixture rows), reviewed golden snapshot updates, and a PGlite replay test like `catalog-thermal-audit.database.test.ts`.
-- **Code:**
-  - `requiredBasicInsulation` and exposures in `ireq.ts` / `thermal-targets.ts`, never converting below the resultant value;
-  - converted IREQ for builders and display (`ireq.min`/`neutral` stay resultant, with basic `target_range`);
-  - the scorer's outfit permeability;
-  - alpine T + L;
-  - builder B for running/biking;
-  - the filter fix;
-  - unit tests against hand-computed Annex A values;
-  - removal of the prototype switches.
-- **`references/thermal-estimation.md`** in the add-wardrobe-item skill moves to the new scale in the same PR. Rows added since 035 (FP Movement, Rossignol) were seeded from low-scale analogues and are in the table.
+**PR A** (`claude/alpine-time-weighted-targets`, #317):
+- Retain the conservative phase baseline until the wind/motion correction.
+- Alpine legs multiplier 1.0 (L).
+
+**PR B** (stacked on and reconciled with PR A):
+- Alpine IREQ at the time-weighted cycle (T), converted with the cycle exposure.
+- **Model.**
+  - `requiredBasicInsulation` (`ireq.ts`): ISO 11079 Annex A, floored at the resultant value.
+  - `phaseExposure` and `basicIreq` (`thermal-targets.ts`); `phaseTargets` converts the whole-body and regional bands when given an exposure.
+  - `OUTER_AIR_PERMEABILITY` (`constants.ts`).
+  - Per-sport outer permeability, an alpine cycle exposure, touring climb/descent/transition exposures, and the scorer's regional `outfitAirPermeability`. Each region is converted before area-weighting; an isolated rain jacket cannot shelter unprotected legs.
+  - API `ireq.min`/`neutral` stay resultant IREQ. `target_range`, `regional` and builder budgets are basic clo.
+- **Builders.**
+  - Running and biking add protective shells outside the clo budget.
+  - `retainRunningProtection` no longer counts a bib as torso protection, and breaks ties between equally warm shells by breathability, then weight. Since 036 all thin shells are equally warm, so the old "lowest clo" pick fell to catalog order.
+- **Requirement filter.** An outer layer that supplies the policy's required wind/wet protection, or the XC torso wind layer, is judged on that protection rather than breathability. XC's regional search no longer leaves a region in underwear alone (`missingWearable`).
+- **Catalog.**
+  - Migration 036 (48 rows, the two Snowdrifter moves with corrected notes and weights, and six reference rows).
+  - The same values in `gear-catalog.json` (38 rows).
+  - `catalog-thermal-calibration.database.test.ts` replays 001–036 in PGlite; 035's test keeps its own checks but not the fixture comparison.
+- **Skill guide.** `references/thermal-estimation.md` and the SKILL.md example card are on the new scale.
+
+**Golden result of PR B** (60 scenarios; mean comfort alpine / biking / running / touring / XC):
+
+| State | Scores |
+|---|---|
+| Today | 52.3 / 64.4 / 76.9 / 65.2 / 97.3 |
+| Reviewed PR A | 57.2 / 64.4 / 76.9 / 65.2 / 97.3 |
+| Reviewed PR A + B | 75.2 / 67.5 / 69.2 / 65.5 / 94.4 |
+
+The reviewed golden matrix passes, including both alpine comfort assertions and the cold/windy down-layer regression. Snapshot changes include the 0.7 m/s cap, regional shell coverage and running’s conservative permeability assumptions.
+
+**Running stays below today's 76.9.** Its builder sizes mid layers before the protection safeguard adds shells, and lab-scale shells add about 0.5 clo. Conservative target permeability avoids under-sizing for water-resistant fabrics, but can over-size an outfit behind waterproof shells: the catalog's 36°F rain case is 1.27 clo against a 0.51–0.82 band, scoring 62.1. The complete running selector (#247) should choose protective layers first and size insulation around them. That selector change remains outside this calibration.
+
+## Applying migration 036
+
+**Check first,** as for 035: merged migrations have shown up in prod's history within about a minute of a merge. After merging, check the migration history (MCP `list_migrations`). If `catalog_outerwear_t2103_scale` is there, only run the check query. 036 needs 035 applied (its guards expect 035's values), which production has had since 2026-10-18.
+
+Otherwise, paste this as one script in the Supabase SQL editor:
+
+```sql
+BEGIN;
+-- contents of supabase/migrations/036_catalog_outerwear_t2103_scale.sql
+INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('036', 'catalog_outerwear_t2103_scale');
+COMMIT;
+```
+
+Then check it:
+
+```sql
+SELECT
+  (SELECT count(*) FROM garment_thermal_properties
+    WHERE abs(rcl_whole_body - (0.5 * coalesce(rcl_torso, 0) + 0.25 * coalesce(rcl_arms, 0) + 0.25 * coalesce(rcl_legs, 0))) > 0.02
+       OR abs(recl_whole_body - (0.5 * coalesce(recl_torso, 0) + 0.25 * coalesce(recl_arms, 0) + 0.25 * coalesce(recl_legs, 0))) > 0.5) AS off_weighting,
+  (SELECT count(*) FROM garment_thermal_properties WHERE data_source LIKE '%docs/catalog-thermal-calibration.md#per-garment-values%') AS recalibrated,
+  (SELECT count(*) FROM garments WHERE brand = 'Patagonia' AND model_name LIKE 'Snowdrifter%' AND category = 'hard_shell') AS snowdrifter_shells,
+  (SELECT count(*) FROM calibration_reference WHERE garment_description = 'ECWCS Fleece Jacket' AND measured_rcl_arm = 1.32) AS reference_fixed;
+```
+
+Expect 0, 48, 2 and 1. 035's check query then counts 12 recalibrated puffies instead of 15: 036 appends to the three vests' `data_source`. Garments added after 2026-10-18 that follow the old guide can add to the first count.
 
 ## Sources
 

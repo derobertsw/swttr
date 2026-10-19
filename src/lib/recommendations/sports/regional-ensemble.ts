@@ -12,6 +12,8 @@ const EPSILON = 1e-6;
 interface OutfitTotals {
   baseMask: number;
   outerMask: number;
+  /** Regions covered by a layer that isn't underwear-only. */
+  wearableMask: number;
   waterproofMask: number;
   torsoClo: number;
   armsClo: number;
@@ -32,6 +34,8 @@ interface GarmentFeatures extends OutfitTotals {
 interface OutfitRankInput {
   missingBase: number;
   missingOuter: number;
+  /** Regions covered only by underlayers, which can't be worn on their own. */
+  missingWearable: number;
   missingWaterproof: number;
   excess: number;
   deficit: number;
@@ -48,7 +52,7 @@ interface SearchOptions {
 }
 
 const EMPTY: OutfitTotals = {
-  baseMask: 0, outerMask: 0, waterproofMask: 0,
+  baseMask: 0, outerMask: 0, wearableMask: 0, waterproofMask: 0,
   torsoClo: 0, armsClo: 0, legsClo: 0,
   breathability: 0, unbreathable: 0, count: 0,
 };
@@ -73,6 +77,7 @@ function features(garment: GarmentRow, options: Pick<SearchOptions, 'puffyFitsUn
     garment, layer: slot, occupancy,
     baseMask: slot === 'base' ? occupancy : 0,
     outerMask,
+    wearableMask: garment.usage === 'underlayer' ? 0 : occupancy,
     waterproofMask: waterproof ? outerMask : 0,
     torsoClo: garment.covers_torso ? thermal?.rcl_torso ?? 0 : 0,
     armsClo: garment.covers_arms ? thermal?.rcl_arms ?? 0 : 0,
@@ -204,6 +209,7 @@ function extend(prefix: OutfitTotals, item: GarmentFeatures | undefined): Outfit
   return {
     baseMask: prefix.baseMask | item.baseMask,
     outerMask: prefix.outerMask | item.outerMask,
+    wearableMask: prefix.wearableMask | item.wearableMask,
     waterproofMask: prefix.waterproofMask | item.waterproofMask,
     torsoClo: prefix.torsoClo + item.torsoClo,
     armsClo: prefix.armsClo + item.armsClo,
@@ -264,6 +270,7 @@ export function buildRegionalEnsemble(
           const candidateRank = options.rank({
             missingBase: missing(partial.baseMask | (outer?.baseMask ?? 0), region),
             missingOuter: missing(partial.outerMask | (outer?.outerMask ?? 0), region),
+            missingWearable: missing(partial.wearableMask | (outer?.wearableMask ?? 0), region),
             missingWaterproof: missing(partial.waterproofMask | (outer?.waterproofMask ?? 0), region),
             excess: Math.max(0, torso - targets.neutral.torso) + Math.max(0, arms - targets.neutral.arms) + Math.max(0, legs - targets.neutral.legs),
             deficit: region === LEGS ? Math.max(0, targets.min.legs - legs) :
