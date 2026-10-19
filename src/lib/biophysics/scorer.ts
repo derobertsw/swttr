@@ -3,11 +3,17 @@
 
 import { calculateIreq, requiredBasicInsulation, walkingSpeedFromMetabolicRate } from './ireq';
 import { predictEnsembleThermal } from './ensemble';
-import { ACTIVITY_WEIGHTS, OUTER_AIR_PERMEABILITY, type ActivityType } from './constants';
+import { ACTIVITY_WEIGHTS, OUTER_AIR_PERMEABILITY, REGIONAL_WEIGHTS, type ActivityType } from './constants';
 import type { EnsembleScore } from '@/types/garments';
 
 /** Wind speed (m/s) above which an ensemble without a shell loses weather protection. */
 export const SIGNIFICANT_WIND_MS = 8;
+
+const REGIONS = [
+  ['torso', 'coversTorso', REGIONAL_WEIGHTS.torso],
+  ['arms', 'coversArms', REGIONAL_WEIGHTS.arm],
+  ['legs', 'coversLegs', REGIONAL_WEIGHTS.leg],
+] as const;
 
 export interface WeatherConditions {
   temperature: number;       // °C
@@ -77,12 +83,19 @@ export function scoreEnsemble(
   const exposure = {
     relativeAirSpeedMs: effectiveWind,
     walkingSpeedMs: walkingSpeedFromMetabolicRate(activity.metabolicRate),
-    airPermeability: outfitAirPermeability(garments),
   };
+  const permeability = outfitAirPermeability(garments);
+  // Convert each region before averaging: a jacket cannot shelter bare legs,
+  // and averaging fabric permeability before this nonlinear conversion would
+  // not preserve each region's requirement. Use the ensemble's area weights.
+  const basicRequirement = (resultantClo: number) => REGIONS.reduce((total, [region, , weight]) =>
+    total + weight * requiredBasicInsulation(resultantClo, {
+      ...exposure, airPermeability: permeability[region],
+    }), 0);
   const ireq = {
     ...resultantIreq,
-    ireqMin: Math.round(requiredBasicInsulation(resultantIreq.ireqMin, exposure) * 100) / 100,
-    ireqNeutral: Math.round(requiredBasicInsulation(resultantIreq.ireqNeutral, exposure) * 100) / 100,
+    ireqMin: Math.round(basicRequirement(resultantIreq.ireqMin) * 100) / 100,
+    ireqNeutral: Math.round(basicRequirement(resultantIreq.ireqNeutral) * 100) / 100,
   };
 
   // Get scoring weights for activity
@@ -206,15 +219,26 @@ export function scoreEnsemble(
 }
 
 /**
- * Air permeability of an outfit's least permeable layer, in l/(m²·s), from
- * protection ratings. Wind reaches the layers under it only through it.
+ * Air permeability of the least permeable layer covering each region, in
+ * l/(m²·s). Uncovered regions retain the open-fabric assumption.
  */
-export function outfitAirPermeability(garments: Pick<GarmentWithProtection, 'windproofRating' | 'waterproofRating'>[]): number {
-  return garments.reduce<number>((lowest, g) => Math.min(lowest,
-    g.waterproofRating === 'waterproof' ? OUTER_AIR_PERMEABILITY.membrane
+export function outfitAirPermeability(garments: Pick<GarmentWithProtection,
+  'windproofRating' | 'waterproofRating' | 'coversTorso' | 'coversArms' | 'coversLegs'>[]) {
+  const result: Record<'torso' | 'arms' | 'legs', number> = {
+    torso: OUTER_AIR_PERMEABILITY.open,
+    arms: OUTER_AIR_PERMEABILITY.open,
+    legs: OUTER_AIR_PERMEABILITY.open,
+  };
+  for (const g of garments) {
+    const permeability = g.waterproofRating === 'waterproof' ? OUTER_AIR_PERMEABILITY.membrane
       : g.windproofRating === 'windproof' ? OUTER_AIR_PERMEABILITY.windproof
         : g.windproofRating === 'wind_resistant' ? OUTER_AIR_PERMEABILITY.windResistant
-          : OUTER_AIR_PERMEABILITY.open), OUTER_AIR_PERMEABILITY.open);
+          : OUTER_AIR_PERMEABILITY.open;
+    for (const [region, covers] of REGIONS) {
+      if (g[covers]) result[region] = Math.min(result[region], permeability);
+    }
+  }
+  return result;
 }
 
 /**

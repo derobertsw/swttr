@@ -220,10 +220,11 @@ const STATIC_AIR_INSULATION = 0.085;
 
 /**
  * ISO 11079's walking speed when none is given: 0.0052 × (M − 58) m/s,
- * capped at the 1.2 m/s the ISO 9920 correction was fitted to.
+ * capped at 0.7 m/s for an inferred movement speed. Explicit walking
+ * speeds have a separate 1.2 m/s validity limit in the correction.
  */
 export function walkingSpeedFromMetabolicRate(metabolicRate: number): number {
-  return Math.max(0, Math.min(1.2, 0.0052 * (metabolicRate - 58)));
+  return Math.max(0, Math.min(0.7, 0.0052 * (metabolicRate - 58)));
 }
 
 /**

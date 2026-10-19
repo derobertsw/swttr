@@ -448,9 +448,10 @@ describe('requiredBasicInsulation (ISO 11079 Annex A)', () => {
     expect(requiredBasicInsulation(2.0, exposure(0, 0, 0))).toBe(requiredBasicInsulation(2.0, exposure(0.4, 0, 1)));
   });
 
-  it('estimates walking speed from metabolic rate up to the 1.2 m/s cap', () => {
+  it('caps inferred movement at 0.7 m/s separately from explicit walking inputs', () => {
     expect(walkingSpeedFromMetabolicRate(58)).toBe(0);
     expect(walkingSpeedFromMetabolicRate(145.5)).toBeCloseTo(0.455, 3);
-    expect(walkingSpeedFromMetabolicRate(400)).toBe(1.2);
+    expect(walkingSpeedFromMetabolicRate(232.8)).toBe(0.7);
+    expect(walkingSpeedFromMetabolicRate(400)).toBe(0.7);
   });
 });

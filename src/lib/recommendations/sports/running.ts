@@ -61,11 +61,13 @@ export const running = createSinglePhaseSport({
   requirementFirst: true,
   activity: 'running',
   profile: { name: 'Running', windExposure: 'normal' },
-  // Matches retainRunningProtection: a rain shell when wet, a wind shell when
-  // freezing or windy, otherwise the base or mid layer is outermost.
-  outerAirPermeability: ({ precipitation, tempC, windMs }) => precipitation
-    ? OUTER_AIR_PERMEABILITY.membrane
-    : tempC <= 0 || windMs > 8 ? OUTER_AIR_PERMEABILITY.windproof : OUTER_AIR_PERMEABILITY.open,
+  // Match the weakest protection retainRunningProtection accepts. A wet-only
+  // requirement accepts water-resistant fabric without a wind rating, so it
+  // cannot establish any reduction in air permeability. When wind protection
+  // is required, wind-resistant (not necessarily windproof) fabric qualifies.
+  // Keep targets independent of wardrobe ownership or a particular shell.
+  outerAirPermeability: ({ tempC, windMs }) => tempC <= 0 || windMs > 8
+    ? OUTER_AIR_PERMEABILITY.windResistant : OUTER_AIR_PERMEABILITY.open,
   minEvapPotential: MIN_EVAP_POTENTIAL,
   protect: (ensemble, categorized, targets) => targets.policy
     ? retainRunningProtection(ensemble, categorized, targets.policy.protection)
