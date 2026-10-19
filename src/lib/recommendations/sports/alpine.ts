@@ -22,7 +22,7 @@ import {
 
 /** Extra relative wind from skiing speed, in m/s. */
 const SKIING_SPEED_WIND_MS = 5;
-/** Weights for blending the skiing and chairlift phases. */
+/** Share of a ski-and-lift cycle spent skiing and riding the chairlift. */
 const SKIING_WEIGHT = 0.6;
 const CHAIRLIFT_WEIGHT = 0.4;
 /** Warn when a region falls this far below its minimum, in clo. */
@@ -45,9 +45,11 @@ export const alpine: SportRecommender<AlpineTargets> = {
     const skiing = phaseIreq(conditions, windMs + SKIING_SPEED_WIND_MS, skiingRate);
     const chairlift = phaseIreq(conditions, windMs, chairliftRate);
 
-    // The minimum blends both phases; comfort and exposure limits follow the
-    // static chairlift ride. Hands and head follow the skiing phase: their
-    // alpine multipliers already add the chairlift and wind exposure.
+    // Keep the conservative phase blend until the wind/motion correction
+    // lands in #318. Lower cycle targets alone under-dress cold, windy days.
+    // The minimum blends both phases; neutral IREQ and DLE follow the lift.
+    // Hands and head follow skiing, since their alpine multipliers already
+    // account for chairlift and wind exposure.
     const baseline: IreqResult = {
       ireqMin: skiing.ireqMin * SKIING_WEIGHT + chairlift.ireqMin * CHAIRLIFT_WEIGHT,
       ireqNeutral: chairlift.ireqNeutral,

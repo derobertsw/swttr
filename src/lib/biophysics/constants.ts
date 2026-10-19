@@ -80,7 +80,9 @@ export const REGIONAL_IREQ_MULTIPLIERS = {
   alpine_skiing: {
     torso: 1.0,    // Standard
     arms: 1.0,     // Less arm work than XC
-    legs: 1.20,    // Chairlift + wind = cold legs
+    // No regional bias. Cold-weather systems put less on the legs, not more:
+    // USARIEM T21-03's warmest ensembles carry 0.45–0.54x the torso's clo there.
+    legs: 1.0,
   },
 } as const;
 

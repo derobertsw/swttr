@@ -45,7 +45,7 @@ Running/XC garment and sustained-effort policy contracts, calibration evidence, 
 
 ### 1. Recommendation Pipeline
 
-Every biophysics recommendation passes through the same pipeline, from metabolic rate lookup through final comfort classification. Multi-phase sports run the target steps once per phase: alpine blends a skiing and a chairlift phase, and ski touring computes uphill, downhill, and transition phases.
+Every biophysics recommendation passes through the same pipeline, from metabolic rate lookup through final comfort classification. Multi-phase sports run the target steps once per phase: alpine blends the phase minima while retaining the chairlift neutral target and exposure limit, and ski touring computes uphill, downhill, and transition phases.
 
 ```mermaid
 graph TD
@@ -200,7 +200,7 @@ graph TD
         A1 --> A2[One base + at most one mid/puffy<br/>+ one outer per region]
         A2 --> A3[Insulated outerwear occupies outer slot<br/>Puffies pair only with hard shells or no outer]
         A3 --> A4[Budget all layers by regional clo<br/>Balance shortfalls against excess warmth]
-        A4 --> A5[Dual metabolic model:<br/>skiing + chairlift blend]
+        A4 --> A5[Conservative dual-phase targets:<br/>60/40 skiing and chairlift minimum<br/>Chairlift neutral IREQ and DLE<br/>Cycle targets deferred until wind/motion correction]
     end
 
     subgraph "XC Skiing — regional builder shared with alpine"
@@ -300,12 +300,12 @@ graph TD
 
 ### 7. Thermal Targets and Comfort
 
-Body-part targets are bands, like the whole-body target range. Running/XC taper added cold margins while preserving the calculated whole-body heat-balance minimum; mild air alone cannot erase a positive requirement for a smaller body or an easy effort. The torso, arms and legs split the whole-body range by the activity's regional multipliers, rescaled so their area-weighted mean is 1: an outfit with every region at its minimum sits exactly at the whole-body minimum. Hands and head scale the whole-body IREQ of the phase they follow; alpine uses the skiing phase, since its extremity multipliers already add chairlift and wind exposure. These local targets are heuristics, so running/XC taper their full bands to permit zero thermal accessory requirements in suitable mild conditions. The comfort status, the body-part pills, and the comfort score all judge shortfalls against the bottom of each band, in `src/lib/biophysics/comfort.ts`.
+Body-part targets are bands, like the whole-body target range. Running/XC taper added cold margins while preserving the calculated whole-body heat-balance minimum; mild air alone cannot erase a positive requirement for a smaller body or an easy effort. The torso, arms and legs split the whole-body range by the activity's regional multipliers, rescaled so their area-weighted mean is 1: an outfit with every region at its minimum sits exactly at the whole-body minimum. Alpine uses equal multipliers for torso, arms and legs, with no extra leg bias. Hands and head scale the whole-body IREQ of the phase they follow; alpine uses the skiing phase, since its extremity multipliers already add chairlift and wind exposure. These local targets are heuristics, so running/XC taper their full bands to permit zero thermal accessory requirements in suitable mild conditions. The comfort status, the body-part pills, and the comfort score all judge shortfalls against the bottom of each band, in `src/lib/biophysics/comfort.ts`.
 
 ```mermaid
 graph TD
     BALANCE[Whole-body heat-balance minimum] --> RANGE[Whole-body target range<br/>Running/XC taper added margins only<br/>Minimum never below heat balance]
-    RANGE --> SPLIT[Split across torso, arms and legs<br/>multipliers rescaled to an area-weighted mean of 1]
+    RANGE --> SPLIT[Split across torso, arms and legs<br/>multipliers rescaled to an area-weighted mean of 1<br/>Alpine: equal torso, arm and leg targets]
     SPLIT --> REG[Regional min and neutral targets]
     PIREQ[Whole-body IREQ of the phase the hands and head follow<br/>alpine: skiing phase] --> EXT[Hand and head targets:<br/>activity multiplier × wind factor<br/>× temperature factor from 0.8 to 1<br/>+ CoWEDA-inspired extremity buffer<br/>Running/XC: taper both bands and buffer<br/>Allow zero thermal coverage in mild dry exercise]
 
