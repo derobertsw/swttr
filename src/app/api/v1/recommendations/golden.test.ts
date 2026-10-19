@@ -242,17 +242,38 @@ describe("POST /api/v1/recommendations/alpine (golden, comfort)", () => {
     ]));
   });
 
-  it("scores an outfit inside the target range as comfortable", async () => {
+  it("scores the in-range catalog outfit as comfortable at 45°F", async () => {
     useDatabase(null, []);
-    // 25°F: the catalog outfit also covers the hands and head. At 45°F its
-    // helmet and liner beanie (0.95 clo) fall short of the 1.42 head minimum.
-    const { body } = await callRoute(alpine, CONDITIONS[1].body);
+    const { body } = await callRoute(alpine, CONDITIONS[0].body);
     const [min, max] = body.ireq.target_range;
     const totalClo = body.recommendation.ensemble_properties.total_clo;
 
     expect(totalClo).toBeGreaterThanOrEqual(min);
     expect(totalClo).toBeLessThanOrEqual(max);
     expect(body.recommendation.thermal_comfort_score).toBeGreaterThanOrEqual(85);
+  });
+
+  it("reports regional shortfalls at 25°F even when whole-body clo is in range", async () => {
+    useDatabase(null, []);
+    const { body } = await callRoute(alpine, CONDITIONS[1].body);
+    const { ensemble_properties: properties, thermal_comfort_score: score } = body.recommendation;
+
+    expect(properties.total_clo).toBeGreaterThanOrEqual(body.ireq.target_range[0]);
+    expect(properties.total_clo).toBeLessThanOrEqual(body.ireq.target_range[1]);
+    expect(properties.regional_clo.arms).toBeLessThan(body.ireq.regional.min.arms);
+    expect(score).toBeLessThan(85);
+    expect(body.warnings).toContainEqual(expect.stringMatching(/^Insufficient arms insulation:/));
+  });
+
+  it("retains a down layer and protective shell at 5°F in 20 mph wind", async () => {
+    useDatabase(null, []);
+    const { body } = await callRoute(alpine, CONDITIONS[2].body);
+
+    expect(body.recommendation.garments).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "insulation_down" }),
+      expect.objectContaining({ category: "hard_shell", covers_torso: true }),
+    ]));
+    expect(body.recommendation.ensemble_properties.total_clo).toBeGreaterThanOrEqual(3.9);
   });
 });
 

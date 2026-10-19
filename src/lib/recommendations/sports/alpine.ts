@@ -1,6 +1,6 @@
 /**
- * Alpine (resort) skiing: insulation first, sized for a whole cycle of
- * descents and chairlift rides.
+ * Alpine (resort) skiing: insulation first, sized for the cold chairlift
+ * ride as well as the descent.
  */
 import { METABOLIC_RATES } from '@/lib/biophysics/constants';
 import { COWEDA_VALIDATION_SOURCE } from '@/lib/biophysics/coweda';
@@ -45,19 +45,17 @@ export const alpine: SportRecommender<AlpineTargets> = {
     const skiing = phaseIreq(conditions, windMs + SKIING_SPEED_WIND_MS, skiingRate);
     const chairlift = phaseIreq(conditions, windMs, chairliftRate);
 
-    // A lift ride lasts minutes between runs, so the outfit is sized for the
-    // whole cycle: IREQ at the time-weighted metabolic rate and relative air
-    // speed (ISO 8996's average over a representative work cycle), not the
-    // steady state of sitting on the lift. The exposure limit still follows
-    // the static ride. Hands and head follow the skiing phase: their alpine
-    // multipliers already add the chairlift and wind exposure.
-    const blendedRate = (skiingRate * SKIING_WEIGHT) + (chairliftRate * CHAIRLIFT_WEIGHT);
-    const cycle = phaseIreq(conditions, windMs + SKIING_SPEED_WIND_MS * SKIING_WEIGHT, blendedRate);
+    // Keep the conservative phase blend until the wind/motion correction
+    // lands in #318. Lower cycle targets alone under-dress cold, windy days.
+    // The minimum blends both phases; neutral IREQ and DLE follow the lift.
+    // Hands and head follow skiing, since their alpine multipliers already
+    // account for chairlift and wind exposure.
     const baseline: IreqResult = {
-      ireqMin: cycle.ireqMin,
-      ireqNeutral: cycle.ireqNeutral,
+      ireqMin: skiing.ireqMin * SKIING_WEIGHT + chairlift.ireqMin * CHAIRLIFT_WEIGHT,
+      ireqNeutral: chairlift.ireqNeutral,
       dleHours: chairlift.dleHours,
     };
+    const blendedRate = (skiingRate * SKIING_WEIGHT) + (chairliftRate * CHAIRLIFT_WEIGHT);
 
     return {
       skiingRate,
@@ -123,8 +121,8 @@ export const alpine: SportRecommender<AlpineTargets> = {
       headwear
     );
 
-    // Regional minima split the whole-body band derived from the 60/40
-    // skiing/chairlift cycle. Warn only about a shortfall the
+    // Regional minima split the whole-body band derived from the blended
+    // 60/40 skiing/chairlift baseline. Warn only about a shortfall the
     // available wearable layers could meaningfully reduce, respecting
     // coverage and rain protection; layer limits can make targets unreachable.
     const regionalClo = predictEnsembleThermal(ensembleToThermalGarments(ensemble)).rcl;

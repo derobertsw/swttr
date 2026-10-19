@@ -130,13 +130,12 @@ describe('alpine targets', () => {
     bodyMetrics: DEFAULT_BODY_METRICS, useWardrobeOnly: false, prioritizeLightPack: false,
   });
 
-  it.each([[-4, 5.4], [-15, 8.9], [-26, 4.5]])('sizes the range for the ski-and-lift cycle at %s°C, not the seated lift ride', (tempC, windMs) => {
+  it.each([[-4, 5.4], [-15, 8.9], [-26, 4.5]])('keeps a lift-based minimum until the wind/motion correction lands at %s°C', (tempC, windMs) => {
     const targets = alpine.computeTargets(request(tempC, windMs));
 
-    // Steady-state sitting on the lift needs far more than a cycle of runs
-    // and rides; the range sits between the two phases' neutral IREQ.
-    expect(targets.targetRange[1]).toBeLessThan(targets.chairlift.ireqNeutral);
-    expect(targets.targetRange[0]).toBeGreaterThan(targets.skiing.ireqMin);
+    // Without the correction, lowering targets to the cycle requirement
+    // removes heavy insulation in cold wind. Preserve the lift-based floor.
+    expect(targets.targetRange[0]).toBeGreaterThanOrEqual(targets.chairlift.ireqNeutral * 0.9);
   });
 
   it('asks every region for the same share of the whole-body range', () => {
