@@ -57,6 +57,32 @@ describe("Trip map projection", () => {
     expect(map.days[0].access_place_id).toBe(`stop:${full.stops[0].id}:access_point`);
     expect(full.stops[0].access_point?.label).toBe("Spruce Peak lot");
   });
+  it("includes the dated crew stay in a scoped moving day with its own origin", async () => {
+    const full = driveTrip();
+    full.days[2].origin = place("Own starting point", 44, -73);
+    const map = await mapFor(full, [], [], SUN);
+    const day = map.days[0];
+    expect(day).toMatchObject({ origin_place_id: `day:${full.days[2].id}:origin`, crew_stay_place_id: stayId("stay-motel"), tonight_place_id: stayId("stay-inn") });
+    const crewStay = map.places.find((entry) => entry.id === day.crew_stay_place_id);
+    expect(crewStay?.visits).toContainEqual({ date: SUN, day_id: day.id, role: "stay" });
+    expect(crewStay?.nights).toEqual(["2027-01-08", SAT]);
+    const placeIds = new Set(map.places.map((entry) => entry.id));
+    for (const reference of [day.destination_place_id, day.origin_place_id, day.access_place_id, day.tonight_place_id, day.crew_stay_place_id, day.meeting_place_id]) {
+      if (reference) expect(placeIds.has(reference)).toBe(true);
+    }
+  });
+  it("revises an overridden day's crew-stay location without invalidating its unchanged drive", async () => {
+    const full = driveTrip();
+    full.days[2].origin = place("Own starting point", 44, -73);
+    const before = await mapFor(full, [], [], SUN);
+    full.lodging!.stays.find((stay) => stay.id === "stay-motel")!.location = { ...MOTEL, longitude: -72.8 };
+    const after = await mapFor(full, [], [], SUN);
+    expect(after.places.find((entry) => entry.id === stayId("stay-motel"))?.coordinates?.longitude).toBe(-72.8);
+    expect(after.days[0].revision).not.toBe(before.days[0].revision);
+    expect(after.revision).not.toBe(before.revision);
+    expect(before.days[0].geometry.revision).not.toBeNull();
+    expect(after.days[0].geometry.revision).toBe(before.days[0].geometry.revision);
+  });
   it("ignores a day access override left over from a previous destination", async () => {
     const full = driveTrip();
     full.days[1].access_point = place("Old lot", 10, 10);
@@ -107,6 +133,13 @@ describe("Trip map projection", () => {
     expect(selected).toMatchObject({ counts: { total: 0, mapped: 0 }, places: [], days: [{ date: SAT, drive: { state: "no_destination" } }] });
     expect(selected.dates).toHaveLength(4);
   });
+  it("keeps a date without a saved day row selectable without assigning destination/access places", async () => {
+    const full = driveTrip();
+    full.days = full.days.filter((day) => day.date !== SAT);
+    const map = await mapFor(full, [], [], SAT);
+    expect(map.days[0]).toMatchObject({ id: `date:${SAT}`, destination_place_id: null, access_place_id: null, drive: { state: "no_destination" } });
+    expect(map.dates).toHaveLength(4);
+  });
   it("retains the deleted stay origin snapshot without exposing or resolving its old ID", async () => {
     const full = driveTrip();
     full.days[0] = { ...full.days[0], origin: MOTEL, origin_stay_id: "deleted-or-foreign-stay" };
@@ -117,7 +150,7 @@ describe("Trip map projection", () => {
   it("reports cached/manual/stale/no-route states without a provider call or a made-up line", async () => {
     const full = driveTrip();
     const row = stored(full);
-    expect((await mapFor(full, [row])).days[1]).toMatchObject({ drive: { state: "available", source: "geoapify", estimate: { duration_label: "30 min" } }, geometry: { state: "unavailable", reason: "provider_permission_pending" } });
+    expect((await mapFor(full, [row])).days[1]).toMatchObject({ drive: { state: "available", source: "geoapify", estimate: { duration_label: "30 min" } }, geometry: { state: "unavailable", reason: "not_requested" } });
     expect((await mapFor(full, [row], [], null, NOW + 8 * 86400000)).days[1].drive.state).toBe("stale");
     expect((await mapFor(full, [stored(full, SAT, "no_route")])).days[1].drive.state).toBe("no_route");
     const manual: ManualEstimateRow = { trip_day_id: full.days[1].id, pair_key: drivePlans(full)[1].pair_key!, duration_seconds: 2400,
@@ -147,6 +180,13 @@ describe("Trip map projection", () => {
     expect(selected.places.every((place) => place.visits.some((visit) => visit.date === SAT))).toBe(true);
     expect(selected.dates).toEqual(all.dates);
   });
+  it("revises refreshed estimate data while preserving geometry bound to unchanged endpoints", async () => {
+    const full = driveTrip();
+    const before = await mapFor(full);
+    const refreshed = await mapFor(full, [stored(full)]);
+    expect(refreshed.revision).not.toBe(before.revision);
+    expect(refreshed.days[1].geometry.revision).toBe(before.days[1].geometry.revision);
+  });
   it("provides touring meeting/access information and an honest notes-only pickup", async () => {
     const full = driveTrip();
     const plan = { id: "tour", trip_id: full.trip.id, trip_day_id: full.days[1].id, objective: "North Ridge", route_url: "https://example.com/tour", meet_time: null, return_time: null,
@@ -154,6 +194,8 @@ describe("Trip map projection", () => {
     full.tour_plans = [buildTourPlanSummary(plan, SAT)];
     const map = await mapFor(full);
     expect(map.days[1]).toMatchObject({ tour: { objective: "North Ridge", access_notes: "Permit required" }, pickup: { state: "notes_only", place_id: null, notes: "Meet at the lower lot" } });
+    expect(map.days[1].meeting_place_id).toBe(map.days[1].access_place_id);
+    expect(map.days[1].crew_stay_place_id).toBe(stayId("stay-motel"));
     expect(map.places.some((entry) => entry.roles.includes("pickup"))).toBe(false);
   });
   it.each(["stop", "day", "stay", "night", "stop-reference", "night-reference", "tour-reference"])("rejects cross-trip %s sources/references", async (kind) => {

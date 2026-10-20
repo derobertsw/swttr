@@ -77,14 +77,16 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
     // Itinerary dates with no saved day row are still selectable.
     const id = day?.id ?? `date:${plan.date}`;
     const visit = { date: plan.date, day_id: id };
-    const stop = day ? full.stops.find((entry) => entry.id === day.stop_id) ?? full.stops[0] : full.stops[0];
+    const stop = day ? full.stops.find((entry) => entry.id === day.stop_id) ?? full.stops[0] : undefined;
     const destinationId = stop ? add({ type: "stop", id: stop.id, slot: "destination" }, stop.name, null, "destination", visit, stop) : null;
-    const point = day ? accessPointFor(full.stops, day) : stop?.access_point ? { location: stop.access_point, scope: "stop" as const } : null;
+    const point = day ? accessPointFor(full.stops, day) : null;
     const accessId = stop ? add(point?.scope === "day" ? { type: "day", id, slot: "access_point" } : { type: "stop", id: stop.id, slot: "access_point" },
       point?.location.label ?? `${stop.name} access point`, point?.location, "access", visit) : null;
     const originId = plan.origin ? add(plan.origin.stay_id ? { type: "stay", id: plan.origin.stay_id, slot: "location" } : { type: "day", id, slot: "origin" },
       plan.origin.label, plan.origin.location, "origin", visit) : null;
     const context = lodging.days.find((entry) => entry.date === plan.date)!;
+    const crewStay = lodging.stays.find((stay) => stay.id === context.starting_stay_id);
+    const crewStayId = crewStay ? add({ type: "stay", id: crewStay.id, slot: "location" }, crewStay.name, crewStay.location, "stay", visit) : null;
     const tonight = lodging.stays.find((stay) => stay.id === context.tonight_stay_id);
     const tonightId = tonight ? add({ type: "stay", id: tonight.id, slot: "location" }, tonight.name, tonight.location, "stay", visit) : null;
     const tour = full.tour_plans?.find((entry) => entry.trip_day_id === id);
@@ -93,21 +95,23 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
     // Reject invalid coordinates before offering external navigation, even for legacy/corrupt rows.
     const validEndpoints = originId && accessId && [originId, accessId].every((key) => places.get(key)?.mapping === "mapped");
     const safeDrive = validEndpoints ? drive : { ...drive, directions: null };
-    const routeRevision = plan.route_key ? revision({ trip_id: full.trip.id, day_id: id, origin_place_id: originId, access_place_id: accessId, route_key: plan.route_key }) : null;
+    const routeRevision = plan.route_key ? revision({ trip_id: full.trip.id, day_id: id, date: plan.date, origin_place_id: originId, access_place_id: accessId, route_key: plan.route_key }) : null;
     const geometryEligible = plan.state === "ready" && validEndpoints && safeDrive.state !== "no_route";
     const result = {
       id, date: plan.date, date_label: dateLabel(plan.date), activity: day?.activity ?? null,
       destination_place_id: destinationId, origin_place_id: originId, access_place_id: accessId, tonight_place_id: tonightId,
+      crew_stay_place_id: crewStayId,
+      meeting_place_id: tour ? accessId : null,
       starting_from: plan.origin?.label ?? "Not set", staying_tonight: context.staying_tonight,
       tonight_status: lodging.nights.find((night) => night.date === plan.date)?.status ?? "unplanned",
       pickup: { place_id: null, state: tour?.pickup_notes ? "notes_only" : "not_set", notes: tour?.pickup_notes ?? null },
       tour: tour ? { objective: tour.objective, route_url: tour.route_url, meet_label: tour.meet_label, time_zone_label: tour.time_zone_label, access_notes: tour.access_notes } : null,
       drive: { ...safeDrive, source: safeDrive.state === "manual" ? "manual" : safeDrive.estimate || safeDrive.state === "no_route" ? "geoapify" : null },
       geometry: { state: geometryEligible ? "unavailable" : "not_applicable",
-        reason: geometryEligible ? "provider_permission_pending" : "drive_not_ready",
+        reason: geometryEligible ? "not_requested" : "drive_not_ready",
         mode: "drive", revision: routeRevision, origin_place_id: originId, access_place_id: accessId },
     } satisfies Omit<TripMapDay, "revision">;
-    const references = [destinationId, originId, accessId, tonightId].map((key) => key ? places.get(key) : null);
+    const references = [destinationId, originId, accessId, tonightId, crewStayId].map((key) => key ? places.get(key) : null);
     return { ...result, revision: revision({ day: result, places: references }) };
   });
   const allPlaces = [...places.values()];
@@ -118,7 +122,7 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
     dates: days.map((day) => ({ date: day.date, label: day.date_label })), places: scopedPlaces,
     days: selectedDate ? days.filter((day) => day.date === selectedDate) : days,
     counts: { mapped: scopedPlaces.filter((place) => place.mapping === "mapped").length, total: scopedPlaces.length },
-    provider: { renderer: "maplibre", style_url: "https://tiles.openfreemap.org/styles/positron", browser_key_required: false, geometry: "unavailable",
+    provider: { renderer: "maplibre", style_url: "https://tiles.openfreemap.org/styles/positron", browser_key_required: false, geometry: "on_demand",
       attribution: [
         { label: "OpenFreeMap", url: "https://openfreemap.org/" },
         { label: "© OpenMapTiles", url: "https://openmaptiles.org/" },
@@ -129,7 +133,7 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
 }
 
 /** Call only after requireTripAccess. Read each source by trip_id; never load kits, invites or bookings into the response. */
-export async function loadTripMap(supabase: SupabaseClient, trip: Trip, date: string | null): Promise<TripMap | null> {
+export async function loadTripMapContext(supabase: SupabaseClient, trip: Trip, date: string | null): Promise<{ full: TripFull; map: TripMap } | null> {
   const [stops, days, lodging, tours] = await Promise.all([
     supabase.from("trip_stops").select("id, trip_id, position, name, latitude, longitude, access_point").eq("trip_id", trip.id).order("position"),
     supabase.from("trip_days").select("id, trip_id, date, stop_id, activity, access_point, access_point_stop_id, origin, origin_stay_id, no_drive").eq("trip_id", trip.id).order("date"),
@@ -146,5 +150,10 @@ export async function loadTripMap(supabase: SupabaseClient, trip: Trip, date: st
   };
   validateSources(full);
   const estimates = await tripDriveEstimates(full, supabaseDriveStore(supabase, trip.id), { refresh: false });
-  return projectTripMap(full, estimates, date);
+  return { full, map: projectTripMap(full, estimates, date) };
+}
+
+/** Saved map/list contract; geometry shares the same authorized source loader. */
+export async function loadTripMap(supabase: SupabaseClient, trip: Trip, date: string | null): Promise<TripMap | null> {
+  return (await loadTripMapContext(supabase, trip, date))?.map ?? null;
 }
