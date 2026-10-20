@@ -23,7 +23,8 @@ export async function GET(request: Request, context: Context) {
     if (!context || !day) return mapJson({ error: "Day not found" }, 404);
     if ((day.geometry.revision ?? day.revision) !== expected) return changed();
     const result = await tripMapGeometry(id, day, drivePlans(context.full).find((p) => p.date === date));
-    // Access or endpoints may change during the bounded provider request.
+    // Rechecking access and reloading context deliberately repeats estimate-store
+    // reads: membership or endpoints may change while the provider/cache resolves.
     const currentAuth = await requireTripAccess(id);
     if (currentAuth instanceof NextResponse) return privateMapResponse(currentAuth);
     const current = await loadTripMapContext(currentAuth.supabase, currentAuth.trip, date);
