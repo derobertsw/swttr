@@ -44,7 +44,7 @@ export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit:
       {!(lodging?.stays.length) && <p className="mt-3 text-base text-muted-foreground">No stays saved yet. Accommodation can be planned later.</p>}
       <div className="mt-3 divide-y divide-border">
         {lodging?.stays.map((stay) => (
-          <article key={stay.id} className="min-w-0 py-3">
+          <article key={stay.id} id={`stay-${stay.id}`} className="min-w-0 scroll-mt-4 py-3">
             <h3 className="break-words text-base font-semibold text-foreground">{stay.name}</h3>
             <p className="mt-1 text-base text-foreground">{stay.date_label}</p>
             <p className="text-base text-muted-foreground">{stay.booking_status === "booked" ? "Booked" : "Not booked"} · {stay.location ? stay.location.precision === "exact" ? "Location set" : "Approximate location" : stay.address ? "Location confirmation needed for drive times" : "Location not set"}</p>
