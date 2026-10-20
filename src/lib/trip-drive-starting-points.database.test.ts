@@ -54,6 +54,7 @@ describe("Starting points and your own estimates in Postgres (029)", () => {
     for (const migration of ["012_trips", "017_trip_stays", "021_trip_date_changes", "025_trip_stay_locations", "026_trip_tour_plans", "028_trip_drive_estimates", "029_trip_drive_starting_points"]) {
       await db.exec(await readFile(`supabase/migrations/${migration}.sql`, "utf8"));
     }
+    await db.exec(await readFile("supabase/migrations/20261020000407_trip_conflicts_no_retry.sql", "utf8"));
   }, 20_000);
 
   // Fri–Mon in Vermont. Stowe Motel has a place; Village Inn doesn't yet.
@@ -108,11 +109,11 @@ describe("Starting points and your own estimates in Postgres (029)", () => {
       await setOrigin({ date: "2027-01-09", origin: { location: CABIN }, no_drive: false, expected: NONE });
       const before = await seen("2027-01-09");
       for (const stale of [NONE, { ...before, no_drive: true }, { ...before, origin: { ...CABIN, label: "Ridge hut" } }]) {
-        await expect(setOrigin({ date: "2027-01-09", origin: null, no_drive: false, expected: stale })).rejects.toMatchObject({ code: "40001" });
+        await expect(setOrigin({ date: "2027-01-09", origin: null, no_drive: false, expected: stale })).rejects.toMatchObject({ code: "PT409" });
       }
       // A stay without a place, or another trip's, isn't one the editor offered.
       for (const stay of [inn, elsewhere]) {
-        await expect(setOrigin({ date: "2027-01-09", origin: { stay_id: stay }, no_drive: false, expected: before })).rejects.toMatchObject({ code: "40001" });
+        await expect(setOrigin({ date: "2027-01-09", origin: { stay_id: stay }, no_drive: false, expected: before })).rejects.toMatchObject({ code: "PT409" });
       }
       expect(await seen("2027-01-09")).toEqual(before);
     });
@@ -165,10 +166,10 @@ describe("Starting points and your own estimates in Postgres (029)", () => {
         [...await expected(["2027-01-09"]), { date: "2027-01-12", entered_at: null, use_calculated: null }],
       ];
       for (const review of stale) {
-        await expect(setEstimate("remove", { dates: ["2027-01-09"], expected: review })).rejects.toMatchObject({ code: "40001" });
+        await expect(setEstimate("remove", { dates: ["2027-01-09"], expected: review })).rejects.toMatchObject({ code: "PT409" });
       }
       await expect(setEstimate("save", { estimate: estimate(50), dates: ["2027-01-10"], expected: [{ date: "2027-01-10", entered_at: before[0].entered_at, use_calculated: false }] }))
-        .rejects.toMatchObject({ code: "40001" });
+        .rejects.toMatchObject({ code: "PT409" });
       expect(await manual()).toEqual(before);
     });
     it("is the organizer's to change", async () => {

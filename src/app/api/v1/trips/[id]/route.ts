@@ -90,7 +90,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     p_lodging_revision: body.lodging_revision ?? null,
     p_expected_removed: expectedRemoved,
   });
-  if (error?.code === "40001") {
+  if (error?.code === "40001" || error?.code === "PT409") {
     // Something changed since the review. Show the change as it would be now.
     const current = await preview().catch(() => null);
     return NextResponse.json({ error: "The trip changed since you reviewed it. Review the changes again.", ...(current ?? {}) }, { status: 409 });

@@ -952,6 +952,22 @@ describe("Trip day page", () => {
       expect(screen.queryByRole("button", { name: "Change tour plan" })).not.toBeInTheDocument();
     });
 
+    it("keeps an inactive plan readable for members without a restore action", async () => {
+      mockAuth.userId = "user-2";
+      const member: TripMember = { ...SAM, user_id: "user-2", status: "joined" };
+      const api = fakeTripApi({
+        "GET /api/v1/trips/trip-1": trip({ ...DAY, activity: "Alpine" }, [ORGANIZER, member]),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      });
+      vi.stubGlobal("fetch", api);
+      await renderPage();
+      await userEvent.setup().click(await screen.findByText("Saved tour plan · Tuckerman Ravine"));
+      expect(screen.getByText("Lower snowfields")).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Restore tour plan" })).not.toBeInTheDocument();
+      expect(sentBodies(api, "PATCH /api/v1/trips/trip-1/days/2026-10-10")).toEqual([]);
+      expect(screen.getByRole("heading", { name: "My kit" })).toBeVisible();
+    });
+
     it("restores a plan kept from Backcountry by setting the activity back", async () => {
       let day: TripDay = { ...DAY, activity: "Alpine" };
       const api = fakeTripApi({

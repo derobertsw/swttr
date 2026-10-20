@@ -141,6 +141,16 @@ describe("Day tour plan", () => {
     expect(screen.getByText("Hillman's Highway if the bowl is loaded")).toBeInTheDocument();
   });
 
+  it("lets members read an inactive plan without offering Restore", async () => {
+    renderPlan({ plans: [saved()], activity: "Alpine", canEdit: false });
+    await userEvent.setup().click(screen.getByText("Saved tour plan · Tuckerman Ravine"));
+    expect(screen.getByText("Hillman's Highway if the bowl is loaded")).toBeVisible();
+    expect(screen.getByText("Pinkham Notch lot fills by 7")).toBeVisible();
+    expect(screen.getByText("Managed by the organizer")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /tour plan/ })).not.toBeInTheDocument();
+    expect(onRestore).not.toHaveBeenCalled();
+  });
+
   it("keeps pending text while showing a newer saved plan, then saves over that revision", async () => {
     // The trip's dates moved, so another day holds this date now, with its own plan.
     const newer = saved({ revision: 4, trip_day_id: "day-2", backup_plan: "Stay below treeline" });

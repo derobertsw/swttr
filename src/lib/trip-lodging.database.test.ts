@@ -24,6 +24,7 @@ describe("Crew lodging transactions in Postgres", () => {
     await db.exec(await readFile("supabase/migrations/017_trip_stays.sql", "utf8"));
     // Every test here runs against 025's version of the lodging transaction.
     await db.exec(await readFile("supabase/migrations/025_trip_stay_locations.sql", "utf8"));
+    await db.exec(await readFile("supabase/migrations/20261020000407_trip_conflicts_no_retry.sql", "utf8"));
   }, 20_000);
   beforeEach(async () => {
     await db.exec("TRUNCATE trips CASCADE;");
@@ -58,7 +59,7 @@ describe("Crew lodging transactions in Postgres", () => {
   });
   it("rejects a stale second session before changing records or assignments", async () => {
     await mutate(0);
-    await expect(mutate(0, "save", input(hotel, { existing: true, name: "Stale name" }))).rejects.toMatchObject({ code: "40001" });
+    await expect(mutate(0, "save", input(hotel, { existing: true, name: "Stale name" }))).rejects.toMatchObject({ code: "PT409" });
     expect((await db.query("SELECT name FROM trip_stays")).rows[0]).toEqual({ name: "Hotel" });
   });
   it("checks for an existing property and dates before adding a duplicate", async () => {
@@ -112,7 +113,7 @@ describe("Crew lodging transactions in Postgres", () => {
     expect((await nights()).length).toBe(3);
     expect((await db.query("SELECT check_out::text, booking_status FROM trip_stays")).rows[0]).toEqual({ check_out: "2026-10-12", booking_status: "booked" });
     expect(await revision()).toBe(2);
-    await expect(mutate(1, "save", input(hotel, { existing: true }))).rejects.toMatchObject({ code: "40001" });
+    await expect(mutate(1, "save", input(hotel, { existing: true }))).rejects.toMatchObject({ code: "PT409" });
   });
   describe("stay locations (#208)", () => {
     const topnotch = { label: "Topnotch Resort", address: "4000 Mountain Road, Stowe, VT", latitude: 44.49391, longitude: -72.73918, precision: "exact",
