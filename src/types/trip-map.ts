@@ -23,7 +23,7 @@ export interface TripMapPlace {
 /** No fabricated line, including when a matrix estimate is available. */
 export interface TripMapGeometry {
   state: "unavailable" | "not_applicable";
-  reason: "provider_permission_pending" | "drive_not_ready";
+  reason: "not_requested" | "drive_not_ready";
   mode: "drive";
   revision: string | null;
   origin_place_id: string | null;
@@ -40,6 +40,8 @@ export interface TripMapDay {
   origin_place_id: string | null;
   access_place_id: string | null;
   tonight_place_id: string | null;
+  crew_stay_place_id: string | null;
+  meeting_place_id: string | null;
   starting_from: string;
   staying_tonight: string;
   tonight_status: "assigned" | "no_stay" | "unplanned";
@@ -63,7 +65,21 @@ export interface TripMap {
     renderer: "maplibre";
     style_url: string;
     browser_key_required: false;
-    geometry: "unavailable";
+    geometry: "on_demand";
     attribution: Array<{ label: string; url: string }>;
   };
 }
+
+/** A selected-day road line is independent of the saved/manual estimate. */
+export type TripMapRoadGeometry = {
+  trip_id: string;
+  day_id: string;
+  date: string;
+  revision: string;
+  mode: "drive";
+  origin_place_id: string | null;
+  access_place_id: string | null;
+} & (
+  | { state: "available"; geometry: { type: "MultiLineString"; coordinates: number[][][] }; provider: "geoapify"; calculated_at: string; attribution: Array<{ label: string; url: string }> }
+  | { state: "unavailable" | "no_route" | "not_applicable"; geometry: null }
+);
