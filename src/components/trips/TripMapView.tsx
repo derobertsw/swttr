@@ -47,9 +47,39 @@ export function TripMapView({ data, canEdit }: { data: TripMap; canEdit: boolean
   const groupPlaces = group?.date === date && group.revision === data.revision ? places.filter((place) => group.ids.includes(place.id)) : [];
   const list = useRef<HTMLDivElement>(null);
   const revealSelection = useRef(false);
+  const scrollSave = useRef<{ timer: number | null; frame: number | null }>({ timer: null, frame: null });
   const historyKey = `tripMapScroll:${data.trip.id}`;
 
+  /** Scroll restoration is best effort; browser history limits must not break selection. */
+  function writeScroll() {
+    const top = list.current?.scrollTop;
+    if (top === undefined || window.history.state?.[historyKey] === top) return;
+    try { window.history.replaceState({ ...window.history.state, [historyKey]: top }, ""); }
+    catch { /* Safari/WKWebView can throttle history writes. */ }
+  }
+  function cancelScrollSave() {
+    if (scrollSave.current.timer !== null) window.clearTimeout(scrollSave.current.timer);
+    if (scrollSave.current.frame !== null) cancelAnimationFrame(scrollSave.current.frame);
+    scrollSave.current = { timer: null, frame: null };
+  }
+  function saveScroll() {
+    if (scrollSave.current.timer !== null || scrollSave.current.frame !== null) return;
+    const url = window.location.href;
+    // A frame alone can still exceed Safari's history quota during long scrolls.
+    scrollSave.current.timer = window.setTimeout(() => {
+      scrollSave.current.timer = null;
+      scrollSave.current.frame = requestAnimationFrame(() => {
+        scrollSave.current.frame = null;
+        if (window.location.href === url) writeScroll();
+      });
+    }, 500);
+  }
+  useEffect(() => cancelScrollSave, [date, selectedId, view, historyKey]);
+
   function navigate(patch: Record<string, string | null>) {
+    cancelScrollSave();
+    // Preserve the outgoing entry even if its throttled save hasn't run yet.
+    writeScroll();
     const search = new URLSearchParams(params.toString());
     for (const [key, value] of Object.entries(patch)) { if (value) search.set(key, value); else search.delete(key); }
     // Next copies its own routing fields. Passing __NA from history.state
@@ -112,7 +142,7 @@ export function TripMapView({ data, canEdit }: { data: TripMap; canEdit: boolean
     </Card>}
     <Button variant="link" className="px-0" onClick={showList}>Skip map</Button>
     <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-      <div ref={list} onScroll={(event) => window.history.replaceState({ ...window.history.state, [historyKey]: event.currentTarget.scrollTop }, "")} className="order-3 min-w-0 space-y-4 lg:order-1 lg:max-h-[48rem] lg:overflow-y-auto lg:p-1">
+      <div ref={list} onScroll={saveScroll} className="order-3 min-w-0 space-y-4 lg:order-1 lg:max-h-[48rem] lg:overflow-y-auto lg:p-1">
         {selected ? <TripMapPlaceDetail tripId={data.trip.id} place={selected} date={date} canEdit={canEdit} /> : <p className="text-base text-muted-foreground">Select a place to read its details.</p>}
         {!!groupPlaces.length && <section className="rounded-card border border-border p-3" aria-label="Places in selected group">
           <h2 id="map-group-heading" tabIndex={-1} className="font-semibold focus-visible:outline-2 focus-visible:outline-ring">{groupPlaces.length} places in this group</h2>

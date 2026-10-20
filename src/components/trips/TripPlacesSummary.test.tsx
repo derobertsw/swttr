@@ -11,6 +11,7 @@ describe("Overview Places entry", () => {
     const fetcher = vi.fn<typeof fetch>(async () => Response.json(data)); vi.stubGlobal("fetch", fetcher);
     render(<TripPlacesSummary tripId={data.trip.id} revision={1} />);
     expect(await screen.findByText("5 of 6 places shown")).toBeVisible();
+    expect(screen.getByRole("region", { name: "Places" })).toBeVisible();
     expect(screen.getByRole("link", { name: "View trip map" })).toHaveAttribute("href", "/trips/trip-drive/map");
     expect(screen.getByRole("list")).toHaveTextContent("Stay · Stowe Motel");
     expect(screen.getByRole("list")).toHaveTextContent("Destination · Stowe, Vermont");

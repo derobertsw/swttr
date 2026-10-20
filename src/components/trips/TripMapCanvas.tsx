@@ -76,10 +76,13 @@ export default function TripMapCanvas(props: Props) {
       map.dragRotate.disable(); map.touchZoomRotate.disableRotation();
       map.getCanvas().setAttribute("aria-label", "Trip places map. Use the place list for keyboard navigation.");
       map.getCanvas().setAttribute("tabindex", "-1");
-      map.on("error", fail);
+      let loaded = false;
+      // Tile/glyph/sprite failures can recover after the first successful load.
+      map.on("error", () => { if (!loaded) fail(); });
       map.getCanvas().addEventListener("webglcontextlost", fail);
       map.on("load", () => {
         if (disposed) return;
+        loaded = true;
         try {
           const primary = getComputedStyle(container.current!).getPropertyValue("--primary").trim() || "#743bea";
           const contrast = getComputedStyle(container.current!).getPropertyValue("--primary-foreground").trim() || "#ffffff";

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { tripMapFixture } from "@/test/tripMap";
@@ -27,7 +27,7 @@ beforeEach(() => {
   nativePush({}, "", path);
   vi.spyOn(window.history, "pushState").mockImplementation((state, unused, url) => { nativePush(state, unused, url); window.dispatchEvent(new PopStateEvent("popstate")); });
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const view = (canEdit = false) => render(<TripMapView data={data} canEdit={canEdit} />);
 
 describe("Synchronized trip map and accessible list", () => {
@@ -110,13 +110,60 @@ describe("Synchronized trip map and accessible list", () => {
     const pane = screen.getByRole("heading", { name: /Village Inn/ }).parentElement!.parentElement!;
     expect(pane.scrollTop).toBe(187);
     pane.scrollTop = 240; fireEvent.scroll(pane);
-    expect(window.history.state["tripMapScroll:trip-drive"]).toBe(240);
+    await waitFor(() => expect(window.history.state["tripMapScroll:trip-drive"]).toBe(240));
     act(() => { nativePush({}, "", `${path}?date=removed&place=removed`); window.dispatchEvent(new PopStateEvent("popstate")); });
     expect(screen.getByRole("alert")).toHaveTextContent("This day is no longer in the itinerary");
     await userEvent.click(screen.getByRole("button", { name: "Show all days" }));
     expect(screen.getByLabelText("Trip dates")).toHaveValue("");
     result.rerender(<TripMapView data={{ ...data, places: [] }} canEdit={false} />);
     expect(screen.getByText("Add a destination to see it on the map.")).toBeVisible();
+  });
+
+  it("coalesces scroll bursts and bounds history writes during sustained scrolling", () => {
+    vi.useFakeTimers(); const result = view();
+    const pane = screen.getByRole("heading", { name: "Place list" }).parentElement!.parentElement!;
+    const replace = vi.spyOn(window.history, "replaceState");
+    for (let i = 1; i <= 100; i++) { pane.scrollTop = i; fireEvent.scroll(pane); }
+    expect(replace).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(600));
+    expect(replace).toHaveBeenCalledOnce();
+    expect(window.history.state["tripMapScroll:trip-drive"]).toBe(100);
+    for (let tick = 0; tick < 100; tick++) {
+      pane.scrollTop = 101 + tick; fireEvent.scroll(pane);
+      act(() => vi.advanceTimersByTime(100));
+    }
+    expect(replace.mock.calls.length).toBeLessThan(25);
+    result.unmount();
+  });
+
+  it("tolerates browser history throttling and still changes selection", () => {
+    vi.useFakeTimers(); const result = view();
+    const pane = screen.getByRole("heading", { name: "Place list" }).parentElement!.parentElement!;
+    vi.spyOn(window.history, "replaceState").mockImplementation(() => { throw new DOMException("History throttled", "SecurityError"); });
+    pane.scrollTop = 91; fireEvent.scroll(pane);
+    expect(() => act(() => vi.advanceTimersByTime(600))).not.toThrow();
+    fireEvent.click(screen.getByRole("button", { name: "Choose destination marker" }));
+    expect(window.location.search).toContain("stop-stowe");
+    expect(screen.getByRole("heading", { name: /Destination · Stowe, Vermont/ })).toHaveFocus();
+    result.unmount();
+  });
+
+  it("flushes the outgoing scroll entry before navigation and cancels delayed saves", () => {
+    vi.useFakeTimers(); const result = view();
+    const pane = screen.getByRole("heading", { name: "Place list" }).parentElement!.parentElement!;
+    pane.scrollTop = 201; fireEvent.scroll(pane);
+    const replace = vi.spyOn(window.history, "replaceState");
+    fireEvent.click(screen.getByRole("button", { name: "Choose destination marker" }));
+    expect(replace.mock.calls[0][0]).toMatchObject({ "tripMapScroll:trip-drive": 201 });
+    expect(window.history.state["tripMapScroll:trip-drive"]).toBe(0);
+    replace.mockClear();
+    act(() => vi.advanceTimersByTime(600));
+    expect(replace).not.toHaveBeenCalled();
+    pane.scrollTop = 250; fireEvent.scroll(pane);
+    act(() => vi.advanceTimersByTime(500));
+    result.unmount();
+    act(() => vi.advanceTimersByTime(50));
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it("uses the list from a deep link without mounting the SDK, and keyboard Skip map focuses it", async () => {

@@ -23,6 +23,16 @@ export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit:
   const [status, setStatus] = useState("");
   const focus = useReturnFocus();
   const lodging = data.lodging;
+  const restoredHash = useRef(false);
+  useEffect(() => {
+    if (restoredHash.current) return;
+    const stay = lodging?.stays.find((candidate) => `#stay-${encodeURIComponent(candidate.id)}` === window.location.hash);
+    const article = stay && document.getElementById(`stay-${stay.id}`);
+    if (!article) return;
+    // Cold links can resolve before the async lodging rows exist.
+    restoredHash.current = true;
+    article.scrollIntoView({ block: "start", behavior: "instant" });
+  }, [lodging]);
   // A stay has departures once it has nights or a day starts from it as its
   // own starting point; until then each call would only cost provider credits.
   const departs = (stay: { id: string; assigned_nights: string[] }) =>

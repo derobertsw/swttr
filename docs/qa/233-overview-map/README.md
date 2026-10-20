@@ -1,6 +1,6 @@
 # #233 — Overview map and synchronized place list
 
-Implemented and checked October 19, 2026. Targets current main and consumes the #232 authorized TripMap projection/provider decision merged in #319. It does not depend on the open geometry follow-up #321. Daily road lines and directions stay with #234; integrated device/research validation stays with #235.
+Implemented and checked October 19, 2026. Consumes the #232 authorized TripMap projection/provider decision merged in #319 and completed in #321. Daily road lines and directions stay with #234; integrated device/research validation stays with #235.
 
 ## Implementation
 
@@ -60,3 +60,14 @@ NODE_OPTIONS=--no-experimental-webstorage npx vitest run \
 `npm run build` passed with locked Next.js 16.4.0/Turbopack in the isolated main-based worktree, including compilation, TypeScript and prerendering. The bundled MapLibre worker asset was included. This supersedes the earlier environment-restricted Turbopack runs in the shared checkout.
 
 Only #233 files were carried into the isolated main-based PR branch. Existing shared-gear behavior on main was retained; unrelated local trip, drive, map-data and recommendation work was left in the original checkout.
+
+## Review follow-up — October 20, 2026
+
+Addressed all four inline review findings:
+
+- A loaded map tolerates transient tile, glyph and sprite errors. Initialization failures and WebGL context loss still offer list recovery.
+- Scroll positions are saved at most once per half-second in an animation frame, with guarded history writes. Navigation first flushes the outgoing position; obsolete timers/frames are canceled on navigation, scope changes and unmount.
+- Overview Places is a named section/region through the existing Card slot.
+- A matching encoded stay anchor is restored once after its lodging article renders. Saved-plan refreshes do not repeat the scroll.
+
+Eight added regression cases cover resource-error recovery, history write limits/errors/cancellation, delayed encoded anchors and absent/unmatched fragments; the existing Overview test now also checks its named region. Focused review run: **4 files / 42 tests passed**. Full suite: **178 files / 2,614 tests passed**. Typecheck, lint, Knip, the default Next.js 16.4.0/Turbopack production build and `git diff --check` passed.

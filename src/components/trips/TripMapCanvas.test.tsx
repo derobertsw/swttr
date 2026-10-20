@@ -70,6 +70,14 @@ describe("Lazy map canvas", () => {
     await act(async () => { finish([{ properties: { id: data.places[0].id } }]); await request; });
     expect(input.onGroup).not.toHaveBeenCalled();
   });
+  it("keeps a loaded map through transient resource errors but reports lost WebGL", async () => {
+    const input = props(); render(<TripMapCanvas {...input} />); await loaded();
+    act(() => { for (let failure = 0; failure < 5; failure++) sdk.map.events["error:"](); });
+    expect(input.onError).not.toHaveBeenCalled();
+    expect(sdk.map.remove).not.toHaveBeenCalled();
+    act(() => sdk.map.getCanvas().dispatchEvent(new Event("webglcontextlost")));
+    expect(input.onError).toHaveBeenCalledOnce();
+  });
   it("reports worker/tile/WebGL errors and initialization timeout for list recovery", async () => {
     vi.useFakeTimers(); const input = props(); const view = render(<TripMapCanvas {...input} />);
     act(() => sdk.map.events["error:"]()); expect(input.onError).toHaveBeenCalledOnce();
