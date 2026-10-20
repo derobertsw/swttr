@@ -1,0 +1,532 @@
+{
+  "trip": {
+    "id": "trip-drive",
+    "name": "Vermont"
+  },
+  "revision": "3b338729137f6e85dcdff5d6c4a276c611ae91999208da816d7e418b55ad9ff3",
+  "scope": {
+    "date": null
+  },
+  "dates": [
+    {
+      "date": "2027-01-08",
+      "label": "Fri Jan 8"
+    },
+    {
+      "date": "2027-01-09",
+      "label": "Sat Jan 9"
+    },
+    {
+      "date": "2027-01-10",
+      "label": "Sun Jan 10"
+    },
+    {
+      "date": "2027-01-11",
+      "label": "Mon Jan 11"
+    },
+    {
+      "date": "2027-01-12",
+      "label": "Tue Jan 12 · unassigned"
+    }
+  ],
+  "places": [
+    {
+      "id": "stay:stay-motel:location",
+      "source": {
+        "type": "stay",
+        "id": "stay-motel",
+        "slot": "location"
+      },
+      "name": "The exceptionally long Green Mountain Lodge and Backcountry Learning Center",
+      "address": "Fictional accommodation, Vermont",
+      "coordinates": {
+        "latitude": 44.4875,
+        "longitude": -72.7262
+      },
+      "mapping": "mapped",
+      "precision": "approximate",
+      "time_zone": "America/New_York",
+      "provenance": {
+        "source": "search",
+        "provider": "geoapify",
+        "provider_id": "place-44.4875",
+        "attribution": "© OpenStreetMap contributors"
+      },
+      "roles": [
+        "stay",
+        "origin"
+      ],
+      "visits": [
+        {
+          "date": "2027-01-08",
+          "day_id": "day-2027-01-08",
+          "role": "stay"
+        },
+        {
+          "date": "2027-01-09",
+          "day_id": "day-2027-01-09",
+          "role": "origin"
+        },
+        {
+          "date": "2027-01-09",
+          "day_id": "day-2027-01-09",
+          "role": "stay"
+        },
+        {
+          "date": "2027-01-10",
+          "day_id": "day-2027-01-10",
+          "role": "origin"
+        }
+      ],
+      "nights": [
+        "2027-01-08",
+        "2027-01-09"
+      ],
+      "night_range": {
+        "check_in": "2027-01-08",
+        "check_out": "2027-01-10"
+      }
+    },
+    {
+      "id": "stay:stay-inn:location",
+      "source": {
+        "type": "stay",
+        "id": "stay-inn",
+        "slot": "location"
+      },
+      "name": "Village Inn",
+      "address": null,
+      "coordinates": null,
+      "mapping": "missing_coordinates",
+      "precision": "unknown",
+      "time_zone": null,
+      "provenance": null,
+      "roles": [
+        "stay",
+        "origin"
+      ],
+      "visits": [
+        {
+          "date": "2027-01-10",
+          "day_id": "day-2027-01-10",
+          "role": "stay"
+        },
+        {
+          "date": "2027-01-11",
+          "day_id": "day-2027-01-11",
+          "role": "origin"
+        }
+      ],
+      "nights": [
+        "2027-01-10"
+      ],
+      "night_range": {
+        "check_in": "2027-01-10",
+        "check_out": "2027-01-11"
+      }
+    },
+    {
+      "id": "stop:stop-stowe:destination",
+      "source": {
+        "type": "stop",
+        "id": "stop-stowe",
+        "slot": "destination"
+      },
+      "name": "Stowe, Vermont",
+      "address": null,
+      "coordinates": {
+        "latitude": 44.5,
+        "longitude": -72.7
+      },
+      "mapping": "mapped",
+      "precision": "unknown",
+      "time_zone": null,
+      "provenance": null,
+      "roles": [
+        "destination"
+      ],
+      "visits": [
+        {
+          "date": "2027-01-08",
+          "day_id": "day-2027-01-08",
+          "role": "destination"
+        },
+        {
+          "date": "2027-01-09",
+          "day_id": "day-2027-01-09",
+          "role": "destination"
+        }
+      ],
+      "nights": [],
+      "night_range": null
+    },
+    {
+      "id": "stop:stop-smuggs:destination",
+      "source": {
+        "type": "stop",
+        "id": "stop-smuggs",
+        "slot": "destination"
+      },
+      "name": "Smugglers' Notch, Vermont",
+      "address": null,
+      "coordinates": {
+        "latitude": 44.5,
+        "longitude": -72.7
+      },
+      "mapping": "mapped",
+      "precision": "unknown",
+      "time_zone": null,
+      "provenance": null,
+      "roles": [
+        "destination"
+      ],
+      "visits": [
+        {
+          "date": "2027-01-10",
+          "day_id": "day-2027-01-10",
+          "role": "destination"
+        },
+        {
+          "date": "2027-01-11",
+          "day_id": "day-2027-01-11",
+          "role": "destination"
+        }
+      ],
+      "nights": [],
+      "night_range": null
+    },
+    {
+      "id": "stop:stop-stowe:access_point",
+      "source": {
+        "type": "stop",
+        "id": "stop-stowe",
+        "slot": "access_point"
+      },
+      "name": "Spruce Peak lot",
+      "address": "Spruce Peak lot, Vermont",
+      "coordinates": {
+        "latitude": 44.53,
+        "longitude": -72.7816
+      },
+      "mapping": "mapped",
+      "precision": "exact",
+      "time_zone": "America/New_York",
+      "provenance": {
+        "source": "search",
+        "provider": "geoapify",
+        "provider_id": "place-44.53",
+        "attribution": "© OpenStreetMap contributors"
+      },
+      "roles": [
+        "access"
+      ],
+      "visits": [
+        {
+          "date": "2027-01-08",
+          "day_id": "day-2027-01-08",
+          "role": "access"
+        },
+        {
+          "date": "2027-01-09",
+          "day_id": "day-2027-01-09",
+          "role": "access"
+        }
+      ],
+      "nights": [],
+      "night_range": null
+    },
+    {
+      "id": "stop:stop-smuggs:access_point",
+      "source": {
+        "type": "stop",
+        "id": "stop-smuggs",
+        "slot": "access_point"
+      },
+      "name": "Smuggs lot",
+      "address": "Smuggs lot, Vermont",
+      "coordinates": {
+        "latitude": 44.587,
+        "longitude": -72.7837
+      },
+      "mapping": "mapped",
+      "precision": "exact",
+      "time_zone": "America/New_York",
+      "provenance": {
+        "source": "search",
+        "provider": "geoapify",
+        "provider_id": "place-44.587",
+        "attribution": "© OpenStreetMap contributors"
+      },
+      "roles": [
+        "access"
+      ],
+      "visits": [
+        {
+          "date": "2027-01-10",
+          "day_id": "day-2027-01-10",
+          "role": "access"
+        },
+        {
+          "date": "2027-01-11",
+          "day_id": "day-2027-01-11",
+          "role": "access"
+        }
+      ],
+      "nights": [],
+      "night_range": null
+    }
+  ],
+  "days": [
+    {
+      "id": "day-2027-01-08",
+      "date": "2027-01-08",
+      "date_label": "Fri Jan 8",
+      "activity": "Backcountry",
+      "destination_place_id": "stop:stop-stowe:destination",
+      "origin_place_id": null,
+      "access_place_id": "stop:stop-stowe:access_point",
+      "tonight_place_id": "stay:stay-motel:location",
+      "starting_from": "Not set",
+      "staying_tonight": "Stowe Motel",
+      "tonight_status": "assigned",
+      "pickup": {
+        "place_id": null,
+        "state": "not_set",
+        "notes": null
+      },
+      "tour": null,
+      "drive": {
+        "date": "2027-01-08",
+        "date_label": "Fri Jan 8",
+        "night_label": "Thu Jan 7",
+        "origin": null,
+        "crew_stay": null,
+        "destination": {
+          "label": "Spruce Peak lot"
+        },
+        "closures": [],
+        "estimate": null,
+        "manual": null,
+        "previous": null,
+        "directions": null,
+        "pair_key": null,
+        "same_drive_dates": [],
+        "state": "missing_origin",
+        "source": null
+      },
+      "geometry": {
+        "state": "not_applicable",
+        "reason": "drive_not_ready",
+        "mode": "drive",
+        "revision": null,
+        "origin_place_id": null,
+        "access_place_id": "stop:stop-stowe:access_point"
+      },
+      "revision": "2e7386b879db975b4b7427c21a84b71c0b16fbb37eddd1b2c577981aa7cfae43"
+    },
+    {
+      "id": "day-2027-01-09",
+      "date": "2027-01-09",
+      "date_label": "Sat Jan 9",
+      "activity": "Backcountry",
+      "destination_place_id": "stop:stop-stowe:destination",
+      "origin_place_id": "stay:stay-motel:location",
+      "access_place_id": "stop:stop-stowe:access_point",
+      "tonight_place_id": "stay:stay-motel:location",
+      "starting_from": "Stowe Motel",
+      "staying_tonight": "Stowe Motel",
+      "tonight_status": "assigned",
+      "pickup": {
+        "place_id": null,
+        "state": "not_set",
+        "notes": null
+      },
+      "tour": null,
+      "drive": {
+        "date": "2027-01-09",
+        "date_label": "Sat Jan 9",
+        "night_label": "Fri Jan 8",
+        "origin": {
+          "label": "Stowe Motel",
+          "stay_id": "stay-motel",
+          "own": false
+        },
+        "crew_stay": {
+          "label": "Stowe Motel",
+          "stay_id": "stay-motel"
+        },
+        "destination": {
+          "label": "Spruce Peak lot"
+        },
+        "closures": [
+          "VT 108 through Smugglers' Notch, usually closed November to mid-May"
+        ],
+        "estimate": null,
+        "manual": null,
+        "previous": null,
+        "directions": {
+          "apple": "https://maps.apple.com/?saddr=44.4875,-72.7262&daddr=44.53,-72.7816&dirflg=d",
+          "google": "https://www.google.com/maps/dir/?api=1&origin=44.4875,-72.7262&destination=44.53,-72.7816&travelmode=driving"
+        },
+        "pair_key": "drive|44.4875,-72.7262>44.53,-72.7816",
+        "same_drive_dates": [
+          "2027-01-09"
+        ],
+        "state": "unavailable",
+        "source": null
+      },
+      "geometry": {
+        "state": "unavailable",
+        "reason": "provider_permission_pending",
+        "mode": "drive",
+        "revision": "e3c46e60d6647d8f7bc9f5fa3cb3de97cfc9b2875257a78e5dd8d8bb5206a535",
+        "origin_place_id": "stay:stay-motel:location",
+        "access_place_id": "stop:stop-stowe:access_point"
+      },
+      "revision": "72397ac955daf79d2277d2d96c5f2bc64758b0609d658d1a7650e41b87264d54"
+    },
+    {
+      "id": "day-2027-01-10",
+      "date": "2027-01-10",
+      "date_label": "Sun Jan 10",
+      "activity": "Backcountry",
+      "destination_place_id": "stop:stop-smuggs:destination",
+      "origin_place_id": "stay:stay-motel:location",
+      "access_place_id": "stop:stop-smuggs:access_point",
+      "tonight_place_id": "stay:stay-inn:location",
+      "starting_from": "Stowe Motel",
+      "staying_tonight": "Village Inn",
+      "tonight_status": "assigned",
+      "pickup": {
+        "place_id": null,
+        "state": "not_set",
+        "notes": null
+      },
+      "tour": null,
+      "drive": {
+        "date": "2027-01-10",
+        "date_label": "Sun Jan 10",
+        "night_label": "Sat Jan 9",
+        "origin": {
+          "label": "Stowe Motel",
+          "stay_id": "stay-motel",
+          "own": false
+        },
+        "crew_stay": {
+          "label": "Stowe Motel",
+          "stay_id": "stay-motel"
+        },
+        "destination": {
+          "label": "Smuggs lot"
+        },
+        "closures": [
+          "VT 108 through Smugglers' Notch, usually closed November to mid-May"
+        ],
+        "estimate": null,
+        "manual": null,
+        "previous": null,
+        "directions": {
+          "apple": "https://maps.apple.com/?saddr=44.4875,-72.7262&daddr=44.587,-72.7837&dirflg=d",
+          "google": "https://www.google.com/maps/dir/?api=1&origin=44.4875,-72.7262&destination=44.587,-72.7837&travelmode=driving"
+        },
+        "pair_key": "drive|44.4875,-72.7262>44.587,-72.7837",
+        "same_drive_dates": [
+          "2027-01-10"
+        ],
+        "state": "unavailable",
+        "source": null
+      },
+      "geometry": {
+        "state": "unavailable",
+        "reason": "provider_permission_pending",
+        "mode": "drive",
+        "revision": "6bb3ffb5870f328a6f365dec31a1268dd25117e384003a91f47fc13da8459767",
+        "origin_place_id": "stay:stay-motel:location",
+        "access_place_id": "stop:stop-smuggs:access_point"
+      },
+      "revision": "cf116ec90bcd6ae87524adfd05c8d96e7162b5e9966930f6db6598567cb326a8"
+    },
+    {
+      "id": "day-2027-01-11",
+      "date": "2027-01-11",
+      "date_label": "Mon Jan 11",
+      "activity": "Backcountry",
+      "destination_place_id": "stop:stop-smuggs:destination",
+      "origin_place_id": "stay:stay-inn:location",
+      "access_place_id": "stop:stop-smuggs:access_point",
+      "tonight_place_id": null,
+      "starting_from": "Village Inn",
+      "staying_tonight": "Not planned yet",
+      "tonight_status": "unplanned",
+      "pickup": {
+        "place_id": null,
+        "state": "not_set",
+        "notes": null
+      },
+      "tour": null,
+      "drive": {
+        "date": "2027-01-11",
+        "date_label": "Mon Jan 11",
+        "night_label": "Sun Jan 10",
+        "origin": {
+          "label": "Village Inn",
+          "stay_id": "stay-inn",
+          "own": false
+        },
+        "crew_stay": {
+          "label": "Village Inn",
+          "stay_id": "stay-inn"
+        },
+        "destination": {
+          "label": "Smuggs lot"
+        },
+        "closures": [],
+        "estimate": null,
+        "manual": null,
+        "previous": null,
+        "directions": null,
+        "pair_key": null,
+        "same_drive_dates": [],
+        "state": "origin_not_located",
+        "source": null
+      },
+      "geometry": {
+        "state": "not_applicable",
+        "reason": "drive_not_ready",
+        "mode": "drive",
+        "revision": null,
+        "origin_place_id": "stay:stay-inn:location",
+        "access_place_id": "stop:stop-smuggs:access_point"
+      },
+      "revision": "aec8e49e1fa5391fc945a87ebe31742dbf2b95d4abed1bbaa7a0fa51f5ed6f76"
+    }
+  ],
+  "counts": {
+    "mapped": 5,
+    "total": 6
+  },
+  "provider": {
+    "renderer": "maplibre",
+    "style_url": "https://tiles.openfreemap.org/styles/positron",
+    "browser_key_required": false,
+    "geometry": "unavailable",
+    "attribution": [
+      {
+        "label": "OpenFreeMap",
+        "url": "https://openfreemap.org/"
+      },
+      {
+        "label": "© OpenMapTiles",
+        "url": "https://openmaptiles.org/"
+      },
+      {
+        "label": "© OpenStreetMap contributors",
+        "url": "https://www.openstreetmap.org/copyright"
+      },
+      {
+        "label": "Powered by Geoapify",
+        "url": "https://www.geoapify.com/"
+      }
+    ]
+  }
+}

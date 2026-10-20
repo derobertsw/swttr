@@ -249,3 +249,30 @@ describe("Crew stays editor", () => {
     expect(sentBodies(api, `PUT ${base}/lodging-nights/2026-10-10`)[0]).toMatchObject({ status: "no_stay", replace_nights: true });
   });
 });
+
+
+describe("Stay deep-link restoration", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+  afterEach(() => { window.history.replaceState({}, "", "/"); vi.restoreAllMocks(); });
+
+  it("waits for lodging data and restores an encoded stay link only once", () => {
+    const saved = { ...hotel, id: "stay:room 1" };
+    window.history.replaceState({}, "", `/trips/${TRIP.id}#stay-${encodeURIComponent(saved.id)}`);
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
+    const result = render(<TripStays data={full()} canEdit={false} onSaved={onSaved} />);
+    expect(scroll).not.toHaveBeenCalled();
+    result.rerender(<TripStays data={full([saved])} canEdit={false} onSaved={onSaved} />);
+    expect(scroll).toHaveBeenCalledOnce();
+    expect(scroll.mock.instances[0]).toBe(document.getElementById(`stay-${saved.id}`));
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "instant" });
+    result.rerender(<TripStays data={full([{ ...saved, name: "Updated room" }])} canEdit={false} onSaved={onSaved} />);
+    expect(scroll).toHaveBeenCalledOnce();
+  });
+
+  it.each(["", "#stay-missing", "#unrelated"])("does not scroll without a matching stay (%s)", (hash) => {
+    window.history.replaceState({}, "", `/trips/${TRIP.id}${hash}`);
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
+    render(<TripStays data={full([hotel])} canEdit={false} onSaved={onSaved} />);
+    expect(scroll).not.toHaveBeenCalled();
+  });
+});

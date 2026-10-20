@@ -23,6 +23,7 @@ import {
 import { useUserId } from "@/hooks/useUserId";
 import { useTrip } from "@/hooks/useTrip";
 import { TripStays } from "@/components/trips/TripStays";
+import { TripPlacesSummary } from "@/components/trips/TripPlacesSummary";
 import type { TripDay, TripStop } from "@/types/trips";
 
 export default function TripOverviewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -81,6 +82,8 @@ export default function TripOverviewPage({ params }: { params: Promise<{ id: str
                 </Link>
               </Card>
             )}
+
+            <TripPlacesSummary tripId={id} revision={data} />
 
             <Card>
               {data.crew_counts && <p className="mb-3 text-sm text-muted-foreground">{formatCrewCounts(data.crew_counts)}</p>}
