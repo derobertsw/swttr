@@ -7,23 +7,24 @@ Implemented and checked October 19, 2026. See [API and provider contract](../../
 | Behavior | Evidence |
 | --- | --- |
 | Checkout/moving day, first origin, override, saved stay identity, tonight and actual nights | `trip-map.test.ts` uses the real #207/#209 lodging/drive resolution; the map's drive results equal the existing drive-estimate service for cached estimates. |
-| Repeated places, multi-role references, coincident entities, named and zero coordinates | Same suite: each day remains a separate visit; saved stay origins share stay identity; destination/access with identical 0,0 coordinates remain separate entities. Missing/null/undefined, string, NaN, infinity and out-of-range values are distinguished and never routed. |
+| Repeated places, multi-role references, coincident entities, named and zero coordinates | Same suite: each day remains a separate visit; saved stay origins share stay identity; co-located destinations remain distinct, and genuine zero latitude/longitude stays mapped. Missing, partial, NaN and out-of-range pairs are distinguished and withheld from markers/navigation. |
 | Approximate/missing endpoints, no drive, no stay, manual/fresh/stale/no route | Projection plus API/cache tests preserve typed states and suppress inappropriate provider calls. Geometry can be unavailable while estimates/list data remain usable. |
 | #210 meeting/pickup | Meeting references the canonical access entity. Pickup notes produce `notes_only` with no invented coordinate or pin. |
 | Current member/owner allowed; non-member/left member denied | Map API tests run the **real** `requireTripAccess`/membership queries against a fixture transport; no protected load/routing occurs on denial. |
 | Cross-trip and private data | Foreign stop/stay/day/tour/night references are rejected. Unknown dates return 404. Fixture invite, booking and kit secrets never appear in the allowlisted response. Estimate reads assert trip filtering. |
 | Geometry format, options, failure and request bounds | `locations/geometry.test.ts` checks two endpoints, drive/typical traffic/avoid options, eight-second signal, missing key, explicit no-road errors, quota/network errors, malformed and oversized responses; no provider properties returned. `trip-map-geometry.test.ts` verifies coalescing, TTL, trip/revision isolation and concurrency/rate limits. |
 | Changed endpoints/access revocation while awaiting routing | API tests delay the provider response, edit the endpoint or revoke membership, then assert 409/404 without a line. Old revision/cache requests cannot restore it. |
-| Client request ordering | `useTripMapGeometry.test.ts` checks no mount/pan-equivalent-render/selection request, immediate hiding on changed revision, cancellation, late-response rejection (switch away/back included), mismatched response identities and errors. |
+| Client request ordering | `useTripMapGeometry.test.ts` checks no mount/pan-equivalent-render/selection request, immediate hiding on changed revision, cancellation, late-response rejection (switch away/back included), mismatched response identities, date moves and errors. |
 | Private HTTP caching and availability | API fixtures verify no-store/Vary on data and denials, all-trip data without a provider call, cached geometry, missing configuration and provider failures. |
 
-Final verification on an isolated branch based on current `origin/main`, with its own `npm ci`: **173 files, 2,560 tests passed**, including **67 new map tests**. The focused map/drive/access suites also passed on that branch. The command below reproduces the relevant map, authorization/loading, drive API, routing and PGlite drive-storage/origin coverage:
+Final verification on an isolated branch based on current `origin/main`, with its own `npm ci`: **174 files, 2,579 tests passed**, including **46 new tests beyond the merged #319 foundation**. The focused map/drive/access suites also passed on that branch. The command below reproduces the relevant map, authorization/loading, drive API, routing and PGlite drive-storage/origin coverage:
 
 ```bash
 NODE_OPTIONS=--no-experimental-webstorage npx vitest run \
   src/lib/trip-map.test.ts src/lib/trip-map-geometry.test.ts \
   src/lib/locations/geometry.test.ts src/hooks/useTripMapGeometry.test.ts \
   'src/app/api/v1/trips/[id]/map/route.test.ts' \
+  'src/app/api/v1/trips/[id]/map/geometry.integration.test.ts' \
   src/lib/trip-drive.test.ts src/lib/locations/routing.test.ts src/lib/trips.test.ts \
   src/lib/trip-drive-estimates.database.test.ts src/lib/trip-drive-starting-points.database.test.ts \
   'src/app/api/v1/trips/[id]/drive-estimates/route.test.ts'

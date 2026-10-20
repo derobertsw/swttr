@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { tripRequest } from "@/lib/trip-requests";
-import type { TripMapDay, TripMapGeometry } from "@/types/trip-map";
+import type { TripMapDay, TripMapRoadGeometry as TripMapGeometry } from "@/types/trip-map";
 
 /**
  * On demand only: selecting/panning does not calculate a route. A changed day
  * or revision hides the old line immediately, even before effect cleanup.
  */
 export function useTripMapGeometry(tripId: string | null, day: TripMapDay | null) {
-  const dayId = day?.id, date = day?.date, revision = day?.revision;
-  const key = tripId && dayId && revision ? JSON.stringify([tripId, dayId, revision]) : null;
+  const dayId = day?.id, date = day?.date, revision = day ? day.geometry.revision ?? day.revision : undefined;
+  const key = tripId && dayId && revision ? JSON.stringify([tripId, dayId, date, revision]) : null;
   const [state, setState] = useState<{ key: string | null; data: TripMapGeometry | null; loading: boolean; error: Error | null }>({ key: null, data: null, loading: false, error: null });
   const pending = useRef<AbortController | null>(null);
 

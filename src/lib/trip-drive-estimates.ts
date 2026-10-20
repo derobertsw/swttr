@@ -74,20 +74,21 @@ function sharedMatrix(matrix: Matrix, ...args: Parameters<Matrix>): ReturnType<M
  * failed calculation keeps a stale estimate for the same pair, or says the
  * estimate is unavailable; it's never replaced by another pair's.
  */
-export async function tripDriveEstimates(full: TripFull, store: DriveEstimateStore, options: { now?: number; matrix?: Matrix } = {}): Promise<TripDriveEstimates> {
+export async function tripDriveEstimates(full: TripFull, store: DriveEstimateStore, options: { now?: number; matrix?: Matrix; refresh?: boolean } = {}): Promise<TripDriveEstimates> {
   const now = options.now ?? Date.now();
   const matrix = options.matrix ?? driveMatrix;
   const plans = drivePlans(full);
   const [storedRows, manual] = await Promise.all([store.read().catch(() => []), manualEstimates(full, store)]);
   const stored = new Map(storedRows.map((row) => [row.date, row]));
   const due = plans.filter((plan): plan is ReadyPlan => {
-    if (plan.state !== "ready") return false;
+    if (options.refresh === false || plan.state !== "ready") return false;
     const row = stored.get(plan.date);
     return row?.route_key !== plan.route_key || now - Date.parse(row.calculated_at) > DRIVE_ESTIMATE_MAX_AGE_MS;
   });
 
   const calculated = new Map<string, StoredDriveEstimate>();
-  const failed = new Set<string>();
+  // Read-only map views label expired estimates stale without spending routing credits.
+  const failed = new Set<string>(options.refresh === false ? plans.map((plan) => plan.date) : []);
   const calculatedAt = new Date(now).toISOString();
   const groups = new Map<string, ReadyPlan[]>();
   for (const plan of due) {

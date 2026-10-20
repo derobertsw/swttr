@@ -2,13 +2,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { driveGeometry } from "@/lib/locations/geometry";
 import { driveTrip } from "@/test/driveTrip";
-import { mapDrivePlans, tripMapData } from "@/lib/trip-map";
+import { projectTripMap } from "@/lib/trip-map";
+import { drivePlans } from "@/lib/trip-drive";
+import { tripDriveEstimates } from "@/lib/trip-drive-estimates";
 import { tripMapGeometry } from "./trip-map-geometry";
 
 vi.mock("@/lib/locations/geometry", () => ({ driveGeometry: vi.fn() }));
 const full = driveTrip();
-const day = (await tripMapData(full, { read: async () => [], write: async () => {} })).days[2];
-const plan = mapDrivePlans(full)[2];
+const estimates = await tripDriveEstimates(full, { read: async () => [], write: async () => {} }, { refresh: false });
+const day = projectTripMap(full, estimates).days[2];
+const plan = drivePlans(full)[2];
 const shape = { type: "MultiLineString" as const, coordinates: [[[-72.7, 44.5], [-72.8, 44.6]]] };
 let now = 0, sequence = 0;
 
@@ -32,12 +35,12 @@ describe("Bounded private geometry reuse", () => {
     const id = `trip-${sequence}`;
     await tripMapGeometry(id, day, plan);
     await tripMapGeometry(`${id}-other`, day, plan);
-    await tripMapGeometry(id, { ...day, revision: "changed" }, plan);
+    await tripMapGeometry(id, { ...day, geometry: { ...day.geometry, revision: "changed" } }, plan);
     expect(driveGeometry).toHaveBeenCalledTimes(3);
     vi.mocked(driveGeometry).mockRejectedValueOnce(new Error("provider failure"));
-    expect((await tripMapGeometry(id, { ...day, revision: "failed" }, plan)).state).toBe("unavailable");
+    expect((await tripMapGeometry(id, { ...day, geometry: { ...day.geometry, revision: "failed" } }, plan)).state).toBe("unavailable");
     now += 1_001;
-    expect((await tripMapGeometry(id, { ...day, revision: "failed" }, plan)).state).toBe("available");
+    expect((await tripMapGeometry(id, { ...day, geometry: { ...day.geometry, revision: "failed" } }, plan)).state).toBe("available");
   });
   it("preserves no route independently of the manual estimate", async () => {
     const id = `trip-${sequence}`;
