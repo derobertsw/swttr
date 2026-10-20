@@ -1,5 +1,7 @@
 # Tour-day planning acceptance review (#210)
 
+**Current status, October 19, 2026:** [#320](https://github.com/derobertsw/swttr/pull/320) is merged and deployed, its conflict-code migration is applied, and production save/copy recovery and the hotel-to-trailhead journey have passed. This record includes historical evidence below; the [remaining acceptance checks](#remaining-acceptance-checks) are still open. All user-facing dates in this record use America/New_York unless stated otherwise.
+
 Reviewed October 18, 2026, against `origin/main` at `41da6b9`, including #314's drive estimates. The initial review used `af861c4`; final integration checks use `41da6b9`. The persisted plan shipped in [#295](https://github.com/derobertsw/swttr/pull/295); plan copying and itinerary reviews shipped in [#301](https://github.com/derobertsw/swttr/pull/301). The recorded product decisions are in [trip-tour-plans.md](../../trip-tour-plans.md), including retaining **Backcountry** as the activity label.
 
 This follow-up fixes draft loss during background trip refreshes. Returning to the browser can reload the trip through `TripProvider`. Previously, a newer plan revision remounted the editor, resetting typed text; changing to another activity removed the editor entirely. The editor now retains the plan and day it opened against until it closes. The existing server conflict check still requires reviewing a newer saved plan before replacing it. The editor also shows the canonical meeting point, including a day-specific override, or explicitly says **Meeting point not set**. Focus can return to the saved-plan disclosure after an activity change.
@@ -33,9 +35,9 @@ A temporary local Vite page imported the actual `DayTourPlan`, `TripSheet` and a
 - **1280px, light:** Enter on Change tour plan opens the dialog and focuses Route or objective; Escape from a clean editor closes it and returns focus to Change tour plan. [Editor screenshot](editor-desktop.png).
 - Temporary viewport overrides were reset after inspection.
 
-## Remaining release acceptance
+## October 18 acceptance state (historical)
 
-The implementation and local regression checks above are complete. Keep #210 open until signed-in organizer/member journeys against deployed migrations and physical iPhone keyboard/safe-area/VoiceOver checks are recorded. A 200% desktop zoom check and the six-person pilot in #205 have not been performed in this review. The fixture is not a substitute for those checks, and it makes no route-suitability or safety claim.
+At the end of the October 18 review, signed-in production journeys, 200% desktop zoom, physical iPhone keyboard/safe-area/VoiceOver checks and #205's six-person pilot were unverified. The production checks below supersede that status where explicitly recorded; fixture checks remain distinct from production and physical-device evidence.
 
 ## October 19 follow-up: production organizer acceptance and conflict recovery
 
@@ -50,23 +52,77 @@ Reviewed current `origin/main` at `8b2bb55` in an isolated worktree. Created one
 - Set a manual access point for the copied day only after reviewing day-only/shared scope. Getting there and both Meet summaries all showed **Entered coordinates**; the other day retained its unset access point. The map URL used the entered access coordinates.
 - Checked the saved summary at 390px and the editor at 320px; document width equaled viewport width in both cases. [390px summary](production-summary-390.jpg), [320px retained draft after timeout](production-timeout-320.jpg). Viewport overrides were reset afterward. These browser checks do not establish physical-device keyboard, safe-area or VoiceOver behavior.
 
-### Defect found and prepared fix
+### Defect found and deployed fix
 
-Concurrent edits exposed a production-only failure missed by PGlite and mocked API tests: stale saves timed out instead of returning the review action. The draft survived and the newer saved plan stayed intact. The result reproduced in a single browser tab after advancing only the synthetic QA plan through its existing mutation function. A direct SQL probe confirmed that the function raises `40001` for the stale revision, without changing the plan.
+Concurrent edits exposed a production-only failure missed by PGlite and mocked API tests: stale saves timed out instead of returning the review action. The draft survived and the newer saved plan stayed intact. The result reproduced in a single browser tab after advancing only the synthetic QA plan through its existing mutation function. Before the fix, a direct SQL probe confirmed that the function raised `40001` for the stale revision, without changing the plan.
 
-Production reports **PostgREST 14.5**. Supabase documents [infinite transaction retries for application-raised `40001`](https://supabase.com/docs/guides/troubleshooting/high-cpu-and-infinite-transaction-retries-when-using-custom-error-codes-in-rpc-functions-77326b), and recommends a non-retryable code such as `PT409`. The prepared migration, [20261020000407_trip_conflicts_no_retry.sql](../../../supabase/migrations/20261020000407_trip_conflicts_no_retry.sql), changes only that literal in an explicit list of existing trip functions. This includes the tour plan, copy/itinerary/date reviews, access points, stays, drive overrides, conditions and packing, which share the defect. It preserves function OIDs, signatures, ownership, security settings and grants; no records, checks, locking or receipt semantics change. The API accepts both codes as the same recoverable 409 during rollout. Unrelated genuine serialization errors are untouched.
+Production reports **PostgREST 14.5**. Supabase documents [infinite transaction retries for application-raised `40001`](https://supabase.com/docs/guides/troubleshooting/high-cpu-and-infinite-transaction-retries-when-using-custom-error-codes-in-rpc-functions-77326b), and recommends a non-retryable code such as `PT409`. The migration shipped in #320, [20261020000407_trip_conflicts_no_retry.sql](../../../supabase/migrations/20261020000407_trip_conflicts_no_retry.sql), changes only that literal in an explicit list of existing trip functions. This includes the tour plan, copy/itinerary/date reviews, access points, stays, drive overrides, conditions and packing, which share the defect. It preserves function OIDs, signatures, ownership, security settings and grants; no records, checks, locking or receipt semantics change. The API accepts both codes as the same recoverable 409 during rollout. Unrelated genuine serialization errors are untouched.
 
 The follow-up also makes the inactive plan's Restore control organizer-only, consistent with its Add/Change controls. Members can expand and read the plan, with **Managed by the organizer**. This does not change the existing permission to edit a day's activity through the shared itinerary controls.
 
 Production read-only checks verified RLS and revoked browser-role table/function access. Migration 026 is recorded numerically; the copy and conditions migrations are already deployed under timestamp versions `20261017191146` and `20261017191151`, respectively. Their absent numeric 030/031 history rows do not mean the migrations are missing. The security advisor's existing [RLS-without-policy informational notices](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy) reflect the server-only access model; this change adds no browser grants.
 
-### Required rollout and remaining acceptance
+### Production rollout completed
 
 Local verification after this follow-up: **168 test files / 2,493 tests passed**, including the migrated Postgres conflict cases, dual-code API recovery, read-only member UI, and migration security/idempotence check. `npm run build` (Next.js 16.4.0), `npm run lint`, `npm run knip` and `git diff --check` passed. Knip retains the existing `apple/**` and `macos/**` configuration hints; the full suite retains its non-failing jsdom navigation notices.
 
-1. Deploy the API's dual-code handling before applying the migration. An older deployment otherwise treats `PT409` as a generic error rather than offering the review.
-2. Apply the new migration and record its timestamp version using the normal migration workflow. It is idempotent and can run with any subset of the explicitly named trip functions present. Do not rerun older function-creating migrations afterward: they would restore `40001`.
-3. Identify and stop the existing retrying requests after approval. Inspection during this test found four `authenticator` / `PostgREST 14.5` sessions executing `mutate_trip_tour_plan`: PIDs **2329830, 2329948, 2329924, 2329863**. Revalidate each PID, role, application and query before any termination; do not stop other sessions. Supabase notes that replacing the function does not stop already-running retry loops. Automatic approval review rejected session termination because production service could be disrupted and explicit authorization was absent. No sessions were terminated and no production function definitions were changed in this review.
-4. Reopen the synthetic QA day's editor, advance its saved revision, then save the stale draft. Confirm a prompt 409, **Review saved plan**, retained text, and an explicit reviewed replacement. Repeat a stale copy/itinerary review. Do not perform more pre-migration stale-write probes; they can start more retry loops.
+- Merged #320 as `f766f581d17c19f005435948b84967094bad028d`; Vercel reported the [main-branch production deployment](https://vercel.com/derobertsws-projects/swttr/Hmn9Nu63UT4oeR3T1MLQR8UZrssF) successful before the migration was applied.
+- Applied the committed conflict-code migration to production. Supabase's migration tool records it as version **20261020001231**, name **trip_conflicts_no_retry**; the repository filename records its earlier creation timestamp. This difference is expected.
+- Compared all **13 affected functions** before and after: function identities, signatures, ownership, security settings and grants matched. Source hashes matched the intended literal-only substitution. A subsequent catalog check found zero public function bodies still containing the deliberately raised `'40001'` literal.
+- With explicit user authorization, revalidated the four identified retry sessions. PIDs **2329863, 2329924 and 2329948** were terminated; **2329830** also exited. A subsequent lookup of all four returned no rows. No other sessions were targeted.
+- Rollout order for another environment remains API dual-code support first, then the migration. Do not rerun earlier function-creating migrations afterward: they would restore `40001`.
 
-Signed-in organizer persistence, read-mode discovery, copy, activity/Restore and manual meeting-point checks are now recorded above. Production conflict recovery remains blocked on rollout, and a signed-in member journey, hotel-to-trailhead integration, 200% desktop zoom, physical iPhone/VoiceOver checks and #205's six-person pilot remain unverified. Keep #210 open.
+### Production conflict-recovery checks
+
+1. Opened the QA day's editor and typed a replacement objective, then advanced only its saved plan through the existing mutation function.
+2. Saving the stale editor exposed **Review saved plan** in approximately **1.2–1.3 seconds** and retained the typed objective. This is the client's HTTP 409 recovery path; before deployment it reached the 20-second timeout. [Recovered conflict at 320px](production-conflict-recovered-320.jpg).
+3. Review saved plan showed the newer saved route while keeping the draft. Explicitly saved the replacement as **QA recovered plan**, reloaded, and confirmed persistence.
+4. Opened a copy from February 14 to February 13 with **Also copy the tour plan**, selecting **Keep** for the existing target plan. Changed the target plan through its normal signed-in editor in another tab.
+5. Submitting the stale copy review showed **The trip changed since you reviewed it. Review the changes again.** within about **four seconds**, refreshed the options and retained Keep.
+6. Saved the refreshed review and observed **Copied to 1 day.** Reloaded both dates: the target retained **QA target plan changed after copy review**, and the source retained **QA recovered plan**.
+
+These timings are browser-observed checks on one synthetic trip, not performance guarantees. Extra test tabs were closed and temporary viewport overrides reset afterward.
+
+## Remaining acceptance pass on October 19
+
+Ran against `origin/main` at `8e4b389`, which includes #320, using the signed-in organizer and the same separate QA trip. No application or database implementation changed in this docs-only follow-up.
+
+### Hotel-to-trailhead integration: passed
+
+Checked that the QA trip had no existing stays, then added **QA hotel — acceptance only**, check-in February 13 and check-out February 14, at manually entered test coordinates `44.4654, -72.6874`. Booking status stayed **Not booked**. The night preview explicitly assigned February 13 and made the hotel February 14's starting point before saving.
+
+After saving and reloading the day:
+
+- **Starting from** showed the QA hotel on checkout morning; **Staying tonight** remained **Not planned yet**.
+- **Getting there** retained the separate day access point at `44.53, -72.78`, and both Meet summaries used that point. Stowe remained the activity destination and **QA recovered plan** remained the tour objective.
+- The real road provider returned **About 17 min drive · 7.5 mi · one way**, with calculation age and Geoapify/OpenStreetMap attribution. This is a road estimate between synthetic test endpoints, not an estimate of the ski/walk approach.
+- The Directions URL used `saddr=44.4654,-72.6874` and `daddr=44.53,-72.78`, with driving mode. It targets the access point, not the route objective or a hut. URL targeting was verified; a physical Maps-app handoff was not part of this check.
+- **Approach (ski or walk)** stayed separately labeled. The hotel assignment did not alter the saved backup, pickup, return/check-in notes or destination-local overnight labels. This fixture combines independent test cases and is not a real itinerary.
+- More tour details still showed **6.2 mi · 2,400 ft ascent · 5 h 45 min**, labeled **Crew estimate**, and the separate exit/pickup note. Those crew-entered figures remained distinct from the 17-minute / 7.5-mile road estimate.
+- At 390px, document width and scroll width were both 390px. [Phone evidence](production-hotel-390.jpg), [desktop evidence](production-hotel-desktop.jpg).
+
+### Keyboard and automated role checks: passed within their stated scope
+
+At a 1280px desktop viewport in the production browser, Enter on **Change tour plan** opened the editor and focused the `objective` input. Escape from the clean editor closed it and restored focus to **Change tour plan**. This is keyboard/focus evidence, not a VoiceOver check or a 200% zoom check.
+
+Re-ran the existing TourPlan, TripStays, DriveEstimate, day-page, tour-plan API and tour-plan Postgres suites: **6 files / 165 tests passed** with `NODE_OPTIONS=--no-experimental-webstorage npm test -- --run` and those six file paths. Member cases cover readable meeting/backup details, no organizer Add/Change/Restore controls, an accessible inactive plan, actionable personal kit controls, and refused member writes/cross-trip references. Those use synthetic identities and are **automated role coverage**, not a signed-in second-account journey. No new tests or code were added.
+
+The docs-only follow-up also passed `npm run build` with Next.js 16.4.0, relative documentation-link validation and `git diff --check`.
+
+### Remaining acceptance checks
+
+| Check | Current status | Needed to complete |
+|---|---|---|
+| Signed-in member journey | Pending: no independent member test session was supplied during this pass. | A signed-in existing test member with access to the QA trip; verify the shared plan and stay read-only controls, and that personal kit/check changes affect only that member. |
+| Actual 200% desktop zoom | Pending, as explicitly requested by the user after native computer-use permissions were unavailable. | A browser session with native control, set to actual 200% zoom. A narrow viewport is not a substitute. |
+| Physical iPhone keyboard, safe areas and VoiceOver | Pending: no physical-device access was supplied during this pass. | A real iPhone with organizer/member sessions and a human/device operator. Browser viewport evidence does not establish these behaviors. |
+| Six-person pilot in #205 | Pending: no participants or pilot results were supplied. | Six actual participants exercising the shared day, with recorded outcomes and any defects. Six automated or synthetic users do not constitute a pilot. |
+
+## Handoff for the open checks
+
+1. **Member:** open the QA day as an existing member. Find the meeting point and backup without opening edit mode; confirm no tour-plan/stay/access-point edit controls. Change a personal kit/check, reload, and compare with the organizer's personal state. On an Alpine day, expand the saved plan without a Restore control. Existing shared itinerary activity permissions remain as documented in [trip-editing.md](../../trip-editing.md).
+2. **200% zoom:** record browser, zoom percentage and window size. Read logistics and the saved plan, open/close the editor by keyboard, and verify labels, Save/Cancel and focus remain usable without clipped controls or horizontal page scrolling. Restore the original zoom afterward.
+3. **iPhone:** record device, iOS version and browser/native shell. Open the editor with the software keyboard visible; reach the optional sections and Save/Cancel, rotate once, and check safe-area clearance. With VoiceOver, find Meet/Backup in summary mode, open the editor, inspect field labels/focus, and verify a deliberate failed save announces its error while retaining input. Use only the QA trip.
+4. **Pilot:** record participant count, roles and dates. Each participant finds the meeting point/backup, reads the hotel-to-access-point context, and completes their personal preparation flow. Record observed completion, confusion and recovery; do not infer success from backend records alone.
+
+Keep **#210 open** until the pending checks pass or the user explicitly changes the acceptance scope. This PR records completed rollout, organizer, hotel and keyboard work without treating the remaining checks as passed.
