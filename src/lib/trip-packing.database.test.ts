@@ -32,6 +32,7 @@ describe("A member's own packing choices in Postgres", () => {
     await db.exec(await readFile("supabase/migrations/20261016231848_trip_personal_packing_checks.sql", "utf8"));
     // Every test here runs against 032's function, which replaces 20261016231848's.
     await db.exec(await readFile("supabase/migrations/032_trip_touring_equipment.sql", "utf8"));
+    await db.exec(await readFile("supabase/migrations/20261020000407_trip_conflicts_no_retry.sql", "utf8"));
   }, 20_000);
   beforeEach(async () => {
     await db.exec("TRUNCATE trips CASCADE;");
@@ -94,10 +95,10 @@ describe("A member's own packing choices in Postgres", () => {
 
     // A kit saved since, a missing kit or an extra one: nothing changes.
     await db.query("UPDATE trip_member_day_kits SET outfit = '{\"version\": 1, \"new\": true}' WHERE id = $1", [Object.keys(kits)[0]]);
-    expect(await code(update({ op: "acknowledge", seen: {}, kits }))).toBe("40001");
+    expect(await code(update({ op: "acknowledge", seen: {}, kits }))).toBe("PT409");
     const now = await kitVersions(ana);
-    expect(await code(update({ op: "acknowledge", seen: {}, kits: { [Object.keys(now)[0]]: Object.values(now)[0] } }))).toBe("40001");
-    expect(await code(update({ op: "acknowledge", seen: {}, kits: { ...now, [randomUUID()]: "2026-10-01T00:00:00Z" } }))).toBe("40001");
+    expect(await code(update({ op: "acknowledge", seen: {}, kits: { [Object.keys(now)[0]]: Object.values(now)[0] } }))).toBe("PT409");
+    expect(await code(update({ op: "acknowledge", seen: {}, kits: { ...now, [randomUUID()]: "2026-10-01T00:00:00Z" } }))).toBe("PT409");
     expect((await db.query<Row>("SELECT seen FROM trip_member_packing")).rows[0].seen).toEqual(seen);
 
     // A kit on a day outside the trip's dates isn't one of them, as the API reads it.
@@ -248,7 +249,7 @@ describe("A member's own packing choices in Postgres", () => {
   it("rejects a check when an outfit changed since it was shown", async () => {
     const kits = await kitVersions(await memberId("Ana"));
     await db.query("UPDATE trip_member_day_kits SET outfit = '{\"changed\": true}' WHERE id = $1", [Object.keys(kits)[0]]);
-    expect(await code(check("item:g-3", { kits }))).toBe("40001");
+    expect(await code(check("item:g-3", { kits }))).toBe("PT409");
     expect((await db.query("SELECT count(*)::int AS n FROM trip_member_packing")).rows[0]).toEqual({ n: 0 });
   });
 

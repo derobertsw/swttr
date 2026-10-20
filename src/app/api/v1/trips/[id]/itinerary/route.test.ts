@@ -131,8 +131,8 @@ describe("Reviewing and saving itinerary changes", () => {
     });
   });
 
-  it("returns the current copy review when the trip changed after the review", async () => {
-    rpc.mockResolvedValue({ data: null, error: { code: "40001", message: "These days changed." } });
+  it.each(["40001", "PT409"])("returns the current copy review when the trip changed after the review (%s)", async (code) => {
+    rpc.mockResolvedValue({ data: null, error: { code, message: "These days changed." } });
     const response = await post({
       action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: "none",
       expected: { from: { stop_id: null, activity: "Hiking", kit: null }, days: [{ date: "2026-10-11", stop_id: JAY.id, activity: null, kit: null }] },
@@ -141,7 +141,7 @@ describe("Reviewing and saving itinerary changes", () => {
     expect(await response.json()).toMatchObject({ options: [{ key: "copy", payload: { expected: { from: { activity: "Ski touring" } } } }] });
   });
 
-  it("checks a reviewed save's access points, falls back before migration 027, and refuses a malformed check", async () => {
+  it.each(["40001", "PT409"])("checks a reviewed save's access points, falls back before migration 027, and refuses a malformed check (%s)", async (code) => {
     const LOT = { label: "Mountain Road lot", address: null, latitude: 44.528, longitude: -72.7853, precision: "exact", time_zone: null, source: "manual", provider: null, provider_id: null, attribution: null };
     const accessPoints = { stops: { [JAY.id]: LOT }, days: {} };
     const body = { action: "assign_days", dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }], access_points: accessPoints };
@@ -157,7 +157,7 @@ describe("Reviewing and saving itinerary changes", () => {
     expect(rpc).toHaveBeenLastCalledWith("edit_trip_itinerary", { p_trip_id: TRIP.id, p_user_id: "user-2", p_action: "assign_days", p_payload: payload });
 
     rpc.mockClear();
-    rpc.mockResolvedValueOnce({ data: null, error: { code: "40001", message: "Access points changed." } });
+    rpc.mockResolvedValueOnce({ data: null, error: { code, message: "Access points changed." } });
     expect((await post(body)).status).toBe(409);
 
     rpc.mockClear();
@@ -166,7 +166,7 @@ describe("Reviewing and saving itinerary changes", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("checks a reviewed save's tour plans from migration 030, and before it refuses only a tour plan copy", async () => {
+  it.each(["40001", "PT409"])("checks a reviewed save's tour plans from migration 030, and before it refuses only a tour plan copy (%s)", async (code) => {
     const PLAN = "11111111-1111-4111-8111-111111111111";
     const SEEN = { date: "2026-10-12", revision: 2 };
     const body = { action: "assign_days", dates: ["2026-10-11"], activity: "Hiking", expected: [{ date: "2026-10-11", stop_id: JAY.id, activity: null }], access_points: { stops: {}, days: {} }, tour_plans: { [PLAN]: SEEN } };
@@ -185,7 +185,7 @@ describe("Reviewing and saving itinerary changes", () => {
     });
 
     rpc.mockClear();
-    rpc.mockResolvedValueOnce({ data: null, error: { code: "40001", message: "Tour plans changed." } });
+    rpc.mockResolvedValueOnce({ data: null, error: { code, message: "Tour plans changed." } });
     expect((await post(body)).status).toBe(409);
 
     // A copy of the tour plan can't go through a function that would drop it.
@@ -225,8 +225,8 @@ describe("Reviewing and saving itinerary changes", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("returns the current review when the trip changed after the review", async () => {
-    rpc.mockResolvedValue({ data: null, error: { code: "40001", message: "Days at this stop changed." } });
+  it.each(["40001", "PT409"])("returns the current review when the trip changed after the review (%s)", async (code) => {
+    rpc.mockResolvedValue({ data: null, error: { code, message: "Days at this stop changed." } });
     const response = await post({ action: "remove_stop", stop_id: STOWE.id, reassign_to: JAY.id, expected: ["2026-10-10"] });
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({

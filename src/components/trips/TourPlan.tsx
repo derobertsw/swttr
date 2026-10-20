@@ -119,10 +119,12 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
             This day&apos;s activity is {activity ?? "not set"}, so the tour plan isn&apos;t in use. It&apos;s kept as saved.
           </p>
           <div className="mt-3"><TourPlanSummary plan={plan} meetingPoint={meetingPoint} /></div>
-          <Button type="button" variant="outline" className="mt-3" loading={restoring} onClick={() => void restore()}>
-            Restore tour plan
-          </Button>
-          <p className="mt-1 text-sm text-muted-foreground">Sets this day&apos;s activity back to {TOUR_ACTIVITY}.</p>
+          {canEdit ? <>
+            <Button type="button" variant="outline" className="mt-3" loading={restoring} onClick={() => void restore()}>
+              Restore tour plan
+            </Button>
+            <p className="mt-1 text-sm text-muted-foreground">Sets this day&apos;s activity back to {TOUR_ACTIVITY}.</p>
+          </> : <p className="mt-3 text-base text-muted-foreground">Managed by the organizer</p>}
           {restoreError && <p role="alert" className="mt-2 text-base text-destructive">Couldn&apos;t restore the tour plan: {restoreError}</p>}
         </details>
         <p aria-live="polite" className="text-sm text-success">{status}</p>

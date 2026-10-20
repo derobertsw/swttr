@@ -53,7 +53,7 @@ export async function handleLodging(request: Request, tripId: string, options: O
     p_replace_nights: body.replace_nights === true,
   });
   if (error) {
-    if (error.code === "40001") return jsonError("The lodging plan changed. Review the saved plan before retrying.", 409);
+    if (["40001", "PT409"].includes(error.code)) return jsonError("The lodging plan changed. Review the saved plan before retrying.", 409);
     if (error.code === "23P01") return jsonError("These nights already have a plan. Review and explicitly replace those nights, or change dates.", 409);
     if (["42501", "P0002"].includes(error.code)) return jsonError("Stay not found in this trip.", 404);
     if (error.code === "22023") return jsonError("This save identity was already used. Reopen the editor.", 409);

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
   const edit = parseAccessPointEdit(body);
   if ("error" in edit) return NextResponse.json(edit, { status: 400 });
   const { error } = await supabase.rpc("set_trip_access_point", { p_trip_id: id, p_user_id: userId, p_payload: edit });
-  if (error?.code === "40001") {
+  if (error?.code === "40001" || error?.code === "PT409") {
     // Something changed since the review. Show the change as it would be now.
     const current = await preview({ action: "set_access_point", date: edit.date, location: edit.location }).catch(() => null);
     return NextResponse.json({

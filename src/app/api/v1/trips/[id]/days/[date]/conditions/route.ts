@@ -40,6 +40,7 @@ export async function POST(request: Request, context: Context) {
   });
   if (error) {
     switch (error.code) {
+      case "PT409":
       case "40001": return jsonError("This day or its sources changed. Review them before saving again.", 409);
       case "P0002": return jsonError("This day is no longer on the trip. Reload the trip.", 404);
       case "42501": return jsonError("Not found", 404);

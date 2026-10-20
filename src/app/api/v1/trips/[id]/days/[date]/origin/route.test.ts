@@ -55,7 +55,7 @@ describe("Saving a day's starting point", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
   it.each([
-    ["40001", 409, "The starting point changed since you opened this. Check it, then try again."],
+    ["40001", 409, "The starting point changed since you opened this. Check it, then try again."], ["PT409", 409, "The starting point changed since you opened this. Check it, then try again."],
     ["PGRST202", 503, "Starting points can't be saved yet. Try again later."],
     ["P0002", 404, "This day isn't on the trip anymore. Reload the trip."],
     ["22023", 400, "Check the starting point and try again."],

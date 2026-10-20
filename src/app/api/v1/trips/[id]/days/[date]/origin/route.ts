@@ -21,7 +21,7 @@ export async function PUT(request: Request, context: Context) {
   if ("error" in edit) return NextResponse.json(edit, { status: 400 });
 
   const { error } = await auth.supabase.rpc("set_trip_day_origin", { p_trip_id: id, p_user_id: auth.userId, p_payload: { date, ...edit } });
-  if (error?.code === "40001") return jsonError("The starting point changed since you opened this. Check it, then try again.", 409);
+  if (error?.code === "40001" || error?.code === "PT409") return jsonError("The starting point changed since you opened this. Check it, then try again.", 409);
   // Before migration 029 the function doesn't exist.
   if (error?.code === "PGRST202" || error?.code === "42883") {
     return NextResponse.json({ error: "Starting points can't be saved yet. Try again later.", field: "origin" }, { status: 503 });

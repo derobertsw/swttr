@@ -274,6 +274,7 @@ function packingError(error: { code?: string; message?: string }, change: Packin
   switch (error.code) {
     case "42501": return jsonError("Not found", 404);
     case "P0002": return jsonError("That item was removed in another session. Reload your list.", 404);
+    case "PT409":
     case "40001": return kitsChanged();
     case "P0409": return NextResponse.json({ error: "This item changed in another session. Review its saved state and try again.", code: "packing_changed" }, { status: 409 });
     case "22023":

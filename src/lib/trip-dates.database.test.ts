@@ -49,6 +49,7 @@ describe("Trip date changes in Postgres", () => {
     await db.exec(await readFile("supabase/migrations/021_trip_date_changes.sql", "utf8"));
     // 026 replaces change_trip_dates to list removed days' tour plans; every test here runs against it.
     await db.exec(await readFile("supabase/migrations/026_trip_tour_plans.sql", "utf8"));
+    await db.exec(await readFile("supabase/migrations/20261020000407_trip_conflicts_no_retry.sql", "utf8"));
   }, 20_000);
 
   // Friday–Sunday: Friday at Stowe skiing, Saturday at Smuggs hiking, Sunday
@@ -96,7 +97,7 @@ describe("Trip date changes in Postgres", () => {
 
   it("removes days and their kits only when the reviewed list matches", async () => {
     const reviewed: Removed[] = [{ date: "2026-10-11", stop_id: null, activity: null, kit_ids: [kits.sunday] }];
-    await expect(change({ to: ["2026-10-09", "2026-10-10"], mode: "keep" })).rejects.toMatchObject({ code: "40001" });
+    await expect(change({ to: ["2026-10-09", "2026-10-10"], mode: "keep" })).rejects.toMatchObject({ code: "PT409" });
     expect(await days()).toHaveLength(3);
     await change({ to: ["2026-10-09", "2026-10-10"], mode: "keep", removed: reviewed });
     expect((await days()).map((day) => day.date)).toEqual(["2026-10-09", "2026-10-10"]);
@@ -106,15 +107,15 @@ describe("Trip date changes in Postgres", () => {
   it("refuses to remove a day whose plan or kits changed after the review", async () => {
     const reviewed: Removed[] = [{ date: "2026-10-11", stop_id: null, activity: null, kit_ids: [kits.sunday] }];
     await db.query("UPDATE trip_days SET activity = 'Hiking' WHERE trip_id = $1 AND date = '2026-10-11'", [tripId]);
-    await expect(change({ to: ["2026-10-09", "2026-10-10"], mode: "keep", removed: reviewed })).rejects.toMatchObject({ code: "40001" });
+    await expect(change({ to: ["2026-10-09", "2026-10-10"], mode: "keep", removed: reviewed })).rejects.toMatchObject({ code: "PT409" });
     await db.query("UPDATE trip_days SET activity = NULL WHERE trip_id = $1 AND date = '2026-10-11'", [tripId]);
     await db.query("INSERT INTO trip_member_day_kits (trip_day_id, trip_member_id) SELECT d.id, m.id FROM trip_days d, trip_members m WHERE d.trip_id = $1 AND d.date = '2026-10-11' AND m.display_name = 'You'", [tripId]);
-    await expect(change({ to: ["2026-10-09", "2026-10-10"], mode: "keep", removed: reviewed })).rejects.toMatchObject({ code: "40001" });
+    await expect(change({ to: ["2026-10-09", "2026-10-10"], mode: "keep", removed: reviewed })).rejects.toMatchObject({ code: "PT409" });
     expect(await days()).toHaveLength(3);
   });
 
   it("requires the dates the change was reviewed for", async () => {
-    await expect(change({ from: ["2026-10-09", "2026-10-12"], to: ["2026-10-16", "2026-10-18"], mode: "move" })).rejects.toMatchObject({ code: "40001" });
+    await expect(change({ from: ["2026-10-09", "2026-10-12"], to: ["2026-10-16", "2026-10-18"], mode: "move" })).rejects.toMatchObject({ code: "PT409" });
     expect(await tripDates()).toMatchObject({ start_date: "2026-10-09", end_date: "2026-10-11" });
   });
 
@@ -142,8 +143,8 @@ describe("Trip date changes in Postgres", () => {
   it("requires the reviewed lodging revision and keeps stay dates and nights", async () => {
     await db.query("INSERT INTO trip_stays (id, trip_id, name, check_in, check_out, booking_status) VALUES ($1, $2, 'Hotel', '2026-10-09', '2026-10-11', 'booked')", [hotel, tripId]);
     await db.query("INSERT INTO trip_lodging_nights (trip_id, date, stay_id, status) VALUES ($1, '2026-10-09', $2, 'assigned'), ($1, '2026-10-10', $2, 'assigned')", [tripId, hotel]);
-    await expect(change({ to: ["2026-10-16", "2026-10-18"], mode: "move" })).rejects.toMatchObject({ code: "40001" });
-    await expect(change({ to: ["2026-10-16", "2026-10-18"], mode: "move", lodging: 1 })).rejects.toMatchObject({ code: "40001" });
+    await expect(change({ to: ["2026-10-16", "2026-10-18"], mode: "move" })).rejects.toMatchObject({ code: "PT409" });
+    await expect(change({ to: ["2026-10-16", "2026-10-18"], mode: "move", lodging: 1 })).rejects.toMatchObject({ code: "PT409" });
     await change({ to: ["2026-10-16", "2026-10-18"], mode: "move", lodging: 0 });
     expect((await db.query("SELECT check_in::text, check_out::text, booking_status FROM trip_stays")).rows).toEqual([{ check_in: "2026-10-09", check_out: "2026-10-11", booking_status: "booked" }]);
     expect((await db.query("SELECT date::text FROM trip_lodging_nights ORDER BY date")).rows).toEqual([{ date: "2026-10-09" }, { date: "2026-10-10" }]);

@@ -115,8 +115,8 @@ describe("Changing a trip's name and dates", () => {
     });
   });
 
-  it("returns the current preview when the trip changed after the review", async () => {
-    rpc.mockResolvedValue({ data: null, error: { code: "40001", message: "Days to remove changed." } });
+  it.each(["40001", "PT409"])("returns the current preview when the trip changed after the review (%s)", async (code) => {
+    rpc.mockResolvedValue({ data: null, error: { code, message: "Days to remove changed." } });
     const response = await save({ end_date: "2026-10-11", mode: "keep", expected_removed: [] });
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({

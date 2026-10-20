@@ -115,7 +115,7 @@ describe("Tour plan API", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it.each([["40001", 409], ["P0002", 404], ["42501", 404], ["22023", 409], ["23514", 400], ["22000", 400], ["XX000", 500]])(
+  it.each([["40001", 409], ["PT409", 409], ["P0002", 404], ["42501", 404], ["22023", 409], ["23514", 400], ["22000", 400], ["XX000", 500]])(
     "sanitizes %s transaction failures", async (code, status) => {
       rpc.mockResolvedValue({ data: null, error: { code, message: "Internal database details" } });
       const response = await PUT(request(body), context());
