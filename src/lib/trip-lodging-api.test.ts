@@ -120,7 +120,7 @@ describe("Stay API authorization and validation", () => {
       expect(payload().location).toMatchObject({ label: "Topnotch Resort", time_zone: null });
     });
   });
-  it.each([["40001", 409], ["23P01", 409], ["42501", 404], ["P0002", 404], ["XX000", 500]])("sanitizes %s transaction failures", async (code, status) => {
+  it.each([["40001", 409], ["PT409", 409], ["23P01", 409], ["42501", 404], ["P0002", 404], ["XX000", 500]])("sanitizes %s transaction failures", async (code, status) => {
     rpc.mockResolvedValue({ error: { code, message: "Internal database details" } });
     const response = await POST(request(body), context); expect(response.status).toBe(status);
     expect(JSON.stringify(await response.json())).not.toContain("Internal database details");

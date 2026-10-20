@@ -72,9 +72,9 @@ describe("Reviewing and saving access points", () => {
     });
   });
 
-  it("returns the current review when the trip changed since, and says when the database isn't ready", async () => {
+  it.each(["40001", "PT409"])("returns the current review when the trip changed since, and says when the database isn't ready (%s)", async (code) => {
     const [, everyDay] = (await previewOf({ date: "2026-10-10", location: LOT })).options;
-    rpc.mockResolvedValueOnce({ data: null, error: { code: "40001" } });
+    rpc.mockResolvedValueOnce({ data: null, error: { code } });
     const stale = await post({ action: "set_access_point", ...everyDay.payload });
     expect(stale.status).toBe(409);
     expect(await stale.json()).toMatchObject({ error: "The trip changed since you reviewed it. Review the access point again.", options: [{ key: "day" }, { key: "stop" }] });

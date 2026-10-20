@@ -69,7 +69,7 @@ async function mutate(request: Request, context: Context, action: Action) {
   }
 
   const { error } = await auth.supabase.rpc("set_trip_drive_estimate", { p_trip_id: id, p_user_id: auth.userId, p_action: action, p_payload: payload });
-  if (error?.code === "40001") return jsonError(STALE, 409);
+  if (error?.code === "40001" || error?.code === "PT409") return jsonError(STALE, 409);
   // Before migration 029 the function doesn't exist.
   if (error?.code === "PGRST202" || error?.code === "42883") {
     return NextResponse.json({ error: "Your own estimates can't be saved yet. Try again later.", field: "duration" }, { status: 503 });

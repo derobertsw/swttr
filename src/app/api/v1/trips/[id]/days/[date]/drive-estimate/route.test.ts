@@ -87,7 +87,7 @@ describe("Saving your own drive estimate", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
   it.each([
-    ["40001", 409, "Your estimate or this day's drive changed since you opened it. Check it, then try again."],
+    ["40001", 409, "Your estimate or this day's drive changed since you opened it. Check it, then try again."], ["PT409", 409, "Your estimate or this day's drive changed since you opened it. Check it, then try again."],
     ["PGRST202", 503, "Your own estimates can't be saved yet. Try again later."],
     ["23514", 400, "Check your estimate and try again."],
     ["XX000", 500, "Couldn't save your estimate. Your entry is still here; try again."],

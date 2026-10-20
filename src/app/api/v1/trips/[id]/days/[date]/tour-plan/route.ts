@@ -50,7 +50,7 @@ async function mutate(request: Request, context: Context, action: "save" | "remo
     p_request_id: body.mutation_id, p_action: action, p_payload: plan ? { ...plan, time_zone: timeZone } : {},
   });
   if (error) {
-    if (error.code === "40001") return jsonError("The tour plan or this day changed. Review the saved plan before saving again.", 409);
+    if (["40001", "PT409"].includes(error.code)) return jsonError("The tour plan or this day changed. Review the saved plan before saving again.", 409);
     if (error.code === "P0002") return jsonError("This day is no longer on the trip. Reload the trip.", 404);
     if (error.code === "42501") return jsonError("Not found", 404);
     if (error.code === "22023") return jsonError("This save identity was already used. Reopen the editor.", 409);

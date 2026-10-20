@@ -80,7 +80,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
   };
   const { error } = await save();
   if (copiesPlan && missing(error?.code)) return jsonError("Copying a tour plan isn't available yet. Nothing was changed.", 503);
-  if (error?.code === "40001") return reviewAgain();
+  if (error?.code === "40001" || error?.code === "PT409") return reviewAgain();
   if (error?.code === "42501") return jsonError("Not found", 404);
   if (error?.code === "P0002") return jsonError("That stop or day isn't on this trip anymore. Reload the trip.", 404);
   if (error?.code === "22023") return jsonError("Check the change and try again.", 400);

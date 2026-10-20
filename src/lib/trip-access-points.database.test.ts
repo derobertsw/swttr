@@ -84,6 +84,7 @@ describe("Access points in Postgres", () => {
     for (const migration of ["012_trips", "016_atomic_trip_creation", "017_trip_stays", "018_trip_saved_kits", "022_trip_itinerary_edits", "023_trip_copy_day", "025_trip_stay_locations", "027_trip_access_points"]) {
       await db.exec(await readFile(`supabase/migrations/${migration}.sql`, "utf8"));
     }
+    await db.exec(await readFile("supabase/migrations/20261020000407_trip_conflicts_no_retry.sql", "utf8"));
   }, 20_000);
 
   // Friday–Monday at Stowe (the base), Smuggs and Jay Peak. Friday has no stop
@@ -183,13 +184,13 @@ describe("Access points in Postgres", () => {
       const payload = edit((await review("2026-10-11", SPRUCE))[1]);
       await db.exec("BEGIN");
       await db.query(sql, [...params]);
-      await expect(run(payload)).rejects.toMatchObject({ code: "40001" });
+      await expect(run(payload)).rejects.toMatchObject({ code: "PT409" });
       await db.exec("ROLLBACK");
     }
     // A stale review fails inside its own transaction; outside one, nothing changed either.
     const payload = edit((await review("2026-10-11", SPRUCE))[1]);
     await db.query(stale[0][0], [...stale[0][1]]);
-    await expect(run(payload)).rejects.toMatchObject({ code: "40001" });
+    await expect(run(payload)).rejects.toMatchObject({ code: "PT409" });
     expect(await stopPoint(stowe)).toEqual(TRAM);
   });
 
@@ -209,7 +210,7 @@ describe("Access points in Postgres", () => {
     await expect(db.query("UPDATE trip_days SET access_point = $1::jsonb WHERE date = '2026-10-09'", [JSON.stringify(SPRUCE)])).rejects.toMatchObject({ code: "23514" });
     await db.query("DELETE FROM trip_stops WHERE trip_id = $1", [tripId]);
     expect(previewAccessPoint(await loadFull(), { action: "set_access_point", date: "2026-10-11", location: MOUNTAIN_RD })).toEqual({ error: "Choose this day's destination first.", status: 400 });
-    await expect(run(payload)).rejects.toMatchObject({ code: "40001" });
+    await expect(run(payload)).rejects.toMatchObject({ code: "PT409" });
   });
 
   describe("with itinerary edits", () => {
@@ -256,8 +257,8 @@ describe("Access points in Postgres", () => {
       // The organizer changes Jay Peak's point in another tab.
       const north = place("North lot", 44.9412, -72.5101);
       await save("2026-10-12", north);
-      await expect(editItinerary("assign_days", move.payload)).rejects.toMatchObject({ code: "40001" });
-      await expect(editItinerary("copy_day", copy.payload)).rejects.toMatchObject({ code: "40001" });
+      await expect(editItinerary("assign_days", move.payload)).rejects.toMatchObject({ code: "PT409" });
+      await expect(editItinerary("copy_day", copy.payload)).rejects.toMatchObject({ code: "PT409" });
       expect(await points()).toMatchObject({ "2026-10-09": "Spruce Peak lot (day)", "2026-10-11": "Mountain Road lot" });
 
       const [current] = await itinerary({ action: "assign_days", dates: ["2026-10-09"], stop_id: jay });

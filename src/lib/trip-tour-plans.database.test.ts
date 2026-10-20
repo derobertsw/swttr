@@ -29,6 +29,7 @@ describe("Tour plan transactions in Postgres", () => {
     for (const migration of ["012_trips", "017_trip_stays", "021_trip_date_changes", "026_trip_tour_plans"]) {
       await db.exec(await readFile(`supabase/migrations/${migration}.sql`, "utf8"));
     }
+    await db.exec(await readFile("supabase/migrations/20261020000407_trip_conflicts_no_retry.sql", "utf8"));
   }, 20_000);
   beforeEach(async () => {
     await db.exec("TRUNCATE trips CASCADE;");
@@ -59,8 +60,8 @@ describe("Tour plan transactions in Postgres", () => {
   it("increments the revision on each change and refuses a stale second session", async () => {
     await mutate();
     expect(await mutate({ revision: 1, payload: plan({ backup_plan: "Lion Head if the bowl is loaded" }) })).toEqual({ revision: 2 });
-    await expect(mutate({ revision: 1, payload: plan({ objective: "Stale" }) })).rejects.toMatchObject({ code: "40001" });
-    await expect(mutate({ revision: 0, payload: plan({ objective: "Another new plan" }) })).rejects.toMatchObject({ code: "40001" });
+    await expect(mutate({ revision: 1, payload: plan({ objective: "Stale" }) })).rejects.toMatchObject({ code: "PT409" });
+    await expect(mutate({ revision: 0, payload: plan({ objective: "Another new plan" }) })).rejects.toMatchObject({ code: "PT409" });
     expect((await saved())[0]).toMatchObject({ objective: "Mount Washington via Tuckerman", revision: 2 });
   });
 
@@ -75,7 +76,7 @@ describe("Tour plan transactions in Postgres", () => {
 
   it("removes a plan only at its reviewed revision, and replays the removal", async () => {
     await mutate();
-    await expect(mutate({ revision: 0, action: "remove", payload: {} })).rejects.toMatchObject({ code: "40001" });
+    await expect(mutate({ revision: 0, action: "remove", payload: {} })).rejects.toMatchObject({ code: "PT409" });
     const requestId = randomUUID();
     expect(await mutate({ revision: 1, action: "remove", payload: {}, requestId })).toEqual({ revision: 0 });
     expect(await saved()).toEqual([]);
@@ -107,10 +108,10 @@ describe("Tour plan transactions in Postgres", () => {
     // Saturday's editor is open; the dates move back a day, so Sunday's row is on Saturday now.
     const saturday = await dayId("2026-10-10");
     await db.query("SELECT public.change_trip_dates($1, 'user-1', '2026-10-09', '2026-10-11', '2026-10-08', '2026-10-10', 'move', 'planning', NULL, NULL, '[]')", [tripId]);
-    await expect(mutate({ date: "2026-10-10", day: saturday })).rejects.toMatchObject({ code: "40001" });
+    await expect(mutate({ date: "2026-10-10", day: saturday })).rejects.toMatchObject({ code: "PT409" });
     await mutate({ date: "2026-10-09", day: saturday, payload: plan({ objective: "Saturday's tour" }) });
     await mutate({ date: "2026-10-10" });
-    await expect(mutate({ date: "2026-10-10", day: saturday, revision: 1, payload: plan({ objective: "Overwrite" }) })).rejects.toMatchObject({ code: "40001" });
+    await expect(mutate({ date: "2026-10-10", day: saturday, revision: 1, payload: plan({ objective: "Overwrite" }) })).rejects.toMatchObject({ code: "PT409" });
     expect((await saved()).map((entry) => [entry.date, entry.objective])).toEqual([["2026-10-09", "Saturday's tour"], ["2026-10-10", "Mount Washington via Tuckerman"]]);
   });
 
@@ -121,13 +122,13 @@ describe("Tour plan transactions in Postgres", () => {
     await mutate({ date: "2026-10-10" });
     await mutate({ date: "2026-10-11" });
     const { rows: [sundayPlan] } = await db.query<{ id: string }>("SELECT id FROM trip_day_tour_plans WHERE trip_day_id = $1", [day.id]);
-    await expect(change(["2026-10-09", "2026-10-10"], "keep", [removed])).rejects.toMatchObject({ code: "40001" });
+    await expect(change(["2026-10-09", "2026-10-10"], "keep", [removed])).rejects.toMatchObject({ code: "PT409" });
     expect(await saved()).toHaveLength(2);
     // A plan changed since the review (same id, newer revision) isn't removed either.
     const reviewed = { ...removed, tour_plan_id: sundayPlan.id, tour_plan_revision: 1 };
     await mutate({ date: "2026-10-11", revision: 1, payload: plan({ backup_plan: "Added after the review" }) });
-    await expect(change(["2026-10-09", "2026-10-10"], "keep", [reviewed])).rejects.toMatchObject({ code: "40001" });
-    await expect(change(["2026-10-09", "2026-10-10"], "keep", [{ ...removed, tour_plan_id: sundayPlan.id }])).rejects.toMatchObject({ code: "40001" });
+    await expect(change(["2026-10-09", "2026-10-10"], "keep", [reviewed])).rejects.toMatchObject({ code: "PT409" });
+    await expect(change(["2026-10-09", "2026-10-10"], "keep", [{ ...removed, tour_plan_id: sundayPlan.id }])).rejects.toMatchObject({ code: "PT409" });
     expect(await saved()).toHaveLength(2);
     await change(["2026-10-09", "2026-10-10"], "keep", [{ ...reviewed, tour_plan_revision: 2 }]);
     expect((await saved()).map((entry) => entry.date)).toEqual(["2026-10-10"]);

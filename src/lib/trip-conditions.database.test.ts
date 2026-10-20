@@ -52,6 +52,7 @@ describe("Conditions sources and reviews in Postgres", () => {
       "022_trip_itinerary_edits", "023_trip_copy_day", "025_trip_stay_locations", "026_trip_tour_plans", "027_trip_access_points", "031_trip_conditions"]) {
       await db.exec(await readFile(`supabase/migrations/${migration}.sql`, "utf8"));
     }
+    await db.exec(await readFile("supabase/migrations/20261020000407_trip_conflicts_no_retry.sql", "utf8"));
   }, 20_000);
   beforeEach(async () => {
     await db.exec("TRUNCATE trips CASCADE;");
@@ -82,14 +83,14 @@ describe("Conditions sources and reviews in Postgres", () => {
     it("saves a change at the revision the editor opened with, and refuses a stale one", async () => {
       const { source_id } = await mutate();
       expect(await mutate({ action: "save", sourceId: source_id, revision: 1, payload: source({ region: null }) })).toEqual({ source_id, revision: 2 });
-      await expect(mutate({ action: "save", sourceId: source_id, revision: 1, payload: source({ name: "Stale" }) })).rejects.toMatchObject({ code: "40001" });
+      await expect(mutate({ action: "save", sourceId: source_id, revision: 1, payload: source({ name: "Stale" }) })).rejects.toMatchObject({ code: "PT409" });
       expect(await daySources()).toMatchObject([{ name: "Mount Washington Avalanche Center", region: null, revision: 2 }]);
     });
 
     it("changes or removes only a source on the day it was opened for", async () => {
       const { source_id } = await mutate({ date: "2026-10-10" });
-      await expect(mutate({ date: "2026-10-11", action: "save", sourceId: source_id, revision: 1 })).rejects.toMatchObject({ code: "40001" });
-      await expect(mutate({ date: "2026-10-11", action: "remove", sourceId: source_id, revision: 1, payload: {} })).rejects.toMatchObject({ code: "40001" });
+      await expect(mutate({ date: "2026-10-11", action: "save", sourceId: source_id, revision: 1 })).rejects.toMatchObject({ code: "PT409" });
+      await expect(mutate({ date: "2026-10-11", action: "remove", sourceId: source_id, revision: 1, payload: {} })).rejects.toMatchObject({ code: "PT409" });
       expect(await daySources()).toHaveLength(1);
     });
 
@@ -101,7 +102,7 @@ describe("Conditions sources and reviews in Postgres", () => {
       expect((await db.query("SELECT count(*)::int AS n FROM trip_conditions_sources")).rows[0]).toEqual({ n: 1 });
       expect(await entries()).toMatchObject([{ date: "2026-10-10", user_id: "user-2", action: "reviewed", note: "Moderate above treeline" }]);
       // With the source off the day, nobody records a review of it there.
-      await expect(review({ sourceId: source_id })).rejects.toMatchObject({ code: "40001" });
+      await expect(review({ sourceId: source_id })).rejects.toMatchObject({ code: "PT409" });
     });
 
     it("replays a retried change without repeating it, and refuses a reused identity with other input", async () => {
@@ -116,7 +117,7 @@ describe("Conditions sources and reviews in Postgres", () => {
       await expect(mutate({ user: "user-2" })).rejects.toMatchObject({ code: "42501" });
       await expect(mutate({ user: "other-user" })).rejects.toMatchObject({ code: "42501" });
       await expect(mutate({ date: "2026-10-12" })).rejects.toMatchObject({ code: "P0002" });
-      await expect(mutate({ day: await dayId("2026-10-11") })).rejects.toMatchObject({ code: "40001" });
+      await expect(mutate({ day: await dayId("2026-10-11") })).rejects.toMatchObject({ code: "PT409" });
       await expect(mutate({ action: "rename" })).rejects.toMatchObject({ code: "22000" });
       expect(await daySources()).toEqual([]);
     });
@@ -175,9 +176,9 @@ describe("Conditions sources and reviews in Postgres", () => {
 
     it("refuses a change from a window that didn't see the latest entry", async () => {
       const first = await review({ sourceId });
-      await expect(review({ sourceId })).rejects.toMatchObject({ code: "40001" });
+      await expect(review({ sourceId })).rejects.toMatchObject({ code: "PT409" });
       await review({ sourceId, expected: first.entry_id, action: "corrected", note: "From window A" });
-      await expect(review({ sourceId, expected: first.entry_id, action: "withdrawn" })).rejects.toMatchObject({ code: "40001" });
+      await expect(review({ sourceId, expected: first.entry_id, action: "withdrawn" })).rejects.toMatchObject({ code: "PT409" });
       expect(await entries()).toHaveLength(2);
     });
 
@@ -200,9 +201,9 @@ describe("Conditions sources and reviews in Postgres", () => {
       await expect(review({ sourceId, user: "user-3" })).rejects.toMatchObject({ code: "42501" });
       await expect(review({ sourceId, user: "other-user" })).rejects.toMatchObject({ code: "42501" });
       await expect(review({ sourceId, user: "user-2", trip: otherTrip })).rejects.toMatchObject({ code: "42501" });
-      await expect(review({ sourceId, date: "2026-10-11" })).rejects.toMatchObject({ code: "40001" });
+      await expect(review({ sourceId, date: "2026-10-11" })).rejects.toMatchObject({ code: "PT409" });
       await expect(review({ sourceId, date: "2026-10-12" })).rejects.toMatchObject({ code: "P0002" });
-      await expect(review({ sourceId, day: await dayId("2026-10-11") })).rejects.toMatchObject({ code: "40001" });
+      await expect(review({ sourceId, day: await dayId("2026-10-11") })).rejects.toMatchObject({ code: "PT409" });
       expect(await entries()).toEqual([]);
     });
 
@@ -255,7 +256,7 @@ describe("Conditions sources and reviews in Postgres", () => {
     ])("refuses a review of the plan from before a change to %s", async (_change, sql) => {
       const seen = await appContext(sourceId);
       await db.query(sql, [tripId]);
-      await expect(review({ sourceId, ctx: seen })).rejects.toMatchObject({ code: "40001" });
+      await expect(review({ sourceId, ctx: seen })).rejects.toMatchObject({ code: "PT409" });
       expect(await entries()).toEqual([]);
       await review({ sourceId });
       expect(await entries()).toHaveLength(1);

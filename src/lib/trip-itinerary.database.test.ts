@@ -91,6 +91,7 @@ describe("Itinerary edits in Postgres", () => {
       "023_trip_copy_day", "025_trip_stay_locations", "026_trip_tour_plans", "027_trip_access_points", "030_trip_copy_tour_plans"]) {
       await db.exec(await readFile(`supabase/migrations/${migration}.sql`, "utf8"));
     }
+    await db.exec(await readFile("supabase/migrations/20261020000407_trip_conflicts_no_retry.sql", "utf8"));
   }, 20_000);
 
   // Friday–Monday at Stowe (the base), Smuggs and Jay Peak. Friday inherits the
@@ -148,9 +149,9 @@ describe("Itinerary edits in Postgres", () => {
 
     it("refuses the removal when the days using the stop changed after the review", async () => {
       await db.query("UPDATE trip_days SET stop_id = $1 WHERE date = '2026-10-12'", [smuggs]);
-      await expect(edit("remove_stop", { stop_id: smuggs, reassign_to: jay, expected: ["2026-10-10"] })).rejects.toMatchObject({ code: "40001" });
+      await expect(edit("remove_stop", { stop_id: smuggs, reassign_to: jay, expected: ["2026-10-10"] })).rejects.toMatchObject({ code: "PT409" });
       // Inherited days count as the base's days.
-      await expect(edit("remove_stop", { stop_id: stowe, reassign_to: jay, expected: ["2026-10-11"] })).rejects.toMatchObject({ code: "40001" });
+      await expect(edit("remove_stop", { stop_id: stowe, reassign_to: jay, expected: ["2026-10-11"] })).rejects.toMatchObject({ code: "PT409" });
       expect(await stopNames()).toHaveLength(3);
     });
   });
@@ -181,7 +182,7 @@ describe("Itinerary edits in Postgres", () => {
       await expect(edit("reorder_stops", { order: [jay, stowe], expected })).rejects.toMatchObject({ code: "22023" });
       await expect(edit("reorder_stops", { order: [jay, jay, stowe], expected })).rejects.toMatchObject({ code: "22023" });
       await expect(edit("reorder_stops", { order: [jay, stowe, elsewhere], expected })).rejects.toMatchObject({ code: "22023" });
-      await expect(edit("reorder_stops", { order: [jay, stowe, smuggs], expected: [smuggs, stowe, jay] })).rejects.toMatchObject({ code: "40001" });
+      await expect(edit("reorder_stops", { order: [jay, stowe, smuggs], expected: [smuggs, stowe, jay] })).rejects.toMatchObject({ code: "PT409" });
       expect(await stopNames()).toEqual(["Stowe, Vermont", "Smuggs, Vermont", "Jay Peak, Vermont"]);
     });
   });
@@ -204,15 +205,15 @@ describe("Itinerary edits in Postgres", () => {
     it("refuses a date without a day even when the expected list leaves it out", async () => {
       await db.query("DELETE FROM trip_days WHERE date = '2026-10-12'");
       const expected = await expectedFor(["2026-10-11"]);
-      await expect(edit("assign_days", { dates: ["2026-10-11", "2026-10-12"], activity: "Hiking", expected })).rejects.toMatchObject({ code: "40001" });
+      await expect(edit("assign_days", { dates: ["2026-10-11", "2026-10-12"], activity: "Hiking", expected })).rejects.toMatchObject({ code: "PT409" });
       expect((await labels())["2026-10-11"]).toBe("Stowe, Vermont · No activity");
     });
 
     it("refuses days whose destination or activity changed after the review", async () => {
       const expected = await expectedFor(["2026-10-09", "2026-10-10"]);
       await db.query("UPDATE trip_days SET activity = 'Biking' WHERE date = '2026-10-10'");
-      await expect(edit("assign_days", { dates: ["2026-10-09", "2026-10-10"], stop_id: jay, expected })).rejects.toMatchObject({ code: "40001" });
-      await expect(edit("assign_days", { dates: ["2026-10-09"], stop_id: jay, expected })).rejects.toMatchObject({ code: "40001" });
+      await expect(edit("assign_days", { dates: ["2026-10-09", "2026-10-10"], stop_id: jay, expected })).rejects.toMatchObject({ code: "PT409" });
+      await expect(edit("assign_days", { dates: ["2026-10-09"], stop_id: jay, expected })).rejects.toMatchObject({ code: "PT409" });
       expect((await labels())["2026-10-09"]).toBe("Stowe, Vermont (base) · Ski touring");
     });
 
@@ -253,9 +254,9 @@ describe("Itinerary edits in Postgres", () => {
 
     it("refuses to overwrite a stop whose place changed after the review", async () => {
       await db.query("UPDATE trip_stops SET name = 'Stowe Mountain Resort, Vermont' WHERE id = $1", [stowe]);
-      await expect(edit("set_day_place", { date: "2026-10-11", place: BURLINGTON, scope: "stop", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-09", "2026-10-11"] } })).rejects.toMatchObject({ code: "40001" });
+      await expect(edit("set_day_place", { date: "2026-10-11", place: BURLINGTON, scope: "stop", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-09", "2026-10-11"] } })).rejects.toMatchObject({ code: "PT409" });
       await db.query("UPDATE trip_stops SET name = $2, latitude = 44.5 WHERE id = $1", [stowe, AT_STOWE.name]);
-      await expect(edit("set_day_place", { date: "2026-10-11", place: BURLINGTON, scope: "day", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-11"] } })).rejects.toMatchObject({ code: "40001" });
+      await expect(edit("set_day_place", { date: "2026-10-11", place: BURLINGTON, scope: "day", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-11"] } })).rejects.toMatchObject({ code: "PT409" });
       expect((await loadFull()).stops[0]).toMatchObject({ name: "Stowe, Vermont", latitude: 44.5 });
     });
 
@@ -270,8 +271,8 @@ describe("Itinerary edits in Postgres", () => {
 
     it("refuses a missing day, and a stop or its days that changed after the review", async () => {
       await expect(edit("set_day_place", { date: "2026-10-13", place: BURLINGTON, scope: "day", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-13"] } })).rejects.toMatchObject({ code: "P0002" });
-      await expect(edit("set_day_place", { date: "2026-10-09", place: BURLINGTON, scope: "day", expected: { stop_id: smuggs, stop: AT_SMUGGS, dates: ["2026-10-09"] } })).rejects.toMatchObject({ code: "40001" });
-      await expect(edit("set_day_place", { date: "2026-10-09", place: BURLINGTON, scope: "stop", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-09"] } })).rejects.toMatchObject({ code: "40001" });
+      await expect(edit("set_day_place", { date: "2026-10-09", place: BURLINGTON, scope: "day", expected: { stop_id: smuggs, stop: AT_SMUGGS, dates: ["2026-10-09"] } })).rejects.toMatchObject({ code: "PT409" });
+      await expect(edit("set_day_place", { date: "2026-10-09", place: BURLINGTON, scope: "stop", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-09"] } })).rejects.toMatchObject({ code: "PT409" });
       await expect(edit("set_day_place", { date: "2026-10-09", place: { ...BURLINGTON, latitude: 91 }, scope: "day", expected: { stop_id: stowe, stop: AT_STOWE, dates: ["2026-10-09"] } })).rejects.toMatchObject({ code: "22023" });
       expect(await stopNames()).toHaveLength(3);
     });
@@ -341,7 +342,7 @@ describe("Itinerary edits in Postgres", () => {
         await db.exec("BEGIN");
         try {
           await db.exec(change);
-          await expect(edit("copy_day", payload)).rejects.toMatchObject({ code: "40001" });
+          await expect(edit("copy_day", payload)).rejects.toMatchObject({ code: "PT409" });
         } finally {
           await db.exec("ROLLBACK");
         }
@@ -438,7 +439,7 @@ describe("Itinerary edits in Postgres", () => {
         await db.exec("BEGIN");
         try {
           await db.exec(change);
-          await expect(reviewedEdit(request.action, payload)).rejects.toMatchObject({ code: "40001" });
+          await expect(reviewedEdit(request.action, payload)).rejects.toMatchObject({ code: "PT409" });
         } finally {
           await db.exec("ROLLBACK");
         }
@@ -456,7 +457,7 @@ describe("Itinerary edits in Postgres", () => {
         const beforeMove = await reviewed({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: false, plan: true }, "replace");
         await db.query("SELECT public.change_trip_dates($1, 'user-1', '2026-10-09', '2026-10-12', '2026-10-10', '2026-10-13', 'move', 'planning', NULL, NULL, '[]')", [tripId]);
         await db.exec("SAVEPOINT stale");
-        await expect(reviewedEdit("copy_day", beforeMove)).rejects.toMatchObject({ code: "40001" });
+        await expect(reviewedEdit("copy_day", beforeMove)).rejects.toMatchObject({ code: "PT409" });
         await db.exec("ROLLBACK TO SAVEPOINT stale");
         // Saturday's plan, now on Oct 11, is still there.
         expect((await plansByDay())["2026-10-11"]).toMatchObject({ objective: "Tuckerman Ravine", revision: 1 });
@@ -466,7 +467,7 @@ describe("Itinerary edits in Postgres", () => {
 
       // Access points are still checked first.
       const payload = await reviewed({ action: "assign_days", dates: ["2026-10-12"], activity: "Hike" });
-      await expect(reviewedEdit("assign_days", { ...payload, access_points: { stops: { [jay]: {} }, days: {} } })).rejects.toMatchObject({ code: "40001" });
+      await expect(reviewedEdit("assign_days", { ...payload, access_points: { stops: { [jay]: {} }, days: {} } })).rejects.toMatchObject({ code: "PT409" });
       await reviewedEdit("assign_days", payload);
       expect((await labels())["2026-10-12"]).toBe("Jay Peak, Vermont · Hike");
     });

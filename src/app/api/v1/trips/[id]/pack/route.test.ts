@@ -680,7 +680,7 @@ describe("POST /api/v1/trips/[id]/pack", () => {
 
   it.each([
     ["P0002", 404, /removed in another session/],
-    ["40001", 409, /saved outfits changed/],
+    ["40001", 409, /saved outfits changed/], ["PT409", 409, /saved outfits changed/],
     ["22023", 400, /Check the change/],
     ["42501", 404, /Not found/],
     ["42883", 503, /can't be saved yet/],
