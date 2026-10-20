@@ -537,6 +537,23 @@ describe("Trip day page", () => {
       }
     });
 
+    it("ignores a malformed or unrelated fragment instead of failing the day", async () => {
+      const scroll = vi.fn();
+      const original = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = scroll;
+      window.history.replaceState(null, "", "#%E0%A4%A");
+      try {
+        vi.stubGlobal("fetch", crewTrip([]));
+        await renderPage();
+        expect(await screen.findByRole("heading", { name: "Getting there" })).toBeVisible();
+        expect(screen.getByRole("link", { name: "View day map" })).toBeVisible();
+        expect(scroll).not.toHaveBeenCalled();
+      } finally {
+        Element.prototype.scrollIntoView = original;
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    });
+
     it("leads with my saved outfit, as saved, with the outing and forecast it was for", async () => {
       vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit({ edited: true }), outfit_saved_at: "2026-10-06T20:01:02Z" })]));
       await renderPage();

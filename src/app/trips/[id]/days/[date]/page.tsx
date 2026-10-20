@@ -120,11 +120,13 @@ export default function DayDetailPage({
   }, [weatherKey, id, date]);
 
   // Links from the trip map open an editor here, like #getting-there-<date>.
-  // Cold links resolve before the async day plan renders.
+  // Cold links resolve before the async day plan renders. Those ids are plain
+  // ASCII, so the fragment is matched as is: decoding a malformed one like #%
+  // would throw.
   const restoredHash = useRef(false);
   useEffect(() => {
     if (restoredHash.current || !day || !window.location.hash) return;
-    const target = document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
+    const target = document.getElementById(window.location.hash.slice(1));
     if (!target) return;
     restoredHash.current = true;
     target.scrollIntoView({ block: "start", behavior: "instant" });
