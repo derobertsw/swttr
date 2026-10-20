@@ -8,6 +8,7 @@ export function privateMapResponse(response: NextResponse): NextResponse {
   return response;
 }
 
+/** Serialize a geometry result or error with the private-response cache policy. */
 export function mapJson(body: unknown, status = 200): NextResponse {
   return privateMapResponse(NextResponse.json(body, { status }));
 }

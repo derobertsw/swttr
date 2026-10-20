@@ -85,6 +85,8 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
     const originId = plan.origin ? add(plan.origin.stay_id ? { type: "stay", id: plan.origin.stay_id, slot: "location" } : { type: "day", id, slot: "origin" },
       plan.origin.label, plan.origin.location, "origin", visit) : null;
     const context = lodging.days.find((entry) => entry.date === plan.date)!;
+    const crewStay = lodging.stays.find((stay) => stay.id === context.starting_stay_id);
+    const crewStayId = crewStay ? add({ type: "stay", id: crewStay.id, slot: "location" }, crewStay.name, crewStay.location, "stay", visit) : null;
     const tonight = lodging.stays.find((stay) => stay.id === context.tonight_stay_id);
     const tonightId = tonight ? add({ type: "stay", id: tonight.id, slot: "location" }, tonight.name, tonight.location, "stay", visit) : null;
     const tour = full.tour_plans?.find((entry) => entry.trip_day_id === id);
@@ -98,7 +100,7 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
     const result = {
       id, date: plan.date, date_label: dateLabel(plan.date), activity: day?.activity ?? null,
       destination_place_id: destinationId, origin_place_id: originId, access_place_id: accessId, tonight_place_id: tonightId,
-      crew_stay_place_id: context.starting_stay_id ? placeId({ type: "stay", id: context.starting_stay_id, slot: "location" }) : null,
+      crew_stay_place_id: crewStayId,
       meeting_place_id: tour ? accessId : null,
       starting_from: plan.origin?.label ?? "Not set", staying_tonight: context.staying_tonight,
       tonight_status: lodging.nights.find((night) => night.date === plan.date)?.status ?? "unplanned",
@@ -109,7 +111,7 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
         reason: geometryEligible ? "not_requested" : "drive_not_ready",
         mode: "drive", revision: routeRevision, origin_place_id: originId, access_place_id: accessId },
     } satisfies Omit<TripMapDay, "revision">;
-    const references = [destinationId, originId, accessId, tonightId].map((key) => key ? places.get(key) : null);
+    const references = [destinationId, originId, accessId, tonightId, crewStayId].map((key) => key ? places.get(key) : null);
     return { ...result, revision: revision({ day: result, places: references }) };
   });
   const allPlaces = [...places.values()];

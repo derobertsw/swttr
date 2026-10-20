@@ -7,6 +7,7 @@ Implemented and checked October 19, 2026. See [API and provider contract](../../
 | Behavior | Evidence |
 | --- | --- |
 | Checkout/moving day, first origin, override, saved stay identity, tonight and actual nights | `trip-map.test.ts` uses the real #207/#209 lodging/drive resolution; the map's drive results equal the existing drive-estimate service for cached estimates. |
+| Crew stay with an own starting point | Scoped moving-day regressions keep the previous-night crew stay as a dated place, resolve every emitted place reference, and revise the day when that stay's coordinates change while preserving unchanged drive geometry. Both regressions failed before the fix and passed afterward on October 20, 2026. |
 | Repeated places, multi-role references, coincident entities, named and zero coordinates | Same suite: each day remains a separate visit; saved stay origins share stay identity; co-located destinations remain distinct, and genuine zero latitude/longitude stays mapped. Missing, partial, NaN and out-of-range pairs are distinguished and withheld from markers/navigation. |
 | Approximate/missing endpoints, no drive, no stay, manual/fresh/stale/no route | Projection plus API/cache tests preserve typed states and suppress inappropriate provider calls. Geometry can be unavailable while estimates/list data remain usable. |
 | #210 meeting/pickup | Meeting references the canonical access entity. Pickup notes produce `notes_only` with no invented coordinate or pin. |
@@ -17,7 +18,7 @@ Implemented and checked October 19, 2026. See [API and provider contract](../../
 | Client request ordering | `useTripMapGeometry.test.ts` checks no mount/pan-equivalent-render/selection request, immediate hiding on changed revision, cancellation, late-response rejection (switch away/back included), mismatched response identities, date moves and errors. |
 | Private HTTP caching and availability | API fixtures verify no-store/Vary on data and denials, all-trip data without a provider call, cached geometry, missing configuration and provider failures. |
 
-Final verification on an isolated branch based on current `origin/main`, with its own `npm ci`: **174 files, 2,579 tests passed**, including **46 new tests beyond the merged #319 foundation**. The focused map/drive/access suites also passed on that branch. The command below reproduces the relevant map, authorization/loading, drive API, routing and PGlite drive-storage/origin coverage:
+Final verification, including the October 20 review fixes, on an isolated branch based on current `origin/main`, with its own `npm ci`: **174 files, 2,581 tests passed**, including **48 new tests beyond the merged #319 foundation**. The focused map/drive/access suites also passed on that branch. The command below reproduces the relevant map, authorization/loading, drive API, routing and PGlite drive-storage/origin coverage:
 
 ```bash
 NODE_OPTIONS=--no-experimental-webstorage npx vitest run \

@@ -57,6 +57,32 @@ describe("Trip map projection", () => {
     expect(map.days[0].access_place_id).toBe(`stop:${full.stops[0].id}:access_point`);
     expect(full.stops[0].access_point?.label).toBe("Spruce Peak lot");
   });
+  it("includes the dated crew stay in a scoped moving day with its own origin", async () => {
+    const full = driveTrip();
+    full.days[2].origin = place("Own starting point", 44, -73);
+    const map = await mapFor(full, [], [], SUN);
+    const day = map.days[0];
+    expect(day).toMatchObject({ origin_place_id: `day:${full.days[2].id}:origin`, crew_stay_place_id: stayId("stay-motel"), tonight_place_id: stayId("stay-inn") });
+    const crewStay = map.places.find((entry) => entry.id === day.crew_stay_place_id);
+    expect(crewStay?.visits).toContainEqual({ date: SUN, day_id: day.id, role: "stay" });
+    expect(crewStay?.nights).toEqual(["2027-01-08", SAT]);
+    const placeIds = new Set(map.places.map((entry) => entry.id));
+    for (const reference of [day.destination_place_id, day.origin_place_id, day.access_place_id, day.tonight_place_id, day.crew_stay_place_id, day.meeting_place_id]) {
+      if (reference) expect(placeIds.has(reference)).toBe(true);
+    }
+  });
+  it("revises an overridden day's crew-stay location without invalidating its unchanged drive", async () => {
+    const full = driveTrip();
+    full.days[2].origin = place("Own starting point", 44, -73);
+    const before = await mapFor(full, [], [], SUN);
+    full.lodging!.stays.find((stay) => stay.id === "stay-motel")!.location = { ...MOTEL, longitude: -72.8 };
+    const after = await mapFor(full, [], [], SUN);
+    expect(after.places.find((entry) => entry.id === stayId("stay-motel"))?.coordinates?.longitude).toBe(-72.8);
+    expect(after.days[0].revision).not.toBe(before.days[0].revision);
+    expect(after.revision).not.toBe(before.revision);
+    expect(before.days[0].geometry.revision).not.toBeNull();
+    expect(after.days[0].geometry.revision).toBe(before.days[0].geometry.revision);
+  });
   it("ignores a day access override left over from a previous destination", async () => {
     const full = driveTrip();
     full.days[1].access_point = place("Old lot", 10, 10);

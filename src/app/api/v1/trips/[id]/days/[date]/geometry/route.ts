@@ -9,6 +9,7 @@ import { mapJson, privateMapResponse } from "@/lib/trip-map-response";
 type Context = { params: Promise<{ id: string; date: string }> };
 const changed = () => mapJson({ error: "The day's places changed. Refresh the trip map.", code: "revision_changed" }, 409);
 
+/** Fetch one authorized day's route line, rejecting changed access or route context. */
 export async function GET(request: Request, context: Context) {
   const { id, date } = await context.params;
   const auth = await requireTripAccess(id);
