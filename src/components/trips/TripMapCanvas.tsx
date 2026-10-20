@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { GeoJSONSource, Map as LibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { TripMap, TripMapPlace } from "@/types/trip-map";
+import type { TripMap, TripMapDay, TripMapPlace } from "@/types/trip-map";
 import { Button } from "@/components/ui/button";
 import { placeRoles, roleLabels, type MapDisplayRole } from "./trip-map-presentation";
 
@@ -12,14 +12,30 @@ type Props = {
   places: TripMapPlace[]; provider: TripMap["provider"]; scope: string; date: string;
   selectedId: string | null; fitRequest: number; onSelect: (id: string) => void;
   onGroup: (ids: string[]) => void; onError: () => void;
+  /** The selected day, whose server references name each place's role that day. */
+  day?: TripMapDay | null;
+  /** Provider road geometry for the day's current origin/access pair; never a line of our own. */
+  route?: number[][][] | null;
+  /** Places the extent fits instead of all of them: the drive's origin and access point. */
+  focusIds?: string[] | null;
 };
 
-function points(places: TripMapPlace[], date: string): GeoJSON.FeatureCollection<GeoJSON.Point> {
-  return { type: "FeatureCollection", features: places.flatMap((place) => place.coordinates ? [{
-    type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [place.coordinates.longitude, place.coordinates.latitude] },
-    properties: { id: place.id, role: placeRoles(place, date)[0], label: roleLabels[placeRoles(place, date)[0]], approximate: place.precision !== "exact" },
-  }] : []) };
+function points(places: TripMapPlace[], date: string, day: TripMapDay | null = null): GeoJSON.FeatureCollection<GeoJSON.Point> {
+  return { type: "FeatureCollection", features: places.flatMap((place) => {
+    if (!place.coordinates) return [];
+    const roles = placeRoles(place, date, day);
+    // A day names every role ("Starting from · Staying tonight"); the whole trip keeps the first.
+    const label = day ? roles.map((role) => roleLabels[role]).join(" · ") : roleLabels[roles[0]];
+    return [{
+      type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [place.coordinates.longitude, place.coordinates.latitude] },
+      properties: { id: place.id, role: roles[0], label, approximate: place.precision !== "exact" },
+    }];
+  }) };
 }
+
+const routeData = (route: number[][][] | null | undefined): GeoJSON.Feature<GeoJSON.MultiLineString> | GeoJSON.FeatureCollection => route
+  ? { type: "Feature", geometry: { type: "MultiLineString", coordinates: route }, properties: {} }
+  : { type: "FeatureCollection", features: [] };
 
 function fit(map: LibreMap, places: TripMapPlace[]) {
   const coordinates = places.flatMap((place) => place.coordinates ? [[place.coordinates.longitude, place.coordinates.latitude] as [number, number]] : []);
@@ -134,20 +150,38 @@ export default function TripMapCanvas(props: Props) {
     };
   }, [props.provider.style_url]);
 
+  const focus = props.focusIds?.join(",") ?? "";
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-    (map.getSource("places") as GeoJSONSource).setData(points(props.places, props.date));
-    const key = `${props.scope}:${props.fitRequest}`;
-    if (fitted.current !== key) { fit(map, props.places); fitted.current = key; }
-  }, [ready, props.places, props.scope, props.date, props.fitRequest]);
+    (map.getSource("places") as GeoJSONSource).setData(points(props.places, props.date, props.day));
+    const key = `${props.scope}:${props.fitRequest}:${focus}`;
+    if (fitted.current !== key) {
+      const focused = focus ? props.places.filter((place) => focus.split(",").includes(place.id)) : [];
+      fit(map, focused.length ? focused : props.places);
+      fitted.current = key;
+    }
+  }, [ready, props.places, props.scope, props.date, props.day, props.fitRequest, focus]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
     const selected = props.places.find((place) => place.id === props.selectedId);
-    (map.getSource("selection") as GeoJSONSource).setData(points(selected ? [selected] : [], props.date));
-  }, [ready, props.places, props.selectedId, props.date]);
+    (map.getSource("selection") as GeoJSONSource).setData(points(selected ? [selected] : [], props.date, props.day));
+  }, [ready, props.places, props.selectedId, props.date, props.day]);
+
+  // The road layer exists only once real geometry arrives, beneath every marker.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const source = map.getSource("route") as GeoJSONSource | undefined;
+    if (source) { source.setData(routeData(props.route)); return; }
+    if (!props.route) return;
+    const primary = getComputedStyle(container.current!).getPropertyValue("--primary").trim() || "#743bea";
+    map.addSource("route", { type: "geojson", data: routeData(props.route) });
+    map.addLayer({ id: "route-casing", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ffffff", "line-width": 8 } }, "groups");
+    map.addLayer({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": primary, "line-width": 4 } }, "groups");
+  }, [ready, props.route]);
 
   return <div className="relative min-w-0">
     <div ref={container} className="h-[min(52dvh,420px)] min-h-64 w-full overflow-hidden rounded-card border border-border lg:h-[560px]" />

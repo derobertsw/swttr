@@ -511,6 +511,32 @@ describe("Trip day page", () => {
       sessionStorage.clear();
     });
 
+    it("opens the day map from Getting there without loading a map above My kit (#234)", async () => {
+      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit(), outfit_saved_at: "2026-10-06T20:01:02Z" })]));
+      await renderPage();
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      const gettingThere = screen.getByRole("heading", { name: "Getting there" }).closest<HTMLElement>('[data-slot="card"]')!;
+      expect(within(gettingThere).getByRole("link", { name: "View day map" })).toHaveAttribute("href", "/trips/trip-1/map?date=2026-10-10&from=day");
+      expect(gettingThere.compareDocumentPosition(myKit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(document.querySelector("canvas")).toBeNull();
+    });
+
+    it("scrolls a cold link from the trip map to the editor it names, once the day renders", async () => {
+      const scroll = vi.fn();
+      const original = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = scroll;
+      window.history.replaceState(null, "", "#getting-there-2026-10-10");
+      try {
+        vi.stubGlobal("fetch", crewTrip([]));
+        await renderPage();
+        await waitFor(() => expect(scroll).toHaveBeenCalledOnce());
+        expect(scroll.mock.contexts[0]).toHaveAttribute("id", "getting-there-2026-10-10");
+      } finally {
+        Element.prototype.scrollIntoView = original;
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    });
+
     it("leads with my saved outfit, as saved, with the outing and forecast it was for", async () => {
       vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit({ edited: true }), outfit_saved_at: "2026-10-06T20:01:02Z" })]));
       await renderPage();

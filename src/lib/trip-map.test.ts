@@ -190,10 +190,14 @@ describe("Trip map projection", () => {
   it("provides touring meeting/access information and an honest notes-only pickup", async () => {
     const full = driveTrip();
     const plan = { id: "tour", trip_id: full.trip.id, trip_day_id: full.days[1].id, objective: "North Ridge", route_url: "https://example.com/tour", meet_time: null, return_time: null,
-      time_zone: "America/New_York", revision: 1, updated_at: "2027-01-01T12:00:00Z", access_notes: "Permit required", pickup_notes: "Meet at the lower lot" } as TripTourPlan;
+      time_zone: "America/New_York", revision: 1, updated_at: "2027-01-01T12:00:00Z", access_notes: "Permit required", pickup_notes: "Meet at the lower lot",
+      approach_notes: "Skin up the summer road" } as TripTourPlan;
     full.tour_plans = [buildTourPlanSummary(plan, SAT)];
     const map = await mapFor(full);
-    expect(map.days[1]).toMatchObject({ tour: { objective: "North Ridge", access_notes: "Permit required" }, pickup: { state: "notes_only", place_id: null, notes: "Meet at the lower lot" } });
+    expect(map.days[1]).toMatchObject({ tour: { objective: "North Ridge", access_notes: "Permit required", approach_notes: "Skin up the summer road" }, pickup: { state: "notes_only", place_id: null, notes: "Meet at the lower lot" } });
+    // The entered approach is text only: no place, line or estimate comes from it.
+    expect(JSON.stringify(map.places)).not.toContain("Skin up");
+    expect(map.days[1].drive.manual).toBeNull();
     expect(map.days[1].meeting_place_id).toBe(map.days[1].access_place_id);
     expect(map.days[1].crew_stay_place_id).toBe(stayId("stay-motel"));
     expect(map.places.some((entry) => entry.roles.includes("pickup"))).toBe(false);

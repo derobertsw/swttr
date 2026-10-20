@@ -72,7 +72,7 @@ const calculatedLabel = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 /** "About 35 min drive · 14 mi · one way", or what's missing, in a few words for a list. */
-function driveSummary(day: TripDriveDay, canEdit: boolean): string {
+export function driveSummary(day: TripDriveDay, canEdit: boolean): string {
   const to = day.destination ? ` to ${day.destination.label}` : "";
   switch (day.state) {
     case "available": return `About ${day.estimate!.duration_label} drive${to} · ${day.estimate!.distance_label} · one way`;
@@ -90,16 +90,19 @@ function driveSummary(day: TripDriveDay, canEdit: boolean): string {
   }
 }
 
-/** Opens maps for the exact endpoints while keeping the current day open. */
-function Directions({ day }: { day: TripDriveDay }) {
+/**
+ * Opens maps for the exact endpoints while keeping the current day open. The
+ * trip map names the access point in `label`: "Directions to Spruce Peak lot".
+ */
+export function Directions({ day, label }: { day: TripDriveDay; label?: string }) {
   const apple = useAppleMaps();
   if (!day.directions || !day.origin || !day.destination) return null;
   const app = apple ? "Apple Maps" : "Google Maps";
   return (
     <Button asChild variant="outline" size="sm">
       <a href={apple ? day.directions.apple : day.directions.google} target="_blank" rel="noopener noreferrer"
-        aria-label={`Directions from ${day.origin.label} to ${day.destination.label} (opens ${app})`}>
-        Directions
+        aria-label={label ? `${label} from ${day.origin.label} (opens ${app})` : `Directions from ${day.origin.label} to ${day.destination.label} (opens ${app})`}>
+        {label ?? "Directions"}
       </a>
     </Button>
   );
