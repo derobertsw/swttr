@@ -1,6 +1,6 @@
 # Tour-day planning acceptance review (#210)
 
-**Current status, October 19, 2026:** [#320](https://github.com/derobertsw/swttr/pull/320) is merged and deployed, its conflict-code migration is applied, and production save/copy recovery and the hotel-to-trailhead journey have passed. This record includes historical evidence below; the [remaining acceptance checks](#remaining-acceptance-checks) are still open. All user-facing dates in this record use America/New_York unless stated otherwise.
+**Current status, October 20, 2026:** #210's acceptance is complete. The signed-in member journey and actual 200% desktop zoom passed on October 20, and the one defect they found (lost keyboard focus after activity and kit taps) is fixed by the PR that adds this section. The physical iPhone checks moved to #144 and the six-person pilot to #205; see [Closing scope](#closing-scope). [#320](https://github.com/derobertsw/swttr/pull/320) is merged and deployed, its conflict-code migration is applied, and production save/copy recovery and the hotel-to-trailhead journey passed on October 19. This record includes historical evidence below. All user-facing dates in this record use America/New_York unless stated otherwise.
 
 Reviewed October 18, 2026, against `origin/main` at `41da6b9`, including #314's drive estimates. The initial review used `af861c4`; final integration checks use `41da6b9`. The persisted plan shipped in [#295](https://github.com/derobertsw/swttr/pull/295); plan copying and itinerary reviews shipped in [#301](https://github.com/derobertsw/swttr/pull/301). The recorded product decisions are in [trip-tour-plans.md](../../trip-tour-plans.md), including retaining **Backcountry** as the activity label.
 
@@ -109,20 +109,72 @@ Re-ran the existing TourPlan, TripStays, DriveEstimate, day-page, tour-plan API 
 
 The docs-only follow-up also passed `npm run build` with Next.js 16.4.0, relative documentation-link validation and `git diff --check`.
 
-### Remaining acceptance checks
+### Open checks at the end of October 19 (historical)
 
-| Check | Current status | Needed to complete |
+| Check | Status on October 19 | Needed to complete |
 |---|---|---|
 | Signed-in member journey | Pending: no independent member test session was supplied during this pass. | A signed-in existing test member with access to the QA trip; verify the shared plan and stay read-only controls, and that personal kit/check changes affect only that member. |
 | Actual 200% desktop zoom | Pending, as explicitly requested by the user after native computer-use permissions were unavailable. | A browser session with native control, set to actual 200% zoom. A narrow viewport is not a substitute. |
 | Physical iPhone keyboard, safe areas and VoiceOver | Pending: no physical-device access was supplied during this pass. | A real iPhone with organizer/member sessions and a human/device operator. Browser viewport evidence does not establish these behaviors. |
 | Six-person pilot in #205 | Pending: no participants or pilot results were supplied. | Six actual participants exercising the shared day, with recorded outcomes and any defects. Six automated or synthetic users do not constitute a pilot. |
 
-## Handoff for the open checks
+## October 20: member journey, 200% zoom and closing scope
 
-1. **Member:** open the QA day as an existing member. Find the meeting point and backup without opening edit mode; confirm no tour-plan/stay/access-point edit controls. Change a personal kit/check, reload, and compare with the organizer's personal state. On an Alpine day, expand the saved plan without a Restore control. Existing shared itinerary activity permissions remain as documented in [trip-editing.md](../../trip-editing.md).
-2. **200% zoom:** record browser, zoom percentage and window size. Read logistics and the saved plan, open/close the editor by keyboard, and verify labels, Save/Cancel and focus remain usable without clipped controls or horizontal page scrolling. Restore the original zoom afterward.
-3. **iPhone:** record device, iOS version and browser/native shell. Open the editor with the software keyboard visible; reach the optional sections and Save/Cancel, rotate once, and check safe-area clearance. With VoiceOver, find Meet/Backup in summary mode, open the editor, inspect field labels/focus, and verify a deliberate failed save announces its error while retaining input. Use only the QA trip.
-4. **Pilot:** record participant count, roles and dates. Each participant finds the meeting point/backup, reads the hotel-to-access-point context, and completes their personal preparation flow. Record observed completion, confusion and recovery; do not infer success from backend records alone.
+Ran on production on October 20, 2026, using the same separate QA trip; `origin/main` was at `a578641`. The organizer and the member were signed in to different browsers. No messages were sent.
 
-Keep **#210 open** until the pending checks pass or the user explicitly changes the acceptance scope. This PR records completed rollout, organizer, hotel and keyboard work without treating the remaining checks as passed.
+### Signed-in member journey: passed
+
+The organizer created an invite on the QA trip's Crew tab for a second, existing account (display name **Will Test**). The member accepted it in the built-in browser pane, which then opened the member's Your bag.
+
+- **Summary without editing:** on February 14, the member read Meet, Backup plan, Return target, Check-in plan (crew notes) and Access and permits without opening an editor. Tour plan and Getting there both said **Managed by the organizer**. A list of the page's visible controls had no Add or Change tour plan, access-point, stay or starting-point control. Open map, Directions, the road estimate (about 17 min · 7.5 mi) and **Approach (ski or walk)** were all present. The activity chips, the destination's Change and Copy to other days stay open to members, as [trip-editing.md](../../trip-editing.md) documents.
+- **Personal kit:** the member picked Shell in My kit. It persisted after a reload, and the organizer's row still said **no kit set**. In the organizer's browser, Crew kits showed Will Test's pick (user-reported, as part of the zoom checklist below).
+- **Personal packing:** the member added **QA member item** in Your bag, checked it and reloaded; it stayed checked. The organizer's Your bag didn't list it (user-reported).
+- **Inactive plan:** as the member, February 13 was switched to Alpine. A collapsed **Saved tour plan** disclosure appeared. Enter expanded it, and the plan was readable with **Managed by the organizer** and no Restore control. Switching back to Backcountry put the plan in use again. The QA trip is otherwise as it was, apart from the member's kit pick and packing item.
+
+### Defect found and fixed
+
+After a keyboard user changed the activity or a My kit control (effort, a layer chip or Flag), focus fell to the page body. Those controls were `disabled` while their save and the reload after it ran, and Chrome moves focus off a disabled button. They're now `aria-disabled`, ignore presses until the save finishes and dim meanwhile, as `SharedGear.tsx` already does. The day-page tests now check the attribute, that a second press during a save sends nothing, and that the pressed chip keeps focus; the updated tests fail against `origin/main`'s page. In a local preview with a 1.5-second save, focus stayed on the chip through the save and the reload, and a second Enter during the save sent no request.
+
+### Actual 200% desktop zoom: passed (user-reported)
+
+The user ran this checklist in Chrome at 200% browser zoom, signed in as the organizer, and reported that it passed. The window size wasn't recorded.
+
+1. February 14 scrolled top to bottom without horizontal scrolling or clipped text and controls.
+2. The tour-plan summary was readable without editing, and More tour details expanded.
+3. Enter on **Change tour plan** opened the editor with focus in Route or objective. Tab reached every labeled field and Save/Cancel without them being hidden or covered.
+4. Escape from the unchanged editor closed it and returned focus to **Change tour plan**.
+5. Crew kits showed the member's pick.
+6. The organizer's Your bag didn't list the member's item.
+7. Zoom was reset afterwards.
+
+A screenshot of the trip overview at the same zoom also showed no clipping.
+
+### Closing scope
+
+Decided by the user on October 20:
+
+- The six-person pilot moves to #205. It is #205's success and release evidence, not one of #210's criteria.
+- Physical iPhone keyboard, safe-area and VoiceOver checks move to the iPhone release work in #144.
+
+| Check | Status |
+|---|---|
+| Signed-in member journey | Passed October 20 |
+| Actual 200% desktop zoom | Passed October 20 (user-reported) |
+| Physical iPhone keyboard, safe areas and VoiceOver | Moved to #144 |
+| Six-person pilot | Moved to #205 |
+
+With those moved, #210 closes with the PR that adds this section.
+
+### Found outside #210
+
+- Every trip's organizer is stored as **You** (`016_atomic_trip_creation.sql`). A member's invite therefore reads "You added you as…", and their Crew kits lists the organizer as "You".
+- A kit row with one pick says "1 layers picked".
+
+### Verification
+
+Full suite: **178 files / 2,614 tests passed** with `NODE_OPTIONS=--no-experimental-webstorage npx vitest run`. ESLint on the changed files, `tsc --noEmit`, `npm run build`, `npx knip` (with its existing two configuration hints) and `git diff --check` passed.
+
+## Handoff for the moved checks
+
+1. **iPhone (#144):** record device, iOS version and browser/native shell. Open the editor with the software keyboard visible; reach the optional sections and Save/Cancel, rotate once, and check safe-area clearance. With VoiceOver, find Meet/Backup in summary mode, open the editor, inspect field labels/focus, and verify a deliberate failed save announces its error while retaining input. Use only the QA trip.
+2. **Pilot (#205):** record participant count, roles and dates. Each participant finds the meeting point/backup, reads the hotel-to-access-point context, and completes their personal preparation flow. Record observed completion, confusion and recovery; do not infer success from backend records alone.
