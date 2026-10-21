@@ -138,9 +138,12 @@ export async function listTripsForUser(
     memberCount.set(m.trip_id, (memberCount.get(m.trip_id) ?? 0) + 1);
   }
 
+  // Status ages without a write. Use one UTC date for the whole response.
+  const today = new Date().toISOString().slice(0, 10);
   return all
     .map((t) => ({
       ...t,
+      status: classifyTripStatus(t.start_date, t.end_date, today),
       stop_count: stopCount.get(t.id) ?? 0,
       member_count: memberCount.get(t.id) ?? 0,
       crew_counts: countTripCrew((members ?? []).filter((m) => m.trip_id === t.id)),
@@ -195,7 +198,7 @@ export async function loadTripFull(
   const stops = (stopsRes.data ?? []) as TripStop[];
   const tour_plans = summarizeTourPlans(tourPlans, days);
   return {
-    trip,
+    trip: { ...trip, status: classifyTripStatus(trip.start_date, trip.end_date) },
     stops,
     members: ((membersRes.data ?? []) as TripMember[]).map((m) => ({
       ...m, invite_token: m.status === "invited" ? m.invite_token : null,
@@ -210,6 +213,7 @@ export async function loadTripFull(
   };
 }
 
+/** Date-based status on the UTC calendar; the stored status can be stale. */
 export function classifyTripStatus(
   startISO: string,
   endISO: string,

@@ -29,20 +29,31 @@ export default function TripsHomePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch("/api/v1/trips")
-      .then(async (res) => {
+    let pending: AbortController | null = null;
+    const load = async () => {
+      pending?.abort();
+      const controller = new AbortController();
+      pending = controller;
+      try {
+        const res = await fetch("/api/v1/trips", { signal: controller.signal });
         if (!res.ok) throw new Error(`Failed (${res.status})`);
-        return res.json();
-      })
-      .then((data: { trips: TripSummary[] }) => {
-        if (!cancelled) setTrips(data.trips);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Unknown error");
-      });
+        const data: { trips: TripSummary[] } = await res.json();
+        if (controller.signal.aborted) return;
+        setTrips(data.trips);
+        setError(null);
+      } catch (err) {
+        if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "Unknown error");
+      }
+    };
+    // The API recalculates statuses, including after a trip's end date passes.
+    const onReturn = () => { if (document.visibilityState === "visible") void load(); };
+    void load();
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
     return () => {
-      cancelled = true;
+      pending?.abort();
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
     };
   }, []);
 
