@@ -163,10 +163,14 @@ describe("Trip day page", () => {
     await renderPage();
 
     await user.click(await screen.findByRole("button", { name: "Hike" }));
-    expect(screen.getByRole("button", { name: "Run" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Run" })).toHaveAttribute("aria-disabled", "true");
+    // aria-disabled, not disabled, so focus stays on the chip that was used.
+    expect(screen.getByRole("button", { name: "Hike" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    expect(saves).toBe(1);
 
     await act(async () => finishFirstSave());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Run" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Run" })).not.toHaveAttribute("aria-disabled"));
     await user.click(screen.getByRole("button", { name: "Run" }));
 
     await waitFor(() =>
@@ -256,15 +260,18 @@ describe("Trip day page", () => {
     await renderPage();
 
     await user.click(await screen.findByRole("button", { name: "Shell" }));
-    expect(screen.getByRole("button", { name: "Gloves" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Gloves" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: "Shell" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Gloves" }));
+    expect(saves).toBe(1);
 
     await act(async () => finishFirstSave());
     await waitFor(() => expect(finishReload).not.toBeNull());
     // Saved, but the trip is still reloading.
-    expect(screen.getByRole("button", { name: "Gloves" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Gloves" })).toHaveAttribute("aria-disabled", "true");
 
     await act(async () => finishReload?.());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Gloves" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Gloves" })).not.toHaveAttribute("aria-disabled"));
     await user.click(screen.getByRole("button", { name: "Gloves" }));
 
     await waitFor(() =>

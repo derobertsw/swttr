@@ -52,6 +52,9 @@ import type { TripEffort, TripKitState, TripMember, TripMemberDayKit, TripPlace,
 const KIT_SLOTS = ["shirt", "midlayer", "jacket", "shell", "pants", "gloves"] as const;
 const EFFORT_OPTIONS: TripEffort[] = ["easy", "steady", "hard"];
 const KIT_STATE_LABEL: Record<TripKitState, string> = { ok: "OK", warn: "Needs help", missing: "Missing" };
+// Dims a control that ignores taps while a save runs. aria-disabled, unlike
+// disabled, keeps a keyboard user's focus on the control they used.
+const savingClassName = "aria-disabled:cursor-progress aria-disabled:opacity-50";
 
 /** The saved day plan, including access, conditions, crew kits and touring notes. */
 export default function DayDetailPage({
@@ -531,9 +534,10 @@ function ActivityPicker({
     return Array.from(set);
   }, [suggested, current]);
 
-  // The chips are disabled from a tap until the save and the reload after it
-  // finish. Saves never overlap, so `current` is still the saved activity if
-  // this one fails.
+  // The chips ignore taps from a tap until the save and the reload after it
+  // finish. They're aria-disabled, not disabled, so the tapped chip keeps
+  // keyboard focus. Saves never overlap, so `current` is still the saved
+  // activity if this one fails.
   const setActivity = async (next: string | null) => {
     setValue(next);
     setSaving(true);
@@ -562,10 +566,10 @@ function ActivityPicker({
             <button
               key={a}
               type="button"
-              onClick={() => setActivity(on ? null : a)}
-              disabled={saving}
+              onClick={() => { if (!saving) void setActivity(on ? null : a); }}
+              aria-disabled={saving || undefined}
               aria-pressed={on}
-              className={chipClassName}
+              className={cn(chipClassName, savingClassName)}
             >
               {a}
               {fromStop && !on && <span className="text-muted-foreground">·</span>}
@@ -663,9 +667,9 @@ function EditableMemberKitRow({
     setState(kit?.state ?? "ok");
   }
 
-  // The row's controls are disabled from a tap until the save and the reload
-  // after it finish. Saves never overlap, so `kit` is still the saved kit if
-  // this one fails.
+  // The row's controls ignore taps from a tap until the save and the reload
+  // after it finish, aria-disabled like the activity chips. Saves never
+  // overlap, so `kit` is still the saved kit if this one fails.
   const persist = async (next: {
     effort?: TripEffort;
     items?: string[];
@@ -727,12 +731,13 @@ function EditableMemberKitRow({
               key={opt}
               type="button"
               onClick={() => {
+                if (saving) return;
                 setEffort(opt);
                 persist({ effort: opt });
               }}
-              disabled={saving}
+              aria-disabled={saving || undefined}
               aria-pressed={effort === opt}
-              className={segmentedItemClassName}
+              className={cn(segmentedItemClassName, savingClassName)}
             >
               {sentenceCase(opt)}
             </button>
@@ -747,10 +752,10 @@ function EditableMemberKitRow({
             <button
               key={slot}
               type="button"
-              onClick={() => toggleItem(slot)}
-              disabled={saving}
+              onClick={() => { if (!saving) toggleItem(slot); }}
+              aria-disabled={saving || undefined}
               aria-pressed={on}
-              className={chipClassName}
+              className={cn(chipClassName, savingClassName)}
             >
               <GarmentGlyph kind={slot} />
               {sentenceCase(slot)}
@@ -767,11 +772,13 @@ function EditableMemberKitRow({
           variant="outline"
           size="sm"
           onClick={() => {
+            if (saving) return;
             const next: TripKitState = state === "warn" ? "ok" : "warn";
             setState(next);
             persist({ state: next });
           }}
-          disabled={saving}
+          aria-disabled={saving || undefined}
+          className={savingClassName}
         >
           Flag {state === "warn" ? "ok" : "warn"}
         </Button>
