@@ -2,8 +2,10 @@ import { useSyncExternalStore } from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { tripMapFixture } from "@/test/tripMap";
-import type { TripMap } from "@/types/trip-map";
+import { driveTrip } from "@/test/driveTrip";
+import { fakeTripApi, reply } from "@/test/tripApi";
+import { storedDrive, tripMapFixture } from "@/test/tripMap";
+import type { TripMap, TripMapDay } from "@/types/trip-map";
 import { TripMapView } from "./TripMapView";
 
 const canvas = vi.hoisted(() => ({ props: null as unknown as Record<string, unknown>, crash: false }));
@@ -174,5 +176,134 @@ describe("Synchronized trip map and accessible list", () => {
     await new Promise((resolve) => requestAnimationFrame(resolve));
     expect(screen.getByRole("heading", { name: "Place list" })).toHaveFocus();
     expect(screen.queryByRole("link", { name: "Edit in trip plan" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Selected day logistics in the map (#234)", () => {
+  const SAT = "2027-01-09", SUN = "2027-01-10";
+  const geometryUrl = (date: string) => `GET /api/v1/trips/trip-drive/days/${date}/geometry`;
+  const dayOf = (map: TripMap, date: string) => map.days.find((entry) => entry.date === date)!;
+  const LINE = [[[-72.7262, 44.4875], [-72.75, 44.55], [-72.7837, 44.587]]];
+  const road = (day: TripMapDay, state: "available" | "unavailable" = "available") => ({
+    trip_id: "trip-drive", day_id: day.id, date: day.date, revision: day.geometry.revision, mode: "drive",
+    origin_place_id: day.origin_place_id, access_place_id: day.access_place_id,
+    ...(state === "available" ? { state, geometry: { type: "MultiLineString", coordinates: LINE }, provider: "geoapify", calculated_at: "2027-01-07T12:00:00Z", attribution: [] } : { state, geometry: null }),
+  });
+
+  it("lists the day's roles in order, focuses the drive and draws only its returned road line", async () => {
+    nativePush({}, "", `${path}?date=${SUN}`);
+    const day = dayOf(data, SUN);
+    const api = fakeTripApi({ [geometryUrl(SUN)]: reply(200, road(day)) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup(); view();
+    expect(screen.getByRole("region", { name: /Sun Jan 10/ })).toHaveTextContent("Starting fromStowe Motel");
+    expect(within(screen.getByRole("list", { name: "Itinerary places" })).getAllByRole("button").map((row) => row.querySelector("span")!.textContent))
+      .toEqual(["● Starting from · Stowe Motel", "◆ Access · Smuggs lot", "▲ Destination · Smugglers' Notch, Vermont", "⌂ Staying tonight · Village Inn"]);
+    expect(canvas.props).toMatchObject({ day: { date: SUN }, route: null, focusIds: null });
+    expect(api).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Show drive" }));
+    expect(canvas.props.focusIds).toEqual([day.origin_place_id, day.access_place_id]);
+    expect(api).toHaveBeenCalledOnce();
+    expect(api.mock.calls[0][0]).toBe(`/api/v1/trips/trip-drive/days/${SUN}/geometry?revision=${day.geometry.revision}`);
+    await waitFor(() => expect(canvas.props.route).toEqual(LINE));
+    expect(screen.getByText("Road route line: Stowe Motel → Smuggs lot, by car, one way.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Show drive" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Show whole day" }));
+    expect(canvas.props.focusIds).toBeNull();
+    expect(canvas.props.route).toEqual(LINE);
+    await user.click(screen.getByRole("button", { name: "Show drive" }));
+    expect(api).toHaveBeenCalledOnce();
+
+    await user.selectOptions(screen.getByLabelText("Trip dates"), SAT);
+    expect(canvas.props).toMatchObject({ day: { date: SAT }, route: null, focusIds: null });
+    expect(api).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a known estimate when the route line is unavailable and retries only on request", async () => {
+    const full = driveTrip();
+    data = await tripMapFixture(full, { rows: [storedDrive(full, SAT, "2027-01-07T12:00:00Z")], now: Date.parse("2027-01-07T12:00:00Z") });
+    nativePush({}, "", `${path}?date=${SAT}`);
+    const api = fakeTripApi({ [geometryUrl(SAT)]: reply(200, road(dayOf(data, SAT), "unavailable")) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup(); view();
+    await user.click(screen.getByRole("button", { name: "Show drive" }));
+    expect(await screen.findByText(/Route line unavailable\. The day's drive details still apply\./)).toBeVisible();
+    expect(screen.getByRole("region", { name: /Sat Jan 9/ })).toHaveTextContent("About 30 min drive to Spruce Peak lot · 15 mi · one way");
+    expect(canvas.props.route).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Retry route line" }));
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+  });
+
+  it("removes the old line at once when the drive's endpoints change and ignores the late answer", async () => {
+    nativePush({}, "", `${path}?date=${SUN}`);
+    const before = dayOf(data, SUN);
+    let finish!: (value: ReturnType<typeof reply>) => void;
+    const api = fakeTripApi({ [geometryUrl(SUN)]: () => new Promise((resolve) => { finish = resolve; }) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup(); const result = view();
+    await user.click(screen.getByRole("button", { name: "Show drive" }));
+    expect(screen.getByText("Loading the road route line…")).toBeVisible();
+    // The organizer moved the access point in its editor; the refreshed map has a new route revision.
+    const edited = structuredClone(data);
+    Object.assign(dayOf(edited, SUN).geometry, { revision: "b".repeat(64) });
+    result.rerender(<TripMapView data={edited} canEdit={false} />);
+    await act(async () => { finish(reply(200, road(before))); });
+    expect(canvas.props.route).toBeNull();
+    expect(screen.getByText(/The road route line isn't loaded\./)).toBeVisible();
+  });
+
+  it("drops a loaded line when a refresh finds no road route for the same pair", async () => {
+    nativePush({}, "", `${path}?date=${SUN}`);
+    const api = fakeTripApi({ [geometryUrl(SUN)]: reply(200, road(dayOf(data, SUN))) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup(); const result = view();
+    await user.click(screen.getByRole("button", { name: "Show drive" }));
+    await waitFor(() => expect(canvas.props.route).toEqual(LINE));
+    // Same endpoints and route revision; the refreshed estimate is now an explicit no-route answer.
+    const refreshed = structuredClone(data);
+    const sunday = dayOf(refreshed, SUN);
+    Object.assign(sunday, { drive: { ...sunday.drive, state: "no_route", directions: null }, geometry: { ...sunday.geometry, state: "not_applicable", reason: "drive_not_ready" } });
+    result.rerender(<TripMapView data={refreshed} canEdit={false} />);
+    expect(canvas.props.route).toBeNull();
+    expect(screen.getByText(/No road route found, so no line is drawn\./)).toBeVisible();
+    expect(screen.queryByText(/Road route line:/)).not.toBeInTheDocument();
+    expect(api).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the day, place, drive focus and line across a refresh after returning from directions", async () => {
+    nativePush({}, "", `${path}?date=${SUN}&place=stay%3Astay-motel%3Alocation`);
+    const api = fakeTripApi({ [geometryUrl(SUN)]: reply(200, road(dayOf(data, SUN))) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup(); const result = view();
+    await user.click(screen.getByRole("button", { name: "Show drive" }));
+    await waitFor(() => expect(canvas.props.route).toEqual(LINE));
+    expect(screen.getByRole("link", { name: /Directions to Smuggs lot from Stowe Motel/ })).toHaveAttribute("target", "_blank");
+    // The map page reloads its snapshot on focus; an unchanged pair keeps its line.
+    act(() => window.dispatchEvent(new Event("focus")));
+    result.rerender(<TripMapView data={structuredClone(data)} canEdit={false} />);
+    expect(window.location.search).toBe(`?date=${SUN}&place=stay%3Astay-motel%3Alocation`);
+    expect(screen.getByRole("heading", { name: /Starting from · Stowe Motel/ })).toBeVisible();
+    expect(canvas.props).toMatchObject({ route: LINE, focusIds: [dayOf(data, SUN).origin_place_id, dayOf(data, SUN).access_place_id] });
+    expect(api).toHaveBeenCalledOnce();
+  });
+
+  it("offers no drive focus on a no-drive day or offline, while the logistics stay readable", async () => {
+    Object.assign(dayOf(data, SAT), { drive: { ...dayOf(data, SAT).drive, state: "no_drive", directions: null }, geometry: { ...dayOf(data, SAT).geometry, state: "not_applicable", reason: "drive_not_ready" } });
+    nativePush({}, "", `${path}?date=${SAT}`);
+    const result = view();
+    expect(screen.queryByRole("button", { name: "Show drive" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show whole day" })).toBeVisible();
+    expect(screen.getByRole("region", { name: /Sat Jan 9/ })).toHaveTextContent("No drive planned");
+    result.unmount();
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+    nativePush({}, "", `${path}?date=${SUN}`);
+    view();
+    expect(screen.getByRole("heading", { name: "Map needs a connection" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Show drive" })).toBeDisabled();
+    expect(screen.getByRole("region", { name: /Sun Jan 10/ })).toHaveTextContent("Staying tonightVillage Inn");
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    act(() => window.dispatchEvent(new Event("online")));
   });
 });

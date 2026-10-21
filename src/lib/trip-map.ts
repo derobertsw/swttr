@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { drivePlans } from "@/lib/trip-drive";
 import { supabaseDriveStore, tripDriveEstimates } from "@/lib/trip-drive-estimates";
+import { TOUR_ACTIVITY } from "@/lib/trip-activities";
 import { buildLodging, dateLabel, loadLodging } from "@/lib/trip-lodging";
 import { accessPointFor } from "@/lib/trip-location";
 import { loadTourPlans, summarizeTourPlans } from "@/lib/trip-tour-plans";
@@ -89,7 +90,10 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
     const crewStayId = crewStay ? add({ type: "stay", id: crewStay.id, slot: "location" }, crewStay.name, crewStay.location, "stay", visit) : null;
     const tonight = lodging.stays.find((stay) => stay.id === context.tonight_stay_id);
     const tonightId = tonight ? add({ type: "stay", id: tonight.id, slot: "location" }, tonight.name, tonight.location, "stay", visit) : null;
-    const tour = full.tour_plans?.find((entry) => entry.trip_day_id === id);
+    // The Day page's activity: the day's own, or its stop's first. A saved tour
+    // plan is in use only on a touring day; otherwise it's kept but not planned (#210).
+    const activity = day?.activity ?? stop?.activities[0] ?? null;
+    const tour = activity === TOUR_ACTIVITY ? full.tour_plans?.find((entry) => entry.trip_day_id === id) : undefined;
     const drive = estimates.days.find((entry) => entry.date === plan.date);
     if (!drive) throw new Error("Missing map drive state");
     // Reject invalid coordinates before offering external navigation, even for legacy/corrupt rows.
@@ -98,14 +102,15 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
     const routeRevision = plan.route_key ? revision({ trip_id: full.trip.id, day_id: id, date: plan.date, origin_place_id: originId, access_place_id: accessId, route_key: plan.route_key }) : null;
     const geometryEligible = plan.state === "ready" && validEndpoints && safeDrive.state !== "no_route";
     const result = {
-      id, date: plan.date, date_label: dateLabel(plan.date), activity: day?.activity ?? null,
+      id, date: plan.date, date_label: dateLabel(plan.date), activity,
       destination_place_id: destinationId, origin_place_id: originId, access_place_id: accessId, tonight_place_id: tonightId,
       crew_stay_place_id: crewStayId,
       meeting_place_id: tour ? accessId : null,
       starting_from: plan.origin?.label ?? "Not set", staying_tonight: context.staying_tonight,
       tonight_status: lodging.nights.find((night) => night.date === plan.date)?.status ?? "unplanned",
       pickup: { place_id: null, state: tour?.pickup_notes ? "notes_only" : "not_set", notes: tour?.pickup_notes ?? null },
-      tour: tour ? { objective: tour.objective, route_url: tour.route_url, meet_label: tour.meet_label, time_zone_label: tour.time_zone_label, access_notes: tour.access_notes } : null,
+      tour: tour ? { objective: tour.objective, route_url: tour.route_url, meet_label: tour.meet_label, time_zone_label: tour.time_zone_label,
+        access_notes: tour.access_notes, approach_notes: tour.approach_notes } : null,
       drive: { ...safeDrive, source: safeDrive.state === "manual" ? "manual" : safeDrive.estimate || safeDrive.state === "no_route" ? "geoapify" : null },
       geometry: { state: geometryEligible ? "unavailable" : "not_applicable",
         reason: geometryEligible ? "not_requested" : "drive_not_ready",

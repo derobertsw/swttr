@@ -34,6 +34,7 @@ export interface TripMapDay {
   id: string;
   date: string;
   date_label: string;
+  /** As the Day page shows it: the day's own activity, or its destination's first. */
   activity: string | null;
   revision: string;
   destination_place_id: string | null;
@@ -47,7 +48,8 @@ export interface TripMapDay {
   tonight_status: "assigned" | "no_stay" | "unplanned";
   /** #210 currently has free text only; there is no separately mappable pickup. */
   pickup: { place_id: null; state: "notes_only" | "not_set"; notes: string | null };
-  tour: { objective: string; route_url: string | null; meet_label: string | null; time_zone_label: string | null; access_notes: string | null } | null;
+  /** approach_notes is the organizer's ski/walk approach as entered: never a calculated route or time. */
+  tour: { objective: string; route_url: string | null; meet_label: string | null; time_zone_label: string | null; access_notes: string | null; approach_notes: string | null } | null;
   drive: TripDriveDay & { source: "geoapify" | "manual" | null };
   geometry: TripMapGeometry;
 }
