@@ -30,9 +30,16 @@ describe("Invitation states and account recovery", () => {
     vi.stubGlobal("fetch", fakeTripApi({ [`GET ${endpoint}`]: reply(200, preview) }));
     await renderPage();
     expect(await screen.findByText("sam@example.test")).toBeInTheDocument();
+    expect(screen.getByText("Alex added you as “Sam”.")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Accept invitation" })).toBeEnabled();
     await userEvent.click(screen.getByRole("button", { name: "Switch account" }));
     expect(auth.signOut).toHaveBeenCalledWith({ redirectUrl: "/trips/invite/invite-sam" });
+  });
+
+  it("says the organizer added the invitee when the invitation doesn't name them", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({ [`GET ${endpoint}`]: reply(200, { ...preview, organizer_name: null }) }));
+    await renderPage();
+    expect(await screen.findByText("The organizer added you as “Sam”.")).toBeInTheDocument();
   });
 
   it("preserves the intended invitation for both sign-in and sign-up", async () => {

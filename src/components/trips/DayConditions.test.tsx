@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DayConditions } from "./DayConditions";
-import { fakeTripApi, ORGANIZER, reply, sentBodies, TRIP, tripFull } from "@/test/tripApi";
+import { fakeTripApi, ORGANIZER, ORGANIZER_TO_CREW, reply, sentBodies, TRIP, tripFull } from "@/test/tripApi";
 import type { TripConditionsReview, TripDayConditionsSource, TripFull, TripMember } from "@/types/trips";
 
 const DATE = "2026-10-10";
@@ -24,9 +24,11 @@ const source = (extra: Partial<TripDayConditionsSource> = {}): TripDayConditions
   reviews: [], ...extra,
 });
 const onSaved = vi.fn().mockResolvedValue(undefined);
-const data = (conditions: TripDayConditionsSource[] = []): TripFull => tripFull({ days: DAYS, members: [ORGANIZER, SAM, ALEX], conditions });
+/** The trip as `userId` gets it from the trip API. */
+const data = (conditions: TripDayConditionsSource[], userId: string | null): TripFull =>
+  tripFull({ days: DAYS, members: [userId === ORGANIZER.user_id ? ORGANIZER : ORGANIZER_TO_CREW, SAM, ALEX], conditions });
 function renderConditions({ conditions = [] as TripDayConditionsSource[], activity = "Backcountry" as string | null, userId = "user-1" as string | null } = {}) {
-  return render(<DayConditions data={data(conditions)} date={DATE} dateLabel="Sat Oct 10" activity={activity} userId={userId} onSaved={onSaved} />);
+  return render(<DayConditions data={data(conditions, userId)} date={DATE} dateLabel="Sat Oct 10" activity={activity} userId={userId} onSaved={onSaved} />);
 }
 
 describe("Day conditions", () => {
@@ -112,7 +114,7 @@ describe("Day conditions", () => {
     const user = userEvent.setup();
     const view = renderConditions({ activity: "Alpine", conditions: [source()] });
     onSaved.mockImplementationOnce(async () => {
-      view.rerender(<DayConditions data={data([])} date={DATE} dateLabel="Sat Oct 10" activity="Alpine" userId="user-1" onSaved={onSaved} />);
+      view.rerender(<DayConditions data={data([], "user-1")} date={DATE} dateLabel="Sat Oct 10" activity="Alpine" userId="user-1" onSaved={onSaved} />);
     });
     await user.click(screen.getByRole("button", { name: "Edit source Mount Washington Avalanche Center" }));
     await user.click(screen.getByRole("button", { name: "Remove from this day" }));
@@ -168,9 +170,9 @@ describe("Day conditions", () => {
     ] })] });
     expect(screen.getByText("No review recorded")).toBeInTheDocument();
     expect(screen.getByText("Your reviews: 0 of 1 recorded for Saturday")).toBeInTheDocument();
-    expect(screen.getByText(/The organizer recorded a review/)).not.toBeVisible();
+    expect(screen.getByText(/Organizer recorded a review/)).not.toBeVisible();
     await user.click(screen.getByText("Crew reviews (2)"));
-    expect(screen.getByText(/The organizer recorded a review/)).toBeVisible();
+    expect(screen.getByText(/^Organizer recorded a review/)).toBeVisible();
     expect(screen.getByText("Wind slab on the headwall")).toBeVisible();
     expect(screen.getByText(/Alex withdrew their review/)).toBeVisible();
     await user.click(screen.getByText("Alex's review history"));
@@ -225,7 +227,7 @@ describe("Day conditions", () => {
     const user = userEvent.setup();
     const view = renderConditions({ userId: "user-2", conditions: [source()] });
     onSaved.mockImplementationOnce(async () => {
-      view.rerender(<DayConditions data={data([source({ context_key: "key-2" })])} date={DATE} dateLabel="Sat Oct 10" activity="Backcountry" userId="user-2" onSaved={onSaved} />);
+      view.rerender(<DayConditions data={data([source({ context_key: "key-2" })], "user-2")} date={DATE} dateLabel="Sat Oct 10" activity="Backcountry" userId="user-2" onSaved={onSaved} />);
     });
     await user.click(screen.getByRole("button", { name: /Record my review/ }));
     await user.type(screen.getByLabelText("Note (optional)"), "Checked at 6");

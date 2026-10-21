@@ -23,10 +23,12 @@ const rpc = vi.fn();
 const post = (body: unknown) => POST(new NextRequest("http://localhost/api/v1/trips/trip-1/itinerary", { method: "POST", body: JSON.stringify(body) }), { params: Promise.resolve({ id: TRIP.id }) });
 const previewOf = async (body: object) => await (await post({ ...body, preview: true })).json() as TripItineraryPreview;
 
+let tables: { trip_member_day_kits: Record<string, unknown>[] } & Record<string, unknown[]>;
+
 describe("Reviewing and saving itinerary changes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    const tables = { trips: [TRIP], trip_stops: [STOWE, JAY], trip_members: [ORGANIZER], trip_days: structuredClone(days), trip_member_day_kits: [], trip_group_gear: [], trip_stays: [], trip_lodging_nights: [] };
+    tables = { trips: [TRIP], trip_stops: [STOWE, JAY], trip_members: [ORGANIZER], trip_days: structuredClone(days), trip_member_day_kits: [], trip_group_gear: [], trip_stays: [], trip_lodging_nights: [] };
     const supabase = { ...createFakeSupabase(tables as unknown as Parameters<typeof createFakeSupabase>[0]), rpc } as unknown as SupabaseClient;
     vi.mocked(requireTripAccess).mockResolvedValue({ supabase, userId: "user-2", trip: TRIP });
     rpc.mockResolvedValue({ data: { action: "assign_days" }, error: null });
@@ -67,6 +69,12 @@ describe("Reviewing and saving itinerary changes", () => {
         { date: "2026-10-10", stop_id: null, activity: "Ski touring" }, { date: "2026-10-12", stop_id: STOWE.id, activity: null },
       ] },
     }]);
+  });
+
+  it("names the organizer's kit for a member reviewing the change", async () => {
+    tables.trip_member_day_kits.push({ id: "kit-organizer", trip_day_id: "day-10", trip_member_id: ORGANIZER.id, effort: "steady", items: ["shell"], note: null, state: "ok", updated_at: TRIP.updated_at });
+    const preview = await previewOf({ action: "set_day_place", date: "2026-10-10", place: BURLINGTON });
+    expect(preview.options[0].changes[0].notes).toEqual(["Kept as saved for the old plan: Organizer's checklist."]);
   });
 
   it("rejects a change it can't review", async () => {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { jsonError, readJson } from "@/lib/api";
 import { parseTripSettings, previewDateChange } from "@/lib/trip-dates";
 import { isCalendarDate } from "@/lib/trip-lodging";
-import { requireTripAccess, classifyTripStatus, loadTripFull } from "@/lib/trips";
+import { requireTripAccess, classifyTripStatus, loadTripFull, tripFullFor } from "@/lib/trips";
 import type { Trip, TripDateChangePreview } from "@/types/trips";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -23,10 +23,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   try {
     const full = await loadTripFull(supabase, auth.trip);
     if (!full) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (auth.userId !== auth.trip.owner_user_id) {
-      full.members = full.members.map((m) => ({ ...m, invite_token: null }));
-    }
-    return NextResponse.json(full);
+    return NextResponse.json(tripFullFor(full, auth.userId));
   } catch {
     return NextResponse.json({ error: "Couldn't load the trip. Try again." }, { status: 500 });
   }
@@ -58,7 +55,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
 
   const preview = async () => {
     const full = await loadTripFull(supabase, id);
-    return full && previewDateChange(full, start, end);
+    return full && previewDateChange(tripFullFor(full, userId), start, end);
   };
   let reviewed: TripDateChangePreview | null;
   try {
