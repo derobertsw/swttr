@@ -213,6 +213,26 @@ export async function loadTripFull(
   };
 }
 
+/** The name create_trip_draft (016) gives the organizer's member row, for their own view. */
+export const ORGANIZER_OWN_NAME = "You";
+
+/**
+ * The trip as `userId` sees it. Only the organizer sees invitation links, or
+ * their own row named "You"; to everyone else, until the organizer renames
+ * it, that row is "Organizer".
+ */
+export function tripFullFor(full: TripFull, userId: string): TripFull {
+  if (userId === full.trip.owner_user_id) return full;
+  return {
+    ...full,
+    members: full.members.map((m) => ({
+      ...m,
+      invite_token: null,
+      display_name: m.role === "organizer" && m.display_name === ORGANIZER_OWN_NAME ? "Organizer" : m.display_name,
+    })),
+  };
+}
+
 /** Date-based status on the UTC calendar; the stored status can be stale. */
 export function classifyTripStatus(
   startISO: string,

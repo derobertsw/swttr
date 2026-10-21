@@ -29,6 +29,9 @@ export const ORGANIZER: TripMember = {
   created_at: "2026-09-28T00:00:00Z",
 };
 
+/** The organizer as the trip API sends them to everyone else on the trip. */
+export const ORGANIZER_TO_CREW: TripMember = { ...ORGANIZER, display_name: "Organizer" };
+
 export const SAM: TripMember = {
   id: "member-sam",
   trip_id: TRIP.id,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 import { getAuthUserId } from "@/lib/auth";
+import { ORGANIZER_OWN_NAME } from "@/lib/trips";
 
 type RouteContext = { params: Promise<{ token: string }> };
 const unavailable = () => NextResponse.json({ state: "unavailable", error: "This invitation is unavailable. Ask the organizer for a new link, or check My trips." }, { status: 404, headers: { "Cache-Control": "private, no-store" } });
@@ -44,7 +45,8 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     state: joined ? "joined" : "available",
     invite: { display_name: member.display_name, status: member.status },
     trip: { id: trip.id, name: trip.name, start_date: trip.start_date, end_date: trip.end_date },
-    organizer_name: organizer?.display_name ?? null,
+    // Null while the organizer's row still has the name meant for their own view.
+    organizer_name: organizer && organizer.display_name !== ORGANIZER_OWN_NAME ? organizer.display_name : null,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 

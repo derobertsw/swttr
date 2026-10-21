@@ -30,11 +30,10 @@ const externalLink = "inline-flex min-h-11 items-center text-primary underline";
 /** A time on the viewer's clock, e.g. "Fri Oct 9, 6:12 PM". */
 const when = (iso: string) => format(new Date(iso), "EEE MMM d, h:mm a");
 
-/** Someone else's name on a review. The organizer's member row is named "You", for their own view. */
+/** Someone else's name on a review: the organizer is "Organizer" to the crew, not "You" (see tripFullFor). */
 function reviewerName(data: TripFull, userId: string): string {
   const member = data.members.find((entry) => entry.user_id === userId);
-  if (userId === data.trip.owner_user_id && (!member || member.display_name === "You")) return "The organizer";
-  return member?.display_name ?? "A former crew member";
+  return member?.display_name ?? (userId === data.trip.owner_user_id ? "The organizer" : "A former crew member");
 }
 
 const isCurrent = (review: TripConditionsReview | undefined) => !!review && review.current.action !== "withdrawn";

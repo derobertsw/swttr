@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import {
   ORGANIZER,
+  ORGANIZER_TO_CREW,
   SAM,
   STOWE_STOP,
   TRIP,
@@ -280,7 +281,7 @@ describe("Trip day page", () => {
       })
     );
     // Only the failed gloves change is undone. The saved shell stays.
-    expect(screen.getByText("1 layers picked")).toBeInTheDocument();
+    expect(screen.getByText("1 layer picked")).toBeInTheDocument();
   });
 
   describe("changing the day's location", () => {
@@ -507,8 +508,8 @@ describe("Trip day page", () => {
       id: `kit-${member.id}`, trip_day_id: DAY.id, trip_member_id: member.id, effort: "steady", items: [], note: null,
       state: "ok", updated_at: "2026-10-06T20:01:02Z", outfit: null, outfit_saved_at: null, ...extra,
     });
-    const crewTrip = (kits: TripMemberDayKit[]) => fakeTripApi({
-      "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP], days: [DAY], members: [ORGANIZER, ANA, SAM], kits })),
+    const crewTrip = (kits: TripMemberDayKit[], members = [ORGANIZER, ANA, SAM]) => fakeTripApi({
+      "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP], days: [DAY], members, kits })),
       "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
     });
 
@@ -675,12 +676,13 @@ describe("Trip day page", () => {
       expect(screen.getByText("Needs help")).toBeInTheDocument();
     });
 
-    it("shows a member only their own kit to change", async () => {
+    it("shows a member only their own kit to change, and the organizer's under their name for the crew", async () => {
       mockAuth.userId = "user-2";
-      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit() })]));
+      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit() })], [ORGANIZER_TO_CREW, ANA, SAM]));
       await renderPage();
       expect(await screen.findByRole("group", { name: "Effort for Ana" })).toBeInTheDocument();
-      expect(screen.queryByRole("group", { name: "Effort for You" })).not.toBeInTheDocument();
+      expect(screen.getByText("Organizer")).toBeInTheDocument();
+      expect(screen.queryByText("You")).not.toBeInTheDocument();
       expect(screen.queryByRole("group", { name: "Effort for Sam" })).not.toBeInTheDocument();
       expect(screen.getByText("Outfit saved · Personalized · 6 items")).toBeInTheDocument();
     });

@@ -37,6 +37,12 @@ describe("Invitation lifecycle with synthetic accounts", () => {
     expect(tables.trip_members[1].status).toBe("invited");
   });
 
+  it("names the organizer only once they have a name the invitee would recognize", async () => {
+    expect(await (await GET(request, ctx())).json()).toMatchObject({ organizer_name: null, invite: { display_name: SAM.display_name } });
+    tables.trip_members[0].display_name = "Will";
+    expect(await (await GET(request, ctx())).json()).toMatchObject({ organizer_name: "Will" });
+  });
+
   it("recovers lost success responses and repeated visits without changing the member id or duplicating it", async () => {
     expect(await (await POST(request, ctx())).json()).toEqual({ trip_id: TRIP.id, already_joined: false });
     expect(await (await POST(request, ctx())).json()).toEqual({ trip_id: TRIP.id, already_joined: true });

@@ -6,7 +6,8 @@ import { requireUser } from "@/lib/api";
 import { GET } from "@/app/api/v1/trips/[id]/route";
 import { GET as GET_LIST } from "@/app/api/v1/trips/route";
 import { ORGANIZER, SAM, STOWE_STOP, TRIP } from "@/test/tripApi";
-import { classifyTripStatus, listTripsForUser, loadTripFull } from "./trips";
+import type { TripFull } from "@/types/trips";
+import { classifyTripStatus, listTripsForUser, loadTripFull, tripFullFor } from "./trips";
 
 vi.mock("@/lib/api", async (original) => ({
   ...await original<typeof import("@/lib/api")>(),
@@ -172,6 +173,27 @@ describe("Trip loading", () => {
     expect(result).toMatchObject({ crew_counts: { joined: 1, pending: 1, guests: 0 }, conditions: [] });
     expect(result.members.find((m: { id: string }) => m.id === ORGANIZER.id).invite_token).toBeNull();
     expect(result.members.find((m: { id: string }) => m.id === SAM.id).invite_token).toBe(owner ? SAM.invite_token : null);
+  });
+
+  it.each([
+    ["the organizer", "You", ORGANIZER.user_id!],
+    ["a member", "Organizer", "user-2"],
+  ])("names the organizer's own row for %s as %s", async (_viewer, name, userId) => {
+    vi.useFakeTimers();
+    const { supabase } = database({
+      trips: [{ ...TRIP }], trip_members: [{ ...ORGANIZER }, { ...SAM, user_id: "user-2", status: "joined" }],
+    });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, userId });
+    const pending = GET(new NextRequest(`http://localhost/api/v1/trips/${TRIP.id}`), { params: Promise.resolve({ id: TRIP.id }) });
+    await vi.runAllTimersAsync();
+    const result = await (await pending).json();
+    expect(result.members.map((m: { display_name: string }) => m.display_name)).toEqual([name, SAM.display_name]);
+  });
+
+  it("keeps a name the organizer gave their row, and a guest's name, for everyone", () => {
+    const full = { trip: TRIP, members: [{ ...ORGANIZER, display_name: "Will" }, { ...SAM, role: "guest", status: "guest", user_id: null, display_name: "You" }] } as TripFull;
+    expect(tripFullFor(full, "user-2").members.map((m) => m.display_name)).toEqual(["Will", "You"]);
+    expect(tripFullFor(full, TRIP.owner_user_id)).toBe(full);
   });
 
   it("returns the existing error response when accommodation fails in parallel", async () => {

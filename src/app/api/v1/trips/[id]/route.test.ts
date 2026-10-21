@@ -27,10 +27,10 @@ const tablesWith = (lodging: boolean) => ({
   trip_days: structuredClone(days), trip_member_day_kits: [samKit], trip_group_gear: [],
   trip_stays: lodging ? [hotel] : [], trip_lodging_nights: lodging ? [{ trip_id: TRIP.id, date: "2026-10-10", stay_id: hotel.id, status: "assigned" }] : [],
 });
-const useTables = (lodging = false) => {
+const useTables = (lodging = false, userId = "user-1") => {
   tables = tablesWith(lodging);
   const supabase = { ...createFakeSupabase(tables as unknown as Parameters<typeof createFakeSupabase>[0]), rpc } as unknown as SupabaseClient;
-  vi.mocked(requireTripAccess).mockResolvedValue({ supabase, userId: "user-1", trip: { ...TRIP, lodging_revision: 2 } });
+  vi.mocked(requireTripAccess).mockResolvedValue({ supabase, userId, trip: { ...TRIP, lodging_revision: 2 } });
 };
 
 describe("Changing a trip's name and dates", () => {
@@ -71,6 +71,13 @@ describe("Changing a trip's name and dates", () => {
     expect(preview.lodging_after.stays[0]).toMatchObject({ booking_status: "booked", review_dates: ["2026-10-12"] });
     expect(preview).toMatchObject({ lodging_revision: 2, from: { label: "Sat Oct 10 – Mon Oct 12 · 3 days" }, to: { label: "Sat Oct 10 – Sun Oct 11 · 2 days" } });
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("names the organizer's kit for a member reviewing the change", async () => {
+    useTables(false, "user-2");
+    tables.trip_member_day_kits.push({ ...samKit, id: "kit-organizer", trip_member_id: ORGANIZER.id });
+    const preview = await (await save({ end_date: "2026-10-11", preview: true })).json() as TripDateChangePreview;
+    expect(preview.plans.keep.removed[0].kits).toEqual(["Sam", "Organizer"]);
   });
 
   it("offers moving the plan when the trip keeps its length", async () => {

@@ -86,8 +86,8 @@ function Invitation({ token, account }: { token: string; account: string | null 
         <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
           {result.state === "joined" ? "You've joined this trip" : result.state === "unavailable" ? "Invitation unavailable" : result.state === "failed" ? "Couldn't load invitation" : "You're invited"}
         </h1>
-        {preview?.organizer_name && <p className="mt-1 text-sm text-muted-foreground">
-          {preview.organizer_name} added you as &ldquo;{preview.invite.display_name}&rdquo;.
+        {preview && <p className="mt-1 text-sm text-muted-foreground">
+          {preview.organizer_name ?? "The organizer"} added you as &ldquo;{preview.invite.display_name}&rdquo;.
         </p>}
       </header>
       {result.state === "loading" && <Skeleton className="h-32 w-full rounded-card" />}

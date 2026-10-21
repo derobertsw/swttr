@@ -718,7 +718,7 @@ function EditableMemberKitRow({
               ? "thin — borrow a layer?"
               : items.length === 0
               ? "no kit set"
-              : `${items.length} layers picked`}
+              : `${items.length} ${items.length === 1 ? "layer" : "layers"} picked`}
           </p>
         </div>
         <div

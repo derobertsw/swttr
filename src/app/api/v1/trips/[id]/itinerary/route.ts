@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError, readJson } from "@/lib/api";
 import { parseAccessPointsCheck, parseItineraryEdit, parseItineraryRequest, parseTourPlansCheck, previewItinerary, requestFor, type TourPlansCheck } from "@/lib/trip-itinerary";
-import { loadTripFull, requireTripAccess } from "@/lib/trips";
+import { loadTripFull, requireTripAccess, tripFullFor } from "@/lib/trips";
 import type { TripItineraryRequest } from "@/types/trips";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
 
   const preview = async (change: TripItineraryRequest) => {
     const full = await loadTripFull(supabase, id);
-    return full ? previewItinerary(full, change, userId) : { error: "Not found", status: 404 as const };
+    return full ? previewItinerary(tripFullFor(full, userId), change, userId) : { error: "Not found", status: 404 as const };
   };
 
   const body = await readJson<Record<string, unknown>>(request);
