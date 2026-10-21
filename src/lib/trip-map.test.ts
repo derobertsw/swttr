@@ -202,6 +202,20 @@ describe("Trip map projection", () => {
     expect(map.days[1].crew_stay_place_id).toBe(stayId("stay-motel"));
     expect(map.places.some((entry) => entry.roles.includes("pickup"))).toBe(false);
   });
+  it("uses a saved tour plan only while the day's activity is touring, as the Day page does", async () => {
+    const full = driveTrip();
+    const plan = { id: "tour", trip_id: full.trip.id, trip_day_id: full.days[1].id, objective: "North Ridge", route_url: "https://example.com/tour", meet_time: "08:00", meet_day_offset: 0,
+      return_time: null, time_zone: "America/New_York", revision: 1, updated_at: "2027-01-01T12:00:00Z", access_notes: "Permit required", pickup_notes: "Lower lot", approach_notes: "Skin up" } as TripTourPlan;
+    full.tour_plans = [buildTourPlanSummary(plan, SAT)];
+    full.days[1] = { ...full.days[1], activity: "Alpine" };
+    const inactive = (await mapFor(full)).days[1];
+    expect(inactive).toMatchObject({ activity: "Alpine", tour: null, meeting_place_id: null, pickup: { state: "not_set", notes: null } });
+    // A day without its own activity takes its destination's first, like the Day page header.
+    full.days[1] = { ...full.days[1], activity: null };
+    const inherited = (await mapFor(full)).days[1];
+    expect(inherited).toMatchObject({ activity: "Backcountry", tour: { objective: "North Ridge" }, pickup: { state: "notes_only" } });
+    expect(inherited.meeting_place_id).toBe(inherited.access_place_id);
+  });
   it.each(["stop", "day", "stay", "night", "stop-reference", "night-reference", "tour-reference"])("rejects cross-trip %s sources/references", async (kind) => {
     const full = driveTrip();
     if (kind === "stop") full.stops[0].trip_id = "other";

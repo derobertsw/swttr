@@ -62,9 +62,10 @@ export function TripMapView({ data, canEdit }: { data: TripMap; canEdit: boolean
   const pair = day && [day.origin_place_id, day.access_place_id].every((id) => places.some((place) => place.id === id && place.mapping === "mapped"))
     && DRIVE_PAIR_STATES.has(day.drive.state) ? [day.origin_place_id!, day.access_place_id!] : null;
   const driveFocus = !!pair && driveDate === date;
-  // Only provider geometry for this exact pair and revision; otherwise no line at all.
-  const road = geometry.data?.state === "available" && geometry.data.origin_place_id === day?.origin_place_id
-    && geometry.data.access_place_id === day?.access_place_id ? geometry.data : null;
+  // Only provider geometry for this exact pair and revision, while the day can
+  // still have one: a refreshed no-route keeps the revision but forbids the line.
+  const road = day?.geometry.state === "unavailable" && geometry.data?.state === "available" && geometry.data.origin_place_id === day.origin_place_id
+    && geometry.data.access_place_id === day.access_place_id ? geometry.data : null;
   const groupPlaces = group?.date === date && group.revision === data.revision ? places.filter((place) => group.ids.includes(place.id)) : [];
   const list = useRef<HTMLDivElement>(null);
   const revealSelection = useRef(false);

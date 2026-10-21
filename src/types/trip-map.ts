@@ -34,6 +34,7 @@ export interface TripMapDay {
   id: string;
   date: string;
   date_label: string;
+  /** As the Day page shows it: the day's own activity, or its destination's first. */
   activity: string | null;
   revision: string;
   destination_place_id: string | null;

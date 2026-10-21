@@ -165,4 +165,20 @@ describe("Selected day logistics on the trip map", () => {
     expect(within(card).getByRole("link", { name: "Edit tour plan" })).toHaveAttribute("href", `/trips/trip-drive/days/${SAT}#tour-plan-heading`);
     expect(within(card).getByRole("link", { name: "Edit tonight's stay" })).toHaveAttribute("href", "/trips/trip-drive#stay-stay-motel");
   });
+
+  it("leaves out a saved tour plan that isn't in use after the day changed activity", async () => {
+    const full = driveTrip();
+    const plan = { id: "tour", trip_id: full.trip.id, trip_day_id: full.days[1].id, objective: "North Ridge", route_url: "https://example.com/tour",
+      meet_time: "08:00", meet_day_offset: 0, return_time: null, time_zone: "America/New_York", revision: 1, updated_at: "2027-01-01T12:00:00Z",
+      access_notes: "Permit required at the kiosk", pickup_notes: "Second car at the lower lot", approach_notes: "Skin 40 min up the summer road" } as TripTourPlan;
+    full.tour_plans = [buildTourPlanSummary(plan, SAT)];
+    full.days[1] = { ...full.days[1], activity: "Alpine" };
+    const map = await tripMapFixture(full);
+    const { day, card } = summary(map, SAT);
+    expect(within(card).getByRole("heading")).toHaveTextContent("Sat Jan 9 · Alpine · Stowe, Vermont");
+    for (const term of ["Meet", "Pickup", "Approach (ski or walk)", "Access notes"]) expect(within(card).queryByText(term, { selector: "dt" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("link", { name: /tour route|tour plan/ })).not.toBeInTheDocument();
+    expect(dayRoles(map.places.find((entry) => entry.id === day.access_place_id)!, day)).toEqual(["access"]);
+    expect(within(card).getByRole("link", { name: /Directions to Spruce Peak lot/ })).toBeVisible();
+  });
 });

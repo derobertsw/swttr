@@ -254,6 +254,24 @@ describe("Selected day logistics in the map (#234)", () => {
     expect(screen.getByText(/The road route line isn't loaded\./)).toBeVisible();
   });
 
+  it("drops a loaded line when a refresh finds no road route for the same pair", async () => {
+    nativePush({}, "", `${path}?date=${SUN}`);
+    const api = fakeTripApi({ [geometryUrl(SUN)]: reply(200, road(dayOf(data, SUN))) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup(); const result = view();
+    await user.click(screen.getByRole("button", { name: "Show drive" }));
+    await waitFor(() => expect(canvas.props.route).toEqual(LINE));
+    // Same endpoints and route revision; the refreshed estimate is now an explicit no-route answer.
+    const refreshed = structuredClone(data);
+    const sunday = dayOf(refreshed, SUN);
+    Object.assign(sunday, { drive: { ...sunday.drive, state: "no_route", directions: null }, geometry: { ...sunday.geometry, state: "not_applicable", reason: "drive_not_ready" } });
+    result.rerender(<TripMapView data={refreshed} canEdit={false} />);
+    expect(canvas.props.route).toBeNull();
+    expect(screen.getByText(/No road route found, so no line is drawn\./)).toBeVisible();
+    expect(screen.queryByText(/Road route line:/)).not.toBeInTheDocument();
+    expect(api).toHaveBeenCalledOnce();
+  });
+
   it("keeps the day, place, drive focus and line across a refresh after returning from directions", async () => {
     nativePush({}, "", `${path}?date=${SUN}&place=stay%3Astay-motel%3Alocation`);
     const api = fakeTripApi({ [geometryUrl(SUN)]: reply(200, road(dayOf(data, SUN))) });
