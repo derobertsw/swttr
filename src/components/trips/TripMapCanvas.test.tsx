@@ -3,12 +3,12 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { tripMapFixture } from "@/test/tripMap";
 import TripMapCanvas from "./TripMapCanvas";
 
-const sdk = vi.hoisted(() => ({ map: null as unknown as FakeMap, fail: false, worker: vi.fn() }));
+const sdk = vi.hoisted(() => ({ map: null as unknown as FakeMap, fail: false, worker: vi.fn(), bounds: [] as number[][][] }));
 type Callback = (event?: unknown) => unknown;
 class FakeMap {
   events: Record<string, Callback> = {};
   sources: Record<string, { setData: ReturnType<typeof vi.fn>; getClusterLeaves: ReturnType<typeof vi.fn> }> = {};
-  layers: Array<{ id: string; type: string; paint?: Record<string, unknown> }> = [];
+  layers: Array<{ id: string; type: string; paint?: Record<string, unknown>; before?: string }> = [];
   canvas = document.createElement("canvas");
   dragRotate = { disable: vi.fn() }; touchZoomRotate = { disableRotation: vi.fn() };
   fitBounds = vi.fn(); remove = vi.fn(); resize = vi.fn(); zoomIn = vi.fn(); zoomOut = vi.fn(); addImage = vi.fn();
@@ -16,18 +16,18 @@ class FakeMap {
   getCanvas() { return this.canvas; }
   addSource(id: string) { this.sources[id] = { setData: vi.fn(), getClusterLeaves: vi.fn() }; }
   getSource(id: string) { return this.sources[id]; }
-  addLayer(layer: { id: string; type: string }) { this.layers.push(layer); }
+  addLayer(layer: { id: string; type: string }, before?: string) { this.layers.push({ ...layer, before }); }
 }
 vi.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}));
 vi.mock("maplibre-gl", () => ({
   Map: function () { if (sdk.fail) throw new Error("No WebGL"); sdk.map = new FakeMap(); return sdk.map; },
-  LngLatBounds: class { extend = vi.fn(); }, setWorkerUrl: sdk.worker,
+  LngLatBounds: class { points: number[][]; constructor(start: number[]) { this.points = [start]; sdk.bounds.push(this.points); } extend(point: number[]) { this.points.push(point); } }, setWorkerUrl: sdk.worker,
 }));
 const data = await tripMapFixture();
 const props = () => ({ places: data.places, provider: data.provider, scope: "all", date: "", selectedId: null as string | null, fitRequest: 0, onSelect: vi.fn(), onGroup: vi.fn(), onError: vi.fn() });
 async function loaded() { await act(async () => { sdk.map.events["load:"](); }); }
 beforeEach(() => {
-  sdk.fail = false;
+  sdk.fail = false; sdk.bounds = [];
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(), rect: vi.fn(), arc: vi.fn(), fill: vi.fn(), stroke: vi.fn(), getImageData: () => ({ data: new Uint8ClampedArray(48 * 48 * 4), width: 48, height: 48 }) } as unknown as CanvasRenderingContext2D);
 });
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
@@ -85,5 +85,36 @@ describe("Lazy map canvas", () => {
     view.unmount();
     sdk.fail = true;
     render(<TripMapCanvas {...input} />); expect(input.onError).toHaveBeenCalledTimes(3);
+  });
+
+  it("labels a day's roles and fits the drive's two places only when asked", async () => {
+    const day = data.days.find((entry) => entry.date === "2027-01-10")!;
+    const places = data.places.filter((place) => place.visits.some((visit) => visit.date === day.date));
+    const input = { ...props(), places, date: day.date, day, scope: `trip:${day.date}` };
+    const view = render(<TripMapCanvas {...input} />); await loaded();
+    const features = sdk.map.sources.places.setData.mock.calls.at(-1)?.[0].features;
+    expect(features.find((feature: { properties: { id: string } }) => feature.properties.id === day.origin_place_id).properties).toMatchObject({ role: "origin", label: "Starting from" });
+    // fit() seeds the bounds with the first point, then extends by every point.
+    expect(sdk.bounds.at(-1)!.slice(1)).toHaveLength(places.filter((place) => place.coordinates).length);
+    view.rerender(<TripMapCanvas {...input} focusIds={[day.origin_place_id!, day.access_place_id!]} />);
+    expect(sdk.map.fitBounds).toHaveBeenCalledTimes(2);
+    const coordinates = (id: string | null) => { const found = places.find((place) => place.id === id)!.coordinates!; return [found.longitude, found.latitude]; };
+    expect(sdk.bounds.at(-1)!.slice(1)).toEqual([coordinates(day.origin_place_id), coordinates(day.access_place_id)]);
+    // Background updates keep the user's camera while the drive stays focused.
+    view.rerender(<TripMapCanvas {...input} places={structuredClone(places)} focusIds={[day.origin_place_id!, day.access_place_id!]} />);
+    expect(sdk.map.fitBounds).toHaveBeenCalledTimes(2);
+  });
+  it("adds a road layer beneath the markers only for supplied provider geometry, and clears it", async () => {
+    const input = props(); const view = render(<TripMapCanvas {...input} route={null} />); await loaded();
+    expect(sdk.map.sources.route).toBeUndefined();
+    expect(sdk.map.layers.some((layer) => layer.type === "line")).toBe(false);
+    const line = [[[-72.7262, 44.4875], [-72.7837, 44.587]]];
+    view.rerender(<TripMapCanvas {...input} route={line} />);
+    expect(sdk.map.layers.filter((layer) => layer.type === "line").map((layer) => [layer.id, layer.before])).toEqual([["route-casing", "groups"], ["route", "groups"]]);
+    view.rerender(<TripMapCanvas {...input} route={null} />);
+    expect(sdk.map.sources.route.setData).toHaveBeenLastCalledWith({ type: "FeatureCollection", features: [] });
+    view.rerender(<TripMapCanvas {...input} route={line} />);
+    expect(sdk.map.sources.route.setData).toHaveBeenLastCalledWith({ type: "Feature", geometry: { type: "MultiLineString", coordinates: line }, properties: {} });
+    expect(sdk.map.layers.filter((layer) => layer.type === "line")).toHaveLength(2);
   });
 });

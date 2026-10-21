@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, CloudOff, Loader2, MapPin } from "lucide-react";
@@ -52,6 +52,9 @@ import type { TripEffort, TripKitState, TripMember, TripMemberDayKit, TripPlace,
 const KIT_SLOTS = ["shirt", "midlayer", "jacket", "shell", "pants", "gloves"] as const;
 const EFFORT_OPTIONS: TripEffort[] = ["easy", "steady", "hard"];
 const KIT_STATE_LABEL: Record<TripKitState, string> = { ok: "OK", warn: "Needs help", missing: "Missing" };
+// Dims a control that ignores taps while a save runs. aria-disabled, unlike
+// disabled, keeps a keyboard user's focus on the control they used.
+const savingClassName = "aria-disabled:cursor-progress aria-disabled:opacity-50";
 
 /** The saved day plan, including access, conditions, crew kits and touring notes. */
 export default function DayDetailPage({
@@ -118,6 +121,19 @@ export default function DayDetailPage({
       controller.abort();
     };
   }, [weatherKey, id, date]);
+
+  // Links from the trip map open an editor here, like #getting-there-<date>.
+  // Cold links resolve before the async day plan renders. Those ids are plain
+  // ASCII, so the fragment is matched as is: decoding a malformed one like #%
+  // would throw.
+  const restoredHash = useRef(false);
+  useEffect(() => {
+    if (restoredHash.current || !day || !window.location.hash) return;
+    const target = document.getElementById(window.location.hash.slice(1));
+    if (!target) return;
+    restoredHash.current = true;
+    target.scrollIntoView({ block: "start", behavior: "instant" });
+  }, [day]);
 
   const dateObj = new Date(`${date}T00:00:00`);
   const canCreateDay = !!data && /^\d{4}-\d{2}-\d{2}$/.test(date)
@@ -210,6 +226,10 @@ export default function DayDetailPage({
                 <h3 className="text-sm font-medium text-muted-foreground">Approach (ski or walk)</h3>
                 <p className="mt-1 whitespace-pre-wrap break-words text-base text-foreground">{tourPlan.approach_notes}</p>
               </div>}
+              {/* The map opens on its own page, so My kit stays where it is (#234). */}
+              <Link href={`/trips/${id}/map?date=${encodeURIComponent(date)}&from=day`} className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
+                <MapPin className="size-4" aria-hidden />View day map
+              </Link>
             </DayAccessPoint>
 
             <ActivityPicker
@@ -514,9 +534,10 @@ function ActivityPicker({
     return Array.from(set);
   }, [suggested, current]);
 
-  // The chips are disabled from a tap until the save and the reload after it
-  // finish. Saves never overlap, so `current` is still the saved activity if
-  // this one fails.
+  // The chips ignore taps from a tap until the save and the reload after it
+  // finish. They're aria-disabled, not disabled, so the tapped chip keeps
+  // keyboard focus. Saves never overlap, so `current` is still the saved
+  // activity if this one fails.
   const setActivity = async (next: string | null) => {
     setValue(next);
     setSaving(true);
@@ -545,10 +566,10 @@ function ActivityPicker({
             <button
               key={a}
               type="button"
-              onClick={() => setActivity(on ? null : a)}
-              disabled={saving}
+              onClick={() => { if (!saving) void setActivity(on ? null : a); }}
+              aria-disabled={saving || undefined}
               aria-pressed={on}
-              className={chipClassName}
+              className={cn(chipClassName, savingClassName)}
             >
               {a}
               {fromStop && !on && <span className="text-muted-foreground">·</span>}
@@ -646,9 +667,9 @@ function EditableMemberKitRow({
     setState(kit?.state ?? "ok");
   }
 
-  // The row's controls are disabled from a tap until the save and the reload
-  // after it finish. Saves never overlap, so `kit` is still the saved kit if
-  // this one fails.
+  // The row's controls ignore taps from a tap until the save and the reload
+  // after it finish, aria-disabled like the activity chips. Saves never
+  // overlap, so `kit` is still the saved kit if this one fails.
   const persist = async (next: {
     effort?: TripEffort;
     items?: string[];
@@ -710,12 +731,13 @@ function EditableMemberKitRow({
               key={opt}
               type="button"
               onClick={() => {
+                if (saving) return;
                 setEffort(opt);
                 persist({ effort: opt });
               }}
-              disabled={saving}
+              aria-disabled={saving || undefined}
               aria-pressed={effort === opt}
-              className={segmentedItemClassName}
+              className={cn(segmentedItemClassName, savingClassName)}
             >
               {sentenceCase(opt)}
             </button>
@@ -730,10 +752,10 @@ function EditableMemberKitRow({
             <button
               key={slot}
               type="button"
-              onClick={() => toggleItem(slot)}
-              disabled={saving}
+              onClick={() => { if (!saving) toggleItem(slot); }}
+              aria-disabled={saving || undefined}
               aria-pressed={on}
-              className={chipClassName}
+              className={cn(chipClassName, savingClassName)}
             >
               <GarmentGlyph kind={slot} />
               {sentenceCase(slot)}
@@ -750,11 +772,13 @@ function EditableMemberKitRow({
           variant="outline"
           size="sm"
           onClick={() => {
+            if (saving) return;
             const next: TripKitState = state === "warn" ? "ok" : "warn";
             setState(next);
             persist({ state: next });
           }}
-          disabled={saving}
+          aria-disabled={saving || undefined}
+          className={savingClassName}
         >
           Flag {state === "warn" ? "ok" : "warn"}
         </Button>

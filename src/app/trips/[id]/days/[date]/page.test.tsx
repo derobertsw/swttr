@@ -164,10 +164,14 @@ describe("Trip day page", () => {
     await renderPage();
 
     await user.click(await screen.findByRole("button", { name: "Hike" }));
-    expect(screen.getByRole("button", { name: "Run" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Run" })).toHaveAttribute("aria-disabled", "true");
+    // aria-disabled, not disabled, so focus stays on the chip that was used.
+    expect(screen.getByRole("button", { name: "Hike" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    expect(saves).toBe(1);
 
     await act(async () => finishFirstSave());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Run" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Run" })).not.toHaveAttribute("aria-disabled"));
     await user.click(screen.getByRole("button", { name: "Run" }));
 
     await waitFor(() =>
@@ -257,15 +261,18 @@ describe("Trip day page", () => {
     await renderPage();
 
     await user.click(await screen.findByRole("button", { name: "Shell" }));
-    expect(screen.getByRole("button", { name: "Gloves" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Gloves" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: "Shell" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Gloves" }));
+    expect(saves).toBe(1);
 
     await act(async () => finishFirstSave());
     await waitFor(() => expect(finishReload).not.toBeNull());
     // Saved, but the trip is still reloading.
-    expect(screen.getByRole("button", { name: "Gloves" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Gloves" })).toHaveAttribute("aria-disabled", "true");
 
     await act(async () => finishReload?.());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Gloves" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Gloves" })).not.toHaveAttribute("aria-disabled"));
     await user.click(screen.getByRole("button", { name: "Gloves" }));
 
     await waitFor(() =>
@@ -510,6 +517,49 @@ describe("Trip day page", () => {
     beforeEach(() => {
       vi.useFakeTimers({ toFake: ["Date"], now: Date.parse("2026-10-07T12:00:00Z") });
       sessionStorage.clear();
+    });
+
+    it("opens the day map from Getting there without loading a map above My kit (#234)", async () => {
+      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit(), outfit_saved_at: "2026-10-06T20:01:02Z" })]));
+      await renderPage();
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      const gettingThere = screen.getByRole("heading", { name: "Getting there" }).closest<HTMLElement>('[data-slot="card"]')!;
+      expect(within(gettingThere).getByRole("link", { name: "View day map" })).toHaveAttribute("href", "/trips/trip-1/map?date=2026-10-10&from=day");
+      expect(gettingThere.compareDocumentPosition(myKit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(document.querySelector("canvas")).toBeNull();
+    });
+
+    it("scrolls a cold link from the trip map to the editor it names, once the day renders", async () => {
+      const scroll = vi.fn();
+      const original = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = scroll;
+      window.history.replaceState(null, "", "#getting-there-2026-10-10");
+      try {
+        vi.stubGlobal("fetch", crewTrip([]));
+        await renderPage();
+        await waitFor(() => expect(scroll).toHaveBeenCalledOnce());
+        expect(scroll.mock.contexts[0]).toHaveAttribute("id", "getting-there-2026-10-10");
+      } finally {
+        Element.prototype.scrollIntoView = original;
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    });
+
+    it("ignores a malformed or unrelated fragment instead of failing the day", async () => {
+      const scroll = vi.fn();
+      const original = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = scroll;
+      window.history.replaceState(null, "", "#%E0%A4%A");
+      try {
+        vi.stubGlobal("fetch", crewTrip([]));
+        await renderPage();
+        expect(await screen.findByRole("heading", { name: "Getting there" })).toBeVisible();
+        expect(screen.getByRole("link", { name: "View day map" })).toBeVisible();
+        expect(scroll).not.toHaveBeenCalled();
+      } finally {
+        Element.prototype.scrollIntoView = original;
+        window.history.replaceState(null, "", window.location.pathname);
+      }
     });
 
     it("leads with my saved outfit, as saved, with the outing and forecast it was for", async () => {

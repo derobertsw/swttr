@@ -1,12 +1,13 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
 import { requireUser } from "@/lib/api";
 import { GET } from "@/app/api/v1/trips/[id]/route";
+import { GET as GET_LIST } from "@/app/api/v1/trips/route";
 import { ORGANIZER, SAM, STOWE_STOP, TRIP } from "@/test/tripApi";
 import type { TripFull } from "@/types/trips";
-import { listTripsForUser, loadTripFull, tripFullFor } from "./trips";
+import { classifyTripStatus, listTripsForUser, loadTripFull, tripFullFor } from "./trips";
 
 vi.mock("@/lib/api", async (original) => ({
   ...await original<typeof import("@/lib/api")>(),
@@ -22,14 +23,14 @@ function database(
   delays: Record<string, number> = {},
   failures: string[] = []
 ) {
-  const requests: Array<{ table: string; started: number }> = [];
+  const requests: Array<{ table: string; started: number; method: string }> = [];
   const supabase = createClient("https://example.supabase.co", "test-key", {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
-      fetch: async (input) => {
+      fetch: async (input, init) => {
         const url = new URL(String(input));
         const table = url.pathname.split("/").at(-1)!;
-        requests.push({ table, started: Date.now() });
+        requests.push({ table, started: Date.now(), method: init?.method ?? "GET" });
         await new Promise((resolve) => setTimeout(resolve, delays[table] ?? 100));
         if (failures.includes(table)) {
           return Response.json({ message: "Database unavailable", code: "XX000" }, { status: 500 });
@@ -57,6 +58,7 @@ afterEach(() => {
 describe("Trip loading", () => {
   it("loads an authorized trip in two network stages and preserves its data", async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-20T12:00:00Z"));
     const { supabase, requests } = database({
       trip_days: [day], trip_member_day_kits: [kit], trip_members: [{ ...ORGANIZER }], trip_stops: [{ ...STOWE_STOP }],
     });
@@ -94,6 +96,7 @@ describe("Trip loading", () => {
 
   it("still supports loading by ID, skips kits without days, and handles missing trips", async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-20T12:00:00Z"));
     const { supabase, requests } = database({ trips: [{ ...TRIP }] });
     const pending = loadTripFull(supabase, TRIP.id);
     await vi.runAllTimersAsync();
@@ -109,6 +112,7 @@ describe("Trip loading", () => {
 
   it("parallelizes list lookups while deduplicating owned trips and excluding left memberships", async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-20T12:00:00Z"));
     const shared = { ...TRIP, id: "shared-trip", owner_user_id: "other-user", start_date: "2026-10-09" };
     const left = { ...TRIP, id: "left-trip", owner_user_id: "other-user" };
     const { supabase } = database({
@@ -201,5 +205,108 @@ describe("Trip loading", () => {
     const response = await pending;
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: "Couldn't load the trip. Try again." });
+  });
+});
+
+describe("Date-based trip status", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-20T12:00:00Z"));
+  });
+
+  it.each([
+    ["2026-10-18", "2026-10-19", "past"],
+    ["2026-10-18", "2026-10-20", "live"],
+    ["2026-10-20", "2026-10-22", "live"],
+    ["2026-10-20", "2026-10-20", "live"],
+    ["2026-10-21", "2026-10-21", "next_up"],
+    ["2026-11-03", "2026-11-05", "next_up"],
+    ["2026-11-04", "2026-11-05", "planning"],
+  ])("classifies %s–%s as %s", (start, end, status) => {
+    expect(classifyTripStatus(start, end)).toBe(status);
+  });
+
+  it.each(["planning", "next_up", "live"] as const)("overrides stale %s in both APIs for owners and members without writes", async (status) => {
+    const owned = { ...TRIP, status };
+    const shared = { ...TRIP, id: "shared-trip", owner_user_id: "another-owner", status };
+    const excluded = [
+      { ...shared, id: "left-trip" },
+      { ...shared, id: "private-trip" },
+    ];
+    const tables = {
+      trips: [owned, shared, ...excluded],
+      trip_members: [
+        { ...ORGANIZER },
+        { ...ORGANIZER, id: "shared-member", trip_id: shared.id },
+        { ...ORGANIZER, id: "left-member", trip_id: "left-trip", status: "left" },
+      ],
+      trip_days: [day], trip_member_day_kits: [kit],
+    };
+    const before = structuredClone(tables);
+    const { supabase, requests } = database(tables);
+    vi.mocked(requireUser).mockResolvedValue({ supabase, userId: ORGANIZER.user_id! });
+    const list = GET_LIST();
+    await vi.runAllTimersAsync();
+    expect(await (await list).json()).toMatchObject({ trips: [
+      { id: owned.id, status: "past" }, { id: shared.id, status: "past" },
+    ] });
+
+    for (const trip of [owned, shared, ...excluded]) {
+      const detail = GET(new NextRequest(`http://localhost/api/v1/trips/${trip.id}`), { params: Promise.resolve({ id: trip.id }) });
+      await vi.runAllTimersAsync();
+      const response = await detail;
+      expect(response.status).toBe(excluded.includes(trip) ? 404 : 200);
+      if (response.ok) {
+        expect(await response.json()).toMatchObject({ trip: { ...trip, status: "past" } });
+      }
+    }
+    const full = loadTripFull(supabase, owned);
+    await vi.runAllTimersAsync();
+    expect(await full).toMatchObject({ trip: { ...owned, status: "past" }, days: [day], kits: [kit] });
+    expect(tables).toEqual(before);
+    expect(requests.every((request) => request.method === "GET")).toBe(true);
+  });
+
+  it("keeps all summaries on one calendar date even if reads span UTC midnight", async () => {
+    vi.setSystemTime(new Date("2026-10-20T23:59:59.950Z"));
+    const { supabase } = database({ trips: [
+      { ...TRIP, end_date: "2026-10-20" },
+      { ...TRIP, id: "other-trip", end_date: "2026-10-20" },
+    ] });
+    const pending = listTripsForUser(supabase, ORGANIZER.user_id!);
+    await vi.runAllTimersAsync();
+    const trips = await pending;
+    expect(trips).toHaveLength(2);
+    expect(trips.every((trip) => trip.status === "past")).toBe(true);
+  });
+
+  it("transitions from Live to Past at UTC midnight on the next read", async () => {
+    vi.setSystemTime(new Date("2026-10-20T23:59:59.000Z"));
+    const { supabase } = database({ trips: [{ ...TRIP, end_date: "2026-10-20" }] });
+    const read = async () => {
+      const pending = Promise.all([listTripsForUser(supabase, ORGANIZER.user_id!), loadTripFull(supabase, TRIP.id)]);
+      await vi.runAllTimersAsync();
+      const [trips, full] = await pending;
+      return [trips[0].status, full!.trip.status];
+    };
+    expect(await read()).toEqual(["live", "live"]);
+    vi.setSystemTime(new Date("2026-10-21T00:00:00Z"));
+    expect(await read()).toEqual(["past", "past"]);
+  });
+
+  it("reflects changed dates in both loaders even when the stored status is stale", async () => {
+    const trip = { ...TRIP };
+    const { supabase } = database({ trips: [trip] });
+    for (const [start, end, expected] of [
+      ["2026-10-10", "2026-10-12", "past"],
+      ["2026-10-22", "2026-10-24", "next_up"],
+      ["2026-10-18", "2026-10-19", "past"],
+    ]) {
+      Object.assign(trip, { start_date: start, end_date: end });
+      const pending = Promise.all([listTripsForUser(supabase, ORGANIZER.user_id!), loadTripFull(supabase, TRIP.id)]);
+      await vi.runAllTimersAsync();
+      const [trips, full] = await pending;
+      expect([trips[0].status, full!.trip.status]).toEqual([expected, expected]);
+    }
   });
 });

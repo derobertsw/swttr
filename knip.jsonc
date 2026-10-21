@@ -4,7 +4,7 @@
   "ignore": ["apple/**", "macos/**"],
   // Benchmarks run separately from Vitest's test.include patterns; skill
   // scripts are run directly with node.
-  "entry": ["src/**/*.bench.ts", ".claude/skills/*/scripts/*.mjs", "docs/qa/179-shared-gear/lock-order.mjs", "docs/qa/233-overview-map/preview.mjs", "docs/qa/233-overview-map/preview/*.tsx"],
+  "entry": ["src/**/*.bench.ts", ".claude/skills/*/scripts/*.mjs", "docs/qa/179-shared-gear/lock-order.mjs", "docs/qa/233-overview-map/preview.mjs", "docs/qa/233-overview-map/preview/*.tsx", "docs/qa/234-day-map/preview.mjs", "docs/qa/234-day-map/preview/*.tsx"],
   "ignoreDependencies": [
     // Linked natively by ios/App/CapApp-SPM/Package.swift; never imported from JS.
     "@capacitor/splash-screen",
