@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Settings } from "lucide-react";
@@ -10,6 +10,29 @@ import { BackLink, daysBetween, formatDateRange } from "@/components/trips/trip-
 import { useTripSummary } from "@/hooks/useTrip";
 import { TRIP_SECTIONS, tripLocation, tripSectionHref, type TripSectionId } from "@/lib/trip-sections";
 import { cn } from "@/lib/utils";
+
+const planPathKey = (tripId: string) => `swttr-trip-plan-path:${tripId}`;
+
+/** Plan's own page or one of its days, on this trip. */
+function isPlanPath(path: string, tripId: string) {
+  const location = tripLocation(path, tripId);
+  return location?.section === "plan" && (location.subpath === "" || location.date !== null);
+}
+
+const subscribeNever = () => () => {};
+
+/** The Plan page this tab last showed for the trip, so a reload elsewhere keeps it. */
+function useSavedPlanPath(tripId: string) {
+  return useSyncExternalStore(subscribeNever, () => {
+    try {
+      const saved = window.sessionStorage.getItem(planPathKey(tripId));
+      return saved && isPlanPath(saved, tripId) ? saved : null;
+    } catch {
+      // Storage can be blocked; Plan then remembers only within the page.
+      return null;
+    }
+  }, () => null);
+}
 
 /**
  * Every trip page's frame (#330): the trip's name and dates, then its four
@@ -21,10 +44,20 @@ export function TripWorkspace({ tripId, children }: { tripId: string; children: 
   const location = tripLocation(pathname, tripId);
   const summary = useTripSummary(tripId);
   // Where Plan last was: its own page or a day. Coming back to Plan from
-  // another section returns there, so the selected day isn't lost.
+  // another section returns there, so the selected day isn't lost, and the
+  // tab keeps it across a reload on another section.
   const [planPath, setPlanPath] = useState<string | null>(null);
-  const onPlan = location?.section === "plan" && (location.subpath === "" || location.date !== null);
+  const savedPlanPath = useSavedPlanPath(tripId);
+  const onPlan = isPlanPath(pathname, tripId);
   if (onPlan && planPath !== pathname) setPlanPath(pathname);
+  useEffect(() => {
+    if (!onPlan) return;
+    try {
+      window.sessionStorage.setItem(planPathKey(tripId), pathname);
+    } catch {
+      // Not saved: Plan still returns to it until the page reloads.
+    }
+  }, [onPlan, pathname, tripId]);
   // On Plan's own page the trip's name is the page's title. Elsewhere the
   // page has its own, and the name only says which trip it is.
   const Title = location?.subpath === "" ? "h1" : "p";
@@ -59,7 +92,7 @@ export function TripWorkspace({ tripId, children }: { tripId: string; children: 
           tripId={tripId}
           current={location?.section ?? null}
           currentIsSectionPage={!!location && TRIP_SECTIONS.some((section) => section.path === location.subpath)}
-          planPath={planPath}
+          planPath={planPath ?? savedPlanPath}
         />
         {children}
       </div>

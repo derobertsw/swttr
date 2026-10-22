@@ -13,7 +13,7 @@ Every earlier URL still works and belongs to the section that now holds it (`src
 | Crew | `/trips/:id/manage` | `/rollcall` |
 | Packing | `/trips/:id/pack` | `/gear` (shared gear) |
 
-- Plan, opened from another section, returns to the day it last showed. From inside Plan it opens Plan's own page with every day.
+- Plan, opened from another section, returns to the day it last showed, even after that section reloads (the tab's session storage, per trip). From inside Plan it opens Plan's own page with every day.
 - Stays used to be part of the overview. A link to a stay on the overview, `/trips/:id#stay-<id>` or `#trip-stays-heading`, now opens it in Stays. The map and drive estimates link to Stays directly.
 - **Edit trip** is in the header on every page except the settings it opens. On Plan's own page the trip's name is the page's title (`h1`); on every other page the page has its own title.
 - Packing reads its own endpoint, so it names the trip for the header from that response (`usePublishTripSummary`) rather than loading the whole trip. Once a full-trip read fails and leaves no trip, as lost access does, the header stops naming it.
