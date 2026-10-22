@@ -142,6 +142,23 @@ describe('optional sustained-activity accessories', () => {
     expect(combined.headwear.neckWarmth?.id).toBe('buff');
   });
 
+  it.each(['head-first', 'neck-first'] as const)('matches combined head/neck warmth to the head layer with %s inventory', order => {
+    const t = targets('xc_skiing', -15, 8, 'hard');
+    const head = hat('headband', 0.3, { headwear_type: 'headband' });
+    const neck = hat('buff', 0.3, { headwear_type: 'buff_thin' });
+    const headwear = order === 'head-first' ? [head, neck] : [neck, head];
+    const accessories = selectPhaseAccessories('xc_skiing', t, { handwear: [], headwear }, -15);
+    expect(accessories.assessments?.head.selected_ids).toEqual(['headband', 'buff']);
+    const requirements = buildClothingRequirements('xc_skiing', t, {
+      garments: [], handwear: [], headwear, accessories: accessories.assessments,
+      ownership: { garments: true, handwear: true, headwear: true },
+    });
+    expect(requirements.find(r => r.region === 'head')).toMatchObject({
+      status: 'owned_match', label: 'XC ski hat or headband',
+      matched_garment_id: 'headband', matched_garment_name: 'Test headband', matched_is_owned: true,
+    });
+  });
+
   it.each(['running', 'xc_skiing'] as const)('does not add thermal insulation for warmer air or greater effort (%s)', activity => {
     for (const effort of ['easy', 'moderate', 'hard'] as const) {
       const cloes = [-15, -5, 0, 5, 10, 15].map(temp => {

@@ -75,6 +75,7 @@ function bodyPartStatus(clo: number, minimum: number, target: number): BodyPartE
   return 'in_range';
 }
 
+/** Assess resolved worn layers against phase bands; unknown insulation withholds comfort. */
 export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
   if (!input.itemClo) throw new Error('Evaluation items must be resolved before evaluating');
   const itemClo = input.itemClo;

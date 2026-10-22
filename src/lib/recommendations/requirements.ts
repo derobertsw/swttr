@@ -107,6 +107,7 @@ interface RequirementPool {
   accessories?: AccessoryAssessments;
 }
 
+/** Match phase requirements to suitable items while preserving ownership and gaps. */
 export function buildClothingRequirements(
   activity: string,
   targets: PhaseTargets,
@@ -134,7 +135,10 @@ export function buildClothingRequirements(
   for (const [region, neutral, items, owned] of extremity) {
     const accessory = pool.accessories?.[region];
     if (accessory) {
-      const matched = (region === 'head' ? pool.headwear : items).find(item => accessory.selected_ids.includes(item.id));
+      const selected = (region === 'head' ? pool.headwear : items).filter(item => accessory.selected_ids.includes(item.id));
+      const matched = region === 'head'
+        ? selected.find(item => HEAD_WARMTH_TYPES.includes((item as HeadwearRow).headwear_type)) ?? selected[0]
+        : selected[0];
       const neckOnly = region === 'head' && matched && !HEAD_WARMTH_TYPES.includes((matched as HeadwearRow).headwear_type);
       const label = region === 'hands' && accessory.purpose === 'pole_grip'
         ? 'Thin XC gloves for pole grip and friction protection'

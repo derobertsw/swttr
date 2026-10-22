@@ -24,11 +24,12 @@ export function hoodInsulation(ensemble: GarmentRow[], hasHelmet: boolean): numb
 
 /** Bounded compatibility mapping from existing catalog metadata. A category
  * alone does not prove pole handling; exclude mittens and require dexterity. */
-export function supportsPoleGrip(item: HandwearRow): boolean {
+function supportsPoleGrip(item: HandwearRow): boolean {
   return ['liner_glove', 'light_glove', 'insulated_glove'].includes(item.handwear_type)
     && typeof item.dexterity_score === 'number' && item.dexterity_score >= 5;
 }
 
+/** Only finite nonnegative catalog clo can participate in thermal selection. */
 const knownInsulation = (item: { rcl_clo: number }) =>
   typeof item.rcl_clo === 'number' && Number.isFinite(item.rcl_clo) && item.rcl_clo >= 0;
 
@@ -100,6 +101,7 @@ export function selectPhaseAccessories(
     helmet: null, headWarmth: headChoice?.head ?? null, neckWarmth: headChoice?.neck ?? null,
   };
 
+  /** Separate worn warmth from unresolved inventory or functional protection. */
   function assessment(
     part: 'hands' | 'head', items: Array<HandwearRow | HeadwearRow>, candidates: Array<HandwearRow | HeadwearRow>,
     clo: number, functionalMissing = false,

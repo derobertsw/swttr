@@ -24,6 +24,7 @@ function isTargetMap(value: unknown): boolean {
     EVALUATED_BODY_PARTS.every((part) => isOptionalNumber((value as Record<string, unknown>)[part]));
 }
 
+/** Validate phase inputs and whitelist item references before catalog resolution. */
 function parsePhase(value: unknown): PhaseEvaluationInput | null {
   if (!value || typeof value !== "object") return null;
   const { itemClo, items: metadata, targets, minTargets, arms, targetRange, extremityMaxTargets } = value as Record<string, unknown>;

@@ -270,7 +270,8 @@ graph TD
     BARE --> HEAD[Head plus neck combinations share one budget<br/>Include worn hood insulation<br/>Avoid overlapping neck layers]
     HAND --> STATE[Report selected, not needed,<br/>missing suitable gear, or unknown data<br/>Explain thermal or functional purpose]
     HEAD --> STATE
-    STATE --> EDIT[Manual edits use the same local limits<br/>Catalog data and worn hoods resolved on server<br/>Cold shortfalls and local excess affect comfort]
+    STATE --> MATCH[Head requirements prefer selected head warmth<br/>Neck fallback only when no head layer is selected]
+    MATCH --> EDIT[Manual edits use the same local limits<br/>Catalog data and worn hoods resolved on server<br/>Cold shortfalls and local excess affect comfort]
     MODE -->|No: compatibility policy| LEGACY[Temperature and target selection retained]
     LEGACY --> LHAND[Biking: active glove thresholds<br/>Alpine and touring: static glove thresholds]
     LEGACY --> LHEAD[Head warmth by temperature<br/>Neck layer below freezing]
