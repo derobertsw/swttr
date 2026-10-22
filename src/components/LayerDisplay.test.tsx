@@ -457,6 +457,9 @@ describe("LayerDisplay", () => {
     it('shows unknown comfort without falling back to the original score when regional data is missing', async () => {
       const data = {
         ...mockBiophysicsData,
+        ireq: { ...mockBiophysicsData.ireq, extremity: {
+          min: { hands: 0, head: 0 }, neutral: { hands: 0, head: 0 }, max: { hands: 0.55, head: 0 },
+        } },
         recommendation: {
           ...mockBiophysicsData.recommendation,
           garments: mockBiophysicsData.recommendation.garments.map(garment => ({ ...garment, rcl_torso: undefined })),
@@ -471,6 +474,7 @@ describe("LayerDisplay", () => {
       expect(screen.getByText('Warmth unknown').closest('div')).toHaveTextContent('Upper body');
       const sent = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
       expect(sent.phases[0].itemClo).toBeUndefined();
+      expect(sent.phases[0].extremityMaxTargets).toEqual({ hands: 0.55, headNeck: 0 });
       expect(sent.phases[0].items.torso[0]).toMatchObject({ sourceId: '72ec5159-3cc2-542f-9cde-945471fff950', item_type: 'garment' });
     });
 

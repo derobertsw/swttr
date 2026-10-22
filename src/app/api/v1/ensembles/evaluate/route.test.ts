@@ -115,6 +115,39 @@ describe("POST /api/v1/ensembles/evaluate", () => {
     const { phases: [result] } = await (await post({ phases: [{ ...phase, itemClo: { ...phase.itemClo, torso: [null] } }] })).json();
     expect(result).toMatchObject({ thermal_data_status: 'unknown', decision: null, comfortScore: null });
   });
+
+  it('uses the running accessory limits for manual addition and removal without changing legacy callers', async () => {
+    const input = {
+      ...phase, targets: { ...phase.targets, hands: 0, headNeck: 0 }, arms: { clo: 0.8, target: 0.8 },
+      itemClo: { ...phase.itemClo, hands: [0.6], headNeck: [] },
+    };
+    const { phases: [legacy, running] } = await (await post({ phases: [input,
+      { ...input, extremityMaxTargets: { hands: 0, headNeck: 0 } },
+    ] })).json();
+    expect(legacy.decision.riskType).toBe('comfortable');
+    expect(running.decision.riskType).toBe('overheat');
+    expect(running.bodyParts.hands.status).toBe('over');
+    const { phases: [removed] } = await (await post({ phases: [{ ...input,
+      extremityMaxTargets: { hands: 0, headNeck: 0 }, itemClo: { ...input.itemClo, hands: [] },
+    }] })).json();
+    expect(removed.decision.riskType).toBe('comfortable');
+    expect(removed.hasExtremityGap).toBe(false);
+  });
+
+  it('counts worn hood insulation from catalog data during running/XC manual checks', async () => {
+    state.client = createFakeSupabase({ garments: [{ ...shirt, hood_type: 'attached' }] });
+    const { phases: [result] } = await (await post({ phases: [{
+      ...itemPhase([reference(shirt.id)]), targets: { headNeck: 0.4 }, minTargets: { headNeck: 0.3 },
+      extremityMaxTargets: { headNeck: 0.5 },
+      // Untrusted client hood values must not override the resolved catalog hood.
+      hoodClo: 9,
+    }] })).json();
+    expect(result.bodyParts.headNeck).toMatchObject({ clo: 0.4, status: 'in_range' });
+  });
+
+  it.each([null, [], { hands: -1 }, { headNeck: 'warm' }])('rejects invalid local accessory limits: %j', async extremityMaxTargets => {
+    expect((await post({ phases: [{ ...phase, extremityMaxTargets }] })).status).toBe(400);
+  });
   it("evaluates each phase in order", async () => {
     const response = await post({ phases: [phase, { ...phase, targetRange: [2, 3] }] });
     expect(response.status).toBe(200);
