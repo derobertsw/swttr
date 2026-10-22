@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useId, useMemo, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, Undo2 } from "lucide-react";
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
 import type { LocationSuggestion, Recommendation } from "@/types/recommendations";
 import type { PrecipitationType, WeatherContext } from "@/types/weather";
+import type { DisplayedLayers } from "@/types/outingAction";
 import type { Outing } from "@/types/outing";
 import type { SavedKitPhase, SavedOutfit } from "@/types/savedKit";
 import type {
@@ -80,6 +81,7 @@ interface LayerDisplayProps {
    * Renders Save to trip below the outfit (#170), given the outfit as shown,
    * edits included, or null when there's nothing to save.
    */
+  onDisplayedLayers?: (layers: DisplayedLayers) => void;
   saveToTrip?: (outfit: SavedOutfit | null) => ReactNode;
 }
 
@@ -168,6 +170,7 @@ const LayerDisplay = ({
   onActivityChange,
   weatherLoading,
   saveToTrip,
+  onDisplayedLayers,
 }: LayerDisplayProps) => {
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
   const [activePhase, setActivePhase] = useState<Phase>("climb");
@@ -467,6 +470,34 @@ const LayerDisplay = ({
         edited: climb.edited || descent.edited,
       }
     : null;
+
+  // Report the same committed Wear/Carry projection used by the visible result.
+  // Keep item IDs, thermal inputs and raw recommendation payloads out of readback.
+  useLayoutEffect(() => {
+    onDisplayedLayers?.({
+      activePhase: showDescent ? shownPhase : "outing",
+      phases: hasLayers ? savedPhases.map(phase => ({
+        id: phase.id,
+        wear: Object.fromEntries(BODY_PARTS.map(part => [part,
+          Object.fromEntries((["base", "mid", "outer"] as const).map(layer => [layer,
+            (phase.wear[part][layer] ?? []).map(item => item.name),
+          ])),
+        ])) as DisplayedLayers["phases"][number]["wear"],
+        carry: [...phase.carry],
+        decision: phase.decision,
+      })) : [],
+      guidance: [...visibleGuidance],
+      missingGear: missingRequirements.map(r => r.message),
+      warnings: [...new Set([...(biophysicsData?.warnings ?? []), ...(showDescent ? biophysicsData?.transition_protocol?.warnings ?? [] : [])])],
+      transition: showDescent && biophysicsData?.transition_protocol ? {
+        priority: biophysicsData.transition_protocol.priority,
+        timeLimitMinutes: biophysicsData.transition_protocol.time_limit_minutes,
+        steps: [...biophysicsData.transition_protocol.steps],
+      } : null,
+      edited: biophysicsActive && (climb.edited || descent.edited),
+      evaluation: !biophysicsActive ? "unavailable" : evaluationPending ? "pending" : evaluationFailed ? "failed" : "ready",
+    });
+  });
 
   return (
     <div className="flex w-full flex-col gap-6 pb-24">

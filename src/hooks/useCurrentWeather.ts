@@ -40,8 +40,10 @@ type PlaceWeatherResult =
  */
 export async function fetchWeatherAt(
   location: LocationSuggestion,
-  localDateTime?: string
+  localDateTime?: string,
+  signal?: AbortSignal
 ): Promise<PlaceWeatherResult> {
+  signal?.throwIfAborted();
   const fallbackError = localDateTime
     ? "Couldn't get the forecast for this place. Try again."
     : "Couldn't get the weather. Try again.";
@@ -52,9 +54,11 @@ export async function fetchWeatherAt(
 
   try {
     const response = await fetch(
-      localDateTime ? `/api/weather?${query}&datetime=${localDateTime}` : `/api/weather?${query}`
+      localDateTime ? `/api/weather?${query}&datetime=${localDateTime}` : `/api/weather?${query}`,
+      ...(signal ? [{ signal }] : [])
     );
     const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    signal?.throwIfAborted();
     if (response.ok && body) {
       const data = parseWeatherResponse(body, formatLocationName(location), localDateTime !== undefined);
       return data ? { data } : { data: null, error: fallbackError };
@@ -63,6 +67,7 @@ export async function fetchWeatherAt(
     const canBeFixed = response.status >= 400 && response.status < 500 && typeof body?.error === "string";
     return { data: null, error: canBeFixed ? String(body?.error) : fallbackError };
   } catch {
+    signal?.throwIfAborted();
     return { data: null, error: fallbackError };
   }
 }

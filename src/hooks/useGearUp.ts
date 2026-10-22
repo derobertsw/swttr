@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
@@ -24,11 +24,15 @@ import {
   type InputMode,
 } from "@/lib/gearUp";
 import { readGearUpDraft, saveGearUpDraft } from "@/lib/gearUpDraft";
+import { isSingleDayOuting } from "@/lib/outingAction";
+import type { CurrentOutingSnapshot, DisplayedLayers, OutingActionOutcome } from "@/types/outingAction";
 import { logWarn } from "@/lib/logger";
 import { RESUME_PARAM, resumeView, TRIP_PARAM, type ResumeView } from "@/lib/outingReturn";
 import type { LaterTime, LayersResult, Outing, OutingTime } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
+
+type CurrentRequest = (() => boolean) & { signal: AbortSignal };
 
 function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boolean {
   return b !== null && a.latitude === b.latitude && a.longitude === b.longitude;
@@ -105,9 +109,9 @@ export function useGearUp() {
 
   /** Layers for an outing in the given weather. */
   const layersFor = useCallback(
-    (outing: Outing, weather: WeatherData) =>
+    (outing: Outing, weather: WeatherData, signal?: AbortSignal) =>
       buildLayersResult(outing, weather, sensitivity, (o, w) =>
-        biophysics.fetch(o.activity, w, o.exertion, bodyMetrics)
+        biophysics.fetch(o.activity, w, o.exertion, bodyMetrics, signal)
       ),
     [sensitivity, biophysics, bodyMetrics]
   );
@@ -117,6 +121,30 @@ export function useGearUp() {
   // retires the running request, so a late answer can't show results or
   // report an error for an outing that's gone.
   const latestRequest = useRef(0);
+  const committedOwner = useRef(owner);
+  const mounted = useRef(true);
+  const activeRequest = useRef<{ controller: AbortController; source: "human" | "agent"; pending: boolean } | null>(null);
+  const displayedLayers = useRef<{ result: LayersResult; layers: DisplayedLayers } | null>(null);
+  // Ref-backed readers are refreshed after each commit, including auth changes.
+  const readSnapshot = useRef<() => CurrentOutingSnapshot>(() => ({
+    status: "empty", pending: null, request: { status: "idle" }, displayed: null, limitations: [],
+  }));
+  const retireRequest = useCallback(() => {
+    latestRequest.current += 1;
+    activeRequest.current?.controller.abort();
+    activeRequest.current = null;
+  }, []);
+  const cancelAgentEdit = useCallback(() => {
+    if (activeRequest.current?.source !== "agent") return;
+    retireRequest();
+    dispatch({ type: "SUBMIT_CANCEL" });
+  }, [retireRequest]);
+  useLayoutEffect(() => {
+    committedOwner.current = owner;
+    mounted.current = true;
+    // A previous account's request must stop before the next account's tools run.
+    return () => { mounted.current = false; retireRequest(); };
+  }, [owner, retireRequest]);
   /**
    * The tab the next plan shown opens on: Packing when coming back to match
    * its packing list to the wardrobe, otherwise the daily plan. Any other
@@ -124,12 +152,15 @@ export function useGearUp() {
    */
   const [planTab, setPlanTab] = useState<"days" | "packing">("days");
   /** Starts loading, and returns a check for whether this request is still the latest. */
-  const startRequest = useCallback((outing: Outing) => {
-    const request = ++latestRequest.current;
+  const startRequest = useCallback((outing: Outing, source: "human" | "agent" = "human"): CurrentRequest => {
+    retireRequest();
+    const request = latestRequest.current;
+    const controller = new AbortController();
+    activeRequest.current = { controller, source, pending: true };
     dispatch({ type: "SUBMIT_START", outing });
     setPlanTab("days");
-    return () => latestRequest.current === request;
-  }, []);
+    return Object.assign(() => latestRequest.current === request && !controller.signal.aborted, { signal: controller.signal });
+  }, [retireRequest]);
 
   /** Results and their edit form/draft share the same submitted inputs. */
   const applyOutingInputs = useCallback((outing: Outing) => {
@@ -140,16 +171,26 @@ export function useGearUp() {
     dispatch({ type: "APPLY_OUTING_TIME", when: outing.when });
   }, [setActivity, setExertion, cancelLocating, locationSearch]);
 
+  // Browser actions resolve only after React commits the result/error and its
+  // visible layer projection. Human events keep their normal React batching.
+  const commitRequest = useCallback((action: Parameters<typeof gearUpReducer>[1]) => {
+    if (activeRequest.current && ["SUBMIT_SUCCESS", "SUBMIT_ERROR", "START_DATE_INVALID"].includes(action.type)) {
+      activeRequest.current.pending = false;
+    }
+    if (activeRequest.current?.source === "agent") flushSync(() => dispatch(action));
+    else dispatch(action);
+  }, []);
+
   const showLayers = useCallback((result: LayersResult) => {
     // A failed update must not replace useful advice (or a manually edited
     // outfit) with a fallback. Initial requests still explain unavailable advice.
     if (state.result && result.advice.kind !== "personalized" && result.advice.reason === "unavailable") {
-      dispatch({ type: "SUBMIT_ERROR", message: "Couldn't load layers for this outing. Try again." });
+      commitRequest({ type: "SUBMIT_ERROR", message: "Couldn't load layers for this outing. Try again." });
       return false;
     }
-    dispatch({ type: "SUBMIT_SUCCESS", result });
+    commitRequest({ type: "SUBMIT_SUCCESS", result });
     return true;
-  }, [state.result]);
+  }, [state.result, commitRequest]);
 
   /**
    * Shows layers for a one-day outing, from its place's current weather or its
@@ -157,53 +198,71 @@ export function useGearUp() {
    * saying why, when there's no weather; the inputs and the shown result stay
    * as they were. Nothing changes once `isCurrent` says the request was retired.
    */
-  const recommendFor = useCallback(async (isCurrent: () => boolean, outing: Outing) => {
-    const { data, error } = await fetchWeatherAt(outing.place, forecastDateTime(outing.when));
+  const recommendFor = useCallback(async (
+    isCurrent: CurrentRequest,
+    outing: Outing,
+    onFailure?: (code: "weather_unavailable" | "recommendation_unavailable") => void,
+  ) => {
+    let weather;
+    try {
+      weather = await fetchWeatherAt(outing.place, forecastDateTime(outing.when), isCurrent.signal);
+    } catch {
+      if (!isCurrent()) return false;
+      onFailure?.("weather_unavailable");
+      commitRequest({ type: "SUBMIT_ERROR", message: "Couldn't get the weather. Try again." });
+      return false;
+    }
+    const { data, error } = weather;
     if (!isCurrent()) return false;
     if (!data) {
       toast.error(error);
-      dispatch({ type: "SUBMIT_ERROR", message: error });
+      onFailure?.("weather_unavailable");
+      commitRequest({ type: "SUBMIT_ERROR", message: error });
       return false;
     }
     try {
-      const result = await layersFor(outing, data);
+      const result = await layersFor(outing, data, isCurrent.signal);
       if (!isCurrent()) return false;
-      return showLayers(result);
+      const shown = showLayers(result);
+      if (!shown) onFailure?.("recommendation_unavailable");
+      return shown;
     } catch (error) {
+      if (!isCurrent()) return false;
+      onFailure?.("recommendation_unavailable");
       logWarn("useGearUp.recommendFor", error);
-      if (isCurrent()) dispatch({ type: "SUBMIT_ERROR", message: "Couldn't load layers for this outing. Try again." });
+      if (isCurrent()) commitRequest({ type: "SUBMIT_ERROR", message: "Couldn't load layers for this outing. Try again." });
       return false;
     }
-  }, [layersFor, showLayers]);
+  }, [layersFor, showLayers, commitRequest]);
 
   /**
    * Shows a multi-day plan for a later outing. Resolves false, after saying
    * why, when it can't be built: on the start date when that's what needs to
    * change. Nothing changes once `isCurrent` says the request was retired.
    */
-  const planFor = useCallback(async (isCurrent: () => boolean, outing: Outing & { when: LaterTime }) => {
+  const planFor = useCallback(async (isCurrent: CurrentRequest, outing: Outing & { when: LaterTime }) => {
     try {
       const result = await fetchPlanAhead(outing, sensitivity);
       if (!isCurrent()) return false;
-      dispatch({ type: "SUBMIT_SUCCESS", result });
+      commitRequest({ type: "SUBMIT_SUCCESS", result });
       return true;
     } catch (error) {
       logWarn("useGearUp.planFor", error);
       if (!isCurrent()) return false;
       if (error instanceof PlanAheadError && error.field === "startDate") {
         // Shown on the start date, which is what needs to change.
-        dispatch({ type: "START_DATE_INVALID", error: error.message, location: outing.place });
+        commitRequest({ type: "START_DATE_INVALID", error: error.message, location: outing.place });
       } else {
         const message = error instanceof PlanAheadError ? error.message : "Couldn't build the plan. Try again.";
         toast.error(message);
-        dispatch({ type: "SUBMIT_ERROR", message });
+        commitRequest({ type: "SUBMIT_ERROR", message });
       }
       return false;
     }
-  }, [sensitivity]);
+  }, [sensitivity, commitRequest]);
 
   /** Shows an outing's layers, or its plan when it's several days. */
-  const showOuting = useCallback((isCurrent: () => boolean, outing: Outing) =>
+  const showOuting = useCallback((isCurrent: CurrentRequest, outing: Outing) =>
     outing.when.mode === "later" && outing.when.durationDays > 1
       ? planFor(isCurrent, { ...outing, when: outing.when })
       : recommendFor(isCurrent, outing),
@@ -218,7 +277,9 @@ export function useGearUp() {
   const handleSubmit = useCallback(async () => {
     // The iOS shell's Gear Up action can fire again while a request is running,
     // or before a requested location arrives.
-    if (state.request.status === "loading" || locationStatus === "locating") return;
+    const replacingAgent = activeRequest.current?.source === "agent";
+    if (replacingAgent) cancelAgentEdit();
+    if ((state.request.status === "loading" && !replacingAgent) || locationStatus === "locating") return;
     if (!activity) {
       toast.error("Please select an activity");
       return;
@@ -240,7 +301,7 @@ export function useGearUp() {
       : { mode: "now" };
     const outing = { activity, exertion, place, when };
     await showOuting(startRequest(outing), outing);
-  }, [activity, exertion, state, locationStatus, locationSearch, startRequest, showOuting]);
+  }, [activity, exertion, state, locationStatus, locationSearch, startRequest, showOuting, cancelAgentEdit]);
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches "gearUp"
   // from its native Gear Up tab while this page is open, and otherwise opens
@@ -277,18 +338,18 @@ export function useGearUp() {
     const outing = { ...shownResult.outing, ...changes };
     const isCurrent = startRequest(outing);
     try {
-      const result = await layersFor(outing, shownResult.weather);
+      const result = await layersFor(outing, shownResult.weather, isCurrent.signal);
       if (!isCurrent()) return false;
       return showLayers(result);
     } catch (error) {
       logWarn("useGearUp.recommendForShownWeather", error);
       if (isCurrent()) {
         toast.error(failureMessage);
-        dispatch({ type: "SUBMIT_ERROR", message: failureMessage });
+        commitRequest({ type: "SUBMIT_ERROR", message: failureMessage });
       }
       return false;
     }
-  }, [shownResult, startRequest, layersFor, showLayers]);
+  }, [shownResult, startRequest, layersFor, showLayers, commitRequest]);
 
   // The form takes the new activity only with its layers, so Edit outing
   // while they load, or after they fail, opens on the activity still shown.
@@ -322,7 +383,8 @@ export function useGearUp() {
 
   /** Start over: clears what was entered, and the last outing with it. */
   const resetToInitialState = useCallback(() => {
-    latestRequest.current += 1;
+    retireRequest();
+    displayedLayers.current = null;
     pendingResume.current = null;
     resetActivity();
     cancelLocating();
@@ -330,7 +392,7 @@ export function useGearUp() {
     locationSearch.reset();
     biophysics.reset();
     forgetResultsEntry();
-  }, [resetActivity, cancelLocating, locationSearch, biophysics, forgetResultsEntry]);
+  }, [retireRequest, resetActivity, cancelLocating, locationSearch, biophysics, forgetResultsEntry]);
 
   const formShowing: InputMode | null = state.result === null ? state.inputMode : null;
   /**
@@ -340,10 +402,10 @@ export function useGearUp() {
    * retired.
    */
   const showForm = useCallback((mode: InputMode, retire = formShowing !== mode) => {
-    if (retire) latestRequest.current += 1;
+    if (retire) retireRequest();
     if (state.result) applyOutingInputs(state.result.outing);
     dispatch({ type: "SHOW_FORM", mode, keepLoading: !retire });
-  }, [formShowing, state.result, applyOutingInputs]);
+  }, [formShowing, state.result, applyOutingInputs, retireRequest]);
   /**
    * Back to the form from the page itself, which also steps back over the
    * results' history entry, so the browser's next Back leaves Gear up.
@@ -427,6 +489,86 @@ export function useGearUp() {
    */
   const accountChanging = restored && owner !== undefined && owner !== state.owner;
 
+  const reportDisplayedLayers = useCallback((result: LayersResult, layers: DisplayedLayers) => {
+    displayedLayers.current = { result, layers };
+  }, []);
+
+  useLayoutEffect(() => {
+    readSnapshot.current = () => {
+      // Do not expose even the pending inputs while auth is loading/changing.
+      if (!authLoaded || owner !== state.owner || !restored) {
+        return { status: "empty", pending: null, request: { status: "idle" }, displayed: null, limitations: ["not_ready"] };
+      }
+      const result = state.result;
+      const displayed = result?.kind === "layers" ? {
+        outing: result.outing,
+        weather: { ...result.weather, units: { temperature: "fahrenheit" as const, windSpeed: "mph" as const } },
+        advice: result.advice.kind === "personalized" ? { kind: "personalized" as const }
+          : { kind: result.advice.kind, reason: result.advice.reason },
+        layers: displayedLayers.current?.result === result ? displayedLayers.current.layers : null,
+      } : null;
+      return structuredClone({
+        status: state.request.status === "loading" ? "loading" : state.request.status === "error" ? "error" : result ? "ready" : "empty",
+        pending: {
+          activity, exertion, place: locationSearch.selectedLocation,
+          when: state.inputMode === "now" ? { mode: "now" } : state.date
+            ? { mode: "later", date: format(state.date, "yyyy-MM-dd"), time: state.time, durationDays: state.durationDays } : null,
+        },
+        request: state.request,
+        displayed,
+        limitations: result?.kind === "plan" ? ["multi_day_readback_unsupported"] : [],
+      });
+    };
+  });
+  const getCurrentOuting = useCallback((): CurrentOutingSnapshot => mounted.current ? readSnapshot.current()
+    : { status: "empty", pending: null, request: { status: "idle" }, displayed: null, limitations: [] }, []);
+
+  /** Submit explicit inputs atomically through the same one-day path as the form. */
+  const submitOuting = useCallback(async (input: unknown, options: { signal?: AbortSignal } = {}): Promise<OutingActionOutcome> => {
+    const fail = (code: Extract<OutingActionOutcome, { status: "error" }>["code"], message: string): OutingActionOutcome =>
+      ({ status: "error", code, message, snapshot: mounted.current && committedOwner.current === owner ? getCurrentOuting()
+        : { status: "empty", pending: null, request: { status: "idle" }, displayed: null, limitations: [] } });
+    if (!isSingleDayOuting(input)) return fail("invalid_input", "Provide a supported activity, effort, resolved place and valid one-day time.");
+    if (!mounted.current || committedOwner.current !== owner || !readyToRequest || !restored || owner !== state.owner) return fail("not_ready", "Wait for sign-in and preferences to finish loading.");
+    if (options.signal?.aborted) return fail("cancelled", "The outing request was cancelled.");
+    if (activeRequest.current?.pending) return fail("busy", "An outing request is already running.");
+    // Clone before the first await: a caller cannot mutate an in-flight outing.
+    const outing = structuredClone(input);
+    let current!: CurrentRequest;
+    flushSync(() => {
+      applyOutingInputs(outing);
+      current = startRequest(outing, "agent");
+    });
+    let abortExecution!: () => void;
+    const cancelled = new Promise<false>(resolve => {
+      abortExecution = () => {
+        // Never clear a newer human request's loading state.
+        if (current()) {
+          retireRequest();
+          flushSync(() => dispatch({ type: "SUBMIT_CANCEL" }));
+        }
+        resolve(false);
+      };
+      current.signal.addEventListener("abort", abortExecution, { once: true });
+    });
+    const cancel = () => abortExecution();
+    options.signal?.addEventListener("abort", cancel, { once: true });
+    try {
+      let failureCode: "weather_unavailable" | "recommendation_unavailable" = "weather_unavailable";
+      const shown = await Promise.race([recommendFor(current, outing, code => { failureCode = code; }), cancelled]);
+      if (!current()) return fail("cancelled", "The outing was cancelled or replaced by a newer action.");
+      if (!shown) {
+        const snapshot = getCurrentOuting();
+        return fail(failureCode, snapshot.request.status === "error" ? snapshot.request.message : "Couldn't load this outing.");
+      }
+      return { status: "completed", snapshot: getCurrentOuting() };
+    } finally {
+      options.signal?.removeEventListener("abort", cancel);
+      current.signal.removeEventListener("abort", abortExecution);
+      if (current()) activeRequest.current = null;
+    }
+  }, [readyToRequest, restored, owner, state.owner, state.request.status, getCurrentOuting, applyOutingInputs, startRequest, recommendFor, retireRequest]);
+
   useEffect(() => {
     if (!restored || !readyToRequest || !pendingResume.current) return;
     const { outing, onResultsEntry, view } = pendingResume.current;
@@ -493,21 +635,21 @@ export function useGearUp() {
 
   return {
     activity,
-    setActivity,
+    setActivity: (value: string) => { cancelAgentEdit(); setActivity(value); },
     activityInitializing: initializing,
     exertion,
-    setExertion,
+    setExertion: (value: typeof exertion) => { cancelAgentEdit(); setExertion(value); },
     result: accountChanging ? null : state.result,
     planTab,
     accountChanging,
     inputMode: state.inputMode,
     setInputMode,
     date: state.date,
-    setDate,
+    setDate: (value: Date | undefined) => { cancelAgentEdit(); setDate(value); },
     time: state.time,
-    setTime,
+    setTime: (value: string) => { cancelAgentEdit(); setTime(value); },
     durationDays: state.durationDays,
-    setDurationDays,
+    setDurationDays: (value: number) => { cancelAgentEdit(); setDurationDays(value); },
     loading: state.request.status === "loading",
     request: state.request,
     showFieldErrors: state.showFieldErrors,
@@ -522,16 +664,21 @@ export function useGearUp() {
     locationSearch: {
       ...locationSearch,
       handleLocationInputChange: (value: string) => {
+        cancelAgentEdit();
         cancelLocating();
         locationSearch.handleLocationInputChange(value);
       },
       handleSelectLocation: (suggestion: LocationSuggestion) => {
+        cancelAgentEdit();
         cancelLocating();
         locationSearch.handleSelectLocation(suggestion);
       },
     },
-    handleUseMyLocation,
+    handleUseMyLocation: () => { cancelAgentEdit(); return handleUseMyLocation(); },
     cancelLocating,
+    submitOuting,
+    getCurrentOuting,
+    reportDisplayedLayers,
     handleSubmit,
     handleWeatherChange,
     handleActivityChange,

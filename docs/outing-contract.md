@@ -197,7 +197,7 @@ This completes the shared outing/result work begun in #215 and continued in #241
 
 Saving a result's outfit to a trip is described in [trip-saved-kits.md](trip-saved-kits.md).
 
-#185 owns the programmatic `submitOuting` interface, caller cancellation, domain error codes and edited Wear/Carry readback. This change exposes no browser tool and adds no second store. #168 owns auth return, #170 owns durable saved snapshots, and #130 retains real-account browser/native/device/accessibility and participant validation. The synthetic browser and jsdom checks here are not represented as that release coverage.
+#185's programmatic `submitOuting` interface now builds on this contract, with caller cancellation, domain error codes and committed edited Wear/Carry readback. See [browser-assisted Gear up](webmcp.md) for its one-day input/outcome contract, concurrency rules and default-off browser tools. It adds no second outing/result store. #168 owns auth return, #170 owns durable saved snapshots, and #130 retains real-account browser/native/device/accessibility and participant validation. The synthetic browser and jsdom checks here are not represented as that release coverage.
 
 ## #168 acceptance review — October 6, 2026
 

@@ -1,4 +1,4 @@
-// Native Chrome smoke test; no polyfill, application credentials, or real tools.
+// Native Chrome smoke test. Default: adapter fixture. WEBMCP_APP_URL: real guest Gear up workflow.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
@@ -20,7 +20,7 @@ const server = createServer((request, response) => {
   response.end(request.url === "/adapter.js" ? adapter : "<!doctype html><title>SWTTR WebMCP fixture</title>");
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
-const url = `http://127.0.0.1:${server.address().port}`;
+const url = process.env.WEBMCP_APP_URL ?? `http://127.0.0.1:${server.address().port}`;
 const chrome = spawn(chromeBin, [
   "--headless", "--no-first-run", "--no-default-browser-check",
   "--enable-features=WebMCPTesting", "--enable-blink-features=WebMCP",
@@ -51,7 +51,7 @@ try {
   let sequence = 0;
   const call = (method, params) => new Promise((resolve, reject) => {
     const id = ++sequence;
-    const timeout = setTimeout(() => { socket.removeEventListener("message", receive); reject(new Error(`${method} timed out`)); }, 15000);
+    const timeout = setTimeout(() => { socket.removeEventListener("message", receive); reject(new Error(`${method} timed out`)); }, method === "Runtime.evaluate" ? 60000 : 15000);
     const receive = event => {
       const message = JSON.parse(event.data);
       if (message.id !== id) return;
@@ -80,7 +80,55 @@ try {
   const result = await call("Runtime.evaluate", {
     awaitPromise: true,
     returnByValue: true,
-    expression: `(async () => {
+    expression: process.env.WEBMCP_APP_URL ? `(async () => {
+      const context = document.modelContext;
+      if (!context?.getTools || !context?.executeTool) throw new Error('Selected document.modelContext API is unavailable');
+      const names = ['swttr_get_capabilities', 'swttr_search_locations', 'swttr_recommend_outing', 'swttr_get_current_outing'];
+      let tools = [];
+      for (let attempt = 0; attempt < 120; attempt++) {
+        tools = await context.getTools();
+        if (names.every(name => tools.some(t => t.name === name))) break;
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+      if (!names.every(name => tools.some(t => t.name === name))) throw new Error('Application tools not discovered; enable NEXT_PUBLIC_ENABLE_WEBMCP and wait for Clerk to load');
+      const execute = async (name, input = {}) => JSON.parse(await context.executeTool(tools.find(t => t.name === name), input));
+      const capabilities = await execute(names[0]);
+      if (capabilities.activities.find(a => a.id === 'running').engine !== 'none') throw new Error('This smoke test must run as a guest');
+      const search = await execute(names[1], { query: 'Stowe' });
+      const place = search.candidates?.find(p => p.name === 'Stowe' && p.region === 'Vermont');
+      if (!place) throw new Error('Stowe, Vermont not found: ' + JSON.stringify(search));
+      if (!place.timeZone) throw new Error('Search must supply destination time zone for the smoke test');
+      const date = new Intl.DateTimeFormat('en-CA', { timeZone: place.timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.now() + 86400000));
+      const input = { activity: 'hiking_snowshoeing', exertion: 'easy', place, when: { mode: 'later', date, time: '09:15', durationDays: 1 } };
+      const outcome = await execute(names[2], input);
+      if (outcome.status !== 'completed' || outcome.snapshot.displayed?.advice.kind !== 'general') throw new Error('Expected general hiking advice: ' + JSON.stringify(outcome));
+      const readback = await execute(names[3]);
+      if (JSON.stringify(outcome.snapshot.displayed) !== JSON.stringify(readback.snapshot.displayed)) throw new Error('Readback differs from submitted result');
+      const displayed = readback.snapshot.displayed;
+      if (JSON.stringify(displayed.outing) !== JSON.stringify(input)) throw new Error('Submitted context mismatch');
+      if (!document.body.innerText.includes(place.name) || !document.body.innerText.includes('9:15')) throw new Error('Visible place/exact requested time mismatch');
+      for (const phase of displayed.layers.phases) for (const part of Object.values(phase.wear)) for (const items of Object.values(part)) for (const item of items) {
+        if (!document.body.innerText.includes(item)) throw new Error('Tool layer absent from visible UI: ' + item);
+      }
+      const running = await execute(names[2], { ...input, activity: 'running' });
+      if (running.snapshot.displayed?.advice.kind !== 'none' || running.snapshot.displayed.advice.reason !== 'auth_required' || !document.body.innerText.includes('Sign in for Running layers')) throw new Error('Guest auth boundary mismatch');
+      const invalid = await execute(names[2], { ...input, place: { ...place, latitude: 91 } }).catch(error => ({ browserValidation: error.name }));
+      if (!invalid.browserValidation && invalid.code !== 'invalid_input') throw new Error('Invalid coordinates accepted');
+      const snapshot = await execute(names[3]);
+      if (snapshot.snapshot.displayed?.outing.activity !== 'running') throw new Error('Invalid input changed the result');
+      const link = [...document.querySelectorAll('a[href="/wardrobe"]')][0];
+      if (!link) throw new Error('Wardrobe navigation link unavailable');
+      link.click();
+      for (let attempt = 0; attempt < 80; attempt++) {
+        if (!(await context.getTools()).some(t => names.includes(t.name))) break;
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      if ((await context.getTools()).some(t => names.includes(t.name))) throw new Error('Tools leaked after leaving Gear up');
+      return { userAgent: navigator.userAgent, api: 'document.modelContext', registered: tools.map(t => t.name),
+        search: { selected: place.name + ', ' + place.region, candidates: search.candidates.length },
+        input, advice: displayed.advice, weather: displayed.weather, layers: displayed.layers,
+        readbackMatches: true, visibleMatches: true, guestRunning: running.snapshot.displayed.advice, invalidInputRejected: true, removedOnNavigation: true };
+    })()` : `(async () => {
       const { registerWebMCPTools } = await import('/adapter.js');
       const context = document.modelContext;
       if (!context?.getTools || !context?.executeTool) throw new Error('Selected document.modelContext API is unavailable');
@@ -102,8 +150,8 @@ try {
       const tools = await context.getTools();
       const tool = tools.find(tool => tool.name === fixture.name);
       if (!tool) throw new Error('Fixture is missing from discovery');
-      // Chrome 154's consumer takes JSON text; the draft takes an object.
-      const value = JSON.parse(await context.executeTool(tool, JSON.stringify({ message: 'native Chrome' })));
+      // Current Chrome follows the draft's object input contract.
+      const value = JSON.parse(await context.executeTool(tool, { message: 'native Chrome' }));
       if (value.message !== 'native Chrome') throw new Error('Wrong tool result');
       registration.dispose();
       if ((await context.getTools()).some(tool => tool.name === fixture.name)) throw new Error('Fixture leaked after cleanup');

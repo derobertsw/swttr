@@ -7,6 +7,8 @@ import type { MultiDayLayerPlan } from "@/types/plan";
 import type { LocationSuggestion } from "@/types/recommendations";
 import { readGearUpDraft } from "@/lib/gearUpDraft";
 import Home from "./page";
+import type { WebMCPTool } from "@/lib/webmcp/adapter";
+import type { OutingActionOutcome } from "@/types/outingAction";
 
 // Mock sonner toast
 vi.mock("sonner", () => ({
@@ -164,6 +166,82 @@ describe("Home Page", () => {
     Object.defineProperty(navigator, "geolocation", {
       value: originalGeolocation,
       writable: true,
+    });
+  });
+
+  describe("browser Gear up tools", () => {
+    let registered: Map<string, WebMCPTool>;
+    const execute = async (name: string, input: Record<string, unknown> = {}) => {
+      let value: unknown;
+      await act(async () => { value = await registered.get(`swttr_${name}`)!.execute(input, { signal: new AbortController().signal }); });
+      return value as OutingActionOutcome;
+    };
+    const outing = { activity: "running", exertion: "easy", place: STOWE,
+      when: { mode: "later", date: "2026-10-22", time: "09:15", durationDays: 1 } };
+    beforeEach(() => {
+      registered = new Map();
+      vi.stubEnv("NEXT_PUBLIC_ENABLE_WEBMCP", "true");
+      Object.defineProperty(document, "modelContext", { configurable: true, value: {
+        registerTool: async (tool: WebMCPTool, { signal }: { signal: AbortSignal }) => {
+          registered.set(tool.name, tool);
+          signal.addEventListener("abort", () => { if (registered.get(tool.name) === tool) registered.delete(tool.name); }, { once: true });
+        }, getTools: async () => [...registered.values()], executeTool: vi.fn(),
+      } });
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes("/api/geocode")) return Promise.resolve(respond(200, { results: [STOWE] }));
+        if (url.includes("/api/weather")) return Promise.resolve(respond(200, { temperature: 30, windSpeed: 7,
+          isForecast: true, forecastTime: "2026-10-22T09:00-04:00", timeZone: "America/New_York" }));
+        if (url.includes("/api/v1/recommendations")) return Promise.resolve(respond(200, RUNNING_RECOMMENDATION));
+        if (url.includes("/api/wardrobe/items")) return Promise.resolve(respond(200, { mappings: [] }));
+        if (url.includes("/api/preferences")) return Promise.resolve(respond(200, { temperatureSensitivity: "neutral" }));
+        return Promise.resolve(respond(200, {}));
+      });
+    });
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      Reflect.deleteProperty(document, "modelContext");
+      mockUseAuth.mockReturnValue(SIGNED_IN);
+    });
+    it("discovers, searches, submits and reads the same visible advice and exact destination-local time", async () => {
+      render(<Home />);
+      await waitFor(() => expect(registered.size).toBe(4));
+      const search = await execute("search_locations", { query: "Stowe" });
+      expect(search).toMatchObject({ candidates: [STOWE] });
+      // Preferences complete before invoking the application action.
+      await waitFor(() => expect(screen.getByRole("radio", { name: "Alpine Skiing" })).toBeEnabled());
+      const outcome = await execute("recommend_outing", outing);
+      expect(outcome).toMatchObject({ status: "completed", snapshot: { status: "ready", displayed: {
+        outing, layers: { activePhase: "outing", phases: [{ wear: { legs: { base: ["Running tights"] } } }] },
+      } } });
+      expect(within(screen.getByRole("region", { name: "Wear" })).getByText("Running tights")).toBeVisible();
+      expect(screen.getByText("Stowe, Vermont, United States")).toBeVisible();
+      expect(screen.getByText(/9:15/)).toBeVisible();
+      expect((await execute("get_current_outing")).snapshot.displayed).toMatchObject({ outing, advice: outcome.snapshot.displayed!.advice, layers: { phases: outcome.snapshot.displayed!.layers!.phases } });
+    });
+    it("reports human layer removals and pending evaluation instead of the original recommendation", async () => {
+      const user = userEvent.setup();
+      render(<Home />);
+      await screen.findByRole("radio", { name: "Alpine Skiing" });
+      await execute("recommend_outing", outing);
+      await user.click(screen.getByRole("button", { name: "Change legs" }));
+      await user.click(within(screen.getByRole("region", { name: "Legs" })).getByRole("button", { name: "Remove" }));
+      await waitFor(async () => expect((await execute("get_current_outing")).snapshot.displayed?.layers?.edited).toBe(true));
+      const edited = await execute("get_current_outing");
+      expect(edited.snapshot.displayed?.layers).toMatchObject({ edited: true, phases: [{ wear: { legs: { base: [] } } }] });
+      expect(within(screen.getByRole("region", { name: "Wear" })).queryByText("Running tights")).not.toBeInTheDocument();
+      expect(["pending", "failed"]).toContain(edited.snapshot.displayed?.layers?.evaluation);
+    });
+    it("invalidates retained callbacks on sign-out and removes discovery on navigation", async () => {
+      const { rerender, unmount } = render(<Home />);
+      await screen.findByRole("radio", { name: "Alpine Skiing" });
+      await execute("recommend_outing", outing);
+      const stale = registered.get("swttr_get_current_outing")!;
+      mockUseAuth.mockReturnValue({ ...SIGNED_IN, userId: null, isSignedIn: false });
+      rerender(<Home />);
+      await expect(stale.execute({}, { signal: new AbortController().signal })).rejects.toMatchObject({ name: "AbortError" });
+      expect((await execute("get_current_outing")).snapshot.displayed).toBeNull();
+      unmount();
+      expect(registered.size).toBe(0);
     });
   });
 
