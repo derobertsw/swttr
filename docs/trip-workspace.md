@@ -1,6 +1,6 @@
 # Trip workspace
 
-Every trip page shares one frame ([#330](https://github.com/derobertsw/swttr/issues/330), part of [#329](https://github.com/derobertsw/swttr/issues/329)): the trip's name and dates, then four local sections, **Plan · Stays · Crew · Packing**. The trip layout renders it (`TripWorkspace`), so it stays mounted while the page below it changes, and it sits inside the app's own navigation: the sidebar on wide screens and the bottom tab bar on phones. The section tabs are links, not a tablist, and stick below the safe area so a long day can change section without scrolling back up.
+Every trip page shares one frame ([#330](https://github.com/derobertsw/swttr/issues/330), part of [#329](https://github.com/derobertsw/swttr/issues/329)): the trip's name and dates, then four local sections, **Plan · Stays · Crew · Packing**. The trip layout renders it (`TripWorkspace`), so it stays mounted while the page below it changes, and it sits inside the app's own navigation: the sidebar on wide screens and the bottom tab bar on phones. The section tabs are links, not a tablist, and stick below the safe area so a long day can change section without scrolling back up. The page's scroll padding keeps linked headings, like a map link's `#getting-there-<date>`, and focused controls below them.
 
 ## Sections and URLs
 
@@ -16,7 +16,7 @@ Every earlier URL still works and belongs to the section that now holds it (`src
 - Plan, opened from another section, returns to the day it last showed. From inside Plan it opens Plan's own page with every day.
 - Stays used to be part of the overview. A link to a stay on the overview, `/trips/:id#stay-<id>` or `#trip-stays-heading`, now opens it in Stays. The map and drive estimates link to Stays directly.
 - **Edit trip** is in the header on every page except the settings it opens. On Plan's own page the trip's name is the page's title (`h1`); on every other page the page has its own title.
-- Packing reads its own endpoint, so it names the trip for the header from that response (`usePublishTripSummary`) rather than loading the whole trip.
+- Packing reads its own endpoint, so it names the trip for the header from that response (`usePublishTripSummary`) rather than loading the whole trip. Once a full-trip read fails and leaves no trip, as lost access does, the header stops naming it.
 - A solo trip needs no crew: nothing in Plan depends on Crew.
 
 ## Plan

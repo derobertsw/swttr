@@ -75,7 +75,8 @@ function dayCount(start: string, end: string) {
 /**
  * The four sections as underlined tabs. They're links, not a tablist: each
  * one is its own page. The bar sticks below the safe area so a long day can
- * change section without scrolling back up.
+ * change section without scrolling back up; `data-trip-sections` gives the
+ * page scroll padding (globals.css), so linked headings land below it.
  */
 function TripSectionNav({ tripId, current, currentIsSectionPage, planPath }: {
   tripId: string;
@@ -85,7 +86,7 @@ function TripSectionNav({ tripId, current, currentIsSectionPage, planPath }: {
   planPath: string | null;
 }) {
   return (
-    <nav aria-label="Trip sections" className="sticky top-[env(safe-area-inset-top)] z-20 bg-background">
+    <nav aria-label="Trip sections" data-trip-sections className="sticky top-[env(safe-area-inset-top)] z-20 bg-background">
       <ul className="grid grid-cols-4 border-b border-border sm:flex sm:gap-2">
         {TRIP_SECTIONS.map((section) => {
           const active = section.id === current;

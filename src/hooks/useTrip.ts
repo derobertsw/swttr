@@ -27,6 +27,9 @@ export const TripContext = createContext<{
 export function useTripSummary(tripId: string): TripSummary | null {
   const shared = useContext(TripContext);
   if (shared?.tripId !== tripId) return null;
+  // A full-trip read that failed and left no trip, as lost access does,
+  // hides what Packing named too.
+  if (shared.state.error && !shared.state.data) return null;
   return shared.state.data?.trip ?? shared.summary;
 }
 

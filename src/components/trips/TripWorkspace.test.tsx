@@ -114,5 +114,14 @@ describe("Trip workspace (#330)", () => {
     await open("/trips/trip-1/pack", <PackPage />);
     expect(screen.getByText("Whistler from the pack list")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("navigation", { name: "Trip sections" })).toHaveAttribute("data-trip-sections");
+  });
+
+  it.each([403, 404])("stops naming the trip once a full-trip read loses access (%i)", async (status) => {
+    vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": reply(status, { error: "No access" }) }));
+    // Packing named the trip, then a page that reads the whole trip lost access.
+    await open("/trips/trip-1/manage", <><PackPage /><TripPage /></>);
+    expect(screen.queryByText("Whistler from the pack list")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit trip" })).not.toBeInTheDocument();
   });
 });
