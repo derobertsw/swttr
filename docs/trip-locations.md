@@ -65,7 +65,7 @@ The day page's **Getting there** card (`src/components/trips/DayAccessPoint.tsx`
 
 ## Drive times (#209)
 
-A day's drive goes from its morning origin to its access point. The origin is the crew stay of the night before (checkout morning counts; arrival day doesn't), unless the organizer gave the day its own starting point. The server calculates every day's drive with Geoapify's Route Matrix (`src/lib/locations/routing.ts`): by car, with `traffic=approximated` (typical traffic, not live; free-flow was optimistic in the pilot). `src/lib/trip-drive.ts` decides each day's origin, state and labels, and `src/lib/trip-drive-estimates.ts` calculates, stores and reuses them.
+A day's drive goes from its morning origin to its access point. The origin is the crew stay of the night before (checkout morning counts; arrival day doesn't), unless the organizer gave the day its own starting point. When people sleep in different places (#331, [trip-stays.md](trip-stays.md)), the crew stay is the one most of the day's participants slept in, until #333 estimates each departure. The server calculates every day's drive with Geoapify's Route Matrix (`src/lib/locations/routing.ts`): by car, with `traffic=approximated` (typical traffic, not live; free-flow was optimistic in the pilot). `src/lib/trip-drive.ts` decides each day's origin, state and labels, and `src/lib/trip-drive-estimates.ts` calculates, stores and reuses them.
 
 | State | Shown as |
 |---|---|

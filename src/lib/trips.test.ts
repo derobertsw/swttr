@@ -188,6 +188,8 @@ describe("Trip loading", () => {
     await vi.runAllTimersAsync();
     const result = await (await pending).json();
     expect(result.members.map((m: { display_name: string }) => m.display_name)).toEqual([name, SAM.display_name]);
+    const people = new Map(result.lodging.people.map((p: { member_id: string; display_name: string }) => [p.member_id, p.display_name]));
+    expect([people.get(ORGANIZER.id), people.get(SAM.id)]).toEqual([name, SAM.display_name]);
   });
 
   it("keeps a name the organizer gave their row, and a guest's name, for everyone", () => {

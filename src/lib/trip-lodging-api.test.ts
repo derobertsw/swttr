@@ -9,6 +9,11 @@ import { POST } from "@/app/api/v1/trips/[id]/stays/route";
 import { POST as preview } from "@/app/api/v1/trips/[id]/stays/preview/route";
 import { PATCH, DELETE } from "@/app/api/v1/trips/[id]/stays/[stayId]/route";
 import { PUT } from "@/app/api/v1/trips/[id]/lodging-nights/[date]/route";
+import { PUT as assign } from "@/app/api/v1/trips/[id]/lodging-assignments/route";
+import { PUT as attendance } from "@/app/api/v1/trips/[id]/members/[memberId]/attendance/route";
+import { peopleKey } from "@/lib/trip-lodging";
+import { ALEX, BLAIR, CASEY, DANA, FRAN, FRI, PINE, SAT, SPLIT_MEMBERS, SPLIT_TRIP, SUN, VILLAGE, splitRows } from "@/test/splitStays";
+import type { TripMember } from "@/types/trips";
 
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), requireUser: vi.fn() }));
 const stayId = "40f9f55e-0e74-4c4a-923f-d7a3f92468a0";
@@ -124,5 +129,124 @@ describe("Stay API authorization and validation", () => {
     rpc.mockResolvedValue({ error: { code, message: "Internal database details" } });
     const response = await POST(request(body), context); expect(response.status).toBe(status);
     expect(JSON.stringify(await response.json())).not.toContain("Internal database details");
+  });
+});
+
+describe("Per-person lodging API (#331)", () => {
+  const key = (members: Array<{ id: string; status: TripMember["status"] }>) => peopleKey(members);
+  const route = (path: string, body: unknown) => new NextRequest(`http://localhost/api/v1/trips/${TRIP.id}/${path}`, { method: "PUT", body: JSON.stringify(body) });
+  const members = SPLIT_MEMBERS.map((member) => ({ ...member, trip_id: TRIP.id, invite_token: null,
+    user_id: member.id === ALEX.id ? "user-1" : member.id === BLAIR.id ? "member-user" : null }));
+  let tables: Record<string, Record<string, unknown>[]>;
+  function crew(userId = "user-1", missing: string[] = []) {
+    const rows = splitRows();
+    tables = { trips: [SPLIT_TRIP as unknown as Record<string, unknown>], trip_members: members, trip_stays: rows.stays as unknown as Record<string, unknown>[],
+      trip_member_lodging_nights: rows.assignments as unknown as Record<string, unknown>[], trip_member_attendance: rows.attendance as unknown as Record<string, unknown>[],
+      trip_lodging_nights: [{ trip_id: TRIP.id, date: FRI, stay_id: PINE.id, status: "assigned" }] };
+    supabase = { ...createFakeSupabase(tables, { missing }), rpc } as unknown as SupabaseClient;
+    vi.mocked(requireUser).mockResolvedValue({ userId, supabase });
+  }
+  const move = { assignments: [{ member_id: BLAIR.id.toUpperCase(), status: "assigned", stay_id: VILLAGE.id, dates: [SAT] }], expected_revision: 4, mutation_id: mutationId };
+  const attendanceContext = (memberId = CASEY.id) => ({ params: Promise.resolve({ id: TRIP.id, memberId }) });
+  const evening = { attendance: { arrival_date: SAT, departure_date: null, skipped_dates: [SAT] }, expected_revision: 4, mutation_id: mutationId };
+  beforeEach(() => { vi.clearAllMocks(); rpc.mockResolvedValue({ data: { revision: 5 }, error: null }); crew(); });
+
+  it("loads each person's nights with the trip, and the crew's before the migration", async () => {
+    const full = await loadTripFull(supabase, TRIP.id);
+    expect(full?.lodging).toMatchObject({ per_member: true, revision: 4, people_key: key(members) });
+    expect(full?.lodging?.people.map((person) => person.display_name)).toEqual(["Alex", "Blair", "Casey", "Dana", "Eli", "Fran"]);
+    expect(full?.lodging?.nights[1].label).toBe("Pine rental (3) · Village hotel (2)");
+    crew("user-1", ["trip_member_lodging_nights", "trip_member_attendance"]);
+    const legacy = await loadTripFull(supabase, TRIP.id);
+    expect(legacy?.lodging).toMatchObject({ per_member: false, attendance: [] });
+    expect(legacy?.lodging?.nights[1]).toMatchObject({ label: "Pine rental", stay_id: PINE.id });
+    expect(legacy?.lodging?.people.find((person) => person.member_id === FRAN.id)?.nights[1].state).toBe("unplanned");
+  });
+
+  it("saves only the listed people's nights through the organizer's transaction", async () => {
+    expect((await assign(route("lodging-assignments", { ...move, user_id: "member-user", replace_nights: true }), context)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("mutate_trip_lodging", { p_trip_id: TRIP.id, p_user_id: "user-1", p_expected_revision: 4, p_request_id: mutationId,
+      p_action: "assign", p_payload: { assignments: [{ member_id: BLAIR.id, status: "assigned", stay_id: VILLAGE.id, dates: [SAT] }] }, p_replace_nights: true });
+  });
+
+  it("takes the person whose dates change from the route", async () => {
+    await attendance(route(`members/${CASEY.id}/attendance`, { ...evening, member_id: DANA.id }), attendanceContext());
+    expect(rpc).toHaveBeenCalledWith("mutate_trip_lodging", expect.objectContaining({ p_action: "attendance",
+      p_payload: { member_id: CASEY.id, arrival_date: SAT, departure_date: null, skipped_dates: [SAT] } }));
+  });
+
+  it("lets members read the plan but not change anyone's nights or dates", async () => {
+    crew("member-user");
+    expect((await assign(route("lodging-assignments", move), context)).status).toBe(403);
+    expect((await attendance(route(`members/${BLAIR.id}/attendance`, evening), attendanceContext(BLAIR.id))).status).toBe(403);
+    expect((await preview(request({ ...move, action: "assign" }), context)).status).toBe(403);
+    crew("outsider");
+    expect((await assign(route("lodging-assignments", move), context)).status).toBe(404);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["no assignments", { ...move, assignments: [] }],
+    ["a stay for a cleared night", { ...move, assignments: [{ member_id: BLAIR.id, status: "unplanned", stay_id: VILLAGE.id, dates: [SAT] }] }],
+    ["an invalid crew key", { ...move, expected_people_key: "not-a-key" }],
+    ["no save identity", { ...move, mutation_id: undefined }],
+  ])("rejects %s before the transaction", async (_, body) => {
+    expect((await assign(route("lodging-assignments", body), context)).status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("previews a one-night move with each person and night, and refuses a stale review", async () => {
+    const response = await preview(request({ ...move, action: "assign" }), context);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ conflicts: [SAT], people_key: key(members),
+      changes: [{ member_id: BLAIR.id, display_name: "Blair", date: SAT, before: "Pine rental", after: "Village hotel", morning: "Sun Oct 11", morning_origin: "Village hotel", conflict: true }] });
+    expect((await preview(request({ ...move, action: "assign", expected_revision: 3 }), context)).status).toBe(409);
+    expect((await preview(request({ ...move, action: "assign", expected_people_key: key([]) }), context)).status).toBe(409);
+    const refused = await preview(request({ ...move, action: "assign", assignments: [{ member_id: CASEY.id, status: "assigned", stay_id: PINE.id, dates: [FRI] }] }), context);
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toEqual({ error: "Casey isn't on the trip the night of Fri Oct 9. Change their dates first.", field: "assignments" });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("previews attendance with the days it changes and the kits it keeps", async () => {
+    tables.trip_days = [{ id: "day-fri", trip_id: TRIP.id, date: FRI }];
+    tables.trip_member_day_kits = [{ id: "kit-1", trip_day_id: "day-fri", trip_member_id: DANA.id }];
+    const response = await preview(request({ action: "attendance", member_id: DANA.id, attendance: { arrival_date: SAT, departure_date: null }, expected_revision: 4 }), context);
+    expect(await response.json()).toMatchObject({ conflicts: [FRI], date_label: "Arrives Sat Oct 10",
+      day_changes: [{ date: FRI, before: "Taking part", after: "Not on trip", kit_saved: true }] });
+  });
+
+  it("passes the reviewed crew key to the transaction", async () => {
+    await assign(route("lodging-assignments", { ...move, expected_people_key: key(members) }), context);
+    expect(rpc.mock.lastCall![1].p_payload).toMatchObject({ people_key: key(members) });
+  });
+
+  it("sends a retry to the transaction even after the plan moved on, so it gets its first result", async () => {
+    rpc.mockResolvedValue({ data: { revision: 3 }, error: null });
+    const retry = await POST(request({ stay: { id: PINE.id, name: "Pine rental", check_in: FRI, check_out: SUN }, expected_revision: 2, mutation_id: mutationId }), context);
+    expect(await retry.json()).toEqual({ revision: 3 });
+  });
+
+  it("explains a rejected night from the saved plan, and names a missing person", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "22023", hint: "night", message: "Night not available for this person" } });
+    const night = await assign(route("lodging-assignments", { ...move, assignments: [{ member_id: CASEY.id, status: "assigned", stay_id: PINE.id, dates: [FRI] }] }), context);
+    expect(night.status).toBe(400);
+    expect(await night.json()).toEqual({ error: "Casey isn't on the trip the night of Fri Oct 9. Change their dates first.", field: "assignments" });
+    rpc.mockResolvedValue({ data: null, error: { code: "42501", hint: "member", message: "Person not found" } });
+    const missing = await attendance(route(`members/${CASEY.id}/attendance`, evening), attendanceContext());
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toEqual({ error: "Person not found in this trip." });
+  });
+
+  it("refuses per-person saves before the migration, and keeps the crew's working", async () => {
+    crew("user-1", ["trip_member_lodging_nights", "trip_member_attendance"]);
+    expect((await assign(route("lodging-assignments", move), context)).status).toBe(503);
+    expect((await attendance(route(`members/${CASEY.id}/attendance`, evening), attendanceContext())).status).toBe(503);
+    expect((await POST(request({ ...body, occupants: [ALEX.id] }), context)).status).toBe(503);
+    expect((await preview(request({ ...move, action: "assign" }), context)).status).toBe(503);
+    expect(rpc).not.toHaveBeenCalled();
+    const crewPreview = await preview(request({ action: "remove", stay_id: PINE.id, expected_revision: 4 }), context);
+    expect(await crewPreview.json()).toMatchObject({ nights: [{ date: FRI, before: "Pine rental", after: "Not planned yet" }], changes: [] });
+    expect((await POST(request(body), context)).status).toBe(200);
   });
 });

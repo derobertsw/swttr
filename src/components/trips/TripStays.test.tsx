@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TripStays, DayLodging } from "./TripStays";
-import { buildLodging, previewLodging } from "@/lib/trip-lodging";
+import { buildLodging, previewCrewLodging } from "@/lib/trip-lodging";
 import { fakeTripApi, reply, sentBodies, TRIP, tripFull } from "@/test/tripApi";
 import type { TripLocation, TripLodgingAction, TripLodgingNight, TripStay, TripStayInput } from "@/types/trips";
 
@@ -12,7 +12,7 @@ const full = (stays: TripStay[] = [], nights: TripLodgingNight[] = [], revision 
 const previewRoute = (data = full()) => (body: unknown) => {
   const input = body as { action: TripLodgingAction; stay: TripStayInput; stay_id: string; date: string; status: string };
   const payload = input.action === "save" ? input.stay : input.action === "remove" ? { id: input.stay_id } : { date: input.date, status: input.status };
-  return reply(200, previewLodging(data.trip, data.lodging!, input.action, payload));
+  return reply(200, previewCrewLodging(data.trip, data.lodging!, input.action, payload));
 };
 const base = `/api/v1/trips/${TRIP.id}`;
 const onSaved = vi.fn().mockResolvedValue(undefined);

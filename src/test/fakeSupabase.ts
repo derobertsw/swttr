@@ -123,8 +123,23 @@ function readColumn(row: Row, column: string): unknown {
   return embedded && typeof embedded === "object" ? (embedded as Row)[field] : undefined;
 }
 
-export function createFakeSupabase(tables: Tables) {
+/** A table that doesn't exist yet: every query fails as PostgREST reports a missing table. */
+class MissingTable {
+  select() { return this; }
+  eq() { return this; }
+  order() { return this; }
+  limit() { return this; }
+  then<TResult1 = { data: null; error: { code: string; message: string } }, TResult2 = never>(
+    onfulfilled?: ((value: { data: null; error: { code: string; message: string } }) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ): PromiseLike<TResult1 | TResult2> {
+    return Promise.resolve({ data: null, error: { code: "PGRST205", message: "Could not find the table" } }).then(onfulfilled, onrejected);
+  }
+}
+
+/** `missing` lists tables from migrations that aren't applied. */
+export function createFakeSupabase(tables: Tables, { missing = [] }: { missing?: string[] } = {}) {
   return {
-    from: (table: string) => new FakeQuery((tables[table] ??= [])),
+    from: (table: string) => missing.includes(table) ? new MissingTable() as unknown as FakeQuery : new FakeQuery((tables[table] ??= [])),
   };
 }
