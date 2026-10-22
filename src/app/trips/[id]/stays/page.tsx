@@ -13,10 +13,11 @@ export default function TripStaysPage({ params }: { params: Promise<{ id: string
   const { data, loading, error, refresh } = useTrip(id);
   const userId = useUserId();
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-5">
+    <div className="flex w-full max-w-6xl flex-col gap-5">
       {loading && !data && <Skeleton className="h-48 w-full rounded-card" />}
       {error && <TripError>{error}</TripError>}
-      {data && <TripStays data={data} canEdit={data.trip.owner_user_id === userId} onSaved={refresh} />}
+      {data && <TripStays data={data} canEdit={data.trip.owner_user_id === userId} onSaved={refresh}
+        viewerMemberId={data.members.find((member) => member.user_id === userId)?.id ?? null} />}
       <div className="h-24" />
     </div>
   );

@@ -140,6 +140,33 @@ describe("Per-person nights and the crew's view of them (#331)", () => {
     expect(person(lodging, DANA.id).nights[1].state).toBe("assigned");
   });
 
+  it("reads each person's nights as runs, with the morning they change stays (#332)", () => {
+    const lodging = build();
+    const runs = (id: string) => person(lodging, id).runs.map((run) => [run.label, run.date_label, run.gap]);
+    expect(runs(ALEX.id)).toEqual([["Not planned", "Thu Oct 8 → Fri Oct 9 · 1 night", false], ["Pine rental", "Fri Oct 9 → Sun Oct 11 · 2 nights", false],
+      ["Mountain lodge", "Sun Oct 11 → Tue Oct 13 · 2 nights", false]]);
+    expect(person(lodging, ALEX.id).changeovers).toEqual([{ date: SUN, date_label: "Sun Oct 11", from: "Pine rental", to: "Mountain lodge" }]);
+    // A late arrival's earlier nights are Not on trip, never a gap.
+    expect(runs(CASEY.id)).toEqual([["Not on trip", "Thu Oct 8 → Sat Oct 10 · 2 nights", false], ["Pine rental", "Sat Oct 10 → Sun Oct 11 · 1 night", false],
+      ["Mountain lodge", "Sun Oct 11 → Tue Oct 13 · 2 nights", false]]);
+    const rows = splitRows();
+    rows.assignments = rows.assignments.filter((night) => !(night.member_id === ELI.id && night.date === SUN));
+    expect(person(build(rows), ELI.id).runs.map((run) => [run.label, run.date_label, run.gap])).toEqual([["Not planned", "Thu Oct 8 → Fri Oct 9 · 1 night", false],
+      ["Village hotel", "Fri Oct 9 → Sun Oct 11 · 2 nights", false], ["Not planned", "Sun Oct 11 → Mon Oct 12 · 1 night", true], ["Mountain lodge", "Mon Oct 12 → Tue Oct 13 · 1 night", false]]);
+    expect(person(build(rows), ELI.id).changeovers).toEqual([]);
+  });
+
+  it("lists each stay's people night by night, consecutive nights with the same people together", () => {
+    const stays = build().stays;
+    const occupancy = (id: string) => stays.find((stay) => stay.id === id)!.occupancy.map((run) => [run.date_label, run.member_ids]);
+    expect(occupancy(PINE.id)).toEqual([["Fri Oct 9 → Sat Oct 10 · 1 night", [ALEX.id, BLAIR.id, DANA.id]], ["Sat Oct 10 → Sun Oct 11 · 1 night", [ALEX.id, BLAIR.id, CASEY.id, DANA.id]]]);
+    expect(occupancy(VILLAGE.id)).toEqual([["Fri Oct 9 → Sun Oct 11 · 2 nights", [ELI.id, FRAN.id]]]);
+    expect(occupancy(LODGE.id)).toEqual([["Sun Oct 11 → Tue Oct 13 · 2 nights", SPLIT_MEMBERS.map((member) => member.id)]]);
+    expect(stays.find((stay) => stay.id === PINE.id)!.checkout_label).toBe("Check-out Sun Oct 11 morning");
+    const undated = buildLodging(SPLIT_TRIP, [{ ...PINE, check_in: null, check_out: null }], [], { members: SPLIT_MEMBERS, per_member: true }).stays[0];
+    expect(undated).toMatchObject({ occupancy: [], checkout_label: null, date_label: "Dates not set" });
+  });
+
   it("makes the same crew key as the database", () => {
     expect(peopleKey([])).toBe("d41d8cd98f00b204e9800998ecf8427e");
     expect(peopleKey([{ id: "b", status: "joined" }, { id: "a", status: "invited" }])).toBe(peopleKey([{ id: "a", status: "invited" }, { id: "b", status: "joined" }]));

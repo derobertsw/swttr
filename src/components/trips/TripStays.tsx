@@ -1,27 +1,59 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Input, fieldClassName } from "@/components/ui/input";
+import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { SectionLabel } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
-import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
-import { LocationPicker, LocationSummary } from "@/components/trips/LocationPicker";
+import { LocationSummary } from "@/components/trips/LocationPicker";
 import { StayDepartures, useDriveEstimates } from "@/components/trips/DriveEstimate";
+import { LodgingEditor, personNote, possessive, STAY_EXACT, type LodgingEditorTarget } from "@/components/trips/LodgingEditor";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
-import { useTripEditorHistory } from "@/hooks/useTripEditorHistory";
-import { errorMessage, timedTripRequest as lodgingRequest, TripRequestError } from "@/lib/trip-requests";
-import type { TripFull, TripLodgingAction, TripLodgingPreview, TripStayInput, TripStaySummary } from "@/types/trips";
+import type { TripFull, TripLodging, TripLodgingPerson, TripPersonRun, TripStaySummary } from "@/types/trips";
 
-type Editor = { action: TripLodgingAction; stay?: TripStaySummary; date?: string; focus?: string };
-const STAY_EXACT = "the exact property";
-const blankStay = (): TripStayInput => ({ id: crypto.randomUUID(), name: "", check_in: null, check_out: null, type: null, address: null, property_url: null, check_in_time: null, check_out_time: null, notes: null, booking_status: "not_booked", location: null });
+type Open = (target: LodgingEditorTarget) => void;
 
-export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit: boolean; onSaved: () => Promise<void> }) {
-  const [editor, setEditor] = useState<Editor | null>(null);
+/** The nights a run covers, as the crew's night list has them. */
+const runDates = (lodging: TripLodging, run: Pick<TripPersonRun, "start" | "nights">) => {
+  const index = lodging.nights.findIndex((night) => night.date === run.start);
+  return lodging.nights.slice(index, index + run.nights).map((night) => night.date);
+};
+
+/** Booking, nights and location as three separate facts, so none reads as another. */
+const stayFacts = (stay: TripStaySummary) => [
+  stay.booking_status === "booked" ? "Booked" : "Booking not confirmed",
+  !stay.check_in && "Nights not set",
+  stay.location?.precision === "exact" ? "Location set" : stay.location ? "Approximate location · Location needed for directions" : "Location needed for directions",
+].filter(Boolean).join(" · ");
+
+const occupantName = (people: TripLodgingPerson[], id: string) => {
+  const person = people.find((candidate) => candidate.member_id === id);
+  return person ? `${person.display_name}${person.membership === "invited" ? " (invitation pending)" : ""}` : "Someone who left";
+};
+
+/**
+ * The Stays section (#207, #332): each person's nights, the crew's by person
+ * and night, and the stays themselves. Members read; the organizer edits.
+ */
+export function TripStays({ data, canEdit, onSaved, viewerMemberId = null }: {
+  data: TripFull; canEdit: boolean; onSaved: () => Promise<void>;
+  /** The signed-in person's trip member id, for My stays. */
+  viewerMemberId?: string | null;
+}) {
+  const [editor, setEditor] = useState<LodgingEditorTarget | null>(null);
   const [status, setStatus] = useState("");
   const focus = useReturnFocus();
   const lodging = data.lodging;
+  const perMember = !!lodging?.per_member;
+  const people = (lodging?.people ?? []).filter((person) => person.membership !== "left");
+  const me = people.find((person) => person.member_id === viewerMemberId);
+  const myStays = new Set(me?.runs.flatMap((run) => run.stay_id ? [run.stay_id] : []));
+  // Members start with their own nights, unless a link names a stay they aren't in.
+  const [hash] = useState(() => typeof window === "undefined" ? "" : window.location.hash);
+  const linkedElsewhere = !!lodging?.stays.some((stay) => `#stay-${encodeURIComponent(stay.id)}` === hash && !myStays.has(stay.id));
+  const [chosenView, setView] = useState<"mine" | "everyone" | null>(null);
+  const mine = !!me && (chosenView ?? (canEdit || linkedElsewhere ? "everyone" : "mine")) === "mine";
+  const shown = (lodging?.stays ?? []).filter((stay) => !mine || myStays.has(stay.id));
   const restoredHash = useRef(false);
   useEffect(() => {
     if (restoredHash.current) return;
@@ -31,232 +63,210 @@ export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit:
     // Cold links can resolve before the async lodging rows exist.
     restoredHash.current = true;
     article.scrollIntoView({ block: "start", behavior: "instant" });
-  }, [lodging]);
+  }, [lodging, mine]);
   // A stay has departures once it has nights or a day starts from it as its
   // own starting point; until then each call would only cost provider credits.
   const departs = (stay: { id: string; assigned_nights: string[] }) =>
     stay.assigned_nights.length > 0 || data.days.some((day) => day.origin_stay_id === stay.id);
   const drive = useDriveEstimates(data, !!lodging?.stays.some(departs));
-  const open = (next: Editor) => {
+  const open: Open = (next) => {
     focus.remember(() => document.getElementById("trip-stays-heading"));
     setEditor(next);
   };
   return (
-    <section aria-labelledby="trip-stays-heading" className="min-w-0">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 id="trip-stays-heading" tabIndex={-1} className="text-title font-semibold text-foreground md:text-title-lg">Stays</h1>
-        {canEdit && <Button type="button" variant="outline" onClick={() => open({ action: "save" })}>Add stay</Button>}
+    <section aria-labelledby="trip-stays-heading" className="@container min-w-0">
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 id="trip-stays-heading" tabIndex={-1} className="text-title font-semibold text-foreground md:text-title-lg">Stays</h1>
+          {canEdit && <Button type="button" variant="outline" onClick={() => open({ action: "save" })}>Add stay</Button>}
+        </div>
+        <p className="mt-1 text-base text-muted-foreground">{perMember ? "Who's staying where, night by night" : "Crew stay · One shared place each night"}</p>
+        {!canEdit && <p className="mt-1 text-base text-muted-foreground">Managed by the organizer</p>}
+        <p aria-live="polite" className="text-sm text-success">{status}</p>
+        {me && !!lodging?.stays.length && <div role="group" aria-label="Show stays for" className={cn(segmentedGroupClassName, "mt-3 grid-cols-2 sm:max-w-xs")}>
+          <button type="button" aria-pressed={mine} onClick={() => setView("mine")} className={segmentedItemClassName}>My stays</button>
+          <button type="button" aria-pressed={!mine} onClick={() => setView("everyone")} className={segmentedItemClassName}>Everyone</button>
+        </div>}
       </div>
-      <p className="mt-1 text-base text-muted-foreground">Crew stay · One shared place each night</p>
-      {!canEdit && <p className="mt-1 text-base text-muted-foreground">Managed by the organizer</p>}
-      <p aria-live="polite" className="text-sm text-success">{status}</p>
-      {!(lodging?.stays.length) && <p className="mt-3 text-base text-muted-foreground">No stays saved yet. Accommodation can be planned later.</p>}
-      <div className="mt-3 divide-y divide-border border-y border-border empty:border-y-0">
-        {lodging?.stays.map((stay) => (
-          <article key={stay.id} id={`stay-${stay.id}`} className="min-w-0 scroll-mt-4 py-4">
-            <h2 className="break-words text-xl font-semibold text-foreground">{stay.name}</h2>
-            <p className="mt-1 text-base text-foreground">{stay.date_label}</p>
-            <p className="text-base text-muted-foreground">{stay.booking_status === "booked" ? "Booked" : "Not booked"} · {stay.location ? stay.location.precision === "exact" ? "Location set" : "Approximate location" : stay.address ? "Location confirmation needed for drive times" : "Location not set"}</p>
-            {stay.check_in && <p className="mt-1 text-sm text-muted-foreground">Assigned crew nights: {stay.assigned_nights.length ? stay.assigned_nights.join(", ") : "None"}</p>}
-            {departs(stay) && <StayDepartures tripId={data.trip.id} stayId={stay.id} drive={drive} canEdit={canEdit} />}
-            {!!stay.review_dates.length && <p className="mt-2 text-base text-warning">Review dates outside the itinerary: {stay.review_dates.join(", ")}. Stay dates and bookings have been kept.</p>}
-            <details className="mt-2 text-base text-foreground">
-              <summary className="min-h-11 cursor-pointer py-2">Stay details</summary>
-              <div className="space-y-2 break-words pb-2">
-                {stay.type && <p>Type: {stay.type}</p>}
-                {stay.location && <div><p>Location:</p><LocationSummary location={stay.location} exactTarget={STAY_EXACT} /></div>}
-                {stay.address && <p>Address: {stay.address}</p>}
-                {stay.check_in_time && <p>Check-in time: {stay.check_in_time.slice(0, 5)} · property local time</p>}
-                {stay.check_out_time && <p>Check-out time: {stay.check_out_time.slice(0, 5)} · property local time</p>}
-                {stay.notes && <p className="whitespace-pre-wrap">Crew notes: {stay.notes}</p>}
-                {stay.property_url && <a href={stay.property_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-primary underline">Open property website (new tab)</a>}
-              </div>
-            </details>
-            {canEdit && <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => open({ action: "save", stay })} aria-label={`Edit ${stay.name}`}>Edit</Button>
-              {!stay.check_in && <Button type="button" variant="outline" onClick={() => open({ action: "save", stay, focus: "check_in" })}>Add dates</Button>}
-              {!stay.location && <Button type="button" variant="outline" onClick={() => open({ action: "save", stay, focus: "location" })} aria-label={`Set location for ${stay.name}`}>Set location</Button>}
-              <Button type="button" variant="outline" onClick={() => open({ action: "remove", stay })} aria-label={`Remove ${stay.name} from trip`}>Remove from trip</Button>
-            </div>}
-          </article>
-        ))}
+      {mine && lodging ? <MyNights person={me} lodging={lodging} canEdit={canEdit && perMember} open={open} />
+        : lodging && people.length > 0 && !!lodging.stays.length && <PeopleByNight className="mt-6 hidden @3xl:block" lodging={lodging} people={people}
+          viewerMemberId={viewerMemberId} canEdit={canEdit && perMember} open={open} />}
+      <div className="max-w-3xl">
+        {!(lodging?.stays.length) && <p className="mt-3 text-base text-muted-foreground">No stays saved yet. Accommodation can be planned later.</p>}
+        {!!shown.length && <h2 className="mt-6 text-lg font-semibold text-foreground">{mine ? "Where you're staying" : "Properties"}</h2>}
+        {mine && !shown.length && !!lodging?.stays.length && <p className="mt-3 text-base text-muted-foreground">You aren&apos;t staying anywhere on this trip yet.</p>}
+        <div className="mt-1 divide-y divide-border border-y border-border empty:border-y-0">
+          {shown.map((stay) => <StayArticle key={stay.id} stay={stay} people={people} canEdit={canEdit} perMember={perMember} open={open}
+            departures={departs(stay) && <StayDepartures tripId={data.trip.id} stayId={stay.id} drive={drive} canEdit={canEdit} />} />)}
+        </div>
+        {!mine && perMember && lodging && <NightsWithoutStay people={people} lodging={lodging} canEdit={canEdit} open={open} />}
+        {!perMember && !!lodging?.nights.length && <details className="mt-3 text-foreground">
+          <summary className="min-h-11 cursor-pointer py-2 text-base">Crew nights</summary>
+          <ul className="divide-y divide-border">
+            {lodging.nights.map((night) => <li key={night.date} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <div className="min-w-0 break-words text-base"><p>{night.date_label}{night.pre_trip ? " · Pre-trip night" : ""}</p><p className="text-muted-foreground">{night.label}</p></div>
+              {canEdit && <Button type="button" variant="outline" onClick={() => open({ action: "night", date: night.date })} aria-label={`Change night ${night.date_label}`}>Change</Button>}
+            </li>)}
+          </ul>
+        </details>}
       </div>
-      {!!lodging?.nights.length && <details className="mt-3 text-foreground">
-        <summary className="min-h-11 cursor-pointer py-2 text-base">Crew nights</summary>
-        <ul className="divide-y divide-border">
-          {lodging.nights.map((night) => <li key={night.date} className="flex flex-wrap items-center justify-between gap-2 py-2">
-            <div className="min-w-0 break-words text-base"><p>{night.date_label}{night.pre_trip ? " · Pre-trip night" : ""}</p><p className="text-muted-foreground">{night.label}</p></div>
-            {canEdit && <Button type="button" variant="outline" onClick={() => open({ action: "night", date: night.date })} aria-label={`Change night ${night.date}`}>Change</Button>}
-          </li>)}
-        </ul>
-      </details>}
-      {editor && <StayEditor key={`${editor.action}:${editor.stay?.id ?? editor.date ?? "new"}`} editor={editor} data={data}
-        onClose={() => setEditor(null)} onCloseAutoFocus={focus.restore} onSaved={async () => {
-          setStatus(editor.action === "remove" ? "Stay removed from trip." : editor.action === "night" ? "Night plan saved." : "Stay saved.");
+      {editor && <LodgingEditor key={`${editor.action}:${editor.stay?.id ?? editor.date ?? editor.memberId ?? "new"}`} editor={editor} data={data}
+        onClose={() => setEditor(null)} onCloseAutoFocus={focus.restore} onSaved={async (message) => {
+          setStatus(message);
           await onSaved();
         }} />}
     </section>
   );
 }
 
-function StayEditor({ editor, data, onClose, onSaved, onCloseAutoFocus }: {
-  editor: Editor; data: TripFull; onClose: () => void; onSaved: () => Promise<void>; onCloseAutoFocus: (event: Event) => void;
+/** One person's nights in order, with the mornings they change stays. */
+function MyNights({ person, lodging, canEdit, open }: { person: TripLodgingPerson; lodging: TripLodging; canEdit: boolean; open: Open }) {
+  // The night before the trip and the last night are planned only by choice.
+  const runs = person.runs.filter((run) => run.state === "assigned" || run.state === "no_stay" || run.gap);
+  return <section aria-labelledby="my-nights-heading" className="mt-6 max-w-3xl">
+    <h2 id="my-nights-heading" className="text-lg font-semibold text-foreground">Your nights</h2>
+    {person.attendance.label !== "Whole trip" && <p className="text-base text-muted-foreground">{person.attendance.label}</p>}
+    {!runs.length && <p className="mt-2 text-base text-muted-foreground">No nights are planned for you yet.</p>}
+    <ul className="mt-2 divide-y divide-border border-y border-border empty:border-y-0">
+      {runs.map((run) => {
+        const changeover = person.changeovers.find((entry) => entry.date === run.end);
+        return <li key={run.start} className="py-3">
+          <p className={cn("break-words text-base font-semibold", run.gap ? "text-warning" : "text-foreground")}>
+            {run.state === "assigned" ? <a href={`#stay-${run.stay_id}`} className="underline underline-offset-4">{run.label}</a> : run.gap ? "Not planned yet" : run.label}
+          </p>
+          <p className="text-base text-foreground">{run.date_label}</p>
+          {changeover && <p className="text-base text-muted-foreground">{changeover.date_label}: leave {changeover.from} in the morning, then {changeover.to} that night</p>}
+          {run.gap && canEdit && <Button type="button" variant="outline" className="mt-2" onClick={() => open({ action: "assign", memberIds: [person.member_id], dates: runDates(lodging, run) })}>Plan these nights</Button>}
+        </li>;
+      })}
+    </ul>
+  </section>;
+}
+
+/** People down the side and nights across: each run of nights in one place is one cell. */
+function PeopleByNight({ lodging, people, viewerMemberId, canEdit, open, className }: {
+  lodging: TripLodging; people: TripLodgingPerson[]; viewerMemberId: string | null; canEdit: boolean; open: Open; className?: string;
 }) {
-  const [stay, setStay] = useState<TripStayInput>(() => editor.stay ? {
-    id: editor.stay.id, name: editor.stay.name, check_in: editor.stay.check_in, check_out: editor.stay.check_out,
-    type: editor.stay.type, address: editor.stay.address, property_url: editor.stay.property_url,
-    check_in_time: editor.stay.check_in_time?.slice(0, 5) ?? null, check_out_time: editor.stay.check_out_time?.slice(0, 5) ?? null,
-    notes: editor.stay.notes, booking_status: editor.stay.booking_status, location: editor.stay.location ?? null,
-  } : blankStay());
-  const [original] = useState(() => JSON.stringify(stay));
-  const [revision, setRevision] = useState(data.lodging?.revision ?? 0);
-  const [nightStatus, setNightStatus] = useState("");
-  const dirty = editor.action === "save" ? JSON.stringify(stay) !== original : editor.action === "night" && nightStatus !== "";
-  const [preview, setPreview] = useState<TripLodgingPreview | null>(null);
-  const [replacement, setReplacement] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [errorField, setErrorField] = useState<string | null>(null);
-  const [conflict, setConflict] = useState(false);
-  const [savedPlan, setSavedPlan] = useState<TripFull | null>(null);
-  const [discarding, setDiscarding] = useState(false);
-  const [closed, setClosed] = useState(false);
-  const mutationId = useRef<string | null>(null);
-  const form = useRef<HTMLFormElement>(null);
-  const reviewRef = useRef<HTMLHeadingElement>(null);
-  const handleBack = () => {
-    if (busy) return true;
-    if (dirty) { setDiscarding(true); return true; }
-    setClosed(true);
-    return false;
-  };
-  const history = useTripEditorHistory(handleBack, dirty && !closed);
-  const close = () => { history.leave(); setClosed(true); };
-  const requestClose = () => {
-    if (handleBack()) history.ensureEntry();
-    else history.leave();
-  };
-  const update = (patch: Partial<TripStayInput>) => {
-    setStay((prev) => ({ ...prev, ...patch }));
-    setPreview(null); setErrorField(null); setError(null); setReplacement(false);
-  };
-  const change = (field: keyof TripStayInput, value: string) => update({ [field]: field === "name" ? value : value || null });
-  // Keeps what was typed in the address so the place can be confirmed later.
-  const saveLocationLater = (query: string) => {
-    if (!stay.address?.trim()) update({ address: query });
-    setTimeout(() => (form.current?.elements.namedItem("address") as HTMLElement | null)?.focus(), 0);
-  };
-  const requestBody = () => ({ action: editor.action, stay, existing: !!editor.stay, stay_id: editor.stay?.id, date: editor.date, status: nightStatus, expected_revision: revision });
-  const showError = (err: unknown) => {
-    setError(errorMessage(err));
-    setConflict(err instanceof TripRequestError && err.status === 409);
-    const field = err instanceof TripRequestError && typeof err.details?.field === "string" ? err.details.field : null;
-    setErrorField(field);
-  };
-  useEffect(() => {
-    if (busy || !errorField) return;
-    const input = form.current?.elements.namedItem(errorField);
-    if (input instanceof HTMLElement) {
-      const details = input.closest("details");
-      if (details) details.open = true;
-      input.focus();
-    }
-  }, [busy, errorField]);
-  const prepare = async (event?: FormEvent) => {
-    event?.preventDefault();
-    if (busy) return;
-    setBusy(true); setError(null); setErrorField(null);
-    try {
-      const result = await lodgingRequest<TripLodgingPreview>(`/api/v1/trips/${data.trip.id}/stays/preview`, "POST", requestBody());
-      setPreview(result); setReplacement(false); mutationId.current = crypto.randomUUID();
-      setTimeout(() => reviewRef.current?.focus(), 0);
-    } catch (err) { showError(err); }
-    finally { setBusy(false); }
-  };
-  const save = async () => {
-    if (busy || !preview || !mutationId.current) return;
-    setBusy(true); setError(null);
-    const base = `/api/v1/trips/${data.trip.id}`;
-    try {
-      await lodgingRequest(editor.action === "night" ? `${base}/lodging-nights/${editor.date}` : `${base}/stays${editor.stay ? `/${editor.stay.id}` : ""}`,
-        editor.action === "remove" ? "DELETE" : editor.action === "night" ? "PUT" : editor.stay ? "PATCH" : "POST",
-        { ...requestBody(), mutation_id: mutationId.current, replace_nights: replacement, expected_people_key: preview.people_key });
-      await onSaved(); close();
-    } catch (err) { showError(err); }
-    finally { setBusy(false); }
-  };
-  const inspect = async () => {
-    setBusy(true); setError(null);
-    try {
-      const current = await lodgingRequest<TripFull>(`/api/v1/trips/${data.trip.id}`, "GET");
-      setSavedPlan(current); setRevision(current.lodging?.revision ?? 0); setPreview(null); setConflict(false);
-    } catch (err) { showError(err); }
-    finally { setBusy(false); }
-  };
-  const input = (field: Exclude<keyof TripStayInput, "location">, label: string, type = "text", required = false, maxLength?: number) => <label className="block min-w-0 space-y-1 text-base text-foreground">
-    <span>{label}</span><Input name={field} type={type} required={required} maxLength={maxLength} value={stay[field] ?? ""} onChange={(event) => change(field, event.target.value)}
-      className={fieldClassName} aria-invalid={errorField === field || undefined} aria-describedby={errorField === field ? "stay-error" : undefined} />
-  </label>;
-  return <TripSheet open={!closed} busy={busy} onClose={requestClose} className="sm:max-w-xl" onCloseAutoFocus={(event) => { onCloseAutoFocus(event); onClose(); }}
-    onOpenAutoFocus={editor.focus ? (event) => { event.preventDefault(); const control = form.current?.elements.namedItem(editor.focus!); if (control instanceof HTMLElement) control.focus(); } : undefined}
-    header={<><TripSheetTitle>{discarding ? "Discard changes?" : editor.action === "remove" ? "Remove from trip" : editor.action === "night" ? "Change crew night" : editor.stay ? "Change stay" : "Add stay"}</TripSheetTitle>
-      <TripSheetDescription>{discarding ? "Your saved stay will be kept." : "Crew stay · Managed by the organizer"}</TripSheetDescription></>}
-    footer={discarding ? <><Button type="button" onClick={(event) => { event.preventDefault(); setDiscarding(false); history.ensureEntry(); }}>Keep editing</Button><Button type="button" variant="outline" onClick={close}>Discard changes</Button></> : <>
-      {conflict ? <Button type="button" loading={busy} onClick={inspect}>Review saved plan</Button> : preview ? <Button type="button" loading={busy} disabled={preview.conflicts.length > 0 && !replacement} onClick={save}>
-        {editor.action === "remove" ? "Remove from trip" : replacement ? "Replace those nights and save" : editor.action === "night" ? "Save night plan" : "Save stay"}
-      </Button> : <Button type="submit" form="stay-form" loading={busy}>Review {editor.action === "remove" ? "removal" : "nights"}</Button>}
-      <Button type="button" variant="outline" disabled={busy} onClick={requestClose}>Cancel</Button>
-    </>}
-  >
-    {!discarding && <div className="space-y-4">
-      {savedPlan && <div className="rounded-control border border-warning p-3 text-base text-foreground">
-        <p>The saved plan is shown below. Your pending text is kept; review nights again before saving.</p>
-        {savedPlan.lodging?.stays.map((saved) => <p key={saved.id} className="mt-2 break-words">{saved.name} · {saved.date_label} · {saved.booking_status === "booked" ? "Booked" : "Not booked"}{saved.notes ? ` · ${saved.notes}` : ""}</p>)}
-        {!savedPlan.lodging?.stays.length && <p>No stays saved.</p>}
-      </div>}
-      {error && <p id="stay-error" role="alert" className="text-base text-destructive">{error}</p>}
-      <form id="stay-form" ref={form} onSubmit={prepare} className="space-y-4" aria-busy={busy}>
-        <fieldset disabled={busy} className="min-w-0 space-y-4">
-          {editor.action === "save" ? <>
-            {input("name", "Stay name", "text", true, 200)}
-            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{input("check_in", "Check-in", "date")}{input("check_out", "Check-out", "date")}</div>
-            <p className="text-base text-muted-foreground">Dates are optional. Check-out morning is included as a starting point, not another night.</p>
-            <label className="block space-y-1 text-base text-foreground"><span>Booking status</span><select name="booking_status" value={stay.booking_status} onChange={(event) => change("booking_status", event.target.value)} className={fieldClassName}><option value="not_booked">Not booked</option><option value="booked">Booked</option></select></label>
-            <LocationPicker tripId={data.trip.id} heading="Where is the stay?" exactTarget={STAY_EXACT} value={stay.location ?? null}
-              initialQuery={editor.focus === "location" ? stay.address ?? "" : ""} onChange={(location) => update({ location })} onSaveLater={saveLocationLater} />
-            {input("address", "Address or location description", "text", false, 1000)}
-            <details className="text-base text-foreground"><summary className="min-h-11 cursor-pointer py-2">More details (optional)</summary>
-              <div className="space-y-3">
-                <label className="block space-y-1"><span>Stay type</span><select name="type" value={stay.type ?? ""} onChange={(event) => change("type", event.target.value)} className={fieldClassName}><option value="">Not set</option>{["hotel", "rental", "hut", "campground", "other"].map((type) => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}</select></label>
-                {input("property_url", "Property website", "url", false, 2000)}
-                {input("check_in_time", "Check-in time (property local time)", "time")}{input("check_out_time", "Check-out time (property local time)", "time")}
-                <label className="block space-y-1"><span>Notes shared with the crew</span><textarea name="notes" rows={3} maxLength={4000} className={cn(fieldClassName, "h-auto py-2")} value={stay.notes ?? ""} onChange={(event) => change("notes", event.target.value)} aria-invalid={errorField === "notes" || undefined} /></label>
-                <p className="text-base text-muted-foreground">Leave out confirmation numbers, payment details and access codes.</p>
-              </div>
-            </details>
-          </> : editor.action === "remove" ? <><p className="break-words text-base text-foreground">{editor.stay?.name}</p><p className="text-base text-foreground">Removing this stay from the trip does not cancel your booking. Assigned nights will become Not planned yet.</p></> : <>
-            <p className="text-base text-foreground">Night of {editor.date}</p>
-            <p className="text-base text-muted-foreground">Current plan: {data.lodging?.nights.find((night) => night.date === editor.date)?.label ?? "Not planned yet"}</p>
-            <label className="block space-y-1 text-base text-foreground"><span>Change night plan to</span><select name="night_status" required value={nightStatus} className={fieldClassName} onChange={(event) => { setNightStatus(event.target.value); setPreview(null); }}><option value="">Choose a night plan</option><option value="no_stay">No stay needed</option><option value="unplanned">Not planned yet</option></select></label>
-            <p className="text-base text-muted-foreground">Neither choice sets the next morning’s starting point. To assign lodging, add or date a stay.</p>
-          </>}
-        </fieldset>
-      </form>
-      {preview && <section className="rounded-control border border-border p-3 text-base text-foreground">
-        <h3 tabIndex={-1} ref={reviewRef} className="font-semibold">{editor.action === "remove" ? "Removal preview" : "Night preview"}</h3>
-        {editor.action === "save" && <p className="mt-1">{preview.date_label}</p>}
-        {!preview.nights.length && <p className="mt-2">No night assignments will change.</p>}
-        <ul className="mt-2 space-y-3">{preview.nights.map((night) => <li key={night.date} className="break-words">
-          <p>{night.date_label}: {night.before} → {night.after}</p>
-          {night.morning && <p className="text-muted-foreground">{night.morning} starting point: {night.morning_origin}</p>}
-        </li>)}</ul>
-        {!!preview.review_dates.length && <p className="mt-3 text-warning">Review nights outside the itinerary: {preview.review_dates.join(", ")}. These dates will be kept.</p>}
-        {!!preview.conflicts.length && <label className="mt-3 flex min-h-11 items-start gap-3"><input type="checkbox" checked={replacement} disabled={busy} onChange={(event) => setReplacement(event.target.checked)} className="mt-1 size-5 shrink-0" /><span>Replace the existing plans for {preview.conflicts.join(", ")}. Keep all stay records and booking statuses.</span></label>}
-        {editor.action === "save" && <Button type="button" variant="outline" className="mt-3" disabled={busy} onClick={() => { setPreview(null); form.current?.querySelector<HTMLInputElement>('input[name="check_in"]')?.focus(); }}>Change dates</Button>}
-      </section>}
-      {busy && <p role="status" className="text-base text-muted-foreground">{preview ? "Saving lodging…" : "Loading night preview…"}</p>}
+  const [selected, setSelected] = useState<{ member: string; start: string } | null>(null);
+  const person = selected ? people.find((candidate) => candidate.member_id === selected.member) : undefined;
+  const run = person?.runs.find((candidate) => candidate.start === selected?.start);
+  return <section aria-labelledby="people-by-night-heading" className={className}>
+    <h2 id="people-by-night-heading" className="text-lg font-semibold text-foreground">Each night</h2>
+    <p className="text-base text-muted-foreground">Choose someone&apos;s nights for the details.</p>
+    <div className="mt-2 overflow-x-auto">
+      <table className="w-full border-collapse text-base">
+        <caption className="sr-only">Who is staying where, by night. Each night&apos;s check-out is the next morning.</caption>
+        <thead><tr className="border-b border-border">
+          <th scope="col" className="sticky left-0 z-10 bg-background py-2 pr-4 text-left text-sm font-medium text-muted-foreground">Person</th>
+          {lodging.nights.map((night) => <th key={night.date} scope="col" className="min-w-32 px-2 py-2 text-left align-bottom text-sm font-medium text-foreground">
+            <span className="block font-normal text-muted-foreground">{night.pre_trip ? "Night before" : night.last_night ? "Last night" : "Night of"}</span>{night.date_label}
+          </th>)}
+        </tr></thead>
+        <tbody className="divide-y divide-border">
+          {people.map((entry) => <tr key={entry.member_id}>
+            <th scope="row" className="sticky left-0 z-10 max-w-48 bg-background py-2 pr-4 text-left align-top font-normal">
+              <span className="block break-words font-semibold text-foreground">{entry.display_name}{entry.member_id === viewerMemberId && entry.display_name !== "You" ? " (you)" : ""}</span>
+              {personNote(entry) && <span className="block text-sm text-muted-foreground">{personNote(entry)}</span>}
+            </th>
+            {entry.runs.map((cell) => {
+              const pressed = selected?.member === entry.member_id && selected.start === cell.start;
+              return <td key={cell.start} colSpan={cell.nights} className="border-l border-border px-1 py-1 align-top">
+                <button type="button" aria-pressed={pressed} aria-label={`${entry.display_name}: ${cell.gap ? "Not planned yet" : cell.label}, ${cell.date_label}`}
+                  onClick={() => setSelected(pressed ? null : { member: entry.member_id, start: cell.start })}
+                  className={cn("flex min-h-11 w-full flex-col items-start justify-center rounded-control px-2 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring aria-pressed:bg-primary-soft",
+                    cell.state === "assigned" ? "text-foreground" : cell.gap && entry.membership !== "invited" ? "text-warning" : "text-muted-foreground")}>
+                  {/* One bar across the run's nights shows they continue. */}
+                  {cell.state === "assigned" && <span aria-hidden="true" className="mb-1 h-0.5 w-full rounded-full bg-primary/60" />}
+                  <span className="break-words">{cell.gap ? "Not planned yet" : cell.label}</span>
+                </button>
+              </td>;
+            })}
+          </tr>)}
+        </tbody>
+      </table>
+    </div>
+    {person && run && <RunDetails person={person} run={run} lodging={lodging} canEdit={canEdit} open={open} />}
+  </section>;
+}
+
+function RunDetails({ person, run, lodging, canEdit, open }: { person: TripLodgingPerson; run: TripPersonRun; lodging: TripLodging; canEdit: boolean; open: Open }) {
+  const stay = run.stay_id ? lodging.stays.find((candidate) => candidate.id === run.stay_id) : undefined;
+  const changeover = person.changeovers.find((entry) => entry.date === run.end);
+  const morning = person.days.find((day) => day.date === run.end);
+  const morningLabel = lodging.nights.find((night) => night.date === run.end)?.date_label;
+  return <div className="mt-4 max-w-3xl border-l-2 border-border pl-4 text-base">
+    <h3 className="break-words font-semibold text-foreground">{person.display_name} · {run.gap ? "Not planned yet" : run.label}</h3>
+    <p className="text-foreground">{run.date_label}</p>
+    {personNote(person) && <p className="text-muted-foreground">{personNote(person)}</p>}
+    {stay && <p className="text-muted-foreground">{stayFacts(stay)}</p>}
+    {changeover ? <p className="text-foreground">{changeover.date_label}: leaves {changeover.from} in the morning, then {changeover.to} that night</p>
+      : stay && morningLabel && morning?.participation === "participating" && <p className="text-foreground">{morningLabel} morning: starts from {morning.starting_from}</p>}
+    {canEdit && <div className="mt-2 flex flex-wrap gap-2">
+      <Button type="button" variant="outline" onClick={() => open({ action: "assign", memberIds: [person.member_id], dates: runDates(lodging, run) })}>Change these nights</Button>
+      <Button type="button" variant="outline" onClick={() => open({ action: "attendance", memberId: person.member_id })}>Change {possessive(person.display_name)} trip dates</Button>
     </div>}
-  </TripSheet>;
+  </div>;
+}
+
+function StayArticle({ stay, people, canEdit, perMember, open, departures }: {
+  stay: TripStaySummary; people: TripLodgingPerson[]; canEdit: boolean; perMember: boolean; open: Open; departures: ReactNode;
+}) {
+  return <article id={`stay-${stay.id}`} className="min-w-0 scroll-mt-4 py-4">
+    <h3 className="break-words text-xl font-semibold text-foreground">{stay.name}</h3>
+    <p className="mt-1 text-base text-foreground">{stay.date_label}</p>
+    {stay.checkout_label && <p className="text-base text-muted-foreground">{stay.checkout_label} · a starting point, not another night</p>}
+    <p className="text-base text-muted-foreground">{stayFacts(stay)}</p>
+    {people.length > 0 && stay.occupancy.length > 0 && <div className="mt-2">
+      <p className="text-sm font-medium text-muted-foreground">Staying here</p>
+      <ul>{stay.occupancy.map((run) => <li key={run.dates[0]} className="flex items-start justify-between gap-3">
+        <p className="min-w-0 flex-1 break-words py-2 text-base text-foreground"><span className="text-muted-foreground">{run.date_label}:</span> {run.member_ids.length ? run.member_ids.map((id) => occupantName(people, id)).join(", ") : "Nobody yet"}</p>
+        {canEdit && perMember && run.member_ids.length > 0 && <Button type="button" variant="ghost" className="shrink-0" onClick={() => open({ action: "assign", memberIds: run.member_ids, dates: run.dates })}
+          aria-label={`Change nights ${run.date_label} at ${stay.name}`}>Change</Button>}
+      </li>)}</ul>
+    </div>}
+    {departures}
+    {!!stay.review_dates.length && <p className="mt-2 text-base text-warning">Review dates outside the itinerary: {stay.review_dates.join(", ")}. Stay dates and bookings have been kept.</p>}
+    <details className="mt-2 text-base text-foreground">
+      <summary className="min-h-11 cursor-pointer py-2">Stay details</summary>
+      <div className="space-y-2 break-words pb-2">
+        {stay.type && <p>Type: {stay.type}</p>}
+        {stay.location && <div><p>Location:</p><LocationSummary location={stay.location} exactTarget={STAY_EXACT} /></div>}
+        {stay.address && <p>Address: {stay.address}</p>}
+        {stay.check_in_time && <p>Check-in time: {stay.check_in_time.slice(0, 5)} · property local time</p>}
+        {stay.check_out_time && <p>Check-out time: {stay.check_out_time.slice(0, 5)} · property local time</p>}
+        {stay.notes && <p className="whitespace-pre-wrap">Crew notes: {stay.notes}</p>}
+        {stay.property_url && <a href={stay.property_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-primary underline">Open property website (new tab)</a>}
+      </div>
+    </details>
+    {canEdit && <div className="flex flex-wrap gap-2">
+      <Button type="button" variant="outline" onClick={() => open({ action: "save", stay })} aria-label={`Edit ${stay.name}`}>Edit</Button>
+      {!stay.check_in && <Button type="button" variant="outline" onClick={() => open({ action: "save", stay, focus: "check_in" })}>Add dates</Button>}
+      {perMember && !!stay.check_in && <Button type="button" variant="outline" onClick={() => open({ action: "save", stay, focus: "occupants" })} aria-label={`Choose who is staying at ${stay.name}`}>Who&apos;s staying</Button>}
+      {!stay.location && <Button type="button" variant="outline" onClick={() => open({ action: "save", stay, focus: "location" })} aria-label={`Set location for ${stay.name}`}>Set location</Button>}
+      <Button type="button" variant="outline" onClick={() => open({ action: "remove", stay })} aria-label={`Remove ${stay.name} from trip`}>Remove from trip</Button>
+    </div>}
+  </article>;
+}
+
+/** Each person's nights with no stay: not planned yet between trip days, or No accommodation needed. */
+function NightsWithoutStay({ people, lodging, canEdit, open }: { people: TripLodgingPerson[]; lodging: TripLodging; canEdit: boolean; open: Open }) {
+  // A pending invitation hasn't said they're coming, so their nights aren't missing yet.
+  const rows = people.filter((person) => person.membership !== "invited")
+    .flatMap((person) => person.runs.filter((run) => run.gap || run.state === "no_stay").map((run) => ({ person, run })));
+  if (!rows.length) return null;
+  return <section aria-labelledby="nights-without-stay-heading" className="mt-6">
+    <h2 id="nights-without-stay-heading" className="text-lg font-semibold text-foreground">Nights without a stay</h2>
+    <ul className="mt-1 divide-y divide-border border-y border-border">
+      {rows.map(({ person, run }) => <li key={`${person.member_id}:${run.start}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
+        <div className="min-w-0 break-words text-base">
+          <p className="text-foreground">{person.display_name} · {run.date_label}</p>
+          <p className={run.gap ? "text-warning" : "text-muted-foreground"}>{run.gap ? "Not planned yet" : run.label}</p>
+        </div>
+        {canEdit && <Button type="button" variant="outline" onClick={() => open({ action: "assign", memberIds: [person.member_id], dates: runDates(lodging, run) })}
+          aria-label={`${run.gap ? "Plan" : "Change"} ${possessive(person.display_name)} nights ${run.date_label}`}>{run.gap ? "Plan" : "Change"}</Button>}
+      </li>)}
+    </ul>
+  </section>;
 }
 
 /**

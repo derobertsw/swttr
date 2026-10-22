@@ -43,6 +43,8 @@ interface TripSheetProps {
   described?: boolean;
   /** For the dialog on wider screens, e.g. its max width. */
   className?: string;
+  /** A long form: on phones the drawer takes the full height, one surface to scroll. */
+  fullHeight?: boolean;
   onOpenAutoFocus?: (event: Event) => void;
   onCloseAutoFocus?: (event: Event) => void;
 }
@@ -60,6 +62,7 @@ export function TripSheet({
   footer,
   described = true,
   className,
+  fullHeight = false,
   onOpenAutoFocus,
   onCloseAutoFocus,
 }: TripSheetProps) {
@@ -75,6 +78,7 @@ export function TripSheet({
       <InDrawer.Provider value={true}>
         <Drawer open={open} onOpenChange={onOpenChange} dismissible={!busy}>
           <DrawerContent
+            className={cn(fullHeight && "h-[calc(100dvh-env(safe-area-inset-top)-1.5rem)]")}
             onOpenAutoFocus={onOpenAutoFocus}
             onCloseAutoFocus={onCloseAutoFocus}
             {...describedBy}

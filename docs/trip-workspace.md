@@ -35,4 +35,4 @@ Plan, Stays, Crew and Packing put their content on the page without cards. Headi
 
 ## What this doesn't change
 
-Data, permissions and calculations are as they were. Per-person nightly lodging (#331), split-stay views (#332), meeting details and departures (#333), sport-specific day briefs (#334), trip-day context in Gear up (#335) and dated crew tasks and statuses (#336) build on this frame.
+Data, permissions and calculations are as they were. Per-person nightly lodging (#331), split-stay views (#332, in [trip-stays.md](trip-stays.md)), meeting details and departures (#333), sport-specific day briefs (#334), trip-day context in Gear up (#335) and dated crew tasks and statuses (#336) build on this frame.

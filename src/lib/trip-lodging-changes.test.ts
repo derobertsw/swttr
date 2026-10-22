@@ -148,4 +148,33 @@ describe("Parsing per-person lodging input", () => {
     expect(parseOccupants([])).toEqual([]);
     expect(parseOccupants(["1a000000-0000-4000-8000-000000000001", "1A000000-0000-4000-8000-000000000001"])).toHaveProperty("error");
   });
+
+  it("says in words whose nights change, grouping people who change the same way (#332)", () => {
+    expect(preview({ action: "assign", assignments: [BLAIR, DANA].map((entry) => ({ member_id: entry.id, status: "assigned" as const, stay_id: VILLAGE.id, dates: [SAT] })) }).summary)
+      .toEqual(["Move Blair and Dana from Pine rental to Village hotel for the night of Sat Oct 10."]);
+    expect(preview({ action: "assign", assignments: [{ member_id: ALEX.id, status: "assigned", stay_id: VILLAGE.id, dates: [FRI, SAT] }] }).summary)
+      .toEqual(["Move Alex from Pine rental to Village hotel for the nights of Fri Oct 9 and Sat Oct 10."]);
+    const rows = splitRows();
+    rows.assignments = rows.assignments.filter((night) => night.stay_id !== VILLAGE.id);
+    rows.stays = rows.stays.filter((stay) => stay.id !== VILLAGE.id);
+    expect(preview({ action: "save", stay: input(VILLAGE), existing: false, occupants: [ELI.id, FRAN.id] }, rows).summary)
+      .toEqual(["Put Eli and Fran (invitation pending) in Village hotel for the nights of Fri Oct 9 and Sat Oct 10."]);
+    expect(preview({ action: "remove", id: PINE.id }).summary).toEqual([
+      "Take Alex, Blair and Dana out of Pine rental for the nights of Fri Oct 9 and Sat Oct 10. Those nights become Not planned.",
+      "Take Casey out of Pine rental for the night of Sat Oct 10. That night becomes Not planned."]);
+    expect(preview({ action: "attendance", member_id: DANA.id, attendance: { arrival_date: null, departure_date: SUN, skipped_dates: [] } }).summary)
+      .toEqual(["Take Dana off the trip for the nights of Sun Oct 11 and Mon Oct 12, and out of Mountain lodge."]);
+    expect(preview({ action: "assign", assignments: [{ member_id: ELI.id, status: "no_stay", dates: [THU, FRI, SAT, MON] }] }).summary)
+      .toEqual(["Change Eli from Not planned to No accommodation needed for the night of Thu Oct 8.",
+        "Change Eli from Village hotel to No accommodation needed for the nights of Fri Oct 9 and Sat Oct 10.",
+        "Change Eli from Mountain lodge to No accommodation needed for the night of Mon Oct 12."]);
+    expect(preview({ action: "assign", assignments: [{ member_id: ALEX.id, status: "unplanned", dates: [FRI, SAT, SUN, MON] }] }).summary)
+      .toEqual(["Take Alex out of Pine rental for the nights of Fri Oct 9 and Sat Oct 10. Those nights become Not planned.",
+        "Take Alex out of Mountain lodge for the nights of Sun Oct 11 and Mon Oct 12. Those nights become Not planned."]);
+    const alone = splitRows();
+    alone.assignments = alone.assignments.filter((night) => night.member_id !== ALEX.id);
+    const cabin = { ...input(PINE), id: "2b000000-0000-4000-8000-000000000009", name: "Cabin", check_out: "2026-10-13" };
+    expect(preview({ action: "save", stay: cabin, existing: false, occupants: [ALEX.id] }, alone).summary).toEqual(["Put Alex in Cabin for the nights of Fri Oct 9 through Mon Oct 12."]);
+    expect(preview({ action: "save", stay: input(PINE, { notes: "Code at the door" }), existing: true }).summary).toEqual([]);
+  });
 });
