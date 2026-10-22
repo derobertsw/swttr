@@ -25,6 +25,8 @@ export interface ExtremityCloValues {
 export interface BodyPartClo {
   clo: number;
   minimum: number;
+  /** Opt-in local upper limit; legacy sport policies omit it. */
+  maximum?: number;
 }
 
 interface ThermalComfortDecision {
@@ -56,10 +58,13 @@ function getSeverity(delta: number, targetRange: [number, number]): ThermalRiskS
 /** Pair each region's or extremity's clo with its minimum target. */
 export function withMinimums<K extends string>(
   clo: Record<K, number> | undefined,
-  minimum: Record<K, number> | undefined
+  minimum: Record<K, number> | undefined,
+  maximum?: Partial<Record<K, number>>,
 ): BodyPartClo[] {
   if (!clo || !minimum) return [];
-  return (Object.keys(minimum) as K[]).map((part) => ({ clo: clo[part], minimum: minimum[part] }));
+  return (Object.keys(minimum) as K[]).map((part) => ({
+    clo: clo[part], minimum: minimum[part], ...(maximum ? { maximum: maximum[part] } : {}),
+  }));
 }
 
 /**
@@ -87,6 +92,13 @@ function localShortfall(bodyParts: BodyPartClo[] = []): { deficit: number; share
   return { deficit, share };
 }
 
+/** Shared local band assessment for accessory selection and manual edits. */
+export function localThermalStatus(clo: number, minimum: number, maximum: number): 'under' | 'over' | 'in_range' {
+  if (minimum - clo > THERMAL_DISPLAY_CLO_EPSILON) return 'under';
+  if (clo - maximum > THERMAL_DISPLAY_CLO_EPSILON) return 'over';
+  return 'in_range';
+}
+
 /**
  * Cold when the whole body is below its target range or a body part is below
  * its minimum, overheating when the whole body is well above the range, and
@@ -106,6 +118,9 @@ export function evaluateThermalComfort(input: ThermalComfortInput): ThermalComfo
   const localDeficit = localShortfall(bodyParts).deficit;
   const wholeBodyDeficit = targetMin - totalClo;
   const wholeBodyExcess = totalClo - targetMax;
+  const localExcess = Math.max(0, ...(bodyParts ?? []).map(part =>
+    part.maximum !== undefined && part.clo - part.maximum > THERMAL_DISPLAY_CLO_EPSILON
+      ? part.clo - part.maximum : 0));
 
   if (wholeBodyDeficit > THERMAL_DISPLAY_CLO_EPSILON) {
     const delta = Math.max(wholeBodyDeficit, localDeficit);
@@ -117,11 +132,12 @@ export function evaluateThermalComfort(input: ThermalComfortInput): ThermalComfo
     };
   }
 
-  if (wholeBodyExcess > overheatBufferClo) {
+  if (wholeBodyExcess > overheatBufferClo || localExcess > 0) {
+    const delta = Math.max(wholeBodyExcess, localExcess);
     return {
       riskType: "overheat",
-      severity: getSeverity(wholeBodyExcess, targetRange),
-      delta: wholeBodyExcess,
+      severity: getSeverity(delta, targetRange),
+      delta,
     };
   }
 

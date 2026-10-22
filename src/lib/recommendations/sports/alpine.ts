@@ -11,7 +11,7 @@ import type { IreqResult } from '@/types/garments';
 import type { SportRecommender } from '../handler';
 import { metabolicRateFor, phaseExposure, phaseIreq, phaseTargets, type PhaseTargets } from '../thermal-targets';
 import { buildAlpineEnsemble, alpineRegionalCapacity } from './alpine-ensemble';
-import { selectHandwear, selectHeadwearByCategory } from '../extremities';
+import { selectPhaseAccessories } from '../extremities';
 import { buildScoredRecommendation } from '../response-builder';
 import {
   formatConditions,
@@ -95,8 +95,7 @@ export const alpine: SportRecommender<AlpineTargets> = {
       targets.regional,
       request.precipitation
     );
-    const handwear = selectHandwear(pool.handwear, tempC, false, targets.extremity.neutral.hands);
-    const headwear = selectHeadwearByCategory(pool.headwear, tempC, false, { includeHelmet: true });
+    const { handwear, headwear } = selectPhaseAccessories('alpine_skiing', targets, pool, tempC, ensemble);
 
     const { recommendation, warnings } = buildScoredRecommendation(
       {

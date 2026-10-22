@@ -9,6 +9,7 @@ import {
   calculateThermalComfortScore,
   evaluateThermalComfort,
   THERMAL_DISPLAY_CLO_EPSILON,
+  localThermalStatus,
   type BodyPartClo,
 } from '@/lib/biophysics/comfort';
 import type {
@@ -37,6 +38,7 @@ function sum(values: (number | null)[]): number | null {
 interface PartAgainstMinimum {
   clo: number;
   minimum: number | undefined;
+  maximum?: number;
 }
 
 function hasMinimum(part: PartAgainstMinimum): part is BodyPartClo {
@@ -73,6 +75,7 @@ function bodyPartStatus(clo: number, minimum: number, target: number): BodyPartE
   return 'in_range';
 }
 
+/** Assess resolved worn layers against phase bands; unknown insulation withholds comfort. */
 export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
   if (!input.itemClo) throw new Error('Evaluation items must be resolved before evaluating');
   const itemClo = input.itemClo;
@@ -82,7 +85,8 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
 
   const bodyParts = Object.fromEntries(
     EVALUATED_BODY_PARTS.map((part) => {
-      const rawClo = sum(itemClo[part]);
+      const rawClo = sum(part === 'headNeck' && input.hoodClo !== undefined
+        ? [...itemClo[part], input.hoodClo] : itemClo[part]);
       if (rawClo === null) return [part, { thermal_data_status: 'unknown', target: input.targets[part] }];
       const coef = REGRESSION_COEF[part];
       const clo = coef ? rawClo * coef : rawClo;
@@ -91,6 +95,9 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
         target === undefined
           ? { clo }
           : { clo, target, delta: target - clo, status: bodyPartStatus(clo, minimum(part) ?? target, target) };
+      if ((part === 'hands' || part === 'headNeck') && input.extremityMaxTargets?.[part] !== undefined) {
+        evaluation.status = localThermalStatus(clo, minimum(part) ?? target ?? 0, input.extremityMaxTargets[part]!);
+      }
       return [part, evaluation];
     })
   ) as Record<EvaluatedBodyPart, BodyPartEvaluation>;
@@ -115,8 +122,8 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
     });
   }
   const extremities: PartAgainstMinimum[] = [
-    { clo: hands.clo!, minimum: minimum('hands') },
-    { clo: headNeck.clo!, minimum: minimum('headNeck') },
+    { clo: hands.clo!, minimum: minimum('hands'), maximum: input.extremityMaxTargets?.hands },
+    { clo: headNeck.clo!, minimum: minimum('headNeck'), maximum: input.extremityMaxTargets?.headNeck },
   ];
   const maxRegionalDeficit = maxDeficit(regions);
   const maxExtremityDeficit = maxDeficit(extremities);

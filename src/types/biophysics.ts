@@ -32,6 +32,24 @@ export interface ExtremityIreqData {
 export interface ExtremityIreqRange {
   min: ExtremityIreqData;
   neutral: ExtremityIreqData;
+  /** Running/XC upper comfort limits; hands may allow thin pole-grip gloves. */
+  max?: ExtremityIreqData;
+}
+
+export interface AccessoryAssessment {
+  state: 'selected' | 'not_needed' | 'missing' | 'unknown';
+  purpose: 'thermal' | 'pole_grip' | 'thermal_and_pole_grip' | 'none';
+  thermal_status: 'under' | 'in_range' | 'over';
+  selected_ids: string[];
+  clo: number;
+  min: number;
+  max: number;
+  message: string;
+}
+
+export interface AccessoryAssessments {
+  hands: AccessoryAssessment;
+  head: AccessoryAssessment;
 }
 
 /**
@@ -154,7 +172,7 @@ export interface RecommendedHeadwear {
   neck_warmth: RecommendedHeadwearItem | null;
 }
 
-export type ClothingRequirementStatus = 'owned_match' | 'generic_suggestion' | 'missing' | 'not_needed';
+export type ClothingRequirementStatus = 'owned_match' | 'generic_suggestion' | 'missing' | 'not_needed' | 'unknown';
 
 /** A suitable-clothing requirement, separate from any wardrobe item. Stable
  * `id` (`<activity>:<region>`) associates edits/explanations across calls. */
@@ -187,6 +205,7 @@ export interface BiophysicsRecommendation {
   };
   ireq: IreqRange;
   recommendation: {
+    accessories?: AccessoryAssessments;
     garments: RecommendedGarment[];
     handwear?: RecommendedHandwear | null;
     headwear?: RecommendedHeadwear | null;
@@ -234,6 +253,10 @@ export interface EvaluationItem extends GarmentSemantics {
 }
 
 export interface PhaseEvaluationInput {
+  /** Internal: resolved from the worn catalog garments on the server. */
+  hoodClo?: number;
+  /** Server-issued running/XC limits, forwarded unchanged for manual edits. */
+  extremityMaxTargets?: Partial<Record<'hands' | 'headNeck', number>>;
   /** Null means unknown, while zero means known zero insulation. Legacy
    * numeric inputs remain supported; items, when sent, are authoritative. */
   itemClo?: Record<EvaluatedBodyPart, (number | null)[]>;
