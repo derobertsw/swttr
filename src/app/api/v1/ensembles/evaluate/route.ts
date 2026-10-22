@@ -26,7 +26,7 @@ function isTargetMap(value: unknown): boolean {
 
 function parsePhase(value: unknown): PhaseEvaluationInput | null {
   if (!value || typeof value !== "object") return null;
-  const { itemClo, items: metadata, targets, minTargets, arms, targetRange } = value as Record<string, unknown>;
+  const { itemClo, items: metadata, targets, minTargets, arms, targetRange, extremityMaxTargets } = value as Record<string, unknown>;
 
   const parsedItems: Record<string, EvaluationItem[]> = {};
   const parsedClo: Record<string, (number | null)[]> = {};
@@ -59,6 +59,13 @@ function parsePhase(value: unknown): PhaseEvaluationInput | null {
 
   if (!isTargetMap(targets)) return null;
   if (minTargets !== undefined && !isTargetMap(minTargets)) return null;
+  if (extremityMaxTargets !== undefined && (
+    !extremityMaxTargets || typeof extremityMaxTargets !== 'object' || Array.isArray(extremityMaxTargets)
+    || !['hands', 'headNeck'].every(part => {
+      const limit = (extremityMaxTargets as Record<string, unknown>)[part];
+      return limit === undefined || isFiniteNumber(limit) && limit >= 0;
+    })
+  )) return null;
 
   if (arms !== undefined) {
     const { clo, target, minTarget, deficitClo } = (arms ?? {}) as Record<string, unknown>;
@@ -81,7 +88,7 @@ function parsePhase(value: unknown): PhaseEvaluationInput | null {
 
   return {
     ...(metadata !== undefined ? { items: parsedItems } : { itemClo: parsedClo }),
-    targets, minTargets, arms, targetRange,
+    targets, minTargets, arms, targetRange, extremityMaxTargets,
   } as PhaseEvaluationInput;
 }
 

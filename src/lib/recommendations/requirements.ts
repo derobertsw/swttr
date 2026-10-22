@@ -5,7 +5,7 @@
  * light requirement, unknown thermal data) is never presented as a match;
  * the requirement survives as `missing` with a generic suggestion.
  */
-import type { ClothingRequirement } from '@/types/biophysics';
+import type { AccessoryAssessments, ClothingRequirement } from '@/types/biophysics';
 import type { GarmentRow, HandwearRow, HeadwearRow } from './types';
 import { garmentCapabilities, hasUsableThermalData } from './garment-semantics';
 import { HEAD_WARMTH_TYPES } from './extremities';
@@ -104,6 +104,7 @@ interface RequirementPool {
   ownership: { garments: boolean; handwear: boolean; headwear: boolean };
   functional?: FunctionalNeeds;
   selectedIds?: ReadonlySet<string>;
+  accessories?: AccessoryAssessments;
 }
 
 export function buildClothingRequirements(
@@ -131,6 +132,23 @@ export function buildClothingRequirements(
     ['head', targets.extremity.neutral.head, headWarmth, pool.ownership.headwear],
   ];
   for (const [region, neutral, items, owned] of extremity) {
+    const accessory = pool.accessories?.[region];
+    if (accessory) {
+      const matched = (region === 'head' ? pool.headwear : items).find(item => accessory.selected_ids.includes(item.id));
+      const neckOnly = region === 'head' && matched && !HEAD_WARMTH_TYPES.includes((matched as HeadwearRow).headwear_type);
+      const label = region === 'hands' && accessory.purpose === 'pole_grip'
+        ? 'Thin XC gloves for pole grip and friction protection'
+        : neckOnly ? 'Neck layer to complement hood warmth' : labels[region][neutral < 0.2 ? 'light' : 'standard'];
+      const result = requirement(activity, region, label, neutral,
+        accessory.state === 'selected' && matched ? { id: matched.id, name: `${matched.brand} ${matched.model_name}` } : undefined, owned);
+      if (accessory.state === 'not_needed' || accessory.state === 'unknown') {
+        result.status = accessory.state;
+        delete result.generic_suggestion;
+      }
+      result.message = accessory.state === 'selected' ? `${result.message}. ${accessory.message}` : accessory.message;
+      requirements.push(result);
+      continue;
+    }
     const label = labels[region][neutral < 0.2 ? 'light' : 'standard'];
     if (neutral < EXTREMITY_NEEDED_CLO) {
       requirements.push({
