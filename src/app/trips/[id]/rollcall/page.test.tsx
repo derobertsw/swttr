@@ -5,10 +5,6 @@ import { ORGANIZER, SAM, TRIP, fakeTripApi, reply, tripFull } from "@/test/tripA
 import RollCallPage from "./page";
 
 // These tests cover the page, not the app chrome around it.
-vi.mock("@/components/PageLayout", () => ({
-  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
 describe("Roll call page", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

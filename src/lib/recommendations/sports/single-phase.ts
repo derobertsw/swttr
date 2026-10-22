@@ -18,7 +18,7 @@ import {
   phaseTargets,
   type PhaseTargets,
 } from '../thermal-targets';
-import { selectHandwear, selectHeadwearByCategory } from '../extremities';
+import { selectPhaseAccessories } from '../extremities';
 import { buildScoredRecommendation } from '../response-builder';
 import { formatConditions, formatSinglePhaseIreq } from '../formatting';
 import { buildClothingRequirements, filterUnsuitableEnsemble } from '../requirements';
@@ -77,14 +77,17 @@ export function createSinglePhaseSport(
     },
 
     emptyResponse(request, targets) {
+      // The no-garment fast path has not inspected accessory availability.
+      const accessories = selectPhaseAccessories(config.activity, targets, { handwear: [], headwear: [], availability: 'unknown' }, request.tempC);
       return {
         ireq: targets.policy ? formatSinglePhaseIreq(targets.ireq, targets) : { min: targets.ireq.ireqMin, neutral: targets.ireq.ireqNeutral },
         ...(config.requirementFirst ? {
-          requirements: buildClothingRequirements(config.activity, targets, { garments: [], handwear: [], headwear: [], ownership: { garments: false, handwear: false, headwear: false } }),
+          requirements: buildClothingRequirements(config.activity, targets, { garments: [], handwear: [], headwear: [], ownership: { garments: false, handwear: false, headwear: false }, accessories: accessories.assessments }),
         } : {}),
         recommendations: {
           target_clo_range: targets.targetRange,
           min_evap_potential: config.minEvapPotential,
+          ...(accessories.assessments ? { accessories: accessories.assessments } : {}),
           guidance: [...config.guidance(request, targets.basicIreq), ...(targets.policy?.assumptions ?? [])],
         },
       };
@@ -102,15 +105,8 @@ export function createSinglePhaseSport(
         }
         : undefined;
       const ensemble = functional ? filterUnsuitableEnsemble(builtEnsemble, targets.regional, functional) : builtEnsemble;
-      const handwear = selectHandwear(
-        pool.handwear,
-        request.tempC,
-        true,
-        targets.extremity.neutral.hands
-      );
-      const headwear = selectHeadwearByCategory(pool.headwear, request.tempC, true, {
-        includeHelmet: false,
-      });
+      const accessories = selectPhaseAccessories(config.activity, targets, pool, request.tempC, ensemble);
+      const { handwear, headwear } = accessories;
 
       const { recommendation, warnings } = buildScoredRecommendation(
         {
@@ -131,11 +127,13 @@ export function createSinglePhaseSport(
             targetRange: targets.targetRange,
             regionalMinTarget: targets.regional.min,
             extremityMinTarget: targets.extremity.min,
+            extremityMaxTarget: targets.extremity.max,
           },
         },
         handwear,
         headwear
       );
+      if (accessories.assessments) recommendation.accessories = accessories.assessments;
 
       const requirements = config.requirementFirst
         ? buildClothingRequirements(config.activity, targets, {
@@ -143,6 +141,7 @@ export function createSinglePhaseSport(
           handwear: pool.handwear, headwear: pool.headwear,
           ownership: { garments: pool.usingWardrobe, handwear: pool.handwearOwned ?? false, headwear: pool.headwearOwned ?? false },
           functional,
+          accessories: accessories.assessments,
           selectedIds: new Set([...ensemble.map((g) => g.id), handwear?.id, headwear.headWarmth?.id, headwear.neckWarmth?.id].filter((id): id is string => Boolean(id))),
         })
         : undefined;
@@ -157,8 +156,10 @@ export function createSinglePhaseSport(
         ireq: formatSinglePhaseIreq(targets.ireq, targets),
         ...(requirements ? { requirements } : {}),
         recommendation,
-        warnings: [...warnings, ...(protectedOutfit?.warnings ?? [])],
-        guidance: [...config.guidance(request, targets.basicIreq), ...missingGuidance, ...(targets.policy?.assumptions ?? [])],
+        warnings: [...warnings, ...(protectedOutfit?.warnings ?? []), ...accessories.warnings],
+        guidance: [...new Set([...config.guidance(request, targets.basicIreq), ...missingGuidance,
+          ...Object.values(accessories.assessments ?? {}).map(assessment => assessment.message),
+          ...(targets.policy?.assumptions ?? [])])],
       };
     },
   };

@@ -3,9 +3,8 @@
 import { use, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import PageLayout from "@/components/PageLayout";
 import { DateChangeSheet, type TripDateChangeRequest } from "@/components/trips/DateChangeSheet";
-import { BackLink, SectionLabel, TripError } from "@/components/trips/trip-primitives";
+import { SectionLabel, TripError } from "@/components/trips/trip-primitives";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,18 +20,15 @@ export default function TripSettingsPage({ params }: { params: Promise<{ id: str
   const { id } = use(params);
   const { data, loading, error, reload } = useTrip(id);
   return (
-    <PageLayout chromeVariant="compact">
-      <div className="flex w-full max-w-2xl flex-col gap-5">
-        <BackLink href={`/trips/${id}`}>Trip</BackLink>
-        <header>
-          <SectionLabel>Trip settings</SectionLabel>
-          <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">Name and dates</h1>
-        </header>
-        {loading && <Skeleton className="h-64 w-full rounded-card" />}
-        {error && <TripError>{error}</TripError>}
-        {data && <SettingsForm key={data.trip.id} trip={data.trip} onSaved={reload} />}
-      </div>
-    </PageLayout>
+    <div className="flex w-full max-w-2xl flex-col gap-5">
+      <header>
+        <SectionLabel>Trip settings</SectionLabel>
+        <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">Name and dates</h1>
+      </header>
+      {loading && <Skeleton className="h-64 w-full rounded-card" />}
+      {error && <TripError>{error}</TripError>}
+      {data && <SettingsForm key={data.trip.id} trip={data.trip} onSaved={reload} />}
+    </div>
   );
 }
 

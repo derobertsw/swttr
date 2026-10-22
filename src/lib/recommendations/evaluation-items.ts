@@ -5,6 +5,8 @@ import { EVALUATED_BODY_PARTS } from './layer-evaluation';
 import { itemThermalMetadata, knownClo } from './item-thermal-metadata';
 import { cacheCatalogRows, cachedCatalogRow } from './evaluation-catalog-cache';
 import { garmentMetadata } from '@/lib/garment-metadata';
+import { hoodInsulation } from './extremities';
+import type { GarmentRow } from './types';
 
 type ItemType = NonNullable<EvaluationItem['item_type']>;
 type Row = Record<string, unknown> & { id: string };
@@ -77,6 +79,17 @@ export async function resolveEvaluationItems(
     ])) as NonNullable<PhaseEvaluationInput['items']>;
     return {
       ...phase, items,
+      ...(phase.extremityMaxTargets ? {
+        hoodClo: hoodInsulation(
+          [...new Set(items.torso.filter(item => item.item_type === 'garment').map(item => item.sourceId))]
+            .flatMap(id => {
+              const row = id ? rows.get('garment')?.get(id) : undefined;
+              return row ? [row as unknown as GarmentRow] : [];
+            }),
+          items.headNeck.some(item => item.item_type === 'headwear' && item.sourceId
+            && rows.get('headwear')?.get(item.sourceId)?.headwear_type === 'ski_helmet'),
+        ),
+      } : {}),
       itemClo: Object.fromEntries(EVALUATED_BODY_PARTS.map(part => [part,
         items[part].map(item => item.rcl ?? null),
       ])) as PhaseEvaluationInput['itemClo'],

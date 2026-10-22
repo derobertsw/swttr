@@ -58,7 +58,7 @@ describe("The day's drive", () => {
     const { rerender } = render(<DayDrive data={driveTrip()} date="2027-01-08" dateLabel="Day" onSaved={vi.fn()} canEdit drive={state(estimates)} />);
     expect(screen.getByText("Choose where you're starting")).toBeInTheDocument();
     expect(screen.getByText(/No crew stay is set for Thu Jan 7 night/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Go to Stays" })).toHaveAttribute("href", "/trips/trip-drive#trip-stays-heading");
+    expect(screen.getByRole("link", { name: "Go to Stays" })).toHaveAttribute("href", "/trips/trip-drive/stays#trip-stays-heading");
     rerender(<DayDrive data={driveTrip()} date="2027-01-11" dateLabel="Day" onSaved={vi.fn()} canEdit={false} drive={state(estimates)} />);
     expect(screen.getByText("Village Inn has no location yet")).toBeInTheDocument();
     expect(screen.getByText("The drive time appears once the organizer sets its location.")).toBeInTheDocument();

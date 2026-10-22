@@ -184,7 +184,7 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
   // Getting there heading once the day has no destination and no Drive row.
   const focusSoon = (id: string) => setTimeout(() => [id, headingId, `getting-there-${date}`]
     .map((candidate) => document.getElementById(candidate)).find(Boolean)?.focus(), 0);
-  const stays = <Link href={`/trips/${tripId}#trip-stays-heading`} className={linkClass}>Go to Stays</Link>;
+  const stays = <Link href={`/trips/${tripId}/stays#trip-stays-heading`} className={linkClass}>Go to Stays</Link>;
 
   const open = (next: NonNullable<typeof editing>) => {
     setEditing(next); setStatus(""); setActionError(null);

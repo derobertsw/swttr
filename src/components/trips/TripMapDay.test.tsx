@@ -93,7 +93,7 @@ describe("Selected day logistics on the trip map", () => {
   it("sends an unlocated stay origin to its stay editor, and a member only to the day", async () => {
     const map = await tripMapFixture();
     summary(map, MON);
-    expect(screen.getByRole("link", { name: "Set the exact location of Village Inn" })).toHaveAttribute("href", "/trips/trip-drive#stay-stay-inn");
+    expect(screen.getByRole("link", { name: "Set the exact location of Village Inn" })).toHaveAttribute("href", "/trips/trip-drive/stays#stay-stay-inn");
     document.body.innerHTML = "";
     const { card } = summary(map, MON, false);
     expect(row(card, "Getting there")).toHaveTextContent("Needs the stay's location");
@@ -163,7 +163,7 @@ describe("Selected day logistics on the trip map", () => {
     expect(within(card).getByRole("link", { name: "Open tour route (new tab)" })).toHaveAttribute("href", "https://example.com/tour");
     expect(within(card).getByRole("link", { name: /Directions to Spruce Peak lot/ }).getAttribute("href")).not.toContain("example.com");
     expect(within(card).getByRole("link", { name: "Edit tour plan" })).toHaveAttribute("href", `/trips/trip-drive/days/${SAT}#tour-plan-heading`);
-    expect(within(card).getByRole("link", { name: "Edit tonight's stay" })).toHaveAttribute("href", "/trips/trip-drive#stay-stay-motel");
+    expect(within(card).getByRole("link", { name: "Edit tonight's stay" })).toHaveAttribute("href", "/trips/trip-drive/stays#stay-stay-motel");
   });
 
   it("leaves out a saved tour plan that isn't in use after the day changed activity", async () => {

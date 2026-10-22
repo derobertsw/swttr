@@ -13,7 +13,7 @@ import {
 import { calculateActivityTargetRange, calculateRegionalTargets } from '@/lib/biophysics/targets';
 import { getMetabolicRateForActivity, type ExertionLevel } from '@/lib/biophysics/exertion';
 import { applyBodySizeMetabolicAdjustment, metabolicHeatFluxFromMet } from '@/lib/biophysics/bodyMetrics';
-import { isCalibratedActivity, SUSTAINED_ACTIVITY_METS, sustainedSportPolicy } from '@/lib/biophysics/sport-policy';
+import { isCalibratedActivity, POLE_GRIP_MAX_CLO, SUSTAINED_ACTIVITY_METS, sustainedSportPolicy } from '@/lib/biophysics/sport-policy';
 import {
   applyCowedaBufferToExtremityTargets,
   applyCowedaBufferToTargetRange,
@@ -163,7 +163,17 @@ export function phaseTargets(
     validationBuffer
   );
 
-  return { targetRange, validationBuffer, regional, extremity, ...(policy ? { policy } : {}) };
+  return {
+    targetRange, validationBuffer, regional,
+    extremity: {
+      ...extremity,
+      ...(policy ? { max: {
+        hands: Math.max(extremity.neutral.hands, policy.protection.poleGrip ? POLE_GRIP_MAX_CLO : 0),
+        head: extremity.neutral.head,
+      } } : {}),
+    },
+    ...(policy ? { policy } : {}),
+  };
 }
 
 export type PhaseTargets = ReturnType<typeof phaseTargets>;

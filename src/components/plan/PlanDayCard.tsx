@@ -16,6 +16,8 @@ interface PlanDayCardProps {
   previousDay?: DailyLayerPlan;
   /** Wardrobe names for the guide's standard items. */
   itemMappings?: Map<string, string>;
+  /** False on a trip day, whose parts aren't cards (#330). */
+  framed?: boolean;
 }
 
 function itemName(bodyPart: BodyPart, layerType: LayerType, name: string, itemMappings?: Map<string, string>) {
@@ -125,7 +127,7 @@ function ChangeList({
  * through the day, and what to carry. After the first day, it leads with what
  * changed since the day before, with the whole outfit a tap away.
  */
-export function PlanDayCard({ day, previousDay, itemMappings }: PlanDayCardProps) {
+export function PlanDayCard({ day, previousDay, itemMappings, framed = true }: PlanDayCardProps) {
   const { temperatureUnit } = useTemperatureUnit();
   const headingId = useId();
   const { baseline } = day;
@@ -138,90 +140,89 @@ export function PlanDayCard({ day, previousDay, itemMappings }: PlanDayCardProps
   });
   const sameAllDay = day.dayparts.length > 1 && changingDayparts.length === 0;
 
-  return (
-    <Card asChild>
-      <article aria-labelledby={headingId} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-0.5">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-            <h3 id={headingId} className="text-lg font-semibold text-foreground">
-              {day.label}
-            </h3>
-            <p className="text-base font-semibold tabular-nums text-foreground">
-              {formatTemperatureRange(baseline.minTemp, baseline.maxTemp, temperatureUnit)}
-            </p>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Wind up to {baseline.maxWindSpeed} mph · {baseline.maxPrecipProbability}% chance of precipitation
+  const article = (
+    <article aria-labelledby={headingId} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-0.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <h3 id={headingId} className="text-lg font-semibold text-foreground">
+            {day.label}
+          </h3>
+          <p className="text-base font-semibold tabular-nums text-foreground">
+            {formatTemperatureRange(baseline.minTemp, baseline.maxTemp, temperatureUnit)}
           </p>
         </div>
+        <p className="text-sm text-muted-foreground">
+          Wind up to {baseline.maxWindSpeed} mph · {baseline.maxPrecipProbability}% chance of precipitation
+        </p>
+      </div>
 
-        {recommendation ? (
-          <section aria-label={`Wear on ${day.label}`} className="flex flex-col gap-2">
-            {leadWithChanges ? (
-              <>
-                {hasChanges(dayChanges) ? (
-                  <>
-                    <p className="text-sm font-semibold text-foreground">Changes from {previousDay.label}</p>
-                    <ChangeList changes={dayChanges} addLabel="Add" removeLabel="Leave out" />
-                  </>
-                ) : (
-                  <p className="text-sm text-foreground">Same layers as {previousDay.label}.</p>
-                )}
-                {sameAllDay && <SameAllDay />}
-                <details className="group">
-                  <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-primary [&::-webkit-details-marker]:hidden">
-                    All layers for {day.label}
-                    <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
-                  </summary>
-                  <div className="pt-1">
-                    <Outfit recommendation={recommendation} itemMappings={itemMappings} />
-                  </div>
-                </details>
-              </>
-            ) : (
-              <>
-                {changingDayparts.length > 0 && (
-                  <p className="text-sm text-muted-foreground">For the coldest part of the day.</p>
-                )}
-                <Outfit recommendation={recommendation} itemMappings={itemMappings} />
-                {sameAllDay && <SameAllDay />}
-              </>
-            )}
-          </section>
-        ) : (
-          <p className="text-sm text-muted-foreground">No general layers for these conditions.</p>
-        )}
+      {recommendation ? (
+        <section aria-label={`Wear on ${day.label}`} className="flex flex-col gap-2">
+          {leadWithChanges ? (
+            <>
+              {hasChanges(dayChanges) ? (
+                <>
+                  <p className="text-sm font-semibold text-foreground">Changes from {previousDay.label}</p>
+                  <ChangeList changes={dayChanges} addLabel="Add" removeLabel="Leave out" />
+                </>
+              ) : (
+                <p className="text-sm text-foreground">Same layers as {previousDay.label}.</p>
+              )}
+              {sameAllDay && <SameAllDay />}
+              <details className="group">
+                <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-primary [&::-webkit-details-marker]:hidden">
+                  All layers for {day.label}
+                  <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <div className="pt-1">
+                  <Outfit recommendation={recommendation} itemMappings={itemMappings} />
+                </div>
+              </details>
+            </>
+          ) : (
+            <>
+              {changingDayparts.length > 0 && (
+                <p className="text-sm text-muted-foreground">For the coldest part of the day.</p>
+              )}
+              <Outfit recommendation={recommendation} itemMappings={itemMappings} />
+              {sameAllDay && <SameAllDay />}
+            </>
+          )}
+        </section>
+      ) : (
+        <p className="text-sm text-muted-foreground">No general layers for these conditions.</p>
+      )}
 
-        {recommendation && changingDayparts.length > 0 && (
-          <section aria-label={`Through ${day.label}`} className="flex flex-col gap-3 border-t border-border pt-3">
-            {changingDayparts.map((daypart) => (
-              <div key={daypart.id} className="flex flex-col gap-1">
-                <p className="text-sm">
-                  <span className="font-semibold text-foreground">{daypart.label}</span>
-                  <span className="text-muted-foreground">
-                    {" "}· {daypart.timeRangeLabel} · {formatTemperatureRange(daypart.minTemp, daypart.maxTemp, temperatureUnit)}
-                  </span>
-                </p>
-                <ChangeList changes={daypart.changes} addLabel="Put on" removeLabel="Take off" />
-              </div>
+      {recommendation && changingDayparts.length > 0 && (
+        <section aria-label={`Through ${day.label}`} className="flex flex-col gap-3 border-t border-border pt-3">
+          {changingDayparts.map((daypart) => (
+            <div key={daypart.id} className="flex flex-col gap-1">
+              <p className="text-sm">
+                <span className="font-semibold text-foreground">{daypart.label}</span>
+                <span className="text-muted-foreground">
+                  {" "}· {daypart.timeRangeLabel} · {formatTemperatureRange(daypart.minTemp, daypart.maxTemp, temperatureUnit)}
+                </span>
+              </p>
+              <ChangeList changes={daypart.changes} addLabel="Put on" removeLabel="Take off" />
+            </div>
+          ))}
+        </section>
+      )}
+
+      {day.carryItems.length > 0 && (
+        <section aria-label={`Carry on ${day.label}`} className="flex flex-col gap-1.5 border-t border-border pt-3">
+          <p className="text-sm font-semibold text-foreground">Carry</p>
+          <ul className="flex flex-col gap-1">
+            {day.carryItems.map((item) => (
+              <li key={item} className="flex items-center gap-2 text-sm text-foreground">
+                <Backpack className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                {item}
+              </li>
             ))}
-          </section>
-        )}
-
-        {day.carryItems.length > 0 && (
-          <section aria-label={`Carry on ${day.label}`} className="flex flex-col gap-1.5 border-t border-border pt-3">
-            <p className="text-sm font-semibold text-foreground">Carry</p>
-            <ul className="flex flex-col gap-1">
-              {day.carryItems.map((item) => (
-                <li key={item} className="flex items-center gap-2 text-sm text-foreground">
-                  <Backpack className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-      </article>
-    </Card>
+          </ul>
+        </section>
+      )}
+    </article>
   );
+  return framed ? <Card asChild>{article}</Card> : article;
 }

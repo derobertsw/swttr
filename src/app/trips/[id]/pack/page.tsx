@@ -6,16 +6,15 @@ import Link from "next/link";
 import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { SharedGearList } from "@/components/trips/SharedGear";
-import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BackLink, SectionLabel, TripError } from "@/components/trips/trip-primitives";
+import { SectionLabel, TripError } from "@/components/trips/trip-primitives";
 import {
   EquipmentItems, ManualItems, OlderChecklists, PackingChanges, PackingItems, PackingSuggestions, packingDay,
 } from "@/components/trips/TripPacking";
 import { EquipmentTemplateSheet } from "@/components/trips/TouringEquipment";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
+import { usePublishTripSummary } from "@/hooks/useTrip";
 import { equipmentKey, withEquipmentChoices } from "@/lib/touring-equipment";
 import { errorMessage, timedTripRequest, tripRequest, TripRequestError } from "@/lib/trip-requests";
 import type { TripDayCoverage } from "@/types/trip-coverage";
@@ -72,6 +71,9 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   // over it; and whether to read the list again once they're done.
   const saves = useRef({ inFlight: 0, finished: 0, refreshAfter: false });
   const afterSaves = useRef(new Set<() => void>());
+  // The pack list has its own endpoint, so it names the trip for the
+  // workspace header rather than loading the whole trip for it.
+  usePublishTripSummary(data?.trip);
 
   useEffect(() => {
     let cancelled = false;
@@ -319,161 +321,160 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
   const groupGear = data?.groupGear ?? [];
 
   return (
-    <PageLayout chromeVariant="compact">
-      <div className="flex w-full max-w-2xl flex-col gap-5">
-        <BackLink href={`/trips/${id}`}>Trip</BackLink>
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1 basis-52">
-            <SectionLabel>Your bag</SectionLabel>
-            <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
-              What to pack
-            </h1>
-            {data && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                From your saved outfits for {savedDays} of {data.totalDays} {data.totalDays === 1 ? "day" : "days"}.
-              </p>
-            )}
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void refresh();
-            }}
-            disabled={loading || refreshing}
-            aria-label="Refresh pack list"
-            aria-busy={refreshing}
-          >
-            {refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-            Refresh
-          </Button>
-        </header>
-        <p role="status" className="sr-only">{status}</p>
-        {busy.size > 0 && <p aria-hidden="true" className="text-sm text-muted-foreground">Saving packing changes…</p>}
-
-        {loading && <Skeleton className="h-48 w-full rounded-card" />}
-        {error && <TripError>{error}</TripError>}
-
-        {Object.entries(checkErrors).map(([key, failure]) => (
-          <Card key={key} role="alert">
-            <p className="break-words text-sm font-medium">Packing check for {failure.name} wasn&apos;t confirmed.</p>
-            <p className="mt-1 text-sm text-muted-foreground">{failure.message} The checkbox shows the last confirmed state.</p>
-            <Button type="button" variant="outline" className="mt-3" disabled={busy.has(key.startsWith("manual:") ? key.slice(7) : key)}
-              aria-label={failure.conflict ? undefined : `Retry packing check for ${failure.name}`}
-              onClick={() => {
-                if (failure.conflict) {
-                  void refresh();
-                  setCheckErrors((current) => { const next = { ...current }; delete next[key]; return next; });
-                } else void saveCheck(failure.change, failure.name);
-              }}>
-              {failure.conflict ? "Review saved list" : "Retry"}
-            </Button>
-          </Card>
-        ))}
-
-        {data && changed && (
-          <PackingChanges items={data.items} removed={data.removed} editable={data.editable}
-            acknowledging={acknowledging} onAcknowledge={() => void acknowledge()} />
-        )}
-
-        {data && review.length > 0 && (
-          <Card>
-            <h2 className="text-xl font-semibold text-foreground">Days to review</h2>
+    <div className="flex w-full max-w-3xl flex-col gap-8">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 basis-52">
+          <SectionLabel>Your bag</SectionLabel>
+          <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
+            What to pack
+          </h1>
+          {data && (
             <p className="mt-1 text-sm text-muted-foreground">
-              Days without a saved outfit aren&apos;t in your list yet, and a saved outfit stays as it was saved when the day&apos;s plan changes.
+              From your saved outfits for {savedDays} of {data.totalDays} {data.totalDays === 1 ? "day" : "days"}.
             </p>
-            <ul className="mt-3 divide-y divide-border">
-              {review.map((day) => (
-                <li key={day.date} className="py-3 text-sm">
-                  <p className="font-medium text-foreground">
-                    {packingDay(day.date)} · {day.activity ?? "Activity not set"}
-                  </p>
-                  {day.stopName && <p className="break-words text-muted-foreground">{day.stopName}</p>}
-                  <p className="mt-1 text-foreground">{day.message}</p>
-                  {day.notes?.map((note) => <p key={note} className="mt-1 text-foreground">{note}</p>)}
-                  {day.message !== day.forecast.message && !["available", "not_requested"].includes(day.forecast.status) && (
-                    <p className="mt-1 text-muted-foreground">{day.forecast.message}</p>
-                  )}
-                  {day.approximation && <p className="mt-1 text-muted-foreground">{day.approximation}</p>}
-                  <Link href={`/trips/${id}/days/${day.date}`}
-                    className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-4 hover:no-underline"
-                    aria-label={`${coverageActionLabel(day)} for ${day.date}`}>
-                    {coverageActionLabel(day)}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            void refresh();
+          }}
+          disabled={loading || refreshing}
+          aria-label="Refresh pack list"
+          aria-busy={refreshing}
+        >
+          {refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+          Refresh
+        </Button>
+      </header>
+      <p role="status" className="sr-only">{status}</p>
+      {busy.size > 0 && <p aria-hidden="true" className="text-sm text-muted-foreground">Saving packing changes…</p>}
 
-        {data && (
-          <section aria-labelledby="pack-kits-heading" className="flex flex-col gap-2.5">
-            <h2 id="pack-kits-heading" ref={listHeading} tabIndex={-1} className="text-xl font-semibold text-foreground">From your saved outfits</h2>
-            <p className="text-sm text-muted-foreground">
-              {data.editable
-                ? "Check an item when you've packed its full quantity. Checks are private to you on this trip. New items start unchecked; returning items keep their previous check."
-                : "Packing checks can't be loaded right now. Refresh to try again."}
-            </p>
-            {data.items.length > 0 ? (
-              <PackingItems items={data.items} editable={data.editable} busy={busy} onQuantity={itemQuantity} checks={data.checks} onCheck={setPacked} />
-            ) : (
-              <Card>
-                <p className="text-sm text-foreground">
-                  No saved outfits yet. Get layers for a day in Gear up and use Save to trip; what you save is packed here, once per item.
+      {loading && <Skeleton className="h-48 w-full rounded-card" />}
+      {error && <TripError>{error}</TripError>}
+
+      {Object.entries(checkErrors).map(([key, failure]) => (
+        <div key={key} role="alert" className="border-l-2 border-destructive pl-3">
+          <p className="break-words text-sm font-medium">Packing check for {failure.name} wasn&apos;t confirmed.</p>
+          <p className="mt-1 text-sm text-muted-foreground">{failure.message} The checkbox shows the last confirmed state.</p>
+          <Button type="button" variant="outline" className="mt-3" disabled={busy.has(key.startsWith("manual:") ? key.slice(7) : key)}
+            aria-label={failure.conflict ? undefined : `Retry packing check for ${failure.name}`}
+            onClick={() => {
+              if (failure.conflict) {
+                void refresh();
+                setCheckErrors((current) => { const next = { ...current }; delete next[key]; return next; });
+              } else void saveCheck(failure.change, failure.name);
+            }}>
+            {failure.conflict ? "Review saved list" : "Retry"}
+          </Button>
+        </div>
+      ))}
+
+      {data && changed && (
+        <PackingChanges items={data.items} removed={data.removed} editable={data.editable}
+          acknowledging={acknowledging} onAcknowledge={() => void acknowledge()} />
+      )}
+
+      {data && review.length > 0 && (
+        <section aria-labelledby="pack-review-heading">
+          <h2 id="pack-review-heading" className="text-xl font-semibold text-foreground">Days to review</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Days without a saved outfit aren&apos;t in your list yet, and a saved outfit stays as it was saved when the day&apos;s plan changes.
+          </p>
+          <ul className="mt-3 divide-y divide-border">
+            {review.map((day) => (
+              <li key={day.date} className="py-3 text-sm">
+                <p className="font-medium text-foreground">
+                  {packingDay(day.date)} · {day.activity ?? "Activity not set"}
                 </p>
-              </Card>
-            )}
-          </section>
-        )}
+                {day.stopName && <p className="break-words text-muted-foreground">{day.stopName}</p>}
+                <p className="mt-1 text-foreground">{day.message}</p>
+                {day.notes?.map((note) => <p key={note} className="mt-1 text-foreground">{note}</p>)}
+                {day.message !== day.forecast.message && !["available", "not_requested"].includes(day.forecast.status) && (
+                  <p className="mt-1 text-muted-foreground">{day.forecast.message}</p>
+                )}
+                {day.approximation && <p className="mt-1 text-muted-foreground">{day.approximation}</p>}
+                <Link href={`/trips/${id}/days/${day.date}`}
+                  className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-4 hover:no-underline"
+                  aria-label={`${coverageActionLabel(day)} for ${day.date}`}>
+                  {coverageActionLabel(day)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
-        {data && (data.equipment.dates.length > 0 || data.equipment.items.length > 0) && (
-          <section aria-labelledby="pack-equipment-heading" className="flex flex-col gap-2.5">
-            <h2 id="pack-equipment-heading" ref={equipmentHeading} tabIndex={-1} className="text-xl font-semibold text-foreground">Touring equipment</h2>
-            <EquipmentItems equipment={data.equipment} busy={busy} onQuantity={equipmentQuantity}
-              onRemove={(item) => void removeEquipment(item)}
-              onAdd={() => { templateFocus.remember(() => equipmentHeading.current); setAddingEquipment(true); }}
-              checks={data.checks} onCheck={setPacked} />
-          </section>
-        )}
-        {data && addingEquipment && (
-          <EquipmentTemplateSheet equipment={data.equipment} onAdd={addEquipment}
-            onClosed={() => setAddingEquipment(false)} onCloseAutoFocus={templateFocus.restore} />
-        )}
+      {data && (
+        <section aria-labelledby="pack-kits-heading" className="flex flex-col gap-2.5">
+          <h2 id="pack-kits-heading" ref={listHeading} tabIndex={-1} className="text-xl font-semibold text-foreground">From your saved outfits</h2>
+          <p className="text-sm text-muted-foreground">
+            {data.editable
+              ? "Check an item when you've packed its full quantity. Checks are private to you on this trip. New items start unchecked; returning items keep their previous check."
+              : "Packing checks can't be loaded right now. Refresh to try again."}
+          </p>
+          {data.items.length > 0 ? (
+            <PackingItems items={data.items} editable={data.editable} busy={busy} onQuantity={itemQuantity} checks={data.checks} onCheck={setPacked} />
+          ) : (
+            <p className="text-sm text-foreground">
+              No saved outfits yet. Get layers for a day in Gear up and use Save to trip; what you save is packed here, once per item.
+            </p>
+          )}
+        </section>
+      )}
 
-        {data && (
-          <section aria-labelledby="pack-own-heading" className="flex flex-col gap-2.5">
-            <h2 id="pack-own-heading" className="text-xl font-semibold text-foreground">Your own items</h2>
-            <ManualItems items={data.manual} editable={data.editable} busy={busy}
-              onAdd={addItem} onQuantity={manualQuantity} onRemove={(item) => void removeItem(item)} checks={data.checks} onCheck={setPacked} />
-          </section>
-        )}
+      {data && (data.equipment.dates.length > 0 || data.equipment.items.length > 0) && (
+        <section aria-labelledby="pack-equipment-heading" className="flex flex-col gap-2.5">
+          <h2 id="pack-equipment-heading" ref={equipmentHeading} tabIndex={-1} className="text-xl font-semibold text-foreground">Touring equipment</h2>
+          <EquipmentItems equipment={data.equipment} busy={busy} onQuantity={equipmentQuantity}
+            onRemove={(item) => void removeEquipment(item)}
+            onAdd={() => { templateFocus.remember(() => equipmentHeading.current); setAddingEquipment(true); }}
+            checks={data.checks} onCheck={setPacked} />
+        </section>
+      )}
+      {data && addingEquipment && (
+        <EquipmentTemplateSheet equipment={data.equipment} onAdd={addEquipment}
+          onClosed={() => setAddingEquipment(false)} onCloseAutoFocus={templateFocus.restore} />
+      )}
 
-        {data && data.checklists.length > 0 && (
-          <section aria-labelledby="pack-checklists-heading" className="flex flex-col gap-2.5">
-            <h2 id="pack-checklists-heading" className="text-xl font-semibold text-foreground">Older day checklists</h2>
-            <OlderChecklists tripId={id} checklists={data.checklists} />
-          </section>
-        )}
+      {data && (
+        <section aria-labelledby="pack-own-heading" className="flex flex-col gap-2.5">
+          <h2 id="pack-own-heading" className="text-xl font-semibold text-foreground">Your own items</h2>
+          <ManualItems items={data.manual} editable={data.editable} busy={busy}
+            onAdd={addItem} onQuantity={manualQuantity} onRemove={(item) => void removeItem(item)} checks={data.checks} onCheck={setPacked} />
+        </section>
+      )}
 
-        {data && data.suggestions.totalRequiredSlots + data.suggestions.extras.length > 0 && (
-          <section aria-labelledby="pack-suggestions-heading" className="flex flex-col gap-2.5">
-            <h2 id="pack-suggestions-heading" className="text-xl font-semibold text-foreground">Suggestions, not in your outfits</h2>
-            <PackingSuggestions list={data.suggestions} days={data.suggestedDays} />
-          </section>
-        )}
+      {data && data.checklists.length > 0 && (
+        <section aria-labelledby="pack-checklists-heading" className="flex flex-col gap-2.5">
+          <h2 id="pack-checklists-heading" className="text-xl font-semibold text-foreground">Older day checklists</h2>
+          <OlderChecklists tripId={id} checklists={data.checklists} />
+        </section>
+      )}
 
-        {data && (
-          <section aria-labelledby="pack-gear-heading" className="flex flex-col gap-2.5">
-            <h2 id="pack-gear-heading" className="text-xl font-semibold text-foreground">Group gear (yours)</h2>
-            <p className="text-sm text-muted-foreground">Requests and accepted responsibilities are separate from your personal packing checks.</p>
-            {groupGear.length === 0 && <p className="text-sm text-muted-foreground">No shared gear is currently assigned to you.</p>}
-            <SharedGearList personal tripId={id} gear={groupGear} userId="self" onSaved={refresh} />
-          </section>
-        )}
+      {data && data.suggestions.totalRequiredSlots + data.suggestions.extras.length > 0 && (
+        <section aria-labelledby="pack-suggestions-heading" className="flex flex-col gap-2.5">
+          <h2 id="pack-suggestions-heading" className="text-xl font-semibold text-foreground">Suggestions, not in your outfits</h2>
+          <PackingSuggestions list={data.suggestions} days={data.suggestedDays} />
+        </section>
+      )}
 
-        <div className="h-24" />
-      </div>
-    </PageLayout>
+      {data && (
+        <section aria-labelledby="pack-gear-heading" className="flex flex-col gap-2.5">
+          <h2 id="pack-gear-heading" className="text-xl font-semibold text-foreground">Group gear (yours)</h2>
+          <p className="text-sm text-muted-foreground">Requests and accepted responsibilities are separate from your personal packing checks.</p>
+          {groupGear.length === 0 && <p className="text-sm text-muted-foreground">No shared gear is currently assigned to you.</p>}
+          <SharedGearList personal tripId={id} gear={groupGear} userId="self" onSaved={refresh} />
+          <Link href={`/trips/${id}/gear`}
+            className="inline-flex min-h-11 w-fit items-center text-sm font-semibold text-primary underline underline-offset-4 hover:no-underline">
+            All shared gear
+          </Link>
+        </section>
+      )}
+
+      <div className="h-24" />
+    </div>
   );
 }
