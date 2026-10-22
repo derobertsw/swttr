@@ -118,6 +118,7 @@ DECLARE
   explicit_occupants boolean;
   occupants uuid[];
   cells jsonb := '[]'::jsonb;
+  cell_list jsonb[] := '{}';
   entry jsonb;
   person record;
   night date;
@@ -139,6 +140,11 @@ BEGIN
   IF p_expected_revision IS NULL OR current_trip.lodging_revision <> p_expected_revision THEN
     RAISE EXCEPTION 'Lodging changed. Review the saved plan.' USING ERRCODE = 'PT409';
   END IF;
+  -- Hold the crew as it is until this change commits, in the same order as
+  -- update_trip_shared_gear: the trip, then its members by id. Joining,
+  -- leaving and removal update or delete a member row without the trip lock,
+  -- so they wait here; adding someone already waits for the trip lock.
+  PERFORM id FROM public.trip_members WHERE trip_id = p_trip_id ORDER BY id FOR SHARE;
   IF p_payload ? 'people_key' AND p_payload->>'people_key' IS DISTINCT FROM public.trip_lodging_people_key(p_trip_id) THEN
     RAISE EXCEPTION 'The crew changed. Review the saved plan.' USING ERRCODE = 'PT409';
   END IF;
@@ -251,9 +257,13 @@ BEGIN
           OR (target.id IS NOT NULL AND (night < target.check_in OR night >= target.check_out)) THEN
           RAISE EXCEPTION 'Night not available for this person' USING ERRCODE = '22023', HINT = 'night';
         END IF;
-        cells := cells || jsonb_build_object('member_id', person.member_id, 'date', night, 'status', entry->>'status', 'stay_id', target.id);
+        IF cardinality(cell_list) >= 2000 THEN
+          RAISE EXCEPTION 'Plan fewer nights at once' USING ERRCODE = '22023', HINT = 'night';
+        END IF;
+        cell_list := array_append(cell_list, jsonb_build_object('member_id', person.member_id, 'date', night, 'status', entry->>'status', 'stay_id', target.id));
       END LOOP;
     END LOOP;
+    cells := to_jsonb(cell_list);
     IF (SELECT count(*) <> count(DISTINCT (cell->>'member_id') || '|' || (cell->>'date')) FROM jsonb_array_elements(cells) AS cell) THEN
       RAISE EXCEPTION 'A night is listed twice' USING ERRCODE = '22023', HINT = 'night';
     END IF;

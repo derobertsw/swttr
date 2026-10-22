@@ -94,6 +94,9 @@ export async function handleLodging(request: Request, tripId: string, options: O
   }
 
   if (!isUuid(body.mutation_id)) return jsonError("Invalid save identity. Reopen the editor.", 400);
+  // Who a crew-wide change covers depends on the crew, which can change
+  // without the lodging revision, so every save says which crew it reviewed.
+  if (peopleKey === undefined) return jsonError("Reload the page and review the nights again before saving.", 400);
   if (body.replace_nights !== undefined && typeof body.replace_nights !== "boolean") return jsonError("Invalid night replacement choice.", 400);
   // Before migration 025 the transaction would drop the place and still succeed.
   if (change.action === "save" && change.stay.location) {
@@ -112,7 +115,7 @@ export async function handleLodging(request: Request, tripId: string, options: O
   const { data, error } = await auth.supabase.rpc("mutate_trip_lodging", {
     p_trip_id: tripId, p_user_id: auth.userId, p_expected_revision: body.expected_revision,
     p_request_id: body.mutation_id, p_action: change.action,
-    p_payload: { ...lodgingPayload(change), ...(peopleKey !== undefined ? { people_key: peopleKey } : {}) },
+    p_payload: { ...lodgingPayload(change), people_key: peopleKey },
     p_replace_nights: body.replace_nights === true,
   });
   if (error) {

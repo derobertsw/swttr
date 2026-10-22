@@ -31,6 +31,7 @@ export function lodgingPayload(change: LodgingChange): Record<string, unknown> {
   }
 }
 
+/** MAX_NIGHTS matches mutate_trip_lodging's limit on one change's person/nights. */
 const MAX_PEOPLE = 200, MAX_DATES = 400, MAX_NIGHTS = 2000;
 const invalid = (error: string, field?: string): LodgingFailure => ({ error, ...(field ? { field } : {}), status: 400 });
 
@@ -52,16 +53,20 @@ export function parseOccupants(value: unknown): string[] | undefined | LodgingFa
 export function parseAssignments(value: unknown): TripLodgingAssignment[] | LodgingFailure {
   if (!Array.isArray(value) || value.length === 0 || value.length > MAX_PEOPLE) return invalid("Choose who and which nights to plan.", "assignments");
   const result: TripLodgingAssignment[] = [];
+  let nights = 0;
   for (const entry of value) {
     if (!entry || typeof entry !== "object") return invalid("Choose who and which nights to plan.", "assignments");
-    const { member_id: memberId, status, stay_id: stayId, dates: nights } = entry as Record<string, unknown>;
+    const { member_id: memberId, status, stay_id: stayId, dates } = entry as Record<string, unknown>;
     if (!isUuid(memberId)) return invalid("Choose people from this trip.", "assignments");
     if (status !== "assigned" && status !== "no_stay" && status !== "unplanned") return invalid("Choose a stay, No accommodation needed or Not planned.", "assignments");
     if (status === "assigned" ? !isUuid(stayId) : stayId != null) return invalid("Choose a stay only for assigned nights.", "assignments");
-    if (nights === undefined && status !== "assigned") return invalid("Choose which nights.", "assignments");
-    const parsed = nights === undefined ? undefined : uniqueDates(nights, "assignments", MAX_DATES);
+    if (dates === undefined && status !== "assigned") return invalid("Choose which nights.", "assignments");
+    const parsed = dates === undefined ? undefined : uniqueDates(dates, "assignments", MAX_DATES);
     if (parsed && "error" in parsed) return parsed;
     if (parsed && parsed.length === 0) return invalid("Choose which nights.", "assignments");
+    // A whole stay's nights are counted against the same limit when they're worked out.
+    nights += parsed?.length ?? 0;
+    if (nights > MAX_NIGHTS) return invalid("Plan fewer nights at once.", "assignments");
     result.push({ member_id: memberId.toLowerCase(), status, ...(status === "assigned" ? { stay_id: (stayId as string).toLowerCase() } : {}), ...(parsed ? { dates: parsed } : {}) });
   }
   return result;
@@ -151,10 +156,10 @@ export function applyLodgingChange(trip: Trip, rows: LodgingRows, members: Lodgi
         if (!onTrip(member.id, night)) return invalid(`${member.display_name} isn't on the trip the night of ${dateLabel(night)}. Change their dates first.`, "assignments");
         if (target && (night < target.check_in! || night >= target.check_out!)) return invalid(`${target.name} doesn't include the night of ${dateLabel(night)}. Change its dates first.`, "assignments");
         if (cells.some((cell) => cell.member_id === member.id && cell.date === night)) return invalid(`${member.display_name}'s night of ${dateLabel(night)} is listed twice.`, "assignments");
+        if (cells.length >= MAX_NIGHTS) return invalid("Plan fewer nights at once.", "assignments");
         cells.push({ member_id: member.id, date: night, status: entry.status, stay_id: target?.id ?? null });
       }
     }
-    if (cells.length > MAX_NIGHTS) return invalid("Plan fewer nights at once.", "assignments");
   } else {
     const member = current.find((candidate) => candidate.id === change.member_id);
     if (!member) return personNotFound;

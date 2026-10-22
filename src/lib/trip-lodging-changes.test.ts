@@ -134,7 +134,9 @@ describe("Parsing per-person lodging input", () => {
       { member_id: id.toLowerCase(), status: "assigned", stay_id: stay.toLowerCase() }, { member_id: id.toLowerCase(), status: "no_stay", dates: [FRI, SAT] }]);
     for (const value of [[], {}, [{ member_id: id, status: "booked" }], [{ member_id: "alex", status: "no_stay", dates: [FRI] }], [{ member_id: id, status: "no_stay" }],
       [{ member_id: id, status: "no_stay", stay_id: stay, dates: [FRI] }], [{ member_id: id, status: "assigned" }], [{ member_id: id, status: "unplanned", dates: [FRI, FRI] }],
-      [{ member_id: id, status: "unplanned", dates: ["2026-02-30"] }], [{ member_id: id, status: "unplanned", dates: [] }]]) {
+      [{ member_id: id, status: "unplanned", dates: ["2026-02-30"] }], [{ member_id: id, status: "unplanned", dates: [] }],
+      // Six people with 400 nights each: more than one change may plan.
+      Array.from({ length: 6 }, () => ({ member_id: id, status: "unplanned", dates: Array.from({ length: 400 }, (_, day) => new Date(Date.UTC(2026, 0, 1 + day)).toISOString().slice(0, 10)) }))]) {
       expect(parseAssignments(value)).toHaveProperty("error");
     }
   });

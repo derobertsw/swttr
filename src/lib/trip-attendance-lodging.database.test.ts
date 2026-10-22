@@ -232,6 +232,15 @@ describe("Attendance and per-person lodging in Postgres (#331)", () => {
     expect(await revision()).toBe(3);
   });
 
+  it("caps one change at 2,000 person/nights, a whole stay's included", async () => {
+    await db.query("UPDATE trips SET end_date = '2027-10-09' WHERE id = $1", [tripId]);
+    await mutate(1, "save", stay(pine, "Pine rental", FRI, "2027-10-10", { occupants: [] }));
+    const everyone = [alex, blair, casey, dana, eli, fran].map((member) => ({ member_id: member, status: "assigned", stay_id: pine }));
+    expect(await code(mutate(2, "assign", { assignments: everyone }))).toBe("22023");
+    await mutate(2, "assign", { assignments: everyone.slice(0, 5) });
+    expect((await db.query("SELECT count(*)::int AS count FROM trip_member_lodging_nights")).rows[0]).toEqual({ count: 5 * 366 });
+  });
+
   it("rejects a stale session and a crew that changed since the review", async () => {
     await mutate(0, "save", stay(pine, "Pine rental", FRI, SUN));
     expect(await code(mutate(0, "assign", { assignments: [{ member_id: alex, status: "unplanned", dates: [FRI] }] }))).toBe("PT409");

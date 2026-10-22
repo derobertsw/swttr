@@ -41,7 +41,9 @@ describe("Crew stays editor", () => {
     await act(async () => finish());
     expect(await screen.findByText("Stay saved.")).toBeInTheDocument();
     expect(onSaved).toHaveBeenCalledOnce();
-    expect(sentBodies(api, `POST ${base}/stays`)[0]).toMatchObject({ stay: { name: "Cabin", check_in: null, check_out: null, booking_status: "not_booked" }, expected_revision: 0 });
+    // The save names the crew its review showed, so a change to the crew meanwhile is reviewed first.
+    expect(sentBodies(api, `POST ${base}/stays`)[0]).toMatchObject({ stay: { name: "Cabin", check_in: null, check_out: null, booking_status: "not_booked" }, expected_revision: 0,
+      expected_people_key: buildLodging(TRIP, [], []).people_key });
   });
   it("keeps input and the save identity after failure, so retry cannot duplicate a stay", async () => {
     const api = fakeTripApi({ [`POST ${base}/stays/preview`]: previewRoute(), [`POST ${base}/stays`]: reply(500, { error: "Database unavailable" }) });
