@@ -5,7 +5,7 @@
  */
 export type TripSectionId = "plan" | "stays" | "crew" | "packing";
 
-export interface TripSection {
+interface TripSection {
   id: TripSectionId;
   label: string;
   /** The section's own page, below /trips/<id>. */
