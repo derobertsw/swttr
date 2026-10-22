@@ -567,7 +567,7 @@ export function useGearUp() {
       current.signal.removeEventListener("abort", abortExecution);
       if (current()) activeRequest.current = null;
     }
-  }, [readyToRequest, restored, owner, state.owner, state.request.status, getCurrentOuting, applyOutingInputs, startRequest, recommendFor, retireRequest]);
+  }, [readyToRequest, restored, owner, state.owner, getCurrentOuting, applyOutingInputs, startRequest, recommendFor, retireRequest]);
 
   useEffect(() => {
     if (!restored || !readyToRequest || !pendingResume.current) return;
@@ -679,6 +679,7 @@ export function useGearUp() {
     submitOuting,
     getCurrentOuting,
     reportDisplayedLayers,
+    handleLayerEdit: cancelAgentEdit,
     handleSubmit,
     handleWeatherChange,
     handleActivityChange,

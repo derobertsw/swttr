@@ -38,3 +38,11 @@ Coverage includes strict unknown-field/numeric/date validation, empty/ambiguous/
 - Supported production configuration and explicit production enablement after preview acceptance.
 
 The implementation remains off by default. #183/#186 are not complete based only on the localhost browser check. Setup, contracts, privacy and rollback: [webmcp.md](../../webmcp.md).
+
+## Review follow-up — October 22, 2026
+
+- Removed the unused request-status dependency from `submitOuting` so the strict lint gate passes.
+- Manual layer edits now retire pending agent work synchronously before changing the outfit, including edits from an already-open picker, moves, phase sync, undo and reset. Passive projection/evaluation updates do not cancel requests.
+- Added regressions using keyboard removal from the real picker portal while either weather or recommendation transport is held. Both failed before the fix and now verify cancellation, retained edited readback, and rejection of a late response even when transport ignores abort.
+- Updated branch checks: lint, typecheck, knip and the production build passed; **184 test files / 2,732 tests passed** with the Node 26 Web Storage option documented above.
+- The first build compiled successfully but stopped for Next.js's one-time security-upgrade advisory about the existing Next.js 16.4.0 dependency. Retrying the same build passed. No dependency upgrade is included in these review fixes.

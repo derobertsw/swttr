@@ -4,14 +4,17 @@ import { isLocalDateTime, isTimeZone } from "@/lib/timeZones";
 import type { Outing } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 
+/** Whether a value can be inspected as a keyed, non-array object. */
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Rejects fields outside the accepted input contract. */
 export function hasOnly(value: Record<string, unknown>, keys: string[]): boolean {
   return Object.keys(value).every(key => keys.includes(key));
 }
 
+/** Checks the length and nonempty content of a display label. */
 const text = (value: unknown, max: number) => typeof value === "string" && value.trim().length > 0 && value.length <= max;
 
 /** Labels are untrusted display data; coordinates determine the weather request. */

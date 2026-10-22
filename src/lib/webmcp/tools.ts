@@ -6,9 +6,11 @@ import { hasOnly, isRecord, isResolvedPlace, isSingleDayOuting } from "@/lib/out
 import type { WebMCPTool } from "./adapter";
 import type { CurrentOutingSnapshot, OutingActionOutcome } from "@/types/outingAction";
 
+/** Builds a closed object schema with explicit required fields. */
 const objectSchema = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({
   type: "object", properties, required, additionalProperties: false,
 });
+/** Bounds the nonempty text accepted by a tool schema. */
 const stringSchema = (maxLength: number) => ({ type: "string", minLength: 1, maxLength });
 const placeSchema = objectSchema({
   id: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },

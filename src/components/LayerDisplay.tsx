@@ -81,8 +81,11 @@ interface LayerDisplayProps {
    * Renders Save to trip below the outfit (#170), given the outfit as shown,
    * edits included, or null when there's nothing to save.
    */
-  onDisplayedLayers?: (layers: DisplayedLayers) => void;
   saveToTrip?: (outfit: SavedOutfit | null) => ReactNode;
+  /** Reports committed visible advice, including edits and evaluation updates. */
+  onDisplayedLayers?: (layers: DisplayedLayers) => void;
+  /** Retires pending tool advice before a manual change to the worn layers. */
+  onLayerEdit?: () => void;
 }
 
 type Phase = "climb" | "descent";
@@ -171,6 +174,7 @@ const LayerDisplay = ({
   weatherLoading,
   saveToTrip,
   onDisplayedLayers,
+  onLayerEdit,
 }: LayerDisplayProps) => {
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
   const [activePhase, setActivePhase] = useState<Phase>("climb");
@@ -213,6 +217,7 @@ const LayerDisplay = ({
   // The phase of the latest edit, which a failed check's Undo change reverts.
   const [lastEditedPhase, setLastEditedPhase] = useState<Phase>("climb");
   const editLayers = (phase: Phase) => {
+    onLayerEdit?.();
     setLastEditedPhase(phase);
     return phaseLayers(phase);
   };
@@ -437,6 +442,7 @@ const LayerDisplay = ({
   // A failed check's Undo change reverts the latest edit, and shows its phase.
   const failedEditLayers = phaseLayers(lastEditedPhase);
   const undoFailedEdit = () => {
+    onLayerEdit?.();
     setActivePhase(lastEditedPhase);
     failedEditLayers.undo();
   };

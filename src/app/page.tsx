@@ -55,6 +55,7 @@ const HomeContent = () => {
     opensSave,
     saveTripId,
     reportDisplayedLayers,
+    handleLayerEdit,
     submitOuting,
     getCurrentOuting,
   } = useGearUp();
@@ -132,6 +133,7 @@ const HomeContent = () => {
           // Everything shown comes from the result, so it stays tied to the
           // outing it was requested for while a change loads or fails.
           <LayerDisplay
+            onLayerEdit={handleLayerEdit}
             onDisplayedLayers={(layers) => reportDisplayedLayers(result, layers)}
             outing={result.outing}
             activity={result.outing.activity}

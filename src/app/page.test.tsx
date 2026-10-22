@@ -231,6 +231,45 @@ describe("Home Page", () => {
       expect(within(screen.getByRole("region", { name: "Wear" })).queryByText("Running tights")).not.toBeInTheDocument();
       expect(["pending", "failed"]).toContain(edited.snapshot.displayed?.layers?.evaluation);
     });
+    it.each(["weather", "recommendation"])("keeps a newer picker edit when an agent is pending on %s", async stage => {
+      const user = userEvent.setup();
+      render(<Home />);
+      await screen.findByRole("radio", { name: "Alpine Skiing" });
+      await execute("recommend_outing", outing);
+      await user.click(screen.getByRole("button", { name: "Change legs" }));
+      fireEvent.keyDown(within(screen.getByRole("region", { name: "Legs" })).getByRole("button", { name: /Running tights/ }), { key: "Enter" });
+      const remove = await screen.findByRole("button", { name: "Remove current item" });
+      const held = Promise.withResolvers<MockResponse>();
+      const originalFetch = mockFetch.getMockImplementation()!;
+      let heldSignal: AbortSignal | undefined;
+      mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+        if (stage === "weather" ? url.includes("/api/weather") : url.includes("/api/v1/recommendations")) {
+          heldSignal = init?.signal as AbortSignal;
+          return held.promise;
+        }
+        return originalFetch(url, init);
+      });
+      let pending!: Promise<unknown>;
+      act(() => {
+        pending = Promise.resolve(registered.get("swttr_recommend_outing")!.execute(
+          { ...outing, exertion: "hard" }, { signal: new AbortController().signal },
+        )).catch(error => ({ browserError: error }));
+      });
+      await waitFor(() => expect(heldSignal).toBeDefined());
+      act(() => remove.focus());
+      await user.keyboard("{Enter}");
+      expect(heldSignal!.aborted).toBe(true);
+      await act(async () => { expect(await pending).toMatchObject({ status: "error", code: "cancelled" }); });
+      const edited = await execute("get_current_outing");
+      expect(edited.snapshot).toMatchObject({ request: { status: "idle" }, displayed: {
+        outing, layers: { edited: true, phases: [{ wear: { legs: { base: [] } } }] },
+      } });
+      await act(async () => { held.resolve(respond(200, stage === "weather" ? { temperature: -50, windSpeed: 40 } : RUNNING_RECOMMENDATION)); });
+      const after = await execute("get_current_outing");
+      expect(after.snapshot.displayed).toMatchObject({ outing, weather: { temperature: 30 },
+        layers: { edited: true, phases: [{ wear: { legs: { base: [] } } }] },
+      });
+    });
     it("invalidates retained callbacks on sign-out and removes discovery on navigation", async () => {
       const { rerender, unmount } = render(<Home />);
       await screen.findByRole("radio", { name: "Alpine Skiing" });
