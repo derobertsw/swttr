@@ -7,7 +7,6 @@ import { AlertTriangle, Backpack, Minus, Plus, X } from "lucide-react";
 import { FieldError } from "@/components/FieldError";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { sentenceCase } from "@/components/trips/trip-primitives";
 import { BODY_PART_LABELS, LAYER_LABELS } from "@/lib/layers";
@@ -100,31 +99,29 @@ export function PackingChanges({ items, removed, editable, acknowledging, onAckn
     removed.length > 0 && `${removed.length} no longer in your outfits`,
   ].filter(Boolean).join(", ");
   return (
-    <Card variant="selected" asChild>
-      <section aria-labelledby={headingId}>
-        <h2 id={headingId} className="text-xl font-semibold text-foreground">Your saved outfits changed</h2>
-        <p className="mt-1 text-sm text-foreground">
-          {sentenceCase(counts)}. The list below already has the changes, marked New or Replaces.
-        </p>
-        {removed.length > 0 && (
-          <>
-            <h3 className="mt-3 text-base font-semibold text-foreground">No longer in your outfits</h3>
-            <ul className="mt-1 flex flex-col gap-1">
-              {removed.map((item) => (
-                <li key={item.key} className="break-words text-sm text-foreground">
-                  {item.name} <span className="text-muted-foreground">· was for {item.dates.map(packingDay).join(", ")}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-        {editable && (
-          <Button type="button" variant="outline" size="sm" className="mt-3" loading={acknowledging} onClick={onAcknowledge}>
-            Got it
-          </Button>
-        )}
-      </section>
-    </Card>
+    <section aria-labelledby={headingId}>
+      <h2 id={headingId} className="text-xl font-semibold text-foreground">Your saved outfits changed</h2>
+      <p className="mt-1 text-sm text-foreground">
+        {sentenceCase(counts)}. The list below already has the changes, marked New or Replaces.
+      </p>
+      {removed.length > 0 && (
+        <>
+          <h3 className="mt-3 text-base font-semibold text-foreground">No longer in your outfits</h3>
+          <ul className="mt-1 flex flex-col gap-1">
+            {removed.map((item) => (
+              <li key={item.key} className="break-words text-sm text-foreground">
+                {item.name} <span className="text-muted-foreground">· was for {item.dates.map(packingDay).join(", ")}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {editable && (
+        <Button type="button" variant="outline" size="sm" className="mt-3" loading={acknowledging} onClick={onAcknowledge}>
+          Got it
+        </Button>
+      )}
+    </section>
   );
 }
 
@@ -171,7 +168,7 @@ export function PackingItems({ items, editable, busy, onQuantity, checks, onChec
     { key: "carry", label: "Carry", items: items.filter((item) => !item.bodyPart) },
   ].filter((group) => group.items.length > 0);
   return (
-    <Card padding="none" className="divide-y divide-border px-4">
+    <div className="divide-y divide-border border-y border-border">
       {groups.map((group) => (
         <section key={group.key} aria-label={group.label} className="py-4">
           <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
@@ -185,7 +182,7 @@ export function PackingItems({ items, editable, busy, onQuantity, checks, onChec
           </ul>
         </section>
       ))}
-    </Card>
+    </div>
   );
 }
 
@@ -223,7 +220,7 @@ export function ManualItems({ items, editable, busy, onAdd, onQuantity, onRemove
   };
 
   return (
-    <Card>
+    <div>
       {items.length > 0 ? (
         <ul className="flex flex-col divide-y divide-border">
           {items.map((item) => (
@@ -265,7 +262,7 @@ export function ManualItems({ items, editable, busy, onAdd, onQuantity, onRemove
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">Your own items can&apos;t be changed right now. Try again later.</p>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -290,7 +287,7 @@ export function EquipmentItems({ equipment, busy, onQuantity, onRemove, onAdd, c
 }) {
   const { items, editable } = equipment;
   return (
-    <Card>
+    <div>
       <p className="text-sm text-muted-foreground">{touringDaysLabel(equipment.dates)}</p>
       {items.length > 0 ? (
         <ul className="mt-2 flex flex-col divide-y divide-border">
@@ -334,14 +331,14 @@ export function EquipmentItems({ equipment, busy, onQuantity, onRemove, onAdd, c
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">Touring equipment can&apos;t be changed right now. Try again later.</p>
       )}
-    </Card>
+    </div>
   );
 }
 
 /** Category checklists from before saved outfits, which name no particular items. */
 export function OlderChecklists({ tripId, checklists }: { tripId: string; checklists: PackingChecklist[] }) {
   return (
-    <Card>
+    <div>
       <p className="text-sm text-muted-foreground">
         These name kinds of layers, not your items, so they aren&apos;t in your list. Save an outfit for the day from Gear up to add it.
       </p>
@@ -358,7 +355,7 @@ export function OlderChecklists({ tripId, checklists }: { tripId: string; checkl
           </li>
         ))}
       </ul>
-    </Card>
+    </div>
   );
 }
 
@@ -373,7 +370,7 @@ export function PackingSuggestions({ list, days }: { list: PackingListData; days
     .map((bodyPart) => ({ bodyPart, rows: rows.filter((row) => row.bodyPart === bodyPart) }))
     .filter((group) => group.rows.length > 0);
   return (
-    <Card padding="none" className="divide-y divide-border px-4">
+    <div className="divide-y divide-border border-y border-border">
       <p className="py-4 text-sm text-muted-foreground">
         General guidance for {days} {days === 1 ? "day" : "days"} without a saved outfit, from each day&apos;s activity and weather.
         These aren&apos;t in your list until you save an outfit for the day.
@@ -415,6 +412,6 @@ export function PackingSuggestions({ list, days }: { list: PackingListData; days
           </ul>
         </section>
       )}
-    </Card>
+    </div>
   );
 }

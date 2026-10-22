@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input, fieldClassName } from "@/components/ui/input";
 import { SectionLabel } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
@@ -43,19 +42,19 @@ export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit:
     setEditor(next);
   };
   return (
-    <Card>
+    <section aria-labelledby="trip-stays-heading" className="min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="trip-stays-heading" tabIndex={-1} className="text-lg font-semibold text-foreground">Stays</h2>
+        <h1 id="trip-stays-heading" tabIndex={-1} className="text-title font-semibold text-foreground md:text-title-lg">Stays</h1>
         {canEdit && <Button type="button" variant="outline" onClick={() => open({ action: "save" })}>Add stay</Button>}
       </div>
       <p className="mt-1 text-base text-muted-foreground">Crew stay · One shared place each night</p>
       {!canEdit && <p className="mt-1 text-base text-muted-foreground">Managed by the organizer</p>}
       <p aria-live="polite" className="text-sm text-success">{status}</p>
       {!(lodging?.stays.length) && <p className="mt-3 text-base text-muted-foreground">No stays saved yet. Accommodation can be planned later.</p>}
-      <div className="mt-3 divide-y divide-border">
+      <div className="mt-3 divide-y divide-border border-y border-border empty:border-y-0">
         {lodging?.stays.map((stay) => (
-          <article key={stay.id} id={`stay-${stay.id}`} className="min-w-0 scroll-mt-4 py-3">
-            <h3 className="break-words text-base font-semibold text-foreground">{stay.name}</h3>
+          <article key={stay.id} id={`stay-${stay.id}`} className="min-w-0 scroll-mt-16 py-4">
+            <h2 className="break-words text-xl font-semibold text-foreground">{stay.name}</h2>
             <p className="mt-1 text-base text-foreground">{stay.date_label}</p>
             <p className="text-base text-muted-foreground">{stay.booking_status === "booked" ? "Booked" : "Not booked"} · {stay.location ? stay.location.precision === "exact" ? "Location set" : "Approximate location" : stay.address ? "Location confirmation needed for drive times" : "Location not set"}</p>
             {stay.check_in && <p className="mt-1 text-sm text-muted-foreground">Assigned crew nights: {stay.assigned_nights.length ? stay.assigned_nights.join(", ") : "None"}</p>}
@@ -84,8 +83,8 @@ export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit:
       </div>
       {!!lodging?.nights.length && <details className="mt-3 text-foreground">
         <summary className="min-h-11 cursor-pointer py-2 text-base">Crew nights</summary>
-        <ul className="space-y-2">
-          {lodging.nights.map((night) => <li key={night.date} className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-border p-2">
+        <ul className="divide-y divide-border">
+          {lodging.nights.map((night) => <li key={night.date} className="flex flex-wrap items-center justify-between gap-2 py-2">
             <div className="min-w-0 break-words text-base"><p>{night.date_label}{night.pre_trip ? " · Pre-trip night" : ""}</p><p className="text-muted-foreground">{night.label}</p></div>
             {canEdit && <Button type="button" variant="outline" onClick={() => open({ action: "night", date: night.date })} aria-label={`Change night ${night.date}`}>Change</Button>}
           </li>)}
@@ -96,7 +95,7 @@ export function TripStays({ data, canEdit, onSaved }: { data: TripFull; canEdit:
           setStatus(editor.action === "remove" ? "Stay removed from trip." : editor.action === "night" ? "Night plan saved." : "Stay saved.");
           await onSaved();
         }} />}
-    </Card>
+    </section>
   );
 }
 
@@ -267,9 +266,9 @@ function StayEditor({ editor, data, onClose, onSaved, onCloseAutoFocus }: {
 export function DayLodging({ data, date, meet, meetingPoint = null }: { data: TripFull; date: string; meet?: string | null; meetingPoint?: string | null }) {
   const context = data.lodging?.days.find((day) => day.date === date);
   if (!context) return null;
-  return <Card><SectionLabel>{meet ? "Crew stay and meet" : "Crew stay"}</SectionLabel><dl className="mt-2 space-y-2 text-base">
+  return <section className="min-w-0"><SectionLabel>{meet ? "Crew stay and meet" : "Crew stay"}</SectionLabel><dl className="mt-2 space-y-2 text-base">
     <div><dt className="text-muted-foreground">Starting from</dt><dd className="break-words text-foreground">{context.starting_from}</dd></div>
     {meet && <div><dt className="text-muted-foreground">Meet</dt><dd className="break-words text-foreground">{meet} · {meetingPoint ?? "Meeting point not set"}</dd></div>}
     <div><dt className="text-muted-foreground">Staying tonight</dt><dd className="break-words text-foreground">{context.staying_tonight}</dd></div>
-  </dl></Card>;
+  </dl></section>;
 }

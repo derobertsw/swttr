@@ -3,13 +3,10 @@
 import { use, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Plus } from "lucide-react";
-import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input, fieldClassName } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  BackLink,
   SectionLabel,
   TripError,
   sectionLabelClassName,
@@ -63,92 +60,85 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
   };
 
   return (
-    <PageLayout chromeVariant="compact">
-      <div className="flex w-full max-w-2xl flex-col gap-5">
-        <BackLink href={`/trips/${id}`}>Trip</BackLink>
-        <header>
-          <SectionLabel>Shared gear</SectionLabel>
-          <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
-            Who&apos;s bringing what?
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">Assignment asks someone to bring an item. Acceptance and packing are confirmed separately.</p>
-          <Button variant="outline" className="mt-3" onClick={() => void reload()}>Refresh shared gear</Button>
-        </header>
+    <div className="flex w-full max-w-3xl flex-col gap-8">
+      <header>
+        <SectionLabel>Shared gear</SectionLabel>
+        <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
+          Who&apos;s bringing what?
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">Assignment asks someone to bring an item. Acceptance and packing are confirmed separately.</p>
+        <Button variant="outline" className="mt-3" onClick={() => void reload()}>Refresh shared gear</Button>
+      </header>
 
-        {loading && <Skeleton className="h-32 w-full rounded-card" />}
-        {error && <TripError>{error}<Button variant="outline" onClick={() => void reload()}>Reload shared gear</Button></TripError>}
+      {loading && <Skeleton className="h-32 w-full rounded-card" />}
+      {error && <TripError>{error}<Button variant="outline" onClick={() => void reload()}>Reload shared gear</Button></TripError>}
 
-        {data && (
-          <>
-            <div className="flex flex-col gap-2">
-              {data.gear.length === 0 && (
-                <Card>
-                  <p className="text-sm text-muted-foreground">No group gear yet.</p>
-                </Card>
-              )}
-              <SharedGearList tripId={id} gear={data.gear} members={members} userId={userId}
-                ownerId={data.trip.owner_user_id} onSaved={reload} />
+      {data && (
+        <>
+          <div className="flex flex-col gap-2">
+            {data.gear.length === 0 && <p className="text-sm text-muted-foreground">No group gear yet.</p>}
+            <SharedGearList tripId={id} gear={data.gear} members={members} userId={userId}
+              ownerId={data.trip.owner_user_id} onSaved={reload} />
+          </div>
+
+          {(organizer || me) && <div>
+            <label htmlFor="add-gear-description" className={cn(sectionLabelClassName, "mb-2 block")}>
+              Add gear
+            </label>
+            {addRecovery && <div role="alert" className="mb-3 break-words text-sm">
+              <p>{addRecovery}</p>
+              <Button variant="outline" className="mt-2" loading={adding} onClick={async () => {
+                if (adding) return;
+                setAdding(true);
+                try {
+                  if (await reload()) {
+                    setAddRecovery(null); setDescription(""); setAssignee(""); creation.current = null;
+                  }
+                } finally { setAdding(false); }
+              }}>Reload added item</Button>
+            </div>}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id="add-gear-description"
+                type="text"
+                disabled={adding || !!addRecovery}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Tent, stove, first aid…"
+                maxLength={200}
+                className="sm:flex-1"
+              />
+              <select
+                disabled={adding || !!addRecovery}
+                value={assignee || (organizer ? "" : me?.id ?? "")}
+                onChange={(e) => setAssignee(e.target.value)}
+                aria-label="Who's bringing it"
+                className={cn(fieldClassName, "sm:w-auto")}
+              >
+                {organizer && <option value="">unassigned</option>}
+                {members
+                  .filter((m) => m.status !== "left" && (organizer || m.id === me?.id))
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.display_name}
+                    </option>
+                  ))}
+              </select>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={addGear}
+                disabled={!description.trim() || adding || !!addRecovery}
+              >
+                {adding ? <Loader2 className="animate-spin" /> : <Plus />}
+                Add
+              </Button>
             </div>
+          </div>}
 
-            {(organizer || me) && <Card>
-              <label htmlFor="add-gear-description" className={cn(sectionLabelClassName, "mb-2 block")}>
-                Add gear
-              </label>
-              {addRecovery && <div role="alert" className="mb-3 break-words text-sm">
-                <p>{addRecovery}</p>
-                <Button variant="outline" className="mt-2" loading={adding} onClick={async () => {
-                  if (adding) return;
-                  setAdding(true);
-                  try {
-                    if (await reload()) {
-                      setAddRecovery(null); setDescription(""); setAssignee(""); creation.current = null;
-                    }
-                  } finally { setAdding(false); }
-                }}>Reload added item</Button>
-              </div>}
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  id="add-gear-description"
-                  type="text"
-                  disabled={adding || !!addRecovery}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Tent, stove, first aid…"
-                  maxLength={200}
-                  className="sm:flex-1"
-                />
-                <select
-                  disabled={adding || !!addRecovery}
-                  value={assignee || (organizer ? "" : me?.id ?? "")}
-                  onChange={(e) => setAssignee(e.target.value)}
-                  aria-label="Who's bringing it"
-                  className={cn(fieldClassName, "sm:w-auto")}
-                >
-                  {organizer && <option value="">unassigned</option>}
-                  {members
-                    .filter((m) => m.status !== "left" && (organizer || m.id === me?.id))
-                    .map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.display_name}
-                      </option>
-                    ))}
-                </select>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={addGear}
-                  disabled={!description.trim() || adding || !!addRecovery}
-                >
-                  {adding ? <Loader2 className="animate-spin" /> : <Plus />}
-                  Add
-                </Button>
-              </div>
-            </Card>}
-
-            <div className="h-24" />
-          </>
-        )}
-      </div>
-    </PageLayout>
+          <div className="h-24" />
+        </>
+      )}
+    </div>
   );
 }
