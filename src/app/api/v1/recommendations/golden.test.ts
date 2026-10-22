@@ -15,6 +15,7 @@ import { POST as biking } from "./biking/route";
 import { POST as running } from "./running/route";
 import { POST as skiTouring } from "./ski-touring/route";
 import { POST as xc } from "./xc/route";
+import { POST as evaluateLayers } from '../ensembles/evaluate/route';
 import type { BiophysicsRecommendation, RecommendedGarment } from "@/types/biophysics";
 
 const state = vi.hoisted(() => ({
@@ -202,9 +203,19 @@ describe.each([
     expect(body.ireq.policy).toMatchObject({ activity, phase: 'sustained', effort: 'moderate' });
     expect(body.ireq.policy.metabolicRateWm2).toBeCloseTo(395.2, 0);
     expect(body.ireq.target_range[0]).toBe(0.03);
-    expect(body.ireq.extremity).toEqual({ min: { hands: 0, head: 0 }, neutral: { hands: 0, head: 0 } });
+    expect(body.ireq.extremity).toEqual({ min: { hands: 0, head: 0 }, neutral: { hands: 0, head: 0 }, max: { hands: activity === 'xc_skiing' ? 0.55 : 0, head: 0 } });
     expect(body.ireq.validation_source).toBe('coweda_inspired_unvalidated_swttr_margin');
     expect(body.guidance).toEqual(expect.arrayContaining(body.ireq.policy.assumptions));
+    expect(body.recommendation.headwear).toEqual({ helmet: null, head_warmth: null, neck_warmth: null });
+    expect(body.recommendation.accessories.head.state).toBe('not_needed');
+    if (activity === 'running') {
+      expect(body.recommendation.handwear).toBeNull();
+      expect(body.recommendation.accessories.hands.state).toBe('not_needed');
+    } else {
+      expect(body.recommendation.handwear).not.toBeNull();
+      expect(body.recommendation.accessories.hands).toMatchObject({ purpose: 'pole_grip', state: 'selected' });
+      expect(body.guidance.join(' ')).toContain('friction protection');
+    }
   });
 
   it('keeps the same body-specific heat-balance floor with clothing or a targets-only response', async () => {
@@ -226,6 +237,61 @@ describe.each([
     expect(empty.body.recommendation).toBeUndefined();
     expect(empty.body.ireq).toEqual(full.body.ireq);
     expect(empty.body.recommendations.guidance).toEqual(expect.arrayContaining(empty.body.ireq.policy.assumptions));
+  });
+});
+
+describe('running accessory selection and manual evaluation', () => {
+  it('does not force thermal accessories in the originally reported four-item wardrobe', async () => {
+    state.userId = USER_ID;
+    const garments = catalog.garments.filter(g => ['Capilene Cool Lightweight', 'Capilene Thermal Weight Boot-Length Bottoms'].includes(g.model_name));
+    const handwear = catalog.handwear.filter(g => g.model_name === 'Ultrafit Multi-Sport Running Gloves');
+    const headwear = catalog.headwear.filter(g => g.model_name === 'Merino 150 Beanie');
+    expect([garments.length, handwear.length, headwear.length]).toEqual([2, 1, 1]);
+    state.client = createFakeSupabase({
+      garments, handwear, headwear,
+      user_wardrobe: [['garment', garments], ['handwear', handwear], ['headwear', headwear]].flatMap(([type, items]) =>
+        (items as typeof garments).map(item => ({ user_id: USER_ID, item_type: type, item_id: item.id, disabled: false }))),
+    });
+    const { status, body } = await callRoute(running, { weather: { temperature: 56, wind_speed: 8 }, exertion: 'moderate', use_wardrobe_only: true });
+    expect(status).toBe(200);
+    expect(body.recommendation.handwear).toBeNull();
+    expect(body.recommendation.headwear.head_warmth).toBeNull();
+    expect(body.recommendation.accessories.hands.state).toBe('not_needed');
+  });
+
+  it('gives matching accessory assessments to automatic selection and manual removal', async () => {
+    const garments = catalog.garments.filter(g => ['top_short_sleeve', 'shorts'].includes(g.garment_type ?? ''));
+    state.userId = null;
+    state.client = createFakeSupabase({ garments, handwear: catalog.handwear, headwear: catalog.headwear, user_wardrobe: [] });
+    const { body } = await callRoute(running, { weather: { temperature: 56, wind_speed: 8 } });
+    const { ireq, recommendation } = body as BiophysicsRecommendation;
+    expect(recommendation.garments).toHaveLength(2);
+    const worn = {
+      torso: recommendation.garments.filter(g => g.covers_torso).map(g => ({ sourceId: g.id, item_type: 'garment' })),
+      legs: recommendation.garments.filter(g => g.covers_legs).map(g => ({ sourceId: g.id, item_type: 'garment' })),
+      hands: [], headNeck: [],
+    };
+    const phase = {
+      items: worn,
+      targets: { torso: ireq.regional!.neutral.torso, legs: ireq.regional!.neutral.legs, hands: ireq.extremity!.neutral.hands, headNeck: ireq.extremity!.neutral.head },
+      minTargets: { torso: ireq.regional!.min.torso, legs: ireq.regional!.min.legs, hands: ireq.extremity!.min.hands, headNeck: ireq.extremity!.min.head },
+      extremityMaxTargets: { hands: ireq.extremity!.max!.hands, headNeck: ireq.extremity!.max!.head },
+      arms: { clo: recommendation.ensemble_properties.regional_clo!.arms, minTarget: ireq.regional!.min.arms },
+      targetRange: ireq.target_range,
+    };
+    const { body: { phases: [removed, added] } } = await callRoute(evaluateLayers, { phases: [phase, {
+      ...phase, items: { ...worn,
+        hands: [{ sourceId: catalog.handwear.find(h => h.model_name === 'Ultrafit Multi-Sport Running Gloves')!.id, item_type: 'handwear' }],
+        headNeck: [{ sourceId: catalog.headwear.find(h => h.model_name === 'Merino 150 Beanie')!.id, item_type: 'headwear' }],
+      },
+    }] });
+    expect(removed.bodyParts.hands.status).toBe(recommendation.accessories!.hands.thermal_status);
+    expect(removed.bodyParts.headNeck.status).toBe(recommendation.accessories!.head.thermal_status);
+    expect(removed.decision.riskType).toBe('comfortable');
+    expect(Math.abs(removed.comfortScore - recommendation.thermal_comfort_score!)).toBeLessThan(1);
+    expect(added.bodyParts.hands.status).toBe('over');
+    expect(added.bodyParts.headNeck.status).toBe('over');
+    expect(added.decision.riskType).toBe('overheat');
   });
 });
 

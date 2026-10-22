@@ -7,6 +7,10 @@ export const SUSTAINED_ACTIVITY_METS = {
   xc_skiing: { easy: 6.8, moderate: 8.5, hard: 11.3 },
 } as const satisfies Partial<Record<ActivityType, Record<ExertionLevel, number>>>;
 
+/** Catalog liner-glove allowance for pole grip, not added thermal demand.
+ * Uses existing liner estimates; see docs/running-xc-foundations.md. */
+export const POLE_GRIP_MAX_CLO = 0.55;
+
 export interface SustainedSportPolicy {
   version: 'running_xc_v1';
   activity: 'running' | 'xc_skiing';

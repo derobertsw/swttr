@@ -227,6 +227,10 @@ const LayerDisplay = ({
     items: evaluationItemsByBodyPart(climb.layers),
     targets: bodyPartTargets(ireq?.regional, ireq?.extremity),
     minTargets: bodyPartTargets(ireq?.regional, ireq?.extremity, "min"),
+    extremityMaxTargets: ireq?.extremity?.max ? {
+      hands: ireq.extremity.max.hands,
+      headNeck: ireq.extremity.max.head,
+    } : undefined,
     arms: regionalClo
       ? { clo: regionalClo.arms, target: ireq?.regional?.neutral?.arms, minTarget: ireq?.regional?.min?.arms }
       : undefined,

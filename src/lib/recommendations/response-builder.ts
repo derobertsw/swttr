@@ -4,7 +4,7 @@
  */
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { scoreEnsemble, type WeatherConditions, type ActivityProfile } from '@/lib/biophysics/scorer';
-import { HOOD_CLO_VALUES, type ActivityType, type HoodType } from '@/lib/biophysics/constants';
+import type { ActivityType } from '@/lib/biophysics/constants';
 import {
   calculateThermalComfortScore,
   withMinimums,
@@ -14,6 +14,7 @@ import {
 import type { BiophysicsRecommendation } from '@/types/biophysics';
 import type { GarmentRow, HandwearRow, HeadwearRecommendations } from './types';
 import { formatGarmentResponse, formatHandwearResponse, formatHeadwearSet, ensembleToThermalGarments } from './formatting';
+import { hoodInsulation } from './extremities';
 
 interface EnsembleScoringInput {
   ensemble: GarmentRow[];
@@ -26,6 +27,7 @@ interface EnsembleScoringInput {
     regionalMinTarget?: RegionalCloValues;
     /** Minimum clo for the hands and head. */
     extremityMinTarget?: ExtremityCloValues;
+    extremityMaxTarget?: ExtremityCloValues;
   };
 }
 
@@ -57,15 +59,7 @@ export function buildScoredRecommendation(
   // Sum hood clo contributions from garments in the ensemble.
   // When a helmet is selected, only helmet_compatible hoods count
   // (attached/removable hoods can't be worn under a helmet).
-  const hasHelmet = headwear.helmet != null;
-  let hoodClo = 0;
-  for (const g of input.ensemble) {
-    if (g.hood_type && g.hood_type in HOOD_CLO_VALUES && g.hood_type !== 'none') {
-      if (!hasHelmet || g.hood_type === 'helmet_compatible') {
-        hoodClo += HOOD_CLO_VALUES[g.hood_type as HoodType];
-      }
-    }
-  }
+  const hoodClo = hoodInsulation(input.ensemble, headwear.helmet != null);
 
   const extremityClo = {
     hands: handwear?.rcl_clo ?? 0,
@@ -77,7 +71,7 @@ export function buildScoredRecommendation(
       targetRange: input.comfortContext.targetRange,
       bodyParts: [
         ...withMinimums(regionalClo, input.comfortContext.regionalMinTarget),
-        ...withMinimums(extremityClo, input.comfortContext.extremityMinTarget),
+        ...withMinimums(extremityClo, input.comfortContext.extremityMinTarget, input.comfortContext.extremityMaxTarget),
       ],
     })
     : null;
