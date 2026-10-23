@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildLodging, parseStay, peopleKey, previewCrewLodging } from "@/lib/trip-lodging";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildLodging, loadLodgingRows, parseStay, peopleKey, previewCrewLodging, shiftDate } from "@/lib/trip-lodging";
+import { createFakeSupabase } from "@/test/fakeSupabase";
 import { TRIP } from "@/test/tripApi";
-import { ALEX, BLAIR, CASEY, DANA, ELI, FRAN, FRI, LODGE, MON, PINE, SAT, SPLIT_MEMBERS, SPLIT_TRIP, SUN, THU, VILLAGE, splitRows } from "@/test/splitStays";
+import { ALEX, BLAIR, CASEY, DANA, ELI, FRAN, FRI, LODGE, MON, PINE, SAT, SPLIT_MEMBERS, SPLIT_TRIP, SUN, THU, VILLAGE, personNight, splitRows } from "@/test/splitStays";
 import type { TripStay, TripLodgingNight } from "@/types/trips";
 
 export const STAY: TripStay = { id: "40f9f55e-0e74-4c4a-923f-d7a3f92468a0", trip_id: TRIP.id, name: "Hotel", check_in: "2026-10-09", check_out: "2026-10-11", type: null, address: null, property_url: null, check_in_time: null, check_out_time: null, notes: null, booking_status: "not_booked", created_at: TRIP.created_at, updated_at: TRIP.updated_at };
@@ -138,6 +140,15 @@ describe("Per-person nights and the crew's view of them (#331)", () => {
     expect(lodging.nights[1]).toMatchObject({ label: "Pine rental", stay_id: PINE.id, split: false });
     expect(person(lodging, FRAN.id).nights[1].state).toBe("unplanned");
     expect(person(lodging, DANA.id).nights[1].state).toBe("assigned");
+  });
+
+  it("reads every person/night of a plan longer than one PostgREST page", async () => {
+    const nights = SPLIT_MEMBERS.flatMap((member) => Array.from({ length: 350 }, (_, day) => personNight(member.id, shiftDate(FRI, day), PINE))).reverse();
+    const supabase = createFakeSupabase({ trip_stays: [PINE], trip_member_lodging_nights: nights, trip_member_attendance: [] } as never, { maxRows: 1000 });
+    const rows = await loadLodgingRows(supabase as unknown as SupabaseClient, SPLIT_TRIP.id);
+    expect(rows.assignments).toHaveLength(2100);
+    expect(new Set(rows.assignments.map((night) => `${night.member_id} ${night.date}`)).size).toBe(2100);
+    expect(rows.assignments.slice(0, 2).map((night) => [night.date, night.member_id])).toEqual([[FRI, ALEX.id], [FRI, BLAIR.id]]);
   });
 
   it("makes the same crew key as the database", () => {
