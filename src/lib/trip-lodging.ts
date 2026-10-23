@@ -266,6 +266,21 @@ export function buildLodging(trip: Trip, stays: TripStay[], assignments: TripLod
 }
 
 const MISSING_TABLE = ["42P01", "PGRST205"];
+/** PostgREST's max_rows: a longer read is cut short without an error. */
+const PAGE = 1000;
+
+type Page<T> = { data: T[] | null; error: { code: string } | null };
+
+/** Every row of a read that can pass max_rows, a page at a time; `page` must order rows fully. */
+async function readAll<T>(page: (from: number, to: number) => PromiseLike<Page<T>>): Promise<Page<T>> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) return { data: null, error };
+    rows.push(...data ?? []);
+    if ((data?.length ?? 0) < PAGE) return { data: rows, error: null };
+  }
+}
 
 /** A trip's saved lodging: per person once migration 20261021201500 is applied, the crew's before. */
 export interface LodgingRows {
@@ -278,7 +293,9 @@ export interface LodgingRows {
 export async function loadLodgingRows(supabase: SupabaseClient, tripId: string): Promise<LodgingRows> {
   const [stays, nights, attendance] = await Promise.all([
     supabase.from("trip_stays").select("*").eq("trip_id", tripId).order("created_at"),
-    supabase.from("trip_member_lodging_nights").select("*").eq("trip_id", tripId).order("date"),
+    // One row per person and night, so a long trip with a big crew passes max_rows.
+    readAll<TripLodgingNight>((from, to) => supabase.from("trip_member_lodging_nights").select("*").eq("trip_id", tripId)
+      .order("date").order("member_id").range(from, to)),
     supabase.from("trip_member_attendance").select("*").eq("trip_id", tripId),
   ]);
   if (stays.error) throw new Error("Couldn't load crew stays. Try again.");
