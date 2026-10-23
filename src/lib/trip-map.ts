@@ -1,14 +1,14 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { drivePlans } from "@/lib/trip-drive";
+import { departurePlans, drivePlans } from "@/lib/trip-drive";
 import { supabaseDriveStore, tripDriveEstimates } from "@/lib/trip-drive-estimates";
 import { TOUR_ACTIVITY } from "@/lib/trip-activities";
 import { buildLodging, dateLabel, loadLodging } from "@/lib/trip-lodging";
 import { accessPointFor } from "@/lib/trip-location";
 import { loadTourPlans, summarizeTourPlans } from "@/lib/trip-tour-plans";
-import type { Trip, TripDay, TripDriveEstimates, TripFull, TripLocation, TripStop } from "@/types/trips";
-import type { TripMap, TripMapDay, TripMapPlace, TripMapRole, TripMapSource } from "@/types/trip-map";
+import type { Trip, TripDay, TripDriveEstimates, TripDriveRoute, TripFull, TripLocation, TripStop } from "@/types/trips";
+import type { TripMap, TripMapDay, TripMapDeparture, TripMapDrive, TripMapGeometry, TripMapPlace, TripMapRole, TripMapSource } from "@/types/trip-map";
 
 /** Ignore response-time age labels; revisions change with saved data/state, not each minute. */
 const revision = (value: unknown) => createHash("sha256").update(JSON.stringify(value, (key, entry) => key === "age_label" ? undefined : entry)).digest("hex");
@@ -43,6 +43,7 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
   validateSources(full);
   const lodging = full.lodging ?? buildLodging(full.trip, [], []);
   const plans = drivePlans({ ...full, lodging });
+  const departuresByDay = departurePlans({ ...full, lodging }, plans);
   const places = new Map<string, TripMapPlace>();
   const add = (source: TripMapSource, name: string, location: TripLocation | null | undefined, role: TripMapRole,
     visit?: { date: string; day_id: string }, legacy?: { latitude: number | null; longitude: number | null }) => {
@@ -94,13 +95,36 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
     // plan is in use only on a touring day; otherwise it's kept but not planned (#210).
     const activity = day?.activity ?? stop?.activities[0] ?? null;
     const tour = activity === TOUR_ACTIVITY ? full.tour_plans?.find((entry) => entry.trip_day_id === id) : undefined;
-    const drive = estimates.days.find((entry) => entry.date === plan.date);
-    if (!drive) throw new Error("Missing map drive state");
-    // Reject invalid coordinates before offering external navigation, even for legacy/corrupt rows.
-    const validEndpoints = originId && accessId && [originId, accessId].every((key) => places.get(key)?.mapping === "mapped");
-    const safeDrive = validEndpoints ? drive : { ...drive, directions: null };
-    const routeRevision = plan.route_key ? revision({ trip_id: full.trip.id, day_id: id, date: plan.date, origin_place_id: originId, access_place_id: accessId, route_key: plan.route_key }) : null;
-    const geometryEligible = plan.state === "ready" && validEndpoints && safeDrive.state !== "no_route";
+    const estimate = estimates.days.find((entry) => entry.date === plan.date);
+    if (!estimate) throw new Error("Missing map drive state");
+    const { departures: routes, ...drive } = estimate;
+    /** A drive from `origin` as the map offers it: Directions and a road line only between two mapped places. */
+    const mapRoute = (route: TripDriveRoute, origin: string | null, ready: boolean, routeKey: string | null) => {
+      // Reject invalid coordinates before offering external navigation, even for legacy/corrupt rows.
+      const validEndpoints = !!origin && !!accessId && [origin, accessId].every((key) => places.get(key)?.mapping === "mapped");
+      const safe = validEndpoints ? route : { ...route, directions: null };
+      const routeRevision = routeKey ? revision({ trip_id: full.trip.id, day_id: id, date: plan.date, origin_place_id: origin, access_place_id: accessId, route_key: routeKey }) : null;
+      const eligible = ready && validEndpoints && safe.state !== "no_route";
+      return {
+        drive: { ...safe, source: safe.state === "manual" ? "manual" : safe.estimate || safe.state === "no_route" ? "geoapify" : null } satisfies TripMapDrive,
+        geometry: { state: eligible ? "unavailable" : "not_applicable", reason: eligible ? "not_requested" : "drive_not_ready",
+          mode: "drive", revision: routeRevision, origin_place_id: origin, access_place_id: accessId } satisfies TripMapGeometry,
+      };
+    };
+    const crewRoute = mapRoute(drive, originId, plan.state === "ready", plan.route_key);
+    const groups = departuresByDay.find((day) => day[0].date === plan.date) ?? [];
+    const departures = groups.map((group): TripMapDeparture => {
+      const route = routes.find((entry) => entry.key === group.key);
+      if (!route) throw new Error("Missing map departure state");
+      const origin = group.crew ? originId : group.origin?.stay_id
+        ? add({ type: "stay", id: group.origin.stay_id, slot: "location" }, group.origin.label, group.origin.location, "origin", visit) : null;
+      const people = group.member_ids.map((memberId) => {
+        const person = lodging.people.find((entry) => entry.member_id === memberId);
+        return { member_id: memberId, name: person?.display_name ?? "Someone", pending: person?.membership === "invited" };
+      });
+      return { key: group.key, label: group.label, people, crew: group.crew, origin_place_id: origin,
+        ...group.crew ? crewRoute : mapRoute(route, origin, group.state === "ready", group.route_key) };
+    });
     const result = {
       id, date: plan.date, date_label: dateLabel(plan.date), activity,
       destination_place_id: destinationId, origin_place_id: originId, access_place_id: accessId, tonight_place_id: tonightId,
@@ -111,12 +135,11 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
       pickup: { place_id: null, state: tour?.pickup_notes ? "notes_only" : "not_set", notes: tour?.pickup_notes ?? null },
       tour: tour ? { objective: tour.objective, route_url: tour.route_url, meet_label: tour.meet_label, time_zone_label: tour.time_zone_label,
         access_notes: tour.access_notes, approach_notes: tour.approach_notes } : null,
-      drive: { ...safeDrive, source: safeDrive.state === "manual" ? "manual" : safeDrive.estimate || safeDrive.state === "no_route" ? "geoapify" : null },
-      geometry: { state: geometryEligible ? "unavailable" : "not_applicable",
-        reason: geometryEligible ? "not_requested" : "drive_not_ready",
-        mode: "drive", revision: routeRevision, origin_place_id: originId, access_place_id: accessId },
+      ...crewRoute,
+      departures,
     } satisfies Omit<TripMapDay, "revision">;
-    const references = [destinationId, originId, accessId, tonightId, crewStayId].map((key) => key ? places.get(key) : null);
+    const references = [destinationId, originId, accessId, tonightId, crewStayId, ...departures.map((entry) => entry.origin_place_id)]
+      .map((key) => key ? places.get(key) : null);
     return { ...result, revision: revision({ day: result, places: references }) };
   });
   const allPlaces = [...places.values()];

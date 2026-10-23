@@ -1,0 +1,167 @@
+// @vitest-environment node
+import { describe, expect, it, vi } from "vitest";
+import { departurePlans, drivePlans, stayDepartures, type StoredDriveEstimate } from "@/lib/trip-drive";
+import { tripDriveEstimates, type DriveEstimateStore, type ManualEstimateRow } from "@/lib/trip-drive-estimates";
+import { RoutingUnavailable, type DriveLeg } from "@/lib/locations/routing";
+import { LODGE_PLACE, PINE_PLACE, place, splitDriveTrip, SPRUCE_LOT, VILLAGE_PLACE } from "@/test/driveTrip";
+import { ALEX, BLAIR, CASEY, DANA, ELI, FRAN, FRI, MON, PINE, personNight, SAT, splitRows, SUN, VILLAGE } from "@/test/splitStays";
+import type { TripFull } from "@/types/trips";
+
+const NOW = Date.parse("2026-10-05T15:00:00Z");
+const ids = (...people: Array<{ id: string }>) => people.map((person) => person.id);
+const departuresOn = (full: TripFull, date: string) => departurePlans(full).find((day) => day[0].date === date)!;
+
+/** Answers like Geoapify, by starting point: the rental 12 min from the lot, the hotel 18, the lodge 3. */
+const MINUTES: Record<string, number> = { [PINE_PLACE.latitude]: 12, [VILLAGE_PLACE.latitude]: 18, [LODGE_PLACE.latitude]: 3 };
+const fakeMatrix = () => vi.fn(async (sources: Array<{ latitude: number }>, targets: unknown[]) =>
+  sources.map((source): Array<DriveLeg | null> => targets.map(() => MINUTES[source.latitude] ? { seconds: MINUTES[source.latitude] * 60, meters: 9_000 } : null)));
+const failing = () => vi.fn(async () => { throw new RoutingUnavailable("timeout"); });
+
+/** Keeps one estimate per day and pair, like trip_drive_estimates after the departures migration. */
+function memoryStore(manual: ManualEstimateRow[] = []) {
+  const saved = new Map<string, StoredDriveEstimate>();
+  const store: DriveEstimateStore & { saved: typeof saved } = {
+    saved,
+    read: vi.fn(async () => [...saved.values()]),
+    write: vi.fn(async (rows: StoredDriveEstimate[]) => { rows.forEach((row) => saved.set(`${row.date}|${row.route_key}`, row)); }),
+    manual: async () => manual,
+  };
+  return store;
+}
+
+describe("Departures by origin (#333)", () => {
+  it("groups the people taking part by the stay each slept in the night before", () => {
+    const full = splitDriveTrip();
+    const saturday = departuresOn(full, SAT);
+    expect(saturday.map((plan) => [plan.key, plan.label, plan.member_ids, plan.crew, plan.state])).toEqual([
+      [`stay:${PINE.id}`, "Pine rental", ids(ALEX, BLAIR, DANA), true, "ready"],
+      // A pending invitation with a planned night counts; Casey isn't taking part yet.
+      [`stay:${VILLAGE.id}`, "Village hotel", ids(ELI, FRAN), false, "ready"],
+    ]);
+    // The crew's departure is the day's drive as before.
+    expect(saturday[0].route_key).toBe(drivePlans(full).find((plan) => plan.date === SAT)!.route_key);
+    expect(saturday[1].route_key).toContain(`${VILLAGE_PLACE.latitude},${VILLAGE_PLACE.longitude}>${SPRUCE_LOT.latitude}`);
+    // Checkout morning: Casey leaves the rental with the others.
+    expect(departuresOn(full, SUN).map((plan) => plan.member_ids)).toEqual([ids(ALEX, BLAIR, CASEY, DANA), ids(ELI, FRAN)]);
+    expect(departuresOn(full, MON).map((plan) => [plan.label, plan.member_ids.length])).toEqual([["Mountain lodge", 6]]);
+  });
+  it("keeps people with no stay the night before explicit, never in the crew's car", () => {
+    // Friday: no pre-trip nights. The pending invitation has none, so isn't listed.
+    expect(departuresOn(splitDriveTrip(), FRI).map((plan) => [plan.key, plan.label, plan.member_ids, plan.state])).toEqual([
+      ["unset:not_set", "Not set", ids(ALEX, BLAIR, DANA, ELI), "missing_origin"],
+    ]);
+    // Casey arrives Saturday and takes part: no starting point yet, after the stays.
+    const rows = splitRows({ attendance: [{ trip_id: "trip-1", member_id: CASEY.id, arrival_date: SAT, departure_date: null, skipped_dates: [] }] });
+    const saturday = departuresOn(splitDriveTrip({ rows }), SAT);
+    expect(saturday.map((plan) => [plan.label, plan.member_ids, plan.crew, plan.state])).toEqual([
+      ["Pine rental", ids(ALEX, BLAIR, DANA), true, "ready"],
+      ["Village hotel", ids(ELI, FRAN), false, "ready"],
+      ["Arrives this day", ids(CASEY), false, "missing_origin"],
+    ]);
+    // Blair's Friday night isn't planned: Blair starts from Not set, not the rental.
+    const unplanned = { ...splitRows(), assignments: splitRows().assignments.filter((night) => !(night.member_id === BLAIR.id && night.date === FRI)) };
+    expect(departuresOn(splitDriveTrip({ rows: unplanned }), SAT).map((plan) => [plan.label, plan.member_ids])).toEqual([
+      ["Pine rental", ids(ALEX, DANA)], ["Village hotel", ids(ELI, FRAN)], ["Not set", ids(BLAIR)],
+    ]);
+  });
+  it("starts everyone from the day's own starting point while it has one", () => {
+    const cabin = place("Ridge cabin", 44.51, -72.75);
+    const base = splitDriveTrip();
+    const full = splitDriveTrip({ days: base.days.map((day) => day.date === SAT ? { ...day, origin: cabin } : day) });
+    expect(departuresOn(full, SAT).map((plan) => [plan.key, plan.label, plan.member_ids.length, plan.origin?.own])).toEqual([["day", "Ridge cabin", 5, true]]);
+  });
+  it("leads with the larger stay when the crew is split evenly elsewhere", () => {
+    // Sat night: Alex alone in the hotel, Blair and Dana in the rental, so Sunday's crew stay is the rental.
+    const rows = splitRows();
+    rows.assignments = rows.assignments.map((night) => night.member_id === ALEX.id && night.date === SAT ? personNight(ALEX.id, SAT, VILLAGE) : night);
+    expect(departuresOn(splitDriveTrip({ rows }), SUN).map((plan) => [plan.label, plan.member_ids.length, plan.crew])).toEqual([
+      ["Pine rental", 3, true], ["Village hotel", 3, false],
+    ]);
+  });
+  it("lists a stay's mornings when anyone starts there", () => {
+    expect(stayDepartures(splitDriveTrip(), NOW).map((stay) => [stay.stay_id, stay.dates])).toEqual([
+      [PINE.id, [SAT, SUN]], [VILLAGE.id, [SAT, SUN]], ["2b000000-0000-4000-8000-000000000003", [MON]],
+    ]);
+  });
+});
+
+describe("Departure estimates (#333)", () => {
+  it("gives the rental and the hotel their own estimates to the same meeting point, in one call", async () => {
+    const matrix = fakeMatrix(), store = memoryStore();
+    const result = await tripDriveEstimates(splitDriveTrip(), store, { now: NOW, matrix });
+    const saturday = result.days.find((day) => day.date === SAT)!;
+    expect(saturday).toMatchObject({ state: "available", origin: { label: "Pine rental" }, estimate: { duration_label: "12 min" } });
+    expect(saturday.departures.map((departure) => [departure.label, departure.member_ids.length, departure.crew, departure.state, departure.estimate?.duration_label])).toEqual([
+      ["Pine rental", 3, true, "available", "12 min"],
+      ["Village hotel", 2, false, "available", "18 min"],
+    ]);
+    expect(saturday.departures[1].directions?.google).toContain(`origin=${VILLAGE_PLACE.latitude},${VILLAGE_PLACE.longitude}`);
+    // One call: the three stays to the one lot.
+    expect(matrix).toHaveBeenCalledTimes(1);
+    expect(matrix.mock.calls[0].map((points) => points.length)).toEqual([3, 1, 0]);
+    // Each day and pair is kept: Sat and Sun from both stays, Mon from the lodge.
+    expect(store.saved.size).toBe(5);
+  });
+  it("calculates only the drive that's new when one person moves", async () => {
+    const store = memoryStore();
+    await tripDriveEstimates(splitDriveTrip(), store, { now: NOW, matrix: fakeMatrix() });
+    // Eli spends Friday night in the rental instead: no new pair, no call.
+    const rows = splitRows();
+    rows.assignments = rows.assignments.map((night) => night.member_id === ELI.id && night.date === FRI ? personNight(ELI.id, FRI, PINE) : night);
+    const again = fakeMatrix();
+    const moved = await tripDriveEstimates(splitDriveTrip({ rows }), store, { now: NOW + 60_000, matrix: again });
+    expect(again).not.toHaveBeenCalled();
+    expect(moved.days.find((day) => day.date === SAT)!.departures.map((departure) => [departure.member_ids, departure.estimate?.duration_label]))
+      .toEqual([[ids(ALEX, BLAIR, DANA, ELI), "12 min"], [ids(FRAN), "18 min"]]);
+    // The hotel's place is corrected: only its drives are calculated again.
+    const corrected = splitDriveTrip();
+    corrected.lodging!.stays = corrected.lodging!.stays.map((stay) => stay.id === VILLAGE.id ? { ...stay, location: place("Village hotel", 44.4662, -72.6881) } : stay);
+    const once = fakeMatrix();
+    await tripDriveEstimates(corrected, store, { now: NOW + 120_000, matrix: once });
+    expect(once).toHaveBeenCalledTimes(1);
+    expect(once.mock.calls[0][0]).toEqual([expect.objectContaining({ latitude: 44.4662 })]);
+  });
+  it("reuses an estimate for the same pair from another day", async () => {
+    const store = memoryStore();
+    await tripDriveEstimates(splitDriveTrip(), store, { now: NOW, matrix: fakeMatrix() });
+    // Everyone goes back to the rental on Sunday night: Monday's drive was already calculated on Saturday.
+    const rows = splitRows();
+    rows.stays = rows.stays.map((stay) => stay.id === PINE.id ? { ...stay, check_out: "2026-10-13" } : stay);
+    rows.assignments = rows.assignments.map((night) => night.date === SUN && night.stay_id ? { ...night, stay_id: PINE.id } : night);
+    const again = fakeMatrix();
+    const monday = (await tripDriveEstimates(splitDriveTrip({ rows }), store, { now: NOW + 60_000, matrix: again })).days.find((day) => day.date === MON)!;
+    expect(again).not.toHaveBeenCalled();
+    expect(monday).toMatchObject({ state: "available", origin: { label: "Pine rental" }, estimate: { duration_label: "12 min" } });
+  });
+  it("keeps each departure's own failure, and an earlier estimate only for its own starting point", async () => {
+    const store = memoryStore();
+    await tripDriveEstimates(splitDriveTrip(), store, { now: NOW, matrix: fakeMatrix() });
+    const moved = splitDriveTrip();
+    moved.stops[0] = { ...moved.stops[0], access_point: place("Mountain Road lot", 44.528, -72.7853) };
+    const saturday = (await tripDriveEstimates(moved, store, { now: NOW + 60_000, matrix: failing() })).days.find((day) => day.date === SAT)!;
+    expect(saturday.departures.map((departure) => [departure.label, departure.state, departure.previous?.origin_label, departure.previous?.duration_label])).toEqual([
+      ["Pine rental", "unavailable", "Pine rental", "12 min"],
+      ["Village hotel", "unavailable", "Village hotel", "18 min"],
+    ]);
+  });
+  it("uses the organizer's estimate only for the departure it was entered for", async () => {
+    const pinePair = drivePlans(splitDriveTrip()).find((plan) => plan.date === SAT)!.pair_key!;
+    const manual: ManualEstimateRow = { trip_day_id: `day-${SAT}`, pair_key: pinePair, origin_label: "Pine rental", destination_label: "Spruce Peak lot",
+      duration_seconds: 900, note: null, use_calculated: false, entered_at: "2026-10-04T12:00:00.000Z" };
+    const saturday = (await tripDriveEstimates(splitDriveTrip(), memoryStore([manual]), { now: NOW, matrix: failing() })).days.find((day) => day.date === SAT)!;
+    expect(saturday.departures.map((departure) => [departure.label, departure.state, departure.manual?.duration_label ?? null])).toEqual([
+      ["Pine rental", "manual", "15 min"],
+      ["Village hotel", "unavailable", null],
+    ]);
+  });
+  it("labels a read-only view's expired estimates stale without calling the provider or writing", async () => {
+    const store = memoryStore();
+    await tripDriveEstimates(splitDriveTrip(), store, { now: NOW, matrix: fakeMatrix() });
+    vi.mocked(store.write).mockClear();
+    const matrix = fakeMatrix();
+    const later = await tripDriveEstimates(splitDriveTrip(), store, { now: NOW + 8 * 86_400_000, matrix, refresh: false });
+    expect(matrix).not.toHaveBeenCalled();
+    expect(store.write).not.toHaveBeenCalled();
+    expect(later.days.find((day) => day.date === SAT)!.departures.map((departure) => departure.state)).toEqual(["stale", "stale"]);
+  });
+});

@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { requireUser } from "@/lib/api";
 import { loadTripMap, loadTripMapContext, projectTripMap } from "@/lib/trip-map";
 import { supabaseDriveStore, tripDriveEstimates } from "@/lib/trip-drive-estimates";
-import { driveTrip, place } from "@/test/driveTrip";
+import { driveTrip, place, splitDriveTrip, SPRUCE_LOT, VILLAGE_PLACE } from "@/test/driveTrip";
+import { PINE, splitRows, VILLAGE } from "@/test/splitStays";
 import type { TripFull } from "@/types/trips";
 import type { TripMap } from "@/types/trip-map";
 import { GET } from "./route";
@@ -100,6 +101,26 @@ describe("Authorized trip map APIs", () => {
     expect(url.searchParams.get("avoid")).toBe("location:44.5555,-72.7947");
     expect((await getGeometry(day.revision)).status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it("fetches another departure's line by its own revision, only when asked (#333)", async () => {
+    full = structuredClone(splitDriveTrip()); full.trip.id = `trip-map-${++sequence}`;
+    for (const row of [...full.days, ...full.stops, ...full.lodging!.stays, ...full.lodging!.assignments]) row.trip_id = full.trip.id;
+    const saturday = "2026-10-10";
+    const day = (await (await get(saturday)).json() as TripMap).days[0];
+    expect(day.departures.map((departure) => [departure.label, departure.crew, departure.people.map((person) => person.name)])).toEqual([
+      ["Pine rental", true, ["Alex", "Blair", "Dana"]], ["Village hotel", false, ["Eli", "Fran"]],
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    const hotel = day.departures[1];
+    expect(hotel.geometry.revision).not.toBe(day.geometry.revision);
+    const body = await (await getGeometry(hotel.geometry.revision!, saturday)).json();
+    expect(body).toMatchObject({ state: "available", revision: hotel.geometry.revision, origin_place_id: hotel.origin_place_id });
+    expect(new URL(fetchMock.mock.calls[0][0]).searchParams.get("waypoints")).toBe(`${VILLAGE_PLACE.latitude},${VILLAGE_PLACE.longitude}|${SPRUCE_LOT.latitude},${SPRUCE_LOT.longitude}`);
+    // Eli and Fran move to the rental: the hotel's revision no longer names a departure.
+    const moved = splitDriveTrip({ rows: { ...splitRows(), assignments: splitRows().assignments.map((night) => night.stay_id === VILLAGE.id ? { ...night, stay_id: PINE.id } : night) } });
+    full = { ...moved, trip: { ...moved.trip, id: full.trip.id } };
+    for (const row of [...full.days, ...full.stops, ...full.lodging!.stays, ...full.lodging!.assignments]) row.trip_id = full.trip.id;
+    expect((await getGeometry(hotel.geometry.revision!, saturday)).status).toBe(409);
   });
   it("keeps cached estimates usable without geometry configuration or on provider failure", async () => {
     const day = await selected();

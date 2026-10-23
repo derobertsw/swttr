@@ -5,7 +5,8 @@ import { tripDriveEstimates, type ManualEstimateRow } from "@/lib/trip-drive-est
 import { projectTripMap } from "@/lib/trip-map";
 import { buildLodging } from "@/lib/trip-lodging";
 import { buildTourPlanSummary } from "@/lib/trip-tour-plans";
-import { driveTrip, driveStay, MOTEL, place } from "@/test/driveTrip";
+import { driveTrip, driveStay, MOTEL, place, splitDriveTrip } from "@/test/driveTrip";
+import { PINE, VILLAGE } from "@/test/splitStays";
 import type { TripFull, TripTourPlan, TripTourPlanSummary } from "@/types/trips";
 
 const SAT = "2027-01-09", SUN = "2027-01-10";
@@ -25,6 +26,23 @@ function stored(full: TripFull, date = SAT, status: "ok" | "no_route" = "ok"): S
 }
 
 describe("Trip map projection", () => {
+  it("lists each departure with its own origin place, people and route revision (#333)", async () => {
+    const full = splitDriveTrip();
+    const map = await mapFor(full, [], [], "2026-10-10", Date.parse("2026-10-05T12:00:00Z"));
+    const [saturday] = map.days;
+    expect(saturday.departures.map((departure) => [departure.label, departure.crew, departure.origin_place_id, departure.drive.state,
+      departure.people.map((person) => `${person.name}${person.pending ? " (pending)" : ""}`)])).toEqual([
+      ["Pine rental", true, stayId(PINE.id), "unavailable", ["Alex", "Blair", "Dana"]],
+      ["Village hotel", false, stayId(VILLAGE.id), "unavailable", ["Eli", "Fran (pending)"]],
+    ]);
+    // The crew's departure is the day's own drive and line; the hotel's is separate and not requested.
+    expect(saturday.departures[0].geometry).toEqual(saturday.geometry);
+    expect(saturday.departures[1].geometry).toMatchObject({ state: "unavailable", reason: "not_requested", origin_place_id: stayId(VILLAGE.id) });
+    expect(saturday.departures[1].geometry.revision).not.toBe(saturday.geometry.revision);
+    expect(saturday.drive).not.toHaveProperty("departures");
+    // Both stays are on the day's map as starting points.
+    expect(map.places.find((entry) => entry.id === stayId(VILLAGE.id))?.visits).toContainEqual(expect.objectContaining({ date: "2026-10-10", role: "origin" }));
+  });
   it("keeps checkout morning separate from tonight and reuses one stay marker across roles/dates", async () => {
     const map = await mapFor();
     const moving = map.days.find((day) => day.date === SUN)!;

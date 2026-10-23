@@ -573,7 +573,8 @@ export interface TripDriveManualEstimate {
   dates: string[];
 }
 
-export interface TripDriveDay {
+/** A drive from one starting point to the day's access point, or why there's no estimate. */
+export interface TripDriveRoute {
   date: string;
   date_label: string;
   /** The night whose stay the day starts from: "Fri Jan 9". */
@@ -604,9 +605,32 @@ export interface TripDriveDay {
   directions: { apple: string; google: string } | null;
 }
 
+/**
+ * The people taking part in a day who start from the same place (#333), with
+ * their drive. They start from the day's own starting point when it has one,
+ * otherwise from the stay each of them slept in the night before. See
+ * docs/trip-locations.md.
+ */
+export interface TripDriveDeparture extends TripDriveRoute {
+  /** "stay:<id>", "day" for the day's own starting point, or "unset:not_set" / "unset:arrives" for people with no starting point. */
+  key: string;
+  /** The stay's or place's name, "Not set", or "Arrives this day". */
+  label: string;
+  /** Who starts here, in crew order; empty when the trip has no per-person plan to go on. */
+  member_ids: string[];
+  /** The crew's departure: the one most people take, which the day's own fields describe. */
+  crew: boolean;
+}
+
+/** A day's drive (#209): the crew's departure, with every departure that morning. */
+export interface TripDriveDay extends TripDriveRoute {
+  /** The crew's first, then other stays by size, then people with no starting point. One while everyone starts from the same place. */
+  departures: TripDriveDeparture[];
+}
+
 export interface TripStayDepartures {
   stay_id: string;
-  /** Mornings that start from the stay, checkout morning included, in date order. */
+  /** Mornings that anyone starts from the stay, checkout morning included, in date order. */
   dates: string[];
   /** The first of them from today on, in the stay's time zone; null once they've all passed. */
   next: string | null;

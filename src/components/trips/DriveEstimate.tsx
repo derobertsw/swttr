@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LocationPicker } from "@/components/trips/LocationPicker";
 import { GEOAPIFY_CREDIT, OSM_CREDIT } from "@/lib/trip-location";
 import { errorMessage, timedTripRequest, tripRequest, TripRequestError } from "@/lib/trip-requests";
-import type { TripDay, TripDriveDay, TripDriveEstimates, TripFull, TripLocation } from "@/types/trips";
+import type { TripDay, TripDriveDay, TripDriveEstimates, TripDriveRoute, TripFull, TripLocation } from "@/types/trips";
 
 const linkClass = "text-primary underline";
 
@@ -72,7 +72,7 @@ const calculatedLabel = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 /** "About 35 min drive · 14 mi · one way", or what's missing, in a few words for a list. */
-export function driveSummary(day: TripDriveDay, canEdit: boolean): string {
+export function driveSummary(day: TripDriveRoute, canEdit: boolean): string {
   const to = day.destination ? ` to ${day.destination.label}` : "";
   switch (day.state) {
     case "available": return `About ${day.estimate!.duration_label} drive${to} · ${day.estimate!.distance_label} · one way`;
@@ -94,7 +94,7 @@ export function driveSummary(day: TripDriveDay, canEdit: boolean): string {
  * Opens maps for the exact endpoints while keeping the current day open. The
  * trip map names the access point in `label`: "Directions to Spruce Peak lot".
  */
-export function Directions({ day, label }: { day: TripDriveDay; label?: string }) {
+export function Directions({ day, label }: { day: TripDriveRoute; label?: string }) {
   const apple = useAppleMaps();
   if (!day.directions || !day.origin || !day.destination) return null;
   const app = apple ? "Apple Maps" : "Google Maps";
@@ -118,7 +118,7 @@ function RoutingAttribution() {
 }
 
 /** Traffic assumptions and previous-route figures, separate from the current duration. */
-function EstimateDetails({ day }: { day: TripDriveDay }) {
+function EstimateDetails({ day }: { day: TripDriveRoute }) {
   if (!day.estimate && !day.previous) return null;
   return (
     <details className="text-sm text-muted-foreground">

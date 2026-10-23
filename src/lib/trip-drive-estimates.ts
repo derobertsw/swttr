@@ -2,17 +2,19 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { driveMatrix, MATRIX_MAX_CELLS } from "@/lib/locations/routing";
 import {
-  closureKey, DRIVE_ESTIMATE_MAX_AGE_MS, driveDay, drivePlans, stayDepartures,
-  type DrivePlan, type StoredDriveEstimate, type StoredManualEstimate,
+  closureKey, departurePlans, DRIVE_ESTIMATE_MAX_AGE_MS, driveDay, drivePlans, stayDepartures,
+  type DeparturePlan, type DrivePlan, type StoredDriveEstimate, type StoredManualEstimate,
 } from "@/lib/trip-drive";
-import type { TripDriveEstimates, TripFull, TripLocation } from "@/types/trips";
+import type { TripDriveDeparture, TripDriveEstimates, TripFull, TripLocation } from "@/types/trips";
 
 /** Your estimate as trip_drive_manual_estimates (029) keeps it: with its day, which can move to another date. */
 export type ManualEstimateRow = Omit<StoredManualEstimate, "date"> & { trip_day_id: string };
 
 /** Where estimates are kept between visits: trip_drive_estimates (028), and your own in 029's table. */
 export interface DriveEstimateStore {
+  /** Every stored estimate: one per day and pair, or one per day before the departures migration. */
   read(): Promise<StoredDriveEstimate[]>;
+  /** One row per day and pair, each day's crew estimate before the others. */
   write(rows: StoredDriveEstimate[]): Promise<void>;
   /** Your own estimates; none before migration 029. */
   manual?(): Promise<ManualEstimateRow[]>;
@@ -66,29 +68,43 @@ function sharedMatrix(matrix: Matrix, ...args: Parameters<Matrix>): ReturnType<M
   return pending;
 }
 
+const routeOf = (plan: DrivePlan | StoredDriveEstimate) => `${plan.date}|${plan.route_key}`;
+const newer = (a: StoredDriveEstimate | undefined, b: StoredDriveEstimate) => !a || Date.parse(b.calculated_at) > Date.parse(a.calculated_at) ? b : a;
+
 /**
- * Every trip day's drive estimate and each stay's departures (#209).
- * Stored estimates for the same pair are reused for a week. The rest are
- * calculated, one provider call per set of winter closures (more when a
- * call would pass the provider's cell limit), and stored. A
- * failed calculation keeps a stale estimate for the same pair, or says the
- * estimate is unavailable; it's never replaced by another pair's.
+ * Every trip day's drive estimates and each stay's departures (#209): the
+ * crew's departure, and since #333 each group that starts somewhere else.
+ * A stored estimate for the same pair, from any day, is reused for a week, so
+ * changing one person's stay calculates only the drive that's new. The rest
+ * are calculated, one provider call per set of winter closures (more when a
+ * call would pass the provider's cell limit), and stored. A failed
+ * calculation keeps a stale estimate for the same pair, or says the estimate
+ * is unavailable; it's never replaced by another pair's.
  */
 export async function tripDriveEstimates(full: TripFull, store: DriveEstimateStore, options: { now?: number; matrix?: Matrix; refresh?: boolean } = {}): Promise<TripDriveEstimates> {
   const now = options.now ?? Date.now();
   const matrix = options.matrix ?? driveMatrix;
   const plans = drivePlans(full);
+  const departures = departurePlans(full, plans);
   const [storedRows, manual] = await Promise.all([store.read().catch(() => []), manualEstimates(full, store)]);
-  const stored = new Map(storedRows.map((row) => [row.date, row]));
-  const due = plans.filter((plan): plan is ReadyPlan => {
-    if (options.refresh === false || plan.state !== "ready") return false;
-    const row = stored.get(plan.date);
-    return row?.route_key !== plan.route_key || now - Date.parse(row.calculated_at) > DRIVE_ESTIMATE_MAX_AGE_MS;
+  const stored = new Map(storedRows.map((row) => [routeOf(row), row]));
+  // The latest estimate for each pair, whichever day it was calculated for.
+  const byRoute = new Map<string, StoredDriveEstimate>();
+  for (const row of storedRows) byRoute.set(row.route_key, newer(byRoute.get(row.route_key), row));
+  const reuse = (plan: DrivePlan) => {
+    const row = stored.get(routeOf(plan)) ?? (plan.route_key ? byRoute.get(plan.route_key) : undefined);
+    return row && { ...row, date: plan.date };
+  };
+  const ready = [...new Map(departures.flat().filter((plan): plan is DeparturePlan & ReadyPlan => plan.state === "ready")
+    .map((plan) => [routeOf(plan), plan])).values()];
+  const due = options.refresh === false ? [] : ready.filter((plan) => {
+    const row = reuse(plan);
+    return !row || now - Date.parse(row.calculated_at) > DRIVE_ESTIMATE_MAX_AGE_MS;
   });
 
   const calculated = new Map<string, StoredDriveEstimate>();
   // Read-only map views label expired estimates stale without spending routing credits.
-  const failed = new Set<string>(options.refresh === false ? plans.map((plan) => plan.date) : []);
+  const failed = new Set<string>(options.refresh === false ? ready.map(routeOf) : []);
   const calculatedAt = new Date(now).toISOString();
   const groups = new Map<string, ReadyPlan[]>();
   for (const plan of due) {
@@ -103,13 +119,13 @@ export async function tripDriveEstimates(full: TripFull, store: DriveEstimateSto
     try {
       legs = await sharedMatrix(matrix, origins, targets, avoid);
     } catch {
-      group.forEach((plan) => failed.add(plan.date));
+      group.forEach((plan) => failed.add(routeOf(plan)));
       return;
     }
     for (const plan of group) {
       const leg = legs[origins.findIndex((point) => pointKey(point) === pointKey(plan.origin!.location!))]
         ?.[targets.findIndex((point) => pointKey(point) === pointKey(plan.destination!.location))];
-      calculated.set(plan.date, {
+      calculated.set(routeOf(plan), {
         date: plan.date, route_key: plan.route_key,
         origin_label: plan.origin!.label, destination_label: plan.destination!.label,
         status: leg ? "ok" : "no_route", duration_seconds: leg?.seconds ?? null, distance_meters: leg?.meters ?? null,
@@ -117,32 +133,74 @@ export async function tripDriveEstimates(full: TripFull, store: DriveEstimateSto
       });
     }
   }));
-  // A failed write only means the next visit calculates again.
-  if (calculated.size) await store.write([...calculated.values()]).catch(() => undefined);
+
+  const rowFor = (plan: DeparturePlan) => calculated.get(routeOf(plan)) ?? reuse(plan) ?? earlier(plan);
+  /**
+   * With no estimate for its pair, a departure's earlier estimate on the same
+   * day, for review only: one from the same starting point (the access point
+   * moved), or for the crew, the latest the day had (the crew moved stays).
+   */
+  const earlier = (plan: DeparturePlan) => {
+    const current = new Set(departures.find((day) => day[0].date === plan.date)!.map((other) => other.route_key));
+    const candidates = storedRows.filter((row) => row.date === plan.date && !current.has(row.route_key))
+      .sort((a, b) => Date.parse(b.calculated_at) - Date.parse(a.calculated_at));
+    return candidates.find((row) => row.origin_label === plan.origin?.label) ?? (plan.crew ? candidates[0] : undefined);
+  };
+  // The crew's first, so a table that keeps one estimate per day (before the
+  // departures migration) keeps the crew's. A crew estimate reused from
+  // another day is stored under this day too, as the day's own. A failed write
+  // only means the next visit calculates again.
+  const crewRows = departures.flatMap((day) => day.filter((plan) => plan.crew && plan.state === "ready"))
+    .flatMap((plan) => calculated.get(routeOf(plan)) ?? (stored.has(routeOf(plan)) ? [] : reuse(plan) ?? []));
+  const writes = [...new Map([...crewRows, ...calculated.values()].map((row) => [routeOf(row), row])).values()];
+  if (writes.length && options.refresh !== false) await store.write(writes).catch(() => undefined);
 
   return {
-    days: plans.map((plan) => driveDay(plan, calculated.get(plan.date) ?? stored.get(plan.date), failed.has(plan.date), now, { plans, manual })),
-    stays: stayDepartures(full, now, plans),
+    days: departures.map((day) => {
+      const routes = day.map((plan) => {
+        // Your estimate is the crew's (#209): another departure uses it only for the same drive.
+        const own = manual.filter((entry) => entry.date === plan.date && entry.pair_key === plan.pair_key);
+        const context = plan.crew ? { plans, manual } : { plans: [plan], manual: own };
+        return driveDay(plan, rowFor(plan), failed.has(routeOf(plan)), now, context);
+      });
+      return {
+        ...routes[day.findIndex((plan) => plan.crew)],
+        departures: routes.map((route, index): TripDriveDeparture => ({
+          ...route, key: day[index].key, label: day[index].label, member_ids: day[index].member_ids, crew: day[index].crew,
+        })),
+      };
+    }),
+    stays: stayDepartures(full, now, departures),
   };
 }
 
 const COLUMNS = "date, route_key, origin_label, destination_label, status, duration_seconds, distance_meters, calculated_at";
 const MANUAL_COLUMNS = "trip_day_id, pair_key, origin_label, destination_label, duration_seconds, note, use_calculated, entered_at";
 
+/** Postgres: no unique constraint matches the ON CONFLICT columns. */
+const NO_MATCHING_KEY = "42P10";
+
 /**
  * trip_drive_estimates and trip_drive_manual_estimates through the server's
  * client. Before migration 028 the first is missing: reads find nothing and
  * writes are skipped, so estimates are still calculated, just not kept.
+ * Before the departures migration (20261023000200) it keeps one estimate per
+ * day, so only each day's crew estimate is kept and other departures are
+ * calculated again on the next visit.
  */
 export function supabaseDriveStore(supabase: SupabaseClient, tripId: string): DriveEstimateStore {
+  const table = () => supabase.from("trip_drive_estimates");
   return {
     async read() {
-      const { data, error } = await supabase.from("trip_drive_estimates").select(COLUMNS).eq("trip_id", tripId);
+      const { data, error } = await table().select(COLUMNS).eq("trip_id", tripId);
       return error ? [] : (data ?? []) as StoredDriveEstimate[];
     },
     async write(rows) {
-      await supabase.from("trip_drive_estimates")
-        .upsert(rows.map((row) => ({ ...row, trip_id: tripId, provider: "geoapify" })), { onConflict: "trip_id,date" });
+      const saved = rows.map((row) => ({ ...row, trip_id: tripId, provider: "geoapify" }));
+      const { error } = await table().upsert(saved, { onConflict: "trip_id,date,route_key" });
+      if (error?.code !== NO_MATCHING_KEY) return;
+      const perDay = [...new Map([...saved].reverse().map((row) => [row.date, row])).values()];
+      await table().upsert(perDay, { onConflict: "trip_id,date" });
     },
     // Before migration 029 the table is missing, and there are none.
     async manual() {
