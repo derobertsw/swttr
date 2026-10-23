@@ -1,95 +1,150 @@
 "use client";
 
-import { use, useMemo } from "react";
-import { Badge } from "@/components/ui/badge";
+import { use, useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  GarmentGlyph,
-  MemberAvatar,
-  SectionLabel,
-  TripError,
-} from "@/components/trips/trip-primitives";
+import { SectionLabel, TripError } from "@/components/trips/trip-primitives";
+import { usePublishTripSummary } from "@/hooks/useTrip";
+import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import { cn } from "@/lib/utils";
-import { useTrip } from "@/hooks/useTrip";
+import type { TripChecklist, TripChecklistPerson, TripDayChecklist } from "@/types/trips";
 
-const REQUIRED_SLOTS = ["shirt", "midlayer", "shell", "pants", "gloves"];
+/** The people a day's checklist lists, in order. A pending invitation is never counted as coming. */
+const GROUPS: Array<{ id: string; title: string; includes: (person: TripChecklistPerson) => boolean }> = [
+  { id: "taking-part", title: "Taking part", includes: (person) => person.membership !== "invited" && person.participation === "participating" },
+  { id: "not-taking-part", title: "There, not taking part", includes: (person) => person.membership !== "invited" && person.participation === "skipping" },
+  { id: "invited", title: "Invitation pending", includes: (person) => person.membership === "invited" && person.participation !== "not_on_trip" },
+];
 
-export default function RollCallPage({ params }: { params: Promise<{ id: string }> }) {
+/**
+ * The Day checklist (#336), in Crew at the Roll call URL: one day at a time,
+ * each person's clothing, tonight's stay, shared gear and source reviews as
+ * separate facts, each linked to where it's done. The server works them out.
+ */
+export default function DayChecklistPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data, loading, error } = useTrip(id);
+  const [data, setData] = useState<TripChecklist | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  // A link can name the day, e.g. ?date=2026-10-10.
+  const [chosen, setChosen] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("date"));
+  usePublishTripSummary(data?.trip);
 
-  // Use the first day's kits as roll-call snapshot (the "trailhead" moment).
-  const rollCall = useMemo(() => {
-    if (!data || data.days.length === 0) return [];
-    const firstDay = data.days[0];
-    return data.members
-      .filter((m) => m.status !== "left")
-      .map((m) => {
-        const kit = data.kits.find(
-          (k) => k.trip_day_id === firstDay.id && k.trip_member_id === m.id
-        );
-        const items = kit?.items ?? [];
-        const missingRequired = REQUIRED_SLOTS.some((s) => !items.includes(s));
-        const ready = items.length > 0 && !missingRequired && kit?.state !== "warn";
-        return { member: m, items, ready };
-      });
-  }, [data]);
+  useEffect(() => {
+    let cancelled = false;
+    tripRequest<TripChecklist>(`/api/v1/trips/${id}/checklist`)
+      .then((body) => { if (!cancelled) { setData(body); setError(null); } })
+      .catch((err) => { if (!cancelled) setError(errorMessage(err)); });
+    return () => { cancelled = true; };
+  }, [id, attempt]);
 
+  const day = data && (data.days.find((entry) => entry.date === chosen) ?? data.days.find((entry) => entry.date === data.default_date) ?? data.days[0]);
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-8">
+    <div className="flex w-full max-w-3xl flex-col gap-6">
       <header>
-        <SectionLabel>Departure day</SectionLabel>
-        <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
-          Roll call
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">Are we leaving? Visual readiness check.</p>
+        <SectionLabel>Crew</SectionLabel>
+        <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">Day checklist</h1>
+        <p className="mt-1 text-base text-muted-foreground">
+          One day at a time: each person&apos;s clothing, tonight&apos;s stay, shared gear and source reviews. Each is its own status, so nothing here says anyone is ready.
+        </p>
       </header>
 
-      {loading && <Skeleton className="h-32 w-full rounded-card" />}
-      {error && <TripError>{error}</TripError>}
+      {!data && !error && <Skeleton className="h-32 w-full rounded-card" />}
+      {error && <div className="flex flex-col items-start gap-3">
+        <TripError>{error}</TripError>
+        <Button type="button" variant="outline" onClick={() => { setError(null); setAttempt((count) => count + 1); }}>Try again</Button>
+      </div>}
 
-      {data && rollCall.length === 0 && <p className="text-sm text-muted-foreground">No crew on this trip yet.</p>}
-
-      {rollCall.length > 0 && (
-        <ul className="divide-y divide-border border-y border-border">
-          {rollCall.map((row) => (
-            <li key={row.member.id} className="py-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <span
-                  className={cn(
-                    "inline-block size-2.5 shrink-0 rounded-full",
-                    row.ready ? "bg-success" : "bg-warning"
-                  )}
-                  aria-hidden
-                />
-                <MemberAvatar name={row.member.display_name} size={32} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {row.member.display_name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {row.ready ? "ready" : "kit incomplete"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  {row.items.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">no kit</span>
-                  ) : (
-                    row.items.slice(0, 6).map((slot) => (
-                      <GarmentGlyph key={slot} kind={slot} />
-                    ))
-                  )}
-                </div>
-                <Badge size="sm" variant={row.ready ? "success" : "warning"}>
-                  {row.ready ? "Ready" : "Missing"}
-                </Badge>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
+      {data && !data.days.length && <p className="text-base text-muted-foreground">This trip has no days yet. Add them in Plan.</p>}
+      {data && day && <>
+        <DayChooser days={data.days} selected={day.date} onSelect={setChosen} />
+        <DayTasks tripId={id} day={day} viewer={data.viewer_member_id} />
+      </>}
       <div className="h-24" />
     </div>
   );
+}
+
+/** Underlined dates, like Plan's date strip; the strip scrolls sideways on its own. */
+function DayChooser({ days, selected, onSelect }: { days: TripDayChecklist[]; selected: string; onSelect: (date: string) => void }) {
+  return <div role="group" aria-label="Choose a day" className="min-w-0 overflow-x-auto border-b border-border">
+    <div className="flex">
+      {days.map((day) => {
+        const [weekday, ...rest] = day.date_label.split(" ");
+        return <button key={day.date} type="button" aria-pressed={day.date === selected} onClick={() => onSelect(day.date)}
+          aria-label={day.date_label}
+          className="flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center border-b-2 border-transparent px-2 py-1 text-foreground transition-colors hover:border-input focus-visible:-outline-offset-2 aria-pressed:border-primary aria-pressed:font-semibold">
+          <span className="text-xs text-muted-foreground">{weekday}</span>
+          <span className="text-base">{rest.join(" ")}</span>
+        </button>;
+      })}
+    </div>
+  </div>;
+}
+
+function DayTasks({ tripId, day, viewer }: { tripId: string; day: TripDayChecklist; viewer: string | null }) {
+  const away = day.people.filter((person) => person.participation === "not_on_trip");
+  return <section aria-labelledby="checklist-day-heading" className="flex flex-col gap-6">
+    <div>
+      <h2 id="checklist-day-heading" className="text-xl font-semibold text-foreground">{day.date_label}</h2>
+      <p className="text-base text-muted-foreground">{[day.activity ?? "Activity not set", day.place].filter(Boolean).join(" · ")}</p>
+    </div>
+    {!day.people.length && <p className="text-base text-muted-foreground">No crew on this trip yet.</p>}
+    {GROUPS.map((group) => {
+      const people = day.people.filter(group.includes);
+      if (!people.length) return null;
+      return <section key={group.id} aria-labelledby={`checklist-${group.id}`}>
+        <h3 id={`checklist-${group.id}`} className="text-base font-semibold text-muted-foreground">{group.title} ({people.length})</h3>
+        <ul className="mt-1 divide-y divide-border border-y border-border">
+          {people.map((person) => <PersonTasks key={person.member_id} tripId={tripId} day={day} person={person} viewer={person.member_id === viewer} />)}
+        </ul>
+      </section>;
+    })}
+    {away.length > 0 && <p className="text-base text-muted-foreground">Not on the trip this day: {away.map((person) => person.display_name).join(", ")}</p>}
+  </section>;
+}
+
+function Fact({ term, children }: { term: string; children: ReactNode }) {
+  return <div className="contents">
+    <dt className="text-muted-foreground">{term}</dt>
+    <dd className="min-w-0 break-words text-foreground">{children}</dd>
+  </div>;
+}
+
+const linkClassName = "underline underline-offset-4 hover:no-underline";
+
+function PersonTasks({ tripId, day, person, viewer }: { tripId: string; day: TripDayChecklist; person: TripChecklistPerson; viewer: boolean }) {
+  const name = viewer && person.display_name !== "You" ? `${person.display_name} (you)` : person.display_name;
+  const { clothing, tonight, conditions } = person;
+  const dayHref = `/trips/${encodeURIComponent(tripId)}/days/${day.date}`;
+  return <li className="py-4">
+    <p className="break-words text-base font-semibold text-foreground">{name}</p>
+    <p className="text-sm text-muted-foreground">{[person.membership_label, person.participation === "skipping" && person.participation_label].filter(Boolean).join(" · ")}</p>
+    <dl className="mt-2 grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-base sm:grid-cols-[8rem_minmax(0,1fr)]">
+      <Fact term="Clothing">
+        <Link href={`${dayHref}#kit-${person.member_id}`} className={linkClassName} aria-label={`${person.display_name}'s clothing for ${day.date_label}: ${clothing.label}`}>{clothing.label}</Link>
+        {clothing.flagged && <span className="text-warning"> · Flagged: needs help</span>}
+        {clothing.notes.map((note) => <span key={note} className="block text-sm text-muted-foreground">{note}</span>)}
+      </Fact>
+      {tonight && <Fact term="Tonight">
+        {tonight.state === "not_on_trip" ? <span className="text-muted-foreground">{tonight.label}</span>
+          : <Link href={`/trips/${encodeURIComponent(tripId)}/stays${tonight.stay_id ? `#stay-${tonight.stay_id}` : ""}`} className={cn(linkClassName, tonight.gap && "text-warning")}
+            aria-label={`${person.display_name}'s stay the night of ${day.date_label}: ${tonight.gap ? "Not planned yet" : tonight.label}`}>{tonight.gap ? "Not planned yet" : tonight.label}</Link>}
+      </Fact>}
+      <Fact term="Shared gear">
+        {person.shared.length ? <ul>{person.shared.map((item) => <li key={item.id}>
+          <Link href={`/trips/${encodeURIComponent(tripId)}/gear#shared-${item.id}`} className={linkClassName}>{item.description}</Link>
+          <span className="text-muted-foreground"> · {item.label}</span>
+        </li>)}</ul> : <span className="text-muted-foreground">None assigned</span>}
+      </Fact>
+      {conditions && <Fact term="Source reviews">
+        <Link href={`${dayHref}#conditions-heading`} className={linkClassName} aria-label={`${person.display_name}'s source reviews for ${day.date_label}: ${conditions.label}`}>{conditions.label}</Link>
+      </Fact>}
+      {viewer && <Fact term="Your packing">
+        <Link href={`/trips/${encodeURIComponent(tripId)}/pack`} className={linkClassName}>Your packing list</Link>
+        <span className="text-muted-foreground"> · checks are private to you</span>
+      </Fact>}
+    </dl>
+  </li>;
 }
