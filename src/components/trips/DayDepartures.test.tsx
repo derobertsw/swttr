@@ -8,7 +8,8 @@ import { followDeparture } from "@/components/trips/trip-map-presentation";
 import { tripDriveEstimates } from "@/lib/trip-drive-estimates";
 import { projectTripMap } from "@/lib/trip-map";
 import { LODGE_PLACE, PINE_PLACE, splitDriveTrip, VILLAGE_PLACE } from "@/test/driveTrip";
-import { ALEX, BLAIR, CASEY, ELI, FRI, PINE, SAT, splitRows, SUN, VILLAGE } from "@/test/splitStays";
+import { ALEX, BLAIR, CASEY, ELI, FRI, MON, PINE, SAT, splitRows, SUN, VILLAGE } from "@/test/splitStays";
+import { fakeTripApi, reply, sentBodies } from "@/test/tripApi";
 import type { TripDriveEstimates, TripFull } from "@/types/trips";
 
 /**
@@ -63,15 +64,12 @@ describe("Your departure on the day (#333)", () => {
     expect(within(items[0]).getByText("About 12 min drive to Spruce Peak lot · 5.6 mi · one way · calculated just now")).toBeVisible();
     expect(within(items[0]).getByRole("link", { name: /Directions from Pine rental/ })).toBeVisible();
   });
-  it("keeps the organizer's estimate controls on the crew's drive", async () => {
+  it("gives the organizer estimate controls on whichever drive shows, the hotel's included", async () => {
     const full = splitDriveTrip();
     const failing = await tripDriveEstimates(full, { read: async () => [], write: async () => undefined },
       { now: NOW, matrix: async () => { throw new Error("timeout"); } });
-    const { unmount } = render(<DayDrive data={full} date={SAT} dateLabel="Sat Oct 10" onSaved={vi.fn()} canEdit memberId={ELI.id} drive={state(failing)} />);
-    expect(screen.getByRole("region", { name: "Your drive" })).toHaveTextContent("Drive estimate unavailable");
-    expect(screen.queryByRole("button", { name: "Add your estimate" })).not.toBeInTheDocument();
-    unmount();
-    render(<DayDrive data={full} date={SAT} dateLabel="Sat Oct 10" onSaved={vi.fn()} canEdit memberId={ALEX.id} drive={state(failing)} />);
+    render(<DayDrive data={full} date={SAT} dateLabel="Sat Oct 10" onSaved={vi.fn()} canEdit memberId={ELI.id} drive={state(failing)} />);
+    expect(screen.getByRole("region", { name: "Your drive" })).toHaveTextContent("Village hotel → Spruce Peak lot");
     expect(screen.getByRole("button", { name: "Add your estimate" })).toBeInTheDocument();
   });
   it("says your own starting point is missing when the crew has one", async () => {
@@ -87,6 +85,51 @@ describe("Your departure on the day (#333)", () => {
     const full = splitDriveTrip();
     render(<StayDepartures tripId={full.trip.id} stayId={VILLAGE.id} drive={state(await estimatesFor(full))} />);
     expect(screen.getByText("Next departure · Sat Oct 10: About 18 min drive to Spruce Peak lot · 5.6 mi · one way")).toBeInTheDocument();
+  });
+});
+
+describe("Starting points for chosen people (#333)", () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+  it("lets the organizer start the hotel's people from the rental, and nobody else", async () => {
+    const full = splitDriveTrip();
+    const fetchMock = fakeTripApi({ [`PUT /api/v1/trips/${full.trip.id}/days/${SAT}/origin`]: reply(200, { ok: true }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const onSaved = vi.fn();
+    render(<DayDrive data={full} date={SAT} dateLabel="Sat Oct 10" onSaved={onSaved} canEdit memberId={ALEX.id} drive={state(await estimatesFor(full))} />);
+    await userEvent.click(screen.getByText("Departures · 2 starting points"));
+    const hotel = screen.getAllByRole("listitem")[1];
+    await userEvent.click(within(hotel).getByRole("button", { name: "Change their starting point" }));
+    const form = screen.getByRole("form", { name: "Starting point for chosen people · Sat Oct 10" });
+    // Who: the hotel's two, checked; the rental's three, not.
+    expect(within(form).getAllByRole("checkbox", { checked: true }).map((box) => box.closest("label")?.textContent)).toEqual([
+      "EliStarts from Village hotel", "Fran (invitation pending)Starts from Village hotel",
+    ]);
+    expect(within(form).getByRole("checkbox", { name: /^You/ })).not.toBeChecked();
+    await userEvent.click(within(form).getByRole("checkbox", { name: /^Fran/ }));
+    await userEvent.click(within(form).getByRole("radio", { name: /^Pine rental/ }));
+    await userEvent.click(within(form).getByRole("button", { name: "Save starting point" }));
+    expect(sentBodies(fetchMock, `PUT /api/v1/trips/${full.trip.id}/days/${SAT}/origin`)).toEqual([{
+      member_ids: [ELI.id], origin: { stay_id: PINE.id }, no_drive: false,
+      expected: [{ member_id: ELI.id, origin: null, origin_stay_id: null, no_drive: false }],
+    }]);
+    expect(onSaved).toHaveBeenCalled();
+    expect(await screen.findByText("Starting point saved for Eli.")).toBeInTheDocument();
+  });
+  it("marks people starting from their own place, and offers it with one departure too", async () => {
+    const full = splitDriveTrip();
+    full.member_origins = [{ trip_id: full.trip.id, trip_day_id: `day-${MON}`, member_id: ELI.id, origin: null, origin_stay_id: null, no_drive: true }];
+    const { unmount } = render(<DayDrive data={full} date={MON} dateLabel="Mon Oct 12" onSaved={vi.fn()} canEdit memberId={ALEX.id} drive={state(await estimatesFor(full))} />);
+    await userEvent.click(screen.getByText("Departures · 2 starting points"));
+    expect(screen.getAllByRole("listitem")[1]).toHaveTextContent("Mountain lodge · Eli (own starting point)No drive planned");
+    unmount();
+    // Everyone from the lodge: the organizer can still give someone their own; a member has nothing to compare.
+    full.member_origins = [];
+    const organizer = render(<DayDrive data={full} date={MON} dateLabel="Mon Oct 12" onSaved={vi.fn()} canEdit memberId={ALEX.id} drive={state(await estimatesFor(full))} />);
+    expect(screen.getByText("Departures · 1 starting point")).toBeInTheDocument();
+    organizer.unmount();
+    render(<DayDrive data={full} date={MON} dateLabel="Mon Oct 12" onSaved={vi.fn()} canEdit={false} memberId={ELI.id} drive={state(await estimatesFor(full))} />);
+    expect(screen.queryByText(/^Departures/)).not.toBeInTheDocument();
   });
 });
 

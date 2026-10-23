@@ -83,24 +83,30 @@ function routeKey(origin: TripLocation, destination: TripLocation, closures: Win
  */
 const pairKey = (origin: TripLocation, destination: TripLocation) => `drive|${coordinates(origin)}>${coordinates(destination)}`;
 
+/** A saved place as a starting point: a stay it was picked from, by its current name and place while it exists. */
+function savedOrigin(full: TripFull, origin: TripLocation, stayId: string | null | undefined): DriveOrigin {
+  const stay = stayId ? full.lodging?.stays.find((candidate) => candidate.id === stayId) : undefined;
+  return stay ? { label: stay.name, stay_id: stay.id, location: stay.location ?? null, own: true }
+    : { label: origin.label, stay_id: null, location: origin, own: true };
+}
+
+/** A stay slept in the night before as a starting point. */
+function stayOrigin(full: TripFull, stayId: string | null): DriveOrigin | null {
+  const stay = stayId ? full.lodging?.stays.find((candidate) => candidate.id === stayId) : undefined;
+  return stay ? { label: stay.name, stay_id: stay.id, location: stay.location ?? null, own: false } : null;
+}
+
 /**
  * Where a day starts: its own starting point while it has one, otherwise the
  * crew stay of the night before. An own point picked from a saved stay
  * follows that stay's name and place while the stay exists.
  */
 function originFor(full: TripFull, day: TripDay | undefined, crewStayId: string | null): DriveOrigin | null {
-  const stays = full.lodging?.stays ?? [];
-  if (day?.origin) {
-    const stay = day.origin_stay_id ? stays.find((candidate) => candidate.id === day.origin_stay_id) : undefined;
-    return stay ? { label: stay.name, stay_id: stay.id, location: stay.location ?? null, own: true }
-      : { label: day.origin.label, stay_id: null, location: day.origin, own: true };
-  }
-  const stay = crewStayId ? stays.find((candidate) => candidate.id === crewStayId) : undefined;
-  return stay ? { label: stay.name, stay_id: stay.id, location: stay.location ?? null, own: false } : null;
+  return day?.origin ? savedOrigin(full, day.origin, day.origin_stay_id) : stayOrigin(full, crewStayId);
 }
 
 /** The drive from `origin` to the day's access point, or what's missing for one. */
-function planFor(full: TripFull, date: string, origin: DriveOrigin | null, crewStayId: string | null): DrivePlan {
+function planFor(full: TripFull, date: string, origin: DriveOrigin | null, crewStayId: string | null, noDrive?: boolean): DrivePlan {
   const day = full.days.find((candidate) => candidate.date === date);
   const crewStay = crewStayId ? full.lodging?.stays.find((candidate) => candidate.id === crewStayId) : undefined;
   const point = day ? accessPointFor(full.stops, day) : null;
@@ -109,7 +115,7 @@ function planFor(full: TripFull, date: string, origin: DriveOrigin | null, crewS
   const blocked = (state: Exclude<DrivePlan["state"], "ready">): DrivePlan => ({ ...shared, state, route_key: null, pair_key: null, closures: [] });
   if (!day || !full.stops.length) return blocked("no_destination");
   // The organizer's choice, whatever else is missing.
-  if (day.no_drive) return blocked("no_drive");
+  if (noDrive ?? day.no_drive) return blocked("no_drive");
   // The origin comes first: the Getting there card already asks for a missing access point.
   if (!origin) return blocked("missing_origin");
   if (!origin.location) return blocked("origin_not_located");
@@ -123,65 +129,81 @@ function planFor(full: TripFull, date: string, origin: DriveOrigin | null, crewS
   };
 }
 
-/** Every trip day's drive for the crew, in date order: from where most of the people taking part start. */
-export function drivePlans(full: TripFull): DrivePlan[] {
-  return (full.lodging?.days ?? []).map(({ date, starting_stay_id }) => {
-    const day = full.days.find((candidate) => candidate.date === date);
-    return planFor(full, date, originFor(full, day, starting_stay_id), starting_stay_id);
-  });
-}
-
 /** The people who start a day from the same place (#333), with their drive. */
-export type DeparturePlan = DrivePlan & { key: string; label: string; member_ids: string[]; crew: boolean };
+export type DeparturePlan = DrivePlan & { key: string; label: string; member_ids: string[]; own_member_ids: string[]; crew: boolean };
+
+/**
+ * Names a departure by where it actually starts: the same stay, or the same
+ * coordinates, is the same departure, and No drive planned is its own.
+ */
+const departureKey = (origin: DriveOrigin | null, unset: string, noDrive: boolean) =>
+  (!origin ? unset : origin.stay_id ? `stay:${origin.stay_id}` : `place:${origin.location ? coordinates(origin.location) : origin.label}`)
+  + (noDrive ? ":no_drive" : "");
 
 /**
  * Each trip day's departures, in date order: the people taking part, grouped
- * by where they start. That's the day's own starting point for everyone while
- * it has one, otherwise the stay each person slept in the night before. People
- * with no stay that night are grouped as Not set, or Arrives this day when they
- * weren't on the trip yet; they're never assumed to travel with the crew. A
- * pending invitation counts once it has a stay for the night. The crew's
- * departure is the one `drivePlans` describes. See docs/trip-locations.md.
+ * by where they actually start. A person's own starting point for the day
+ * (#333) comes first, then the day's own starting point, then the stay each
+ * person slept in the night before. No drive planned, the day's or their own,
+ * is a departure of its own. People with no starting point are grouped as
+ * Not set, or Arrives this day when they weren't on the trip yet; they're
+ * never assumed to travel with the crew. A pending invitation counts once it
+ * has a stay for the night or a starting point of its own. The crew's
+ * departure is the one most people take from the day's usual starting point.
+ * See docs/trip-locations.md.
  */
-export function departurePlans(full: TripFull, plans = drivePlans(full)): DeparturePlan[][] {
+export function departurePlans(full: TripFull): DeparturePlan[][] {
   const lodging = full.lodging;
   const stays = lodging?.stays ?? [];
   const people = lodging?.people ?? [];
-  return plans.map((plan) => {
-    const day = full.days.find((candidate) => candidate.date === plan.date);
-    const crewKey = day?.origin ? "day" : plan.origin?.stay_id ? `stay:${plan.origin.stay_id}` : "unset:not_set";
+  return (lodging?.days ?? []).map(({ date, starting_stay_id }) => {
+    const day = full.days.find((candidate) => candidate.date === date);
+    const plan = planFor(full, date, originFor(full, day, starting_stay_id), starting_stay_id);
+    const crewKey = departureKey(plan.origin, "unset:not_set", !!day?.no_drive);
     const travellers = people.flatMap((person) => {
-      const morning = person.days.find((entry) => entry.date === plan.date);
+      const morning = person.days.find((entry) => entry.date === date);
       if (morning?.participation !== "participating") return [];
-      if (!CREW_STATUSES.has(person.membership) && !morning.starting_stay_id) return [];
-      const key = day?.origin ? "day" : morning.starting_stay_id ? `stay:${morning.starting_stay_id}`
-        : morning.starting_from === "Arrives this day" ? "unset:arrives" : "unset:not_set";
-      return [{ key, member_id: person.member_id }];
+      const own = day ? full.member_origins?.find((row) => row.trip_day_id === day.id && row.member_id === person.member_id) : undefined;
+      if (!CREW_STATUSES.has(person.membership) && !morning.starting_stay_id && !own) return [];
+      const origin = own?.origin ? savedOrigin(full, own.origin, own.origin_stay_id)
+        : day?.origin ? originFor(full, day, null) : stayOrigin(full, morning.starting_stay_id);
+      const noDrive = !!day?.no_drive || !!own?.no_drive;
+      const unset = morning.starting_from === "Arrives this day" ? "unset:arrives" : "unset:not_set";
+      return [{ member_id: person.member_id, origin, noDrive, own: !!own, key: departureKey(origin, unset, noDrive) }];
     });
     // Nobody to group, such as a trip before per-person nights: the crew's drive alone.
-    if (!travellers.length) return [{ ...plan, key: crewKey, label: plan.origin?.label ?? "Not set", member_ids: [], crew: true }];
+    if (!travellers.length) return [{ ...plan, key: crewKey, label: plan.origin?.label ?? "Not set", member_ids: [], own_member_ids: [], crew: true }];
 
     const keys = [...new Set(travellers.map((entry) => entry.key))];
-    // With no stay among them, the crew's departure is the people with none.
-    const crew = keys.includes(crewKey) ? crewKey : keys.find((key) => key.startsWith("unset:"))!;
     const size = (key: string) => travellers.filter((entry) => entry.key === key).length;
-    // The crew's, then stays by size and stay order, then Not set, then Arrives this day.
-    const order = (key: string) => key === crew ? [0, 0, 0] : key.startsWith("unset:") ? [2, key === "unset:arrives" ? 1 : 0, 0]
-      : [1, -size(key), stays.findIndex((stay) => `stay:${stay.id}` === key)];
-    keys.sort((a, b) => {
-      const [x, y] = [order(a), order(b)];
-      return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
-    });
+    const unset = (key: string) => key.startsWith("unset:");
+    const rank = (key: string) => {
+      const index = stays.findIndex((stay) => key.startsWith(`stay:${stay.id}`));
+      return index === -1 ? stays.length : index;
+    };
+    // Stays and places by size and stay order, then Not set, then Arrives this day.
+    keys.sort((a, b) => Number(unset(a)) - Number(unset(b)) || Number(a.startsWith("unset:arrives")) - Number(b.startsWith("unset:arrives"))
+      || size(b) - size(a) || rank(a) - rank(b));
+    // The crew's departure leads: from the day's usual starting point, or the
+    // largest group when everyone there has a starting point of their own.
+    const crew = keys.includes(crewKey) ? crewKey : keys[0];
+    keys.sort((a, b) => Number(b === crew) - Number(a === crew));
     return keys.map((key): DeparturePlan => {
-      const member_ids = travellers.filter((entry) => entry.key === key).map((entry) => entry.member_id);
-      const unsetLabel = key === "unset:arrives" ? "Arrives this day" : "Not set";
-      if (key === crew) return { ...plan, key, label: plan.origin?.label ?? unsetLabel, member_ids, crew: true };
-      const stay = key.startsWith("stay:") ? stays.find((candidate) => `stay:${candidate.id}` === key) : undefined;
-      const origin = stay ? { label: stay.name, stay_id: stay.id, location: stay.location ?? null, own: false } : null;
-      const crewStayId = plan.crew_stay?.stay_id ?? null;
-      return { ...planFor(full, plan.date, origin, crewStayId), key, member_ids, crew: false, label: origin?.label ?? unsetLabel };
+      const group = travellers.filter((entry) => entry.key === key);
+      const member_ids = group.map((entry) => entry.member_id);
+      const own_member_ids = group.filter((entry) => entry.own).map((entry) => entry.member_id);
+      const label = group[0].origin?.label ?? (key.startsWith("unset:arrives") ? "Arrives this day" : "Not set");
+      if (key === crewKey) return { ...plan, key, label, member_ids, own_member_ids, crew: true };
+      // Their own place only when every one of them is there by their own choice.
+      const origin = group.find((entry) => !entry.own)?.origin ?? group[0].origin;
+      return { ...planFor(full, date, origin, starting_stay_id, group[0].noDrive), key, label, member_ids, own_member_ids, crew: key === crew };
     });
   });
+}
+
+/** Every trip day's drive for the crew, in date order: its crew departure. */
+export function drivePlans(full: TripFull): DrivePlan[] {
+  return departurePlans(full).map((day) => day.find((plan) => plan.crew)!);
 }
 
 /** One way, rounded to the minute: "Under 1 min", "35 min", "1 hr 5 min". */
@@ -231,15 +253,16 @@ const sameManual = (a: StoredManualEstimate, b: StoredManualEstimate) =>
   a.pair_key === b.pair_key && a.duration_seconds === b.duration_seconds && a.note === b.note && Date.parse(a.entered_at) === Date.parse(b.entered_at);
 
 /**
- * The day as the page shows it. `row` is the day's estimate, newly
- * calculated or stored, and `failed` says recalculating it failed this time.
- * A stored estimate for another pair is only ever `previous`. `manual` is
- * every day's estimate of your own; the day's is in use while it's for the
- * day's pair, unless the organizer chose a calculated estimate for that pair
- * and there is one. Your estimate for another pair is shown for review only.
+ * The drive as the page shows it. `row` is its estimate, newly calculated or
+ * stored, and `failed` says recalculating it failed this time. A stored
+ * estimate for another pair is only ever `previous`. `manual` is every
+ * estimate of your own, each for a drive on a day (#333), and `plans` every
+ * drive on the trip; yours for this drive is in use unless the organizer chose
+ * a calculated estimate for it and there is one. With `earlier`, the crew's
+ * drive also shows yours for a drive the day no longer has, for review only.
  */
 export function driveDay(plan: DrivePlan, row: StoredDriveEstimate | undefined, failed: boolean, now: number,
-  context: { plans?: DrivePlan[]; manual?: StoredManualEstimate[] } = {}): TripDriveRoute {
+  context: { plans?: DrivePlan[]; manual?: StoredManualEstimate[]; earlier?: boolean } = {}): TripDriveRoute {
   const plans = context.plans ?? [plan], manual = context.manual ?? [];
   const base = {
     date: plan.date, date_label: dateLabel(plan.date), night_label: dateLabel(shiftDate(plan.date, -1)),
@@ -251,14 +274,15 @@ export function driveDay(plan: DrivePlan, row: StoredDriveEstimate | undefined, 
   };
   if (plan.state !== "ready") return { ...base, state: plan.state };
   const directions = directionsUrls(plan.origin!.location!, plan.destination!.location);
-  const sameDrive = plans.filter((other) => other.pair_key === plan.pair_key).map((other) => other.date);
-  const pairOf = (date: string) => plans.find((other) => other.date === date)?.pair_key;
-  const own = manual.find((entry) => entry.date === plan.date);
+  const sameDrive = [...new Set(plans.filter((other) => other.pair_key === plan.pair_key).map((other) => other.date))];
+  const drives = (date: string, pair: string) => plans.some((other) => other.date === date && other.pair_key === pair);
+  const own = manual.find((entry) => entry.date === plan.date && entry.pair_key === plan.pair_key)
+    ?? (context.earlier ? manual.find((entry) => entry.date === plan.date && !drives(entry.date, entry.pair_key)) : undefined);
   const yours: TripDriveManualEstimate | null = own ? {
-    duration_label: durationLabel(own.duration_seconds), duration_seconds: own.duration_seconds, note: own.note, entered_at: own.entered_at,
-    origin_label: own.origin_label, destination_label: own.destination_label,
+    pair_key: own.pair_key, duration_label: durationLabel(own.duration_seconds), duration_seconds: own.duration_seconds, note: own.note,
+    entered_at: own.entered_at, origin_label: own.origin_label, destination_label: own.destination_label,
     current: own.pair_key === plan.pair_key, use_calculated: own.use_calculated,
-    dates: manual.filter((entry) => sameManual(entry, own) && pairOf(entry.date) === own.pair_key).map((entry) => entry.date),
+    dates: manual.filter((entry) => sameManual(entry, own) && drives(entry.date, own.pair_key)).map((entry) => entry.date),
   } : null;
   const day = { ...base, directions, manual: yours, same_drive_dates: sameDrive };
 
@@ -291,7 +315,7 @@ export function driveDay(plan: DrivePlan, row: StoredDriveEstimate | undefined, 
  * counts (#333), so a stay with part of the crew lists its mornings too.
  * `next` is the first from today on, using the stay's time zone when it has one.
  */
-export function stayDepartures(full: TripFull, now: number, departures = departurePlans(full)): TripStayDepartures[] {
+export function stayDepartures(full: TripFull, now: number, departures: DeparturePlan[][] = departurePlans(full)): TripStayDepartures[] {
   const lodging = full.lodging;
   return (lodging?.stays ?? []).map((stay) => {
     const dates = departures.filter((day) => day.some((plan) => plan.origin?.stay_id === stay.id)).map((day) => day[0].date);

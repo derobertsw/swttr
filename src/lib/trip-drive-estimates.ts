@@ -2,10 +2,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { driveMatrix, MATRIX_MAX_CELLS } from "@/lib/locations/routing";
 import {
-  closureKey, departurePlans, DRIVE_ESTIMATE_MAX_AGE_MS, driveDay, drivePlans, stayDepartures,
+  closureKey, departurePlans, DRIVE_ESTIMATE_MAX_AGE_MS, driveDay, stayDepartures,
   type DeparturePlan, type DrivePlan, type StoredDriveEstimate, type StoredManualEstimate,
 } from "@/lib/trip-drive";
-import type { TripDriveDeparture, TripDriveEstimates, TripFull, TripLocation } from "@/types/trips";
+import type { TripDriveDeparture, TripDriveEstimates, TripFull, TripLocation, TripMemberDayOrigin } from "@/types/trips";
 
 /** Your estimate as trip_drive_manual_estimates (029) keeps it: with its day, which can move to another date. */
 export type ManualEstimateRow = Omit<StoredManualEstimate, "date"> & { trip_day_id: string };
@@ -84,8 +84,8 @@ const newer = (a: StoredDriveEstimate | undefined, b: StoredDriveEstimate) => !a
 export async function tripDriveEstimates(full: TripFull, store: DriveEstimateStore, options: { now?: number; matrix?: Matrix; refresh?: boolean } = {}): Promise<TripDriveEstimates> {
   const now = options.now ?? Date.now();
   const matrix = options.matrix ?? driveMatrix;
-  const plans = drivePlans(full);
-  const departures = departurePlans(full, plans);
+  const departures = departurePlans(full);
+  const plans = departures.flat();
   const [storedRows, manual] = await Promise.all([store.read().catch(() => []), manualEstimates(full, store)]);
   const stored = new Map(storedRows.map((row) => [routeOf(row), row]));
   // The latest estimate for each pair, whichever day it was calculated for.
@@ -157,21 +157,27 @@ export async function tripDriveEstimates(full: TripFull, store: DriveEstimateSto
 
   return {
     days: departures.map((day) => {
-      const routes = day.map((plan) => {
-        // Your estimate is the crew's (#209): another departure uses it only for the same drive.
-        const own = manual.filter((entry) => entry.date === plan.date && entry.pair_key === plan.pair_key);
-        const context = plan.crew ? { plans, manual } : { plans: [plan], manual: own };
-        return driveDay(plan, rowFor(plan), failed.has(routeOf(plan)), now, context);
-      });
+      // Your estimates are per drive (#333); the crew's drive also shows one for a drive the day no longer has.
+      const routes = day.map((plan) => driveDay(plan, rowFor(plan), failed.has(routeOf(plan)), now, { plans, manual, earlier: plan.crew }));
       return {
         ...routes[day.findIndex((plan) => plan.crew)],
         departures: routes.map((route, index): TripDriveDeparture => ({
-          ...route, key: day[index].key, label: day[index].label, member_ids: day[index].member_ids, crew: day[index].crew,
+          ...route, key: day[index].key, label: day[index].label, member_ids: day[index].member_ids,
+          own_member_ids: day[index].own_member_ids, crew: day[index].crew,
         })),
       };
     }),
     stays: stayDepartures(full, now, departures),
   };
+}
+
+/** People's own starting points (#333). Before its migration there are none; any other failure fails the load rather than hide them. */
+export async function loadMemberDayOrigins(supabase: SupabaseClient, tripId: string): Promise<TripMemberDayOrigin[]> {
+  const { data, error } = await supabase.from("trip_member_day_origins")
+    .select("trip_id, trip_day_id, member_id, origin, origin_stay_id, no_drive").eq("trip_id", tripId);
+  if (error && ["42P01", "PGRST205"].includes(error.code)) return [];
+  if (error) throw new Error("Couldn't load starting points. Try again.");
+  return (data ?? []) as TripMemberDayOrigin[];
 }
 
 const COLUMNS = "date, route_key, origin_label, destination_label, status, duration_seconds, distance_meters, calculated_at";

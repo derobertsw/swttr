@@ -5,6 +5,7 @@ import { jsonError, requireUser, type AuthedContext } from "@/lib/api";
 import { buildLodging, loadLodgingRows } from "@/lib/trip-lodging";
 import { loadTourPlans, summarizeTourPlans } from "@/lib/trip-tour-plans";
 import { loadConditions, summarizeConditions } from "@/lib/trip-conditions";
+import { loadMemberDayOrigins } from "@/lib/trip-drive-estimates";
 import type {
   Trip,
   TripDay,
@@ -180,7 +181,7 @@ export async function loadTripFull(
     return { days, kits: (kits ?? []) as TripMemberDayKit[] };
   };
 
-  const [stopsRes, membersRes, { days, kits }, gearRes, lodgingRows, tourPlans, conditions] = await Promise.all([
+  const [stopsRes, membersRes, { days, kits }, gearRes, lodgingRows, tourPlans, conditions, memberOrigins] = await Promise.all([
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("position"),
     supabase.from("trip_members").select("*").eq("trip_id", tripId),
     loadDaysAndKits(),
@@ -192,6 +193,7 @@ export async function loadTripFull(
     loadLodgingRows(supabase, tripId),
     loadTourPlans(supabase, tripId),
     loadConditions(supabase, tripId),
+    loadMemberDayOrigins(supabase, tripId),
   ]);
 
   if (gearRes.error) throw new Error("Couldn't load shared gear. Try again.");
@@ -212,6 +214,7 @@ export async function loadTripFull(
     lodging,
     tour_plans,
     conditions: summarizeConditions(conditions, { stops, days, tour_plans }),
+    member_origins: memberOrigins,
   };
 }
 

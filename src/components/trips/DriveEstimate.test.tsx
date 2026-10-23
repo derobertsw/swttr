@@ -356,7 +356,7 @@ describe("Your estimate", () => {
     await userEvent.click(within(form).getByRole("button", { name: "Save your estimate" }));
     expect(sentBodies(fetchMock, `PUT ${ESTIMATE_URL}`)).toEqual([{
       pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", duration_seconds: 2400, note: "Resort directions page",
-      dates: [SAT, SUN], clear: [], expected: [{ date: SAT, entered_at: null, use_calculated: null }, { date: SUN, entered_at: null, use_calculated: null }],
+      dates: [SAT, SUN], clear: [], expected: [SAT, SUN].map((date) => ({ date, pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", entered_at: null, use_calculated: null })),
     }]);
     expect(await screen.findByText("Your estimate saved for Sat Jan 9 and Sun Jan 10.")).toBeInTheDocument();
     expect(retry).toHaveBeenCalled();
@@ -427,7 +427,7 @@ describe("Your estimate", () => {
     expect(screen.getByText("About 40 min drive · one way")).toBeInTheDocument();
     expect(screen.getByText(/^Calculated estimate: about 12 min · 5.6 mi/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Use calculated estimate" }));
-    expect(sentBodies(fetchMock, `PATCH ${ESTIMATE_URL}`)).toEqual([{ use_calculated: true, expected: [{ date: SAT, entered_at: "2027-01-04T12:00:00.000Z", use_calculated: false }] }]);
+    expect(sentBodies(fetchMock, `PATCH ${ESTIMATE_URL}`)).toEqual([{ use_calculated: true, pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", expected: [{ date: SAT, pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", entered_at: "2027-01-04T12:00:00.000Z", use_calculated: false }] }]);
     expect(await screen.findByText("Using the calculated estimate.")).toBeInTheDocument();
     unmount();
 
@@ -460,8 +460,8 @@ describe("Your estimate", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Edit your estimate" })).toHaveFocus());
     await userEvent.click(screen.getByRole("button", { name: "Remove your estimate" }));
     await userEvent.click(screen.getByRole("button", { name: "Remove your estimate" }));
-    const seen = { entered_at: "2027-01-04T12:00:00.000Z", use_calculated: false };
-    expect(sentBodies(fetchMock, `DELETE ${ESTIMATE_URL}`)).toEqual([{ dates: [SAT, SUN], expected: [{ date: SAT, ...seen }, { date: SUN, ...seen }] }]);
+    const seen = { pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", entered_at: "2027-01-04T12:00:00.000Z", use_calculated: false };
+    expect(sentBodies(fetchMock, `DELETE ${ESTIMATE_URL}`)).toEqual([{ pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", dates: [SAT, SUN], expected: [{ date: SAT, ...seen }, { date: SUN, ...seen }] }]);
     expect(await screen.findByText("Your estimate removed.")).toBeInTheDocument();
   });
   it("reviews what's saved after a removal conflict, then removes against it", async () => {
@@ -488,7 +488,7 @@ describe("Your estimate", () => {
     const question = await screen.findByText("Saved now: about 45 min · Front desk. Remove your estimate from Sat Jan 9? Any calculated estimate stays.");
     expect(question).toHaveFocus();
     await userEvent.click(screen.getByRole("button", { name: "Remove your estimate" }));
-    expect(sentBodies(fetchMock, `DELETE ${ESTIMATE_URL}`)[1]).toEqual({ dates: [SAT], expected: [{ date: SAT, entered_at: "2027-01-05T09:00:00.000Z", use_calculated: false }] });
+    expect(sentBodies(fetchMock, `DELETE ${ESTIMATE_URL}`)[1]).toEqual({ pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", dates: [SAT], expected: [{ date: SAT, pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", entered_at: "2027-01-05T09:00:00.000Z", use_calculated: false }] });
     expect(await screen.findByText("Your estimate removed.")).toBeInTheDocument();
   });
   it("keeps an open entry when the day's last destination is removed, then returns focus to Getting there", async () => {
@@ -531,7 +531,7 @@ describe("Your estimate", () => {
     expect(within(form).getByRole("checkbox", { name: "Sun Jan 10" })).toBeChecked();
     await userEvent.click(within(form).getByRole("checkbox", { name: "Sun Jan 10" }));
     await userEvent.click(within(form).getByRole("button", { name: "Save your estimate" }));
-    expect(sentBodies(fetchMock, `PUT ${ESTIMATE_URL}`)[0]).toMatchObject({ dates: [SAT], clear: [SUN], duration_seconds: 2400 });
+    expect(sentBodies(fetchMock, `PUT ${ESTIMATE_URL}`)[0]).toMatchObject({ dates: [SAT], clear: [{ date: SUN, pair_key: "drive|44.4875,-72.7262>44.53,-72.7816" }], duration_seconds: 2400 });
   });
   it("asks for a review once the day's drive is another pair", async () => {
     const full = withDays({ date: SAT, origin: CABIN });
