@@ -4,7 +4,7 @@ import {
   type LodgingMember, type LodgingRows,
 } from "@/lib/trip-lodging";
 import type {
-  Trip, TripAttendanceInput, TripLodgingAssignment, TripLodgingNight, TripLodgingPreview, TripMemberAttendance, TripStay, TripStayInput,
+  Trip, TripAttendanceInput, TripLodgingAssignment, TripLodgingNight, TripLodgingPreview, TripMemberAttendance, TripPersonNight, TripStay, TripStayInput,
 } from "@/types/trips";
 
 /**
@@ -196,6 +196,53 @@ export function applyLodgingChange(trip: Trip, rows: LodgingRows, members: Lodgi
   return { stays, assignments, attendance, conflicts };
 }
 
+const listed = (items: string[]) => items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+
+/** "the nights of Fri Oct 9 and Sat Oct 10"; three or more in a row read "Fri Oct 9 through Sun Oct 11". */
+function nightsPhrase(sorted: string[]): string {
+  const runs: string[][] = [];
+  for (const date of sorted) {
+    const last = runs.at(-1);
+    if (last && shiftDate(last.at(-1)!, 1) === date) last.push(date); else runs.push([date]);
+  }
+  const parts = runs.flatMap((run) => run.length >= 3 ? [`${dateLabel(run[0])} through ${dateLabel(run.at(-1)!)}`] : run.map(dateLabel));
+  return `${sorted.length === 1 ? "the night of" : "the nights of"} ${listed(parts)}`;
+}
+
+type NightChange = { member_id: string; who: string; date: string; before: TripPersonNight; after: TripPersonNight };
+
+/**
+ * Person/night changes in words, one sentence for each set of people whose
+ * nights change the same way: "Move Alex from Pine rental to Village hotel
+ * for the nights of Fri Oct 9 and Sat Oct 10."
+ */
+function summarizeChanges(changes: NightChange[]): string[] {
+  const byPerson = new Map<string, { first: string; who: string; key: string; before: TripPersonNight; after: TripPersonNight; dates: string[] }>();
+  for (const change of changes) {
+    const key = `${change.before.state}|${change.before.stay_id}|${change.after.state}|${change.after.stay_id}`;
+    const entry = byPerson.get(`${change.member_id}|${key}`);
+    if (entry) entry.dates.push(change.date);
+    else byPerson.set(`${change.member_id}|${key}`, { first: change.date, who: change.who, key, before: change.before, after: change.after, dates: [change.date] });
+  }
+  // People whose nights change the same way share a sentence.
+  const groups = new Map<string, { first: string; who: string[]; before: TripPersonNight; after: TripPersonNight; dates: string[] }>();
+  for (const entry of byPerson.values()) {
+    const dates = [...entry.dates].sort();
+    const group = groups.get(`${entry.key}|${dates.join()}`);
+    if (group) group.who.push(entry.who);
+    else groups.set(`${entry.key}|${dates.join()}`, { first: dates[0], who: [entry.who], before: entry.before, after: entry.after, dates });
+  }
+  return [...groups.values()].sort((a, b) => a.first.localeCompare(b.first)).map(({ who: names, before, after, dates }) => {
+    const who = listed(names), when = nightsPhrase(dates);
+    if (after.state === "not_on_trip") return `Take ${who} off the trip for ${when}${before.state === "assigned" ? `, and out of ${before.label}` : ""}.`;
+    if (before.state === "not_on_trip" && after.state === "unplanned") return `Add ${who} to the trip for ${when}, with nothing planned yet.`;
+    if (before.state === "assigned" && after.state === "assigned") return `Move ${who} from ${before.label} to ${after.label} for ${when}.`;
+    if (before.state === "unplanned" && after.state === "assigned") return `Put ${who} in ${after.label} for ${when}.`;
+    if (before.state === "assigned" && after.state === "unplanned") return `Take ${who} out of ${before.label} for ${when}. ${dates.length === 1 ? "That night becomes" : "Those nights become"} Not planned.`;
+    return `Change ${who} from ${before.label} to ${after.label} for ${when}.`;
+  });
+}
+
 /**
  * What a change does to each person's nights and the following mornings,
  * with the conflicts a save must confirm. No write occurs.
@@ -219,9 +266,16 @@ export function previewLodgingChange(trip: Trip, rows: LodgingRows, members: Lod
   }));
   const changed = new Set(changes.map((entry) => entry.date));
   const stay = change.action === "save" ? change.stay : undefined;
+  const summary = summarizeChanges(after.people.flatMap((person, index) => person.nights.flatMap((night, nightIndex) => {
+    const prior = before.people[index].nights[nightIndex];
+    if (prior.state === night.state && prior.stay_id === night.stay_id) return [];
+    const who = person.membership === "invited" ? `${person.display_name} (invitation pending)` : person.display_name;
+    return [{ member_id: person.member_id, who, date: night.date, before: prior, after: night }];
+  })));
   return {
     revision: before.revision,
     people_key: before.people_key,
+    summary,
     nights: after.nights.flatMap((night, index) => {
       if (!changed.has(night.date) && night.label === before.nights[index].label) return [];
       const morning = morningOf(night.date);

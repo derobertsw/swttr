@@ -4,7 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseTripLocation } from "@/lib/trip-location";
 import type {
   Trip, TripLocation, TripLodging, TripLodgingAction, TripLodgingCrewNight, TripLodgingGroup, TripLodgingNight, TripLodgingPerson,
-  TripLodgingPreview, TripLodgingState, TripMember, TripMemberAttendance, TripPersonDay, TripPersonNight, TripStay, TripStayInput,
+  TripLodgingPreview, TripLodgingState, TripMember, TripMemberAttendance, TripPersonChangeover, TripPersonDay, TripPersonNight,
+  TripPersonRun, TripStay, TripStayInput,
 } from "@/types/trips";
 
 export function isCalendarDate(value: unknown): value is string {
@@ -15,6 +16,8 @@ export function isCalendarDate(value: unknown): value is string {
 export const isUuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export const shiftDate = (date: string, days: number) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 export const dateLabel = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).replace(",", "");
+/** Consecutive nights as a stay's dates read: "Fri Oct 9 → Sun Oct 11 · 2 nights", ending on the check-out morning. */
+const nightsLabel = (first: string, count: number) => `${dateLabel(first)} → ${dateLabel(shiftDate(first, count))} · ${count} ${count === 1 ? "night" : "nights"}`;
 /** Each date from `start` up to, not including, `end`. */
 export function dates(start: string | null, end: string | null): string[] {
   if (!start || !end) return [];
@@ -107,6 +110,20 @@ function attendanceLabel(attendance: TripMemberAttendance | undefined): string {
   return parts.length ? parts.join(" · ") : "Whole trip";
 }
 
+/** A person's nights as runs of the same plan; a gap and a planned-by-choice night don't share one. */
+function personRuns(nights: TripPersonNight[], gaps: Set<string>): TripPersonRun[] {
+  const runs: TripPersonRun[] = [];
+  for (const night of nights) {
+    const gap = gaps.has(night.date), last = runs.at(-1);
+    if (last && last.end === night.date && last.state === night.state && last.stay_id === night.stay_id && last.gap === gap) {
+      last.end = shiftDate(night.date, 1); last.nights += 1;
+    } else {
+      runs.push({ state: night.state, stay_id: night.stay_id, label: night.label, start: night.date, end: shiftDate(night.date, 1), nights: 1, date_label: "", gap });
+    }
+  }
+  return runs.map((run) => ({ ...run, date_label: nightsLabel(run.start, run.nights) }));
+}
+
 /** Stays by the number of people in each, then in stay order. */
 function majority(groups: TripLodgingGroup[]): TripLodgingGroup | undefined {
   return [...groups].sort((a, b) => b.member_ids.length - a.member_ids.length)[0];
@@ -151,6 +168,13 @@ export function buildLodging(trip: Trip, stays: TripStay[], assignments: TripLod
       return { date, participation, starting_stay_id: participation === "participating" ? before.stay_id : null, starting_from: startingFrom,
         tonight_stay_id: tonight.stay_id, staying_tonight: tonight.label };
     });
+    const gaps = nights.filter((entry) => entry.state === "unplanned" && entry.date >= trip.start_date && entry.date < trip.end_date).map((entry) => entry.date);
+    // Mornings they leave one stay and sleep in another that night.
+    const changeovers = dayDates.flatMap((date): TripPersonChangeover[] => {
+      const before = night(shiftDate(date, -1)), tonight = night(date);
+      return before.state === "assigned" && tonight.state === "assigned" && before.stay_id !== tonight.stay_id
+        ? [{ date, date_label: dateLabel(date), from: before.label, to: tonight.label }] : [];
+    });
     const person: TripLodgingPerson = {
       member_id: member.id, display_name: member.display_name, role: member.role, membership: member.status,
       attendance: {
@@ -162,9 +186,9 @@ export function buildLodging(trip: Trip, stays: TripStay[], assignments: TripLod
           ...[...skipped].filter((date) => date < trip.start_date || date > trip.end_date),
         ])].sort(),
       },
-      nights, days,
-      gaps: nights.filter((entry) => entry.state === "unplanned" && entry.date >= trip.start_date && entry.date < trip.end_date).map((entry) => entry.date),
+      nights, days, gaps,
       review_nights: current ? assignments.filter((row) => row.member_id === member.id && !onTrip(row.date)).map((row) => row.date).sort() : [],
+      runs: personRuns(nights, new Set(gaps)), changeovers,
     };
     // Counted in the crew's view of a night: the crew, and anyone else once they have a plan for it.
     const counted = (date: string) => onTrip(date) && (CREW_STATUSES.has(member.status) || personRows.has(`${member.id}|${date}`));
@@ -205,11 +229,21 @@ export function buildLodging(trip: Trip, stays: TripStay[], assignments: TripLod
     attendance,
     stays: stays.map((stay) => {
       const covered = dates(stay.check_in, stay.check_out);
-      return { ...stay, night_count: covered.length, date_label: covered.length ? `${dateLabel(stay.check_in!)} → ${dateLabel(stay.check_out!)} · ${covered.length} ${covered.length === 1 ? "night" : "nights"}` : "Dates not set",
+      // Who sleeps here each night of the itinerary, consecutive nights with the same people together.
+      const occupancy: TripLodging["stays"][number]["occupancy"] = [];
+      for (const date of covered.filter((night) => night >= preTrip && night <= trip.end_date)) {
+        const ids = people.filter((entry) => { const night = entry.night(date); return night.state === "assigned" && night.stay_id === stay.id; }).map((entry) => entry.person.member_id);
+        const last = occupancy.at(-1);
+        if (last && last.dates.at(-1) === shiftDate(date, -1) && last.member_ids.join() === ids.join()) last.dates.push(date);
+        else occupancy.push({ dates: [date], date_label: "", member_ids: ids });
+      }
+      return { ...stay, night_count: covered.length, date_label: covered.length ? nightsLabel(stay.check_in!, covered.length) : "Dates not set",
         assigned_nights: savedNightsAt(stay.id),
         occupants: members.filter((member) => member.status !== "left").map((member) => ({ member_id: member.id,
           nights: assignments.filter((row) => row.member_id === member.id && row.stay_id === stay.id).map((row) => row.date).sort() }))
           .filter((occupant) => occupant.nights.length > 0),
+        occupancy: occupancy.map((run) => ({ ...run, date_label: nightsLabel(run.dates[0], run.dates.length) })),
+        checkout_label: stay.check_out ? `Check-out ${dateLabel(stay.check_out)} morning` : null,
         review_dates: covered.filter((date) => date < preTrip || date > trip.end_date) };
     }),
     nights,
@@ -304,7 +338,7 @@ export function previewCrewLodging(trip: Trip, lodging: TripLodging, action: Tri
   const affected = [...new Set([...assigning, ...clearing, ...("date" in payload ? [payload.date] : [])])].sort();
   const conflicts: string[] = [];
   const labelFor = (date: string) => lodging.assignments.find((night) => night.date === date)?.status === "no_stay" ? "No stay needed" : lodging.nights.find((night) => night.date === date)?.label ?? lodging.stays.find((saved) => saved.assigned_nights.includes(date))?.name ?? "Not planned yet";
-  return { revision: lodging.revision, people_key: lodging.people_key, changes: [], day_changes: [],
+  return { revision: lodging.revision, people_key: lodging.people_key, changes: [], day_changes: [], summary: [],
     date_label: stay?.check_in ? `${dateLabel(stay.check_in)} → ${dateLabel(stay.check_out!)} · ${dates(stay.check_in, stay.check_out).length} nights` : "Dates not set",
     nights: affected.map((date) => {
       const existing = lodging.assignments.find((night) => night.date === date);
