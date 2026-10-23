@@ -350,6 +350,30 @@ export interface TripPersonDay {
   staying_tonight: string;
 }
 
+/** A person's consecutive nights with the same plan (#332). */
+export interface TripPersonRun {
+  state: TripLodgingState;
+  stay_id: string | null;
+  /** As TripPersonNight's. */
+  label: string;
+  /** The first night, and the morning after the last one. */
+  start: string;
+  end: string;
+  nights: number;
+  /** "Fri Oct 9 → Sun Oct 11 · 2 nights", as a stay's dates read. */
+  date_label: string;
+  /** Not planned on a night between trip days: see `gaps`. */
+  gap: boolean;
+}
+
+/** A morning someone leaves one stay and sleeps in another that night. */
+export interface TripPersonChangeover {
+  date: string;
+  date_label: string;
+  from: string;
+  to: string;
+}
+
 /** A person's attendance and nights, as the server works them out. */
 export interface TripLodgingPerson {
   member_id: string;
@@ -370,6 +394,9 @@ export interface TripLodgingPerson {
   gaps: string[];
   /** Saved nights they're no longer on the trip for, kept after a trip date change for review. */
   review_nights: string[];
+  /** `nights` as consecutive runs, for views that show continuity (#332). */
+  runs: TripPersonRun[];
+  changeovers: TripPersonChangeover[];
 }
 
 /** People in one stay on a night or starting from it on a morning. */
@@ -386,6 +413,10 @@ export interface TripStaySummary extends TripStay {
   assigned_nights: string[];
   /** Who has nights here, and which. */
   occupants: Array<{ member_id: string; nights: string[] }>;
+  /** Its nights, consecutive ones with the same people together (#332). */
+  occupancy: Array<{ dates: string[]; date_label: string; member_ids: string[] }>;
+  /** "Check-out Sun Oct 11 morning": a starting point, not another night. */
+  checkout_label: string | null;
   review_dates: string[];
 }
 
@@ -519,6 +550,8 @@ export interface TripLodgingPreview {
   /** Dates with a person/night conflict, listed in `changes`. */
   conflicts: string[];
   changes: TripLodgingPersonChange[];
+  /** `changes` in words, e.g. "Move Alex from Pine rental to Village hotel for the nights of Fri Oct 9 and Sat Oct 10." Empty before per-person nights. */
+  summary: string[];
   /** For attendance: days whose participation changes. A saved kit stays saved. */
   day_changes: Array<{ member_id: string; display_name: string; date: string; date_label: string; before: string; after: string; kit_saved: boolean }>;
   review_dates: string[];
