@@ -5,6 +5,7 @@ import { EXERTION_LEVELS } from "@/lib/biophysics/exertion";
 import { hasOnly, isRecord, isResolvedPlace, isSingleDayOuting } from "@/lib/outingAction";
 import type { WebMCPTool } from "./adapter";
 import type { CurrentOutingSnapshot, OutingActionOutcome } from "@/types/outingAction";
+import type { LocationSuggestion } from "@/types/recommendations";
 
 /** Builds a closed object schema with explicit required fields. */
 const objectSchema = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({
@@ -24,6 +25,18 @@ const NAMES = ["swttr_get_capabilities", "swttr_search_locations", "swttr_recomm
 const staticActivities = new Set(["alpine_skiing", "xc_skiing", "hiking_snowshoeing"]);
 const invalid = () => ({ status: "error", code: "invalid_input", message: "Input must match the documented schema; unknown fields are not accepted." });
 const isEmpty = (input: unknown) => isRecord(input) && Object.keys(input).length === 0;
+const searchFailed = () => ({ status: "error", code: "location_unavailable", message: "Couldn't search locations. Try again." });
+
+/**
+ * A search result as a candidate, with only the place fields the contract
+ * lists, or null when it can't be one. Some geocoded places have no country.
+ */
+function readCandidate(value: unknown): LocationSuggestion | null {
+  if (!isRecord(value)) return null;
+  const { id, name, region, country = "", latitude, longitude, timeZone } = value;
+  const candidate = { id, name, country, latitude, longitude, ...(region !== undefined && { region }), ...(timeZone !== undefined && { timeZone }) };
+  return isResolvedPlace(candidate) ? candidate : null;
+}
 
 interface GearUpToolActions {
   signedIn: boolean;
@@ -68,13 +81,14 @@ export function gearUpTools(actions: GearUpToolActions): WebMCPTool[] {
           const response = await fetch(`/api/geocode?q=${encodeURIComponent(input.query.trim())}`, { signal });
           const body: unknown = await response.json();
           signal.throwIfAborted();
-          if (!response.ok || !isRecord(body) || !Array.isArray(body.results) || !body.results.every(isResolvedPlace)) {
-            return { status: "error", code: "location_unavailable", message: "Couldn't search locations. Try again." };
-          }
-          return { status: "completed", candidates: body.results.slice(0, 5), selectionRequired: true };
+          if (!response.ok || !isRecord(body) || !Array.isArray(body.results)) return searchFailed();
+          // An unusable result leaves out only itself; places found but none usable isn't "no places".
+          const candidates = body.results.map(readCandidate).filter(place => place !== null);
+          if (candidates.length === 0 && body.results.length > 0) return searchFailed();
+          return { status: "completed", candidates: candidates.slice(0, 5), selectionRequired: true };
         } catch {
           signal.throwIfAborted();
-          return { status: "error", code: "location_unavailable", message: "Couldn't search locations. Try again." };
+          return searchFailed();
         }
       },
     },

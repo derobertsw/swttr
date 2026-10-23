@@ -20,17 +20,28 @@ export interface DisplayedLayers {
   evaluation: "pending" | "failed" | "ready" | "unavailable";
 }
 
+/** The device's own position reads back as having been used, never as coordinates. */
+export interface DeviceLocationReadback {
+  kind: "device_location";
+  name: string;
+}
+
+export type ReadbackPlace = Outing["place"] | DeviceLocationReadback;
+export type ReadbackOuting = Omit<Outing, "place"> & { place: ReadbackPlace };
+/** Request state, with its outing's place as read back. */
+type ReadbackRequest<T = OutingRequestState> = T extends { outing: Outing } ? Omit<T, "outing"> & { outing: ReadbackOuting } : T;
+
 export interface CurrentOutingSnapshot {
   status: "empty" | "loading" | "error" | "ready";
   pending: {
     activity: string;
     exertion: Outing["exertion"];
-    place: Outing["place"] | null;
+    place: ReadbackPlace | null;
     when: Outing["when"] | null;
   } | null;
-  request: OutingRequestState;
+  request: ReadbackRequest;
   displayed: {
-    outing: Outing;
+    outing: ReadbackOuting;
     weather: WeatherData & { units: { temperature: "fahrenheit"; windSpeed: "mph" } };
     advice: { kind: Advice["kind"]; reason?: string };
     layers: DisplayedLayers | null;

@@ -178,7 +178,8 @@ const LayerDisplay = ({
 }: LayerDisplayProps) => {
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
   const [activePhase, setActivePhase] = useState<Phase>("climb");
-  const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
+  // With the suggested layers it was opened on (see below).
+  const [pickerTarget, setPickerTarget] = useState<(PickerTarget & { suggestionKey: string }) | null>(null);
   const weatherFocus = useReturnFocus();
   const pickerFocus = useReturnFocus();
   const wearHeadingId = useId();
@@ -214,6 +215,12 @@ const LayerDisplay = ({
   const climb = useEditableLayers(recommendedLayers);
   const descent = useEditableLayers(initialDescentLayers);
   const phaseLayers = (phase: Phase) => (phase === "descent" ? descent : climb);
+  // A newer result's layers (a browser agent's can land while the picker is
+  // open) replace the ones it was opened on, so it closes rather than
+  // changing the new outfit at the old item's position.
+  if (pickerTarget && phaseLayers(pickerTarget.phase).suggestionKey !== pickerTarget.suggestionKey) {
+    setPickerTarget(null);
+  }
   // The phase of the latest edit, which a failed check's Undo change reverts.
   const [lastEditedPhase, setLastEditedPhase] = useState<Phase>("climb");
   const editLayers = (phase: Phase) => {
@@ -333,7 +340,7 @@ const LayerDisplay = ({
     pickerFocus.remember(
       () => fallbackIds.map((id) => document.getElementById(id)).find((element) => element !== null) ?? null
     );
-    setPickerTarget(target);
+    setPickerTarget({ ...target, suggestionKey: phaseLayers(target.phase).suggestionKey });
   };
 
   const handlePickerSelect = (item: PickerItem) => {

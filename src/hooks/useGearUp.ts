@@ -11,7 +11,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useBiophysicsRecommendation } from "@/hooks/useBiophysicsRecommendation";
 import { useActivitySelection } from "@/hooks/useActivitySelection";
 import { fetchWeatherAt } from "@/hooks/useCurrentWeather";
-import { useDeviceLocation, yourLocation } from "@/hooks/useDeviceLocation";
+import { isYourLocation, useDeviceLocation, yourLocation } from "@/hooks/useDeviceLocation";
 import { useResultsHistoryEntry } from "@/hooks/useResultsHistoryEntry";
 import {
   buildLayersResult,
@@ -25,7 +25,7 @@ import {
 } from "@/lib/gearUp";
 import { readGearUpDraft, saveGearUpDraft } from "@/lib/gearUpDraft";
 import { isSingleDayOuting } from "@/lib/outingAction";
-import type { CurrentOutingSnapshot, DisplayedLayers, OutingActionOutcome } from "@/types/outingAction";
+import type { CurrentOutingSnapshot, DisplayedLayers, OutingActionOutcome, ReadbackOuting, ReadbackPlace } from "@/types/outingAction";
 import { logWarn } from "@/lib/logger";
 import { RESUME_PARAM, resumeView, TRIP_PARAM, type ResumeView } from "@/lib/outingReturn";
 import type { LaterTime, LayersResult, Outing, OutingTime } from "@/types/outing";
@@ -36,6 +36,15 @@ type CurrentRequest = (() => boolean) & { signal: AbortSignal };
 
 function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boolean {
   return b !== null && a.latitude === b.latitude && a.longitude === b.longitude;
+}
+
+/** Browser tools learn that the device's position was used, not where it is. */
+function readbackPlace(place: LocationSuggestion): ReadbackPlace {
+  return isYourLocation(place) ? { kind: "device_location", name: place.name } : place;
+}
+
+function readbackOuting(outing: Outing): ReadbackOuting {
+  return { ...outing, place: readbackPlace(outing.place) };
 }
 
 /** Takes /?resume=… (and an update's trip=…) out of the address, so a reload or Edit outing doesn't ask again. */
@@ -143,7 +152,9 @@ export function useGearUp() {
     committedOwner.current = owner;
     mounted.current = true;
     // A previous account's request must stop before the next account's tools run.
-    return () => { mounted.current = false; retireRequest(); };
+    // Until sign-in loads there's no account yet: a request made meanwhile
+    // carries on, as nothing would end its loading after RESTORE.
+    return () => { mounted.current = false; if (owner !== undefined) retireRequest(); };
   }, [owner, retireRequest]);
   /**
    * The tab the next plan shown opens on: Packing when coming back to match
@@ -501,7 +512,7 @@ export function useGearUp() {
       }
       const result = state.result;
       const displayed = result?.kind === "layers" ? {
-        outing: result.outing,
+        outing: readbackOuting(result.outing),
         weather: { ...result.weather, units: { temperature: "fahrenheit" as const, windSpeed: "mph" as const } },
         advice: result.advice.kind === "personalized" ? { kind: "personalized" as const }
           : { kind: result.advice.kind, reason: result.advice.reason },
@@ -510,11 +521,11 @@ export function useGearUp() {
       return structuredClone({
         status: state.request.status === "loading" ? "loading" : state.request.status === "error" ? "error" : result ? "ready" : "empty",
         pending: {
-          activity, exertion, place: locationSearch.selectedLocation,
+          activity, exertion, place: locationSearch.selectedLocation && readbackPlace(locationSearch.selectedLocation),
           when: state.inputMode === "now" ? { mode: "now" } : state.date
             ? { mode: "later", date: format(state.date, "yyyy-MM-dd"), time: state.time, durationDays: state.durationDays } : null,
         },
-        request: state.request,
+        request: state.request.status === "idle" ? state.request : { ...state.request, outing: readbackOuting(state.request.outing) },
         displayed,
         limitations: result?.kind === "plan" ? ["multi_day_readback_unsupported"] : [],
       });

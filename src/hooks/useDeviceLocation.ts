@@ -72,6 +72,11 @@ export function yourLocation({ latitude, longitude }: Coordinates): LocationSugg
   return { id: 0, name: "Your location", country: "", latitude, longitude };
 }
 
+/** Whether a place is the device's own position (see yourLocation). */
+export function isYourLocation(place: LocationSuggestion): boolean {
+  return place.id === 0 && !place.country;
+}
+
 /**
  * The device's position, looked up only when asked. One request runs at a
  * time: cancelling it, or asking again, drops whatever it would have found.

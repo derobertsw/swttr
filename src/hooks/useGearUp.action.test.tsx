@@ -4,6 +4,7 @@ import { useGearUp } from "./useGearUp";
 import type { Outing } from "@/types/outing";
 import { ACTIVITIES } from "@/data/activities";
 import type { OutingActionOutcome } from "@/types/outingAction";
+import { yourLocation } from "@/hooks/useDeviceLocation";
 
 const auth = vi.hoisted(() => ({ userId: "user-one" as string | null, isLoaded: true }));
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
@@ -26,6 +27,7 @@ beforeEach(() => {
   sessionStorage.clear();
   window.history.replaceState(null, "", "/");
   auth.userId = "user-one";
+  auth.isLoaded = true;
   fetchMock = vi.fn(async (url: string) => Response.json(url.startsWith("/api/weather") ? weather : advice));
   vi.stubGlobal("fetch", fetchMock);
   vi.stubGlobal("localStorage", { setItem: vi.fn() });
@@ -93,6 +95,37 @@ describe("atomic one-day outing action", () => {
     await expect(pending).resolves.toMatchObject({ code: "cancelled", snapshot: { displayed: null, pending: null } });
     await act(async () => held.resolve(Response.json(weather)));
     expect(result.current.result).toBeNull();
+  });
+
+  it("finishes a human request made before sign-in loads", async () => {
+    auth.isLoaded = false;
+    const held = Promise.withResolvers<Response>();
+    fetchMock.mockImplementationOnce(() => held.promise);
+    const { result, rerender } = await setup();
+    act(() => result.current.locationSearch.handleSelectLocation(input.place));
+    let human!: Promise<void>;
+    act(() => { human = result.current.handleSubmit(); });
+    auth.isLoaded = true;
+    rerender();
+    await act(async () => { held.resolve(Response.json({ temperature: 30, windSpeed: 7 })); await human; });
+    expect(result.current.request).toEqual({ status: "idle" });
+    expect(result.current.result?.outing.place).toEqual(input.place);
+  });
+
+  it("reads back that the device's position was used, never its coordinates", async () => {
+    const held = Promise.withResolvers<Response>();
+    fetchMock.mockImplementationOnce(() => held.promise);
+    const { result } = await setup();
+    act(() => result.current.locationSearch.handleSelectLocation(yourLocation({ latitude: 44.123456, longitude: -72.654321 })));
+    let human!: Promise<void>;
+    act(() => { human = result.current.handleSubmit(); });
+    const device = { kind: "device_location", name: "Your location" };
+    const loading = result.current.getCurrentOuting();
+    expect(loading).toMatchObject({ pending: { place: device }, request: { status: "loading", outing: { place: device } } });
+    await act(async () => { held.resolve(Response.json({ temperature: 30, windSpeed: 7 })); await human; });
+    const shown = result.current.getCurrentOuting();
+    expect(shown.displayed?.outing.place).toEqual(device);
+    expect(JSON.stringify([loading, shown])).not.toMatch(/44\.12|72\.65/);
   });
 
   it("uses the same result path as a human submission with the same fixture weather and gear", async () => {

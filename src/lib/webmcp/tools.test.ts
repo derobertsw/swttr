@@ -35,9 +35,16 @@ describe("Gear up WebMCP contract", () => {
     expect(await execute("search_locations", { query: "unknown" })).toMatchObject({ candidates: [] });
     expect(submitOuting).not.toHaveBeenCalled();
   });
-  it.each([null, {}, { results: [place, { ...place, latitude: NaN }] }, { results: [{ ...place, token: "private" }] }])("rejects malformed search responses: %j", async body => {
+  it.each([null, {}, { results: "Stowe" }, { results: [{ ...place, latitude: NaN }, { ...place, name: " " }] }])("rejects malformed search responses: %j", async body => {
     fetchMock.mockResolvedValueOnce(Response.json(body));
     expect(await execute("search_locations", { query: "Stowe" })).toMatchObject({ code: "location_unavailable" });
+  });
+  it("keeps usable candidates when others aren't, without fields the contract doesn't list", async () => {
+    const noCountry = { id: 3, name: "Stowe", latitude: 44.4, longitude: -72.7 };
+    fetchMock.mockResolvedValueOnce(Response.json({ results: [{ ...place, latitude: NaN }, { ...place, id: 2, token: "private" }, noCountry] }));
+    const result = await execute("search_locations", { query: "Stowe" });
+    expect(result).toEqual({ status: "completed", selectionRequired: true, candidates: [{ ...place, id: 2 }, { ...noCountry, country: "" }] });
+    expect(JSON.stringify(result)).not.toContain("private");
   });
   it("handles HTTP, parse and network failures without returning raw errors", async () => {
     for (const response of [Response.json({ results: [place] }, { status: 500 }), new Response("<html>unavailable</html>")]) {
