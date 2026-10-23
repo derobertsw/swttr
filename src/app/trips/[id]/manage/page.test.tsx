@@ -20,10 +20,6 @@ vi.mock("@/hooks/useUserId", () => ({ useUserId: () => "user-1" }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 // These tests cover the page, not the app chrome around it.
-vi.mock("@/components/PageLayout", () => ({
-  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
 /** The page suspends until its params resolve, so rendering is awaited. */
 async function renderPage() {
   await act(async () => {

@@ -2,7 +2,6 @@
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { sectionLabelClassName } from "@/components/trips/trip-primitives";
 import { LocationPicker, LocationSummary } from "@/components/trips/LocationPicker";
 import { ItineraryChangeSheet } from "@/components/trips/ItineraryChangeSheet";
@@ -61,7 +60,7 @@ export function DayAccessPoint({ data, day, dateLabel, canEdit, onSaved, childre
     : unchanged === 1 ? `1 other day at ${stop?.name} keeps its access point.` : `${unchanged} other days at ${stop?.name} keep their access points.`;
 
   return (
-    <Card>
+    <section aria-labelledby={`getting-there-${day.date}`}>
       <h2 id={`getting-there-${day.date}`} tabIndex={-1} className={sectionLabelClassName}>Getting there</h2>
       {point ? <div className="mt-1 space-y-2">
         <p className="text-sm text-muted-foreground">{point.scope === "day" ? `Only ${dateLabel}` : `Every day at ${stop?.name}`}</p>
@@ -108,6 +107,6 @@ export function DayAccessPoint({ data, day, dateLabel, canEdit, onSaved, childre
         />
       )}
       {children}
-    </Card>
+    </section>
   );
 }

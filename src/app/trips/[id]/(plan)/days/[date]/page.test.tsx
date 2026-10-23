@@ -34,10 +34,6 @@ const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 // These tests cover the page, not the app chrome around it.
-vi.mock("@/components/PageLayout", () => ({
-  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
 const DAY: TripDay = {
   id: "day-1",
   trip_id: TRIP.id,
@@ -523,7 +519,7 @@ describe("Trip day page", () => {
       vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit(), outfit_saved_at: "2026-10-06T20:01:02Z" })]));
       await renderPage();
       const myKit = await screen.findByRole("region", { name: "My kit" });
-      const gettingThere = screen.getByRole("heading", { name: "Getting there" }).closest<HTMLElement>('[data-slot="card"]')!;
+      const gettingThere = screen.getByRole("heading", { name: "Getting there" }).closest<HTMLElement>("section")!;
       expect(within(gettingThere).getByRole("link", { name: "View day map" })).toHaveAttribute("href", "/trips/trip-1/map?date=2026-10-10&from=day");
       expect(gettingThere.compareDocumentPosition(myKit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(document.querySelector("canvas")).toBeNull();
@@ -737,7 +733,7 @@ describe("Trip day page", () => {
       const fetchMock = copyTrip(tripFull({ stops: [STOWE_STOP, JAY], days, kits: [myKit(days[0], { outfit: savedOutfit() }), myKit(days[1], { items: ["shell"] })] }), () => reply(200, { ok: true }));
       const user = userEvent.setup();
       await renderPage();
-      const card = (await screen.findByRole("heading", { name: "Copy this day" })).closest("div")!;
+      const card = (await screen.findByRole("heading", { name: "Copy this day" })).closest("section")!;
       expect(within(card).getByText("Give other days this day's plan: Stowe, Vermont · Alpine.")).toBeInTheDocument();
       await user.click(within(card).getByRole("button", { name: "Copy to other days" }));
       expect(within(card).getByRole("button", { name: "Review copy" })).toBeDisabled();
@@ -982,7 +978,7 @@ describe("Trip day page", () => {
         "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
       }));
       await renderPage();
-      const gettingThere = (await screen.findByRole("heading", { name: "Getting there" })).closest<HTMLElement>('[data-slot="card"]')!;
+      const gettingThere = (await screen.findByRole("heading", { name: "Getting there" })).closest<HTMLElement>("section")!;
       expect(within(gettingThere).getByRole("heading", { name: "Approach (ski or walk)" })).toBeVisible();
       expect(within(gettingThere).getByText(approach)).toBeVisible();
       expect(within(gettingThere).getByRole("status")).toHaveTextContent("Checking the drive time…");
@@ -999,7 +995,7 @@ describe("Trip day page", () => {
       await renderPage();
       expect(await screen.findByText("Lower snowfields")).toBeInTheDocument();
       // Getting there (#208) says the same for its access point.
-      const tourPlan = screen.getByRole("heading", { name: "Tour plan" }).closest<HTMLElement>('[data-slot="card"]')!;
+      const tourPlan = screen.getByRole("heading", { name: "Tour plan" }).closest<HTMLElement>("section")!;
       expect(within(tourPlan).getByText("Managed by the organizer")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Change tour plan" })).not.toBeInTheDocument();
     });
