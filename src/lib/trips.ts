@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 import { jsonError, requireUser, type AuthedContext } from "@/lib/api";
-import { loadLodging } from "@/lib/trip-lodging";
+import { buildLodging, loadLodgingRows } from "@/lib/trip-lodging";
 import { loadTourPlans, summarizeTourPlans } from "@/lib/trip-tour-plans";
 import { loadConditions, summarizeConditions } from "@/lib/trip-conditions";
 import type {
@@ -180,7 +180,7 @@ export async function loadTripFull(
     return { days, kits: (kits ?? []) as TripMemberDayKit[] };
   };
 
-  const [stopsRes, membersRes, { days, kits }, gearRes, lodging, tourPlans, conditions] = await Promise.all([
+  const [stopsRes, membersRes, { days, kits }, gearRes, lodgingRows, tourPlans, conditions] = await Promise.all([
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("position"),
     supabase.from("trip_members").select("*").eq("trip_id", tripId),
     loadDaysAndKits(),
@@ -189,7 +189,7 @@ export async function loadTripFull(
       .select("*")
       .eq("trip_id", tripId)
       .order("sort_order"),
-    loadLodging(supabase, trip),
+    loadLodgingRows(supabase, tripId),
     loadTourPlans(supabase, tripId),
     loadConditions(supabase, tripId),
   ]);
@@ -197,6 +197,8 @@ export async function loadTripFull(
   if (gearRes.error) throw new Error("Couldn't load shared gear. Try again.");
   const stops = (stopsRes.data ?? []) as TripStop[];
   const tour_plans = summarizeTourPlans(tourPlans, days);
+  const lodging = buildLodging(trip, lodgingRows.stays, lodgingRows.assignments,
+    { members: (membersRes.data ?? []) as TripMember[], attendance: lodgingRows.attendance, per_member: lodgingRows.per_member });
   return {
     trip: { ...trip, status: classifyTripStatus(trip.start_date, trip.end_date) },
     stops,
@@ -223,13 +225,12 @@ export const ORGANIZER_OWN_NAME = "You";
  */
 export function tripFullFor(full: TripFull, userId: string): TripFull {
   if (userId === full.trip.owner_user_id) return full;
+  const nameFor = (m: { role: TripMember["role"]; display_name: string }) =>
+    m.role === "organizer" && m.display_name === ORGANIZER_OWN_NAME ? "Organizer" : m.display_name;
   return {
     ...full,
-    members: full.members.map((m) => ({
-      ...m,
-      invite_token: null,
-      display_name: m.role === "organizer" && m.display_name === ORGANIZER_OWN_NAME ? "Organizer" : m.display_name,
-    })),
+    members: full.members.map((m) => ({ ...m, invite_token: null, display_name: nameFor(m) })),
+    ...(full.lodging ? { lodging: { ...full.lodging, people: full.lodging.people.map((p) => ({ ...p, display_name: nameFor(p) })) } } : {}),
   };
 }
 

@@ -180,7 +180,7 @@ function StayEditor({ editor, data, onClose, onSaved, onCloseAutoFocus }: {
     try {
       await lodgingRequest(editor.action === "night" ? `${base}/lodging-nights/${editor.date}` : `${base}/stays${editor.stay ? `/${editor.stay.id}` : ""}`,
         editor.action === "remove" ? "DELETE" : editor.action === "night" ? "PUT" : editor.stay ? "PATCH" : "POST",
-        { ...requestBody(), mutation_id: mutationId.current, replace_nights: replacement });
+        { ...requestBody(), mutation_id: mutationId.current, replace_nights: replacement, expected_people_key: preview.people_key });
       await onSaved(); close();
     } catch (err) { showError(err); }
     finally { setBusy(false); }
