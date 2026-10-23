@@ -57,7 +57,7 @@ INSERT INTO public.trip_member_lodging_nights (trip_id, member_id, date, stay_id
   FROM public.trip_lodging_nights night
   JOIN public.trip_members member ON member.trip_id = night.trip_id AND member.status IN ('joined', 'guest');
 COMMENT ON TABLE public.trip_lodging_nights IS
-  'Superseded by trip_member_lodging_nights (#331), which it was copied to. No longer read or written; kept for audit and an API rollback.';
+  'Superseded by trip_member_lodging_nights (#331), which it was copied to. The API reads it only while the per-person tables don''t exist, before this migration; kept for audit and an API rollback.';
 
 ALTER TABLE public.trip_member_attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trip_member_lodging_nights ENABLE ROW LEVEL SECURITY;
