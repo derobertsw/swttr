@@ -12,10 +12,6 @@ vi.mock("@/hooks/useUserId", () => ({ useUserId: () => "user-1" }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 // These tests cover the page, not the app chrome around it.
-vi.mock("@/components/PageLayout", () => ({
-  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
 const TENT: TripGroupGear = {
   revision: "a171593c-5c29-4c09-96c4-c27e65b641e8",
   id: "gear-tent",

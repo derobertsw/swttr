@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type FormEvent, type RefObject } from "rea
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input, fieldClassName } from "@/components/ui/input";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
@@ -80,7 +79,7 @@ export function DayConditions({ data, date, dateLabel, activity, userId, onSaved
   const reviewSource = reviewing && sources.find((source) => source.id === reviewing.sourceId);
 
   return (
-    <Card>
+    <section aria-labelledby="conditions-heading">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="conditions-heading" tabIndex={-1} className="text-title font-semibold text-foreground">Conditions</h2>
         {canEdit && <Button type="button" variant="outline" onClick={() => openEditor(null)}>Add source</Button>}
@@ -112,7 +111,7 @@ export function DayConditions({ data, date, dateLabel, activity, userId, onSaved
       {reviewing && <ReviewEditor key={`${reviewing.sourceId}:${reviewing.mode}`} tripId={data.trip.id} date={date} dateLabel={dateLabel}
         dayId={dayId} source={reviewSource || undefined} review={reviewSource ? mine(reviewSource) : undefined} mode={reviewing.mode}
         onSaved={saved} onReload={onSaved} onClose={() => setReviewing(null)} onCloseAutoFocus={focus.restore} />}
-    </Card>
+    </section>
   );
 }
 

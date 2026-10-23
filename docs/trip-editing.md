@@ -1,6 +1,6 @@
 # Editing a saved trip (#176)
 
-A saved trip can be renamed and its dates changed from **Edit trip** on the overview (`/trips/:id/settings`). Destinations (`/trips/:id/stops`) reorders and removes stops and sets several days at once, a day page's location change asks which days it's for, and a day page can copy its plan to other days. This page records the product decisions for #176, delivered in three PRs, and the rules that follow from them.
+A saved trip can be renamed and its dates changed from **Edit trip** in the trip's header (`/trips/:id/settings`). Destinations (`/trips/:id/stops`) reorders and removes stops and sets several days at once, a day page's location change asks which days it's for, and a day page can copy its plan to other days. This page records the product decisions for #176, delivered in three PRs, and the rules that follow from them.
 
 ## Decisions (October 7, 2026)
 
@@ -36,7 +36,7 @@ A saved trip can be renamed and its dates changed from **Edit trip** on the over
 
 ### Pages
 
-- The overview's **Edit trip** button opens `/trips/:id/settings`: trip name, start and end dates, then **Save** (name only) or **Review date change**.
+- The header's **Edit trip** button opens `/trips/:id/settings`: trip name, start and end dates, then **Save** (name only) or **Review date change**.
 - `DateChangeSheet` (`src/components/trips/DateChangeSheet.tsx`) loads the review, offers Move or Keep when both apply, and saves. The legacy wizard (`/trips/new?trip=…&step=1`) uses the same sheet for a date change.
 
 ### API: `PATCH /api/v1/trips/:id`

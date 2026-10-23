@@ -11,7 +11,6 @@ import type { TripDayCoverage } from "@/types/trip-coverage";
 import type { PackingCheckChange, PackingChecks, PackingItem, TripPackResponse } from "@/types/trip-packing";
 import PackListPage from "./page";
 
-vi.mock("@/components/PageLayout", () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 const PACK = "GET /api/v1/trips/trip-1/pack";

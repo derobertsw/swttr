@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input, fieldClassName } from "@/components/ui/input";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
@@ -112,7 +111,7 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
 
   if (!active && plan) {
     return (<>
-      <Card>
+      <section>
         <details>
           <summary id="tour-plan-heading" className="min-h-11 cursor-pointer py-2 text-base font-semibold text-foreground">Saved tour plan · {plan.objective}</summary>
           <p className="mt-1 text-base text-foreground">
@@ -128,13 +127,13 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
           {restoreError && <p role="alert" className="mt-2 text-base text-destructive">Couldn&apos;t restore the tour plan: {restoreError}</p>}
         </details>
         <p aria-live="polite" className="text-sm text-success">{status}</p>
-      </Card>
+      </section>
       {editor}
     </>);
   }
 
   return (<>
-    {active && <Card>
+    {active && <section aria-labelledby="tour-plan-heading">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="tour-plan-heading" tabIndex={-1} className="text-title font-semibold text-foreground">Tour plan</h2>
         {canEdit && <Button type="button" variant="outline" onClick={open}>{plan ? "Change tour plan" : "Add tour plan"}</Button>}
@@ -146,7 +145,7 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
           No tour plan yet.{canEdit ? " Add the route, when to meet and a backup plan; everything but the route is optional." : ""}
         </p>
       )}
-    </Card>}
+    </section>}
     {editor}
   </>);
 }

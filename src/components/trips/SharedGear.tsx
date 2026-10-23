@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { fieldClassName } from "@/components/ui/input";
 import { errorMessage, timedTripRequest } from "@/lib/trip-requests";
 import type { TripGroupGear, TripMember } from "@/types/trips";
@@ -61,45 +60,47 @@ export function SharedGearList({ tripId, gear, members = [], userId, ownerId, on
       }}>Reload shared gear</Button>
     </div>}
     {notice && <p role="status" className="break-words text-sm text-muted-foreground">{notice}</p>}
-    {gear.map((item) => {
-      const recipient = members.find((m) => m.id === item.assignee_member_id);
-      const guest = recipient?.status === "guest" && recipient.role === "guest" && !recipient.user_id;
-      const canConfirm = personal || (!!me && item.assignee_member_id === me.id) || (organizer && guest);
-      const canAssign = organizer || (!!me && (!item.assignee_member_id || item.assignee_member_id === me.id));
-      const blocked = busy !== null || !!failure || !item.revision;
-      const latest = item.events?.at(-1);
-      const state = !item.assignee_member_id ? "Unassigned" : item.packed_at ? "Packed" : item.accepted_at ? "Accepted · not packed" : "Awaiting acceptance";
-      return <Card key={item.id} id={`shared-${item.id}`} className="min-w-0 scroll-mt-20">
-        <p className="break-words text-base font-medium">{item.description}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{state}{recipient ? ` · ${recipient.display_name}` : ""}</p>
-        {!item.assignee_member_id && latest?.action === "decline" && <p className="mt-1 text-sm">Declined. Choose someone else to bring it.</p>}
-        {!item.assignee_member_id && latest?.action === "member_removed" && <p className="mt-1 text-sm">Previous recipient left the crew. Assign this again.</p>}
-        {!item.revision && <p className="text-sm">Shared confirmation is unavailable. Reload after the shared gear update is installed.</p>}
-        {canConfirm && item.assignee_member_id && !item.accepted_at && <p className="mt-2 break-words text-sm">{guest ? `Can ${recipient?.display_name} bring ${item.description}?` : `Can you bring ${item.description}?`}</p>}
-        {guest && organizer && <p className="mt-1 break-words text-sm text-muted-foreground">You confirm on behalf of {recipient?.display_name}. Your account is recorded as the actor.</p>}
-        <div className="mt-3 flex flex-wrap items-center gap-2" aria-busy={busy === item.id || undefined}>
-          {!personal && canAssign && <select value={item.assignee_member_id ?? ""}
-            aria-label={`Who's bringing ${item.description}`} disabled={blocked}
-            className={`${fieldClassName} min-h-11 w-full sm:w-auto sm:max-w-64`}
-            onChange={(e) => void change(item, "assign", e.target.value || null)}>
-            <option value="" disabled={!organizer}>unassigned</option>
-            {members.filter((m) => m.status !== "left" && (organizer || m.id === me?.id)).map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}
-          </select>}
-          {canConfirm && item.assignee_member_id && <>
-            {!item.accepted_at ? <>
-              <Button variant="secondary" aria-label={`Accept ${item.description}`} aria-disabled={blocked || undefined} onClick={() => { if (!blocked) void change(item, "accept"); }}>Accept</Button>
-              <Button variant="outline" aria-label={`Decline ${item.description}`} aria-disabled={blocked || undefined} onClick={() => { if (!blocked) void change(item, "decline"); }}>Decline</Button>
-            </> : <>
-              <Button variant="secondary" aria-label={`${item.packed_at ? "Mark not packed" : "Mark packed"} ${item.description}`} aria-disabled={blocked || undefined} onClick={() => { if (!blocked) void change(item, item.packed_at ? "unpack" : "pack"); }}>{item.packed_at ? "Mark not packed" : "Mark packed"}</Button>
-              <Button variant="outline" aria-label={`Can’t bring ${item.description}`} aria-disabled={blocked || undefined} onClick={() => { if (!blocked) void change(item, "decline"); }}>Can’t bring</Button>
+    <div className="divide-y divide-border border-y border-border empty:border-y-0">
+      {gear.map((item) => {
+        const recipient = members.find((m) => m.id === item.assignee_member_id);
+        const guest = recipient?.status === "guest" && recipient.role === "guest" && !recipient.user_id;
+        const canConfirm = personal || (!!me && item.assignee_member_id === me.id) || (organizer && guest);
+        const canAssign = organizer || (!!me && (!item.assignee_member_id || item.assignee_member_id === me.id));
+        const blocked = busy !== null || !!failure || !item.revision;
+        const latest = item.events?.at(-1);
+        const state = !item.assignee_member_id ? "Unassigned" : item.packed_at ? "Packed" : item.accepted_at ? "Accepted · not packed" : "Awaiting acceptance";
+        return <div key={item.id} id={`shared-${item.id}`} className="min-w-0 scroll-mt-20 py-3">
+          <p className="break-words text-base font-medium">{item.description}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{state}{recipient ? ` · ${recipient.display_name}` : ""}</p>
+          {!item.assignee_member_id && latest?.action === "decline" && <p className="mt-1 text-sm">Declined. Choose someone else to bring it.</p>}
+          {!item.assignee_member_id && latest?.action === "member_removed" && <p className="mt-1 text-sm">Previous recipient left the crew. Assign this again.</p>}
+          {!item.revision && <p className="text-sm">Shared confirmation is unavailable. Reload after the shared gear update is installed.</p>}
+          {canConfirm && item.assignee_member_id && !item.accepted_at && <p className="mt-2 break-words text-sm">{guest ? `Can ${recipient?.display_name} bring ${item.description}?` : `Can you bring ${item.description}?`}</p>}
+          {guest && organizer && <p className="mt-1 break-words text-sm text-muted-foreground">You confirm on behalf of {recipient?.display_name}. Your account is recorded as the actor.</p>}
+          <div className="mt-3 flex flex-wrap items-center gap-2" aria-busy={busy === item.id || undefined}>
+            {!personal && canAssign && <select value={item.assignee_member_id ?? ""}
+              aria-label={`Who's bringing ${item.description}`} disabled={blocked}
+              className={`${fieldClassName} min-h-11 w-full sm:w-auto sm:max-w-64`}
+              onChange={(e) => void change(item, "assign", e.target.value || null)}>
+              <option value="" disabled={!organizer}>unassigned</option>
+              {members.filter((m) => m.status !== "left" && (organizer || m.id === me?.id)).map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}
+            </select>}
+            {canConfirm && item.assignee_member_id && <>
+              {!item.accepted_at ? <>
+                <Button variant="secondary" aria-label={`Accept ${item.description}`} aria-disabled={blocked || undefined} onClick={() => { if (!blocked) void change(item, "accept"); }}>Accept</Button>
+                <Button variant="outline" aria-label={`Decline ${item.description}`} aria-disabled={blocked || undefined} onClick={() => { if (!blocked) void change(item, "decline"); }}>Decline</Button>
+              </> : <>
+                <Button variant="secondary" aria-label={`${item.packed_at ? "Mark not packed" : "Mark packed"} ${item.description}`} aria-disabled={blocked || undefined} onClick={() => { if (!blocked) void change(item, item.packed_at ? "unpack" : "pack"); }}>{item.packed_at ? "Mark not packed" : "Mark packed"}</Button>
+                <Button variant="outline" aria-label={`Can’t bring ${item.description}`} aria-disabled={blocked || undefined} onClick={() => { if (!blocked) void change(item, "decline"); }}>Can’t bring</Button>
+              </>}
             </>}
-          </>}
-          {!personal && organizer && <Button variant="ghost" disabled={blocked} onClick={() => void change(item, "delete")} aria-label={`Remove ${item.description}`}>Remove</Button>}
-        </div>
-        {item.accepted_at && <p className="mt-2 break-words text-sm text-muted-foreground">Accepted by {members.find((m) => m.user_id === item.accepted_by)?.display_name ?? (personal ? "you" : "a former crew member")} · {new Date(item.accepted_at).toLocaleString()}</p>}
-        {item.packed_at && <p className="mt-1 break-words text-sm text-muted-foreground">Packed by {members.find((m) => m.user_id === item.packed_by)?.display_name ?? (personal ? "you" : "a former crew member")} · {new Date(item.packed_at).toLocaleString()}</p>}
-      </Card>;
-    })}
+            {!personal && organizer && <Button variant="ghost" disabled={blocked} onClick={() => void change(item, "delete")} aria-label={`Remove ${item.description}`}>Remove</Button>}
+          </div>
+          {item.accepted_at && <p className="mt-2 break-words text-sm text-muted-foreground">Accepted by {members.find((m) => m.user_id === item.accepted_by)?.display_name ?? (personal ? "you" : "a former crew member")} · {new Date(item.accepted_at).toLocaleString()}</p>}
+          {item.packed_at && <p className="mt-1 break-words text-sm text-muted-foreground">Packed by {members.find((m) => m.user_id === item.packed_by)?.display_name ?? (personal ? "you" : "a former crew member")} · {new Date(item.packed_at).toLocaleString()}</p>}
+        </div>;
+      })}
+    </div>
   </div>;
 }
 
@@ -107,10 +108,10 @@ export function SharedGearList({ tripId, gear, members = [], userId, ownerId, on
 export function SharedGearAttention({ tripId, gear }: { tripId: string; gear: TripGroupGear[] }) {
   const unresolved = gear.filter((g) => !g.assignee_member_id || !g.accepted_at);
   if (!unresolved.length) return null;
-  return <Card><h2 className="text-base font-semibold">Shared gear needs attention</h2>
+  return <section><h2 className="text-base font-semibold">Shared gear needs attention</h2>
     <ul className="mt-2 space-y-2">{unresolved.map((g) => <li key={g.id} className="break-words text-sm">
       {g.description} · {g.assignee_member_id ? "Awaiting acceptance" : "Unassigned"}{" "}
       <Link className="inline-flex min-h-11 items-center font-semibold text-primary underline" href={`/trips/${tripId}/gear#shared-${g.id}`}>{g.assignee_member_id ? "View request" : "View item"}</Link>
     </li>)}</ul>
-  </Card>;
+  </section>;
 }

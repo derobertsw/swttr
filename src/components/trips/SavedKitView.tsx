@@ -6,7 +6,6 @@ import { format } from "date-fns";
 import { CalendarRange, MapPin, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { BodyPartSection } from "@/components/layers";
 import { CarryCard } from "@/components/layers/CarryCard";
@@ -106,7 +105,7 @@ function SavedOutfitView({ outfit, note }: { outfit: SavedOutfit; note: React.Re
 
       <section aria-labelledby={wearHeadingId} className="flex flex-col gap-3">
         <h3 id={wearHeadingId} className="text-xl font-semibold text-foreground">Wear</h3>
-        <Card padding="none" className="divide-y divide-border px-4">
+        <div className="divide-y divide-border border-y border-border">
           {BODY_PARTS.map((bodyPart) => (
             <BodyPartSection
               key={bodyPart}
@@ -120,10 +119,10 @@ function SavedOutfitView({ outfit, note }: { outfit: SavedOutfit; note: React.Re
               onAddLayer={noop}
             />
           ))}
-        </Card>
+        </div>
       </section>
 
-      {touring && phase.id !== "outing" && <CarryCard items={phase.carry} phase={phase.id} />}
+      {touring && phase.id !== "outing" && <CarryCard items={phase.carry} phase={phase.id} framed={false} />}
     </section>
   );
 }
@@ -174,7 +173,7 @@ function SavedPlanDayView({ kit, note }: { kit: SavedPlanDay; note: React.ReactN
 
       {note}
 
-      <PlanDayCard day={kit.day} />
+      <PlanDayCard day={kit.day} framed={false} />
     </section>
   );
 }
@@ -185,7 +184,7 @@ function SavedNote({ kit, savedAt, day, tripId }: Omit<SavedKitViewProps, "outfi
   const mismatches = outfitMismatches(kit, day);
   const from = kit.kind === "plan_day" ? `from a ${kit.outing.when.durationDays}-day plan in Gear up` : "from Gear up";
   return (
-    <Card variant="muted" className="flex flex-col gap-1 text-sm">
+    <div className="flex flex-col gap-1 text-sm">
       <p className="text-foreground">
         {savedAt ? `Saved ${format(new Date(savedAt), "MMM d 'at' h:mm a")} ${from}` : `Saved ${from}`}
         {kit.kind !== "plan_day" && kit.edited && ", with your changes"}. It stays as saved when the forecast changes.
@@ -193,7 +192,7 @@ function SavedNote({ kit, savedAt, day, tripId }: Omit<SavedKitViewProps, "outfi
       {reason && <p className="text-muted-foreground">{reason}</p>}
       {mismatches.map((mismatch) => <p key={mismatch} className="text-foreground">{mismatch}</p>)}
       <UpdateInGearUp kit={kit} tripId={tripId} date={day.date} />
-    </Card>
+    </div>
   );
 }
 

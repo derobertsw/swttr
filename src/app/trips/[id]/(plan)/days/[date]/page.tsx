@@ -3,16 +3,13 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, CloudOff, Loader2, MapPin } from "lucide-react";
-import PageLayout from "@/components/PageLayout";
+import { ChevronRight, CloudOff, Loader2, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { chipClassName } from "@/components/ui/chip";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  BackLink,
   GarmentGlyph,
   MemberAvatar,
   SectionLabel,
@@ -20,6 +17,7 @@ import {
   WeatherGlyph,
   formatDateRange,
   inferWeatherKind,
+  sectionLabelClassName,
   sentenceCase,
 } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
@@ -165,125 +163,104 @@ export default function DayDetailPage({
   const fitOf = (kit: TripMemberDayKit | undefined) =>
     kit?.outfit && day ? outfitMismatches(kit.outfit, { date, activity: day.activity, stop: effectiveStop ?? null }) : [];
 
-  // Find prev/next day for arrows.
   const dayIndex = data?.days.findIndex((d) => d.date === date) ?? -1;
-  const prevDay = dayIndex > 0 ? data?.days[dayIndex - 1] : undefined;
-  const nextDay =
-    dayIndex >= 0 && data && dayIndex < data.days.length - 1 ? data.days[dayIndex + 1] : undefined;
 
   return (
-    <PageLayout chromeVariant="compact">
-      <div className="flex w-full max-w-3xl flex-col gap-5">
-        <div className="flex items-center gap-3">
-          <BackLink href={`/trips/${id}`}>Trip</BackLink>
-          <div className="ml-auto flex items-center gap-1">
-            {prevDay && (
-              <Button asChild variant="ghost" size="icon-sm">
-                <Link href={`/trips/${id}/days/${prevDay.date}`} aria-label="Previous day">
-                  <ChevronLeft className="size-5" />
-                </Link>
-              </Button>
+    // The workspace around it holds the trip's days: a list beside the day on
+    // wide screens, a date strip above it on narrow ones (#330). The day's
+    // parts sit on the page without cards, apart by spacing and headings.
+    <div className="flex w-full max-w-3xl flex-col gap-8">
+      {loading && <Skeleton className="h-32 w-full rounded-card" />}
+      {error && <TripError>{error}</TripError>}
+
+      {data && !day && (
+        <MissingDayPlan tripId={id} date={date} dateLabel={dateLabel} canCreate={canCreateDay} tripDates={formatDateRange(data.trip.start_date, data.trip.end_date)} onSaved={refresh} />
+      )}
+      {data && day && (
+        <>
+          <header>
+            <SectionLabel>
+              Day {dayIndex + 1} of {data.days.length} ·{" "}
+              {activity ?? "no activity"}
+            </SectionLabel>
+            <h1 id="trip-day-heading" tabIndex={-1} className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
+              {dateLabel}
+            </h1>
+            {effectiveStop && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {effectiveStop.name}
+                {usingBaseFallback && <span className="ml-1.5">· base location</span>}
+              </p>
             )}
-            {nextDay && (
-              <Button asChild variant="ghost" size="icon-sm">
-                <Link href={`/trips/${id}/days/${nextDay.date}`} aria-label="Next day">
-                  <ChevronRight className="size-5" />
-                </Link>
-              </Button>
-            )}
-          </div>
-        </div>
+          </header>
 
-        {loading && <Skeleton className="h-32 w-full rounded-card" />}
-        {error && <TripError>{error}</TripError>}
+          <DayLodging data={data} date={date} meet={activity === TOUR_ACTIVITY ? tourPlan?.meet_label : null} meetingPoint={meetingPoint} />
 
-        {data && !day && (
-          <MissingDayPlan tripId={id} date={date} dateLabel={dateLabel} canCreate={canCreateDay} tripDates={formatDateRange(data.trip.start_date, data.trip.end_date)} onSaved={refresh} />
-        )}
-        {data && day && (
-          <>
-            <header>
-              <SectionLabel>
-                Day {dayIndex + 1} of {data.days.length} ·{" "}
-                {activity ?? "no activity"}
-              </SectionLabel>
-              <h1 id="trip-day-heading" tabIndex={-1} className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
-                {dateLabel}
-              </h1>
-              {effectiveStop && (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {effectiveStop.name}
-                  {usingBaseFallback && <span className="ml-1.5">· base location</span>}
-                </p>
-              )}
-            </header>
+          <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()}>
+            <DayDrive data={data} date={date} dateLabel={dateLabel} drive={drive} canEdit={data.trip.owner_user_id === userId} onSaved={refresh} />
+            {activity === TOUR_ACTIVITY && tourPlan?.approach_notes && <div className="mt-3 border-t border-border pt-3">
+              <h3 className="text-sm font-medium text-muted-foreground">Approach (ski or walk)</h3>
+              <p className="mt-1 whitespace-pre-wrap break-words text-base text-foreground">{tourPlan.approach_notes}</p>
+            </div>}
+            {/* The map opens on its own page, so My kit stays where it is (#234). */}
+            <Link href={`/trips/${id}/map?date=${encodeURIComponent(date)}&from=day`} className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
+              <MapPin className="size-4" aria-hidden />View day map
+            </Link>
+          </DayAccessPoint>
 
-            <DayLodging data={data} date={date} meet={activity === TOUR_ACTIVITY ? tourPlan?.meet_label : null} meetingPoint={meetingPoint} />
+          <ActivityPicker
+            tripId={id}
+            date={date}
+            current={day.activity ?? null}
+            suggested={effectiveStop?.activities ?? []}
+            onSaved={refresh}
+          />
 
-            <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()}>
-              <DayDrive data={data} date={date} dateLabel={dateLabel} drive={drive} canEdit={data.trip.owner_user_id === userId} onSaved={refresh} />
-              {activity === TOUR_ACTIVITY && tourPlan?.approach_notes && <div className="mt-3 border-t border-border pt-3">
-                <h3 className="text-sm font-medium text-muted-foreground">Approach (ski or walk)</h3>
-                <p className="mt-1 whitespace-pre-wrap break-words text-base text-foreground">{tourPlan.approach_notes}</p>
-              </div>}
-              {/* The map opens on its own page, so My kit stays where it is (#234). */}
-              <Link href={`/trips/${id}/map?date=${encodeURIComponent(date)}&from=day`} className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
-                <MapPin className="size-4" aria-hidden />View day map
-              </Link>
-            </DayAccessPoint>
+          <WeatherCard
+            tripId={id}
+            date={date}
+            dateLabel={dateLabel}
+            stop={effectiveStop ?? null}
+            result={forecast}
+            onRetry={() => setWeatherAttempt((attempt) => attempt + 1)}
+            onLocationSaved={() => refresh()}
+          />
 
-            <ActivityPicker
-              tripId={id}
-              date={date}
-              current={day.activity ?? null}
-              suggested={effectiveStop?.activities ?? []}
-              onSaved={refresh}
-            />
+          {me && (myKit?.outfit ? (
+            <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} />
+          ) : (
+            <section aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
+              <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
+              <p className="text-sm text-muted-foreground">
+                No outfit saved for this day.{" "}
+                <Link href="/" className="font-medium text-foreground underline underline-offset-2">Get layers in Gear up</Link>
+                {" "}and use Save to trip, or mark what you&apos;ll bring below.
+              </p>
+              <MemberKitRow tripId={id} date={date} member={me} kit={myKit} editable onSaved={refresh} />
+            </section>
+          ))}
 
-            <WeatherCard
-              tripId={id}
-              date={date}
-              dateLabel={dateLabel}
-              stop={effectiveStop ?? null}
-              result={forecast}
-              onRetry={() => setWeatherAttempt((attempt) => attempt + 1)}
-              onLocationSaved={() => refresh()}
-            />
+          {me && activity === TOUR_ACTIVITY && <DayEquipment tripId={id} gear={data.gear} memberId={me.id} />}
 
-            {me && (myKit?.outfit ? (
-              <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} />
-            ) : (
-              <section aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
-                <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
-                <p className="text-sm text-muted-foreground">
-                  No outfit saved for this day.{" "}
-                  <Link href="/" className="font-medium text-foreground underline underline-offset-2">Get layers in Gear up</Link>
-                  {" "}and use Save to trip, or mark what you&apos;ll bring below.
-                </p>
-                <MemberKitRow tripId={id} date={date} member={me} kit={myKit} editable onSaved={refresh} />
-              </section>
-            ))}
+          <DayTourPlan
+            data={data}
+            date={date}
+            dateLabel={dateLabel}
+            activity={activity}
+            canEdit={!!userId && data.trip.owner_user_id === userId}
+            onSaved={refresh}
+            onRestore={async () => {
+              await tripRequest(`/api/v1/trips/${id}/days/${date}`, "PATCH", { activity: TOUR_ACTIVITY });
+              await refresh();
+            }}
+          />
 
-            {me && activity === TOUR_ACTIVITY && <DayEquipment tripId={id} gear={data.gear} memberId={me.id} />}
+          <DayConditions data={data} date={date} dateLabel={dateLabel} activity={activity} userId={userId} onSaved={refresh} />
 
-            <DayTourPlan
-              data={data}
-              date={date}
-              dateLabel={dateLabel}
-              activity={activity}
-              canEdit={!!userId && data.trip.owner_user_id === userId}
-              onSaved={refresh}
-              onRestore={async () => {
-                await tripRequest(`/api/v1/trips/${id}/days/${date}`, "PATCH", { activity: TOUR_ACTIVITY });
-                await refresh();
-              }}
-            />
-
-            <DayConditions data={data} date={date} dateLabel={dateLabel} activity={activity} userId={userId} onSaved={refresh} />
-
-            {crew.length > 0 && (
-              <section className="flex flex-col gap-2.5">
-                <SectionLabel>{me ? "Crew kits" : "Kits"}</SectionLabel>
+          {crew.length > 0 && (
+            <section aria-labelledby="crew-kits-heading" className="flex flex-col gap-1">
+              <h2 id="crew-kits-heading" className={sectionLabelClassName}>{me ? "Crew kits" : "Kits"}</h2>
+              <div className="divide-y divide-border border-y border-border">
                 {crew.map((m) => (
                   <MemberKitRow
                     key={m.id}
@@ -296,25 +273,25 @@ export default function DayDetailPage({
                     onSaved={refresh}
                   />
                 ))}
-              </section>
-            )}
+              </div>
+            </section>
+          )}
 
-            <CopyDayCard
-              tripId={id}
-              day={day}
-              dayLabel={dateLabel}
-              stops={data.stops}
-              days={data.days}
-              kit={myKit?.outfit ? "outfit" : myKit && myKit.items.length > 0 ? "checklist" : null}
-              tourPlan={isOrganizer && activity === TOUR_ACTIVITY ? tourPlan?.objective ?? null : null}
-              onSaved={() => void refresh()}
-            />
+          <CopyDayCard
+            tripId={id}
+            day={day}
+            dayLabel={dateLabel}
+            stops={data.stops}
+            days={data.days}
+            kit={myKit?.outfit ? "outfit" : myKit && myKit.items.length > 0 ? "checklist" : null}
+            tourPlan={isOrganizer && activity === TOUR_ACTIVITY ? tourPlan?.objective ?? null : null}
+            onSaved={() => void refresh()}
+          />
 
-            <div className="h-24" />
-          </>
-        )}
-      </div>
-    </PageLayout>
+          <div className="h-24" />
+        </>
+      )}
+    </div>
   );
 }
 
@@ -336,7 +313,7 @@ function MissingDayPlan({ tripId, date, dateLabel, canCreate, tripDates, onSaved
     }
   };
   return (
-    <Card>
+    <div>
       <h1 className="text-xl font-semibold text-foreground">{dateLabel}</h1>
       <p className="mt-2 text-sm text-foreground">{canCreate
         ? "This date has no saved day plan. Create one to choose an activity and plan your kit."
@@ -346,7 +323,7 @@ function MissingDayPlan({ tripId, date, dateLabel, canCreate, tripDates, onSaved
       {canCreate && <Button type="button" onClick={() => void create()} disabled={saving} aria-busy={saving} className="mt-3">
         {saving ? "Creating day plan…" : "Create day plan"}
       </Button>}
-    </Card>
+    </div>
   );
 }
 
@@ -394,7 +371,8 @@ function WeatherCard({
   };
 
   return (
-    <Card>
+    <section aria-labelledby="day-weather-heading">
+      <h2 id="day-weather-heading" className={cn(sectionLabelClassName, "mb-2")}>Weather</h2>
       <div className="flex items-start gap-3">
         {weather ? (
           <WeatherGlyph kind={inferWeatherKind(weather.tempF, weather.precip)} className="size-8 shrink-0" />
@@ -500,7 +478,7 @@ function WeatherCard({
           onCloseAutoFocus={reviewFocus.restore}
         />
       )}
-    </Card>
+    </section>
   );
 }
 
@@ -553,9 +531,9 @@ function ActivityPicker({
   };
 
   return (
-    <Card>
+    <section aria-labelledby="day-activity-heading">
       <div className="flex items-center justify-between">
-        <SectionLabel>Activity</SectionLabel>
+        <h2 id="day-activity-heading" className={sectionLabelClassName}>Activity</h2>
         {saving && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -580,7 +558,7 @@ function ActivityPicker({
       {value === null && (
         <p className="mt-2 text-sm text-muted-foreground">Tap a chip to set this day&apos;s activity.</p>
       )}
-    </Card>
+    </section>
   );
 }
 
@@ -619,7 +597,7 @@ function MemberKitSummary({ member, kit, fit }: { member: TripMember; kit: TripM
     ? Object.values(wear).reduce((count, layers) => count + layers.base.length + (layers.mid?.length ?? 0) + layers.outer.length, 0)
     : 0;
   return (
-    <Card className={cn(kit?.state === "warn" && !outfit && "border-warning")}>
+    <div className="py-3">
       <div className="flex flex-wrap items-center gap-3">
         <MemberAvatar name={member.display_name} size={28} state={member.role === "organizer" ? "self" : "default"} />
         <div className="min-w-32 flex-1">
@@ -637,7 +615,7 @@ function MemberKitSummary({ member, kit, fit }: { member: TripMember; kit: TripM
           <Badge size="sm" variant="warning">{KIT_STATE_LABEL[kit.state]}</Badge>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -704,7 +682,7 @@ function EditableMemberKitRow({
   };
 
   return (
-    <Card className={cn(state === "warn" && "border-warning")}>
+    <div className="py-3">
       <div className="flex flex-wrap items-center gap-3">
         <MemberAvatar
           name={member.display_name}
@@ -783,6 +761,6 @@ function EditableMemberKitRow({
           Flag {state === "warn" ? "ok" : "warn"}
         </Button>
       </div>
-    </Card>
+    </div>
   );
 }

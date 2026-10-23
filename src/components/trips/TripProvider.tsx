@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { TripContext, useTripState } from "@/hooks/useTrip";
+import { TripContext, useTripState, type TripSummary } from "@/hooks/useTrip";
 
 export function TripProvider({ tripId, children }: { tripId: string; children: ReactNode }) {
   const { userId, sessionId, isLoaded } = useAuth();
@@ -20,6 +20,7 @@ function TripSession({ tripId, enabled, children }: { tripId: string; enabled: b
   const [requested, setRequested] = useState(false);
   const activate = useCallback(() => setRequested(true), []);
   const state = useTripState(enabled && requested ? tripId : null);
+  const [summary, setSummary] = useState<TripSummary | null>(null);
   const { revalidate } = state;
   useEffect(() => {
     const onReturn = () => {
@@ -35,5 +36,5 @@ function TripSession({ tripId, enabled, children }: { tripId: string; enabled: b
     };
   }, [revalidate]);
 
-  return <TripContext.Provider value={{ tripId, state, activate }}>{children}</TripContext.Provider>;
+  return <TripContext.Provider value={{ tripId, state, activate, summary, setSummary }}>{children}</TripContext.Provider>;
 }
