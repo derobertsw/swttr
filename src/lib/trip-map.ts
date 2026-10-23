@@ -8,7 +8,7 @@ import { buildLodging, dateLabel, loadLodging } from "@/lib/trip-lodging";
 import { accessPointFor } from "@/lib/trip-location";
 import { loadTourPlans, summarizeTourPlans } from "@/lib/trip-tour-plans";
 import type { Trip, TripDay, TripDriveEstimates, TripDriveRoute, TripFull, TripLocation, TripStop } from "@/types/trips";
-import type { TripMap, TripMapDay, TripMapDeparture, TripMapDrive, TripMapGeometry, TripMapPlace, TripMapRole, TripMapSource } from "@/types/trip-map";
+import type { TripMap, TripMapDay, TripMapDeparture, TripMapDrive, TripMapGeometry, TripMapPerson, TripMapPlace, TripMapRole, TripMapSource } from "@/types/trip-map";
 
 /** Ignore response-time age labels; revisions change with saved data/state, not each minute. */
 const revision = (value: unknown) => createHash("sha256").update(JSON.stringify(value, (key, entry) => key === "age_label" ? undefined : entry)).digest("hex");
@@ -125,6 +125,15 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
       return { key: group.key, label: group.label, people, crew: group.crew, origin_place_id: origin,
         ...group.crew ? crewRoute : mapRoute(route, origin, group.state === "ready", group.route_key) };
     });
+    const people = lodging.people.filter((person) => person.membership !== "left").map((person): TripMapPerson => {
+      const morning = person.days.find((entry) => entry.date === plan.date);
+      const stay = morning?.tonight_stay_id ? lodging.stays.find((entry) => entry.id === morning.tonight_stay_id) : undefined;
+      return {
+        member_id: person.member_id, departure_key: departures.find((entry) => entry.people.some((one) => one.member_id === person.member_id))?.key ?? null,
+        starting_from: morning?.starting_from ?? "Not on trip", staying_tonight: morning?.staying_tonight ?? "Not on trip",
+        tonight_place_id: stay ? add({ type: "stay", id: stay.id, slot: "location" }, stay.name, stay.location, "stay", visit) : null,
+      };
+    });
     const result = {
       id, date: plan.date, date_label: dateLabel(plan.date), activity,
       destination_place_id: destinationId, origin_place_id: originId, access_place_id: accessId, tonight_place_id: tonightId,
@@ -137,9 +146,10 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
         access_notes: tour.access_notes, approach_notes: tour.approach_notes } : null,
       ...crewRoute,
       departures,
+      people,
     } satisfies Omit<TripMapDay, "revision">;
-    const references = [destinationId, originId, accessId, tonightId, crewStayId, ...departures.map((entry) => entry.origin_place_id)]
-      .map((key) => key ? places.get(key) : null);
+    const references = [destinationId, originId, accessId, tonightId, crewStayId, ...departures.map((entry) => entry.origin_place_id),
+      ...people.map((person) => person.tonight_place_id)].map((key) => key ? places.get(key) : null);
     return { ...result, revision: revision({ day: result, places: references }) };
   });
   const allPlaces = [...places.values()];

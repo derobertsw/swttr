@@ -262,13 +262,22 @@ function StayEditor({ editor, data, onClose, onSaved, onCloseAutoFocus }: {
 /**
  * The day's starting point and stay, with the tour plan's meet time and the
  * day's access point, where the crew meets, between them when there's one (#210).
+ * A person on the trip sees their own first, then the crew's where it differs (#333).
  */
-export function DayLodging({ data, date, meet, meetingPoint = null }: { data: TripFull; date: string; meet?: string | null; meetingPoint?: string | null }) {
+export function DayLodging({ data, date, meet, meetingPoint = null, memberId = null }: {
+  data: TripFull; date: string; meet?: string | null; meetingPoint?: string | null;
+  /** The signed-in person's membership, whose own stay leads. */
+  memberId?: string | null;
+}) {
   const context = data.lodging?.days.find((day) => day.date === date);
   if (!context) return null;
-  return <section className="min-w-0"><SectionLabel>{meet ? "Crew stay and meet" : "Crew stay"}</SectionLabel><dl className="mt-2 space-y-2 text-base">
-    <div><dt className="text-muted-foreground">Starting from</dt><dd className="break-words text-foreground">{context.starting_from}</dd></div>
-    {meet && <div><dt className="text-muted-foreground">Meet</dt><dd className="break-words text-foreground">{meet} · {meetingPoint ?? "Meeting point not set"}</dd></div>}
-    <div><dt className="text-muted-foreground">Staying tonight</dt><dd className="break-words text-foreground">{context.staying_tonight}</dd></div>
+  const mine = data.lodging?.people.find((person) => person.member_id === memberId)?.days.find((day) => day.date === date);
+  const row = (term: string, value: string) => <div key={term}><dt className="text-muted-foreground">{term}</dt><dd className="break-words text-foreground">{value}</dd></div>;
+  return <section className="min-w-0"><SectionLabel>{`${mine ? "Your stay" : "Crew stay"}${meet ? " and meet" : ""}`}</SectionLabel><dl className="mt-2 space-y-2 text-base">
+    {row("Starting from", mine?.starting_from ?? context.starting_from)}
+    {meet && row("Meet", `${meet} · ${meetingPoint ?? "Meeting point not set"}`)}
+    {row("Staying tonight", mine?.staying_tonight ?? context.staying_tonight)}
+    {mine && mine.starting_from !== context.starting_from && row("Crew starting from", context.starting_from)}
+    {mine && mine.staying_tonight !== context.staying_tonight && row("Crew staying tonight", context.staying_tonight)}
   </dl></section>;
 }

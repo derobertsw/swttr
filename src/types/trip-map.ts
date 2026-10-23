@@ -58,6 +58,18 @@ export interface TripMapDay {
    * with its own geometry revision, only when someone shows that drive.
    */
   departures: TripMapDeparture[];
+  /** Each person's morning and night (#333), so a view can lead with the signed-in person's own. */
+  people: TripMapPerson[];
+}
+
+export interface TripMapPerson {
+  member_id: string;
+  /** Their departure's key, while they're taking part. */
+  departure_key: string | null;
+  /** Their stay's name, "Not set", "Arrives this day", "Not taking part" or "Not on trip". */
+  starting_from: string;
+  tonight_place_id: string | null;
+  staying_tonight: string;
 }
 
 export type TripMapDrive = TripDriveRoute & { source: "geoapify" | "manual" | null };
