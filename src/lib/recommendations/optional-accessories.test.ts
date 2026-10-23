@@ -178,6 +178,85 @@ describe('optional sustained-activity accessories', () => {
     }
   });
 
+  describe('deep cold and catalog temperature ratings', () => {
+    // −15°F with 10 mph wind; the bands accept ~1.1–1.2 clo gloves and a ~1 clo hat.
+    const tempC = -26.1;
+    const deep = (activity: 'running' | 'xc_skiing') => targets(activity, tempC, 4.47);
+    const rated = {
+      handwear: [
+        glove('softshell', 1.2, { handwear_type: 'light_glove', dexterity_score: 7, min_temp_active: -10 }),
+        glove('shell-mitt', 0.8, { handwear_type: 'shell_overmitten', dexterity_score: 3, min_temp_active: -15 }),
+        glove('expedition-glove', 2.1, { handwear_type: 'insulated_glove', dexterity_score: 5, min_temp_active: -25 }),
+      ],
+      headwear: [
+        hat('thin-beanie', 0.45, { min_temp_active: 0 }),
+        hat('balaclava', 1.4, { headwear_type: 'balaclava_heavy', min_temp_active: -25 }),
+      ],
+    };
+
+    it.each(['running', 'xc_skiing'] as const)('wears owned rated gloves and a balaclava rather than going without (%s)', activity => {
+      const t = deep(activity);
+      const result = selectPhaseAccessories(activity, t, rated, tempC);
+      expect(result.handwear?.id).toBe('expedition-glove');
+      expect(result.headwear.headWarmth?.id).toBe('balaclava');
+      expect(result.assessments?.hands).toMatchObject({ state: 'selected', thermal_status: 'in_range', max: 2.1 });
+      expect(result.assessments?.hands.message).toContain("aren't rated for it");
+      expect(result.assessments?.head).toMatchObject({ state: 'selected', thermal_status: 'in_range', max: 1.4 });
+      expect(result.extremityMax).toEqual({ hands: 2.1, head: 1.4 });
+      expect(result.warnings).toEqual(expect.not.arrayContaining([expect.stringContaining('no suitable')]));
+
+      // Judged against the raised limits the response reports, the worn
+      // items aren't overheating, and removing them is cold.
+      const judged = { ...t, extremity: { ...t.extremity, max: result.extremityMax! } };
+      expect(manual(judged, [2.1], [1.4]).bodyParts.hands.status).toBe('in_range');
+      expect(manual(judged, [2.1], [1.4]).decision?.riskType).not.toBe('overheat');
+      expect(manual(judged, [], []).decision?.riskType).toBe('cold');
+    });
+
+    it('wears an unrated item when nothing rated is owned, with a warning', () => {
+      const t = deep('running');
+      const result = selectPhaseAccessories('running', t, { handwear: [rated.handwear[0]], headwear: [rated.headwear[0]] }, tempC);
+      expect(result.handwear?.id).toBe('softshell');
+      expect(result.headwear.headWarmth?.id).toBe('thin-beanie');
+      expect(result.assessments?.hands.thermal_status).toBe('in_range');
+      expect(result.assessments?.head).toMatchObject({ state: 'missing', thermal_status: 'under', selected_ids: ['thin-beanie'] });
+      expect(result.assessments?.head.message).toContain('closest available option still falls short');
+      expect(result.warnings).toContain("Test softshell isn't rated for this cold; check warmth before use.");
+      expect(result.extremityMax).toEqual(t.extremity.max);
+    });
+
+    it('adds a hat under a hood that leaves the head short, and never only a neck piece', () => {
+      const t = deep('running');
+      const hood = { hood_type: 'attached' } as GarmentRow;
+      const result = selectPhaseAccessories('running', t, {
+        handwear: [], headwear: [...rated.headwear, hat('face-mask', 0.9, { headwear_type: 'facemask', min_temp_active: -20 })],
+      }, tempC, [hood]);
+      expect(result.headwear.headWarmth?.id).toBe('balaclava');
+      expect(result.assessments?.head.thermal_status).toBe('in_range');
+    });
+
+    it('prefers XC gloves that grip poles to a closer-fitting overmitt', () => {
+      const t = targets('xc_skiing', -15, 8.94, 'hard');
+      const result = selectPhaseAccessories('xc_skiing', t, {
+        handwear: [glove('overmitt', t.extremity.neutral.hands, { handwear_type: 'shell_overmitten', dexterity_score: 3 }), glove('softshell', 1, { handwear_type: 'light_glove', dexterity_score: 7 })],
+        headwear: [],
+      }, -15);
+      expect(result.handwear?.id).toBe('softshell');
+      expect(result.assessments?.hands.purpose).toBe('thermal_and_pole_grip');
+    });
+  });
+
+  it('wears the nearest glove when going without would leave hands colder than it is warm', () => {
+    const t = targets('running', -4, 5.36);
+    const result = selectPhaseAccessories('running', t, { handwear: [glove('shell-mitt', 0.8, { handwear_type: 'shell_overmitten' })], headwear: [] }, -4);
+    expect(t.extremity.max!.hands).toBeLessThan(0.7);
+    expect(result.handwear?.id).toBe('shell-mitt');
+    expect(result.assessments?.hands).toMatchObject({ state: 'selected', thermal_status: 'over' });
+    expect(result.assessments?.hands.message).toContain('going without would leave you colder');
+    // A little warmth costs less than the cold of going without.
+    expect(manual(t, [0.8], []).comfortScore!).toBeGreaterThan(manual(t, [], []).comfortScore!);
+  });
+
   it.each(['biking', 'alpine_skiing', 'ski_touring_uphill', 'ski_touring_downhill'] as const)('preserves explicit compatibility selection for %s', activity => {
     const t = targets(activity, -8);
     const result = selectPhaseAccessories(activity, t, pool, -8);
