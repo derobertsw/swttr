@@ -87,12 +87,12 @@ export async function tripDriveEstimates(full: TripFull, store: DriveEstimateSto
   const plans = drivePlans(full);
   const departures = departurePlans(full, plans);
   const [storedRows, manual] = await Promise.all([store.read().catch(() => []), manualEstimates(full, store)]);
-  const stored = new Map(storedRows.map((row) => [routeOf(row), row]));
-  // The latest estimate for each pair, whichever day it was calculated for.
+  // The latest estimate for each pair, whichever day it was calculated for,
+  // so an expired one for this day never hides a fresh one from another.
   const byRoute = new Map<string, StoredDriveEstimate>();
   for (const row of storedRows) byRoute.set(row.route_key, newer(byRoute.get(row.route_key), row));
   const reuse = (plan: DrivePlan) => {
-    const row = stored.get(routeOf(plan)) ?? (plan.route_key ? byRoute.get(plan.route_key) : undefined);
+    const row = plan.route_key ? byRoute.get(plan.route_key) : undefined;
     return row && { ...row, date: plan.date };
   };
   const ready = [...new Map(departures.flat().filter((plan): plan is DeparturePlan & ReadyPlan => plan.state === "ready")
@@ -146,12 +146,17 @@ export async function tripDriveEstimates(full: TripFull, store: DriveEstimateSto
       .sort((a, b) => Date.parse(b.calculated_at) - Date.parse(a.calculated_at));
     return candidates.find((row) => row.origin_label === plan.origin?.label) ?? (plan.crew ? candidates[0] : undefined);
   };
-  // The crew's first, so a table that keeps one estimate per day (before the
-  // departures migration) keeps the crew's. A crew estimate reused from
-  // another day is stored under this day too, as the day's own. A failed write
-  // only means the next visit calculates again.
-  const crewRows = departures.flatMap((day) => day.filter((plan) => plan.crew && plan.state === "ready"))
-    .flatMap((plan) => calculated.get(routeOf(plan)) ?? (stored.has(routeOf(plan)) ? [] : reuse(plan) ?? []));
+  // Each day's crew estimate goes first, and goes with any other departure
+  // written for its day, so a table that keeps one estimate per day (before
+  // the departures migration) keeps the crew's rather than the last written.
+  // One newly calculated, or reused from another day, is stored as this day's
+  // own. A failed write only means the next visit calculates again.
+  const writtenDays = new Set([...calculated.values()].map((row) => row.date));
+  const crewRows = departures.flatMap((day) => day.filter((plan) => plan.crew && plan.state === "ready")).flatMap((plan) => {
+    const row = calculated.get(routeOf(plan)) ?? reuse(plan);
+    const kept = row && byRoute.get(plan.route_key!)?.date === plan.date && !calculated.has(routeOf(plan));
+    return row && (!kept || writtenDays.has(plan.date)) ? [row] : [];
+  });
   const writes = [...new Map([...crewRows, ...calculated.values()].map((row) => [routeOf(row), row])).values()];
   if (writes.length && options.refresh !== false) await store.write(writes).catch(() => undefined);
 

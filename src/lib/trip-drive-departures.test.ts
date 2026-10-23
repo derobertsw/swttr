@@ -154,6 +154,34 @@ describe("Departure estimates (#333)", () => {
       ["Village hotel", "unavailable", null],
     ]);
   });
+  it("reuses a fresh estimate for the same drive from another day over this day's expired one", async () => {
+    const store = memoryStore();
+    await tripDriveEstimates(splitDriveTrip(), store, { now: NOW, matrix: fakeMatrix() });
+    // Saturday's rental drive was calculated over a week ago; Sunday's, for the same drive, an hour ago.
+    const old = new Date(NOW - 8 * 86_400_000).toISOString(), recent = new Date(NOW - 3_600_000).toISOString();
+    for (const [key, row] of store.saved) store.saved.set(key, { ...row, calculated_at: row.date === SAT && row.origin_label === "Pine rental" ? old : recent });
+    const matrix = fakeMatrix();
+    const saturday = (await tripDriveEstimates(splitDriveTrip(), store, { now: NOW, matrix })).days.find((day) => day.date === SAT)!;
+    expect(matrix).not.toHaveBeenCalled();
+    expect(saturday).toMatchObject({ state: "available", estimate: { calculated_at: recent, stale: false } });
+    // It's stored as Saturday's own, so the expired row goes.
+    expect(store.saved.get(`${SAT}|${departuresOn(splitDriveTrip(), SAT)[0].route_key}`)?.calculated_at).toBe(recent);
+  });
+  it("keeps each day's crew estimate in a table that keeps one per day, before the departures migration", async () => {
+    // Like supabaseDriveStore's fallback: the first row written for a day wins.
+    const saved = new Map<string, StoredDriveEstimate>();
+    const perDay: DriveEstimateStore = {
+      read: async () => [...saved.values()],
+      write: async (rows) => { [...new Map([...rows].reverse().map((row) => [row.date, row])).values()].forEach((row) => saved.set(row.date, row)); },
+    };
+    await tripDriveEstimates(splitDriveTrip(), perDay, { now: NOW, matrix: fakeMatrix() });
+    expect(saved.get(SAT)?.origin_label).toBe("Pine rental");
+    // The next visit calculates the hotel's drive again, and the rental's stays.
+    await tripDriveEstimates(splitDriveTrip(), perDay, { now: NOW + 60_000, matrix: fakeMatrix() });
+    expect([saved.get(SAT)?.origin_label, saved.get(SUN)?.origin_label]).toEqual(["Pine rental", "Pine rental"]);
+    const offline = (await tripDriveEstimates(splitDriveTrip(), perDay, { now: NOW + 120_000, matrix: failing() })).days.find((day) => day.date === SAT)!;
+    expect(offline.departures.map((departure) => departure.state)).toEqual(["available", "unavailable"]);
+  });
   it("labels a read-only view's expired estimates stale without calling the provider or writing", async () => {
     const store = memoryStore();
     await tripDriveEstimates(splitDriveTrip(), store, { now: NOW, matrix: fakeMatrix() });
