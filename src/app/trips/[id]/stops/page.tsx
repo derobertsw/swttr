@@ -30,7 +30,7 @@ export default function TripStopsPage({ params }: { params: Promise<{ id: string
         // The overview and day pages share this trip's data, and reuse it for a
         // minute, so a saved stop must reach it too. This page keeps its own list.
         void refresh();
-      }} onItineraryChange={() => void reload()} onBack={overview} onNext={overview} backLabel="Overview" nextLabel="Done">
+      }} onItineraryChange={() => void reload()} onBack={overview} onNext={overview} backLabel="Plan" nextLabel="Done">
         <TripDaysEditor tripId={id} stops={stops} days={data.days} onSaved={() => void reload()} />
       </TripStopsEditor>
     )}
