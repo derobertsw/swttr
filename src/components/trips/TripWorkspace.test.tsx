@@ -39,7 +39,8 @@ function tab(name: string) {
 
 describe("Trip workspace (#330)", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
+    window.sessionStorage.clear();
     vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": reply(200, tripFull()) }));
   });
 
@@ -84,6 +85,35 @@ describe("Trip workspace (#330)", () => {
     pathname = "/trips/trip-1/pack";
     view.rerender(workspace());
     expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1/days/2026-10-11");
+  });
+
+  it("keeps Plan's last day when another section reloads", async () => {
+    const view = await open("/trips/trip-1/days/2026-10-11");
+    view.unmount();
+    await open("/trips/trip-1/stays");
+    expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1/days/2026-10-11");
+  });
+
+  it.each([
+    ["another trip's day", "/trips/trip-2/days/2026-10-11"],
+    ["a page outside Plan", "/trips/trip-1/pack"],
+    ["something else", "javascript:alert(1)"],
+  ])("ignores a saved Plan page that is %s", async (_, saved) => {
+    window.sessionStorage.setItem("swttr-trip-plan-path:trip-1", saved);
+    await open("/trips/trip-1/stays");
+    expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1");
+  });
+
+  it("remembers Plan's day within the page when storage is blocked", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+    const view = await open("/trips/trip-1/days/2026-10-11");
+    pathname = "/trips/trip-1/stays";
+    view.rerender(workspace());
+    expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1/days/2026-10-11");
+    view.unmount();
+    await open("/trips/trip-1/stays");
+    expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1");
   });
 
   it("titles Plan's own page with the trip and names it on every other page", async () => {
