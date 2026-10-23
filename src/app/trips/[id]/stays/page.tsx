@@ -17,7 +17,8 @@ export default function TripStaysPage({ params }: { params: Promise<{ id: string
       {loading && !data && <Skeleton className="h-48 w-full rounded-card" />}
       {error && <TripError>{error}</TripError>}
       {data && <TripStays data={data} canEdit={data.trip.owner_user_id === userId} onSaved={refresh}
-        viewerMemberId={data.members.find((member) => member.user_id === userId)?.id ?? null} />}
+        // Until Clerk loads there is no viewer: a guest or invitation has no user id either.
+        viewerMemberId={userId ? data.members.find((member) => member.user_id === userId)?.id ?? null : null} />}
       <div className="h-24" />
     </div>
   );
