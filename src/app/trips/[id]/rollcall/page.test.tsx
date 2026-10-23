@@ -85,4 +85,22 @@ describe("Day checklist page (#336)", () => {
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("heading", { name: "Sat Oct 10", level: 2 })).toBeInTheDocument();
   });
+
+  it("reads the checklist again on coming back to the tab, keeping the chosen day, and ignores an older answer that arrives late", async () => {
+    const later = buildDayChecklists(checklistTrip({ kits: [kit(BLAIR.id, SAT, { outfit: savedOutfit() })] }), "user-blair", SAT);
+    const answers: Array<(value: ReturnType<typeof reply>) => void> = [];
+    let calls = 0;
+    vi.stubGlobal("fetch", fakeTripApi({ [ROUTE]: () => ++calls === 1 ? reply(200, checklist) : new Promise((resolve) => answers.push(resolve)) }));
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByRole("button", { name: "Sun Oct 11" }));
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    expect(answers).toHaveLength(2);
+    await act(async () => answers[1](reply(200, later)));
+    await act(async () => answers[0](reply(200, checklist)));
+    expect(screen.getByRole("button", { name: "Sun Oct 11" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Sat Oct 10" }));
+    expect(screen.getByRole("link", { name: "Blair's clothing for Sat Oct 10: Outfit saved" })).toBeInTheDocument();
+  });
 });

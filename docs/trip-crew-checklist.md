@@ -4,7 +4,7 @@ The Day checklist (`/trips/:id/rollcall`, in Crew) replaces Roll call, which jud
 
 ## What it shows
 
-- **The day.** Underlined dates, like Plan's date strip. It opens on today during the trip, the first day before it, and the last day after it. A link can name the day with `?date=YYYY-MM-DD`. Changing the day doesn't reload anything.
+- **The day.** Underlined dates, like Plan's date strip. It opens on today during the trip, the first day before it, and the last day after it. A link can name the day with `?date=YYYY-MM-DD`. Changing the day doesn't reload anything; coming back to the tab or reconnecting reads the checklist again, as the trip pages do, keeping the chosen day.
 - **Who.** Grouped by attendance on that day ([trip-stays.md](trip-stays.md), #331): Taking part, There, not taking part (an evening arrival), Invitation pending, and a line naming who isn't on the trip that day. A pending invitation is never counted as coming. Each person's membership stays a fact of its own: Organizer, Joined, Managed guest or Invitation pending.
 - **Clothing** for that day, linked to their kit row on the day (`/days/:date#kit-<member>`):
   - Outfit saved.

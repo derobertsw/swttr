@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState, type ReactNode } from "react";
+import { use, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,18 +26,33 @@ export default function DayChecklistPage({ params }: { params: Promise<{ id: str
   const { id } = use(params);
   const [data, setData] = useState<TripChecklist | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
   // A link can name the day, e.g. ?date=2026-10-10.
   const [chosen, setChosen] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("date"));
   usePublishTripSummary(data?.trip);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Only the latest read is shown, so an older answer arriving late can't replace a newer one.
+  const latest = useRef(0);
+  const load = useCallback(() => {
+    const request = ++latest.current;
     tripRequest<TripChecklist>(`/api/v1/trips/${id}/checklist`)
-      .then((body) => { if (!cancelled) { setData(body); setError(null); } })
-      .catch((err) => { if (!cancelled) setError(errorMessage(err)); });
-    return () => { cancelled = true; };
-  }, [id, attempt]);
+      .then((body) => { if (request === latest.current) { setData(body); setError(null); } })
+      .catch((err) => { if (request === latest.current) setError(errorMessage(err)); });
+  }, [id]);
+  useEffect(() => {
+    load();
+    // Read it again on coming back to the tab or online, as TripProvider does for
+    // the trip, so the crew's changes meanwhile show. The day shown stays chosen.
+    const onReturn = () => { if (document.visibilityState === "visible") load(); };
+    window.addEventListener("focus", onReturn);
+    window.addEventListener("online", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
+    return () => {
+      latest.current += 1;
+      window.removeEventListener("focus", onReturn);
+      window.removeEventListener("online", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
+    };
+  }, [load]);
 
   const day = data && (data.days.find((entry) => entry.date === chosen) ?? data.days.find((entry) => entry.date === data.default_date) ?? data.days[0]);
   return (
@@ -53,7 +68,7 @@ export default function DayChecklistPage({ params }: { params: Promise<{ id: str
       {!data && !error && <Skeleton className="h-32 w-full rounded-card" />}
       {error && <div className="flex flex-col items-start gap-3">
         <TripError>{error}</TripError>
-        <Button type="button" variant="outline" onClick={() => { setError(null); setAttempt((count) => count + 1); }}>Try again</Button>
+        <Button type="button" variant="outline" onClick={() => { setError(null); load(); }}>Try again</Button>
       </div>}
 
       {data && !data.days.length && <p className="text-base text-muted-foreground">This trip has no days yet. Add them in Plan.</p>}
