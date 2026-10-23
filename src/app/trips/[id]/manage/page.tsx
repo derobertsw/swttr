@@ -1,17 +1,15 @@
 "use client";
 
 import { use, useRef, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import { Loader2, Trash2, UserPlus } from "lucide-react";
+import { ChevronRight, Loader2, Trash2, UserPlus } from "lucide-react";
 import { SharedGearAttention } from "@/components/trips/SharedGear";
-import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  BackLink,
   formatCrewCounts,
   InviteLinkButton,
   MemberAvatar,
@@ -124,145 +122,146 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
   };
 
   return (
-    <PageLayout chromeVariant="compact">
-      <div className="flex w-full max-w-2xl flex-col gap-5">
-        <BackLink href={`/trips/${id}`}>Trip</BackLink>
-        <header>
-          <SectionLabel>Crew</SectionLabel>
-          <h1
-            id={HEADING_ID}
-            tabIndex={-1}
-            className="mt-1 text-title font-semibold text-foreground md:text-title-lg"
-          >
-            Manage crew
-          </h1>
-        </header>
+    <div className="flex w-full max-w-3xl flex-col gap-8">
+      <header>
+        <SectionLabel>Crew</SectionLabel>
+        <h1
+          id={HEADING_ID}
+          tabIndex={-1}
+          className="mt-1 text-title font-semibold text-foreground md:text-title-lg"
+        >
+          Manage crew
+        </h1>
+        <Link href={`/trips/${id}/rollcall`} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary">
+          Roll call
+          <ChevronRight className="size-4" aria-hidden="true" />
+        </Link>
+      </header>
 
-        {loading && <Skeleton className="h-32 w-full rounded-card" />}
-        {error && <TripError>{error}</TripError>}
+      {loading && <Skeleton className="h-32 w-full rounded-card" />}
+      {error && <TripError>{error}</TripError>}
 
-        {data && (
-          <>
-            <SharedGearAttention tripId={id} gear={data.gear} />
-            {data.crew_counts && <p className="text-sm text-muted-foreground">{formatCrewCounts(data.crew_counts)}</p>}
-            {!canManage && <p className="text-sm text-muted-foreground">The organizer manages invitations and guests.</p>}
-            <div className="flex flex-col gap-2">
-              {data.members.map((m) => (
-                <Card key={m.id}>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <MemberAvatar
-                      name={m.display_name}
-                      state={
-                        m.role === "organizer"
-                          ? "self"
-                          : m.status === "guest"
-                          ? "guest"
-                          : m.status === "invited"
-                          ? "invited"
-                          : "default"
-                      }
-                    />
-                    <div className="min-w-32 flex-1">
-                      <p className="truncate text-sm font-semibold text-foreground">
-                        {m.display_name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {m.role} · {m.status === "guest" ? "organizer-managed guest" : m.status === "invited" ? m.invite_token || !canManage ? "invitation pending" : "invitation pending · link revoked" : m.status}
-                      </p>
-                    </div>
-                    <div className="ml-auto flex flex-wrap items-center gap-1.5">
-                      {canManage && m.status === "invited" && m.invite_token && (
-                        <InviteLinkButton
-                          token={m.invite_token}
-                          recipientName={m.display_name}
-                          tripName={data.trip.name}
-                        />
-                      )}
-                      {canManage && m.status === "invited" && <>
-                        {m.invite_token && <Button variant="outline" size="sm" disabled={changingLink === m.id} onClick={() => changeLink(m, "revoke")}>Revoke link</Button>}
-                        <Button variant="outline" size="sm" disabled={changingLink === m.id} onClick={() => changeLink(m, "replace")}>{m.invite_token ? "Replace link" : "Create new link"}</Button>
-                      </>}
-                      {canManage && m.role !== "organizer" && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          id={removeButtonId(m.id)}
-                          onClick={() => openConfirm(m)}
-                          aria-label={`Remove ${m.display_name}`}
-                        >
-                          <Trash2 />
-                          Remove
-                        </Button>
-                      )}
-                    </div>
+      {data && (
+        <>
+          <SharedGearAttention tripId={id} gear={data.gear} />
+          {data.crew_counts && <p className="text-sm text-muted-foreground">{formatCrewCounts(data.crew_counts)}</p>}
+          {!canManage && <p className="text-sm text-muted-foreground">The organizer manages invitations and guests.</p>}
+          <ul className="divide-y divide-border border-y border-border">
+            {data.members.map((m) => (
+              <li key={m.id} className="py-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <MemberAvatar
+                    name={m.display_name}
+                    state={
+                      m.role === "organizer"
+                        ? "self"
+                        : m.status === "guest"
+                        ? "guest"
+                        : m.status === "invited"
+                        ? "invited"
+                        : "default"
+                    }
+                  />
+                  <div className="min-w-32 flex-1">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {m.display_name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {m.role} · {m.status === "guest" ? "organizer-managed guest" : m.status === "invited" ? m.invite_token || !canManage ? "invitation pending" : "invitation pending · link revoked" : m.status}
+                    </p>
                   </div>
-                </Card>
+                  <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                    {canManage && m.status === "invited" && m.invite_token && (
+                      <InviteLinkButton
+                        token={m.invite_token}
+                        recipientName={m.display_name}
+                        tripName={data.trip.name}
+                      />
+                    )}
+                    {canManage && m.status === "invited" && <>
+                      {m.invite_token && <Button variant="outline" size="sm" disabled={changingLink === m.id} onClick={() => changeLink(m, "revoke")}>Revoke link</Button>}
+                      <Button variant="outline" size="sm" disabled={changingLink === m.id} onClick={() => changeLink(m, "replace")}>{m.invite_token ? "Replace link" : "Create new link"}</Button>
+                    </>}
+                    {canManage && m.role !== "organizer" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        id={removeButtonId(m.id)}
+                        onClick={() => openConfirm(m)}
+                        aria-label={`Remove ${m.display_name}`}
+                      >
+                        <Trash2 />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {canManage && <div>
+            <label htmlFor="add-member-name" className={cn(sectionLabelClassName, "mb-2 block")}>
+              Add member
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <Input
+                id="add-member-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Display name"
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={add}
+                disabled={!name.trim() || adding}
+              >
+                {adding ? <Loader2 className="animate-spin" /> : <UserPlus />}
+                {kind === "invite" ? "Create invite link" : "Add guest"}
+              </Button>
+            </div>
+            <div
+              role="group"
+              aria-label="How they join"
+              className={cn(segmentedGroupClassName, "mt-3 grid-cols-2")}
+            >
+              {(["invite", "guest"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setKind(k)}
+                  aria-pressed={kind === k}
+                  className={segmentedItemClassName}
+                >
+                  {k === "invite" ? "Invite link" : "Managed guest"}
+                </button>
               ))}
             </div>
+            <p className="mt-3 text-sm text-muted-foreground">{kind === "invite" ? "Create a link, then copy or share it yourself. No message is sent. Replacing or revoking a pending link disables the old link without deleting the person's prepared kits." : "A guest has no account or trip access. The organizer manages their kits and gear."}</p>
+          </div>}
 
-            {canManage && <Card>
-              <label htmlFor="add-member-name" className={cn(sectionLabelClassName, "mb-2 block")}>
-                Add member
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <Input
-                  id="add-member-name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Display name"
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={add}
-                  disabled={!name.trim() || adding}
-                >
-                  {adding ? <Loader2 className="animate-spin" /> : <UserPlus />}
-                  {kind === "invite" ? "Create invite link" : "Add guest"}
-                </Button>
-              </div>
-              <div
-                role="group"
-                aria-label="How they join"
-                className={cn(segmentedGroupClassName, "mt-3 grid-cols-2")}
-              >
-                {(["invite", "guest"] as const).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setKind(k)}
-                    aria-pressed={kind === k}
-                    className={segmentedItemClassName}
-                  >
-                    {k === "invite" ? "Invite link" : "Managed guest"}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-3 text-sm text-muted-foreground">{kind === "invite" ? "Create a link, then copy or share it yourself. No message is sent. Replacing or revoking a pending link disables the old link without deleting the person's prepared kits." : "A guest has no account or trip access. The organizer manages their kits and gear."}</p>
-            </Card>}
+          <p className="text-sm text-muted-foreground">
+            Removing someone also deletes their kits for this trip.
+          </p>
+          <div className="h-24" />
+        </>
+      )}
 
-            <p className="text-center text-sm text-muted-foreground">
-              Removing someone also deletes their kits for this trip.
-            </p>
-            <div className="h-24" />
-          </>
-        )}
-
-        {confirming && (
-          <RemoveConfirmSheet
-            member={confirming.member}
-            open={confirming.open}
-            removing={removing}
-            onCancel={closeConfirm}
-            onConfirm={remove}
-            onCloseAutoFocus={handleConfirmCloseAutoFocus}
-          />
-        )}
-      </div>
-    </PageLayout>
+      {confirming && (
+        <RemoveConfirmSheet
+          member={confirming.member}
+          open={confirming.open}
+          removing={removing}
+          onCancel={closeConfirm}
+          onConfirm={remove}
+          onCloseAutoFocus={handleConfirmCloseAutoFocus}
+        />
+      )}
+    </div>
   );
 }
 

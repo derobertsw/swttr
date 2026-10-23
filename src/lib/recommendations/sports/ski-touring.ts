@@ -24,7 +24,7 @@ import {
   type PhaseTargets,
 } from '../thermal-targets';
 import { sortByBreathability } from '../sorting';
-import { selectHandwear, selectHeadwearByCategory } from '../extremities';
+import { selectPhaseAccessories } from '../extremities';
 import {
   ensembleToThermalGarments,
   formatConditions,
@@ -166,9 +166,11 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     const { uphill, downhill } = targets;
 
     // Climb: no helmet (conditional), active warmth selection
-    const climbHeadwear = selectHeadwearByCategory(pool.headwear, tempC, true, { includeHelmet: false });
+    const climbAccessories = selectPhaseAccessories('ski_touring_uphill', uphill, pool, tempC);
+    const climbHeadwear = climbAccessories.headwear;
     // Descent: helmet mandatory, static warmth selection
-    const descentHeadwear = selectHeadwearByCategory(pool.headwear, tempC, false, { includeHelmet: true });
+    const descentAccessories = selectPhaseAccessories('ski_touring_downhill', downhill, pool, tempC);
+    const descentHeadwear = descentAccessories.headwear;
 
     // Uphill Ensemble
     const uphillEnsemble = buildUphillEnsemble(
@@ -258,12 +260,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
       arms: Math.round(uphillThermalProperties.rcl.arm * 100) / 100,
       legs: Math.round(uphillThermalProperties.rcl.leg * 100) / 100,
     };
-    const selectedHandwear = selectHandwear(
-      pool.handwear,
-      tempC,
-      false,
-      uphill.extremity.neutral.hands
-    );
+    const selectedHandwear = climbAccessories.handwear;
     const thermalComfortScore = calculateThermalComfortScore({
       totalClo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
       targetRange: uphill.targetRange,
@@ -281,7 +278,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     // Gloves carry over from the climb — only select warmer descent gloves if climb pair is insufficient
     const descentHandwear = selectedHandwear && selectedHandwear.rcl_clo >= downhill.extremity.neutral.hands
       ? selectedHandwear
-      : selectHandwear(pool.handwear, tempC, false, downhill.extremity.neutral.hands) ?? selectedHandwear;
+      : descentAccessories.handwear ?? selectedHandwear;
 
     return {
       conditions: {

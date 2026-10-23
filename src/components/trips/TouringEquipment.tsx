@@ -4,7 +4,6 @@ import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, Circle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
@@ -229,16 +228,16 @@ export function DayEquipment({ tripId, gear, memberId }: {
       <p role="status" className="sr-only">{status}</p>
       {!data && !error && <Skeleton className="h-20 w-full rounded-card" />}
       {error && (
-        <Card role="alert">
+        <div role="alert">
           <p className="text-base font-medium text-foreground">Couldn&apos;t load your touring equipment.</p>
           <p className="mt-1 text-sm text-muted-foreground">{error}</p>
           <Button type="button" variant="outline" className="mt-3" onClick={() => { setError(null); setAttempt((value) => value + 1); }}>
             Retry
           </Button>
-        </Card>
+        </div>
       )}
       {data && (
-        <Card>
+        <div>
           {items.length > 0 ? <>
             <p className="text-sm text-muted-foreground">Packed for the trip, as checked on your packing list.</p>
             <ul className="mt-2 flex flex-col divide-y divide-border">
@@ -270,10 +269,10 @@ export function DayEquipment({ tripId, gear, memberId }: {
             )}
             <Link href={`/trips/${tripId}/pack`} className={linkClassName}>Open my packing list</Link>
           </div>
-        </Card>
+        </div>
       )}
       {assigned.length > 0 && (
-        <Card>
+        <div>
           <h3 className="text-base font-semibold text-foreground">Shared items assigned to you</h3>
           <ul className="mt-1 flex flex-col divide-y divide-border">
             {assigned.map((item) => (
@@ -284,7 +283,7 @@ export function DayEquipment({ tripId, gear, memberId }: {
             ))}
           </ul>
           <Link href={`/trips/${tripId}/gear`} className={linkClassName}>Open shared gear</Link>
-        </Card>
+        </div>
       )}
       {data && adding && (
         <EquipmentTemplateSheet equipment={data.equipment} onAdd={add}

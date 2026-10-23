@@ -1,6 +1,6 @@
 # Crew stays (#207, first slice of #205)
 
-Overview now contains optional Stays. Organizers can save a name-only draft, add dates and shared details later, and edit/remove stays. Members read the same saved information without organizer actions. A property website opens in a new tab. A stay can also have a confirmed place, found with search or typed as coordinates ([trip-locations.md](trip-locations.md), #208); lodging never changes an activity destination or its weather coordinates.
+The trip's Stays section (`/trips/:id/stays`, [trip-workspace.md](trip-workspace.md)) contains optional Stays. Organizers can save a name-only draft, add dates and shared details later, and edit/remove stays. Members read the same saved information without organizer actions. A property website opens in a new tab. A stay can also have a confirmed place, found with search or typed as coordinates ([trip-locations.md](trip-locations.md), #208); lodging never changes an activity destination or its weather coordinates.
 
 Check-in includes that night; check-out excludes it. Friday–Sunday is two nights. The previous night's assigned stay supplies a day's Starting from; that day's assigned night supplies Staying tonight. A pre-trip night can explicitly supply the first morning's origin. Undated stays, an unplanned night and No stay needed never supply an origin. The night list includes the itinerary's last night and its optional pre-trip night.
 

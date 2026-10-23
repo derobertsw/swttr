@@ -27,7 +27,7 @@ function driveFix(tripId: string, day: TripMapDay, canEdit: boolean): { label: s
     case "missing_origin": return { label: "Set starting point", href: gettingThere };
     case "origin_not_located":
     case "approximate_origin": return origin?.stay_id
-      ? { label: `Set the exact location of ${origin.label}`, href: `/trips/${tripId}#stay-${encodeURIComponent(origin.stay_id)}` }
+      ? { label: `Set the exact location of ${origin.label}`, href: `/trips/${tripId}/stays#stay-${encodeURIComponent(origin.stay_id)}` }
       : { label: "Change starting point", href: gettingThere };
     case "missing_access_point": return { label: "Set access point", href: gettingThere };
     case "approximate_access_point": return { label: "Choose the exact entrance or parking", href: gettingThere };
@@ -96,7 +96,7 @@ export function TripMapDaySummary({ tripId, day, places, canEdit }: {
     {canEdit && <p className="mt-1 flex flex-wrap gap-x-4">
       <Link href={`${dayHref}#getting-there-${day.date}`} className={linkClass}>Edit Getting there</Link>
       {tour && <Link href={`${dayHref}#tour-plan-heading`} className={linkClass}>Edit tour plan</Link>}
-      <Link href={tonight?.source.type === "stay" ? `/trips/${tripId}#stay-${encodeURIComponent(tonight.source.id)}` : `/trips/${tripId}#trip-stays-heading`} className={linkClass}>Edit tonight&apos;s stay</Link>
+      <Link href={tonight?.source.type === "stay" ? `/trips/${tripId}/stays#stay-${encodeURIComponent(tonight.source.id)}` : `/trips/${tripId}/stays#trip-stays-heading`} className={linkClass}>Edit tonight&apos;s stay</Link>
     </p>}
   </section>;
 }

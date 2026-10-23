@@ -2,7 +2,6 @@
 
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
-import PageLayout from "@/components/PageLayout";
 import { TripStopsEditor } from "@/components/trips/LegacyTripWizard";
 import { TripDaysEditor } from "@/components/trips/TripDaysEditor";
 import { Button } from "@/components/ui/button";
@@ -21,7 +20,7 @@ export default function TripStopsPage({ params }: { params: Promise<{ id: string
     setEditedStops(null);
   };
   const stops = data && (editedStops ?? data.stops);
-  return <PageLayout chromeVariant="compact"><div className="flex w-full max-w-2xl flex-col gap-5 pb-24">
+  return <div className="flex w-full max-w-2xl flex-col gap-5 pb-24">
     <header><h1 className="text-title font-semibold text-foreground md:text-title-lg">Destinations</h1><p className="mt-2 text-sm text-muted-foreground">Add, order and remove stops, then choose the days that use them.</p></header>
     {loading && !data && <p role="status">Loading destinations…</p>}
     {error && <div role="alert"><p>{error}</p><Button variant="outline" onClick={() => void refresh()}>Retry</Button></div>}
@@ -35,5 +34,5 @@ export default function TripStopsPage({ params }: { params: Promise<{ id: string
         <TripDaysEditor tripId={id} stops={stops} days={data.days} onSaved={() => void reload()} />
       </TripStopsEditor>
     )}
-  </div></PageLayout>;
+  </div>;
 }

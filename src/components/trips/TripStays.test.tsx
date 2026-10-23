@@ -259,7 +259,7 @@ describe("Stay deep-link restoration", () => {
 
   it("waits for lodging data and restores an encoded stay link only once", () => {
     const saved = { ...hotel, id: "stay:room 1" };
-    window.history.replaceState({}, "", `/trips/${TRIP.id}#stay-${encodeURIComponent(saved.id)}`);
+    window.history.replaceState({}, "", `/trips/${TRIP.id}/stays#stay-${encodeURIComponent(saved.id)}`);
     const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
     const result = render(<TripStays data={full()} canEdit={false} onSaved={onSaved} />);
     expect(scroll).not.toHaveBeenCalled();

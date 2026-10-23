@@ -37,7 +37,7 @@ describe('running/XC calibrated policy', () => {
   it('allows exposed arms/lower legs and no thermal accessories in the reported mild dry run', () => {
     const result = targets('running', (56 - 32) * 5 / 9);
     expect(result.targetRange[0]).toBe(result.ireq.ireqMin);
-    expect(result.extremity).toEqual({ min: { hands: 0, head: 0 }, neutral: { hands: 0, head: 0 } });
+    expect(result.extremity).toEqual({ min: { hands: 0, head: 0 }, neutral: { hands: 0, head: 0 }, max: { hands: 0, head: 0 } });
     expect(result.validationBuffer.coldRisk).toBe(0);
     // A generic shirt/shorts ensemble uses region averages, with no thermal accessories.
     const evaluation = evaluatePhase({
