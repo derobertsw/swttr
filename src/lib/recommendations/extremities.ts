@@ -147,13 +147,14 @@ export function selectPhaseAccessories(
     }));
   const byItems = (a: typeof combinations[number], b: typeof combinations[number]) => a.count - b.count || a.clo - b.clo
     || (a.head?.id ?? '').localeCompare(b.head?.id ?? '') || (a.neck?.id ?? '').localeCompare(b.neck?.id ?? '');
-  const headInRange = combinations.filter(option => localThermalStatus(option.clo, min.head, maximum.head) === 'in_range');
-  // In deep cold, a head left short by the hood alone gets a hat.
-  const headOptions = deepCold(knownHeads, tempC) && localThermalStatus(hoodClo, min.head, maximum.head) === 'under'
-    ? combinations.filter(option => option.head)
-    : combinations;
+  // In deep cold, a head left short by the hood alone gets a hat: a neck
+  // piece over the hood can't stand in for one, even within the band.
+  const hatRequired = deepCold(knownHeads, tempC) && localThermalStatus(hoodClo, min.head, maximum.head) === 'under';
+  const withHat = combinations.filter(option => option.head);
+  const headOptions = hatRequired && withHat.length > 0 ? withHat : combinations;
+  const headInRange = headOptions.filter(option => localThermalStatus(option.clo, min.head, maximum.head) === 'in_range');
   const headChoice = headInRange.length > 0 ? [...headInRange].sort(byItems)[0]
-    : [...(headOptions.length > 0 ? headOptions : combinations)].sort((a, b) =>
+    : [...headOptions].sort((a, b) =>
       outsideRange(a.clo, min.head, maximum.head) - outsideRange(b.clo, min.head, maximum.head) || byItems(a, b))[0];
   const headwear: HeadwearRecommendations = {
     helmet: null, headWarmth: headChoice?.head ?? null, neckWarmth: headChoice?.neck ?? null,

@@ -235,6 +235,17 @@ describe('optional sustained-activity accessories', () => {
       expect(result.assessments?.head.thermal_status).toBe('in_range');
     });
 
+    it('does not let a neck gaiter over a short hood stand in for the hat, even within the band', () => {
+      // −20°C, 10 mph: a 0.4 clo hood alone is short of the ~0.84 minimum,
+      // and hood + 0.55 clo gaiter would land in range without a hat.
+      const t = targets('running', -20, 4.47);
+      const gaiter = hat('gaiter', 0.55, { headwear_type: 'buff_heavy', min_temp_active: -10 });
+      const result = selectPhaseAccessories('running', t, { handwear: [], headwear: [...rated.headwear, gaiter] }, -20,
+        [{ hood_type: 'attached' } as GarmentRow]);
+      expect(result.headwear.headWarmth?.id).toBe('balaclava');
+      expect(result.assessments?.head).toMatchObject({ state: 'selected', thermal_status: 'in_range' });
+    });
+
     it('prefers XC gloves that grip poles to a closer-fitting overmitt', () => {
       const t = targets('xc_skiing', -15, 8.94, 'hard');
       const result = selectPhaseAccessories('xc_skiing', t, {
