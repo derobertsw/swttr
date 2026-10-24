@@ -194,10 +194,10 @@ export default function DayDetailPage({
             )}
           </header>
 
-          <DayLodging data={data} date={date} meet={activity === TOUR_ACTIVITY ? tourPlan?.meet_label : null} meetingPoint={meetingPoint} />
+          <DayLodging data={data} date={date} meet={activity === TOUR_ACTIVITY ? tourPlan?.meet_label : null} meetingPoint={meetingPoint} memberId={me?.id} />
 
           <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()}>
-            <DayDrive data={data} date={date} dateLabel={dateLabel} drive={drive} canEdit={data.trip.owner_user_id === userId} onSaved={refresh} />
+            <DayDrive data={data} date={date} dateLabel={dateLabel} drive={drive} canEdit={data.trip.owner_user_id === userId} onSaved={refresh} memberId={me?.id} />
             {activity === TOUR_ACTIVITY && tourPlan?.approach_notes && <div className="mt-3 border-t border-border pt-3">
               <h3 className="text-sm font-medium text-muted-foreground">Approach (ski or walk)</h3>
               <p className="mt-1 whitespace-pre-wrap break-words text-base text-foreground">{tourPlan.approach_notes}</p>

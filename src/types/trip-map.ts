@@ -1,4 +1,4 @@
-import type { TripDriveDay, TripLocation } from "@/types/trips";
+import type { TripDriveRoute, TripLocation } from "@/types/trips";
 
 export type TripMapRole = "stay" | "destination" | "access" | "origin" | "pickup";
 export type TripMapSource = { type: "stay" | "stop" | "day"; id: string; slot: "location" | "destination" | "access_point" | "origin" };
@@ -50,7 +50,40 @@ export interface TripMapDay {
   pickup: { place_id: null; state: "notes_only" | "not_set"; notes: string | null };
   /** approach_notes is the organizer's ski/walk approach as entered: never a calculated route or time. */
   tour: { objective: string; route_url: string | null; meet_label: string | null; time_zone_label: string | null; access_notes: string | null; approach_notes: string | null } | null;
-  drive: TripDriveDay & { source: "geoapify" | "manual" | null };
+  drive: TripMapDrive;
+  geometry: TripMapGeometry;
+  /**
+   * Who starts where that morning (#333), the crew's first: its drive and
+   * geometry are the day's own. Another departure's road line is requested
+   * with its own geometry revision, only when someone shows that drive.
+   */
+  departures: TripMapDeparture[];
+  /** Each person's morning and night (#333), so a view can lead with the signed-in person's own. */
+  people: TripMapPerson[];
+}
+
+export interface TripMapPerson {
+  member_id: string;
+  /** Their departure's key, while they're taking part. */
+  departure_key: string | null;
+  /** Their stay's name, "Not set", "Arrives this day", "Not taking part" or "Not on trip". */
+  starting_from: string;
+  tonight_place_id: string | null;
+  staying_tonight: string;
+}
+
+export type TripMapDrive = TripDriveRoute & { source: "geoapify" | "manual" | null };
+
+/** People taking part in a day who start from the same place, and their drive. */
+export interface TripMapDeparture {
+  key: string;
+  /** The stay's or place's name, "Not set" or "Arrives this day". */
+  label: string;
+  /** In crew order; a pending invitation is listed once it has a stay for the night. */
+  people: Array<{ member_id: string; name: string; pending: boolean }>;
+  crew: boolean;
+  origin_place_id: string | null;
+  drive: TripMapDrive;
   geometry: TripMapGeometry;
 }
 

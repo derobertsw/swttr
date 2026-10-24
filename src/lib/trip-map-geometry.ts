@@ -3,7 +3,7 @@ import { driveGeometry } from "@/lib/locations/geometry";
 import { allowRequest } from "@/lib/rate-limit";
 import type { DrivePlan } from "@/lib/trip-drive";
 import { GEOAPIFY_CREDIT, OSM_CREDIT } from "@/lib/trip-location";
-import type { TripMapDay, TripMapRoadGeometry as TripMapGeometry } from "@/types/trip-map";
+import type { TripMapDay, TripMapDeparture, TripMapRoadGeometry as TripMapGeometry } from "@/types/trip-map";
 
 const CACHE_MS = 5 * 60_000;
 const MAX_ENTRIES = 128;
@@ -11,13 +11,17 @@ const MAX_IN_FLIGHT = 8;
 const cached = new Map<string, { expires: number; result: TripMapGeometry }>();
 const pending = new Map<string, Promise<TripMapGeometry>>();
 
-/** Auth is always checked by the route, including before serving a cache hit. */
-export async function tripMapGeometry(tripId: string, day: TripMapDay, plan: DrivePlan | undefined): Promise<TripMapGeometry> {
-  const base = { trip_id: tripId, day_id: day.id, date: day.date, revision: day.geometry.revision ?? day.revision, mode: "drive" as const,
-    origin_place_id: day.origin_place_id, access_place_id: day.access_place_id };
+/**
+ * The road line for the day's drive, or for one of its other departures
+ * (#333). Auth is always checked by the route, including before serving a cache hit.
+ */
+export async function tripMapGeometry(tripId: string, day: TripMapDay, plan: DrivePlan | undefined, departure?: TripMapDeparture): Promise<TripMapGeometry> {
+  const route = departure ?? day;
+  const base = { trip_id: tripId, day_id: day.id, date: day.date, revision: route.geometry.revision ?? day.revision, mode: "drive" as const,
+    origin_place_id: route.origin_place_id, access_place_id: day.access_place_id };
   // A fresh explicit no-route matrix answer needs no additional provider request.
-  if (day.drive.state === "no_route") return { ...base, state: "no_route", geometry: null };
-  if (!plan || plan.state !== "ready" || day.geometry.state === "not_applicable") return { ...base, state: "not_applicable", geometry: null };
+  if (route.drive.state === "no_route") return { ...base, state: "no_route", geometry: null };
+  if (!plan || plan.state !== "ready" || route.geometry.state === "not_applicable") return { ...base, state: "not_applicable", geometry: null };
   const key = JSON.stringify([tripId, day.id, base.revision]);
   const now = Date.now();
   for (const [id, entry] of cached) if (entry.expires <= now) cached.delete(id);

@@ -1,4 +1,5 @@
-import { buildLodging } from "@/lib/trip-lodging";
+import { buildLodging, type LodgingRows } from "@/lib/trip-lodging";
+import { FRI, LODGE, MON, PINE, SAT, SPLIT_MEMBERS, SPLIT_TRIP, splitRows, SUN, VILLAGE } from "@/test/splitStays";
 import type { Trip, TripDay, TripFull, TripLocation, TripLodgingNight, TripStay, TripStop } from "@/types/trips";
 
 /**
@@ -53,3 +54,29 @@ export function driveTrip({ stays, days, stops }: { stays?: TripStay[]; days?: T
 }
 
 export { stay as driveStay, day as driveDayRow };
+
+export const PINE_PLACE = place("Pine rental", 44.4712, -72.7011);
+export const VILLAGE_PLACE = place("Village hotel", 44.4654, -72.6874);
+export const LODGE_PLACE = place("Mountain lodge", 44.5211, -72.7802);
+
+/**
+ * The downhill reference journey (#329, src/test/splitStays.ts) with places,
+ * for departures (#333): every day at Stowe, meeting at Spruce Peak lot.
+ * - Fri: nobody has a stay the night before.
+ * - Sat: Alex, Blair and Dana leave the Pine rental; Eli and Fran (a pending
+ *   invitation with nights planned) the Village hotel. Casey arrives that
+ *   evening and isn't taking part.
+ * - Sun: Casey joins the rental group, on checkout morning.
+ * - Mon: all six leave the Mountain lodge.
+ */
+export function splitDriveTrip({ rows = splitRows(), days }: { rows?: LodgingRows; days?: TripDay[] } = {}): TripFull {
+  const located: Record<string, TripLocation> = { [PINE.id]: PINE_PLACE, [VILLAGE.id]: VILLAGE_PLACE, [LODGE.id]: LODGE_PLACE };
+  const stays = rows.stays.map((saved) => ({ ...saved, location: saved.location ?? located[saved.id] ?? null }));
+  const trip = SPLIT_TRIP;
+  const stowe: TripStop = { ...stop("stop-stowe", 0, "Stowe, Vermont", SPRUCE_LOT), trip_id: trip.id, activities: ["Downhill"] };
+  return {
+    trip, stops: [stowe], members: [], kits: [], gear: [],
+    days: days ?? [FRI, SAT, SUN, MON].map((date) => ({ ...day(date, stowe.id), trip_id: trip.id, activity: "Downhill" })),
+    lodging: buildLodging(trip, stays, rows.assignments, { members: SPLIT_MEMBERS, attendance: rows.attendance, per_member: true }),
+  };
+}

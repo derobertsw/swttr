@@ -57,3 +57,36 @@ describe("Stored drive estimates in Postgres (028)", () => {
     expect((await db.query("SELECT relrowsecurity FROM pg_class WHERE relname = 'trip_drive_estimates'")).rows).toEqual([{ relrowsecurity: true }]);
   });
 });
+
+describe("Estimates per day and pair (20261023000200, #333)", () => {
+  let pg: PGlite;
+  const row = (date: string, routeKey: string, origin: string, seconds: number) =>
+    pg.query(`INSERT INTO trip_drive_estimates (trip_id, date, route_key, origin_label, destination_label, status, duration_seconds, distance_meters, provider)
+      VALUES ($1, $2, $3, $4, 'Spruce Peak lot', 'ok', $5, 9000, 'geoapify')
+      ON CONFLICT (trip_id, date, route_key) DO UPDATE SET duration_seconds = EXCLUDED.duration_seconds`, [tripId, date, routeKey, origin, seconds]);
+  beforeAll(async () => {
+    pg = await PGlite.create();
+    await pg.exec("CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS; CREATE FUNCTION public.update_updated_at_column() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END $$;");
+    for (const migration of ["012_trips", "028_trip_drive_estimates"]) {
+      await pg.exec(await readFile(`supabase/migrations/${migration}.sql`, "utf8"));
+    }
+    await pg.query("INSERT INTO trips (id, owner_user_id, name, start_date, end_date) VALUES ($1, 'user-1', 'Vermont', '2027-01-08', '2027-01-11')", [tripId]);
+    // A day's estimate saved before the migration is kept.
+    await pg.query(`INSERT INTO trip_drive_estimates (trip_id, date, route_key, origin_label, destination_label, status, duration_seconds, distance_meters, provider)
+      VALUES ($1, '2027-01-09', 'drive|approximated|pine>lot|none', 'Pine rental', 'Spruce Peak lot', 'ok', 720, 9000, 'geoapify')`, [tripId]);
+    await pg.exec(await readFile("supabase/migrations/20261023000200_trip_drive_departures.sql", "utf8"));
+  }, 20_000);
+  afterAll(async () => { await pg.close(); });
+
+  it("keeps each departure's estimate on the same day, and replaces one pair in place", async () => {
+    await row("2027-01-09", "drive|approximated|village>lot|none", "Village hotel", 1080);
+    await row("2027-01-09", "drive|approximated|pine>lot|none", "Pine rental", 780);
+    const { rows } = await pg.query("SELECT origin_label, duration_seconds FROM trip_drive_estimates ORDER BY origin_label");
+    expect(rows).toEqual([{ origin_label: "Pine rental", duration_seconds: 780 }, { origin_label: "Village hotel", duration_seconds: 1080 }]);
+  });
+  it("refuses the old one-per-day key with the error the API falls back on", async () => {
+    await expect(pg.query(`INSERT INTO trip_drive_estimates (trip_id, date, route_key, origin_label, destination_label, status, duration_seconds, distance_meters, provider)
+      VALUES ($1, '2027-01-10', 'k', 'Pine rental', 'Spruce Peak lot', 'ok', 60, 100, 'geoapify') ON CONFLICT (trip_id, date) DO NOTHING`, [tripId]))
+      .rejects.toMatchObject({ code: "42P10" });
+  });
+});

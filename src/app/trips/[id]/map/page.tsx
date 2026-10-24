@@ -23,7 +23,8 @@ export default function TripMapPage({ params }: { params: Promise<{ id: string }
       {trip.error && <TripError>{trip.error}</TripError>}
       {map.error && <div className="space-y-2"><TripError>{map.error.message}</TripError>{map.data && <p className="text-base text-muted-foreground">Showing previously loaded places. Changes may be missing until you reconnect and retry.</p>}<Button variant="outline" onClick={() => void map.refresh()}>Retry places</Button></div>}
       {(!trip.data || !map.data) && !trip.error && !map.error && <p role="status">Loading trip places…</p>}
-      {trip.data && map.data && <Suspense fallback={<p>Loading map view…</p>}><TripMapView key={map.data.trip.id} data={map.data} canEdit={trip.data.trip.owner_user_id === userId} /></Suspense>}
+      {trip.data && map.data && <Suspense fallback={<p>Loading map view…</p>}><TripMapView key={map.data.trip.id} data={map.data} canEdit={trip.data.trip.owner_user_id === userId}
+        memberId={trip.data.members.find((member) => member.user_id !== null && member.user_id === userId && member.status !== "left")?.id ?? null} /></Suspense>}
     </div>
   );
 }

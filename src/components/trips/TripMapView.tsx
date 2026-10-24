@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useTripMapGeometry } from "@/hooks/useTripMapGeometry";
-import { dayRoles, placeDates, type MapDisplayRole } from "./trip-map-presentation";
+import { dayRoles, followDeparture, placeDates, type MapDisplayRole } from "./trip-map-presentation";
 import type { TripMap, TripMapDay } from "@/types/trip-map";
 import { TripMapAttribution, TripMapPlaceDetail, TripMapPlaceList, PlaceLabel } from "./TripMapPlaces";
 import { TripMapDaySummary } from "./TripMapDay";
@@ -37,13 +37,18 @@ function subscribeDesktop(change: () => void) {
 }
 
 /** The shared map/list presentation can also be entered with ?date=YYYY-MM-DD. */
-export function TripMapView({ data, canEdit }: { data: TripMap; canEdit: boolean }) {
+export function TripMapView({ data, canEdit, memberId = null }: { data: TripMap; canEdit: boolean; memberId?: string | null }) {
   const params = useSearchParams();
   const date = params.get("date") ?? "";
   const selectedId = params.get("place");
   const view = params.get("view") === "list" ? "list" : "map";
   const validDate = !date || data.dates.some((day) => day.date === date);
-  const day = (validDate && date && data.days.find((entry) => entry.date === date)) || null;
+  const crewDay = (validDate && date && data.days.find((entry) => entry.date === date)) || null;
+  // The departure the map follows (#333): one chosen in the day summary, or the signed-in person's own.
+  const [chosen, setChosen] = useState<{ date: string; key: string } | null>(null);
+  // A departure that's gone since, after its people moved, goes back to your own.
+  const chosenKey = chosen?.date === date && crewDay?.departures?.some((departure) => departure.key === chosen.key) ? chosen.key : null;
+  const day = useMemo(() => crewDay && followDeparture(crewDay, memberId, chosenKey), [crewDay, memberId, chosenKey]);
   const places = useMemo(() => {
     const scoped = validDate ? data.places.filter((place) => !date || placeDates(place).includes(date)) : [];
     return day ? [...scoped].sort((a, b) => dayRank(dayRoles(a, day)) - dayRank(dayRoles(b, day))) : scoped;
@@ -179,7 +184,9 @@ export function TripMapView({ data, canEdit }: { data: TripMap; canEdit: boolean
     <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
       <div ref={list} onScroll={saveScroll} className="order-3 min-w-0 space-y-4 lg:order-1 lg:max-h-[48rem] lg:overflow-y-auto lg:p-1">
         {/* After the bounded map on phones, like a selected place; first beside it on desktop. */}
-        {day && <TripMapDaySummary tripId={data.trip.id} day={day} places={places} canEdit={canEdit} />}
+        {day && crewDay && <TripMapDaySummary tripId={data.trip.id} day={day} places={places} canEdit={canEdit} memberId={memberId}
+          following={chosenKey ?? day.people?.find((person) => person.member_id === memberId)?.departure_key ?? crewDay.departures?.find((departure) => departure.crew)?.key ?? null}
+          onFollow={(key) => { setChosen({ date: crewDay.date, key }); setDriveDate(null); }} />}
         {selected ? <TripMapPlaceDetail tripId={data.trip.id} place={selected} date={date} day={day} canEdit={canEdit} /> : <p className="text-base text-muted-foreground">Select a place to read its details.</p>}
         {!!groupPlaces.length && <section className="rounded-card border border-border p-3" aria-label="Places in selected group">
           <h2 id="map-group-heading" tabIndex={-1} className="font-semibold focus-visible:outline-2 focus-visible:outline-ring">{groupPlaces.length} places in this group</h2>

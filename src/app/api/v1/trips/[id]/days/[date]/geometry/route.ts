@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { allowRequest } from "@/lib/rate-limit";
 import { requireTripAccess } from "@/lib/trips";
-import { drivePlans } from "@/lib/trip-drive";
+import { departurePlans, drivePlans } from "@/lib/trip-drive";
 import { loadTripMapContext } from "@/lib/trip-map";
 import { tripMapGeometry } from "@/lib/trip-map-geometry";
 import { mapJson, privateMapResponse } from "@/lib/trip-map-response";
+import type { TripMapDay } from "@/types/trip-map";
 
 type Context = { params: Promise<{ id: string; date: string }> };
 const changed = () => mapJson({ error: "The day's places changed. Refresh the trip map.", code: "revision_changed" }, 409);
+/** Another departure than the crew's, named by its route revision. */
+const departureFor = (day: TripMapDay, revision: string) => day.departures.find((entry) => !entry.crew && entry.geometry.revision === revision);
 
 /** Fetch one authorized day's route line, rejecting changed access or route context. */
 export async function GET(request: Request, context: Context) {
@@ -21,8 +24,12 @@ export async function GET(request: Request, context: Context) {
     const context = await loadTripMapContext(auth.supabase, auth.trip, date);
     const day = context?.map.days.find((d) => d.date === date);
     if (!context || !day) return mapJson({ error: "Day not found" }, 404);
-    if ((day.geometry.revision ?? day.revision) !== expected) return changed();
-    const result = await tripMapGeometry(id, day, drivePlans(context.full).find((p) => p.date === date));
+    // The day's drive, or another departure's by its own revision (#333).
+    const departure = departureFor(day, expected);
+    if (!departure && (day.geometry.revision ?? day.revision) !== expected) return changed();
+    const plan = departure ? departurePlans(context.full).flat().find((p) => p.date === date && p.key === departure.key)
+      : drivePlans(context.full).find((p) => p.date === date);
+    const result = await tripMapGeometry(id, day, plan, departure);
     // Rechecking access and reloading context deliberately repeats estimate-store
     // reads: membership or endpoints may change while the provider/cache resolves.
     const currentAuth = await requireTripAccess(id);
@@ -30,7 +37,7 @@ export async function GET(request: Request, context: Context) {
     const current = await loadTripMapContext(currentAuth.supabase, currentAuth.trip, date);
     const currentDay = current?.map.days.find((d) => d.id === day.id && d.date === date);
     if (!currentDay) return mapJson({ error: "Day not found" }, 404);
-    if ((currentDay.geometry.revision ?? currentDay.revision) !== expected) return changed();
+    if (departure ? departureFor(currentDay, expected)?.key !== departure.key : (currentDay.geometry.revision ?? currentDay.revision) !== expected) return changed();
     return mapJson(result);
   } catch { return mapJson({ error: "Couldn't load the route line. Try again." }, 500); }
 }
