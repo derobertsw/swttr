@@ -13,8 +13,10 @@ import { EXERTION_LEVELS, type ExertionLevel } from "@/lib/biophysics/exertion";
 import { STORAGE_KEYS } from "@/lib/storage";
 import type { Outing, OutingTime } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
+import type { XCContext } from '@/types/xc';
+import { isXCContext } from '@/types/xc';
 
-export interface GearUpDraft {
+export interface GearUpDraft extends XCContext {
   activity: string;
   exertion: ExertionLevel;
   /** The picked place, or null when none is. */
@@ -67,6 +69,7 @@ function isOutingTime(value: unknown): value is OutingTime {
 function isOuting(value: unknown): value is Outing {
   return (
     isObject(value) &&
+    isXCContext(value) &&
     isActivity(value.activity) &&
     isExertion(value.exertion) &&
     isPlace(value.place) &&
@@ -77,6 +80,7 @@ function isOuting(value: unknown): value is Outing {
 function isDraft(value: unknown): value is GearUpDraft {
   return (
     isObject(value) &&
+    isXCContext(value) &&
     isActivity(value.activity) &&
     isExertion(value.exertion) &&
     (value.place === null || isPlace(value.place)) &&
@@ -146,6 +150,8 @@ export function keepOutingForGearUp(owner: string, outing: Outing): void {
   saveGearUpDraft(owner, {
     activity: outing.activity,
     exertion: outing.exertion,
+    outingPattern: outing.outingPattern,
+    xcExposure: outing.xcExposure,
     place: outing.place,
     inputMode: outing.when.mode,
     date: later?.date ?? kept?.date ?? null,

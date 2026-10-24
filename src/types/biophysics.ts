@@ -5,6 +5,7 @@
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
 import type { EnsembleScore, GarmentSemantics, ThermalProvenance } from "@/types/garments";
 import type { SustainedSportPolicy } from '@/lib/biophysics/sport-policy';
+import type { OutingPattern, XCExposure } from '@/types/xc';
 
 export interface IreqData {
   min: number;
@@ -202,6 +203,8 @@ export interface BiophysicsRecommendation {
     precipitation?: boolean;
     /** XC skiing only: exertion expressed as XC intensity. */
     intensity?: "easy" | "moderate" | "racing";
+    outing_pattern?: OutingPattern;
+    xc_exposure?: XCExposure;
   };
   ireq: IreqRange;
   recommendation: {
@@ -225,6 +228,8 @@ export interface BiophysicsRecommendation {
     extremity_ireq: ExtremityIreqRange;
   };
   pack_items?: PackItems;
+  /** Generic carry advice, excluded from moving insulation and ownership. */
+  carry_items?: Array<{ label: string; reason: string }>;
   transition_protocol?: TransitionProtocol;
 }
 

@@ -7,6 +7,18 @@ import ActivitySelection from "./ActivitySelection";
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
 
 describe("ActivitySelection", () => {
+  it('offers independent stop and exposure controls for XC without changing effort', async () => {
+    const user = userEvent.setup();
+    const onXCContextChange = vi.fn();
+    const onExertionChange = vi.fn();
+    render(<ActivitySelection value="xc_skiing" onChange={vi.fn()} exertion="hard" onExertionChange={onExertionChange}
+      xcContext={{ outingPattern: 'continuous' }} onXCContextChange={onXCContextChange} />);
+    await user.click(screen.getByRole('radio', { name: 'Frequent stops' }));
+    expect(onXCContextChange).toHaveBeenLastCalledWith({ outingPattern: 'frequent_stops' });
+    await user.click(screen.getByRole('radio', { name: 'Long descents' }));
+    expect(onXCContextChange).toHaveBeenLastCalledWith({ outingPattern: 'continuous', xcExposure: 'descents' });
+    expect(onExertionChange).not.toHaveBeenCalled();
+  });
   const ControlledSelection = ({
     value = "running",
     exertion = "moderate",

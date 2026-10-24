@@ -15,6 +15,7 @@ import type { UserBodyMetrics } from "@/types/preferences";
 import type { WeatherData } from "@/types/weather";
 import { useAuth } from "@clerk/nextjs";
 import { logWarn } from "@/lib/logger";
+import type { XCContext } from '@/types/xc';
 
 type BiophysicsWeather = WeatherData & { humidity?: number };
 
@@ -27,7 +28,8 @@ interface UseBiophysicsResult {
     weather: BiophysicsWeather,
     exertion: ExertionLevel,
     bodyMetrics: UserBodyMetrics,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    xcContext?: XCContext,
   ) => Promise<BiophysicsOutcome>;
   reset: () => void;
 }
@@ -53,7 +55,8 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
       weather: BiophysicsWeather,
       exertion: ExertionLevel,
       bodyMetrics: UserBodyMetrics,
-      signal?: AbortSignal
+    signal?: AbortSignal,
+    xcContext?: XCContext,
     ): Promise<BiophysicsOutcome> => {
       signal?.throwIfAborted();
       if (!isBiophysicsSupported(activity)) {
@@ -81,6 +84,10 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
               precipitation_type: weather.precipitationType,
             },
             exertion,
+            ...(activity === 'xc_skiing' ? {
+              outing_pattern: xcContext?.outingPattern ?? 'unknown',
+              xc_exposure: xcContext?.xcExposure ?? 'unknown',
+            } : {}),
             // Backward-compatible alias for routes that still inspect "intensity".
             intensity: exertionToXcIntensity(exertion),
             use_wardrobe_only: Boolean(userId),

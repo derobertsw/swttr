@@ -4,6 +4,7 @@
  * they're shown. See docs/trip-saved-kits.md.
  */
 import { EXERTION_LEVELS, type ExertionLevel } from "@/lib/biophysics/exertion";
+import { isXCContext } from '@/types/xc';
 import { addDaysToDateString } from "@/lib/forecastRange";
 import { diffRecommendations } from "@/lib/planAhead";
 import { formatZonedTime, isLocalDateTime, isTimeZone } from "@/lib/timeZones";
@@ -89,8 +90,12 @@ function readOuting(value: unknown): Outing | null {
     || !EXERTION_LEVELS.includes(value.exertion as ExertionLevel)) return null;
   const place = readPlace(value.place);
   const when = readWhen(value.when);
-  if (!place || !when) return null;
-  return { activity: value.activity, exertion: value.exertion as ExertionLevel, place, when };
+  const xc = { outingPattern: value.outingPattern, xcExposure: value.xcExposure };
+  if (!place || !when || !isXCContext(xc)) return null;
+  return { activity: value.activity, exertion: value.exertion as ExertionLevel, place, when,
+    ...(xc.outingPattern !== undefined ? { outingPattern: xc.outingPattern } : {}),
+    ...(xc.xcExposure !== undefined ? { xcExposure: xc.xcExposure } : {}),
+  };
 }
 
 function readContext(value: unknown): WeatherContext | undefined | null {
