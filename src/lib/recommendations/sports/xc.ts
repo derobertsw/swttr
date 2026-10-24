@@ -1,93 +1,98 @@
-/**
- * XC skiing: breathability over warmth, with separate clo targets for torso
- * and legs so one region cannot borrow insulation from the other.
- */
+/** XC moving outfits: independent regional fit and condition-based protection. */
+import { OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
+import { needsXCWindProtection, xcPhaseContext } from '@/lib/biophysics/xc-policy';
 import { exertionToXcIntensity } from '@/lib/biophysics/exertion';
-import { SIGNIFICANT_WIND_MS } from '@/lib/biophysics/scorer';
 import type { PhaseTargets } from '../thermal-targets';
-import type { RecommendationRequest } from '../request';
 import type { CategorizedGarments, GarmentRow } from '../types';
+import { hasUsableThermalData } from '../garment-semantics';
 import { createSinglePhaseSport } from './single-phase';
 import { buildRegionalEnsemble } from './regional-ensemble';
-import { OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
+import { xcBasic, xcProtection, xcRegionFit, xcRegionMatches } from './xc-outfit';
 
 const MIN_EVAP_POTENTIAL = 0.25;
-/** Shells breathe less than base and mid layers, so they have a lower bar. */
-const MIN_SHELL_EVAP_POTENTIAL = 0.2;
-
-// XC skiers wear light insulation under a wind shell or soft shell, so a
-// puffy fits under any shell, but not under insulated outerwear.
 const puffyFitsUnder = (outer: GarmentRow) => outer.category !== 'outer_insulated';
 
-/**
- * XC skiers make their own wind, so the torso and legs need a wind layer
- * once it is freezing, windy, or wet. In mild, calm, dry weather a shell is
- * optional.
- */
-export function needsWindLayer(
-  { tempC, windMs, precipitation }: Pick<RecommendationRequest, 'tempC' | 'windMs' | 'precipitation'>
-): boolean {
-  return precipitation || tempC <= 0 || windMs > SIGNIFICANT_WIND_MS;
-}
-
-/**
- * Pick a base, an optional mid and an outer layer for the torso, then the
- * legs. When `windLayer` is true every region gets an outer layer, and
- * insulated pants or jackets count as that layer, so no shell goes over them.
- * Never leave a region in underwear alone. Then keep each region within its
- * min–neutral band. Among equally close outfits, prefer layers that meet the
- * breathability bar, then fewer layers, then the most breathable ones.
- */
+/** Keep the shared regional enumeration, identity and slot compatibility.
+ * XC assesses actual clothing/protection rather than mandatory base/outer
+ * masks. Alpine's rank and search semantics remain unchanged. */
 export function buildXCEnsemble(
   categorized: CategorizedGarments,
   targets: PhaseTargets['regional'],
   minEvapPotential: number,
-  windLayer: boolean
+  needs: { wind: boolean; wet: boolean },
 ): GarmentRow[] {
-  const breathableFrom = { base: minEvapPotential, mid: minEvapPotential, outer: MIN_SHELL_EVAP_POTENTIAL };
-
-  return buildRegionalEnsemble(categorized, targets, {
+  const known: CategorizedGarments = {
+    baseLayers: categorized.baseLayers.filter(hasUsableThermalData),
+    midLayers: categorized.midLayers.filter(hasUsableThermalData),
+    insulation: categorized.insulation.filter(hasUsableThermalData),
+    shells: categorized.shells.filter(hasUsableThermalData),
+  };
+  return buildRegionalEnsemble(known, targets, {
     puffyFitsUnder,
-    breathableFrom,
-    rank: (candidate) => {
-      const missingCoverage = candidate.missingBase + (windLayer ? candidate.missingOuter : 0);
-      const { missingWearable, excess, deficit, surplus, unbreathable, breathability, count } = candidate;
-      return [missingCoverage, missingWearable, deficit + excess, unbreathable, count, -breathability, surplus];
+    rank: () => [], // XC uses the explicit outfit assessment below.
+    assess: (outfit, region) => {
+      const regional = outfit.filter(g => g[`covers_${region}`]);
+      const basic = xcBasic(outfit, region);
+      if (regional.length && !basic) return null;
+      const { deficit, excess, severeExcess } = xcRegionFit(outfit, targets, region);
+      return [
+        Number(!xcProtection(outfit, region, needs)),
+        needs.wet ? Number(!regional.some(g => g.garment_protection?.waterproof_rating === 'waterproof'
+          && xcProtection([g], region, { wind: false, wet: true }))) : 0,
+        severeExcess, Number(!basic), deficit + excess, excess,
+        regional.filter(g => (g.garment_thermal_properties?.evap_potential ?? 0) <
+          (['soft_shell', 'hard_shell', 'windbreaker'].includes(g.category) ? 0.2 : minEvapPotential)).length,
+        regional.length,
+        -regional.reduce((sum, g) => sum + (g.garment_thermal_properties?.evap_potential ?? 0), 0),
+      ];
     },
   });
 }
 
-function getXCGuidance(tempC: number, ireq: { ireqMin: number; ireqNeutral: number }): string[] {
-  const guidance: string[] = [];
-
-  if (tempC > 0) {
-    guidance.push('Warm conditions - prioritize breathability over insulation');
-    guidance.push('A single breathable base layer may be sufficient');
-  } else if (tempC > -10) {
-    guidance.push('Moderate cold - balance warmth and breathability');
-    guidance.push('Consider a light base + breathable mid layer');
-  } else {
-    guidance.push('Cold conditions - ensure adequate insulation while maintaining breathability');
-    guidance.push('Use a mid-weight base with a breathable softshell');
-  }
-
-  guidance.push(`Target insulation: ${ireq.ireqMin.toFixed(1)}-${ireq.ireqNeutral.toFixed(1)} clo`);
-  guidance.push('Look for garments with evaporative potential >= 0.25');
-
-  return guidance;
-}
-
 export const xc = createSinglePhaseSport({
   requirementFirst: true,
-  windTorsoRequirement: (request) => needsWindLayer(request),
-  // XC wind layers are mostly soft shells.
-  outerAirPermeability: (request) => needsWindLayer(request) ? OUTER_AIR_PERMEABILITY.windResistant : OUTER_AIR_PERMEABILITY.open,
+  completeOutfit: true,
+  outerAirPermeability: request => {
+    const context = xcPhaseContext({ ...request, precipitationType: request.weather.precipitation_type });
+    return context.precipitation === 'wet' ? OUTER_AIR_PERMEABILITY.membrane
+      : needsXCWindProtection(request.tempC, context.effectiveWindMs) ? OUTER_AIR_PERMEABILITY.windResistant : OUTER_AIR_PERMEABILITY.open;
+  },
   activity: 'xc_skiing',
   profile: { name: 'XC Skiing', windExposure: 'normal' },
   minEvapPotential: MIN_EVAP_POTENTIAL,
   catalog: { minScore: { field: 'xc_skiing_score', minScore: 6 } },
-  buildEnsemble: (categorized, targets, request) =>
-    buildXCEnsemble(categorized, targets.regional, MIN_EVAP_POTENTIAL, needsWindLayer(request)),
-  conditions: (request) => ({ intensity: exertionToXcIntensity(request.exertion) }),
-  guidance: (request, ireq) => getXCGuidance(request.tempC, ireq),
+  buildEnsemble: (categorized, targets) =>
+    buildXCEnsemble(categorized, targets.regional, MIN_EVAP_POTENTIAL, targets.policy!.protection),
+  protect: (ensemble, _categorized, targets) => ({ ensemble, warnings:
+    (['torso', 'legs'] as const).filter(region => !xcProtection(ensemble, region, targets.policy!.protection))
+      .map(region => `Available XC clothing lacks required ${targets.policy!.protection.wet ? 'wet-weather' : 'wind'} protection for ${region}.`),
+  }),
+  conditions: (request) => ({ intensity: exertionToXcIntensity(request.exertion),
+    outing_pattern: request.outingPattern ?? 'unknown', xc_exposure: request.xcExposure ?? 'unknown' }),
+  guidance: (_request, _ireq, ensemble, targets) => {
+    if (!targets) return ['Choose a breathable Nordic top and standalone tights or pants for the moving phase.'];
+    const context = targets.policy!.xc!;
+    const guidance = ensemble?.length
+      ? [`While skiing, wear: ${ensemble.map(g => `${g.brand} ${g.model_name}`).join(', ')}.`]
+      : ['No available clothing forms a suitable XC moving outfit; fill the clothing gaps below.'];
+    if (ensemble && xcRegionMatches(ensemble, targets, 'legs') && ensemble.filter(g => g.covers_legs).length === 1)
+      guidance.push('One standalone leg garment supplies the selected coverage and warmth; no extra base or shell pants are needed.');
+    guidance.push(targets.policy!.protection.wind
+      ? 'Wind protection is required by the current exposure; an existing wind-resistant garment can supply it without another shell.'
+      : 'No extra wind layer is required for this exposure; freezing alone does not require another garment.');
+    guidance.push(context.precipitation === 'wet' ? 'Rain, mixed precipitation or near-melting snow requires wet-weather protection.'
+      : context.precipitation === 'dry_snow' ? 'Cold snow is treated as dry snow; waterproof layers are not forced solely by snowfall.'
+        : 'Dry conditions do not require a waterproof layer.');
+    guidance.push(`Exposure uses ${context.effectiveWindMs.toFixed(1)} m/s effective wind (the greater of ambient wind and the exposure floor, never their sum).`);
+    guidance.push(context.outingPattern === 'frequent_stops'
+      ? 'Frequent stops: the worn outfit is sized for moving effort. Put on carried warmth at stops and after skiing.'
+      : context.outingPattern === 'unknown' ? 'Outing pattern is unknown; moving targets assume continuous skiing. Classic versus skate does not determine effort.'
+        : 'Continuous training: moving targets use your selected effort, independently of classic or skate technique.');
+    return guidance;
+  },
+  carry: (_request, targets) => targets.policy?.xc?.carryWarmth ? [{
+    label: 'Extra insulation for breaks and after skiing',
+    reason: targets.policy.xc.outingPattern === 'frequent_stops' ? 'Frequent stops reduce heat production; add this only while stopped.'
+      : 'Cold or wet conditions justify extra warmth once movement stops.',
+  }] : [],
 });

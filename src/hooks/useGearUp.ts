@@ -31,6 +31,7 @@ import { RESUME_PARAM, resumeView, TRIP_PARAM, type ResumeView } from "@/lib/out
 import type { LaterTime, LayersResult, Outing, OutingTime } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
+import type { XCContext } from '@/types/xc';
 
 type CurrentRequest = (() => boolean) & { signal: AbortSignal };
 
@@ -74,6 +75,7 @@ function removeResumeParam() {
  * /?resume=packing, which also opens the plan on its packing list.
  */
 export function useGearUp() {
+  const [xcContext, setXCContext] = useReducer((_previous: XCContext, next: XCContext) => next, {});
   const searchParams = useSearchParams();
   const {
     sensitivity,
@@ -120,7 +122,7 @@ export function useGearUp() {
   const layersFor = useCallback(
     (outing: Outing, weather: WeatherData, signal?: AbortSignal) =>
       buildLayersResult(outing, weather, sensitivity, (o, w) =>
-        biophysics.fetch(o.activity, w, o.exertion, bodyMetrics, signal)
+        biophysics.fetch(o.activity, w, o.exertion, bodyMetrics, signal, o.activity === "xc_skiing" ? o : undefined)
       ),
     [sensitivity, biophysics, bodyMetrics]
   );
@@ -177,6 +179,7 @@ export function useGearUp() {
   const applyOutingInputs = useCallback((outing: Outing) => {
     setActivity(outing.activity);
     setExertion(outing.exertion);
+    setXCContext({ outingPattern: outing.outingPattern, xcExposure: outing.xcExposure });
     cancelLocating();
     locationSearch.handleSelectLocation(outing.place);
     dispatch({ type: "APPLY_OUTING_TIME", when: outing.when });
@@ -310,9 +313,9 @@ export function useGearUp() {
     const when: OutingTime = later
       ? { mode: "later", date: format(state.date!, "yyyy-MM-dd"), time: state.time, durationDays: state.durationDays }
       : { mode: "now" };
-    const outing = { activity, exertion, place, when };
+    const outing = { activity, exertion, place, when, ...(activity === 'xc_skiing' ? xcContext : {}) };
     await showOuting(startRequest(outing), outing);
-  }, [activity, exertion, state, locationStatus, locationSearch, startRequest, showOuting, cancelAgentEdit]);
+  }, [activity, exertion, xcContext, state, locationStatus, locationSearch, startRequest, showOuting, cancelAgentEdit]);
 
   // The iOS shell (ios/App/App/SWTTRViewController.swift) dispatches "gearUp"
   // from its native Gear Up tab while this page is open, and otherwise opens
@@ -398,6 +401,7 @@ export function useGearUp() {
     displayedLayers.current = null;
     pendingResume.current = null;
     resetActivity();
+    setXCContext({});
     cancelLocating();
     dispatch({ type: "RESET" });
     locationSearch.reset();
@@ -463,6 +467,7 @@ export function useGearUp() {
     if (draft) {
       setActivity(draft.activity);
       setExertion(draft.exertion);
+      setXCContext({ outingPattern: draft.outingPattern, xcExposure: draft.xcExposure });
       if (draft.place) locationSearch.handleSelectLocation(draft.place);
     }
     const returning = resumeView(searchParams.get(RESUME_PARAM));
@@ -596,6 +601,7 @@ export function useGearUp() {
     saveGearUpDraft(owner, {
       activity,
       exertion,
+      ...xcContext,
       place: locationSearch.selectedLocation,
       inputMode: state.inputMode,
       date: state.date ? format(state.date, "yyyy-MM-dd") : null,
@@ -609,6 +615,7 @@ export function useGearUp() {
     state.owner,
     activity,
     exertion,
+    xcContext,
     locationSearch.selectedLocation,
     state.inputMode,
     state.date,
@@ -645,6 +652,8 @@ export function useGearUp() {
   }, [showPlanForm]);
 
   return {
+    xcContext,
+    setXCContext,
     activity,
     setActivity: (value: string) => { cancelAgentEdit(); setActivity(value); },
     activityInitializing: initializing,

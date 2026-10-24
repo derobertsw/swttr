@@ -141,12 +141,17 @@ function expectWearable(body: BiophysicsRecommendation, puffyOuters: string[]) {
   }
 }
 
-// XC needs a wind layer on the torso and legs unless it is mild, calm and dry.
-function expectWindLayers(body: BiophysicsRecommendation) {
-  const garments = body.recommendation?.garments ?? [];
+// XC protection comes from garment properties, regardless of category.
+function expectXCProtection(body: BiophysicsRecommendation) {
+  const needs = body.ireq.policy!.protection;
   for (const region of ["torso", "legs"] as const) {
-    const layers = garments.filter((g) => g[`covers_${region}`] && !(region === "torso" && isBib(g)));
-    expect(layers.some((g) => OUTER_CATEGORIES.includes(g.category))).toBe(true);
+    const garments = body.recommendation.garments.filter(g => g[`covers_${region}`] && (g[`coverage_${region}`] ?? 1) === 1);
+    const wind = !needs.wind || garments.some(g => ['wind_resistant', 'windproof'].includes(g.protection?.windproof_rating ?? ''));
+    const wet = !needs.wet || garments.some(g => ['water_resistant', 'waterproof'].includes(g.protection?.waterproof_rating ?? ''));
+    if (!wind || !wet) {
+      expect(body.warnings.some(w => w.includes('protection') && w.includes(region))).toBe(true);
+      expect(body.requirements?.find(r => r.region === region)?.status).toBe('missing');
+    }
   }
 }
 
@@ -157,11 +162,11 @@ describe.each(ROUTES)("POST /api/v1/recommendations/$sport (golden)", ({ POST, s
 
   for (const mode of MODES) {
     describe(mode.name, () => {
-      it.each(CONDITIONS)("$name", async ({ name, body }) => {
+      it.each(CONDITIONS)("$name", async ({ body }) => {
         useDatabase(mode.userId, mode.wardrobe);
         const result = await callRoute(POST, { ...body, ...mode.extraBody });
         if (sport in PUFFY_OUTERS) expectWearable(result.body, PUFFY_OUTERS[sport]);
-        if (sport === "xc" && name !== "mild, calm, dry, easy") expectWindLayers(result.body);
+        if (sport === "xc") expectXCProtection(result.body);
         // A score of 0 can't tell one outfit from another (#152).
         expect(result.body.recommendation?.thermal_comfort_score).toBeGreaterThan(0);
         expect(result).toMatchSnapshot();

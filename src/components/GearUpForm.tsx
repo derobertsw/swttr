@@ -17,6 +17,7 @@ import { SegmentedChoice } from "@/components/SegmentedChoice";
 import { ACTIVITIES } from "@/data/activities";
 import type { DeviceLocationStatus } from "@/hooks/useDeviceLocation";
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
+import type { XCContext } from '@/types/xc';
 import type { InputMode } from "@/lib/gearUp";
 import { toPickerDate, zonedNow } from "@/lib/timeZones";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,8 @@ interface GearUpFormProps {
   activityInitializing: boolean;
   exertion: ExertionLevel;
   onExertionChange: (exertion: ExertionLevel) => void;
+  xcContext?: XCContext;
+  onXCContextChange?: (context: XCContext) => void;
   location: string;
   locationQuery: string;
   suggestions: LocationSuggestion[];
@@ -111,6 +114,8 @@ export function GearUpForm({
   activityInitializing,
   exertion,
   onExertionChange,
+  xcContext,
+  onXCContextChange,
   location,
   locationQuery,
   suggestions,
@@ -191,6 +196,8 @@ export function GearUpForm({
           onChange={onActivityChange}
           exertion={exertion}
           onExertionChange={onExertionChange}
+          xcContext={xcContext}
+          onXCContextChange={onXCContextChange}
         />
       )}
 

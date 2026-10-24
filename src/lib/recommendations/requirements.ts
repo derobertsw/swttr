@@ -10,6 +10,7 @@ import type { GarmentRow, HandwearRow, HeadwearRow } from './types';
 import { garmentCapabilities, hasUsableThermalData } from './garment-semantics';
 import { HEAD_WARMTH_TYPES } from './extremities';
 import type { PhaseTargets } from './thermal-targets';
+import { xcBasic, xcRegionMatches, xcRequirementLabel } from './sports/xc-outfit';
 
 const CLO_MARGIN = 0.15;
 const EXTREMITY_NEEDED_CLO = 0.05;
@@ -104,6 +105,7 @@ interface RequirementPool {
   ownership: { garments: boolean; handwear: boolean; headwear: boolean };
   functional?: FunctionalNeeds;
   selectedIds?: ReadonlySet<string>;
+  selectedGarments?: GarmentRow[];
   accessories?: AccessoryAssessments;
 }
 
@@ -118,6 +120,22 @@ export function buildClothingRequirements(
 
   for (const region of ['torso', 'legs'] as const) {
     const neutral = targets.regional.neutral[region];
+    if (activity === 'xc_skiing' && (pool.selectedGarments || pool.garments.length === 0)) {
+      const selected = pool.selectedGarments ?? [];
+      const matches = xcRegionMatches;
+      const basic = xcBasic;
+      const label = xcRequirementLabel;
+      const matched = matches(selected, targets, region) ? basic(selected, region) : undefined;
+      const result = requirement(activity, region, label(targets, region), neutral, matched, pool.ownership.garments);
+      if (matched) {
+        const names = selected.filter(g => g[`covers_${region}`]).map(g => `${g.brand} ${g.model_name}`).join(' + ');
+        result.matched_garment_name = names;
+        result.message = `${result.label} — ${pool.ownership.garments ? 'matched in your wardrobe' : 'suggested (not in your wardrobe)'}: ${names}`;
+      }
+      requirements.push(result);
+      continue;
+    }
+
     let label = labels[region][neutral < 0.2 ? 'light' : 'standard'];
     if (activity === 'xc_skiing' && region === 'torso' && !pool.functional?.torsoWind) label = 'Breathable Nordic top';
     const candidates = pool.garments.filter((g) => isSuitableForRegion(g, region, targets.regional, pool.functional));

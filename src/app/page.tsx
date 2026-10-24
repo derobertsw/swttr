@@ -24,6 +24,8 @@ const HomeContent = () => {
     activityInitializing,
     exertion,
     setExertion,
+    xcContext,
+    setXCContext,
     result,
     inputMode,
     setInputMode,
@@ -90,6 +92,8 @@ const HomeContent = () => {
               activityInitializing={activityInitializing}
               exertion={exertion}
               onExertionChange={setExertion}
+              xcContext={xcContext}
+              onXCContextChange={setXCContext}
               location={locationSearch.location}
               locationQuery={locationSearch.locationQuery}
               suggestions={locationSearch.suggestions}

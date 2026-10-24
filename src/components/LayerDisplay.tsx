@@ -466,7 +466,7 @@ const LayerDisplay = ({
     : [{
         id: "outing",
         wear: !biophysicsActive && recommendation ? applyRecommendationMappings(recommendation, itemMappings) : climb.layers,
-        carry: [],
+        carry: biophysicsData?.carry_items?.map(item => `${item.label}: ${item.reason}`) ?? [],
         decision: biophysicsActive ? savedDecision("climb") : null,
       }];
   const savedOutfit: SavedOutfit | null = outing && hasLayers
@@ -657,6 +657,9 @@ const LayerDisplay = ({
 
             <div className="flex min-w-0 flex-col gap-6">
               {showDescent && <CarryCard items={packedItems} phase={shownPhase} />}
+              {!showDescent && !!biophysicsData?.carry_items?.length && (
+                <CarryCard items={biophysicsData.carry_items.map(item => `${item.label}: ${item.reason}`)} phase="outing" />
+              )}
 
               <RecommendedItemsCard items={recommendedItems} onOwned={handleItemOwned} />
 

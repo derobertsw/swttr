@@ -123,6 +123,7 @@ function SavedOutfitView({ outfit, note }: { outfit: SavedOutfit; note: React.Re
       </section>
 
       {touring && phase.id !== "outing" && <CarryCard items={phase.carry} phase={phase.id} framed={false} />}
+      {!touring && phase.carry.length > 0 && <CarryCard items={phase.carry} phase="outing" framed={false} />}
     </section>
   );
 }

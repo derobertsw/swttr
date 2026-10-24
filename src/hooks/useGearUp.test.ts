@@ -52,6 +52,25 @@ describe("useGearUp request completion", () => {
     return hook;
   }
 
+  it('submits and restores independent XC stop/exposure choices with the outing', async () => {
+    const { result, unmount } = renderHook(() => useGearUp());
+    await waitFor(() => expect(result.current.activityInitializing).toBe(false));
+    act(() => {
+      result.current.setActivity('xc_skiing');
+      result.current.setExertion('easy');
+      result.current.setXCContext({ outingPattern: 'frequent_stops', xcExposure: 'descents' });
+      result.current.locationSearch.handleSelectLocation(STOWE);
+    });
+    await act(() => result.current.handleSubmit());
+    expect(result.current.result?.outing).toMatchObject({ activity: 'xc_skiing', exertion: 'easy', outingPattern: 'frequent_stops', xcExposure: 'descents' });
+    const request = fetchMock.mock.calls.find(call => String(call[0]).includes('/recommendations/xc'))!;
+    expect(JSON.parse(request[1].body)).toMatchObject({ exertion: 'easy', outing_pattern: 'frequent_stops', xc_exposure: 'descents' });
+    expect(readGearUpDraft('test-user')).toMatchObject({ outingPattern: 'frequent_stops', xcExposure: 'descents' });
+    unmount();
+    const restored = renderHook(() => useGearUp());
+    await waitFor(() => expect(restored.result.current.xcContext).toEqual({ outingPattern: 'frequent_stops', xcExposure: 'descents' }));
+  });
+
   it.each(["weather", "recommendation"])(
     "resolves a weather change as false when it is retired during its %s request",
     async (stage) => {

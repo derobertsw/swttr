@@ -5,8 +5,8 @@ import { Card } from "@/components/ui/card";
 interface CarryCardProps {
   /** Items carried, not worn, during the shown phase. */
   items: string[];
-  phase: "climb" | "descent";
-  /** False on a trip day, whose parts aren't cards (#330). */
+  phase: "climb" | "descent" | "outing";
+  /** False on a trip day, whose parts are not cards (#330). */
   framed?: boolean;
 }
 
@@ -20,7 +20,7 @@ export function CarryCard({ items, phase, framed = true }: CarryCardProps) {
       <div>
         <h3 id={headingId} className="text-xl font-semibold text-foreground">Carry</h3>
         <p className="text-sm text-muted-foreground">
-          {phase === "climb" ? "In your pack until the descent." : "Back in your pack for the descent."}
+          {phase === "outing" ? "For breaks and after skiing. Not included in moving comfort." : phase === "climb" ? "In your pack until the descent." : "Back in your pack for the descent."}
         </p>
       </div>
       <Frame>
