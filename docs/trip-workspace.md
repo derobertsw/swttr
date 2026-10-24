@@ -41,7 +41,7 @@ A day reads in one order on every width ([#334](https://github.com/derobertsw/sw
 6. **Weather, My kit and My equipment**, then the crew's kits.
 7. **The activity**, a control rather than part of the reading, then Copy this day.
 
-**Downhill skiing** and **Backcountry skiing** are the labels for the stored `Alpine` and `Backcountry` activities everywhere a day's activity is shown, including itinerary reviews and a review's "Activity changed to" reason. Storage, links and older app versions keep the stored names (`tripActivityLabel` in `src/lib/trip-activities.ts`). **Travel** joins Rest as a day type with no clothing to plan (`tripActivityNeedsClothing`): neither asks anyone for a kit, and neither do days someone isn't taking part in, by the attendance the server works out (#331). The days list's Next step skips them too.
+**Downhill skiing** and **Backcountry skiing** are the labels for the stored `Alpine` and `Backcountry` activities everywhere a day's activity is shown, including itinerary reviews and a review's "Activity changed to" reason. Storage, links and older app versions keep the stored names (`tripActivityLabel` in `src/lib/trip-activities.ts`). **Travel** joins Rest as a day type with no clothing to plan (`tripActivityNeedsClothing`): neither asks anyone for a kit, and neither do days someone isn't taking part in, by the attendance the server works out (#331). The days list's Next step skips them too, and on the packing list a Travel or Rest day without a kit links to its day ("Review day") rather than to Plan kit manually.
 
 ## No content cards
 

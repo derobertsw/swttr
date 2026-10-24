@@ -6,7 +6,7 @@ import { buildPackingListFromDays } from "@/lib/packingList";
 import { fetchUserWardrobeItems } from "@/lib/userWardrobe";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
-import { tripActivityToRecommendationKey } from "@/lib/trip-activities";
+import { tripActivityLabel, tripActivityNeedsClothing, tripActivityToRecommendationKey } from "@/lib/trip-activities";
 import { fetchTripForecast, hasTripCoordinates, resolveTripStop, tripDayForecast, tripForecastDateOutsideWindow } from "@/lib/trip-forecast";
 import { outfitMismatches } from "@/lib/trip-kit-fit";
 import {
@@ -74,7 +74,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     // An older category checklist, without a saved outfit.
     const manualKit = !outfit && !!kit && kit.items.length > 0 ? kit : undefined;
     const outsideWindow = tripForecastDateOutsideWindow(date);
-    const needsForecast = !!day && activity !== "Rest" && !outfit && !manualKit && !!activityKey
+    const needsForecast = !!day && tripActivityNeedsClothing(activity) && !outfit && !manualKit && !!activityKey
       && Object.hasOwn(layerRecommendations, activityKey) && hasTripCoordinates(stop) && !outsideWindow;
     return { date, day, stop, activity, activityKey, outfit, manualKit, outsideWindow, needsForecast };
   });
@@ -115,8 +115,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     if (manualKit) {
       return { ...entry, advice: "manual", reason: "manual_kit", message: "Older checklist saved. It names layers, not your items, so it isn't in your list. Save an outfit from Gear up to add them." };
     }
-    if (activity === "Rest") {
-      return { ...entry, advice: "rest", reason: "rest_day", message: "Rest day; review personal items manually." };
+    // Travel and Rest days have no clothing to plan (#334): the day page says so, so this links to the day, not a kit task.
+    if (activity && !tripActivityNeedsClothing(activity)) {
+      return { ...entry, advice: "rest", reason: "rest_day", message: `${tripActivityLabel(activity)} day; review personal items manually.`, action: "review_day" };
     }
     if (!activity) {
       return { ...entry, advice: "missing_inputs", reason: "no_activity", message: "Choose an activity for this day.", action: "set_activity" };
@@ -126,7 +127,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     }
     // Trips invokes the static table, whose capabilities differ from Gear up's biophysics routes.
     if (!activityKey || !Object.hasOwn(layerRecommendations, activityKey)) {
-      return { ...entry, advice: "unsupported", reason: "activity_unsupported", message: `Automatic trip clothing guidance is unavailable for ${activity}. Plan your kit manually.` };
+      return { ...entry, advice: "unsupported", reason: "activity_unsupported", message: `Automatic trip clothing guidance is unavailable for ${tripActivityLabel(activity)}. Plan your kit manually.` };
     }
     if (activity === "Climb") entry.approximation = "Climb uses general hiking guidance; climbing-specific equipment is not included.";
     if (hours.length === 0) {

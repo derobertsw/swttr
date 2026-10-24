@@ -259,9 +259,13 @@ describe("GET /api/v1/trips/[id]/pack", () => {
     const supported = ["Alpine", "XC", "Hike", "Climb"].includes(activity);
     expect(data.suggestedDays).toBe(supported ? 1 : 0);
     expect(data.coverage[0]).toMatchObject({
-      advice: supported ? "available" : activity === "Rest" ? "rest" : "unsupported",
+      advice: supported ? "available" : ["Rest", "Travel"].includes(activity) ? "rest" : "unsupported",
       forecast: { status: supported ? "available" : "not_requested", availableHours: supported ? 16 : 0 },
     });
+    // Travel and Rest have no clothing to plan, so they link to the day rather than a kit task (#334).
+    if (["Rest", "Travel"].includes(activity)) {
+      expect(data.coverage[0]).toMatchObject({ message: `${activity} day; review personal items manually.`, action: "review_day" });
+    }
     if (activity === "Climb") expect(data.coverage[0].approximation).toMatch(/hiking guidance/);
     if (!supported) {
       expect(data.suggestions.totalRequiredSlots).toBe(0);
