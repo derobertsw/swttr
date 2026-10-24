@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SectionLabel, TripError } from "@/components/trips/trip-primitives";
 import { usePublishTripSummary } from "@/hooks/useTrip";
-import { errorMessage, tripRequest } from "@/lib/trip-requests";
+import { errorMessage, tripRequest, TripRequestError } from "@/lib/trip-requests";
 import { cn } from "@/lib/utils";
 import type { TripChecklist, TripChecklistPerson, TripDayChecklist } from "@/types/trips";
 
@@ -36,7 +36,13 @@ export default function DayChecklistPage({ params }: { params: Promise<{ id: str
     const request = ++latest.current;
     tripRequest<TripChecklist>(`/api/v1/trips/${id}/checklist`)
       .then((body) => { if (request === latest.current) { setData(body); setError(null); } })
-      .catch((err) => { if (request === latest.current) setError(errorMessage(err)); });
+      .catch((err) => {
+        if (request !== latest.current) return;
+        // Signed out or no longer on the trip: the crew's details go, as the trip pages' do.
+        // A failure that may pass keeps the last checklist.
+        if (err instanceof TripRequestError && [401, 403, 404].includes(err.status)) setData(null);
+        setError(errorMessage(err));
+      });
   }, [id]);
   useEffect(() => {
     load();
@@ -139,7 +145,7 @@ function PersonTasks({ tripId, day, person, viewer }: { tripId: string; day: Tri
     <dl className="mt-2 grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-base sm:grid-cols-[8rem_minmax(0,1fr)]">
       <Fact term="Clothing">
         <Link href={`${dayHref}#kit-${person.member_id}`} className={linkClassName} aria-label={`${person.display_name}'s clothing for ${day.date_label}: ${clothing.label}`}>{clothing.label}</Link>
-        {clothing.flagged && <span className="text-warning"> · Flagged: needs help</span>}
+        {clothing.flag && <span className="text-warning"> · {clothing.flag.label}</span>}
         {clothing.notes.map((note) => <span key={note} className="block text-sm text-muted-foreground">{note}</span>)}
       </Fact>
       {tonight && <Fact term="Tonight">

@@ -38,12 +38,13 @@ export function buildDayChecklists(full: TripFull, viewerUserId: string | null, 
       const participation = lodging?.days.find((entry) => entry.date === day.date)?.participation ?? "participating";
       const kit = full.kits.find((candidate) => candidate.trip_day_id === day.id && candidate.trip_member_id === member.id);
       const notes = kit?.outfit ? outfitMismatches(kit.outfit, { date: day.date, activity: day.activity, stop }) : [];
-      const flagged = !kit?.outfit && kit?.state === "warn";
+      const flag: TripChecklistPerson["clothing"]["flag"] = kit && !kit.outfit && kit.state !== "ok"
+        ? { state: kit.state, label: kit.state === "warn" ? "Flagged: needs help" : "Flagged: missing" } : null;
       const clothing: TripChecklistPerson["clothing"] = kit?.outfit
-        ? { state: notes.length ? "outfit_review" : "outfit", label: notes.length ? "Outfit saved for another plan" : "Outfit saved", notes, flagged: false }
+        ? { state: notes.length ? "outfit_review" : "outfit", label: notes.length ? "Outfit saved for another plan" : "Outfit saved", notes, flag: null }
         : kit && kit.items.length
-          ? { state: "checklist", label: `Older checklist: ${kit.items.map(sentence).join(", ")}`, notes, flagged }
-          : { state: "not_started", label: "Not started", notes, flagged };
+          ? { state: "checklist", label: `Older checklist: ${kit.items.map(sentence).join(", ")}`, notes, flag }
+          : { state: "not_started", label: "Not started", notes, flag };
       const night = lodging?.nights.find((entry) => entry.date === day.date);
       let conditions: TripChecklistPerson["conditions"] = null;
       if (sources.length && member.user_id) {

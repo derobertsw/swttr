@@ -11,7 +11,7 @@ The Day checklist (`/trips/:id/rollcall`, in Crew) replaces Roll call, which jud
   - Outfit saved for another plan, with the same reasons the day page gives (another place, date or activity).
   - Older checklist: the category slots (Shell, Gloves), never treated as an outfit.
   - Not started: no kit, or a kit with nothing in it. An empty kit is never OK.
-  - Flagged: needs help, when someone flagged their checklist.
+  - Flagged: needs help, or Flagged: missing, when someone flagged their kit on the day (the day page's Needs help and Missing).
 - **Tonight**: their stay that night, or Not planned yet for a gap, linked to Stays.
 - **Shared gear** assigned to them, for the whole trip, with #179's states: Awaiting acceptance, Accepted · not packed, Packed. A response from before acceptance tracking says only Assigned. Each item links to it on the shared gear page (`/gear#shared-<id>`), which scrolls to it once the list loads.
 - **Source reviews**, on days with official sources (#211): how many of the day's sources they've reviewed, how many reviews were recorded before the plan changed, and the latest review's date. A review is a dated fact, not a verdict about conditions. Managed guests and pending invitations have no account to record one, so they have none.

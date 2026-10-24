@@ -103,4 +103,25 @@ describe("Day checklist page (#336)", () => {
     await user.click(screen.getByRole("button", { name: "Sat Oct 10" }));
     expect(screen.getByRole("link", { name: "Blair's clothing for Sat Oct 10: Outfit saved" })).toBeInTheDocument();
   });
+
+  it.each([401, 403, 404])("clears the crew's details once a refresh says access is gone (%i)", async (status) => {
+    let calls = 0;
+    vi.stubGlobal("fetch", fakeTripApi({ [ROUTE]: () => ++calls === 1 ? reply(200, checklist) : reply(status, { error: "Not found" }) }));
+    await renderPage();
+    expect(await screen.findByRole("heading", { name: "Sat Oct 10", level: 2 })).toBeInTheDocument();
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(await screen.findByText("Not found")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Sat Oct 10", level: 2 })).not.toBeInTheDocument();
+    expect(screen.queryByText("Blair (you)")).not.toBeInTheDocument();
+  });
+
+  it("keeps the last checklist when a refresh fails for another reason", async () => {
+    let calls = 0;
+    vi.stubGlobal("fetch", fakeTripApi({ [ROUTE]: () => ++calls === 1 ? reply(200, checklist) : reply(500, { error: "Couldn't load the day checklist. Try again." }) }));
+    await renderPage();
+    expect(await screen.findByRole("heading", { name: "Sat Oct 10", level: 2 })).toBeInTheDocument();
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(await screen.findByText("Couldn't load the day checklist. Try again.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sat Oct 10", level: 2 })).toBeInTheDocument();
+  });
 });

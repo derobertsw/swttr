@@ -15,12 +15,20 @@ describe("Day checklist (#336)", () => {
       kit(ALEX.id, SAT, { outfit: savedOutfit() }),
       kit(BLAIR.id, SAT, { items: ["shell", "gloves"], state: "warn" }),
       kit(DANA.id, SAT, { items: [], state: "ok" }),
+      kit(ELI.id, SAT, { items: ["shell"], state: "missing" }),
+      kit(CASEY.id, SAT, { state: "missing" }),
       kit(ALEX.id, SUN, { outfit: savedOutfit() }),
+      kit(BLAIR.id, SUN, { outfit: savedOutfit(), state: "warn" }),
     ] });
-    expect(person(full, SAT, ALEX.id).clothing).toEqual({ state: "outfit", label: "Outfit saved", notes: [], flagged: false });
-    expect(person(full, SAT, BLAIR.id).clothing).toEqual({ state: "checklist", label: "Older checklist: Shell, Gloves", notes: [], flagged: true });
-    expect(person(full, SAT, DANA.id).clothing).toMatchObject({ state: "not_started", label: "Not started", flagged: false });
-    expect(person(full, SAT, ELI.id).clothing).toMatchObject({ state: "not_started", label: "Not started" });
+    expect(person(full, SAT, ALEX.id).clothing).toEqual({ state: "outfit", label: "Outfit saved", notes: [], flag: null });
+    expect(person(full, SAT, BLAIR.id).clothing).toEqual({ state: "checklist", label: "Older checklist: Shell, Gloves", notes: [], flag: { state: "warn", label: "Flagged: needs help" } });
+    expect(person(full, SAT, DANA.id).clothing).toMatchObject({ state: "not_started", label: "Not started", flag: null });
+    // Missing, as the day page shows it, whether or not the kit has slots.
+    expect(person(full, SAT, ELI.id).clothing).toMatchObject({ state: "checklist", flag: { state: "missing", label: "Flagged: missing" } });
+    expect(person(full, SAT, CASEY.id).clothing).toMatchObject({ state: "not_started", flag: { state: "missing", label: "Flagged: missing" } });
+    expect(person(full, SAT, FRAN.id).clothing).toMatchObject({ state: "not_started", label: "Not started", flag: null });
+    // A saved outfit carries no checklist flag, as on the day page.
+    expect(person(full, SUN, BLAIR.id).clothing.flag).toBeNull();
     // Saturday's outfit copied to Sunday was planned for Saturday's forecast.
     expect(person(full, SUN, ALEX.id).clothing).toMatchObject({ state: "outfit_review", label: "Outfit saved for another plan" });
     expect(person(full, SUN, ALEX.id).clothing.notes).toEqual([expect.stringContaining("Sat Oct 10")]);

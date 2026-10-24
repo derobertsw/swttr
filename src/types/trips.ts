@@ -728,8 +728,8 @@ export interface TripChecklistPerson {
     label: string;
     /** Why a saved outfit no longer fits the day, as the day page says it. */
     notes: string[];
-    /** Flagged on the day as needing help. */
-    flagged: boolean;
+    /** Flagged on the day, as Needs help or Missing; never set on a saved outfit, as the day page shows it. */
+    flag: { state: "warn" | "missing"; label: string } | null;
   };
   /** Their plan for tonight; null without lodging. */
   tonight: { state: TripLodgingState; stay_id: string | null; label: string; gap: boolean } | null;
