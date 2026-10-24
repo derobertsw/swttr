@@ -1,8 +1,8 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { departurePlans, drivePlans } from "@/lib/trip-drive";
-import { supabaseDriveStore, tripDriveEstimates } from "@/lib/trip-drive-estimates";
+import { departurePlans } from "@/lib/trip-drive";
+import { loadMemberDayOrigins, supabaseDriveStore, tripDriveEstimates } from "@/lib/trip-drive-estimates";
 import { TOUR_ACTIVITY } from "@/lib/trip-activities";
 import { buildLodging, dateLabel, loadLodging } from "@/lib/trip-lodging";
 import { accessPointFor } from "@/lib/trip-location";
@@ -25,7 +25,8 @@ function mappedCoordinates(latitude: unknown, longitude: unknown): Pick<TripMapP
 function validateSources(full: TripFull): void {
   const tripId = full.trip.id;
   const stays = full.lodging?.stays ?? [];
-  if ([...full.stops, ...full.days, ...stays, ...full.lodging?.assignments ?? [], ...full.tour_plans ?? []].some((row) => row.trip_id !== tripId)) {
+  if ([...full.stops, ...full.days, ...stays, ...full.lodging?.assignments ?? [], ...full.tour_plans ?? [], ...full.member_origins ?? []]
+    .some((row) => row.trip_id !== tripId)) {
     throw new Error("Invalid map source");
   }
   const stops = new Set(full.stops.map((stop) => stop.id));
@@ -33,7 +34,8 @@ function validateSources(full: TripFull): void {
   const stayIds = new Set(stays.map((stay) => stay.id));
   if (full.days.some((day) => day.stop_id !== null && !stops.has(day.stop_id))
     || full.lodging?.assignments.some((night) => night.stay_id !== null && !stayIds.has(night.stay_id))
-    || full.tour_plans?.some((plan) => !days.has(plan.trip_day_id))) throw new Error("Invalid map reference");
+    || full.tour_plans?.some((plan) => !days.has(plan.trip_day_id))
+    || full.member_origins?.some((row) => !days.has(row.trip_day_id))) throw new Error("Invalid map reference");
   // A deleted stay's starting point deliberately remains a saved snapshot (#209).
   // access_point_stop_id may likewise name a removed stop: accessPointFor ignores it.
 }
@@ -42,8 +44,8 @@ function validateSources(full: TripFull): void {
 export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, selectedDate: string | null = null): TripMap {
   validateSources(full);
   const lodging = full.lodging ?? buildLodging(full.trip, [], []);
-  const plans = drivePlans({ ...full, lodging });
-  const departuresByDay = departurePlans({ ...full, lodging }, plans);
+  const departuresByDay = departurePlans({ ...full, lodging });
+  const plans = departuresByDay.map((day) => day.find((group) => group.crew)!);
   const places = new Map<string, TripMapPlace>();
   const add = (source: TripMapSource, name: string, location: TripLocation | null | undefined, role: TripMapRole,
     visit?: { date: string; day_id: string }, legacy?: { latitude: number | null; longitude: number | null }) => {
@@ -116,8 +118,11 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
     const departures = groups.map((group): TripMapDeparture => {
       const route = routes.find((entry) => entry.key === group.key);
       if (!route) throw new Error("Missing map departure state");
+      // A stay, or a place people chose for themselves this day (#333), under the first of them.
       const origin = group.crew ? originId : group.origin?.stay_id
-        ? add({ type: "stay", id: group.origin.stay_id, slot: "location" }, group.origin.label, group.origin.location, "origin", visit) : null;
+        ? add({ type: "stay", id: group.origin.stay_id, slot: "location" }, group.origin.label, group.origin.location, "origin", visit)
+        : group.origin ? add({ type: "day", id: `${id}/${group.own_member_ids[0] ?? group.member_ids[0]}`, slot: "origin" }, group.origin.label, group.origin.location, "origin", visit)
+        : null;
       const people = group.member_ids.map((memberId) => {
         const person = lodging.people.find((entry) => entry.member_id === memberId);
         return { member_id: memberId, name: person?.display_name ?? "Someone", pending: person?.membership === "invited" };
@@ -172,10 +177,10 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
 
 /** Call only after requireTripAccess. Read each source by trip_id; never load kits, invites or bookings into the response. */
 export async function loadTripMapContext(supabase: SupabaseClient, trip: Trip, date: string | null): Promise<{ full: TripFull; map: TripMap } | null> {
-  const [stops, days, lodging, tours] = await Promise.all([
+  const [stops, days, lodging, tours, memberOrigins] = await Promise.all([
     supabase.from("trip_stops").select("id, trip_id, position, name, latitude, longitude, access_point").eq("trip_id", trip.id).order("position"),
     supabase.from("trip_days").select("id, trip_id, date, stop_id, activity, access_point, access_point_stop_id, origin, origin_stay_id, no_drive").eq("trip_id", trip.id).order("date"),
-    loadLodging(supabase, trip), loadTourPlans(supabase, trip.id),
+    loadLodging(supabase, trip), loadTourPlans(supabase, trip.id), loadMemberDayOrigins(supabase, trip.id),
   ]);
   if (stops.error || days.error) throw new Error("Couldn't load map places");
   if (date && !lodging.days.some((day) => day.date === date)) return null;
@@ -184,7 +189,7 @@ export async function loadTripMapContext(supabase: SupabaseClient, trip: Trip, d
   }
   const full: TripFull = {
     trip, stops: (stops.data ?? []) as TripStop[], days: (days.data ?? []) as TripDay[], lodging,
-    tour_plans: summarizeTourPlans(tours, (days.data ?? []) as TripDay[]), members: [], kits: [], gear: [],
+    tour_plans: summarizeTourPlans(tours, (days.data ?? []) as TripDay[]), members: [], kits: [], gear: [], member_origins: memberOrigins,
   };
   validateSources(full);
   const estimates = await tripDriveEstimates(full, supabaseDriveStore(supabase, trip.id), { refresh: false });
