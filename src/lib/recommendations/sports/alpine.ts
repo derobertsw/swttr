@@ -88,7 +88,6 @@ export const alpine: SportRecommender<AlpineTargets> = {
 
   recommend(request, targets, pool) {
     const { tempC, windMs, humidity, weather } = request;
-    const [targetCloMin, targetCloMax] = targets.targetRange;
 
     const ensemble = buildAlpineEnsemble(
       pool.categorized,
@@ -118,7 +117,9 @@ export const alpine: SportRecommender<AlpineTargets> = {
         comfortContext: {
           targetRange: targets.targetRange,
           regionalMinTarget: targets.regional.min,
+          regionalTarget: targets.regional.neutral,
           extremityMinTarget: targets.extremity.min,
+          extremityTarget: targets.extremity.neutral,
         },
       },
       handwear,
@@ -154,7 +155,7 @@ export const alpine: SportRecommender<AlpineTargets> = {
         chairlift: formatIreqPhase(targets.chairlift),
         dle_hours: targets.chairlift.dleHours,
         dle_method: DLE_ESTIMATION_METHOD,
-        target_range: [Math.round(targetCloMin * 100) / 100, Math.round(targetCloMax * 100) / 100],
+        target_range: targets.targetRange,
         regional: targets.regional,
         extremity: targets.extremity,
         validation_buffer_clo: formatValidationBuffer(targets.validationBuffer),
@@ -162,7 +163,7 @@ export const alpine: SportRecommender<AlpineTargets> = {
       },
       recommendation,
       warnings,
-      guidance: getAlpineGuidance(tempC, weather.precipitation),
+      guidance: [...(recommendation.evaluation?.decision?.reasons ?? []), ...getAlpineGuidance(tempC, weather.precipitation)],
     };
   },
 };

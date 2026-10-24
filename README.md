@@ -58,8 +58,8 @@ graph TD
     P -->|No usable garments| T[Targets-only response]
     P --> G[Ensemble Building]
     G --> R[Running/XC only: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
-    R --> H[Ensemble Scoring<br/>Least permeable covering layer per region<br/>Convert each regional requirement to basic clo<br/>Then combine with ensemble area weights]
-    H --> I[Comfort Evaluation:<br/>shortfalls below each minimum]
+    R --> I[Canonical server phase assessment:<br/>actual worn regional and extremity basic clo<br/>local shortfalls and excess, moisture and clothing gaps]
+    I --> H[Ensemble thermal scoring and API/UI reasons<br/>consume the same phase assessment]
 
     subgraph "Shared Biophysics Core — thermal-targets.ts"
         B
@@ -78,7 +78,7 @@ graph TD
         G
     end
 
-    subgraph "Shared Evaluation — response-builder.ts (ski touring scores each phase itself)"
+    subgraph "Shared Evaluation — layer-evaluation.ts and response-builder.ts"
         H
         I
     end
@@ -295,7 +295,11 @@ graph TD
 
 ### 7. Thermal Targets and Comfort
 
-Body-part targets are bands, like the whole-body target range. Whole-body and regional bands are converted from resultant IREQ to basic garment clo using each phase’s wind, movement and assumed outer permeability; the conversion never lowers a positive resultant requirement. The scorer uses the least permeable covering layer separately for torso, arms and legs, converts before combining the regions with the ensemble’s area weights, and leaves uncovered regions at open permeability. Running targets assume only wind-resistant fabric when wind protection is required; a wet-only requirement accepts water-resistant fabrics with no known wind rating, so it cannot imply a membrane. These conservative targets stay independent of wardrobe ownership.
+The response's `recommendation.evaluation` and manual `POST /api/v1/ensembles/evaluate` share `evaluatePhase`. Touring exposes a separate `descent_evaluation`; packed layers never raise climb insulation. `decision.status`, `summary`, `reasons` and `warnings` are server-owned. The legacy `riskType` is retained for saved-outfit compatibility; it is a thermal mismatch direction, not a medical diagnosis. UI judgments must use the server summary rather than infer comfort from a score.
+
+The old fixed +0.3 clo extension no longer makes an outfit comfortable. Whole-body excess uses a 0.01 clo numerical tolerance (the reported 0.353 versus 0.18–0.31 case is warmer); local excess uses the same 0.05 clo tolerance as local deficits. Upper targets are the phase's regional/neutral bands or explicit accessory limits, including XC's functional glove allowance. Small differences produce adjustment guidance without an injury warning. Significant mismatch messages retain conservative engineering allowances relative to the phase band; no numerical sport calibration or physiological safety threshold is introduced here. Field validation remains necessary. Missing regional catalog data or custom arm estimates produce unknown comfort; missing suitable clothing produces an incomplete outfit rather than an ideal outfit scored as worn. Existing evaporative resistance reasoning (#67) stays separate from clo.
+
+Body-part targets are bands, like the whole-body target range. Whole-body and regional bands are converted from resultant IREQ to basic garment clo using each phase’s wind, movement and assumed outer permeability; the conversion never lowers a positive resultant requirement. Recommendations and manual edits compare actual regional garment clo with the same basic-clo phase bands. Standalone scoring retains its regional permeability conversion when no canonical phase assessment is supplied. Running targets assume only wind-resistant fabric when wind protection is required; a wet-only requirement accepts water-resistant fabrics with no known wind rating, so it cannot imply a membrane. These conservative targets stay independent of wardrobe ownership.
 
 Running/XC taper added cold margins while preserving the calculated whole-body heat-balance minimum; mild air alone cannot erase a positive requirement for a smaller body or an easy effort. The torso, arms and legs split the whole-body range by the activity's regional multipliers, rescaled so their area-weighted mean is 1: an outfit with every region at its minimum sits exactly at the whole-body minimum. Alpine uses equal multipliers for torso, arms and legs, with no extra leg bias. Hands and head scale the whole-body IREQ of the phase they follow; alpine uses the skiing phase, since its extremity multipliers already add chairlift and wind exposure. These local targets are heuristics, so running/XC taper their full bands to permit zero thermal accessory requirements in suitable mild conditions. The comfort status, the body-part pills, and the comfort score all judge shortfalls against the bottom of each band, in `src/lib/biophysics/comfort.ts`. Running/XC also apply the same 0.05 clo tolerance above explicit accessory upper limits during selection and manual evaluation. XC allows existing thin liner gloves up to 0.55 clo (plus that tolerance) for pole grip; this is a catalog-based engineering allowance, not a physiological threshold.
 
@@ -314,15 +318,23 @@ graph TD
     LOOKUP --> KNOWN{All worn items have usable thermal data?}
     KNOWN -->|Yes: regional averages already include partial coverage| DEC
     KNOWN -->|No| UNKNOWN[Comfort unknown with missing body areas<br/>No total clo, decision or score]
-    DEC -->|Whole body more than 0.05 clo below the range| COLD[Cold]
-    DEC -->|Whole body more than 0.3 clo above the range| HOT[Overheating]
-    DEC -->|Running/XC accessory more than 0.05 clo above its upper limit| HOT
-    DEC -->|A body part more than 0.05 clo below its minimum| COLD
-    DEC -->|Otherwise| OK[Comfortable]
+    DEC -->|Whole body more than 0.05 clo below the range<br/>or local shortfall beyond 0.05 clo| COLD[Cooler than recommended]
+    DEC -->|Whole body more than 0.01 clo above the range<br/>or local excess beyond 0.05 clo| HOT[Warmer than recommended]
+    COLD --> MIX{Both local cold and excess warmth?}
+    HOT --> MIX
+    MIX -->|Yes| UNEVEN[Uneven warmth<br/>Extra torso warmth never covers bare required regions]
+    DEC -->|Within numerical tolerances| OK[Likely comfortable<br/>Estimated fit, never Optimal or a confidence percentage]
+    DEC --> WARN[Separate significant mismatch warnings<br/>Cold gap exceeds band width, with a 0.2 clo floor<br/>Warm excess exceeds the larger of<br/>band width and the legacy 0.3 clo allowance<br/>Engineering heuristics, not medical risk thresholds]
+    DEC --> MOISTURE[Existing evaporative-potential heuristic<br/>Report moisture limitation separately<br/>Never change fabric insulation]
+    OK --> S1[Score 85 to 100 by distance from band midpoint]
+    COLD --> S2[Score 85 × share of needed insulation<br/>at the worst-covered part, including 0.5 clo surface air]
+    HOT --> S3[Existing linear excess score to half-score<br/>then a smooth positive tail for severe excess<br/>or the local cold score if lower]
+    LOOKUP --> ACTUAL[Recompute worn arms and hood from current catalog items<br/>Carried clothing contributes only when worn in that phase]
+    ACTUAL --> DEC
+    DEC --> GAP[Missing standalone clothing or functional protection:<br/>explicit incomplete status, separate from unknown data]
+    DEC --> UI[API, edited outfit status, body-area pills and explanations<br/>use this phase assessment]
+    UI --> STALE[Pending or failed edit: retain outfit and labeled previous verdict<br/>Hide current score, body statuses and reasons until evaluated]
 
-    OK --> S1[Score 85 to 100<br/>by distance from the middle of the range]
-    COLD --> S2[Score 85 × the share of needed insulation<br/>the worst-covered part has: the whole body<br/>or a body part, each against its own minimum<br/>plus 0.5 clo of surface air]
-    HOT --> S3[Score 78 − 35 × whole-body or local excess clo,<br/>or a short body part's cold score if lower]
 ```
 
 ## Getting Started

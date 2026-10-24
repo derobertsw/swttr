@@ -5,8 +5,7 @@
 import { garmentMetadata } from '@/lib/garment-metadata';
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { DLE_ESTIMATION_METHOD } from '@/lib/biophysics/ireq';
-import { scoreEnsemble } from '@/lib/biophysics/scorer';
-import { calculateThermalComfortScore, withMinimums } from '@/lib/biophysics/comfort';
+import { buildScoredRecommendation } from '../response-builder';
 import type { ExertionLevel } from '@/lib/biophysics/exertion';
 import { applyBodySizeMetabolicAdjustment } from '@/lib/biophysics/bodyMetrics';
 import { COWEDA_VALIDATION_SOURCE } from '@/lib/biophysics/coweda';
@@ -211,21 +210,6 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     const downhillThermalGarments = ensembleToThermalGarments(downhillEnsemble);
     const downhillThermalProperties = predictEnsembleThermal(downhillThermalGarments);
 
-    // Scoring
-    const uphillScore = scoreEnsemble(
-      uphillThermalGarments,
-      { temperature: tempC, windSpeed: targets.uphillWind, humidity, precipitation: false },
-      { name: 'Ski Touring Uphill', metabolicRate: targets.uphillRate, hasStaticPeriods: false, windExposure: 'sheltered' },
-      'ski_touring_uphill'
-    );
-
-    const downhillScore = scoreEnsemble(
-      downhillThermalGarments,
-      { temperature: tempC, windSpeed: targets.downhillWind, humidity, precipitation: request.precipitation },
-      { name: 'Ski Touring Downhill', metabolicRate: targets.downhillRate, hasStaticPeriods: false, windExposure: 'exposed' },
-      'ski_touring_downhill'
-    );
-
     // Transition Protocol
     const transitionProtocol = generateTransitionProtocol(
       tempC, windMs, uphillTotalClo, targets.basic.transition, packInsulationLayer
@@ -245,40 +229,22 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
       legs: Math.round(downhillThermalProperties.rcl.leg * 100) / 100,
     };
 
-    const descentCloDeficit = Math.max(
-      0,
-      downhill.targetRange[0] - downhillThermalProperties.rcl.wholeBody
-    );
-    const descentWarnings: string[] = [];
-    if (descentCloDeficit > 0.05) {
-      descentWarnings.push(
-        `Insufficient overall insulation for descent: ${downhillThermalProperties.rcl.wholeBody.toFixed(1)} clo vs ${downhill.targetRange[0].toFixed(1)} clo required`
-      );
-    }
-    const regionalClo = {
-      torso: Math.round(uphillThermalProperties.rcl.torso * 100) / 100,
-      arms: Math.round(uphillThermalProperties.rcl.arm * 100) / 100,
-      legs: Math.round(uphillThermalProperties.rcl.leg * 100) / 100,
-    };
     const selectedHandwear = climbAccessories.handwear;
-    const thermalComfortScore = calculateThermalComfortScore({
-      totalClo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
-      targetRange: uphill.targetRange,
-      bodyParts: [
-        ...withMinimums(regionalClo, uphill.regional.min),
-        ...withMinimums(
-          {
-            hands: selectedHandwear?.rcl_clo ?? 0,
-            head: (climbHeadwear.helmet?.rcl_clo ?? 0) + (climbHeadwear.headWarmth?.rcl_clo ?? 0) + (climbHeadwear.neckWarmth?.rcl_clo ?? 0),
-          },
-          uphill.extremity.min
-        ),
-      ],
-    });
     // Gloves carry over from the climb — only select warmer descent gloves if climb pair is insufficient
     const descentHandwear = selectedHandwear && selectedHandwear.rcl_clo >= downhill.extremity.neutral.hands
       ? selectedHandwear
       : descentAccessories.handwear ?? selectedHandwear;
+
+    const scorePhase = (ensemble: GarmentRow[], phase: PhaseTargets, climb: boolean) => buildScoredRecommendation({
+      ensemble,
+      weather: { temperature: tempC, windSpeed: climb ? targets.uphillWind : targets.downhillWind, humidity, precipitation: !climb && request.precipitation },
+      activity: { name: climb ? 'Ski Touring Uphill' : 'Ski Touring Downhill', metabolicRate: climb ? targets.uphillRate : targets.downhillRate, hasStaticPeriods: false, windExposure: climb ? 'sheltered' : 'exposed' },
+      activityKey: climb ? 'ski_touring_uphill' : 'ski_touring_downhill',
+      comfortContext: { targetRange: phase.targetRange, regionalMinTarget: phase.regional.min, regionalTarget: phase.regional.neutral,
+        extremityMinTarget: phase.extremity.min, extremityTarget: phase.extremity.neutral, extremityMaxTarget: phase.extremity.max },
+    }, climb ? selectedHandwear : descentHandwear, climb ? climbHeadwear : descentHeadwear);
+    const uphillResult = scorePhase(uphillEnsemble, uphill, true);
+    const downhillResult = scorePhase(downhillEnsemble, downhill, false);
 
     return {
       conditions: {
@@ -301,22 +267,8 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         },
         validation_source: COWEDA_VALIDATION_SOURCE,
       },
-      recommendation: {
-        garments: uphillEnsemble.map(formatGarmentResponse),
-        handwear: selectedHandwear ? formatHandwearResponse(selectedHandwear) : null,
-        headwear: formatHeadwearSet(climbHeadwear),
-        ensemble_properties: {
-          total_clo: Math.round(uphillThermalProperties.rcl.wholeBody * 100) / 100,
-          regional_clo: regionalClo,
-          evap_potential: Math.round(uphillThermalProperties.evapPotential * 1000) / 1000,
-          permeability_index: Math.round(uphillThermalProperties.im * 100) / 100,
-        },
-        score: uphillScore.totalScore,
-        thermal_comfort_score: thermalComfortScore ?? Math.round(
-          ((uphillScore.componentScores.coldProtection + uphillScore.componentScores.overheatPrevention) / 2) * 10
-        ) / 10,
-        component_scores: uphillScore.componentScores,
-      },
+      recommendation: uphillResult.recommendation,
+      descent_evaluation: downhillResult.recommendation.evaluation,
       descent_headwear: formatHeadwearSet(descentHeadwear),
       descent_handwear: descentHandwear ? formatHandwearResponse(descentHandwear) : null,
       descent_breakdown: {
@@ -339,8 +291,12 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         total_weight_g: totalPackWeightGrams,
       },
       transition_protocol: transitionProtocol,
-      warnings: [...uphillScore.warnings, ...downhillScore.warnings, ...descentWarnings],
-      guidance: generateTouringGuidance(tempC, targets.uphillIreq, targets.downhillIreq),
+      warnings: [...uphillResult.warnings.map(w => `Climb: ${w}`), ...downhillResult.warnings.map(w => `Descent: ${w}`)],
+      guidance: [
+        ...(uphillResult.recommendation.evaluation?.decision?.reasons ?? []).map(r => `Climb: ${r}`),
+        ...(downhillResult.recommendation.evaluation?.decision?.reasons ?? []).map(r => `Descent: ${r}`),
+        ...generateTouringGuidance(tempC, targets.uphillIreq, targets.downhillIreq),
+      ],
     };
   },
 };
