@@ -8,7 +8,8 @@ import { followDeparture } from "@/components/trips/trip-map-presentation";
 import { tripDriveEstimates } from "@/lib/trip-drive-estimates";
 import { projectTripMap } from "@/lib/trip-map";
 import { LODGE_PLACE, PINE_PLACE, splitDriveTrip, VILLAGE_PLACE } from "@/test/driveTrip";
-import { ALEX, BLAIR, CASEY, ELI, FRI, PINE, SAT, splitRows, SUN, VILLAGE } from "@/test/splitStays";
+import { ALEX, BLAIR, CASEY, ELI, FRAN, FRI, personNight, PINE, SAT, splitRows, SUN, VILLAGE } from "@/test/splitStays";
+import { departurePlans } from "@/lib/trip-drive";
 import type { TripDriveEstimates, TripFull } from "@/types/trips";
 
 /**
@@ -74,6 +75,28 @@ describe("Your departure on the day (#333)", () => {
     render(<DayDrive data={full} date={SAT} dateLabel="Sat Oct 10" onSaved={vi.fn()} canEdit memberId={ALEX.id} drive={state(failing)} />);
     expect(screen.getByRole("button", { name: "Add your estimate" })).toBeInTheDocument();
   });
+  it("lets an organizer leaving from another stay show the crew's drive and manage its estimate", async () => {
+    // Alex and Fran swap Friday nights: the rental is still the crew's, Alex leaves from the hotel.
+    const rows = splitRows();
+    rows.assignments = rows.assignments.map((night) => night.date !== FRI ? night
+      : night.member_id === ALEX.id ? personNight(ALEX.id, FRI, VILLAGE) : night.member_id === FRAN.id ? personNight(FRAN.id, FRI, PINE) : night);
+    const full = splitDriveTrip({ rows });
+    const pinePair = departurePlans(full).find((day) => day[0].date === SAT)![0].pair_key!;
+    const manual = [{ trip_day_id: `day-${SAT}`, pair_key: pinePair, origin_label: "Pine rental", destination_label: "Spruce Peak lot",
+      duration_seconds: 900, note: null, use_calculated: false, entered_at: "2026-10-04T12:00:00.000Z" }];
+    const estimates = await tripDriveEstimates(full, { read: async () => [], write: async () => undefined, manual: async () => manual },
+      { now: NOW, matrix: async () => { throw new Error("timeout"); } });
+    render(<DayDrive data={full} date={SAT} dateLabel="Sat Oct 10" onSaved={vi.fn()} canEdit memberId={ALEX.id} drive={state(estimates)} />);
+    expect(screen.getByRole("region", { name: "Your drive" })).toHaveTextContent("Village hotel → Spruce Peak lot");
+    expect(screen.queryByRole("button", { name: "Edit your estimate" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText("Departures · 2 starting points"));
+    await userEvent.click(screen.getByRole("button", { name: "Show drive from Pine rental" }));
+    const crew = screen.getByRole("region", { name: "Drive from Pine rental" });
+    expect(within(crew).getByText("Pine rental → Spruce Peak lot")).toBeInTheDocument();
+    expect(within(crew).getByRole("button", { name: "Edit your estimate" })).toBeInTheDocument();
+    expect(within(crew).getByRole("button", { name: "Show drive from Pine rental" })).toHaveAttribute("aria-pressed", "true");
+    expect(document.activeElement).toHaveTextContent("Drive from Pine rental");
+  });
   it("says your own starting point is missing when the crew has one", async () => {
     // Blair's Friday night isn't planned.
     const rows = { ...splitRows(), assignments: splitRows().assignments.filter((night) => !(night.member_id === BLAIR.id && night.date === FRI)) };
@@ -115,6 +138,14 @@ describe("Departures on the trip map (#333)", () => {
     expect(onFollow).toHaveBeenCalledWith(`stay:${PINE.id}`);
     // Chosen, the rental's drive replaces yours on the map.
     expect(followDeparture(crew, ELI.id, `stay:${PINE.id}`)).toMatchObject({ starting_from: "Pine rental", origin_place_id: `stay:${PINE.id}:location` });
+  });
+  it("says the drive is the crew's for someone with no departure that day", async () => {
+    const [saturday] = (await mapFor()).days;
+    // Casey arrives Saturday evening and isn't taking part.
+    expect(followDeparture(saturday, CASEY.id)).toMatchObject({
+      starting_from: "Not taking part · the crew starts from Pine rental", staying_tonight: "Pine rental",
+      origin_place_id: saturday.origin_place_id, drive: { origin: { label: "Pine rental" } },
+    });
   });
   it("leads with Sunday's checkout morning from the rental for Casey", async () => {
     const full = splitDriveTrip();

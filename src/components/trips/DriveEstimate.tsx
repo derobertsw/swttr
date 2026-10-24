@@ -139,9 +139,18 @@ function EstimateDetails({ day }: { day: TripDriveRoute }) {
 /**
  * Everyone's departures that morning (#333): who starts from where, and each
  * drive to the same access point, in the server's order with the crew's first.
- * Anyone on the trip can open it; nobody is listed under a stay they didn't sleep in.
+ * Anyone on the trip can open it and show a departure's drive above; nobody
+ * is listed under a stay they didn't sleep in.
  */
-function Departures({ data, day, memberId, canEdit }: { data: TripFull; day: TripDriveDay; memberId: string | null; canEdit: boolean }) {
+function Departures({ data, day, memberId, canEdit, shown, onShow }: {
+  data: TripFull;
+  day: TripDriveDay;
+  memberId: string | null;
+  canEdit: boolean;
+  /** The departure whose drive shows above. */
+  shown: string | null;
+  onShow: (key: string) => void;
+}) {
   const people = data.lodging?.people ?? [];
   const name = (id: string) => {
     const person = people.find((entry) => entry.member_id === id);
@@ -159,7 +168,11 @@ function Departures({ data, day, memberId, canEdit }: { data: TripFull; day: Tri
               {driveSummary(departure, canEdit)}
               {departure.estimate && departure.state !== "manual" ? ` · calculated ${departure.estimate.age_label}` : ""}
             </p>
-            <Directions day={departure} />
+            <div className="flex flex-wrap gap-2">
+              {departure.origin && <Button type="button" size="sm" variant={shown === departure.key ? "default" : "outline"}
+                aria-pressed={shown === departure.key} onClick={() => onShow(departure.key)}>Show drive from {departure.label}</Button>}
+              <Directions day={departure} />
+            </div>
           </li>
         ))}
       </ul>
@@ -208,11 +221,17 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
   const crewStayId = data.lodging?.days.find((candidate) => candidate.date === date)?.starting_stay_id ?? null;
   const crewStay = data.lodging?.stays.find((stay) => stay.id === crewStayId);
   const crewDay = drive.estimates?.days.find((candidate) => candidate.date === date);
-  // Your own departure, when you're taking part; the organizer's estimate controls stay with the crew's.
-  const mine = memberId ? crewDay?.departures?.find((departure) => departure.member_ids.includes(memberId)) : undefined;
-  const day: TripDriveRoute | undefined = mine ?? crewDay;
-  const crewShown = !mine || mine.crew;
-  const split = (crewDay?.departures?.length ?? 0) > 1;
+  // The departure shown: one chosen from Departures, else your own when
+  // you're taking part, else the crew's. The organizer's estimate controls
+  // stay with the crew's, which they can show from Departures.
+  const [shownKey, setShownKey] = useState<string | null>(null);
+  const departures = crewDay?.departures ?? [];
+  const chosen = departures.find((departure) => departure.key === shownKey);
+  const mine = memberId ? departures.find((departure) => departure.member_ids.includes(memberId)) : undefined;
+  const day: TripDriveRoute | undefined = chosen ?? mine ?? crewDay;
+  const shownDeparture = chosen ?? mine;
+  const crewShown = !shownDeparture || shownDeparture.crew;
+  const split = departures.length > 1;
   const [editing, setEditing] = useState<"origin" | "estimate" | "remove" | null>(null);
   // The drive as it was when your estimate's editor opened. The editor keeps
   // it, so a refresh that changes or removes the drive never drops an entry.
@@ -284,11 +303,13 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
     // The card already says what's missing about the access point.
     if (!startLine && !canEdit) return null;
     body = startLine;
-  } else if (day.state === "missing_origin" && !crewShown) {
-    // Yours alone: the crew has a stay, you don't.
-    body = <Missing title={mine?.label === "Arrives this day" ? "You arrive this day" : "Your starting point isn't set"}>
-      {mine?.label === "Arrives this day" ? "You weren't on the trip the night before, so there's no stay to start from."
-        : `You don't have a stay planned for ${day.night_label} night.`}{canEdit ? <> {stays} to assign one.</> : ""}
+  } else if (day.state === "missing_origin" && shownDeparture && !shownDeparture.crew) {
+    // Some people have no starting point while the crew has one.
+    const yours = shownDeparture === mine, arriving = shownDeparture.label === "Arrives this day";
+    body = <Missing title={yours ? arriving ? "You arrive this day" : "Your starting point isn't set" : arriving ? "Arriving this day" : "Starting point not set"}>
+      {arriving ? `${yours ? "You weren't" : "They weren't"} on the trip the night before, so there's no stay to start from.`
+        : `${yours ? "You don't" : "They don't"} have a stay planned for ${day.night_label} night.`}
+      {canEdit ? <> {stays} to assign one.</> : ""}
     </Missing>;
   } else if (day.state === "missing_origin") {
     body = <Missing title="Choose where you're starting">
@@ -367,9 +388,12 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
 
   return (
     <section aria-labelledby={headingId} className="mt-3 border-t border-border pt-3">
-      <h3 id={headingId} tabIndex={-1} className="text-sm font-medium text-muted-foreground">{split && mine ? "Your drive" : "Drive"}</h3>
+      <h3 id={headingId} tabIndex={-1} className="text-sm font-medium text-muted-foreground">
+        {chosen && chosen !== mine ? `Drive from ${chosen.label}` : split && mine ? "Your drive" : "Drive"}
+      </h3>
       <div aria-live="polite" className="mt-1">{body}</div>
-      {split && crewDay && !drive.loading && <Departures data={data} day={crewDay} memberId={memberId} canEdit={canEdit} />}
+      {split && crewDay && !drive.loading && <Departures data={data} day={crewDay} memberId={memberId} canEdit={canEdit}
+        shown={shownDeparture?.key ?? null} onShow={(key) => { setShownKey(key); focusSoon(headingId); }} />}
       {editing === "estimate" && opened && (
         <YourEstimateEditor tripId={tripId} day={opened.day} days={opened.days}
           onCancel={() => close(estimateId)} onReviewed={drive.retry}
