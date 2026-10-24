@@ -287,7 +287,7 @@ describe("Your estimate (#209)", () => {
   it("is only for review once the day's drive is another pair", async () => {
     const full = driveTrip({ days: [driveDayRow("2027-01-08", "stop-stowe"), { ...driveDayRow(SAT, "stop-stowe"), origin: CABIN }] });
     const saturday = await day(memoryStore([], [yours(SAT, 40)]), SAT, fakeMatrix(), full);
-    expect(saturday).toMatchObject({ state: "available", manual: { current: false, origin_label: "Stowe Motel", dates: [] } });
+    expect(saturday).toMatchObject({ state: "available", manual: null, obsolete: [{ current: false, origin_label: "Stowe Motel", dates: [] }] });
     // Not for a day with no drive to estimate.
     const noDrive = driveTrip({ days: [driveDayRow("2027-01-08", "stop-stowe"), { ...driveDayRow(SAT, "stop-stowe"), no_drive: true }] });
     expect(await day(memoryStore([], [yours(SAT, 40)]), SAT, fakeMatrix(), noDrive)).toMatchObject({ state: "no_drive", manual: null });

@@ -272,7 +272,7 @@ const PAGE = 1000;
 type Page<T> = { data: T[] | null; error: { code: string } | null };
 
 /** Every row of a read that can pass max_rows, a page at a time; `page` must order rows fully. */
-async function readAll<T>(page: (from: number, to: number) => PromiseLike<Page<T>>): Promise<Page<T>> {
+export async function readAll<T>(page: (from: number, to: number) => PromiseLike<Page<T>>): Promise<Page<T>> {
   const rows: T[] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await page(from, from + PAGE - 1);

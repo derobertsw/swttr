@@ -67,3 +67,46 @@ describe("Saving a day's starting point", () => {
     expect(await response.json()).toMatchObject({ error });
   });
 });
+
+describe("Saving chosen people's starting point (#333)", () => {
+  const ELI = "1a000000-0000-4000-8000-000000000005", FRAN = "1a000000-0000-4000-8000-000000000006";
+  const seen = (memberId: string, saved: { origin: unknown; origin_stay_id: string | null; no_drive: boolean } = NONE) => ({ member_id: memberId, ...saved });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(requireTripAccess).mockResolvedValue({ supabase: { rpc } as unknown as SupabaseClient, userId: "user-1", trip: full.trip });
+    rpc.mockResolvedValue({ data: { ok: true }, error: null });
+  });
+
+  it("saves the same starting point for each of them, with what the editor showed for each", async () => {
+    const body = { member_ids: [ELI, FRAN.toUpperCase()], origin: { stay_id: STAY }, no_drive: false, expected: [seen(ELI), seen(FRAN)] };
+    expect((await put(body)).status).toBe(200);
+    expect(rpc).toHaveBeenLastCalledWith("set_trip_member_day_origins", {
+      p_trip_id: full.trip.id, p_user_id: "user-1",
+      p_payload: { date: "2027-01-08", member_ids: [ELI, FRAN], origin: { stay_id: STAY }, no_drive: false, expected: [seen(ELI), seen(FRAN)] },
+    });
+    // Back to where they'd start anyway.
+    const own = { origin: CABIN, origin_stay_id: null, no_drive: true };
+    await put({ member_ids: [ELI], origin: null, no_drive: false, expected: [seen(ELI, own)] });
+    expect(rpc.mock.lastCall![1].p_payload).toEqual({ date: "2027-01-08", member_ids: [ELI], origin: null, no_drive: false, expected: [seen(ELI, own)] });
+  });
+  it("rejects nobody, a repeat, someone not reviewed or a bad place", async () => {
+    for (const body of [
+      { member_ids: [], origin: null, no_drive: true, expected: [] },
+      { member_ids: [ELI, ELI], origin: null, no_drive: true, expected: [seen(ELI)] },
+      { member_ids: [ELI, FRAN], origin: null, no_drive: true, expected: [seen(ELI)] },
+      { member_ids: ["someone"], origin: null, no_drive: true, expected: [seen("someone")] },
+      { member_ids: [ELI], origin: null, no_drive: "yes", expected: [seen(ELI)] },
+    ]) expect((await put(body)).status).toBe(400);
+    expect(await (await put({ member_ids: [ELI], origin: { location: { ...CABIN, latitude: 200 } }, no_drive: false, expected: [seen(ELI)] })).json())
+      .toMatchObject({ field: "origin" });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["PT409", 409], ["PGRST202", 503], ["42501", 403], ["P0002", 404], ["22023", 400], ["XX000", 500],
+  ])("answers a %s from the database with %i", async (code, status) => {
+    rpc.mockResolvedValue({ data: null, error: { code } });
+    const response = await put({ member_ids: [ELI], origin: null, no_drive: true, expected: [seen(ELI)] });
+    expect(response.status).toBe(status);
+    if (code === "PGRST202") expect(await response.json()).toEqual({ error: "Starting points for one person can't be saved yet. Try again later.", field: "origin" });
+  });
+});
