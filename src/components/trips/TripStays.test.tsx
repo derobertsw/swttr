@@ -2,8 +2,10 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TripStays, DayLodging } from "./TripStays";
-import { buildLodging, previewLodging } from "@/lib/trip-lodging";
-import { fakeTripApi, reply, sentBodies, TRIP, tripFull } from "@/test/tripApi";
+import { buildLodging, previewCrewLodging } from "@/lib/trip-lodging";
+import { previewLodgingChange, type LodgingChange } from "@/lib/trip-lodging-changes";
+import { fakeTripApi, ORGANIZER, reply, sentBodies, TRIP, tripFull } from "@/test/tripApi";
+import { ALEX, BLAIR, CASEY, DANA, ELI, FRI, PINE, SAT, SPLIT_MEMBERS, SPLIT_TRIP, SUN, VILLAGE, splitRows } from "@/test/splitStays";
 import type { TripLocation, TripLodgingAction, TripLodgingNight, TripStay, TripStayInput } from "@/types/trips";
 
 const hotel: TripStay = { id: "40f9f55e-0e74-4c4a-923f-d7a3f92468a0", trip_id: TRIP.id, name: "Hotel", check_in: "2026-10-09", check_out: "2026-10-11", type: null, address: null, property_url: "https://example.com", check_in_time: null, check_out_time: null, notes: "Meet in lobby", booking_status: "booked", created_at: TRIP.created_at, updated_at: TRIP.updated_at };
@@ -12,7 +14,7 @@ const full = (stays: TripStay[] = [], nights: TripLodgingNight[] = [], revision 
 const previewRoute = (data = full()) => (body: unknown) => {
   const input = body as { action: TripLodgingAction; stay: TripStayInput; stay_id: string; date: string; status: string };
   const payload = input.action === "save" ? input.stay : input.action === "remove" ? { id: input.stay_id } : { date: input.date, status: input.status };
-  return reply(200, previewLodging(data.trip, data.lodging!, input.action, payload));
+  return reply(200, previewCrewLodging(data.trip, data.lodging!, input.action, payload));
 };
 const base = `/api/v1/trips/${TRIP.id}`;
 const onSaved = vi.fn().mockResolvedValue(undefined);
@@ -41,7 +43,9 @@ describe("Crew stays editor", () => {
     await act(async () => finish());
     expect(await screen.findByText("Stay saved.")).toBeInTheDocument();
     expect(onSaved).toHaveBeenCalledOnce();
-    expect(sentBodies(api, `POST ${base}/stays`)[0]).toMatchObject({ stay: { name: "Cabin", check_in: null, check_out: null, booking_status: "not_booked" }, expected_revision: 0 });
+    // The save names the crew its review showed, so a change to the crew meanwhile is reviewed first.
+    expect(sentBodies(api, `POST ${base}/stays`)[0]).toMatchObject({ stay: { name: "Cabin", check_in: null, check_out: null, booking_status: "not_booked" }, expected_revision: 0,
+      expected_people_key: buildLodging(TRIP, [], []).people_key });
   });
   it("keeps input and the save identity after failure, so retry cannot duplicate a stay", async () => {
     const api = fakeTripApi({ [`POST ${base}/stays/preview`]: previewRoute(), [`POST ${base}/stays`]: reply(500, { error: "Database unavailable" }) });
@@ -71,7 +75,7 @@ describe("Crew stays editor", () => {
     expect(await screen.findByText("Sat Oct 10 → Mon Oct 12 · 2 nights")).toBeInTheDocument();
     expect(screen.getByText("Sun Oct 11 starting point: Hut")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save stay" })).toBeDisabled();
-    await user.click(screen.getByRole("checkbox", { name: /Replace the existing plans for 2026-10-10/ }));
+    await user.click(screen.getByRole("checkbox", { name: /Replace the existing plans for Sat Oct 10/ }));
     await user.click(screen.getByRole("button", { name: "Replace those nights and save" }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
     expect(sentBodies(api, `POST ${base}/stays`)[0]).toMatchObject({ replace_nights: true });
@@ -158,7 +162,7 @@ describe("Crew stays editor", () => {
       vi.stubGlobal("fetch", api);
       const user = userEvent.setup();
       render(<TripStays data={existing} canEdit onSaved={onSaved} />);
-      expect(screen.getByText("Booked · Location confirmation needed for drive times")).toBeInTheDocument();
+      expect(screen.getByText("Booked · Location needed for directions")).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Set location for Hotel" }));
       const dialog = screen.getByRole("dialog");
       await waitFor(() => expect(within(dialog).getByRole("combobox", { name: "Search name or address" })).toHaveFocus());
@@ -204,7 +208,7 @@ describe("Crew stays editor", () => {
     it("shows members the place in words with a map link and its credit", async () => {
       const user = userEvent.setup();
       render(<TripStays data={full([{ ...hotel, location: { ...topnotch, precision: "approximate", label: "Stowe" } }], assigned)} canEdit={false} onSaved={onSaved} />);
-      expect(screen.getByText("Booked · Approximate location")).toBeInTheDocument();
+      expect(screen.getByText("Booked · Approximate location · Location needed for directions")).toBeInTheDocument();
       await user.click(screen.getByText("Stay details"));
       expect(screen.getByText("Approximate area — choose the exact property for drive times.")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Open map (new tab)" })).toHaveAttribute("target", "_blank");
@@ -238,7 +242,7 @@ describe("Crew stays editor", () => {
     const user = userEvent.setup();
     render(<TripStays data={existing} canEdit onSaved={onSaved} />);
     await user.click(screen.getByText("Crew nights"));
-    await user.click(screen.getByRole("button", { name: "Change night 2026-10-10" }));
+    await user.click(screen.getByRole("button", { name: "Change night Sat Oct 10" }));
     expect(screen.getByLabelText("Change night plan to")).toHaveValue("");
     await user.selectOptions(screen.getByLabelText("Change night plan to"), "no_stay");
     await user.click(screen.getByRole("button", { name: "Review nights" }));
@@ -257,7 +261,7 @@ describe("Stay deep-link restoration", () => {
 
   it("waits for lodging data and restores an encoded stay link only once", () => {
     const saved = { ...hotel, id: "stay:room 1" };
-    window.history.replaceState({}, "", `/trips/${TRIP.id}#stay-${encodeURIComponent(saved.id)}`);
+    window.history.replaceState({}, "", `/trips/${TRIP.id}/stays#stay-${encodeURIComponent(saved.id)}`);
     const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
     const result = render(<TripStays data={full()} canEdit={false} onSaved={onSaved} />);
     expect(scroll).not.toHaveBeenCalled();
@@ -274,5 +278,209 @@ describe("Stay deep-link restoration", () => {
     const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
     render(<TripStays data={full([hotel])} canEdit={false} onSaved={onSaved} />);
     expect(scroll).not.toHaveBeenCalled();
+  });
+});
+
+// The downhill reference journey (#329): src/test/splitStays.ts.
+const splitFull = (rows = splitRows()) => tripFull({ trip: SPLIT_TRIP,
+  lodging: buildLodging(SPLIT_TRIP, rows.stays, rows.assignments, { members: SPLIT_MEMBERS, attendance: rows.attendance, per_member: true }) });
+const splitPreview = (rows = splitRows()) => (body: unknown) => {
+  const input = body as Record<string, unknown>;
+  const change = (input.action === "assign" ? { action: "assign", assignments: input.assignments }
+    : input.action === "attendance" ? { action: "attendance", member_id: input.member_id, attendance: input.attendance }
+    : input.action === "remove" ? { action: "remove", id: input.stay_id }
+    : { action: "save", stay: input.stay, existing: input.existing, ...(input.occupants ? { occupants: input.occupants } : {}) }) as LodgingChange;
+  const result = previewLodgingChange(SPLIT_TRIP, rows, SPLIT_MEMBERS, change);
+  return "error" in result ? reply(result.status, { error: result.error, field: result.field }) : reply(200, result);
+};
+const estimates = { [`GET ${base}/drive-estimates`]: reply(200, { days: [], stays: [] }) };
+const peopleTable = () => screen.getByRole("table", { name: /Who is staying where/ });
+
+describe("Split stays (#332)", () => {
+  beforeEach(() => { vi.clearAllMocks(); window.history.replaceState({}, "", "/"); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("starts a member on their own nights and the morning they change stays, then shows everyone by property", async () => {
+    vi.stubGlobal("fetch", fakeTripApi(estimates));
+    const user = userEvent.setup();
+    render(<TripStays data={splitFull()} canEdit={false} onSaved={onSaved} viewerMemberId={BLAIR.id} />);
+    expect(screen.getByRole("button", { name: "My stays" })).toHaveAttribute("aria-pressed", "true");
+    const mine = screen.getByRole("region", { name: "Your nights" });
+    expect(within(mine).getByRole("link", { name: "Pine rental" })).toHaveAttribute("href", `#stay-${PINE.id}`);
+    expect(within(mine).getByText("Fri Oct 9 → Sun Oct 11 · 2 nights")).toBeInTheDocument();
+    expect(within(mine).getByText("Sun Oct 11: leave Pine rental in the morning, then Mountain lodge that night")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(["Pine rental", "Mountain lodge"]);
+    expect(screen.queryByRole("button", { name: /Change|Edit|Plan/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Everyone" }));
+    const pine = document.getElementById(`stay-${PINE.id}`)!;
+    expect(within(pine).getByText("Alex, Blair, Dana")).toBeInTheDocument();
+    expect(within(pine).getByText("Alex, Blair, Casey, Dana")).toBeInTheDocument();
+    expect(within(pine).getByText("Check-out Sun Oct 11 morning · a starting point, not another night")).toBeInTheDocument();
+    // The pending invitation is named as one, not as a confirmed guest.
+    expect(within(document.getElementById(`stay-${VILLAGE.id}`)!).getByText("Eli, Fran (invitation pending)")).toBeInTheDocument();
+    expect(within(peopleTable()).getByRole("rowheader", { name: /Blair \(you\)/ })).toBeInTheDocument();
+  });
+
+  it("opens on everyone when a link names a stay the member isn't in", () => {
+    vi.stubGlobal("fetch", fakeTripApi(estimates));
+    window.history.replaceState({}, "", `/trips/${TRIP.id}/stays#stay-${VILLAGE.id}`);
+    vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+    render(<TripStays data={splitFull()} canEdit={false} onSaved={onSaved} viewerMemberId={BLAIR.id} />);
+    expect(screen.getByRole("button", { name: "Everyone" })).toHaveAttribute("aria-pressed", "true");
+    expect(document.getElementById(`stay-${VILLAGE.id}`)).toBeInTheDocument();
+  });
+
+  it("lays people out by night, one cell for each run of nights, and details the chosen nights", async () => {
+    vi.stubGlobal("fetch", fakeTripApi(estimates));
+    const user = userEvent.setup();
+    render(<TripStays data={splitFull()} canEdit onSaved={onSaved} viewerMemberId={ALEX.id} />);
+    const table = peopleTable();
+    // A late arrival's earlier nights are Not on trip, not missing.
+    expect(within(table).getByRole("button", { name: "Casey: Not on trip, Thu Oct 8 → Sat Oct 10 · 2 nights" }).closest("td")).toHaveAttribute("colspan", "2");
+    expect(within(table).getByRole("rowheader", { name: /Dana/ })).toHaveTextContent("Managed guest");
+    expect(within(table).getByRole("rowheader", { name: /Fran/ })).toHaveTextContent("Invitation pending");
+    const alex = within(table).getByRole("button", { name: "Alex: Pine rental, Fri Oct 9 → Sun Oct 11 · 2 nights" });
+    await user.click(alex);
+    expect(alex).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: "Alex · Pine rental" })).toBeInTheDocument();
+    expect(screen.getByText("Sun Oct 11: leaves Pine rental in the morning, then Mountain lodge that night")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change Alex's trip dates" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Nights without a stay" })).not.toBeInTheDocument();
+  });
+
+  it("moves only the chosen people and nights, after a preview that says so in words", async () => {
+    const api = fakeTripApi({ ...estimates, [`POST ${base}/stays/preview`]: splitPreview(), [`PUT ${base}/lodging-assignments`]: reply(200, { revision: 5 }) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    render(<TripStays data={splitFull()} canEdit onSaved={onSaved} viewerMemberId={ALEX.id} />);
+    await user.click(screen.getByRole("button", { name: "Change nights Sat Oct 10 → Sun Oct 11 · 1 night at Pine rental" }));
+    for (const name of [/^Alex/, /^Blair/, /^Casey/, /^Dana/]) expect(screen.getByRole("checkbox", { name })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /^Eli/ })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Night of Sat Oct 10" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Night of Fri Oct 9" })).not.toBeChecked();
+    await user.click(screen.getByRole("checkbox", { name: /^Alex/ }));
+    await user.click(screen.getByRole("checkbox", { name: /^Casey/ }));
+    await user.click(screen.getByRole("radio", { name: /^Village hotel/ }));
+    await user.click(screen.getByRole("button", { name: "Review nights" }));
+    expect(await screen.findByText("Move Blair and Dana from Pine rental to Village hotel for the night of Sat Oct 10.")).toBeInTheDocument();
+    expect(screen.getByText("Nobody else's nights change.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save nights" })).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: /Replace the existing plans for Sat Oct 10/ }));
+    await user.click(screen.getByRole("button", { name: "Replace those nights and save" }));
+    expect(await screen.findByText("Nights saved.")).toBeInTheDocument();
+    expect(sentBodies(api, `PUT ${base}/lodging-assignments`)[0]).toMatchObject({ expected_revision: 4, replace_nights: true, expected_people_key: splitFull().lodging!.people_key,
+      assignments: [{ member_id: BLAIR.id, status: "assigned", stay_id: VILLAGE.id, dates: [SAT] }, { member_id: DANA.id, status: "assigned", stay_id: VILLAGE.id, dates: [SAT] }] });
+  });
+
+  it("leaves pending invitations out of Everyone and skips nights someone isn't on the trip", async () => {
+    const api = fakeTripApi({ ...estimates, [`POST ${base}/stays/preview`]: splitPreview() });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    render(<TripStays data={splitFull()} canEdit onSaved={onSaved} viewerMemberId={ALEX.id} />);
+    await user.click(within(peopleTable()).getByRole("button", { name: "Alex: Pine rental, Fri Oct 9 → Sun Oct 11 · 2 nights" }));
+    await user.click(screen.getByRole("button", { name: "Change these nights" }));
+    await user.click(screen.getByRole("checkbox", { name: /^Everyone on the crew \(5\)/ }));
+    expect(screen.getByRole("checkbox", { name: /^Fran/ })).not.toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "No accommodation needed" }));
+    await user.click(screen.getByRole("button", { name: "Review nights" }));
+    expect(await screen.findByText("Change Alex, Blair and Dana from Pine rental to No accommodation needed for the nights of Fri Oct 9 and Sat Oct 10.")).toBeInTheDocument();
+    expect(screen.getByText("Change Casey from Pine rental to No accommodation needed for the night of Sat Oct 10.")).toBeInTheDocument();
+    const [body] = sentBodies(api, `POST ${base}/stays/preview`) as Array<{ assignments: Array<{ member_id: string; dates: string[] }> }>;
+    expect(body.assignments.map((entry) => [entry.member_id, entry.dates])).toEqual([[ALEX.id, [FRI, SAT]], [BLAIR.id, [FRI, SAT]], [CASEY.id, [SAT]], [DANA.id, [FRI, SAT]], [ELI.id, [FRI, SAT]]]);
+  });
+
+  it("asks for who, which nights and a plan before previewing", async () => {
+    const api = fakeTripApi({ ...estimates, [`POST ${base}/stays/preview`]: splitPreview() });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    render(<TripStays data={splitFull()} canEdit onSaved={onSaved} viewerMemberId={ALEX.id} />);
+    await user.click(screen.getByRole("button", { name: "Change nights Sat Oct 10 → Sun Oct 11 · 1 night at Pine rental" }));
+    await user.click(screen.getByRole("button", { name: "Review nights" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Choose a stay, No accommodation needed or Not planned.");
+    expect(screen.getAllByRole("radio")[0]).toHaveFocus();
+    expect(api).not.toHaveBeenCalledWith(expect.stringContaining("preview"), expect.anything());
+  });
+
+  it("never moves anyone for a notes-only edit, and sets exactly who stays from Who's staying", async () => {
+    const api = fakeTripApi({ ...estimates, [`POST ${base}/stays/preview`]: splitPreview() });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    render(<TripStays data={splitFull()} canEdit onSaved={onSaved} viewerMemberId={ALEX.id} />);
+    await user.click(screen.getByRole("button", { name: "Edit Pine rental" }));
+    expect(screen.getByRole("group", { name: "Who is staying here?" })).toBeInTheDocument();
+    await user.click(screen.getByText("More details (optional)"));
+    await user.type(screen.getByLabelText("Notes shared with the crew"), "Code at the door");
+    await user.click(screen.getByRole("button", { name: "Review nights" }));
+    expect(await screen.findByText("No night assignments will change.")).toBeInTheDocument();
+    expect(sentBodies(api, `POST ${base}/stays/preview`)[0]).not.toHaveProperty("occupants");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(await screen.findByRole("button", { name: "Discard changes" }));
+
+    await user.click(await screen.findByRole("button", { name: "Choose who is staying at Pine rental" }));
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /^Alex/ })).toHaveFocus());
+    await user.click(screen.getByRole("checkbox", { name: /^Casey/ }));
+    await user.click(screen.getByRole("button", { name: "Review nights" }));
+    expect(await screen.findByText("Take Casey out of Pine rental for the night of Sat Oct 10. That night becomes Not planned.")).toBeInTheDocument();
+    expect(sentBodies(api, `POST ${base}/stays/preview`)[1]).toMatchObject({ occupants: [ALEX.id, BLAIR.id, DANA.id] });
+  });
+
+  it("names each person's gap and offers No accommodation needed or their trip dates", async () => {
+    const rows = splitRows();
+    rows.assignments = rows.assignments.filter((night) => !(night.member_id === ELI.id && night.date === SUN));
+    const api = fakeTripApi({ ...estimates, [`POST ${base}/stays/preview`]: splitPreview(rows), [`PUT ${base}/members/${ELI.id}/attendance`]: reply(200, { revision: 5 }) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    render(<TripStays data={splitFull(rows)} canEdit onSaved={onSaved} viewerMemberId={ALEX.id} />);
+    const gaps = screen.getByRole("region", { name: "Nights without a stay" });
+    expect(within(gaps).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(gaps).getByText("Eli · Sun Oct 11 → Mon Oct 12 · 1 night")).toBeInTheDocument();
+    await user.click(within(gaps).getByRole("button", { name: "Plan Eli's nights Sun Oct 11 → Mon Oct 12 · 1 night" }));
+    expect(screen.getByRole("checkbox", { name: "Night of Sun Oct 11" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "No accommodation needed" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Change Eli's trip dates" }));
+    expect(screen.getByRole("heading", { name: "Eli's trip dates" })).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Leaves"), SUN);
+    await user.click(screen.getByRole("button", { name: "Review nights" }));
+    expect(await screen.findByText("Take Eli off the trip for the night of Sun Oct 11.")).toBeInTheDocument();
+    expect(screen.getByText("Take Eli off the trip for the night of Mon Oct 12, and out of Mountain lodge.")).toBeInTheDocument();
+    expect(screen.getByText("Mon Oct 12: Taking part → Not on trip")).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: /Clear their plans for Mon Oct 12/ }));
+    await user.click(screen.getByRole("button", { name: "Replace those nights and save" }));
+    expect(await screen.findByText("Eli's trip dates saved.")).toBeInTheDocument();
+    expect(sentBodies(api, `PUT ${base}/members/${ELI.id}/attendance`)[0]).toMatchObject({ replace_nights: true, attendance: { arrival_date: null, departure_date: SUN, skipped_dates: [] } });
+  });
+
+  it("keeps the chosen people and nights after a stale save and shows each person's saved nights", async () => {
+    const api = fakeTripApi({ ...estimates, [`POST ${base}/stays/preview`]: splitPreview(), [`GET ${base}`]: reply(200, splitFull()),
+      [`PUT ${base}/lodging-assignments`]: reply(409, { error: "The lodging plan changed. Review the saved plan before retrying." }) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    render(<TripStays data={splitFull()} canEdit onSaved={onSaved} viewerMemberId={ALEX.id} />);
+    await user.click(screen.getByRole("button", { name: "Change nights Fri Oct 9 → Sun Oct 11 · 2 nights at Village hotel" }));
+    await user.click(screen.getByRole("checkbox", { name: /^Fran/ }));
+    await user.click(screen.getByRole("radio", { name: /^Pine rental/ }));
+    await user.click(screen.getByRole("button", { name: "Review nights" }));
+    await user.click(await screen.findByRole("checkbox", { name: /Replace the existing plans/ }));
+    await user.click(screen.getByRole("button", { name: "Replace those nights and save" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The lodging plan changed.");
+    expect(onSaved).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Review saved plan" }));
+    expect(await screen.findByText(/^Eli: .*Village hotel Fri Oct 9 → Sun Oct 11 · 2 nights/)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /^Eli/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /^Fran/ })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: /^Pine rental/ })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Review nights" })).toBeInTheDocument();
+  });
+
+  it("offers only crew-wide night plans before per-person nights are saved", async () => {
+    vi.stubGlobal("fetch", fakeTripApi(estimates));
+    const user = userEvent.setup();
+    render(<TripStays data={full([hotel], assigned)} canEdit onSaved={onSaved} viewerMemberId={ORGANIZER.id} />);
+    expect(screen.getByText("Crew stay · One shared place each night")).toBeInTheDocument();
+    expect(screen.getByText("Crew nights")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Who is staying|Change nights/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Edit Hotel" }));
+    expect(screen.queryByRole("group", { name: "Who is staying here?" })).not.toBeInTheDocument();
   });
 });

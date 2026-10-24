@@ -12,7 +12,6 @@ import TripSettingsPage from "./page";
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush }) }));
-vi.mock("@/components/PageLayout", () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: "user-1", sessionId: "session-1", isLoaded: true }) }));
 const params = Promise.resolve({ id: TRIP.id });
 

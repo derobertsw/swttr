@@ -27,7 +27,7 @@ export function TripMapPlaceList({ places, date, day = null, selectedId, onSelec
 
 export function TripMapPlaceDetail({ tripId, place, date, day = null, canEdit }: { tripId: string; place: TripMapPlace; date: string; day?: TripMapDay | null; canEdit: boolean }) {
   const days = date ? placeDates(place).filter((d) => d === date) : placeDates(place);
-  const stayHref = `/trips/${tripId}#stay-${encodeURIComponent(place.source.id)}`;
+  const stayHref = `/trips/${tripId}/stays#stay-${encodeURIComponent(place.source.id)}`;
   const editHref = place.source.type === "stay" ? stayHref : place.source.type === "stop" ? `/trips/${tripId}/stops` : `/trips/${tripId}/days/${days[0] ?? placeDates(place)[0] ?? ""}`;
   return <section aria-labelledby="selected-place-heading" className="min-w-0 rounded-card border border-primary bg-card p-4 text-base wrap-anywhere">
     <h2 id="selected-place-heading" tabIndex={-1} className="font-semibold focus-visible:outline-2 focus-visible:outline-ring"><PlaceLabel place={place} date={date} day={day} /></h2>

@@ -1,6 +1,6 @@
 # Trip creation (#169)
 
-A new trip starts with one form: destination, start/end dates, an editable suggested name and an optional default activity. Create trip opens the saved overview; crew and additional stops are optional. A destination is assigned explicitly to every seeded day. Activity can remain unset, with a direct next-step link on the overview.
+A new trip starts with one form: destination, start/end dates, an editable suggested name and an optional default activity. Create trip opens the saved trip's Plan ([trip-workspace.md](trip-workspace.md)); crew and additional stops are optional. A destination is assigned explicitly to every seeded day. Activity can remain unset, with a direct next-step link above the trip's days.
 
 ## Save and recovery contract
 

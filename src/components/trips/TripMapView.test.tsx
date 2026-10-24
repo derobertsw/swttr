@@ -46,7 +46,7 @@ describe("Synchronized trip map and accessible list", () => {
     expect(row).toHaveAttribute("aria-pressed", "true");
     expect(row).toHaveTextContent("2027-01-08 · 2027-01-09");
     await user.click(screen.getByRole("button", { name: /Village Inn/ }));
-    expect(screen.getByRole("link", { name: "View stay" })).toHaveAttribute("href", "/trips/trip-drive#stay-stay-inn");
+    expect(screen.getByRole("link", { name: "View stay" })).toHaveAttribute("href", "/trips/trip-drive/stays#stay-stay-inn");
     expect(screen.getByRole("link", { name: "View day · 2027-01-10" })).toBeVisible();
   });
 

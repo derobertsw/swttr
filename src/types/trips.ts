@@ -297,34 +297,175 @@ export interface TripStay extends TripStayInput {
   updated_at: string;
 }
 
+/**
+ * A saved lodging plan for a night: a person's (#331), or, without
+ * `member_id`, the whole crew's from before per-person nights. No row is Not planned.
+ */
 export interface TripLodgingNight {
   trip_id: string;
   date: string;
   stay_id: string | null;
   status: "assigned" | "no_stay";
+  member_id?: string;
+}
+
+/**
+ * A person's dates on the trip (#331): see docs/trip-stays.md. Without a saved
+ * row they're on it from the pre-trip night through the last night, taking
+ * part every day. Their arrival night is on the trip and their departure night
+ * isn't, like a stay's check-in and check-out.
+ */
+export interface TripAttendanceInput {
+  arrival_date: string | null;
+  departure_date: string | null;
+  /** Days they're there but not taking part in the day's plan, such as an evening arrival. */
+  skipped_dates: string[];
+}
+
+export interface TripMemberAttendance extends TripAttendanceInput {
+  trip_id: string;
+  member_id: string;
+}
+
+/** One person's plan for one night. */
+export type TripLodgingState = "assigned" | "no_stay" | "unplanned" | "not_on_trip";
+export type TripDayParticipation = "participating" | "skipping" | "not_on_trip";
+
+export interface TripPersonNight {
+  date: string;
+  state: TripLodgingState;
+  stay_id: string | null;
+  /** The stay's name, "No accommodation needed", "Not planned" or "Not on trip". */
+  label: string;
+}
+
+export interface TripPersonDay {
+  date: string;
+  participation: TripDayParticipation;
+  /** Their stay the night before, while they take part. */
+  starting_stay_id: string | null;
+  /** The stay's name, "Not set", "Arrives this day", "Not taking part" or "Not on trip". */
+  starting_from: string;
+  tonight_stay_id: string | null;
+  staying_tonight: string;
+}
+
+/** A person's consecutive nights with the same plan (#332). */
+export interface TripPersonRun {
+  state: TripLodgingState;
+  stay_id: string | null;
+  /** As TripPersonNight's. */
+  label: string;
+  /** The first night, and the morning after the last one. */
+  start: string;
+  end: string;
+  nights: number;
+  /** "Fri Oct 9 → Sun Oct 11 · 2 nights", as a stay's dates read. */
+  date_label: string;
+  /** Not planned on a night between trip days: see `gaps`. */
+  gap: boolean;
+}
+
+/** A morning someone leaves one stay and sleeps in another that night. */
+export interface TripPersonChangeover {
+  date: string;
+  date_label: string;
+  from: string;
+  to: string;
+}
+
+/** A person's attendance and nights, as the server works them out. */
+export interface TripLodgingPerson {
+  member_id: string;
+  display_name: string;
+  role: TripMemberRole;
+  /** Their membership as saved: attendance and lodging never change it. */
+  membership: TripMemberStatus;
+  attendance: TripAttendanceInput & {
+    /** "Whole trip", or e.g. "Arrives Sat Oct 10 · Skips Sat Oct 10". */
+    label: string;
+    /** Saved dates the trip's dates no longer include, kept for review. */
+    review_dates: string[];
+  };
+  /** Every night from the pre-trip night through the last night. */
+  nights: TripPersonNight[];
+  days: TripPersonDay[];
+  /** Nights between trip days they're on the trip with no plan. The pre-trip and last nights are never gaps. */
+  gaps: string[];
+  /** Saved nights they're no longer on the trip for, kept after a trip date change for review. */
+  review_nights: string[];
+  /** `nights` as consecutive runs, for views that show continuity (#332). */
+  runs: TripPersonRun[];
+  changeovers: TripPersonChangeover[];
+}
+
+/** People in one stay on a night or starting from it on a morning. */
+export interface TripLodgingGroup {
+  stay_id: string;
+  label: string;
+  member_ids: string[];
 }
 
 export interface TripStaySummary extends TripStay {
   date_label: string;
   night_count: number;
+  /** Nights anyone has saved here. */
   assigned_nights: string[];
+  /** Who has nights here, and which. */
+  occupants: Array<{ member_id: string; nights: string[] }>;
+  /** Its nights, consecutive ones with the same people together (#332). */
+  occupancy: Array<{ dates: string[]; date_label: string; member_ids: string[] }>;
+  /** "Check-out Sun Oct 11 morning": a starting point, not another night. */
+  checkout_label: string | null;
   review_dates: string[];
 }
 
+/** The crew's mornings and nights, for views that show one plan; split nights list each group. */
 export interface TripLodgingContext {
   date: string;
+  /** One stay's name, "Not set", or each group, e.g. "Pine rental (3) · Village hotel (2)". */
   starting_from: string;
+  /** Where most of the people taking part start from. */
   starting_stay_id: string | null;
   staying_tonight: string;
   tonight_stay_id: string | null;
+  /** The people taking part, by the stay they start from. */
+  origins: TripLodgingGroup[];
+  /** They start from more than one stay. */
+  split: boolean;
+  participating_member_ids: string[];
+}
+
+export interface TripLodgingCrewNight {
+  date: string;
+  date_label: string;
+  pre_trip: boolean;
+  /** The night of the last trip day. Like the pre-trip night, it's planned only by choice. */
+  last_night: boolean;
+  /** One stay's name, "No stay needed", "Not planned yet", or each group, e.g. "Pine rental (3) · Village hotel (2)". */
+  label: string;
+  /** The stay most of the crew is in. */
+  stay_id: string | null;
+  status: "assigned" | "no_stay" | "unplanned";
+  split: boolean;
+  occupancy: TripLodgingGroup[];
+  /** On the trip with no plan for the night. Pending invitations count once they have a plan. */
+  unplanned_member_ids: string[];
 }
 
 export interface TripLodging {
   revision: number;
+  /** Who's on the crew as the server read it; send it back as `expected_people_key` so a change meanwhile is reviewed first. */
+  people_key: string;
+  /** False until per-person nights are migrated: nights are then the crew's, and per-person changes can't be saved. */
+  per_member: boolean;
   stays: TripStaySummary[];
+  /** The saved nights: each person's, or the crew's before per-person nights. */
   assignments: TripLodgingNight[];
-  nights: Array<{ date: string; date_label: string; pre_trip: boolean; label: string; stay_id: string | null; status: "assigned" | "no_stay" | "unplanned" }>;
+  attendance: TripMemberAttendance[];
+  nights: TripLodgingCrewNight[];
   days: TripLodgingContext[];
+  people: TripLodgingPerson[];
 }
 
 /** How a date change treats day plans: see docs/trip-editing.md. */
@@ -373,11 +514,46 @@ export interface TripDateChangePreview {
   lodging_revision: number;
 }
 
-export type TripLodgingAction = "save" | "remove" | "night";
+export type TripLodgingAction = "save" | "remove" | "night" | "assign" | "attendance";
+
+/** Sets one person's nights (#331). The other people and nights don't change. */
+export interface TripLodgingAssignment {
+  member_id: string;
+  status: "assigned" | "no_stay" | "unplanned";
+  /** Required, and only allowed, for "assigned". */
+  stay_id?: string;
+  /** Required unless assigning a stay: then omitting it means every night of the stay they're on the trip. */
+  dates?: string[];
+}
+
+/** One person's night that a change affects. */
+export interface TripLodgingPersonChange {
+  member_id: string;
+  display_name: string;
+  membership: TripMemberStatus;
+  date: string;
+  date_label: string;
+  before: string;
+  after: string;
+  /** The next morning, when it's a trip day, and where this person starts it after the change. */
+  morning: string | null;
+  morning_origin: string | null;
+  /** It replaces a plan they already have: saving needs `replace_nights`. */
+  conflict: boolean;
+}
+
 export interface TripLodgingPreview {
   revision: number;
+  people_key: string;
+  /** The crew's view of each night that changes. */
   nights: Array<{ date: string; date_label: string; before: string; after: string; morning: string | null; morning_origin: string }>;
+  /** Dates with a person/night conflict, listed in `changes`. */
   conflicts: string[];
+  changes: TripLodgingPersonChange[];
+  /** `changes` in words, e.g. "Move Alex from Pine rental to Village hotel for the nights of Fri Oct 9 and Sat Oct 10." Empty before per-person nights. */
+  summary: string[];
+  /** For attendance: days whose participation changes. A saved kit stays saved. */
+  day_changes: Array<{ member_id: string; display_name: string; date: string; date_label: string; before: string; after: string; kit_saved: boolean }>;
   review_dates: string[];
   date_label: string;
 }

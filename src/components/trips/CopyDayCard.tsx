@@ -2,7 +2,6 @@
 
 import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { ItineraryChangeSheet } from "@/components/trips/ItineraryChangeSheet";
 import { DayChecklist, dayPlanLabel } from "@/components/trips/TripDaysEditor";
 import { sectionLabelClassName } from "@/components/trips/trip-primitives";
@@ -58,7 +57,7 @@ export function CopyDayCard({ tripId, day, dayLabel, stops, days, kit, tourPlan 
   };
 
   return (
-    <Card>
+    <section>
       <h2 ref={headingRef} tabIndex={-1} className={sectionLabelClassName}>Copy this day</h2>
       <p className="mt-1 break-words text-sm text-muted-foreground">
         Give other days this day&apos;s plan: {dayPlanLabel(stops, day)}.
@@ -126,6 +125,6 @@ export function CopyDayCard({ tripId, day, dayLabel, stops, days, kit, tourPlan 
           }}
         />
       )}
-    </Card>
+    </section>
   );
 }

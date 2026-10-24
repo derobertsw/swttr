@@ -27,7 +27,7 @@ describe("Overview Places entry", () => {
   it("keeps map entry usable after data failure and retries", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("Offline")).mockResolvedValueOnce(Response.json(data)));
     render(<TripPlacesSummary tripId={data.trip.id} revision={1} />);
-    expect(await screen.findByText("Places unavailable. Your itinerary is still available below.")).toBeVisible();
+    expect(await screen.findByText("Places unavailable. The trip's days are still available.")).toBeVisible();
     expect(screen.getByRole("link", { name: "View trip map" })).toBeVisible();
     await act(async () => userEvent.click(screen.getByRole("button", { name: "Retry places" })));
     expect(await screen.findByText("5 of 6 places shown")).toBeVisible();

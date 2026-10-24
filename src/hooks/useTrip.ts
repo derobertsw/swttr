@@ -2,17 +2,46 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { fetchTripFull, TripRequestError } from "@/lib/trip-requests";
-import type { TripFull } from "@/types/trips";
+import type { Trip, TripFull } from "@/types/trips";
 
 function toErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Failed to load trip";
 }
 
+/** What the trip workspace header shows. */
+export type TripSummary = Pick<Trip, "id" | "name" | "start_date" | "end_date">;
+
 export const TripContext = createContext<{
   tripId: string;
   state: ReturnType<typeof useTripState>;
   activate: () => void;
+  /** The trip as a page with its own endpoint, like Packing, last loaded it. */
+  summary: TripSummary | null;
+  setSummary: (summary: TripSummary) => void;
 } | null>(null);
+
+/**
+ * The trip's name and dates for the workspace header. It never loads the
+ * full trip: it uses whatever the page already loaded.
+ */
+export function useTripSummary(tripId: string): TripSummary | null {
+  const shared = useContext(TripContext);
+  if (shared?.tripId !== tripId) return null;
+  // A full-trip read that failed and left no trip, as lost access does,
+  // hides what Packing named too.
+  if (shared.state.error && !shared.state.data) return null;
+  return shared.state.data?.trip ?? shared.summary;
+}
+
+/** Names the trip for the workspace header from a page's own trip data. */
+export function usePublishTripSummary(summary: TripSummary | null | undefined) {
+  const shared = useContext(TripContext);
+  const setSummary = shared?.tripId === summary?.id ? shared?.setSummary : undefined;
+  const { id, name, start_date, end_date } = summary ?? {};
+  useEffect(() => {
+    if (setSummary && id && name && start_date && end_date) setSummary({ id, name, start_date, end_date });
+  }, [setSummary, id, name, start_date, end_date]);
+}
 
 export function useTrip(tripId: string | null) {
   const shared = useContext(TripContext);

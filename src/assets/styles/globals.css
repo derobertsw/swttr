@@ -262,6 +262,11 @@
   }
 }
 
+/* A linked heading or focused control clears a trip's sticky section tabs. */
+html:has([data-trip-sections]) {
+  scroll-padding-top: calc(3.5rem + env(safe-area-inset-top));
+}
+
 @supports (-webkit-touch-callout: none) {
   body {
     letter-spacing: -0.01em;

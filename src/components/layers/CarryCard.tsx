@@ -6,11 +6,14 @@ interface CarryCardProps {
   /** Items carried, not worn, during the shown phase. */
   items: string[];
   phase: "climb" | "descent";
+  /** False on a trip day, whose parts aren't cards (#330). */
+  framed?: boolean;
 }
 
 /** What goes in the pack during the shown ski-touring phase. */
-export function CarryCard({ items, phase }: CarryCardProps) {
+export function CarryCard({ items, phase, framed = true }: CarryCardProps) {
   const headingId = useId();
+  const Frame = framed ? Card : "div";
 
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
@@ -20,7 +23,7 @@ export function CarryCard({ items, phase }: CarryCardProps) {
           {phase === "climb" ? "In your pack until the descent." : "Back in your pack for the descent."}
         </p>
       </div>
-      <Card>
+      <Frame>
         {items.length > 0 ? (
           <ul className="flex flex-col gap-2">
             {items.map((name) => (
@@ -33,7 +36,7 @@ export function CarryCard({ items, phase }: CarryCardProps) {
         ) : (
           <p className="text-sm text-muted-foreground">Nothing extra to carry.</p>
         )}
-      </Card>
+      </Frame>
     </section>
   );
 }

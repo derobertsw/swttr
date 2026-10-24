@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildLodging, parseStay, previewLodging } from "@/lib/trip-lodging";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildLodging, loadLodgingRows, parseStay, peopleKey, previewCrewLodging, shiftDate } from "@/lib/trip-lodging";
+import { createFakeSupabase } from "@/test/fakeSupabase";
 import { TRIP } from "@/test/tripApi";
+import { ALEX, BLAIR, CASEY, DANA, ELI, FRAN, FRI, LODGE, MON, PINE, SAT, SPLIT_MEMBERS, SPLIT_TRIP, SUN, THU, VILLAGE, personNight, splitRows } from "@/test/splitStays";
 import type { TripStay, TripLodgingNight } from "@/types/trips";
 
 export const STAY: TripStay = { id: "40f9f55e-0e74-4c4a-923f-d7a3f92468a0", trip_id: TRIP.id, name: "Hotel", check_in: "2026-10-09", check_out: "2026-10-11", type: null, address: null, property_url: null, check_in_time: null, check_out_time: null, notes: null, booking_status: "not_booked", created_at: TRIP.created_at, updated_at: TRIP.updated_at };
@@ -27,17 +30,17 @@ describe("Lodging dates and previews", () => {
   });
   it("previews exact overlapping nights and morning origins", () => {
     const lodging = buildLodging(TRIP, [STAY], [assigned(STAY, "2026-10-09"), assigned(STAY, "2026-10-10")]);
-    const preview = previewLodging(TRIP, lodging, "save", { ...hut, check_in: "2026-10-10" });
+    const preview = previewCrewLodging(TRIP, lodging, "save", { ...hut, check_in: "2026-10-10" });
     expect(preview.conflicts).toEqual(["2026-10-10"]);
     expect(preview.nights[0]).toMatchObject({ before: "Hotel", after: "Hut", morning: "Sun Oct 11" });
     expect(preview.nights.map((night) => night.date)).toEqual(["2026-10-10", "2026-10-11", "2026-10-12"]);
   });
   it("previews removal and date changes without mutating the saved plan", () => {
     const lodging = buildLodging(TRIP, [STAY], [assigned(STAY, "2026-10-09"), assigned(STAY, "2026-10-10")]);
-    expect(previewLodging(TRIP, lodging, "remove", { id: STAY.id }).nights[0]).toMatchObject({ before: "Hotel", after: "Not planned yet", morning: "Sat Oct 10" });
-    expect(previewLodging(TRIP, lodging, "save", { ...STAY, check_in: null, check_out: null }).nights).toHaveLength(2);
+    expect(previewCrewLodging(TRIP, lodging, "remove", { id: STAY.id }).nights[0]).toMatchObject({ before: "Hotel", after: "Not planned yet", morning: "Sat Oct 10" });
+    expect(previewCrewLodging(TRIP, lodging, "save", { ...STAY, check_in: null, check_out: null }).nights).toHaveLength(2);
     expect(lodging.stays[0].assigned_nights).toHaveLength(2);
-    expect(previewLodging(TRIP, lodging, "save", { ...STAY, notes: "Meet in lobby" }).nights).toHaveLength(0);
+    expect(previewCrewLodging(TRIP, lodging, "save", { ...STAY, notes: "Meet in lobby" }).nights).toHaveLength(0);
   });
   it("flags dates outside a shortened itinerary while allowing the pre-trip night", () => {
     expect(buildLodging(TRIP, [STAY], []).stays[0].review_dates).toEqual([]);
@@ -51,5 +54,133 @@ describe("Lodging dates and previews", () => {
   });
   it.each([{ check_in: "2026-02-30" }, { check_out: null }, { check_out: "2026-10-09" }, { check_out: "9999-12-31" }, { check_in: 0 }, { name: " " }, { notes: "x".repeat(4001) }, { check_in_time: "25:10" }, { type: "castle" }])("rejects invalid or unbounded stay data (%#)", (change) => {
     expect(parseStay({ ...STAY, ...change })).toHaveProperty("error");
+  });
+});
+
+describe("Per-person nights and the crew's view of them (#331)", () => {
+  const build = (rows = splitRows(), members = SPLIT_MEMBERS) =>
+    buildLodging(SPLIT_TRIP, rows.stays, rows.assignments, { members, attendance: rows.attendance, per_member: true });
+  const person = (lodging: ReturnType<typeof build>, id: string) => lodging.people.find((entry) => entry.member_id === id)!;
+
+  it("gives an evening arrival Saturday's lodging without Saturday's plan or Friday's night", () => {
+    const casey = person(build(), CASEY.id);
+    expect(casey.nights.map((night) => [night.date, night.state, night.label])).toEqual([
+      [THU, "not_on_trip", "Not on trip"], [FRI, "not_on_trip", "Not on trip"], [SAT, "assigned", "Pine rental"],
+      [SUN, "assigned", "Mountain lodge"], [MON, "assigned", "Mountain lodge"]]);
+    expect(casey.days.map((day) => [day.date, day.participation, day.starting_from, day.staying_tonight])).toEqual([
+      [FRI, "not_on_trip", "Not on trip", "Not on trip"], [SAT, "skipping", "Not taking part", "Pine rental"],
+      [SUN, "participating", "Pine rental", "Mountain lodge"], [MON, "participating", "Mountain lodge", "Mountain lodge"]]);
+    expect(casey.attendance).toMatchObject({ arrival_date: SAT, label: "Arrives Sat Oct 10 · Skips Sat Oct 10", review_dates: [] });
+    expect(casey.gaps).toEqual([]);
+  });
+
+  it("names each group on a split night and starts the crew's day from where most of them slept", () => {
+    const lodging = build();
+    expect(lodging.nights.map((night) => [night.date, night.label, night.stay_id, night.split])).toEqual([
+      [THU, "Not planned yet", null, false],
+      [FRI, "Pine rental (3) · Village hotel (2)", PINE.id, true],
+      [SAT, "Pine rental (4) · Village hotel (2)", PINE.id, true],
+      [SUN, "Mountain lodge", LODGE.id, false],
+      [MON, "Mountain lodge", LODGE.id, false]]);
+    expect(lodging.nights[1].occupancy).toEqual([{ stay_id: PINE.id, label: "Pine rental", member_ids: [ALEX.id, BLAIR.id, DANA.id] },
+      { stay_id: VILLAGE.id, label: "Village hotel", member_ids: [ELI.id, FRAN.id] }]);
+    expect(lodging.nights.map((night) => [night.pre_trip, night.last_night])).toEqual([[true, false], [false, false], [false, false], [false, false], [false, true]]);
+    // Casey isn't there Friday and skips Saturday, so he's no one's origin until Sunday.
+    expect(lodging.days.map((day) => [day.date, day.starting_from, day.starting_stay_id, day.participating_member_ids.length])).toEqual([
+      [FRI, "Not set", null, 5], [SAT, "Pine rental (3) · Village hotel (2)", PINE.id, 5],
+      [SUN, "Pine rental (4) · Village hotel (2)", PINE.id, 6], [MON, "Mountain lodge", LODGE.id, 6]]);
+    expect(lodging.days[2].origins.map((group) => group.member_ids.length)).toEqual([4, 2]);
+    expect(lodging.stays.find((stay) => stay.id === PINE.id)).toMatchObject({ assigned_nights: [FRI, SAT],
+      occupants: [{ member_id: ALEX.id, nights: [FRI, SAT] }, { member_id: BLAIR.id, nights: [FRI, SAT] }, { member_id: CASEY.id, nights: [SAT] }, { member_id: DANA.id, nights: [FRI, SAT] }] });
+  });
+
+  it("keeps a pending invitation and a managed guest as they are, and leaves the pre-trip and last nights out of gaps", () => {
+    const rows = splitRows();
+    rows.assignments = rows.assignments.filter((night) => night.member_id !== FRAN.id && !(night.member_id === DANA.id && night.date === SAT));
+    const lodging = build(rows);
+    expect(person(lodging, FRAN.id)).toMatchObject({ membership: "invited", gaps: [FRI, SAT, SUN] });
+    expect(person(lodging, DANA.id)).toMatchObject({ membership: "guest", role: "guest", gaps: [SAT] });
+    expect(person(lodging, ALEX.id).gaps).toEqual([]);
+    // Fran has no plan, so she isn't counted in the crew's nights; Dana is.
+    expect(lodging.nights[2]).toMatchObject({ label: "Pine rental (3) · Village hotel (1) · Not planned yet (1)", unplanned_member_ids: [DANA.id] });
+    expect(lodging.nights[1].label).toBe("Pine rental (3) · Village hotel (1)");
+  });
+
+  it("ends an early departure's nights on the day they leave, which they still spend there", () => {
+    const rows = splitRows();
+    rows.attendance = [...rows.attendance, { trip_id: SPLIT_TRIP.id, member_id: DANA.id, arrival_date: null, departure_date: SUN, skipped_dates: [] }];
+    rows.assignments = rows.assignments.filter((night) => !(night.member_id === DANA.id && night.date >= SUN));
+    const dana = person(build(rows), DANA.id);
+    expect(dana.nights.slice(3).map((night) => night.state)).toEqual(["not_on_trip", "not_on_trip"]);
+    expect(dana.days.map((day) => day.participation)).toEqual(["participating", "participating", "participating", "not_on_trip"]);
+    expect(dana.days[2]).toMatchObject({ starting_from: "Pine rental", staying_tonight: "Not on trip" });
+    expect(dana.attendance.label).toBe("Leaves Sun Oct 11");
+  });
+
+  it("flags saved nights and dates the trip no longer includes, and ignores people who left", () => {
+    const shortened = { ...SPLIT_TRIP, start_date: SAT };
+    const rows = splitRows();
+    const lodging = buildLodging(shortened, rows.stays, rows.assignments,
+      { members: SPLIT_MEMBERS.map((entry) => entry.id === ELI.id ? { ...entry, status: "left" as const } : entry), attendance: rows.attendance, per_member: true });
+    expect(person(lodging, ALEX.id).review_nights).toEqual([]);
+    expect(person(lodging, ALEX.id).nights[0]).toMatchObject({ date: FRI, state: "assigned", label: "Pine rental" });
+    expect(person(lodging, ELI.id).nights.every((night) => night.state === "not_on_trip")).toBe(true);
+    expect(person(lodging, ELI.id).review_nights).toEqual([]);
+    expect(lodging.nights[0]).toMatchObject({ date: FRI, pre_trip: true, label: "Pine rental (3) · Village hotel (1)" });
+    expect(lodging.stays.find((stay) => stay.id === VILLAGE.id)!.occupants.map((entry) => entry.member_id)).toEqual([FRAN.id]);
+    const moved = { ...SPLIT_TRIP, start_date: "2026-10-16", end_date: "2026-10-18" };
+    const later = buildLodging(moved, rows.stays, rows.assignments, { members: SPLIT_MEMBERS, attendance: rows.attendance, per_member: true });
+    expect(person(later, ALEX.id).review_nights).toEqual([FRI, SAT, SUN, MON]);
+    expect(person(later, CASEY.id).attendance.review_dates).toEqual([SAT]);
+  });
+
+  it("applies crew-wide nights from before per-person nights to the crew only", () => {
+    const lodging = buildLodging(SPLIT_TRIP, [PINE], [assigned(PINE, FRI)], { members: SPLIT_MEMBERS });
+    expect(lodging.per_member).toBe(false);
+    expect(lodging.nights[1]).toMatchObject({ label: "Pine rental", stay_id: PINE.id, split: false });
+    expect(person(lodging, FRAN.id).nights[1].state).toBe("unplanned");
+    expect(person(lodging, DANA.id).nights[1].state).toBe("assigned");
+  });
+
+  it("reads every person/night of a plan longer than one PostgREST page", async () => {
+    const nights = SPLIT_MEMBERS.flatMap((member) => Array.from({ length: 350 }, (_, day) => personNight(member.id, shiftDate(FRI, day), PINE))).reverse();
+    const supabase = createFakeSupabase({ trip_stays: [PINE], trip_member_lodging_nights: nights, trip_member_attendance: [] } as never, { maxRows: 1000 });
+    const rows = await loadLodgingRows(supabase as unknown as SupabaseClient, SPLIT_TRIP.id);
+    expect(rows.assignments).toHaveLength(2100);
+    expect(new Set(rows.assignments.map((night) => `${night.member_id} ${night.date}`)).size).toBe(2100);
+    expect(rows.assignments.slice(0, 2).map((night) => [night.date, night.member_id])).toEqual([[FRI, ALEX.id], [FRI, BLAIR.id]]);
+  });
+
+  it("reads each person's nights as runs, with the morning they change stays (#332)", () => {
+    const lodging = build();
+    const runs = (id: string) => person(lodging, id).runs.map((run) => [run.label, run.date_label, run.gap]);
+    expect(runs(ALEX.id)).toEqual([["Not planned", "Thu Oct 8 → Fri Oct 9 · 1 night", false], ["Pine rental", "Fri Oct 9 → Sun Oct 11 · 2 nights", false],
+      ["Mountain lodge", "Sun Oct 11 → Tue Oct 13 · 2 nights", false]]);
+    expect(person(lodging, ALEX.id).changeovers).toEqual([{ date: SUN, date_label: "Sun Oct 11", from: "Pine rental", to: "Mountain lodge" }]);
+    // A late arrival's earlier nights are Not on trip, never a gap.
+    expect(runs(CASEY.id)).toEqual([["Not on trip", "Thu Oct 8 → Sat Oct 10 · 2 nights", false], ["Pine rental", "Sat Oct 10 → Sun Oct 11 · 1 night", false],
+      ["Mountain lodge", "Sun Oct 11 → Tue Oct 13 · 2 nights", false]]);
+    const rows = splitRows();
+    rows.assignments = rows.assignments.filter((night) => !(night.member_id === ELI.id && night.date === SUN));
+    expect(person(build(rows), ELI.id).runs.map((run) => [run.label, run.date_label, run.gap])).toEqual([["Not planned", "Thu Oct 8 → Fri Oct 9 · 1 night", false],
+      ["Village hotel", "Fri Oct 9 → Sun Oct 11 · 2 nights", false], ["Not planned", "Sun Oct 11 → Mon Oct 12 · 1 night", true], ["Mountain lodge", "Mon Oct 12 → Tue Oct 13 · 1 night", false]]);
+    expect(person(build(rows), ELI.id).changeovers).toEqual([]);
+  });
+
+  it("lists each stay's people night by night, consecutive nights with the same people together", () => {
+    const stays = build().stays;
+    const occupancy = (id: string) => stays.find((stay) => stay.id === id)!.occupancy.map((run) => [run.date_label, run.member_ids]);
+    expect(occupancy(PINE.id)).toEqual([["Fri Oct 9 → Sat Oct 10 · 1 night", [ALEX.id, BLAIR.id, DANA.id]], ["Sat Oct 10 → Sun Oct 11 · 1 night", [ALEX.id, BLAIR.id, CASEY.id, DANA.id]]]);
+    expect(occupancy(VILLAGE.id)).toEqual([["Fri Oct 9 → Sun Oct 11 · 2 nights", [ELI.id, FRAN.id]]]);
+    expect(occupancy(LODGE.id)).toEqual([["Sun Oct 11 → Tue Oct 13 · 2 nights", SPLIT_MEMBERS.map((member) => member.id)]]);
+    expect(stays.find((stay) => stay.id === PINE.id)!.checkout_label).toBe("Check-out Sun Oct 11 morning");
+    const undated = buildLodging(SPLIT_TRIP, [{ ...PINE, check_in: null, check_out: null }], [], { members: SPLIT_MEMBERS, per_member: true }).stays[0];
+    expect(undated).toMatchObject({ occupancy: [], checkout_label: null, date_label: "Dates not set" });
+  });
+
+  it("makes the same crew key as the database", () => {
+    expect(peopleKey([])).toBe("d41d8cd98f00b204e9800998ecf8427e");
+    expect(peopleKey([{ id: "b", status: "joined" }, { id: "a", status: "invited" }])).toBe(peopleKey([{ id: "a", status: "invited" }, { id: "b", status: "joined" }]));
+    expect(peopleKey([{ id: "a", status: "joined" }])).not.toBe(peopleKey([{ id: "a", status: "invited" }]));
   });
 });

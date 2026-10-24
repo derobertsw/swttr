@@ -10,13 +10,17 @@ vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/l
 const full = driveTrip();
 const get = (query = "", id = full.trip.id) => GET(new Request(`https://example.com/api/v1/trips/${id}/map${query}`), { params: Promise.resolve({ id }) });
 
-/** Exercise actual access helper, PostgREST query builder, loading and projection together. */
-function database(status = "joined", userId = "member", failures: string[] = []) {
+/**
+ * Exercise actual access helper, PostgREST query builder, loading and projection together.
+ * Without `perMember`, the database is from before per-person nights (#331) and has only the crew's.
+ */
+function database(status = "joined", userId = "member", failures: string[] = [], perMember = true) {
   const requests: URL[] = [];
   const tables: Record<string, unknown[]> = {
-    trips: [full.trip], trip_stops: full.stops, trip_days: full.days,
-    trip_stays: full.lodging!.stays, trip_lodging_nights: full.lodging!.assignments,
-    trip_members: [{ id: "membership", trip_id: full.trip.id, user_id: "member", status, invite_token: "SECRET" }],
+    trips: [full.trip], trip_stops: full.stops, trip_days: full.days, trip_stays: full.lodging!.stays,
+    ...perMember ? { trip_member_lodging_nights: full.lodging!.assignments.map((night) => ({ ...night, member_id: "membership" })) }
+      : { trip_lodging_nights: full.lodging!.assignments },
+    trip_members: [{ id: "membership", trip_id: full.trip.id, user_id: "member", display_name: "Sam", role: "member", status, invite_token: "SECRET" }],
   };
   const supabase = createClient("https://example.supabase.co", "test-service-key", {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -26,6 +30,7 @@ function database(status = "joined", userId = "member", failures: string[] = [])
       expect(init?.method ?? "GET").toBe("GET");
       const table = url.pathname.split("/").at(-1)!;
       if (failures.includes(table)) return Response.json({ code: "XX000", message: "database secret" }, { status: 500 });
+      if (!perMember && table.startsWith("trip_member_")) return Response.json({ code: "PGRST205", message: "missing table" }, { status: 404 });
       const rows = (tables[table] ?? []).filter((value) => {
         const row = value as Record<string, unknown>;
         return [...url.searchParams].every(([column, filter]) => !filter.startsWith("eq.") && !filter.startsWith("neq.")
@@ -42,15 +47,18 @@ beforeEach(() => { vi.clearAllMocks(); vi.spyOn(globalThis, "fetch").mockRejecte
 afterEach(() => vi.restoreAllMocks());
 
 describe("GET trip map", () => {
-  it.each(["user-1", "member"])("loads for an authorized %s with private headers, no provider and no kit/invite reads", async (user) => {
-    const { requests } = database("joined", user);
+  it.each([["user-1", true], ["member", true], ["member", false]])("loads for an authorized %s with private headers, no provider and no kit/invite reads (per person: %s)", async (user, perMember) => {
+    const { requests } = database("joined", user as string, [], perMember as boolean);
     const response = await get("?date=2027-01-10");
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(response.headers.get("vary")).toContain("Authorization");
     expect(await response.json()).toMatchObject({ scope: { date: "2027-01-10" }, days: [{ starting_from: "Stowe Motel", staying_tonight: "Village Inn" }] });
     expect(requests.some((url) => /kits|gear|conditions/.test(url.pathname))).toBe(false);
-    expect(requests.filter((url) => url.pathname.endsWith("trip_members"))).toHaveLength(user === "member" ? 1 : 0);
+    // The access check, and lodging's names and memberships: never invitation links.
+    const members = requests.filter((url) => url.pathname.endsWith("trip_members"));
+    expect(members).toHaveLength(user === "member" ? 2 : 1);
+    expect(members.every((url) => !/\*|invite_token/.test(url.searchParams.get("select") ?? "*"))).toBe(true);
     for (const url of requests.filter((url) => !url.pathname.endsWith("trips"))) expect(url.searchParams.get("trip_id")).toBe(`eq.${full.trip.id}`);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });

@@ -54,7 +54,8 @@ export function previewDateChange(full: TripFull, start: string, end: string): T
       keep: planFor(full, start, end, "keep"),
       ...(sameLength ? { move: planFor(full, start, end, "move") } : {}),
     },
-    lodging_after: buildLodging({ ...trip, start_date: start, end_date: end }, lodging.stays, lodging.assignments),
+    lodging_after: buildLodging({ ...trip, start_date: start, end_date: end }, lodging.stays, lodging.assignments,
+      { members: full.members, attendance: lodging.attendance, per_member: lodging.per_member }),
     lodging_revision: lodging.revision,
   };
 }
