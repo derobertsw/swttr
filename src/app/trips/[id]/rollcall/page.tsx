@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SectionLabel, TripError } from "@/components/trips/trip-primitives";
 import { usePublishTripSummary } from "@/hooks/useTrip";
+import { tripActivityLabel } from "@/lib/trip-activities";
 import { errorMessage, tripRequest, TripRequestError } from "@/lib/trip-requests";
 import { cn } from "@/lib/utils";
 import type { TripChecklist, TripChecklistPerson, TripDayChecklist } from "@/types/trips";
@@ -109,7 +110,7 @@ function DayTasks({ tripId, day, viewer }: { tripId: string; day: TripDayCheckli
   return <section aria-labelledby="checklist-day-heading" className="flex flex-col gap-6">
     <div>
       <h2 id="checklist-day-heading" className="text-xl font-semibold text-foreground">{day.date_label}</h2>
-      <p className="text-base text-muted-foreground">{[day.activity ?? "Activity not set", day.place].filter(Boolean).join(" · ")}</p>
+      <p className="text-base text-muted-foreground">{[day.activity ? tripActivityLabel(day.activity) : "Activity not set", day.place].filter(Boolean).join(" · ")}</p>
     </div>
     {!day.people.length && <p className="text-base text-muted-foreground">No crew on this trip yet.</p>}
     {GROUPS.map((group) => {

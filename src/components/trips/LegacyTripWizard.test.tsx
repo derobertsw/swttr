@@ -564,7 +564,7 @@ describe("New trip wizard", () => {
 
       await user.click(edit);
       const sheet = await screen.findByRole("dialog");
-      await user.click(within(sheet).getByRole("button", { name: "Alpine" }));
+      await user.click(within(sheet).getByRole("button", { name: "Downhill skiing" }));
       const save = within(sheet).getByRole("button", { name: "Save stop" });
       await user.click(save);
 
@@ -581,7 +581,7 @@ describe("New trip wizard", () => {
         })
       );
       expect(screen.getByRole("dialog")).toBe(sheet);
-      expect(within(sheet).getByRole("button", { name: "Alpine" })).toHaveAttribute("aria-pressed", "true");
+      expect(within(sheet).getByRole("button", { name: "Downhill skiing" })).toHaveAttribute("aria-pressed", "true");
       expect(within(sheet).getByRole("button", { name: "Close" })).toBeEnabled();
     });
 
@@ -593,11 +593,11 @@ describe("New trip wizard", () => {
 
       await user.click(edit);
       const sheet = await screen.findByRole("dialog");
-      await user.click(within(sheet).getByRole("button", { name: "Alpine" }));
+      await user.click(within(sheet).getByRole("button", { name: "Downhill skiing" }));
       await user.click(within(sheet).getByRole("button", { name: "Save stop" }));
 
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-      expect(screen.getByText("Base · Alpine")).toBeInTheDocument();
+      expect(screen.getByText("Base · Downhill skiing")).toBeInTheDocument();
       expect(edit).toHaveFocus();
       expect(sentBodies(fetchMock, "PATCH /api/v1/trips/trip-1/stops/stop-stowe")).toEqual([
         { activities: ["Alpine"] },

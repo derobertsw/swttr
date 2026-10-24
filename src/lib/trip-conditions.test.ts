@@ -77,7 +77,7 @@ describe("staleReasons", () => {
   it("names each relevant change", () => {
     expect(changed({ day: { date: "2026-10-11" } })).toEqual(["Date changed from Sat Oct 10"]);
     expect(changed({ stops: [{ ...stop, latitude: 44.3 }] })).toEqual(["Destination changed"]);
-    expect(changed({ day: { activity: "Alpine" } })).toEqual(["Activity changed to Alpine"]);
+    expect(changed({ day: { activity: "Alpine" } })).toEqual(["Activity changed to Downhill skiing"]);
     expect(changed({ stops: [{ ...stop, access_point: point(44.3) }] })).toEqual(["Access point changed"]);
     expect(changed({ day: { access_point: point(44.3), access_point_stop_id: "stop-1" } })).toEqual(["Access point changed"]);
     expect(changed({ plans: [{ ...plan, objective: "Gulf of Slides" }] })).toEqual(["Route changed"]);

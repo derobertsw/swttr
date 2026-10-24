@@ -25,13 +25,25 @@ describe("Day checklist (#336)", () => {
     expect(person(full, SAT, DANA.id).clothing).toMatchObject({ state: "not_started", label: "Not started", flag: null });
     // Missing, as the day page shows it, whether or not the kit has slots.
     expect(person(full, SAT, ELI.id).clothing).toMatchObject({ state: "checklist", flag: { state: "missing", label: "Flagged: missing" } });
-    expect(person(full, SAT, CASEY.id).clothing).toMatchObject({ state: "not_started", flag: { state: "missing", label: "Flagged: missing" } });
+    // Casey isn't taking part Saturday, so nothing is asked of them; a saved flag still shows.
+    expect(person(full, SAT, CASEY.id).clothing).toMatchObject({ state: "not_needed", label: "Nothing to plan", flag: { state: "missing", label: "Flagged: missing" } });
     expect(person(full, SAT, FRAN.id).clothing).toMatchObject({ state: "not_started", label: "Not started", flag: null });
     // A saved outfit carries no checklist flag, as on the day page.
     expect(person(full, SUN, BLAIR.id).clothing.flag).toBeNull();
     // Saturday's outfit copied to Sunday was planned for Saturday's forecast.
     expect(person(full, SUN, ALEX.id).clothing).toMatchObject({ state: "outfit_review", label: "Outfit saved for another plan" });
     expect(person(full, SUN, ALEX.id).clothing.notes).toEqual([expect.stringContaining("Sat Oct 10")]);
+  });
+
+  it("asks nobody for clothing on a Travel or Rest day, and keeps a kit someone saved there (#334)", () => {
+    const base = trip();
+    const full = trip({ days: base.days.map((day) => day.date === SUN ? { ...day, activity: "Travel" } : day.date === MON ? { ...day, activity: "Rest" } : day),
+      kits: [kit(BLAIR.id, MON, { items: ["shell"] })] });
+    expect(person(full, SUN, ALEX.id).clothing).toEqual({ state: "not_needed", label: "Nothing to plan", notes: [], flag: null });
+    expect(person(full, MON, ALEX.id).clothing.state).toBe("not_needed");
+    expect(person(full, MON, BLAIR.id).clothing).toMatchObject({ state: "checklist", label: "Older checklist: Shell" });
+    // Saturday is still a ski day.
+    expect(person(full, SAT, ALEX.id).clothing.state).toBe("not_started");
   });
 
   it("follows the selected day's attendance and tonight's stay, and names a pending invitation as one", () => {

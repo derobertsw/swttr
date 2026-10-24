@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { tripActivityLabel } from "@/lib/trip-activities";
 import { dateLabel } from "@/lib/trip-lodging";
 import { accessPointFor } from "@/lib/trip-location";
 import type {
@@ -85,7 +86,7 @@ export function staleReasons(saved: Partial<TripConditionsContext>, now: TripCon
   const reasons: string[] = [];
   if (saved.date !== now.date) reasons.push(saved.date ? `Date changed from ${dateLabel(saved.date)}` : "Date changed");
   if (!same(saved.stop, now.stop)) reasons.push("Destination changed");
-  if (!same(saved.activity, now.activity)) reasons.push(`Activity changed to ${now.activity ?? "none"}`);
+  if (!same(saved.activity, now.activity)) reasons.push(`Activity changed to ${now.activity ? tripActivityLabel(now.activity) : "none"}`);
   if (!same(saved.access_point, now.access_point)) reasons.push("Access point changed");
   if (!same(saved.route, now.route)) reasons.push(!saved.route ? "Tour plan added" : !now.route ? "Tour plan removed" : "Route changed");
   if (!same(saved.source?.url, now.source.url)) reasons.push("Source link changed");

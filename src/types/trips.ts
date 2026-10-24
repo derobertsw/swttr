@@ -777,7 +777,8 @@ export interface TripChecklistPerson {
   participation_label: string;
   /** The day's saved outfit, an older checklist, or Not started. A checklist is never an outfit. */
   clothing: {
-    state: "outfit" | "outfit_review" | "checklist" | "not_started";
+    /** Not needed on a Travel or Rest day, or a day they aren't taking part in (#334). */
+    state: "outfit" | "outfit_review" | "checklist" | "not_started" | "not_needed";
     label: string;
     /** Why a saved outfit no longer fits the day, as the day page says it. */
     notes: string[];

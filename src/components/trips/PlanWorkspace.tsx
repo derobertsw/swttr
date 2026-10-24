@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spine, StopDot } from "@/components/trips/trip-primitives";
 import { useTrip } from "@/hooks/useTrip";
 import { useUserId } from "@/hooks/useUserId";
+import { tripActivityLabel, tripActivityNeedsClothing } from "@/lib/trip-activities";
 import { tripLocation } from "@/lib/trip-sections";
 import { cn } from "@/lib/utils";
 import type { TripDay, TripFull } from "@/types/trips";
@@ -69,7 +70,10 @@ function revealWithin(box: HTMLElement, item: HTMLElement, axis: "x" | "y") {
   }
 }
 
-/** What to do next: the first day without an activity or without your kit. */
+/**
+ * What to do next: the first day without an activity, or without your kit on
+ * a day you take part in that has clothing to plan (not Travel or Rest, #334).
+ */
 function nextStep(data: TripFull, userId: string | null) {
   if (data.stops.length === 0) {
     return {
@@ -80,8 +84,11 @@ function nextStep(data: TripFull, userId: string | null) {
     };
   }
   const member = data.members.find((m) => m.user_id === userId && m.status !== "left");
+  const person = data.lodging?.people.find((entry) => entry.member_id === member?.id);
+  const takesPart = (date: string) => (person?.days.find((entry) => entry.date === date)?.participation ?? "participating") === "participating";
   const day = data.days.find((candidate) => !candidate.activity
-    || !data.kits.some((kit) => kit.trip_day_id === candidate.id && kit.trip_member_id === member?.id));
+    || (tripActivityNeedsClothing(candidate.activity) && takesPart(candidate.date)
+      && !data.kits.some((kit) => kit.trip_day_id === candidate.id && kit.trip_member_id === member?.id)));
   if (!day) return null;
   return {
     text: !day.activity ? "Choose an activity for your next unplanned day." : "Plan your kit for your next unplanned day.",
@@ -164,7 +171,7 @@ function TripItinerary({ tripId, data, loading, selected, className }: {
                     <span className="block text-sm font-semibold text-foreground">
                       {dateLabel(day.date, { weekday: "short", month: "short", day: "numeric" })}
                     </span>
-                    <span className="block text-sm text-muted-foreground wrap-anywhere">{day.activity ?? "Activity not set"}</span>
+                    <span className="block text-sm text-muted-foreground wrap-anywhere">{day.activity ? tripActivityLabel(day.activity) : "Activity not set"}</span>
                   </span>
                 </Link>
               </li>

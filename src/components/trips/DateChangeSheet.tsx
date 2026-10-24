@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
+import { tripActivityLabel } from "@/lib/trip-activities";
 import { errorMessage, timedTripRequest, TripRequestError } from "@/lib/trip-requests";
 import type { Trip, TripDateChangeDay, TripDateChangeMode, TripDateChangePreview } from "@/types/trips";
 
@@ -166,7 +167,7 @@ function DayList({ title, days, describe = (day) => day.date_label, warning = fa
       <ul className="mt-1 space-y-2">
         {days.map((day) => (
           <li key={day.date} className="break-words">
-            <p>{describe(day)} · {day.destination} · {day.activity ?? "No activity"}</p>
+            <p>{describe(day)} · {day.destination} · {day.activity ? tripActivityLabel(day.activity) : "No activity"}</p>
             {day.kits.length > 0 && <p className="text-muted-foreground">{day.kits.length === 1 ? "Kit" : "Kits"}: {day.kits.join(", ")}</p>}
             {day.tour_plan && <p className="text-muted-foreground">Tour plan: {day.tour_plan}</p>}
           </li>
