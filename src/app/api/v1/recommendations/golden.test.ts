@@ -293,6 +293,42 @@ describe('running accessory selection and manual evaluation', () => {
     expect(added.bodyParts.headNeck.status).toBe('over');
     expect(added.decision.riskType).toBe('overheat');
   });
+
+  it.each([['running', running], ['xc', xc]] as const)('wears owned gloves and a balaclava rated for -15°F (%s), and manual checks agree', async (_, POST) => {
+    useDatabase(USER_ID, FULL_WARDROBE);
+    const { body } = await callRoute(POST, { ...CONDITIONS[3].body, use_wardrobe_only: true });
+    const { ireq, recommendation } = body as BiophysicsRecommendation;
+    const owned = (type: string, id: string | undefined) => FULL_WARDROBE.some(row => row.item_type === type && row.item_id === id);
+
+    expect(owned('handwear', recommendation.handwear?.id)).toBe(true);
+    expect(owned('headwear', recommendation.headwear?.head_warmth?.id)).toBe(true);
+    for (const part of ['hands', 'head'] as const) {
+      expect(recommendation.accessories![part]).toMatchObject({ state: 'selected', thermal_status: 'in_range' });
+      expect(recommendation.accessories![part].max).toBe(ireq.extremity!.max![part]);
+    }
+    expect(body.warnings).toEqual(expect.not.arrayContaining([expect.stringContaining('no suitable')]));
+
+    const worn = {
+      torso: recommendation.garments.filter(g => g.covers_torso).map(g => ({ sourceId: g.id, item_type: 'garment' })),
+      legs: recommendation.garments.filter(g => g.covers_legs).map(g => ({ sourceId: g.id, item_type: 'garment' })),
+      hands: [{ sourceId: recommendation.handwear!.id, item_type: 'handwear' }],
+      headNeck: [{ sourceId: recommendation.headwear!.head_warmth!.id, item_type: 'headwear' }],
+    };
+    const phase = {
+      items: worn,
+      targets: { torso: ireq.regional!.neutral.torso, legs: ireq.regional!.neutral.legs, hands: ireq.extremity!.neutral.hands, headNeck: ireq.extremity!.neutral.head },
+      minTargets: { torso: ireq.regional!.min.torso, legs: ireq.regional!.min.legs, hands: ireq.extremity!.min.hands, headNeck: ireq.extremity!.min.head },
+      extremityMaxTargets: { hands: ireq.extremity!.max!.hands, headNeck: ireq.extremity!.max!.head },
+      arms: { clo: recommendation.ensemble_properties.regional_clo!.arms, minTarget: ireq.regional!.min.arms },
+      targetRange: ireq.target_range,
+    };
+    const { body: { phases: [kept, removed] } } = await callRoute(evaluateLayers, { phases: [phase, { ...phase, items: { ...worn, hands: [], headNeck: [] } }] });
+    expect(kept.bodyParts.hands.status).toBe('in_range');
+    expect(kept.bodyParts.headNeck.status).toBe('in_range');
+    expect(kept.decision.riskType).not.toBe('overheat');
+    expect(removed.bodyParts.hands.status).toBe('under');
+    expect(removed.decision.riskType).toBe('cold');
+  });
 });
 
 describe("POST /api/v1/recommendations/alpine (golden, comfort)", () => {

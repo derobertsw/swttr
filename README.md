@@ -260,18 +260,23 @@ graph TD
 
 ### 6. Extremity Selection
 
-Running/XC evaluate optional thermal coverage against the phase's local min/max bands. The absence of insulation competes with known suitable gear; an unsuitable or unknown wardrobe never forces the warmest item. Functional XC gloves have a separate pole-grip purpose. Cycling, alpine and touring explicitly retain the earlier selection rules pending calibration; required alpine/descent helmets remain outside the optional path.
+Running/XC evaluate optional thermal coverage against the phase's local min/max bands. The absence of insulation competes with known suitable gear. When nothing fits, going without is weighed against the nearest item, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings check the heuristic bands in deep cold: items rated for these conditions win, and the lightest rated choice sets the upper limit that scoring and manual checks use. Functional XC gloves have a separate pole-grip purpose. Cycling, alpine and touring explicitly retain the earlier selection rules pending calibration; required alpine/descent helmets remain outside the optional path.
 
 ```mermaid
 graph TD
     EXT[Server sport and phase policy<br/>Local minimum, neutral and upper limits] --> MODE{Sustained running or XC?}
-    MODE -->|Yes| BARE[Evaluate bare hands and no thermal headwear<br/>alongside known suitable accessories]
-    BARE --> HAND[Hands: reject insufficient and excess warmth<br/>XC: prefer dexterous pole-grip gloves<br/>Thin-glove allowance does not add thermal demand]
+    MODE -->|Yes| RATED[Prefer items rated for the conditions:<br/>active minimum at most air temperature + 10°C<br/>Neck pieces must be rated]
+    RATED --> BARE[Evaluate bare hands and no thermal headwear<br/>alongside known suitable accessories]
+    BARE --> HAND[Hands: prefer gloves within the local band<br/>XC: choose among dexterous pole-grip gloves when any exist<br/>Thin-glove allowance does not add thermal demand]
     BARE --> HEAD[Head plus neck combinations share one budget<br/>Include worn hood insulation<br/>Avoid overlapping neck layers]
-    HAND --> STATE[Report selected, not needed,<br/>missing suitable gear, or unknown data<br/>Explain thermal or functional purpose]
-    HEAD --> STATE
+    HAND --> FIT{Anything within the band?}
+    HEAD --> FIT
+    FIT -->|No| NEAREST[Weigh going without against the nearest item<br/>shortfall counts double an excess<br/>Deep cold: rated and unrated gear owned,<br/>so a short part gets the lightest rated item]
+    NEAREST --> LIMIT[Lightest rated choice above the band<br/>raises that part's upper limit]
+    FIT -->|Yes| STATE
+    LIMIT --> STATE[Report selected, not needed,<br/>missing suitable gear, or unknown data<br/>Explain thermal or functional purpose]
     STATE --> MATCH[Head requirements prefer selected head warmth<br/>Neck fallback only when no head layer is selected]
-    MATCH --> EDIT[Manual edits use the same local limits<br/>Catalog data and worn hoods resolved on server<br/>Cold shortfalls and local excess affect comfort]
+    MATCH --> EDIT[Manual edits use the same local limits, raised ones included<br/>Catalog data and worn hoods resolved on server<br/>Cold shortfalls and local excess affect comfort]
     MODE -->|No: compatibility policy| LEGACY[Temperature and target selection retained]
     LEGACY --> LHAND[Biking: active glove thresholds<br/>Alpine and touring: static glove thresholds]
     LEGACY --> LHEAD[Head warmth by temperature<br/>Neck layer below freezing]
