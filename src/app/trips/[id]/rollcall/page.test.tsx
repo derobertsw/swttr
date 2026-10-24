@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { buildDayChecklists } from "@/lib/trip-checklist";
-import { checklistTrip, gear, kit, source } from "@/test/dayChecklist";
+import { checklistMembers, checklistTrip, gear, kit, source } from "@/test/dayChecklist";
 import { savedOutfit } from "@/test/savedKit";
 import { ALEX, BLAIR, PINE, SAT, SUN } from "@/test/splitStays";
 import { fakeTripApi, reply, TRIP } from "@/test/tripApi";
@@ -123,5 +123,18 @@ describe("Day checklist page (#336)", () => {
     await act(async () => { window.dispatchEvent(new Event("focus")); });
     expect(await screen.findByText("Couldn't load the day checklist. Try again.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sat Oct 10", level: 2 })).toBeInTheDocument();
+  });
+
+  it("says Your on the organizer's own row, which the trip names You to them", async () => {
+    const own = buildDayChecklists(checklistTrip({
+      members: checklistMembers.map((member) => member.id === ALEX.id ? { ...member, display_name: "You" } : member),
+      conditions: [source("avalanche", SAT, [{ user: "user-alex" }])],
+    }), "user-alex", SAT);
+    vi.stubGlobal("fetch", fakeTripApi({ [ROUTE]: reply(200, own) }));
+    await renderPage();
+    expect(await screen.findByRole("link", { name: "Your clothing for Sat Oct 10: Not started" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Your stay the night of Sat Oct 10: Pine rental" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Your source reviews for Sat Oct 10: 1 of 1 source reviewed/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /You's/ })).not.toBeInTheDocument();
   });
 });

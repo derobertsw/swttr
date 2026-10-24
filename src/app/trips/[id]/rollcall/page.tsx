@@ -137,6 +137,8 @@ const linkClassName = "underline underline-offset-4 hover:no-underline";
 
 function PersonTasks({ tripId, day, person, viewer }: { tripId: string; day: TripDayChecklist; person: TripChecklistPerson; viewer: boolean }) {
   const name = viewer && person.display_name !== "You" ? `${person.display_name} (you)` : person.display_name;
+  // The organizer's own row is named "You" to them (tripFullFor).
+  const whose = person.display_name === "You" ? "Your" : `${person.display_name}'s`;
   const { clothing, tonight, conditions } = person;
   const dayHref = `/trips/${encodeURIComponent(tripId)}/days/${day.date}`;
   return <li className="py-4">
@@ -144,14 +146,14 @@ function PersonTasks({ tripId, day, person, viewer }: { tripId: string; day: Tri
     <p className="text-sm text-muted-foreground">{[person.membership_label, person.participation === "skipping" && person.participation_label].filter(Boolean).join(" · ")}</p>
     <dl className="mt-2 grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-base sm:grid-cols-[8rem_minmax(0,1fr)]">
       <Fact term="Clothing">
-        <Link href={`${dayHref}#kit-${person.member_id}`} className={linkClassName} aria-label={`${person.display_name}'s clothing for ${day.date_label}: ${clothing.label}`}>{clothing.label}</Link>
+        <Link href={`${dayHref}#kit-${person.member_id}`} className={linkClassName} aria-label={`${whose} clothing for ${day.date_label}: ${clothing.label}`}>{clothing.label}</Link>
         {clothing.flag && <span className="text-warning"> · {clothing.flag.label}</span>}
         {clothing.notes.map((note) => <span key={note} className="block text-sm text-muted-foreground">{note}</span>)}
       </Fact>
       {tonight && <Fact term="Tonight">
         {tonight.state === "not_on_trip" ? <span className="text-muted-foreground">{tonight.label}</span>
           : <Link href={`/trips/${encodeURIComponent(tripId)}/stays${tonight.stay_id ? `#stay-${tonight.stay_id}` : ""}`} className={cn(linkClassName, tonight.gap && "text-warning")}
-            aria-label={`${person.display_name}'s stay the night of ${day.date_label}: ${tonight.gap ? "Not planned yet" : tonight.label}`}>{tonight.gap ? "Not planned yet" : tonight.label}</Link>}
+            aria-label={`${whose} stay the night of ${day.date_label}: ${tonight.gap ? "Not planned yet" : tonight.label}`}>{tonight.gap ? "Not planned yet" : tonight.label}</Link>}
       </Fact>}
       <Fact term="Shared gear">
         {person.shared.length ? <ul>{person.shared.map((item) => <li key={item.id}>
@@ -160,7 +162,7 @@ function PersonTasks({ tripId, day, person, viewer }: { tripId: string; day: Tri
         </li>)}</ul> : <span className="text-muted-foreground">None assigned</span>}
       </Fact>
       {conditions && <Fact term="Source reviews">
-        <Link href={`${dayHref}#conditions-heading`} className={linkClassName} aria-label={`${person.display_name}'s source reviews for ${day.date_label}: ${conditions.label}`}>{conditions.label}</Link>
+        <Link href={`${dayHref}#conditions-heading`} className={linkClassName} aria-label={`${whose} source reviews for ${day.date_label}: ${conditions.label}`}>{conditions.label}</Link>
       </Fact>}
       {viewer && <Fact term="Your packing">
         <Link href={`/trips/${encodeURIComponent(tripId)}/pack`} className={linkClassName}>Your packing list</Link>
