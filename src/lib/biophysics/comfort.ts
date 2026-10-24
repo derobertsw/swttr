@@ -1,8 +1,8 @@
 import type { ThermalDecision } from '@/types/biophysics';
 
 /** Legacy significant-mismatch allowance; never a comfortable-band extension. */
-export const OVERHEAT_BUFFER_CLO = 0.3;
-export const WHOLE_BODY_WARMTH_EPSILON = 0.01;
+const OVERHEAT_BUFFER_CLO = 0.3;
+const WHOLE_BODY_WARMTH_EPSILON = 0.01;
 export const THERMAL_DISPLAY_CLO_EPSILON = 0.05;
 /**
  * Insulation of the air layer around the clothing, in clo. ISO 9920 puts it
@@ -40,7 +40,7 @@ interface ThermalComfortDecision extends ThermalDecision {
   delta: number;
 }
 
-export interface ThermalComfortInput {
+interface ThermalComfortInput {
   totalClo: number | undefined;
   targetRange: [number, number] | undefined;
   /** Torso, arms, legs, hands and head, each with its minimum target. */
