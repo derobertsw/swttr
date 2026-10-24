@@ -10,6 +10,7 @@ export const TRIP_ACTIVITY_OPTIONS = [
   "Bike",
   "Surf",
   "Climb",
+  "Travel",
   "Rest",
 ] as const;
 
@@ -17,6 +18,26 @@ type TripActivity = (typeof TRIP_ACTIVITY_OPTIONS)[number];
 
 /** The trip activity a tour plan belongs to (#210). */
 export const TOUR_ACTIVITY: TripActivity = "Backcountry";
+
+// What people read for a stored activity (#334). Storage keeps "Alpine" and
+// "Backcountry", so saved days, tour plans and older app versions still match.
+const TRIP_ACTIVITY_LABEL: Partial<Record<TripActivity, string>> = {
+  Alpine: "Downhill skiing",
+  Backcountry: "Backcountry skiing",
+};
+
+/** The label for a stored activity; one a person typed reads as typed. */
+export function tripActivityLabel(activity: string): string {
+  return Object.hasOwn(TRIP_ACTIVITY_LABEL, activity) ? TRIP_ACTIVITY_LABEL[activity as TripActivity]! : activity;
+}
+
+// Day types with no clothing to plan (#334): nobody is asked for a kit on them.
+const NO_CLOTHING_ACTIVITIES: ReadonlySet<string> = new Set<TripActivity>(["Travel", "Rest"]);
+
+/** False for a Travel or Rest day; an unset activity still has clothing to plan once it's chosen. */
+export function tripActivityNeedsClothing(activity: string | null): boolean {
+  return !activity || !NO_CLOTHING_ACTIVITIES.has(activity);
+}
 
 // Map the trip chip label to the activity key used by the biophysics
 // activity identifiers. Individual callers must check their own engine's
@@ -34,6 +55,7 @@ const TRIP_ACTIVITY_TO_RECOMMENDATION_KEY = {
   Bike: "biking",
   Climb: "hiking_snowshoeing", // closest available — load-bearing, slow uphill
   Surf: null,
+  Travel: null,
   Rest: null,
 } satisfies Record<TripActivity, string | null>;
 

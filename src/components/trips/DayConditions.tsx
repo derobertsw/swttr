@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
+import { CircleDashed, Eye, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, fieldClassName } from "@/components/ui/input";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
@@ -36,6 +36,35 @@ function reviewerName(data: TripFull, userId: string): string {
 }
 
 const isCurrent = (review: TripConditionsReview | undefined) => !!review && review.current.action !== "withdrawn";
+const iconClassName = "mt-0.5 size-4 shrink-0";
+
+/**
+ * A day's conditions as one line near the top of its brief (#334): your own
+ * reviews of its official sources, linked to Conditions below. Icon and text,
+ * not a card, and never a verdict on the conditions themselves.
+ */
+export function ConditionsTask({ data, date, activity, userId }: {
+  data: TripFull;
+  date: string;
+  /** The activity the day page shows: the day's own or its stop's first. */
+  activity: string | null;
+  userId: string | null;
+}) {
+  const sources = data.conditions?.filter((source) => source.date === date) ?? [];
+  if (!userId || (activity !== TOUR_ACTIVITY && sources.length === 0)) return null;
+  const reviews = sources.flatMap((source) => source.reviews.filter((review) => review.user_id === userId && isCurrent(review)));
+  const changed = reviews.filter((review) => review.stale_reasons.length > 0).length;
+  const recorded = reviews.length - changed;
+  const Icon = changed ? TriangleAlert : sources.length && recorded === sources.length ? Eye : CircleDashed;
+  const text = sources.length === 0 ? "No official sources added yet"
+    : [`Your reviews: ${recorded} of ${sources.length} recorded`, changed && `${changed} reviewed before the plan changed`].filter(Boolean).join(" · ");
+  return (
+    <a href="#conditions-heading" className="mt-1 flex min-h-11 w-fit items-center gap-2 py-2 text-base text-foreground underline underline-offset-2">
+      <Icon className={cn(iconClassName, "mt-0", changed ? "text-warning" : "text-muted-foreground")} aria-hidden />
+      <span>Conditions · {text}</span>
+    </a>
+  );
+}
 
 type ReviewMode = "record" | "correct" | "withdraw";
 
@@ -137,18 +166,24 @@ function SourceRow({ data, source, userId, canEdit, onEdit, onReview }: {
       <p className="text-sm text-muted-foreground">Validity not available in SWTTR — check the source.</p>
       <p className="text-sm text-muted-foreground">Added by the organizer</p>
 
+      {/* Your review as icon and text on the page, not another box (#334). */}
       {userId && (
-        <div className="mt-2 rounded-control border border-border p-3 text-base text-foreground">
+        <div className="mt-2 text-base text-foreground">
           {!current ? (
-            <p>No review recorded{review ? ` · You withdrew your review ${when(review.current.created_at)}` : ""}</p>
+            <p className="flex gap-2"><CircleDashed className={cn(iconClassName, "text-muted-foreground")} aria-hidden />
+              <span>No review recorded{review ? ` · You withdrew your review ${when(review.current.created_at)}` : ""}</span></p>
           ) : stale ? (
-            <>
-              <Badge variant="warning">Plan changed — review again</Badge>
-              <p className="mt-1">{review!.stale_reasons.join(" · ")}</p>
-              <p className="text-sm text-muted-foreground">You reviewed it {when(review!.current.reviewed_at)}, before the change.</p>
-            </>
+            <div className="flex gap-2">
+              <TriangleAlert className={cn(iconClassName, "text-warning")} aria-hidden />
+              <div>
+                <p className="font-medium">Plan changed — review again</p>
+                <p>{review!.stale_reasons.join(" · ")}</p>
+                <p className="text-sm text-muted-foreground">You reviewed it {when(review!.current.reviewed_at)}, before the change.</p>
+              </div>
+            </div>
           ) : (
-            <p>You reviewed this source {when(review!.current.reviewed_at)}</p>
+            <p className="flex gap-2"><Eye className={cn(iconClassName, "text-muted-foreground")} aria-hidden />
+              <span>You reviewed this source {when(review!.current.reviewed_at)}</span></p>
           )}
           {current && review!.current.note && <p className="mt-1 break-words whitespace-pre-wrap">Your note: {review!.current.note}</p>}
           <div className="mt-2 flex flex-wrap gap-2">
@@ -184,7 +219,8 @@ function CrewReview({ review, name }: { review: TripConditionsReview; name: stri
         ? `${name} withdrew their review · ${when(review.current.created_at)}`
         : `${name} recorded a review · ${when(review.current.reviewed_at)}`}</p>
       {!withdrawn && review.stale_reasons.length > 0 && (
-        <p><Badge variant="warning">Plan changed since</Badge> {review.stale_reasons.join(" · ")}</p>
+        <p className="flex gap-2"><TriangleAlert className={cn(iconClassName, "text-warning")} aria-hidden />
+          <span>Plan changed since · {review.stale_reasons.join(" · ")}</span></p>
       )}
       {!withdrawn && review.current.note && <p className="break-words whitespace-pre-wrap text-muted-foreground">{review.current.note}</p>}
       {review.history.length > 0 && <History label={`${name}'s review history`} review={review} />}

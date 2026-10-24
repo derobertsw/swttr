@@ -14,7 +14,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
-import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
+import { TRIP_ACTIVITY_OPTIONS, tripActivityLabel } from "@/lib/trip-activities";
 import { errorMessage, TripRequestError, tripRequest } from "@/lib/trip-requests";
 import { STORAGE_KEYS } from "@/lib/storage";
 import type { TripCreationInput } from "@/lib/trip-creation";
@@ -188,7 +188,7 @@ function TripDraftForm({ userId }: { userId: string }) {
                 <label className="flex flex-col gap-2 text-sm font-medium">Trip name<Input required maxLength={200} value={draft.name} placeholder="Your trip name" onChange={(event) => edit({ name: event.target.value, nameEdited: true })} /></label>
                 <label className="flex flex-col gap-2 text-sm font-medium">Default activity (optional)
                   <select value={draft.activity} onChange={(event) => edit({ activity: event.target.value })} className="h-12 w-full rounded-control border border-input bg-card px-3 text-base">
-                    <option value="">Choose later</option>{TRIP_ACTIVITY_OPTIONS.map((activity) => <option key={activity}>{activity}</option>)}
+                    <option value="">Choose later</option>{TRIP_ACTIVITY_OPTIONS.map((activity) => <option key={activity} value={activity}>{tripActivityLabel(activity)}</option>)}
                   </select>
                 </label>
                 <p className="text-sm text-muted-foreground">The first destination is assigned to every trip day. You can choose different stops later.</p>

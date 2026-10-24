@@ -326,7 +326,7 @@ describe("Day tour plan", () => {
     renderPlan({ plans: [saved()], activity: "Alpine" });
     expect(screen.queryByRole("heading", { name: "Tour plan" })).not.toBeInTheDocument();
     await user.click(screen.getByText("Saved tour plan · Tuckerman Ravine"));
-    expect(screen.getByText(/activity is Alpine, so the tour plan isn't in use/)).toBeVisible();
+    expect(screen.getByText(/activity is Downhill skiing, so the tour plan isn't in use/)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Restore tour plan" }));
     expect(onRestore).toHaveBeenCalledOnce();
     expect(await screen.findByText(/Tour plan restored/)).toBeInTheDocument();

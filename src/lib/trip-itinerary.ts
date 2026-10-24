@@ -1,5 +1,5 @@
 import "server-only";
-import { TOUR_ACTIVITY } from "@/lib/trip-activities";
+import { TOUR_ACTIVITY, tripActivityLabel } from "@/lib/trip-activities";
 import { dateLabel, isCalendarDate, isUuid } from "@/lib/trip-lodging";
 import { accessPointFor, sameLocation } from "@/lib/trip-location";
 import type { TripDay, TripFull, TripItineraryOption, TripItineraryPreview, TripItineraryRequest, TripMember, TripMemberDayKit, TripPlace, TripStop } from "@/types/trips";
@@ -231,7 +231,7 @@ export function dayLabels({ stops, days }: Itinerary): Map<string, string> {
   const base = stops[0];
   return new Map(days.map((day) => {
     const destination = (day.stop_id && names.get(day.stop_id)) ?? (base ? `${base.name} (base)` : "No destination");
-    return [day.date, `${destination} · ${day.activity ?? "No activity"}`];
+    return [day.date, `${destination} · ${day.activity ? tripActivityLabel(day.activity) : "No activity"}`];
   }));
 }
 
@@ -482,7 +482,7 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest, 
       const stop = "stop_id" in request ? stops.find((candidate) => candidate.id === request.stop_id) : undefined;
       if ("stop_id" in request && !stop) return { error: "That stop isn't on this trip anymore. Reload the trip.", status: 404 };
       const set = { ...(stop ? { stop_id: stop.id } : {}), ...("activity" in request ? { activity: request.activity ?? null } : {}) };
-      const parts = [stop?.name, "activity" in request ? request.activity ?? "No activity" : undefined].filter(Boolean);
+      const parts = [stop?.name, "activity" in request ? request.activity ? tripActivityLabel(request.activity) : "No activity" : undefined].filter(Boolean);
       return { options: [review({ stops, days: days.map((day) => request.dates.includes(day.date) ? { ...day, ...set } : day) }, {
         key: "assign", label: `${parts.join(" and ")} for ${plural(selected.length)}`, detail: null,
         payload: {

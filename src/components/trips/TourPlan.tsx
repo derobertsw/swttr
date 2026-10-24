@@ -7,7 +7,7 @@ import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/tr
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { useTripEditorHistory } from "@/hooks/useTripEditorHistory";
-import { TOUR_ACTIVITY } from "@/lib/trip-activities";
+import { TOUR_ACTIVITY, tripActivityLabel } from "@/lib/trip-activities";
 import { accessPointFor } from "@/lib/trip-location";
 import { errorMessage, timedTripRequest, TripRequestError } from "@/lib/trip-requests";
 import { cn } from "@/lib/utils";
@@ -100,7 +100,7 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
   const restore = async () => {
     setRestoring(true); setRestoreError(null);
     focusAfterRestore.current = true;
-    try { await onRestore(); setStatus("Tour plan restored. The day's activity is Backcountry again."); }
+    try { await onRestore(); setStatus(`Tour plan restored. The day's activity is ${tripActivityLabel(TOUR_ACTIVITY)} again.`); }
     catch (err) { focusAfterRestore.current = false; setRestoreError(errorMessage(err)); }
     finally { setRestoring(false); }
   };
@@ -115,14 +115,14 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
         <details>
           <summary id="tour-plan-heading" className="min-h-11 cursor-pointer py-2 text-base font-semibold text-foreground">Saved tour plan · {plan.objective}</summary>
           <p className="mt-1 text-base text-foreground">
-            This day&apos;s activity is {activity ?? "not set"}, so the tour plan isn&apos;t in use. It&apos;s kept as saved.
+            This day&apos;s activity is {activity ? tripActivityLabel(activity) : "not set"}, so the tour plan isn&apos;t in use. It&apos;s kept as saved.
           </p>
           <div className="mt-3"><TourPlanSummary plan={plan} meetingPoint={meetingPoint} /></div>
           {canEdit ? <>
             <Button type="button" variant="outline" className="mt-3" loading={restoring} onClick={() => void restore()}>
               Restore tour plan
             </Button>
-            <p className="mt-1 text-sm text-muted-foreground">Sets this day&apos;s activity back to {TOUR_ACTIVITY}.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Sets this day&apos;s activity back to {tripActivityLabel(TOUR_ACTIVITY)}.</p>
           </> : <p className="mt-3 text-base text-muted-foreground">Managed by the organizer</p>}
           {restoreError && <p role="alert" className="mt-2 text-base text-destructive">Couldn&apos;t restore the tour plan: {restoreError}</p>}
         </details>

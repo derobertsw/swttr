@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
-import { SectionLabel } from "@/components/trips/trip-primitives";
+import { sectionLabelClassName } from "@/components/trips/trip-primitives";
 import { cn } from "@/lib/utils";
 import { LocationSummary } from "@/components/trips/LocationPicker";
 import { StayDepartures, useDriveEstimates } from "@/components/trips/DriveEstimate";
@@ -269,25 +269,66 @@ function NightsWithoutStay({ people, lodging, canEdit, open }: { people: TripLod
   </section>;
 }
 
+/** A day's lodging as one person reads it: theirs, with the crew's where it differs (#333). */
+function dayLodging(data: TripFull, date: string, memberId: string | null) {
+  const context = data.lodging?.days.find((day) => day.date === date);
+  const person = data.lodging?.people.find((entry) => entry.member_id === memberId);
+  return { context, person, mine: person?.days.find((day) => day.date === date) };
+}
+
+const lodgingRow = (term: string, value: string) =>
+  <div key={term}><dt className="text-muted-foreground">{term}</dt><dd className="break-words text-foreground">{value}</dd></div>;
+
 /**
- * The day's starting point and stay, with the tour plan's meet time and the
- * day's access point, where the crew meets, between them when there's one (#210).
- * A person on the trip sees their own first, then the crew's where it differs (#333).
+ * The start of a day's brief (#334): the meet, with the tour plan's time and
+ * the day's access point, where the crew meets (#210), then where you start.
+ * A person on the trip sees their own start first, then the crew's where it
+ * differs (#333). The drive follows in Getting there, and tonight's stay after it.
  */
-export function DayLodging({ data, date, meet, meetingPoint = null, memberId = null }: {
+export function DayStart({ data, date, meet, meetingPoint = null, memberId = null }: {
   data: TripFull; date: string; meet?: string | null; meetingPoint?: string | null;
-  /** The signed-in person's membership, whose own stay leads. */
+  /** The signed-in person's membership, whose own start leads. */
   memberId?: string | null;
 }) {
-  const context = data.lodging?.days.find((day) => day.date === date);
+  const { context, mine } = dayLodging(data, date, memberId);
   if (!context) return null;
-  const mine = data.lodging?.people.find((person) => person.member_id === memberId)?.days.find((day) => day.date === date);
-  const row = (term: string, value: string) => <div key={term}><dt className="text-muted-foreground">{term}</dt><dd className="break-words text-foreground">{value}</dd></div>;
-  return <section className="min-w-0"><SectionLabel>{`${mine ? "Your stay" : "Crew stay"}${meet ? " and meet" : ""}`}</SectionLabel><dl className="mt-2 space-y-2 text-base">
-    {row("Starting from", mine?.starting_from ?? context.starting_from)}
-    {meet && row("Meet", `${meet} · ${meetingPoint ?? "Meeting point not set"}`)}
-    {row("Staying tonight", mine?.staying_tonight ?? context.staying_tonight)}
-    {mine && mine.starting_from !== context.starting_from && row("Crew starting from", context.starting_from)}
-    {mine && mine.staying_tonight !== context.staying_tonight && row("Crew staying tonight", context.staying_tonight)}
-  </dl></section>;
+  return <section aria-labelledby={`day-start-${date}`} className="min-w-0">
+    <h2 id={`day-start-${date}`} className={sectionLabelClassName}>{meet ? "Meet and start" : "Start of the day"}</h2>
+    <dl className="mt-2 space-y-2 text-base">
+      {meet && lodgingRow("Meet", `${meet} · ${meetingPoint ?? "Meeting point not set"}`)}
+      {lodgingRow("Starting from", mine?.starting_from ?? context.starting_from)}
+      {mine && mine.starting_from !== context.starting_from && lodgingRow("Crew starting from", context.starting_from)}
+    </dl>
+  </section>;
+}
+
+/**
+ * Where you sleep after the day (#334), after its drive and approach. On a
+ * morning you move, it names both stays, with their check-out and check-in
+ * times when the organizer saved them.
+ */
+export function DayTonight({ data, date, memberId = null }: { data: TripFull; date: string; memberId?: string | null }) {
+  const { context, person, mine } = dayLodging(data, date, memberId);
+  if (!context) return null;
+  const move = person?.changeovers.find((entry) => entry.date === date);
+  const stay = (id: string | null | undefined) => data.lodging?.stays.find((candidate) => candidate.id === id);
+  // The night before, as saved: a day you skip has no starting stay, but you still check out.
+  const nightIndex = person?.nights.findIndex((night) => night.date === date) ?? -1;
+  const leaving = move && nightIndex > 0 ? stay(person?.nights[nightIndex - 1].stay_id) : undefined;
+  const arriving = move && stay(mine?.tonight_stay_id);
+  const times = [
+    leaving?.check_out_time && `Check out of ${leaving.name} by ${leaving.check_out_time.slice(0, 5)}`,
+    arriving?.check_in_time && `Check in at ${arriving.name} from ${arriving.check_in_time.slice(0, 5)}`,
+  ].filter(Boolean).join(" · ");
+  return <section aria-labelledby={`day-tonight-${date}`} className="min-w-0">
+    <h2 id={`day-tonight-${date}`} className={sectionLabelClassName}>Tonight</h2>
+    <dl className="mt-2 space-y-2 text-base">
+      {lodgingRow("Staying tonight", mine?.staying_tonight ?? context.staying_tonight)}
+      {move && <div><dt className="text-muted-foreground">Moving</dt><dd className="break-words text-foreground">
+        {move.from} → {move.to}
+        {times && <span className="block text-sm text-muted-foreground">{times} · property local time</span>}
+      </dd></div>}
+      {mine && mine.staying_tonight !== context.staying_tonight && lodgingRow("Crew staying tonight", context.staying_tonight)}
+    </dl>
+  </section>;
 }
