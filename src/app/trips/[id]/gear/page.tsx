@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useTrip } from "@/hooks/useTrip";
 import { errorMessage, timedTripRequest } from "@/lib/trip-requests";
 import { SharedGearList } from "@/components/trips/SharedGear";
+import { PackingNav } from "@/components/trips/PackingNav";
 import { useUserId } from "@/hooks/useUserId";
 
 export default function GroupGearPage({ params }: { params: Promise<{ id: string }> }) {
@@ -29,6 +30,16 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
   const members = data?.members ?? [];
   const me = members.find((m) => m.user_id === userId && m.status === "joined");
   const creation = useRef<{ name: string; assignee: string; id: string } | null>(null);
+  // The Day checklist links to an item, like #shared-<id>. Cold links resolve
+  // before the list renders, so the item is scrolled to once it's there.
+  const restoredHash = useRef(false);
+  useEffect(() => {
+    if (restoredHash.current || !data || !window.location.hash) return;
+    const target = document.getElementById(window.location.hash.slice(1));
+    if (!target) return;
+    restoredHash.current = true;
+    target.scrollIntoView({ block: "start", behavior: "instant" });
+  }, [data]);
 
   const addGear = async () => {
     const item = description.trim();
@@ -61,6 +72,7 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
 
   return (
     <div className="flex w-full max-w-3xl flex-col gap-8">
+      <PackingNav tripId={id} current="shared" />
       <header>
         <SectionLabel>Shared gear</SectionLabel>
         <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">

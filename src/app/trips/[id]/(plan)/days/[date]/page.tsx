@@ -48,7 +48,8 @@ import type { TripDayParticipation, TripEffort, TripKitState, TripMember, TripMe
 
 const KIT_SLOTS = ["shirt", "midlayer", "jacket", "shell", "pants", "gloves"] as const;
 const EFFORT_OPTIONS: TripEffort[] = ["easy", "steady", "hard"];
-const KIT_STATE_LABEL: Record<TripKitState, string> = { ok: "OK", warn: "Needs help", missing: "Missing" };
+// "ok" only means nothing is flagged: an empty kit is Not started, never OK (#336).
+const KIT_FLAG_LABEL: Record<Exclude<TripKitState, "ok">, string> = { warn: "Needs help", missing: "Missing" };
 // Dims a control that ignores taps while a save runs. aria-disabled, unlike
 // disabled, keeps a keyboard user's focus on the control they used.
 const savingClassName = "aria-disabled:cursor-progress aria-disabled:opacity-50";
@@ -258,9 +259,12 @@ export default function DayDetailPage({
           />
 
           {me && (myKit?.outfit ? (
-            <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} />
+            <div id={`kit-${me.id}`}>
+              <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} />
+            </div>
           ) : !hasKit(myKit) && (!needsClothing || myParticipation !== "participating") ? (
-            <section aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
+            // The Day checklist links here (#336).
+            <section id={`kit-${me.id}`} aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
               <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
               <p className="text-sm text-muted-foreground">
                 {myParticipation === "skipping" ? "You're not taking part this day, so there's no kit to plan."
@@ -635,7 +639,8 @@ function MemberKitSummary({ member, kit, fit }: { member: TripMember; kit: TripM
     ? Object.values(wear).reduce((count, layers) => count + layers.base.length + (layers.mid?.length ?? 0) + layers.outer.length, 0)
     : 0;
   return (
-    <div className="py-3">
+    // The Day checklist links here (#336).
+    <div id={`kit-${member.id}`} className="py-3">
       <div className="flex flex-wrap items-center gap-3">
         <MemberAvatar name={member.display_name} size={28} state={member.role === "organizer" ? "self" : "default"} />
         <div className="min-w-32 flex-1">
@@ -644,13 +649,13 @@ function MemberKitSummary({ member, kit, fit }: { member: TripMember; kit: TripM
             {outfit
               ? `Outfit saved · ${kitAdvice(outfit).kind === "personalized" ? "Personalized" : "General guide"} · ${worn} ${worn === 1 ? "item" : "items"}`
               : !kit || kit.items.length === 0
-              ? "no kit set"
-              : `${sentenceCase(kit.effort)} · ${kit.items.map(sentenceCase).join(", ")}`}
+              ? "Not started"
+              : `Checklist · ${sentenceCase(kit.effort)} · ${kit.items.map(sentenceCase).join(", ")}`}
           </p>
           {fit.map((note) => <p key={note} className="text-sm text-foreground">{note}</p>)}
         </div>
         {kit && !outfit && kit.state !== "ok" && (
-          <Badge size="sm" variant="warning">{KIT_STATE_LABEL[kit.state]}</Badge>
+          <Badge size="sm" variant="warning">{KIT_FLAG_LABEL[kit.state]}</Badge>
         )}
       </div>
     </div>
@@ -720,7 +725,8 @@ function EditableMemberKitRow({
   };
 
   return (
-    <div className="py-3">
+    // The Day checklist links here (#336).
+    <div id={`kit-${member.id}`} className="py-3">
       <div className="flex flex-wrap items-center gap-3">
         <MemberAvatar
           name={member.display_name}
@@ -733,7 +739,7 @@ function EditableMemberKitRow({
             {state === "warn"
               ? "thin — borrow a layer?"
               : items.length === 0
-              ? "no kit set"
+              ? "Not started"
               : `${items.length} ${items.length === 1 ? "layer" : "layers"} picked`}
           </p>
         </div>
@@ -781,7 +787,7 @@ function EditableMemberKitRow({
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
         <Badge size="sm" variant={state === "ok" ? "neutral" : "warning"}>
-          {KIT_STATE_LABEL[state]}
+          {state !== "ok" ? KIT_FLAG_LABEL[state] : items.length ? "Checklist" : "Not started"}
         </Badge>
         <Button
           type="button"
@@ -796,7 +802,7 @@ function EditableMemberKitRow({
           aria-disabled={saving || undefined}
           className={savingClassName}
         >
-          Flag {state === "warn" ? "ok" : "warn"}
+          {state === "warn" ? "Clear needs help" : "Flag needs help"}
         </Button>
       </div>
     </div>

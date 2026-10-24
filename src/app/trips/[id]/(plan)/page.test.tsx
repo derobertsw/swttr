@@ -26,7 +26,7 @@ describe("Plan's own page (#330)", () => {
     expect(destinations).toHaveTextContent("Stowe, Vermont");
     expect(screen.getByRole("link", { name: "Add or edit destinations" })).toHaveAttribute("href", "/trips/trip-1/stops");
     expect(screen.queryByRole("heading", { name: "Stays" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Roll call" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Day checklist" })).not.toBeInTheDocument();
   });
 
   it("says when an older draft has no destinations yet", async () => {

@@ -15,6 +15,7 @@ import {
 import { EquipmentTemplateSheet } from "@/components/trips/TouringEquipment";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { usePublishTripSummary } from "@/hooks/useTrip";
+import { PackingNav } from "@/components/trips/PackingNav";
 import { equipmentKey, withEquipmentChoices } from "@/lib/touring-equipment";
 import { tripActivityLabel } from "@/lib/trip-activities";
 import { errorMessage, timedTripRequest, tripRequest, TripRequestError } from "@/lib/trip-requests";
@@ -323,6 +324,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
 
   return (
     <div className="flex w-full max-w-3xl flex-col gap-8">
+      <PackingNav tripId={id} current="mine" />
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1 basis-52">
           <SectionLabel>Your bag</SectionLabel>
