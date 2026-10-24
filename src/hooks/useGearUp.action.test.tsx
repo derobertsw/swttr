@@ -183,6 +183,8 @@ describe("atomic one-day outing action", () => {
     for (const invalid of [
       { ...input, accountId: "other" }, { ...input, activity: "unknown" },
       { ...input, when: { ...input.when, date: "2026-02-30" } },
+      // A real ISO date the form's date parser can't hold.
+      { ...input, when: { ...input.when, date: "0000-10-22" } },
       { ...input, place: { ...input.place, latitude: 91 } },
       { ...input, when: { ...input.when, durationDays: 2 } },
     ]) expect(await result.current.submitOuting(invalid)).toMatchObject({ status: "error", code: "invalid_input" });

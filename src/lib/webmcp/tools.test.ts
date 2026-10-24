@@ -69,7 +69,8 @@ describe("Gear up WebMCP contract", () => {
       { ...input, surprise: true }, { ...input, activity: "ski" }, { ...input, exertion: "maximum" },
       { ...input, place: { ...place, longitude: 181 } }, { ...input, place: { ...place, latitude: Infinity } },
       { ...input, place: { ...place, timeZone: "bad-zone" } }, { ...input, place: { ...place, name: "x".repeat(201) } },
-      { ...input, when: { ...input.when, date: "2026-02-30" } }, { ...input, when: { ...input.when, time: "24:00" } },
+      { ...input, when: { ...input.when, date: "2026-02-30" } }, { ...input, when: { ...input.when, date: "0000-10-22" } },
+      { ...input, when: { ...input.when, time: "24:00" } },
       { ...input, when: { ...input.when, durationDays: 7 } }, { ...input, when: { mode: "now", date: "2026-10-22" } },
     ];
     for (const value of bad) expect(await execute("recommend_outing", value)).toMatchObject({ code: "invalid_input" });

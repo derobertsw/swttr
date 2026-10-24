@@ -1,5 +1,6 @@
 import { ACTIVITIES } from "@/data/activities";
 import { EXERTION_LEVELS } from "@/lib/biophysics/exertion";
+import { isDate } from "@/lib/gearUpDraft";
 import { isLocalDateTime, isTimeZone } from "@/lib/timeZones";
 import type { Outing } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
@@ -36,6 +37,7 @@ export function isSingleDayOuting(value: unknown): value is Outing {
   const when = value.when;
   if (when.mode === "now") return hasOnly(when, ["mode"]);
   return when.mode === "later" && hasOnly(when, ["mode", "date", "time", "durationDays"])
-    && when.durationDays === 1 && typeof when.date === "string" && typeof when.time === "string"
+    // The form parses the date with date-fns, which holds fewer dates than ISO parsing.
+    && when.durationDays === 1 && isDate(when.date) && typeof when.time === "string"
     && isLocalDateTime(`${when.date}T${when.time}`);
 }
