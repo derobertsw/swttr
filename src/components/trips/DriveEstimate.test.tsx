@@ -165,6 +165,16 @@ describe("Fetching the estimates", () => {
     rerender(<Probe data={structuredClone(after)} />);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+  it("fetches again when a person's own starting point is saved (#333)", async () => {
+    const before = driveTrip();
+    const fetchMock = fakeTripApi({ [`GET ${URL}`]: async () => reply(200, await estimatesFor(before)) });
+    vi.stubGlobal("fetch", fetchMock);
+    const { rerender } = render(<Probe data={before} />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const after = { ...structuredClone(before), member_origins: [{ trip_id: before.trip.id, trip_day_id: `day-${SAT}`, member_id: "member-1", origin: null, origin_stay_id: null, no_drive: true }] };
+    rerender(<Probe data={after} />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  });
   it("says why when the estimates can't load", async () => {
     vi.stubGlobal("fetch", fakeTripApi({ [`GET ${URL}`]: reply(500, { error: "Couldn't load drive times. Try again." }) }));
     render(<Probe data={driveTrip()} />);

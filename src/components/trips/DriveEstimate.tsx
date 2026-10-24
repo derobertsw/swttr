@@ -26,9 +26,9 @@ export interface DriveEstimatesState {
 
 /**
  * The trip's drive estimates (#209), fetched again whenever a stay, night,
- * destination, access point or starting point changes. A response is kept
- * with the plan it was fetched for, so an older answer can never show
- * against a newer plan.
+ * destination, access point or starting point, a person's own included,
+ * changes. A response is kept with the plan it was fetched for, so an older
+ * answer can never show against a newer plan.
  */
 export function useDriveEstimates(data: TripFull | null | undefined, enabled = true): DriveEstimatesState {
   const [attempt, setAttempt] = useState(0);
@@ -38,6 +38,8 @@ export function useDriveEstimates(data: TripFull | null | undefined, enabled = t
     trip: [data.trip.id, data.trip.start_date, data.trip.end_date, data.lodging?.revision, data.lodging?.people_key],
     stops: data.stops.map((stop) => [stop.id, stop.access_point]),
     days: data.days.map((day) => [day.date, day.stop_id, day.access_point_stop_id, day.access_point, day.origin, day.origin_stay_id, day.no_drive]),
+    // A person's own starting point changes their departure (#333).
+    people: (data.member_origins ?? []).map((row) => [row.trip_day_id, row.member_id, row.origin, row.origin_stay_id, row.no_drive]),
   }), [data]);
   const key = enabled && plan ? plan : null;
   const tripId = data?.trip.id;
