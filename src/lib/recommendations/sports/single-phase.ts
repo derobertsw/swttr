@@ -129,9 +129,13 @@ export function createSinglePhaseSport(
           },
           activityKey: config.activity,
           comfortContext: {
+            requireStandalone: config.requirementFirst,
+            protectionNeeds: targets.policy?.protection,
             targetRange: targets.targetRange,
             regionalMinTarget: targets.regional.min,
+            regionalTarget: targets.regional.neutral,
             extremityMinTarget: targets.extremity.min,
+            extremityTarget: targets.extremity.neutral,
             extremityMaxTarget: judged.extremity.max,
           },
         },
@@ -163,7 +167,7 @@ export function createSinglePhaseSport(
         ...(requirements ? { requirements } : {}),
         recommendation,
         warnings: [...warnings, ...(protectedOutfit?.warnings ?? []), ...accessories.warnings],
-        guidance: [...new Set([...config.guidance(request, targets.basicIreq, ensemble, targets), ...missingGuidance,
+        guidance: [...new Set([...(recommendation.evaluation?.decision?.reasons ?? []), ...config.guidance(request, targets.basicIreq, ensemble, targets), ...missingGuidance,
           ...Object.values(accessories.assessments ?? {}).map(assessment => assessment.message),
           ...(targets.policy?.assumptions ?? [])])],
       };

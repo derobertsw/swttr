@@ -915,8 +915,8 @@ describe("LayerDisplay", () => {
       // weighted: 1.42×0.5 + 1.2×0.25 + 0.24×0.25 ≈ 1.1
       expect(await screen.findByText("Actual 1.1 clo")).toBeInTheDocument();
       // The risk and what to do about it show above the outfit
-      const risk = screen.getByRole("region", { name: /^Cold risk/ });
-      expect(risk).toHaveTextContent(/Add a warmer base and an insulating mid-layer now/);
+      const risk = screen.getByRole("region", { name: /^Cooler than recommended/ });
+      expect(risk).toHaveTextContent(/Significant insulation shortfall/);
       expect(
         risk.compareDocumentPosition(screen.getByRole("heading", { name: "Wear" })) & Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
@@ -1066,8 +1066,8 @@ describe("LayerDisplay", () => {
       );
 
       // With adjusted garments and target range, effectiveTotalClo is in range
-      // and no significant regional deficits → score ≥ 85 → "Optimal"
-      expect(await screen.findByText("Optimal")).toBeInTheDocument();
+      // and no significant regional deficits → score ≥ 85 → "Likely comfortable"
+      expect(await screen.findByText("Likely comfortable")).toBeInTheDocument();
     });
 
     it("should not show cold risk when the whole-body and body-part gaps stay within display tolerance", async () => {
@@ -1096,9 +1096,9 @@ describe("LayerDisplay", () => {
         />
       );
 
-      expect(await screen.findByText("Optimal")).toBeInTheDocument();
+      expect(await screen.findByText("Likely comfortable")).toBeInTheDocument();
       expect(screen.queryByRole("region", { name: /cold risk/i })).not.toBeInTheDocument();
-      expect(screen.getByText("In the comfort range for these conditions.")).toBeInTheDocument();
+      expect(screen.getByText("Likely comfortable.")).toBeInTheDocument();
       expect(screen.queryByText("Cold Stress")).not.toBeInTheDocument();
     });
 
@@ -1112,7 +1112,7 @@ describe("LayerDisplay", () => {
         />
       );
 
-      expect((await screen.findAllByText(/Cold Risk/i)).length).toBeGreaterThan(0);
+      expect((await screen.findAllByText(/Cooler than recommended/i)).length).toBeGreaterThan(0);
       expect(screen.queryByText("Comfort Range Achieved")).not.toBeInTheDocument();
     });
 
@@ -1201,9 +1201,9 @@ describe("LayerDisplay", () => {
       // Descent: torso raw (1.7+0.7)*0.836=2.01, arms 1.2, legs 0.25*0.961=0.24
       // Full body = 2.01*0.50 + 1.2*0.25 + 0.24*0.25 ≈ 1.37 vs 0.9 max → over by ~0.47
       // The climb view flags the descent's risk on its tab.
-      const descentTab = await screen.findByRole("button", { name: "Descent, overheating risk" });
+      const descentTab = await screen.findByRole("button", { name: "Descent, uneven warmth" });
       fireEvent.click(descentTab);
-      expect(screen.getByRole("region", { name: /^Descent overheating risk/ })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: /^Descent uneven warmth/ })).toBeInTheDocument();
     });
 
     it("should show descent cold risk card when descent clo is below target", async () => {
@@ -1239,8 +1239,8 @@ describe("LayerDisplay", () => {
 
       // Descent: torso raw (1.7+0.2)*0.836=1.59, arms 1.2, legs 0.25*0.961=0.24
       // Full body = 1.59*0.50 + 1.2*0.25 + 0.24*0.25 ≈ 1.16 vs 3.0 min → short by ~1.84
-      fireEvent.click(await screen.findByRole("button", { name: "Descent, cold risk" }));
-      expect(screen.getByRole("region", { name: /^Descent cold risk/ })).toHaveTextContent(/high/);
+      fireEvent.click(await screen.findByRole("button", { name: "Descent, uneven warmth" }));
+      expect(screen.getByRole("region", { name: /^Descent uneven warmth/ })).toHaveTextContent(/Significant insulation shortfall/);
     });
 
     describe("outfit first", () => {
@@ -1294,7 +1294,7 @@ describe("LayerDisplay", () => {
         fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
         fireEvent.click(screen.getByText("Pick catalog fleece"));
 
-        expect(screen.getByRole("region", { name: "Recommendation warnings" })).toHaveTextContent("Your layer changes have not been checked");
+        expect(screen.getByRole("region", { name: "Recommendation warnings" })).toHaveTextContent("Weather protection and transition advice below refers to that outfit");
         expect(screen.getByRole("region", { name: "Original recommendation" })).toHaveTextContent("They do not include your layer changes");
 
         fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
@@ -1336,11 +1336,11 @@ describe("LayerDisplay", () => {
         ).toBeTruthy();
       });
 
-      it("explains the layers with the recommendation's own guidance", () => {
+      it("explains the current outfit using the server assessment", async () => {
         renderPersonalized();
 
-        const why = screen.getByText("Why these layers?").closest("details")!;
-        expect(within(why).getByRole("listitem")).toHaveTextContent("Layer up for the chairlift");
+        const why = (await screen.findByText("Why these layers?")).closest("details")!;
+        expect(within(why).getAllByRole("listitem").map(item => item.textContent).join(" ")).toContain("below the estimated target band");
       });
 
       it("shows empty layers and editing controls only after Change", () => {
@@ -1578,7 +1578,7 @@ describe("LayerDisplay", () => {
   });
 
   describe("without a personalized recommendation", () => {
-    const scoreLabel = /optimal|comfortable|cold stress|overheating risk/i;
+    const scoreLabel = /likely comfortable|warmer than recommended|cooler than recommended|uneven warmth|outfit incomplete|protection incomplete/i;
 
     it("labels static layers as general guidance with no comfort score", () => {
       render(<LayerDisplay {...defaultProps} activity="alpine_skiing" biophysicsStatus="auth_required" />);

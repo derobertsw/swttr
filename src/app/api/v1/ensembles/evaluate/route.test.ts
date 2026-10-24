@@ -52,6 +52,15 @@ describe("POST /api/v1/ensembles/evaluate", () => {
     expect(full.items.legs[0]).toMatchObject({ usage: 'standalone', coverage_legs: 1 });
   });
 
+  it('recomputes arms from singleton-array catalog relations', async () => {
+    state.client = createFakeSupabase({ garments: [{ ...shirt,
+      garment_thermal_properties: [shirt.garment_thermal_properties],
+    }, shorts] });
+    const { phases: [result] } = await (await post({ phases: [itemPhase([reference(shirt.id)], [reference(shorts.id)])] })).json();
+    expect(result.thermal_data_status).toBe('known');
+    expect(result.breakdown.regions.find((region: { region: string }) => region.region === 'arms').clo).toBeCloseTo(0.02 * 0.809);
+  });
+
   it('retains underlayer identity despite client claims about standalone use', async () => {
     const underlayer = catalog.garments.find(g => g.model_name === 'Capilene Midweight Bottoms')!;
     const { phases: [result] } = await (await post({ phases: [itemPhase([], [{ ...reference(underlayer.id), usage: 'standalone' }])] })).json();
@@ -124,7 +133,7 @@ describe("POST /api/v1/ensembles/evaluate", () => {
     const { phases: [legacy, running] } = await (await post({ phases: [input,
       { ...input, extremityMaxTargets: { hands: 0, headNeck: 0 } },
     ] })).json();
-    expect(legacy.decision.riskType).toBe('comfortable');
+    expect(legacy.decision.status).toBe('warmer');
     expect(running.decision.riskType).toBe('overheat');
     expect(running.bodyParts.hands.status).toBe('over');
     const { phases: [removed] } = await (await post({ phases: [{ ...input,
@@ -252,7 +261,10 @@ describe("POST /api/v1/ensembles/evaluate", () => {
     state.client = client;
     state.userId = 'user-1';
     const input = { phases: [itemPhase([{ sourceId: id, item_type: 'custom' }])] };
-    expect((await (await post(input)).json()).phases[0].thermal_data_status).toBe('known');
+    const owned = (await (await post(input)).json()).phases[0];
+    expect(owned.items.torso[0].thermal_data_status).toBe('known');
+    // A custom torso estimate does not establish arm insulation.
+    expect(owned.comfortScore).toBeNull();
     state.userId = 'user-2';
     expect((await (await post(input)).json()).phases[0].thermal_data_status).toBe('unknown');
     state.userId = 'user-1';

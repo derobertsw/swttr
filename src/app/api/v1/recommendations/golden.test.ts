@@ -376,14 +376,21 @@ describe("POST /api/v1/recommendations/alpine (golden, comfort)", () => {
     expect(body.recommendation.thermal_comfort_score).toBeGreaterThanOrEqual(85);
   });
 
-  it("scores the corrected catalog outfit as comfortable at 25°F", async () => {
+  it("reports local accessory excess even when whole-body insulation is in range at 25°F", async () => {
     useDatabase(null, []);
     const { body } = await callRoute(alpine, CONDITIONS[1].body);
     const { ensemble_properties: properties, thermal_comfort_score: score } = body.recommendation;
 
     expect(properties.total_clo).toBeGreaterThanOrEqual(body.ireq.target_range[0]);
     expect(properties.total_clo).toBeLessThanOrEqual(body.ireq.target_range[1]);
-    expect(score).toBeGreaterThanOrEqual(85);
+    expect(score).toBeLessThan(85);
+    expect(body.recommendation.evaluation.bodyParts.headNeck.status).toBe('over');
+    expect(body.recommendation.evaluation.decision).toMatchObject({
+      status: 'warmer', summary: 'Warmer than recommended',
+    });
+    expect(body.recommendation.evaluation.decision.reasons).toContain(
+      'Head and neck has more insulation than its estimated upper target.',
+    );
     expect(body.warnings).not.toEqual(expect.arrayContaining([
       expect.stringMatching(/^Insufficient (torso|arms|legs) insulation:/),
     ]));

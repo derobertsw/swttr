@@ -3,24 +3,6 @@ import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ThermalDecision } from "@/types/biophysics";
 
-function riskSummary(decision: ThermalDecision): string {
-  const degree = decision.severity === "high" ? "Significantly" : "Slightly";
-  return decision.riskType === "cold"
-    ? `${degree} under-insulated (+${decision.delta.toFixed(1)} clo needed).`
-    : `${degree} over-insulated (-${decision.delta.toFixed(1)} clo advised).`;
-}
-
-function immediateAction(decision: ThermalDecision): string {
-  if (decision.riskType === "cold") {
-    return decision.severity === "high"
-      ? "Add a warmer base and an insulating mid-layer now."
-      : "Add a light-to-mid insulation layer now.";
-  }
-  return decision.severity === "high"
-    ? "Remove a warm layer and open vents immediately."
-    : "Drop one layer or increase venting to avoid overheating.";
-}
-
 interface ComfortDecisionProps {
   unknown?: boolean;
   /** The server's evaluation of the worn layers; nothing shows until it arrives. */
@@ -58,17 +40,17 @@ export function ComfortDecision({ decision, phase, staleness, unknown }: Comfort
   );
   if (!decision) return null;
 
-  if (decision.riskType === "comfortable") {
+  if (decision.status === "near_target" || (!decision.status && decision.riskType === "comfortable")) {
     return (
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-success">
         <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
-        {phase ? `${phase}: in` : "In"} the comfort range for these conditions.
+        {phase ? `${phase}: ` : ""}{staleness ? "Previous outfit: " : ""}{decision.summary ?? "Likely comfortable"}.
         {staleness && <StaleLabel staleness={staleness} />}
       </p>
     );
   }
 
-  const risk = `${decision.riskType === "cold" ? "Cold" : "Overheating"} risk: ${decision.severity === "high" ? "high" : "moderate"}`;
+  const risk = decision.summary ?? (decision.riskType === "cold" ? "Cooler than recommended" : "Warmer than recommended");
   const title = phase ? `${phase} ${risk.toLowerCase()}` : risk;
 
   return (
@@ -90,8 +72,8 @@ export function ComfortDecision({ decision, phase, staleness, unknown }: Comfort
           </h3>
           {staleness && <StaleLabel staleness={staleness} />}
         </div>
-        <p className="mt-1 text-base text-foreground">{immediateAction(decision)}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{riskSummary(decision)}</p>
+        <p className="mt-1 text-base text-foreground">{decision.warnings?.[0] ?? "Consider adjusting the areas outside their estimated target bands."}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{decision.reasons?.[0]}</p>
       </div>
     </section>
   );

@@ -44,7 +44,7 @@ export function runningProtection(ensemble: GarmentRow[], region: Region, needs:
     && (!needs.wet || ensemble.some(g => fullCoverage(g) && garmentCapabilities(g).wet));
 }
 
-export function runningOutfitProperties(ensemble: GarmentRow[]) {
+function runningOutfitProperties(ensemble: GarmentRow[]) {
   return predictEnsembleThermal(ensembleToThermalGarments(ensemble));
 }
 
