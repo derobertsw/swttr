@@ -1,0 +1,9 @@
+{
+  "resorts": [
+    {
+      "match": { "name": "Arapahoe Basin", "countryCode": "US" },
+      "aliases": ["A Basin", "A-Basin"],
+      "note": "Skiers' usual short name (#7 search fixtures)."
+    }
+  ]
+}

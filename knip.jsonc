@@ -9,7 +9,9 @@
     // Linked natively by ios/App/CapApp-SPM/Package.swift; never imported from JS.
     "@capacitor/splash-screen",
     // Loaded through postcss.config.mjs by Next's bundled PostCSS.
-    "postcss"
+    "postcss",
+    // Installed on demand by scripts/import-ski-resorts.mjs; too big for every install.
+    "geo-tz"
   ],
   "ignoreIssues": {
     // Vendored shadcn/ui components keep their full upstream export surface.

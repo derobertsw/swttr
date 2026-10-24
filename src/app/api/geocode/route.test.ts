@@ -2,6 +2,25 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "./route";
 
+vi.mock("@/data/ski-resorts.json", async () => ({
+  default: {
+    source: { snapshotDate: "2026-10-01", attribution: "© OpenStreetMap contributors, Skimap.org (OpenSkiData)" },
+    redirects: {},
+    resorts: (await import("@/test/skiResorts")).RESORT_FIXTURES,
+  },
+}));
+
+const STOWE_TOWN = { id: 5241248, name: "Stowe", admin1: "Vermont", country: "United States", latitude: 44.46, longitude: -72.68, timezone: "America/New_York" };
+
+function geocoderReturns(results: object[]) {
+  global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ results }) });
+}
+
+const search = async (params: string) => {
+  const response = await GET(new NextRequest(`http://localhost:3000/api/geocode?${params}`));
+  return { status: response.status, body: await response.json() };
+};
+
 describe("Geocode API Route", () => {
   const originalFetch = global.fetch;
 
@@ -291,6 +310,91 @@ describe("Geocode API Route", () => {
       expect(response.status).toBe(200);
       expect(global.fetch).toHaveBeenCalled();
       expect(data.results).toHaveLength(1);
+    });
+  });
+
+  describe("search kind", () => {
+    it("refuses an unknown kind", async () => {
+      expect(await search("q=Stowe&kind=resorts")).toEqual({ status: 400, body: { error: "Unknown search kind" } });
+    });
+
+    it("searches places only when no kind is given, as before", async () => {
+      geocoderReturns([STOWE_TOWN]);
+
+      const { body } = await search("q=Stowe");
+
+      expect(body.results).toEqual([{
+        id: 5241248, name: "Stowe", region: "Vermont", country: "United States",
+        latitude: 44.46, longitude: -72.68, timeZone: "America/New_York",
+      }]);
+    });
+
+    it("searches only the resort catalog for kind=resort, without calling the geocoder", async () => {
+      global.fetch = vi.fn();
+
+      const { status, body } = await search("q=Killington&kind=resort");
+
+      expect(status).toBe(200);
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(body.results).toEqual([{
+        id: "resort:killington", kind: "resort", source: "openskidata", resortId: "killington",
+        name: "Killington Resort", region: "Vermont", country: "United States",
+        latitude: 43.6, longitude: -72.8, timeZone: "America/New_York",
+        elevationM: 1260, pointLabel: "Top of K-1 Express Gondola", match: "exact",
+        attribution: "© OpenStreetMap contributors, Skimap.org (OpenSkiData)",
+      }]);
+    });
+
+    it("returns a typo suggestion for a misspelled resort, marked as one", async () => {
+      const { body } = await search("q=Killngton&kind=resort");
+
+      expect(body.results.map((result: { resortId: string; match: string }) => [result.resortId, result.match])).toEqual([["killington", "typo"]]);
+    });
+
+    it("keeps an unknown forecast elevation null and labels a reference point", async () => {
+      const { body } = await search("q=Mad River Glen&kind=resort");
+
+      expect(body.results[0]).toMatchObject({ resortId: "mad-river-glen", elevationM: null, pointLabel: "Resort reference point" });
+    });
+
+    it("finds nothing for a short query in resort search", async () => {
+      expect((await search("q=K&kind=resort")).body).toEqual({ results: [] });
+    });
+
+    it("keeps a town and its resort apart in all-places search", async () => {
+      geocoderReturns([STOWE_TOWN]);
+
+      const { body } = await search("q=Stowe&kind=all");
+
+      expect(body.results.map((result: { id: unknown; kind: string; name: string }) => [result.id, result.kind, result.name])).toEqual([
+        [5241248, "place", "Stowe"],
+        ["resort:stowe", "resort", "Stowe Mountain Resort"],
+      ]);
+      expect(body.results[0].source).toBe("open-meteo");
+    });
+
+    it("puts a resort named exactly as typed before places", async () => {
+      geocoderReturns([{ id: 5442727, name: "Vail", admin1: "Colorado", country: "United States", latitude: 39.64, longitude: -106.37 }]);
+
+      const { body } = await search("q=Vail&kind=all");
+
+      expect(body.results.map((result: { id: unknown }) => result.id)).toEqual(["resort:vail", 5442727]);
+    });
+
+    it("keeps resort matches when the geocoder fails, marked partial", async () => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: false });
+
+      const { status, body } = await search("q=Whistler&kind=all");
+
+      expect(status).toBe(200);
+      expect(body.partial).toBe(true);
+      expect(body.results.map((result: { id: string }) => result.id)).toEqual(["resort:whistler-blackcomb"]);
+    });
+
+    it("fails as before when the geocoder fails and no resort matches", async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
+
+      expect(await search("q=Denver&kind=all")).toEqual({ status: 500, body: { error: "Failed to fetch location data" } });
     });
   });
 });

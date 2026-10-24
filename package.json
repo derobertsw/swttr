@@ -12,6 +12,7 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:webmcp": "node scripts/webmcp-smoke.mjs",
+    "import-ski-resorts": "node scripts/import-ski-resorts.mjs",
     "knip": "knip"
   },
   "dependencies": {
