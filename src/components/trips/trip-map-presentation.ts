@@ -46,3 +46,22 @@ export function placeStatus(place: TripMapPlace): string {
 }
 
 export const roleSymbols: Record<MapDisplayRole, string> = { stay: "⌂", destination: "▲", origin: "●", access: "◆", meeting: "◆", tonight: "⌂", pickup: "■" };
+
+/**
+ * The day as one departure or person sees it (#333). `key` is a departure
+ * someone chose to show; otherwise it's the person's own. Either way the day
+ * takes that departure's starting point, drive and road line, and a person's
+ * own night. Someone with no departure that day, such as Casey on the evening
+ * they arrive, sees the crew's drive, said to be the crew's. Without a person
+ * it's the crew's day.
+ */
+export function followDeparture(day: TripMapDay, memberId: string | null, key: string | null = null): TripMapDay {
+  const person = memberId ? day.people?.find((entry) => entry.member_id === memberId) : undefined;
+  const departure = day.departures?.find((entry) => entry.key === (key ?? person?.departure_key));
+  const crew = day.departures?.find((entry) => entry.crew)?.label ?? day.starting_from;
+  return {
+    ...day,
+    ...person ? { starting_from: `${person.starting_from} · the crew starts from ${crew}`, tonight_place_id: person.tonight_place_id, staying_tonight: person.staying_tonight } : {},
+    ...departure ? { starting_from: departure.label, origin_place_id: departure.origin_place_id, drive: departure.drive, geometry: departure.geometry } : {},
+  };
+}

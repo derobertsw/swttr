@@ -8,7 +8,7 @@ Implemented October 19, 2026 on top of the map foundation delivered in #319. The
 
 Each day's `geometry` metadata retains mode, endpoint references and its opaque **route revision**, with `reason: "not_requested"` for eligible drives. `provider.geometry` is `"on_demand"`. The map/day snapshot revisions may change as estimates change; `day.geometry.revision` remains stable while the endpoint identities, coordinates, mode, traffic model and closure options remain unchanged. Tokens are equality checks, not sequence numbers.
 
-`GET /api/v1/trips/:id/days/:date/geometry?revision=<day.geometry.revision>` resolves both endpoints on the server and fetches one selected day's road line. For a blocked day with null geometry revision, use its day revision. A missing/malformed revision returns 400; a changed revision returns 409 with `code: "revision_changed"`; an absent date returns 404. Callers cannot submit coordinates, arbitrary place IDs or a routing mode.
+`GET /api/v1/trips/:id/days/:date/geometry?revision=<day.geometry.revision>` resolves both endpoints on the server and fetches one selected day's road line. Another departure's line (#333) uses that departure's `geometry.revision` in the same parameter; a revision that no longer names a departure gets 409. For a blocked day with null geometry revision, use its day revision. A missing/malformed revision returns 400; a changed revision returns 409 with `code: "revision_changed"`; an absent date returns 404. Callers cannot submit coordinates, arbitrary place IDs or a routing mode.
 
 The `TripMapRoadGeometry` response binds trip ID, day ID/date, revision, mode, `origin_place_id` and `access_place_id` to one result:
 

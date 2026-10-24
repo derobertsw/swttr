@@ -52,6 +52,16 @@ describe("GET drive estimates", () => {
     expect(upsert).toHaveBeenCalledWith([
       expect.objectContaining({ trip_id: full.trip.id, provider: "geoapify", date: "2027-01-09", status: "ok", duration_seconds: 720 }),
       expect.objectContaining({ trip_id: full.trip.id, provider: "geoapify", date: "2027-01-10", status: "ok", duration_seconds: 4440 }),
+    ], { onConflict: "trip_id,date,route_key" });
+  });
+  it("keeps each day's crew estimate before the departures migration", async () => {
+    upsert.mockResolvedValueOnce({ error: { code: "42P10" } });
+    const response = await get();
+    expect(response.status).toBe(200);
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(upsert).toHaveBeenLastCalledWith([
+      expect.objectContaining({ date: "2027-01-10", duration_seconds: 4440 }),
+      expect.objectContaining({ date: "2027-01-09", duration_seconds: 720 }),
     ], { onConflict: "trip_id,date" });
   });
   it("reports a provider failure on the days, not as an error, so the plan still shows", async () => {

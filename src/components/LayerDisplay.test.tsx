@@ -713,6 +713,25 @@ describe("LayerDisplay", () => {
         expect(finishChanging(legs)).toEqual(["Mid: Catalog fleece"]);
       });
 
+      it("closes when a newer result's layers replace the ones it was opened on", () => {
+        const props = { recommendation: null, temperature: 15, windspeed: 10 };
+        const { rerender } = render(<LayerDisplay {...props} biophysicsData={mockBiophysicsData} />);
+        const legs = screen.getByRole("region", { name: "Legs" });
+        fireEvent.click(within(legs).getByRole("button", { name: "Change legs" }));
+        fireEvent.click(within(legs).getByRole("button", { name: /Thermal Tights/ }));
+
+        // The same layers again keep it open.
+        rerender(<LayerDisplay {...props} biophysicsData={{ ...mockBiophysicsData }} />);
+        expect(screen.getByText("Pick catalog fleece")).toBeInTheDocument();
+
+        const garments = mockBiophysicsData.recommendation.garments.map((garment) =>
+          garment.name === "Thermal Tights" ? { ...garment, id: "0b5f9a2e-6c1d-5e4a-9f3b-2d7c8e1a4b60", name: "Fleece Tights" } : garment
+        );
+        rerender(<LayerDisplay {...props} biophysicsData={{ ...mockBiophysicsData, recommendation: { ...mockBiophysicsData.recommendation, garments } }} />);
+        expect(screen.queryByText("Pick catalog fleece")).not.toBeInTheDocument();
+        expect(within(screen.getByRole("region", { name: "Legs" })).getByText("Fleece Tights")).toBeInTheDocument();
+      });
+
       it("adds an item under its own layer, whichever layer's Add was used", () => {
         const torso = changeArea("Upper body");
         fireEvent.click(within(torso).getByRole("button", { name: "Add base" }));

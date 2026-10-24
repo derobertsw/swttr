@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LocationPicker } from "@/components/trips/LocationPicker";
 import { GEOAPIFY_CREDIT, OSM_CREDIT } from "@/lib/trip-location";
 import { errorMessage, timedTripRequest, tripRequest, TripRequestError } from "@/lib/trip-requests";
-import type { TripDay, TripDriveDay, TripDriveEstimates, TripFull, TripLocation } from "@/types/trips";
+import type { TripDay, TripDriveDay, TripDriveEstimates, TripDriveRoute, TripFull, TripLocation } from "@/types/trips";
 
 const linkClass = "text-primary underline";
 
@@ -34,7 +34,8 @@ export function useDriveEstimates(data: TripFull | null | undefined, enabled = t
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ tripId: string; plan: string; attempt: number; estimates: TripDriveEstimates | null; error: string | null } | null>(null);
   const plan = useMemo(() => data && JSON.stringify({
-    trip: [data.trip.id, data.trip.start_date, data.trip.end_date, data.lodging?.revision],
+    // Who's on the crew decides the departures too (#333), and changes without a lodging revision.
+    trip: [data.trip.id, data.trip.start_date, data.trip.end_date, data.lodging?.revision, data.lodging?.people_key],
     stops: data.stops.map((stop) => [stop.id, stop.access_point]),
     days: data.days.map((day) => [day.date, day.stop_id, day.access_point_stop_id, day.access_point, day.origin, day.origin_stay_id, day.no_drive]),
   }), [data]);
@@ -72,7 +73,7 @@ const calculatedLabel = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 /** "About 35 min drive · 14 mi · one way", or what's missing, in a few words for a list. */
-export function driveSummary(day: TripDriveDay, canEdit: boolean): string {
+export function driveSummary(day: TripDriveRoute, canEdit: boolean): string {
   const to = day.destination ? ` to ${day.destination.label}` : "";
   switch (day.state) {
     case "available": return `About ${day.estimate!.duration_label} drive${to} · ${day.estimate!.distance_label} · one way`;
@@ -94,7 +95,7 @@ export function driveSummary(day: TripDriveDay, canEdit: boolean): string {
  * Opens maps for the exact endpoints while keeping the current day open. The
  * trip map names the access point in `label`: "Directions to Spruce Peak lot".
  */
-export function Directions({ day, label }: { day: TripDriveDay; label?: string }) {
+export function Directions({ day, label }: { day: TripDriveRoute; label?: string }) {
   const apple = useAppleMaps();
   if (!day.directions || !day.origin || !day.destination) return null;
   const app = apple ? "Apple Maps" : "Google Maps";
@@ -118,7 +119,7 @@ function RoutingAttribution() {
 }
 
 /** Traffic assumptions and previous-route figures, separate from the current duration. */
-function EstimateDetails({ day }: { day: TripDriveDay }) {
+function EstimateDetails({ day }: { day: TripDriveRoute }) {
   if (!day.estimate && !day.previous) return null;
   return (
     <details className="text-sm text-muted-foreground">
@@ -131,6 +132,50 @@ function EstimateDetails({ day }: { day: TripDriveDay }) {
           <p>Earlier estimate, for {day.previous.origin_label} → {day.previous.destination_label}: about {day.previous.duration_label} · {day.previous.distance_label} (calculated {calculatedLabel(day.previous.calculated_at)}).</p>
         )}
       </div>
+    </details>
+  );
+}
+
+/**
+ * Everyone's departures that morning (#333): who starts from where, and each
+ * drive to the same access point, in the server's order with the crew's first.
+ * Anyone on the trip can open it and show a departure's drive above; nobody
+ * is listed under a stay they didn't sleep in.
+ */
+function Departures({ data, day, memberId, canEdit, shown, onShow }: {
+  data: TripFull;
+  day: TripDriveDay;
+  memberId: string | null;
+  canEdit: boolean;
+  /** The departure whose drive shows above. */
+  shown: string | null;
+  onShow: (key: string) => void;
+}) {
+  const people = data.lodging?.people ?? [];
+  const name = (id: string) => {
+    const person = people.find((entry) => entry.member_id === id);
+    if (!person) return "Someone";
+    return `${id === memberId ? "You" : person.display_name}${person.membership === "invited" ? " (invitation pending)" : ""}`;
+  };
+  return (
+    <details className="mt-2 text-base text-foreground">
+      <summary className="min-h-11 cursor-pointer py-2">Departures · {day.departures.length} starting points</summary>
+      <ul className="space-y-3 pb-2">
+        {day.departures.map((departure) => (
+          <li key={departure.key} className="min-w-0 space-y-1 break-words">
+            <p><span className="font-medium">{departure.label}</span> · {listed(departure.member_ids.map(name))}</p>
+            <p className="text-sm text-muted-foreground">
+              {driveSummary(departure, canEdit)}
+              {departure.estimate && departure.state !== "manual" ? ` · calculated ${departure.estimate.age_label}` : ""}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {departure.origin && <Button type="button" size="sm" variant={shown === departure.key ? "default" : "outline"}
+                aria-pressed={shown === departure.key} onClick={() => onShow(departure.key)}>Show drive from {departure.label}</Button>}
+              <Directions day={departure} />
+            </div>
+          </li>
+        ))}
+      </ul>
     </details>
   );
 }
@@ -153,11 +198,13 @@ const noticeClass = "rounded-control border border-warning p-3 text-base text-fo
 /**
  * The drive part of the day's Getting there (#209): where the day starts →
  * the access point, the one-way estimate, Directions and Estimate details.
- * The organizer can start the day somewhere else, plan no drive, and add an
- * estimate of their own when routing has none. Only this row waits for the
- * estimate; the rest of the day shows.
+ * Each person sees their own departure first, and everyone can open the
+ * day's other departures (#333). The organizer can start the day somewhere
+ * else, plan no drive, and add an estimate of their own for the crew's drive
+ * when routing has none. Only this row waits for the estimate; the rest of
+ * the day shows.
  */
-export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
+export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, memberId = null }: {
   data: TripFull;
   date: string;
   dateLabel: string;
@@ -166,12 +213,25 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
   canEdit: boolean;
   /** Reloads the trip after the starting point changes. */
   onSaved: () => Promise<void> | void;
+  /** The signed-in person's membership, whose departure leads. */
+  memberId?: string | null;
 }) {
   const tripId = data.trip.id;
   const tripDay = data.days.find((candidate) => candidate.date === date);
   const crewStayId = data.lodging?.days.find((candidate) => candidate.date === date)?.starting_stay_id ?? null;
   const crewStay = data.lodging?.stays.find((stay) => stay.id === crewStayId);
-  const day = drive.estimates?.days.find((candidate) => candidate.date === date);
+  const crewDay = drive.estimates?.days.find((candidate) => candidate.date === date);
+  // The departure shown: one chosen from Departures, else your own when
+  // you're taking part, else the crew's. The organizer's estimate controls
+  // stay with the crew's, which they can show from Departures.
+  const [shownKey, setShownKey] = useState<string | null>(null);
+  const departures = crewDay?.departures ?? [];
+  const chosen = departures.find((departure) => departure.key === shownKey);
+  const mine = memberId ? departures.find((departure) => departure.member_ids.includes(memberId)) : undefined;
+  const day: TripDriveRoute | undefined = chosen ?? mine ?? crewDay;
+  const shownDeparture = chosen ?? mine;
+  const crewShown = !shownDeparture || shownDeparture.crew;
+  const split = departures.length > 1;
   const [editing, setEditing] = useState<"origin" | "estimate" | "remove" | null>(null);
   // The drive as it was when your estimate's editor opened. The editor keeps
   // it, so a refresh that changes or removes the drive never drops an entry.
@@ -188,7 +248,7 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
 
   const open = (next: NonNullable<typeof editing>) => {
     setEditing(next); setStatus(""); setActionError(null);
-    setOpened(day && drive.estimates ? { day, days: drive.estimates.days } : null);
+    setOpened(crewDay && drive.estimates ? { day: crewDay, days: drive.estimates.days } : null);
   };
   const close = (focusId: string, message?: string) => {
     setEditing(null);
@@ -243,6 +303,14 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
     // The card already says what's missing about the access point.
     if (!startLine && !canEdit) return null;
     body = startLine;
+  } else if (day.state === "missing_origin" && shownDeparture && !shownDeparture.crew) {
+    // Some people have no starting point while the crew has one.
+    const yours = shownDeparture === mine, arriving = shownDeparture.label === "Arrives this day";
+    body = <Missing title={yours ? arriving ? "You arrive this day" : "Your starting point isn't set" : arriving ? "Arriving this day" : "Starting point not set"}>
+      {arriving ? `${yours ? "You weren't" : "They weren't"} on the trip the night before, so there's no stay to start from.`
+        : `${yours ? "You don't" : "They don't"} have a stay planned for ${day.night_label} night.`}
+      {canEdit ? <> {stays} to assign one.</> : ""}
+    </Missing>;
   } else if (day.state === "missing_origin") {
     body = <Missing title="Choose where you're starting">
       No crew stay is set for {day.night_label} night{canEdit ? <>. Set a starting point for this day, or {stays} to assign one.</> : "."}
@@ -264,6 +332,8 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
   } else {
     const yours = day.manual;
     const whose = canEdit ? "Your estimate" : "Organizer's estimate";
+    // The organizer's own estimate is managed on the crew's drive (#209).
+    const manage = canEdit && crewShown;
     const entered = (manual: NonNullable<typeof yours>) => `entered ${calculatedLabel(manual.entered_at)}${manual.note ? ` · ${manual.note}` : ""}`;
     const changed = day.state === "unavailable" && day.previous;
     body = <div className="space-y-2">
@@ -290,22 +360,22 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
       {/* The other estimate for the same drive is kept, and offered separately. */}
       {day.state === "manual" && day.estimate && <div className="space-y-1">
         <p className="break-words text-sm text-foreground">Calculated estimate: about {day.estimate.duration_label} · {day.estimate.distance_label} · one way (calculated {day.estimate.age_label}){day.estimate.stale ? " · not updated" : ""}</p>
-        {canEdit && <Button type="button" size="sm" variant="outline" disabled={working} onClick={() => void prefer(true)}>Use calculated estimate</Button>}
+        {manage && <Button type="button" size="sm" variant="outline" disabled={working} onClick={() => void prefer(true)}>Use calculated estimate</Button>}
       </div>}
       {day.state !== "manual" && yours?.current && <div className="space-y-1">
         <p className="break-words text-sm text-foreground">{whose}: about {yours.duration_label} · {entered(yours)}</p>
-        {canEdit && <Button type="button" size="sm" variant="outline" disabled={working} onClick={() => void prefer(false)}>Use your estimate</Button>}
+        {manage && <Button type="button" size="sm" variant="outline" disabled={working} onClick={() => void prefer(false)}>Use your estimate</Button>}
       </div>}
-      {canEdit && yours && !yours.current && <p className="break-words text-sm text-foreground">
+      {manage && yours && !yours.current && <p className="break-words text-sm text-foreground">
         Your estimate, about {yours.duration_label}, was for {yours.origin_label} → {yours.destination_label}. Edit it to use it for this drive, or remove it.
       </p>}
       <div className="flex flex-wrap gap-2">
         <Directions day={day} />
         {(day.state === "unavailable" || day.state === "stale") && <Button type="button" size="sm" variant="outline" disabled={drive.refreshing} onClick={drive.retry}>Retry</Button>}
-        {canEdit && !editing && !yours && (day.state === "unavailable" || day.state === "stale" || day.state === "no_route") && (
+        {manage && !editing && !yours && (day.state === "unavailable" || day.state === "stale" || day.state === "no_route") && (
           <Button id={estimateId} type="button" size="sm" variant="outline" onClick={() => open("estimate")}>Add your estimate</Button>
         )}
-        {canEdit && !editing && yours && <>
+        {manage && !editing && yours && <>
           <Button id={estimateId} type="button" size="sm" variant="outline" onClick={() => open("estimate")}>Edit your estimate</Button>
           <Button type="button" size="sm" variant="outline" onClick={() => open("remove")}>Remove your estimate</Button>
         </>}
@@ -318,8 +388,12 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved }: {
 
   return (
     <section aria-labelledby={headingId} className="mt-3 border-t border-border pt-3">
-      <h3 id={headingId} tabIndex={-1} className="text-sm font-medium text-muted-foreground">Drive</h3>
+      <h3 id={headingId} tabIndex={-1} className="text-sm font-medium text-muted-foreground">
+        {chosen && chosen !== mine ? `Drive from ${chosen.label}` : split && mine ? "Your drive" : "Drive"}
+      </h3>
       <div aria-live="polite" className="mt-1">{body}</div>
+      {split && crewDay && !drive.loading && <Departures data={data} day={crewDay} memberId={memberId} canEdit={canEdit}
+        shown={shownDeparture?.key ?? null} onShow={(key) => { setShownKey(key); focusSoon(headingId); }} />}
       {editing === "estimate" && opened && (
         <YourEstimateEditor tripId={tripId} day={opened.day} days={opened.days}
           onCancel={() => close(estimateId)} onReviewed={drive.retry}
@@ -661,7 +735,11 @@ export function StayDepartures({ tripId, stayId, drive, canEdit = false }: { tri
     <Button type="button" size="sm" variant="outline" onClick={drive.retry}>Retry</Button>
   </div>;
   if (!departures?.dates.length) return null;
-  const dayOf = (date: string) => drive.estimates!.days.find((day) => day.date === date);
+  // The drive from this stay, whether or not it's the crew's that morning (#333).
+  const dayOf = (date: string) => {
+    const day = drive.estimates!.days.find((candidate) => candidate.date === date);
+    return day?.departures?.find((departure) => departure.origin?.stay_id === stayId) ?? day;
+  };
   const next = departures.next ? dayOf(departures.next) : undefined;
   const hasCalculated = departures.dates.some((date) => {
     const day = dayOf(date);

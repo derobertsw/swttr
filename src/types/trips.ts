@@ -606,7 +606,8 @@ export interface TripDriveManualEstimate {
   dates: string[];
 }
 
-export interface TripDriveDay {
+/** A drive from one starting point to the day's access point, or why there's no estimate. */
+export interface TripDriveRoute {
   date: string;
   date_label: string;
   /** The night whose stay the day starts from: "Fri Jan 9". */
@@ -637,9 +638,32 @@ export interface TripDriveDay {
   directions: { apple: string; google: string } | null;
 }
 
+/**
+ * The people taking part in a day who start from the same place (#333), with
+ * their drive. They start from the day's own starting point when it has one,
+ * otherwise from the stay each of them slept in the night before. See
+ * docs/trip-locations.md.
+ */
+export interface TripDriveDeparture extends TripDriveRoute {
+  /** "stay:<id>", "day" for the day's own starting point, or "unset:not_set" / "unset:arrives" for people with no starting point. */
+  key: string;
+  /** The stay's or place's name, "Not set", or "Arrives this day". */
+  label: string;
+  /** Who starts here, in crew order; empty when the trip has no per-person plan to go on. */
+  member_ids: string[];
+  /** The crew's departure: the one most people take, which the day's own fields describe. */
+  crew: boolean;
+}
+
+/** A day's drive (#209): the crew's departure, with every departure that morning. */
+export interface TripDriveDay extends TripDriveRoute {
+  /** The crew's first, then other stays by size, then people with no starting point. One while everyone starts from the same place. */
+  departures: TripDriveDeparture[];
+}
+
 export interface TripStayDepartures {
   stay_id: string;
-  /** Mornings that start from the stay, checkout morning included, in date order. */
+  /** Mornings that anyone starts from the stay, checkout morning included, in date order. */
   dates: string[];
   /** The first of them from today on, in the stay's time zone; null once they've all passed. */
   next: string | null;
@@ -706,4 +730,56 @@ export interface TripItineraryOption {
 export interface TripItineraryPreview {
   /** One option, or several to choose from with no default. */
   options: TripItineraryOption[];
+}
+
+/**
+ * One person's facts for one trip day (#336). Each is its own status, linked
+ * to its own task; nothing combines them into Ready or Safe.
+ */
+export interface TripChecklistPerson {
+  member_id: string;
+  display_name: string;
+  role: TripMemberRole;
+  membership: TripMemberStatus;
+  /** "Organizer", "Joined", "Invitation pending" or "Managed guest". */
+  membership_label: string;
+  participation: TripDayParticipation;
+  /** "Taking part", "There, not taking part" or "Not on trip". */
+  participation_label: string;
+  /** The day's saved outfit, an older checklist, or Not started. A checklist is never an outfit. */
+  clothing: {
+    state: "outfit" | "outfit_review" | "checklist" | "not_started";
+    label: string;
+    /** Why a saved outfit no longer fits the day, as the day page says it. */
+    notes: string[];
+    /** Flagged on the day, as Needs help or Missing; never set on a saved outfit, as the day page shows it. */
+    flag: { state: "warn" | "missing"; label: string } | null;
+  };
+  /** Their plan for tonight; null without lodging. */
+  tonight: { state: TripLodgingState; stay_id: string | null; label: string; gap: boolean } | null;
+  /** Shared gear assigned to them, for the whole trip (#179). */
+  shared: Array<{ id: string; description: string; status: "assigned" | "awaiting" | "accepted" | "packed"; label: string }>;
+  /**
+   * Their reviews of the day's official sources (#211). Null when the day has
+   * none, or for someone without an account, who can't record one.
+   */
+  conditions: { sources: number; reviewed: number; out_of_date: number; latest: string | null; label: string } | null;
+}
+
+export interface TripDayChecklist {
+  date: string;
+  date_label: string;
+  activity: string | null;
+  place: string | null;
+  people: TripChecklistPerson[];
+}
+
+/** `GET /api/v1/trips/:id/checklist`: every day's checklist, and the day to show first. */
+export interface TripChecklist {
+  /** For the workspace header, as Packing names the trip. */
+  trip: Pick<Trip, "id" | "name" | "start_date" | "end_date">;
+  default_date: string | null;
+  /** The signed-in person's member id, for their own row. */
+  viewer_member_id: string | null;
+  days: TripDayChecklist[];
 }

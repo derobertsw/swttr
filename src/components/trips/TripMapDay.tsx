@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { Directions, driveSummary } from "./DriveEstimate";
 import { placeStatus } from "./trip-map-presentation";
 import type { TripMapDay, TripMapPlace } from "@/types/trip-map";
@@ -41,9 +42,15 @@ function driveFix(tripId: string, day: TripMapDay, canEdit: boolean): { label: s
  * A selected day's logistics in words (#234): where the day starts, the access
  * point and its drive, the meeting time, notes and tonight's stay, with
  * Directions to the access point. All of it reads without the map canvas.
+ * `day` follows one departure (#333), the signed-in person's own unless
+ * someone chose another from the day's departures.
  */
-export function TripMapDaySummary({ tripId, day, places, canEdit }: {
+export function TripMapDaySummary({ tripId, day, places, canEdit, memberId = null, following = null, onFollow }: {
   tripId: string; day: TripMapDay; places: TripMapPlace[]; canEdit: boolean;
+  memberId?: string | null;
+  /** The departure `day` follows. */
+  following?: string | null;
+  onFollow?: (key: string) => void;
 }) {
   const place = (id: string | null) => id ? places.find((candidate) => candidate.id === id) ?? null : null;
   const origin = place(day.origin_place_id), access = place(day.access_place_id), tonight = place(day.tonight_place_id);
@@ -86,6 +93,17 @@ export function TripMapDaySummary({ tripId, day, places, canEdit }: {
         {day.staying_tonight}
         {tonight && <span className={noteClass}>{placeStatus(tonight)}</span>}
       </Row>
+      {(day.departures?.length ?? 0) > 1 && <Row term="Departures">
+        <ul className="mt-1 space-y-3">
+          {day.departures.map((departure) => <li key={departure.key} className="min-w-0">
+            <span className="font-medium">{departure.label}</span>
+            {" · "}{departure.people.map((person) => `${person.member_id === memberId ? "You" : person.name}${person.pending ? " (invitation pending)" : ""}`).join(", ")}
+            <span className={noteClass}>{driveSummary(departure.drive, canEdit)}</span>
+            {onFollow && <Button type="button" variant={following === departure.key ? "default" : "outline"} size="sm" className="mt-1"
+              aria-pressed={following === departure.key} onClick={() => onFollow(departure.key)}>Show {departure.label} departure</Button>}
+          </li>)}
+        </ul>
+      </Row>}
     </dl>
     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
       <Directions day={drive} label={`Directions to ${drive.destination?.label}`} />

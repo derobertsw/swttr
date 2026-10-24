@@ -92,6 +92,7 @@ type GearUpAction =
   | { type: "SUBMIT_START"; outing: Outing }
   | { type: "SUBMIT_SUCCESS"; result: OutingResult }
   | { type: "SUBMIT_ERROR"; message: string }
+  | { type: "SUBMIT_CANCEL" }
   /** `keepLoading` when the running request was made from the form in this mode (see useGearUp). */
   | { type: "SHOW_FORM"; mode: InputMode; keepLoading: boolean }
   /** `kept` is null when nothing was kept for `owner`. */
@@ -148,6 +149,8 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
           : state.request,
         startDateError: { message: action.error, location: action.location },
       };
+    case "SUBMIT_CANCEL":
+      return { ...state, request: { status: "idle" } };
     case "SUBMIT_START":
       return { ...state, request: { status: "loading", outing: action.outing }, startDateError: null };
     case "SUBMIT_SUCCESS": {

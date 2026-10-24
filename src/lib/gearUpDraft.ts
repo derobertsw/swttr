@@ -38,8 +38,11 @@ const isActivity = (value: unknown): value is string => ACTIVITIES.some((activit
 const isExertion = (value: unknown): value is ExertionLevel => EXERTION_LEVELS.some((level) => level === value);
 const isMode = (value: unknown): value is OutingTime["mode"] => value === "now" || value === "later";
 
-/** A real calendar date as "yyyy-MM-dd": "2026-02-31" has the shape, but isn't one. */
-function isDate(value: unknown): value is string {
+/**
+ * A real calendar date as "yyyy-MM-dd" that the form's date parser can hold:
+ * "2026-02-31" has the shape, but isn't one, and year 0000 parses as invalid.
+ */
+export function isDate(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = parse(value, "yyyy-MM-dd", new Date());
   return isValid(date) && format(date, "yyyy-MM-dd") === value;
