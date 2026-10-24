@@ -61,7 +61,7 @@ describe("Trip packing coverage", () => {
     vi.stubGlobal("fetch", fakeTripApi({ [PACK]: reply(200, pack([
       entry("2026-10-10", { advice: "available", message: "No outfit saved. General suggestions for this day are below.", forecast: partial, action: "review_day" }),
       entry("2026-10-11", { advice: "manual", message: "Older checklist saved.", action: "plan_manually" }),
-      entry("2026-10-12", { advice: "rest", activity: "Rest", message: "Rest day; review personal items manually.", action: "plan_manually" }),
+      entry("2026-10-12", { advice: "rest", activity: "Rest", message: "Rest day; review personal items manually.", action: "review_day" }),
       entry("2026-10-13", { advice: "available", activity: "Climb", approximation: "Climb uses general hiking guidance.", action: "review_day" }),
       saved("2026-10-14"),
     ])) }));
@@ -72,7 +72,7 @@ describe("Trip packing coverage", () => {
     expect(screen.getByText("Rest day; review personal items manually.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Plan this day for 2026-10-10" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Review checklist for 2026-10-11" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Plan kit manually for 2026-10-12" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review day for 2026-10-12" })).toBeInTheDocument();
     expect(screen.getByText("Climb uses general hiking guidance.")).toBeInTheDocument();
     // A saved day that still fits isn't one to review.
     expect(screen.queryByRole("link", { name: /2026-10-14/ })).not.toBeInTheDocument();

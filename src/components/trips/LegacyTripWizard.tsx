@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { errorMessage, fetchTripFull, tripRequest, TripRequestError } from "@/lib/trip-requests";
 import type { DateRange } from "react-day-picker";
 import type { Trip, TripMember, TripStop } from "@/types/trips";
-import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
+import { TRIP_ACTIVITY_OPTIONS, tripActivityLabel } from "@/lib/trip-activities";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -558,7 +558,7 @@ export function TripStopsEditor({
                       {i === 0 ? "Base · " : ""}
                       {stop.activities.length === 0
                         ? "no activities yet"
-                        : stop.activities.join(", ")}
+                        : stop.activities.map(tripActivityLabel).join(", ")}
                     </p>
                   </div>
                 </div>
@@ -849,7 +849,7 @@ function StopDetailSheet({
                 aria-pressed={on}
                 className={chipClassName}
               >
-                {a}
+                {tripActivityLabel(a)}
               </button>
             );
           })}
@@ -1083,7 +1083,7 @@ function Step4Review({
                 <MapPin className="size-3.5 text-muted-foreground" />
                 {s.name}
                 {s.activities.length > 0 && (
-                  <span className="text-xs text-muted-foreground">· {s.activities.join(", ")}</span>
+                  <span className="text-xs text-muted-foreground">· {s.activities.map(tripActivityLabel).join(", ")}</span>
                 )}
               </li>
             ))}
