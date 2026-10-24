@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import catalog from '@/test/fixtures/gear-catalog.json';
+import * as ensembleModel from '@/lib/biophysics/ensemble';
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { evaluatePhase } from '../layer-evaluation';
 import { categorizeGarments } from '../categorization';
@@ -177,6 +178,92 @@ describe('complete running outfits', () => {
     expect(ids(outfit).sort()).toEqual([tee.id, shorts.id, jacket.id, pants.id].sort());
     expect(runningRegionMatches(outfit, t, 'torso')).toBe(true);
     expect(runningRegionMatches(outfit, t, 'legs')).toBe(true);
+  });
+
+  it.each([
+    { name: 'mild', t: targets() },
+    { name: 'cold wind', t: targets(-12, 'moderate', 10) },
+    { name: 'rain', t: targets(1, 'moderate', 4, true) },
+  ])('prunes before pairing and converts each garment only once: $name', ({ t }) => {
+    const prediction = vi.spyOn(ensembleModel, 'predictEnsembleThermal');
+    const conversion = vi.spyOn(ensembleModel, 'garmentToThermalProps');
+    try {
+      const expected = ids(select(garments, t));
+      const predictions = prediction.mock.calls.length;
+      expect(predictions).toBeLessThan(500); // Formerly ~86,000 per request.
+      expect(conversion.mock.calls.length).toBeLessThanOrEqual(garments.length);
+      prediction.mockClear();
+      conversion.mockClear();
+      const expanded = [0, 1, 2, 3].flatMap(copy => garments.map(g => ({ ...g, id: copy ? `${g.id}-duplicate-${copy}` : g.id })));
+      expect(ids(select(expanded, t))).toEqual(expected);
+      // Equivalent products keep the deterministic first ID without
+      // multiplying either the regional work or the thermal conversions.
+      expect(prediction.mock.calls.length).toBe(predictions);
+      expect(conversion.mock.calls.length).toBeLessThanOrEqual(garments.length);
+    } finally {
+      prediction.mockRestore();
+      conversion.mockRestore();
+    }
+  });
+
+  it('keeps a late ideal alternative in a large wardrobe rather than capping candidates', () => {
+    const expanded = [0, 1, 2, 3].flatMap(copy => garments.map(g => ({
+      ...g, id: `${g.id}-variant-${copy}`,
+      garment_thermal_properties: Object.fromEntries(Object.entries(g.garment_thermal_properties ?? {}).map(([key, value]) =>
+        [key, typeof value === 'number' && /^(rcl|recl)_/.test(key) ? value * (1 + copy * 0.03) : value])),
+    })));
+    const ideal: GarmentRow = { ...tee, id: 'zz-ideal-top',
+      garment_thermal_properties: { ...tee.garment_thermal_properties, recl_torso: 0.1, recl_arms: 0.1 } };
+    const prediction = vi.spyOn(ensembleModel, 'predictEnsembleThermal');
+    const conversion = vi.spyOn(ensembleModel, 'garmentToThermalProps');
+    try {
+      const outfit = select([...expanded, ideal]);
+      expect(ids(outfit)).toContain(ideal.id);
+      expect(conversion.mock.calls.length).toBeLessThanOrEqual(expanded.length + 1);
+      expect(prediction.mock.calls.length).toBeLessThan(2 * (expanded.length + 1) + 500);
+    } finally {
+      prediction.mockRestore();
+      conversion.mockRestore();
+    }
+  });
+
+  it('combines shared body garments with regional choices without counting them twice', () => {
+    const suit: GarmentRow = { ...tee, id: 'running-suit', garment_type: 'suit', covers_legs: true, coverage_legs: 0.3,
+      garment_thermal_properties: { ...tee.garment_thermal_properties, rcl_legs: 0.06, recl_legs: 1.4 } };
+    const weatherSuit: GarmentRow = { ...suit, id: 'weather-suit', category: 'hard_shell', usage: 'unknown',
+      coverage_arms: 1, coverage_legs: 1,
+      garment_protection: { windproof_rating: 'windproof', waterproof_rating: 'waterproof' },
+      garment_thermal_properties: { ...suit.garment_thermal_properties, rcl_torso: 0.15, rcl_arms: 0.1, rcl_legs: 0.15 } };
+    const t = targets(1, 'moderate', 4, true);
+    t.targetRange = [0.15, 0.4];
+    t.regional = { min: { torso: 0.15, arms: 0.1, legs: 0.2 }, neutral: { torso: 0.4, arms: 0.3, legs: 0.4 } };
+    const outfit = select([tee, shorts, tights, suit, weatherSuit], t);
+    expect(ids(outfit)).toEqual([suit.id, weatherSuit.id]);
+    expect(runningRegionMatches(outfit, t, 'torso')).toBe(true);
+    expect(runningRegionMatches(outfit, t, 'legs')).toBe(true);
+    const props = predictEnsembleThermal(ensembleToThermalGarments(outfit));
+    expect(props.rcl.leg).toBeCloseTo((0.06 + 0.15) * 0.961, 12);
+  });
+
+  it.each([true, false])('explains best available clothing that still misses a target, owned=%s', owned => {
+    const t = targets();
+    t.regional = { min: { torso: 2, arms: 2, legs: 2 }, neutral: { torso: 2.5, arms: 2.5, legs: 2.5 } };
+    t.targetRange = [2, 2.5];
+    const outfit = select([tee, shorts], t);
+    const requirements = buildClothingRequirements('running', t, {
+      garments: [tee, shorts], selectedGarments: outfit, handwear: [], headwear: [],
+      ownership: { garments: owned, handwear: false, headwear: false },
+    });
+    for (const region of ['torso', 'legs'] as const) {
+      const requirement = requirements.find(r => r.region === region)!;
+      expect(requirement.status).toBe('missing');
+      expect(requirement.message).toContain('best available');
+      expect(requirement.message).toContain(owned ? 'in your wardrobe' : 'not owned');
+      expect(requirement.message).toContain('still below the insulation target');
+      expect(requirement.message).not.toContain('no matching item');
+      expect(requirement.matched_garment_id).toBeUndefined();
+      expect(requirement.generic_suggestion?.owned).toBe(false);
+    }
   });
 
   it('does not repeat a standalone garment spanning torso and legs', () => {
