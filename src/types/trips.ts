@@ -129,6 +129,23 @@ export interface TripFull {
   tour_plans?: TripTourPlanSummary[];
   /** Each day's conditions sources with the crew's reviews (#211); optional like `lodging`. */
   conditions?: TripDayConditionsSource[];
+  /** People's own starting points (#333); missing or empty before its migration. */
+  member_origins?: TripMemberDayOrigin[];
+}
+
+/**
+ * One person's own starting point for a day (#333), used instead of the day's
+ * own and the stay they slept in: see docs/trip-locations.md.
+ */
+export interface TripMemberDayOrigin {
+  trip_id: string;
+  trip_day_id: string;
+  member_id: string;
+  /** Null keeps where they'd start anyway; then `no_drive` is set. */
+  origin: TripLocation | null;
+  /** The saved stay it was picked from, while that stay exists. */
+  origin_stay_id: string | null;
+  no_drive: boolean;
 }
 
 /** A Backcountry day's tour plan as the organizer enters it: see docs/trip-tour-plans.md. */
@@ -591,6 +608,8 @@ export interface TripDriveEstimate {
 
 /** The organizer's own one-way estimate for a day (#209), kept with the pair it was entered for. */
 export interface TripDriveManualEstimate {
+  /** The drive it was entered for (#333): it's kept per day and drive. */
+  pair_key: string;
   duration_label: string;
   duration_seconds: number;
   /** Where the time comes from, in the organizer's words. */
@@ -598,7 +617,7 @@ export interface TripDriveManualEstimate {
   entered_at: string;
   origin_label: string;
   destination_label: string;
-  /** False when the day's drive is now another pair: shown for review, never as the day's estimate. */
+  /** False for a drive nobody has that day any more: shown for review, never as the day's estimate. */
   current: boolean;
   /** The organizer chose the calculated estimate for the same pair instead. */
   use_calculated: boolean;
@@ -624,8 +643,13 @@ export interface TripDriveRoute {
   destination: { label: string } | null;
   /** The calculated estimate for this pair, when there is one: the day's estimate, or the one offered instead of yours. */
   estimate: TripDriveEstimate | null;
-  /** The organizer's own estimate for the day, when there is one and the day has a drive to estimate. */
+  /** The organizer's own estimate for this drive, when there is one and the day has a drive to estimate. */
   manual: TripDriveManualEstimate | null;
+  /**
+   * On the crew's drive (#333): the organizer's estimates for drives nobody
+   * has that day any more, each for review, to use for this drive or remove.
+   */
+  obsolete: TripDriveManualEstimate[];
   /** An earlier estimate for a different origin or access point: only for Estimate details, with its own pair. */
   previous: (TripDriveEstimate & { origin_label: string; destination_label: string }) | null;
   /** Names this origin, access point and mode, so a save can say which drive it was for; null without one. */
@@ -645,12 +669,17 @@ export interface TripDriveRoute {
  * docs/trip-locations.md.
  */
 export interface TripDriveDeparture extends TripDriveRoute {
-  /** "stay:<id>", "day" for the day's own starting point, or "unset:not_set" / "unset:arrives" for people with no starting point. */
+  /**
+   * Where it starts: "stay:<id>", "place:<latitude>,<longitude>", or "unset:not_set" / "unset:arrives"
+   * for people with no starting point, with ":no_drive" for No drive planned.
+   */
   key: string;
   /** The stay's or place's name, "Not set", or "Arrives this day". */
   label: string;
   /** Who starts here, in crew order; empty when the trip has no per-person plan to go on. */
   member_ids: string[];
+  /** Of them, the people here by a starting point or No drive planned of their own for the day. */
+  own_member_ids: string[];
   /** The crew's departure: the one most people take, which the day's own fields describe. */
   crew: boolean;
 }

@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadTripFull, requireTripAccess } from "@/lib/trips";
-import { driveTrip, MOTEL, SMUGGS_LOT as SMUGGS, SPRUCE_LOT } from "@/test/driveTrip";
+import { drivePlans } from "@/lib/trip-drive";
+import { driveTrip, MOTEL, SMUGGS_LOT as SMUGGS, splitDriveTrip, SPRUCE_LOT, VILLAGE_PLACE } from "@/test/driveTrip";
 import { DELETE, PATCH, PUT } from "./route";
 
 vi.mock("@/lib/trips", async (original) => ({ ...await original<typeof import("@/lib/trips")>(), requireTripAccess: vi.fn(), loadTripFull: vi.fn() }));
@@ -11,7 +12,7 @@ vi.mock("@/lib/trips", async (original) => ({ ...await original<typeof import("@
 const SAT = "2027-01-09", SUN = "2027-01-10";
 const PAIR = `drive|${MOTEL.latitude},${MOTEL.longitude}>${SPRUCE_LOT.latitude},${SPRUCE_LOT.longitude}`;
 const ENTERED = "2027-01-04T12:00:00.000000+00:00";
-const none = (date: string) => ({ date, entered_at: null, use_calculated: null });
+const none = (date: string, pair = PAIR) => ({ date, pair_key: pair, entered_at: null, use_calculated: null });
 const rpc = vi.fn();
 const call = (handler: typeof PUT, method: string, body: unknown, date = SAT) => handler(
   new Request(`http://localhost/api/v1/trips/trip-drive/days/${date}/drive-estimate`, { method, body: JSON.stringify(body) }),
@@ -35,7 +36,7 @@ describe("Saving your own drive estimate", () => {
     const response = await save({ dates: [SAT, SUN], expected: [none(SAT), none(SUN)] });
     expect(response.status).toBe(200);
     expect(requireTripAccess).toHaveBeenCalledWith("trip-drive", { organizerOnly: true });
-    expect(rpc).toHaveBeenCalledWith("set_trip_drive_estimate", {
+    expect(rpc).toHaveBeenCalledWith("set_trip_drive_pair_estimate", {
       p_trip_id: "trip-drive", p_user_id: "user-1", p_action: "save",
       p_payload: {
         estimate: { pair_key: PAIR, origin_label: "Stowe Motel", destination_label: "Spruce Peak lot", duration_seconds: 2400, note: "Resort directions page" },
@@ -54,14 +55,30 @@ describe("Saving your own drive estimate", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
   it("removes it from the days that shared it, and chooses the calculated estimate on one day", async () => {
-    const seen = [{ date: SAT, entered_at: ENTERED, use_calculated: false }, { date: SUN, entered_at: ENTERED, use_calculated: false }];
-    expect((await call(DELETE, "DELETE", { dates: [SAT, SUN], expected: seen })).status).toBe(200);
-    expect(rpc).toHaveBeenLastCalledWith("set_trip_drive_estimate", expect.objectContaining({ p_action: "remove", p_payload: { dates: [SAT, SUN], expected: seen } }));
-    expect((await call(PATCH, "PATCH", { use_calculated: true, expected: seen })).status).toBe(200);
-    expect(rpc).toHaveBeenLastCalledWith("set_trip_drive_estimate", expect.objectContaining({
-      p_action: "prefer", p_payload: { use_calculated: true, expected: [seen[0]], dates: [SAT] },
+    const seen = [SAT, SUN].map((date) => ({ date, pair_key: PAIR, entered_at: ENTERED, use_calculated: false }));
+    expect((await call(DELETE, "DELETE", { pair_key: PAIR, dates: [SAT, SUN], expected: seen })).status).toBe(200);
+    expect(rpc).toHaveBeenLastCalledWith("set_trip_drive_pair_estimate", expect.objectContaining({ p_action: "remove", p_payload: { pair_key: PAIR, dates: [SAT, SUN], expected: seen } }));
+    expect((await call(PATCH, "PATCH", { pair_key: PAIR, use_calculated: true, expected: seen })).status).toBe(200);
+    expect(rpc).toHaveBeenLastCalledWith("set_trip_drive_pair_estimate", expect.objectContaining({
+      p_action: "prefer", p_payload: { pair_key: PAIR, use_calculated: true, expected: [seen[0]], dates: [SAT] },
     }));
     expect(loadTripFull).not.toHaveBeenCalled();
+  });
+  it("saves one for another departure's drive, replacing an estimate for a drive the day no longer has (#333)", async () => {
+    full = splitDriveTrip();
+    vi.mocked(requireTripAccess).mockResolvedValue({ supabase: { rpc } as unknown as SupabaseClient, userId: "user-1", trip: full.trip });
+    const saturday = "2026-10-10";
+    const hotel = `drive|${VILLAGE_PLACE.latitude},${VILLAGE_PLACE.longitude}>${SPRUCE_LOT.latitude},${SPRUCE_LOT.longitude}`;
+    const earlier = { date: saturday, pair_key: "drive|1,1>2,2" };
+    const response = await save({ pair_key: hotel, dates: [saturday], clear: [earlier],
+      expected: [none(saturday, hotel), { ...earlier, entered_at: ENTERED, use_calculated: false }] }, saturday);
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("set_trip_drive_pair_estimate", expect.objectContaining({ p_action: "save", p_payload: expect.objectContaining({
+      estimate: expect.objectContaining({ pair_key: hotel, origin_label: "Village hotel", destination_label: "Spruce Peak lot" }), clear: [earlier],
+    }) }));
+    // The crew's drive is still there too, but not on a day nobody drives it.
+    expect(drivePlans(full).find((plan) => plan.date === saturday)?.pair_key).not.toBe(hotel);
+    expect((await save({ pair_key: hotel, dates: ["2026-10-12"], expected: [none("2026-10-12", hotel)] }, "2026-10-12")).status).toBe(409);
   });
   it("refuses members as requireTripAccess does", async () => {
     vi.mocked(requireTripAccess).mockResolvedValue(NextResponse.json({ error: "Organizer only" }, { status: 403 }));
@@ -76,14 +93,19 @@ describe("Saving your own drive estimate", () => {
     for (const body of [
       { dates: [SUN], expected: [none(SUN)] },
       { dates: [SAT, SAT], expected: [none(SAT)] },
-      { clear: [SAT] },
+      { clear: [{ date: SAT, pair_key: PAIR }] },
+      { clear: [SUN], expected: [none(SAT), none(SUN)] },
       { expected: [] },
-      { expected: [{ date: SAT, entered_at: "yesterday", use_calculated: false }] },
-      { expected: [{ date: SAT, entered_at: ENTERED, use_calculated: null }] },
+      { expected: [{ date: SAT, entered_at: null, use_calculated: null }] },
+      { expected: [none(SAT, "drive|other")] },
+      { expected: [{ ...none(SAT), entered_at: "yesterday", use_calculated: false }] },
+      { expected: [{ ...none(SAT), entered_at: ENTERED, use_calculated: null }] },
       { pair_key: "" },
     ]) expect((await save(body)).status).toBe(400);
-    expect((await call(PATCH, "PATCH", { use_calculated: "yes", expected: [none(SAT)] })).status).toBe(400);
-    expect((await call(DELETE, "DELETE", { dates: [SUN], expected: [none(SUN)] })).status).toBe(400);
+    expect((await call(PATCH, "PATCH", { pair_key: PAIR, use_calculated: "yes", expected: [none(SAT)] })).status).toBe(400);
+    // An app from before #333 sends no pair: it's asked to reload.
+    expect((await call(PATCH, "PATCH", { use_calculated: true, expected: [none(SAT)] })).status).toBe(400);
+    expect((await call(DELETE, "DELETE", { pair_key: PAIR, dates: [SUN], expected: [none(SUN)] })).status).toBe(400);
     expect(rpc).not.toHaveBeenCalled();
   });
   it.each([

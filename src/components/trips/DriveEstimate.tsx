@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LocationPicker } from "@/components/trips/LocationPicker";
 import { GEOAPIFY_CREDIT, OSM_CREDIT } from "@/lib/trip-location";
 import { errorMessage, timedTripRequest, tripRequest, TripRequestError } from "@/lib/trip-requests";
-import type { TripDay, TripDriveDay, TripDriveEstimates, TripDriveRoute, TripFull, TripLocation } from "@/types/trips";
+import type { TripDay, TripDriveDay, TripDriveEstimates, TripDriveManualEstimate, TripDriveRoute, TripFull, TripLocation } from "@/types/trips";
 
 const linkClass = "text-primary underline";
 
@@ -26,9 +26,9 @@ export interface DriveEstimatesState {
 
 /**
  * The trip's drive estimates (#209), fetched again whenever a stay, night,
- * destination, access point or starting point changes. A response is kept
- * with the plan it was fetched for, so an older answer can never show
- * against a newer plan.
+ * destination, access point or starting point, a person's own included,
+ * changes. A response is kept with the plan it was fetched for, so an older
+ * answer can never show against a newer plan.
  */
 export function useDriveEstimates(data: TripFull | null | undefined, enabled = true): DriveEstimatesState {
   const [attempt, setAttempt] = useState(0);
@@ -38,6 +38,8 @@ export function useDriveEstimates(data: TripFull | null | undefined, enabled = t
     trip: [data.trip.id, data.trip.start_date, data.trip.end_date, data.lodging?.revision, data.lodging?.people_key],
     stops: data.stops.map((stop) => [stop.id, stop.access_point]),
     days: data.days.map((day) => [day.date, day.stop_id, day.access_point_stop_id, day.access_point, day.origin, day.origin_stay_id, day.no_drive]),
+    // A person's own starting point changes their departure (#333).
+    people: (data.member_origins ?? []).map((row) => [row.trip_day_id, row.member_id, row.origin, row.origin_stay_id, row.no_drive]),
   }), [data]);
   const key = enabled && plan ? plan : null;
   const tripId = data?.trip.id;
@@ -136,13 +138,21 @@ function EstimateDetails({ day }: { day: TripDriveRoute }) {
   );
 }
 
+/** A person's name in departures (#333): "You", and whether an invitation is pending. */
+function personName(data: TripFull, id: string, memberId: string | null): string {
+  const person = data.lodging?.people.find((entry) => entry.member_id === id);
+  if (!person) return "Someone";
+  return `${id === memberId ? "You" : person.display_name}${person.membership === "invited" ? " (invitation pending)" : ""}`;
+}
+
 /**
  * Everyone's departures that morning (#333): who starts from where, and each
  * drive to the same access point, in the server's order with the crew's first.
- * Anyone on the trip can open it and show a departure's drive above; nobody
- * is listed under a stay they didn't sleep in.
+ * Anyone on the trip can open it and show a departure's drive above; nobody is
+ * listed under a stay they didn't sleep in. The organizer can give chosen
+ * people their own starting point from here.
  */
-function Departures({ data, day, memberId, canEdit, shown, onShow }: {
+function Departures({ data, day, memberId, canEdit, shown, onShow, onChangeStart }: {
   data: TripFull;
   day: TripDriveDay;
   memberId: string | null;
@@ -150,31 +160,32 @@ function Departures({ data, day, memberId, canEdit, shown, onShow }: {
   /** The departure whose drive shows above. */
   shown: string | null;
   onShow: (key: string) => void;
+  /** The organizer's: change these people's starting point. */
+  onChangeStart?: (memberIds: string[], focusId: string) => void;
 }) {
-  const people = data.lodging?.people ?? [];
-  const name = (id: string) => {
-    const person = people.find((entry) => entry.member_id === id);
-    if (!person) return "Someone";
-    return `${id === memberId ? "You" : person.display_name}${person.membership === "invited" ? " (invitation pending)" : ""}`;
-  };
+  const count = day.departures.length;
   return (
     <details className="mt-2 text-base text-foreground">
-      <summary className="min-h-11 cursor-pointer py-2">Departures · {day.departures.length} starting points</summary>
+      <summary className="min-h-11 cursor-pointer py-2">Departures · {count} starting {count === 1 ? "point" : "points"}</summary>
       <ul className="space-y-3 pb-2">
-        {day.departures.map((departure) => (
-          <li key={departure.key} className="min-w-0 space-y-1 break-words">
-            <p><span className="font-medium">{departure.label}</span> · {listed(departure.member_ids.map(name))}</p>
+        {day.departures.map((departure) => {
+          const changeId = `change-start-${day.date}-${departure.key}`;
+          return <li key={departure.key} className="min-w-0 space-y-1 break-words">
+            <p><span className="font-medium">{departure.label}</span> · {listed(departure.member_ids.map((id) =>
+              `${personName(data, id, memberId)}${departure.own_member_ids?.includes(id) ? " (own starting point)" : ""}`))}</p>
             <p className="text-sm text-muted-foreground">
               {driveSummary(departure, canEdit)}
               {departure.estimate && departure.state !== "manual" ? ` · calculated ${departure.estimate.age_label}` : ""}
             </p>
             <div className="flex flex-wrap gap-2">
-              {departure.origin && <Button type="button" size="sm" variant={shown === departure.key ? "default" : "outline"}
+              {departure.origin && count > 1 && <Button type="button" size="sm" variant={shown === departure.key ? "default" : "outline"}
                 aria-pressed={shown === departure.key} onClick={() => onShow(departure.key)}>Show drive from {departure.label}</Button>}
               <Directions day={departure} />
+              {onChangeStart && departure.member_ids.length > 0 && <Button id={changeId} type="button" size="sm" variant="outline"
+                onClick={() => onChangeStart(departure.member_ids, changeId)}>Change their starting point</Button>}
             </div>
-          </li>
-        ))}
+          </li>;
+        })}
       </ul>
     </details>
   );
@@ -185,10 +196,16 @@ function Missing({ title, children }: { title: string; children?: ReactNode }) {
   return <div><p className="text-base text-foreground">{title}</p>{children && <p className="text-sm text-muted-foreground">{children}</p>}</div>;
 }
 
-/** What an editor showed for each day: what a your-estimate change expects to find. */
-const seenEstimates = (days: TripDriveDay[], dates: string[]) => dates.map((date) => {
-  const manual = days.find((day) => day.date === date)?.manual;
-  return { date, entered_at: manual?.entered_at ?? null, use_calculated: manual ? manual.use_calculated : null };
+/** The drive with `pair` on `date`: a departure's (#333), or the day's own. */
+const routeOn = (days: TripDriveDay[], date: string, pair: string | null): TripDriveRoute | undefined => {
+  const day = days.find((candidate) => candidate.date === date);
+  return day?.departures?.find((departure) => departure.pair_key === pair) ?? (day && day.pair_key === pair ? day : undefined);
+};
+/** What an editor showed for each drive on a day: what a your-estimate change expects to find. */
+const seenEstimates = (days: TripDriveDay[], drives: Array<{ date: string; pair_key: string }>) => drives.map(({ date, pair_key }) => {
+  const day = days.find((candidate) => candidate.date === date);
+  const manual = [day, ...day?.departures ?? []].flatMap((route) => [route?.manual, ...route?.obsolete ?? []]).find((entry) => entry?.pair_key === pair_key);
+  return { date, pair_key, entered_at: manual?.entered_at ?? null, use_calculated: manual ? manual.use_calculated : null };
 });
 /** The day's starting point as an editor showed it. */
 const seenOrigin = (day: TripDay | undefined) => ({ origin: day?.origin ?? null, origin_stay_id: day?.origin_stay_id ?? null, no_drive: day?.no_drive ?? false });
@@ -222,20 +239,20 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
   const crewStay = data.lodging?.stays.find((stay) => stay.id === crewStayId);
   const crewDay = drive.estimates?.days.find((candidate) => candidate.date === date);
   // The departure shown: one chosen from Departures, else your own when
-  // you're taking part, else the crew's. The organizer's estimate controls
-  // stay with the crew's, which they can show from Departures.
+  // you're taking part, else the crew's (#333).
   const [shownKey, setShownKey] = useState<string | null>(null);
   const departures = crewDay?.departures ?? [];
   const chosen = departures.find((departure) => departure.key === shownKey);
   const mine = memberId ? departures.find((departure) => departure.member_ids.includes(memberId)) : undefined;
   const day: TripDriveRoute | undefined = chosen ?? mine ?? crewDay;
   const shownDeparture = chosen ?? mine;
-  const crewShown = !shownDeparture || shownDeparture.crew;
   const split = departures.length > 1;
-  const [editing, setEditing] = useState<"origin" | "estimate" | "remove" | null>(null);
+  const [editing, setEditing] = useState<"origin" | "people" | "estimate" | "remove" | null>(null);
+  // Whose starting point the people editor changes, and where focus returns.
+  const [people, setPeople] = useState<{ ids: string[]; focusId: string } | null>(null);
   // The drive as it was when your estimate's editor opened. The editor keeps
   // it, so a refresh that changes or removes the drive never drops an entry.
-  const [opened, setOpened] = useState<{ day: TripDriveDay; days: TripDriveDay[] } | null>(null);
+  const [opened, setOpened] = useState<{ day: TripDriveRoute; days: TripDriveDay[]; estimate: TripDriveManualEstimate | null; focusId: string } | null>(null);
   const [status, setStatus] = useState("");
   const [working, setWorking] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -246,9 +263,10 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
     .map((candidate) => document.getElementById(candidate)).find(Boolean)?.focus(), 0);
   const stays = <Link href={`/trips/${tripId}/stays#trip-stays-heading`} className={linkClass}>Go to Stays</Link>;
 
-  const open = (next: NonNullable<typeof editing>) => {
+  /** `estimate` is yours that the editor starts from: this drive's, one for a drive the day no longer has, or none. */
+  const open = (next: NonNullable<typeof editing>, estimate: TripDriveManualEstimate | null = day?.manual ?? null, focusId = estimateId) => {
     setEditing(next); setStatus(""); setActionError(null);
-    setOpened(crewDay && drive.estimates ? { day: crewDay, days: drive.estimates.days } : null);
+    setOpened(day && drive.estimates ? { day, days: drive.estimates.days, estimate, focusId } : null);
   };
   const close = (focusId: string, message?: string) => {
     setEditing(null);
@@ -273,7 +291,7 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
     { origin: null, no_drive: tripDay?.no_drive ?? false, expected: seenOrigin(tripDay) },
     crewStay ? `Starting from ${crewStay.name} again.` : "Starting point removed.", onSaved, originId);
   const prefer = (useCalculated: boolean) => act(`/api/v1/trips/${tripId}/days/${date}/drive-estimate`, "PATCH",
-    { use_calculated: useCalculated, expected: seenEstimates(drive.estimates?.days ?? [], [date]) },
+    { use_calculated: useCalculated, pair_key: day!.pair_key, expected: seenEstimates(drive.estimates?.days ?? [], [{ date, pair_key: day!.pair_key! }]) },
     useCalculated ? "Using the calculated estimate." : "Using your estimate.", drive.retry, headingId);
 
   // "Starting from Ridge cabin · only this day · No drive planned"
@@ -309,7 +327,7 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
     body = <Missing title={yours ? arriving ? "You arrive this day" : "Your starting point isn't set" : arriving ? "Arriving this day" : "Starting point not set"}>
       {arriving ? `${yours ? "You weren't" : "They weren't"} on the trip the night before, so there's no stay to start from.`
         : `${yours ? "You don't" : "They don't"} have a stay planned for ${day.night_label} night.`}
-      {canEdit ? <> {stays} to assign one.</> : ""}
+      {canEdit ? <> Set their starting point from Departures, or {stays} to assign one.</> : ""}
     </Missing>;
   } else if (day.state === "missing_origin") {
     body = <Missing title="Choose where you're starting">
@@ -332,8 +350,8 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
   } else {
     const yours = day.manual;
     const whose = canEdit ? "Your estimate" : "Organizer's estimate";
-    // The organizer's own estimate is managed on the crew's drive (#209).
-    const manage = canEdit && crewShown;
+    // The organizer's own estimate is for the drive shown, whichever departure it is (#333).
+    const manage = canEdit;
     const entered = (manual: NonNullable<typeof yours>) => `entered ${calculatedLabel(manual.entered_at)}${manual.note ? ` · ${manual.note}` : ""}`;
     const changed = day.state === "unavailable" && day.previous;
     body = <div className="space-y-2">
@@ -366,9 +384,17 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
         <p className="break-words text-sm text-foreground">{whose}: about {yours.duration_label} · {entered(yours)}</p>
         {manage && <Button type="button" size="sm" variant="outline" disabled={working} onClick={() => void prefer(false)}>Use your estimate</Button>}
       </div>}
-      {manage && yours && !yours.current && <p className="break-words text-sm text-foreground">
-        Your estimate, about {yours.duration_label}, was for {yours.origin_label} → {yours.destination_label}. Edit it to use it for this drive, or remove it.
-      </p>}
+      {/* Each of yours for a drive nobody has that day any more (#333), on the crew's drive. */}
+      {manage && day.obsolete?.map((old, index) => <div key={old.pair_key} className="space-y-1">
+        <p className="break-words text-sm text-foreground">
+          Your estimate, about {old.duration_label}, was for {old.origin_label} → {old.destination_label}. Use it for this drive, or remove it.
+        </p>
+        {!editing && <div className="flex flex-wrap gap-2">
+          <Button id={`${estimateId}-old-${index}`} type="button" size="sm" variant="outline"
+            onClick={() => open("estimate", old, `${estimateId}-old-${index}`)}>Use it for this drive</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => open("remove", old, `${estimateId}-old-${index}`)}>Remove it</Button>
+        </div>}
+      </div>)}
       <div className="flex flex-wrap gap-2">
         <Directions day={day} />
         {(day.state === "unavailable" || day.state === "stale") && <Button type="button" size="sm" variant="outline" disabled={drive.refreshing} onClick={drive.retry}>Retry</Button>}
@@ -392,16 +418,26 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
         {chosen && chosen !== mine ? `Drive from ${chosen.label}` : split && mine ? "Your drive" : "Drive"}
       </h3>
       <div aria-live="polite" className="mt-1">{body}</div>
-      {split && crewDay && !drive.loading && <Departures data={data} day={crewDay} memberId={memberId} canEdit={canEdit}
-        shown={shownDeparture?.key ?? null} onShow={(key) => { setShownKey(key); focusSoon(headingId); }} />}
+      {/* The organizer sees them with one departure too, to give someone a starting point of their own. */}
+      {crewDay && !drive.loading && (split || (canEdit && departures.some((departure) => departure.member_ids.length))) && (
+        <Departures data={data} day={crewDay} memberId={memberId} canEdit={canEdit} shown={shownDeparture?.key ?? null}
+          onShow={(key) => { setShownKey(key); focusSoon(headingId); }}
+          onChangeStart={canEdit && tripDay ? (ids, focusId) => { setPeople({ ids, focusId }); setEditing("people"); setStatus(""); setActionError(null); } : undefined} />
+      )}
+      {editing === "people" && people && tripDay && crewDay && (
+        // A new form for each group it's opened from, so switching never keeps the last group's choices.
+        <PeopleStartingPointEditor key={people.focusId} data={data} day={tripDay} drive={crewDay} dateLabel={dateLabel} memberId={memberId} initial={people.ids}
+          onCancel={() => close(people.focusId)}
+          onSaved={async (message) => { await onSaved(); close(people.focusId, message); }} />
+      )}
       {editing === "estimate" && opened && (
-        <YourEstimateEditor tripId={tripId} day={opened.day} days={opened.days}
-          onCancel={() => close(estimateId)} onReviewed={drive.retry}
+        <YourEstimateEditor tripId={tripId} day={opened.day} days={opened.days} from={opened.estimate}
+          onCancel={() => close(opened.focusId)} onReviewed={drive.retry}
           onSaved={(message) => { drive.retry(); close(headingId, message); }} />
       )}
-      {editing === "remove" && opened && (
-        <RemoveYourEstimate tripId={tripId} day={opened.day} days={opened.days}
-          onCancel={() => close(estimateId)} onConflict={drive.retry}
+      {editing === "remove" && opened && opened.estimate && (
+        <RemoveYourEstimate tripId={tripId} day={opened.day} days={opened.days} estimate={opened.estimate}
+          onCancel={() => close(opened.focusId)} onConflict={drive.retry}
           onRemoved={() => { drive.retry(); close(headingId, "Your estimate removed."); }} />
       )}
       <p aria-live="polite" className="text-sm text-success">{status}</p>
@@ -530,26 +566,164 @@ function StartingPointEditor({ data, day, dateLabel, nightLabel, crewStayId, onC
   );
 }
 
+/** A person's own starting point for a day as an editor showed it (#333): what a change expects to find. */
+const seenMemberOrigin = (data: Pick<TripFull, "member_origins">, day: TripDay, memberId: string) => {
+  const row = data.member_origins?.find((entry) => entry.trip_day_id === day.id && entry.member_id === memberId);
+  return { member_id: memberId, origin: row?.origin ?? null, origin_stay_id: row?.origin_stay_id ?? null, no_drive: row?.no_drive ?? false };
+};
+
+/**
+ * A starting point for chosen people on one day (#333), instead of the stay
+ * each slept in or the day's own: a saved stay with a place, any place, or
+ * where they'd start anyway, with or without No drive planned. Nobody else's
+ * starting point, and no other day, changes.
+ */
+function PeopleStartingPointEditor({ data, day, drive, dateLabel, memberId, initial, onCancel, onSaved }: {
+  data: TripFull;
+  day: TripDay;
+  /** The day's drive, for who's taking part and where each starts. */
+  drive: TripDriveDay;
+  dateLabel: string;
+  memberId: string | null;
+  /** The people chosen when it opened. */
+  initial: string[];
+  onCancel: () => void;
+  onSaved: (message: string) => Promise<void>;
+}) {
+  const stays = (data.lodging?.stays ?? []).filter((stay) => stay.location);
+  const travellers = drive.departures.flatMap((departure) => departure.member_ids.map((id) => ({ id, from: departure.label, own: !!departure.own_member_ids?.includes(id) })));
+  const [chosen, setChosen] = useState(initial);
+  const [seen, setSeen] = useState(() => Object.fromEntries(travellers.map(({ id }) => [id, seenMemberOrigin(data, day, id)])));
+  // What the chosen people share already, or where they'd start anyway.
+  const [start] = useState(() => {
+    const rows = initial.map((id) => seen[id]);
+    const first = rows[0];
+    const shared = rows.every((row) => row && first && row.origin_stay_id === first.origin_stay_id && JSON.stringify(row.origin) === JSON.stringify(first.origin));
+    if (!shared || !first?.origin) return { choice: "usual", place: null as TripLocation | null, noDrive: rows.every((row) => row?.no_drive) };
+    const picked = first.origin_stay_id && stays.some((stay) => stay.id === first.origin_stay_id);
+    return { choice: picked ? `stay:${first.origin_stay_id}` : "place", place: picked ? null : first.origin as TripLocation, noDrive: rows.every((row) => row?.no_drive) };
+  });
+  const [choice, setChoice] = useState(start.choice);
+  const [place, setPlace] = useState<TripLocation | null>(start.place);
+  const [noDrive, setNoDrive] = useState(start.noDrive);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState(false);
+  const [reviewed, setReviewed] = useState<string | null>(null);
+  const form = useRef<HTMLFormElement>(null);
+  const name = `people-start-${day.date}`;
+  useEffect(() => { form.current?.querySelector<HTMLInputElement>(`input[name="${name}-who"]:checked`)?.focus(); }, [name]);
+
+  const names = (ids: string[]) => listed(ids.map((id) => personName(data, id, memberId)));
+  const origin = choice === "usual" ? null : choice === "place" ? (place ? { location: place } : undefined) : { stay_id: choice.slice(5) };
+  const ready = chosen.length > 0 && origin !== undefined;
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!ready || busy) return;
+    setBusy(true); setError(null); setReviewed(null);
+    try {
+      await timedTripRequest(`/api/v1/trips/${data.trip.id}/days/${day.date}/origin`, "PUT",
+        { member_ids: chosen, origin, no_drive: noDrive, expected: chosen.map((id) => seen[id] ?? seenMemberOrigin(data, day, id)) });
+      await onSaved(origin === null && !noDrive ? `${names(chosen)} start from where they'd start anyway.`
+        : `Starting point saved for ${names(chosen)}.${noDrive ? " No drive planned." : ""}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setConflict(err instanceof TripRequestError && err.status === 409);
+      if (err instanceof TripRequestError && err.details?.field === "origin") (form.current?.elements.namedItem("origin") as HTMLElement | null)?.focus();
+    } finally { setBusy(false); }
+  };
+  const review = async () => {
+    setBusy(true); setError(null);
+    try {
+      const current = await timedTripRequest<TripFull>(`/api/v1/trips/${data.trip.id}`, "GET");
+      const saved = current.days.find((candidate) => candidate.id === day.id && candidate.date === day.date);
+      if (!saved) throw new Error("This day isn't on the trip anymore. Reload the trip.");
+      setSeen(Object.fromEntries(travellers.map(({ id }) => [id, seenMemberOrigin(current, saved, id)])));
+      setConflict(false);
+      setReviewed(`Saved now: ${chosen.map((id) => {
+        const row = seenMemberOrigin(current, saved, id);
+        return `${personName(data, id, memberId)} ${row.origin ? `from ${row.origin.label}` : "from where they'd start anyway"}${row.no_drive ? ", no drive planned" : ""}`;
+      }).join("; ")}. Your choice is still here; save to replace it.`);
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusy(false); }
+  };
+  const option = (value: string, label: string, detail: string) => (
+    <label key={value} className="flex min-h-11 cursor-pointer items-start gap-3 rounded-control border border-border p-3 has-checked:border-primary">
+      <input type="radio" name={`${name}-from`} value={value} checked={choice === value} onChange={() => setChoice(value)} className="mt-1 size-5 shrink-0" />
+      <span className="min-w-0 break-words"><span className="block text-base text-foreground">{label}</span><span className="block text-sm text-muted-foreground">{detail}</span></span>
+    </label>
+  );
+
+  return (
+    <form ref={form} onSubmit={save} aria-labelledby={`${name}-title`} aria-busy={busy} className="mt-3 space-y-3 border-t border-border pt-3">
+      <h4 id={`${name}-title`} className="text-base font-semibold text-foreground">Starting point for chosen people · {dateLabel}</h4>
+      <p className="text-sm text-muted-foreground">Only these people, only this day. Everyone else&apos;s starting point and the stays don&apos;t change.</p>
+      {reviewed && <p className={noticeClass}>{reviewed}</p>}
+      {error && <p role="alert" className="text-base text-destructive">{error}</p>}
+      <fieldset disabled={busy} className="min-w-0 space-y-3">
+        <fieldset className="min-w-0 space-y-1">
+          <legend className="text-base font-medium text-foreground">Who</legend>
+          {travellers.map(({ id, from, own }) => (
+            <label key={id} className="flex min-h-11 cursor-pointer items-start gap-3">
+              <input type="checkbox" name={`${name}-who`} value={id} checked={chosen.includes(id)} className="mt-1 size-5 shrink-0"
+                onChange={(event) => setChosen((current) => event.target.checked ? [...current, id] : current.filter((other) => other !== id))} />
+              <span className="min-w-0 break-words">
+                <span className="block text-base text-foreground">{personName(data, id, memberId)}</span>
+                <span className="block text-sm text-muted-foreground">Starts from {from}{own ? " · their own this day" : ""}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <fieldset className="min-w-0 space-y-2">
+          <legend className="text-base font-medium text-foreground">Start from</legend>
+          {option("usual", "Where they'd start anyway", day.origin ? `The day's starting point, ${day.origin.label}` : "The stay each of them slept in the night before")}
+          {stays.map((stay) => option(`stay:${stay.id}`, stay.name, stay.location?.precision === "approximate" ? "Saved stay · approximate area" : "Saved stay"))}
+          {option("place", "Another place", "Search for a place or enter coordinates")}
+        </fieldset>
+        {choice === "place" && <LocationPicker tripId={data.trip.id} heading="Where do they start?" exactTarget="the exact place"
+          value={place} name="origin" onChange={setPlace} />}
+        <label className="flex min-h-11 cursor-pointer items-start gap-3">
+          <input type="checkbox" name="no_drive" checked={noDrive} onChange={(event) => setNoDrive(event.target.checked)} className="mt-1 size-5 shrink-0" />
+          <span className="min-w-0">
+            <span className="block text-base text-foreground">No drive planned</span>
+            <span className="block text-sm text-muted-foreground">They start on foot or skis, or meet at the access point. Their starting point is kept.</span>
+          </span>
+        </label>
+      </fieldset>
+      <div className="flex flex-wrap gap-2">
+        {conflict
+          ? <Button type="button" loading={busy} onClick={() => void review()}>Review saved starting points</Button>
+          : <Button type="submit" loading={busy} disabled={!ready}>Save starting point</Button>}
+        <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>Cancel</Button>
+      </div>
+      {busy && <p role="status" className="text-base text-muted-foreground">{conflict ? "Loading the saved starting points…" : "Saving starting point…"}</p>}
+    </form>
+  );
+}
+
 /**
  * Your own one-way drive time, for when routing has none. It's for the drive
  * shown, and can be saved for the other days with the same drive.
  */
-function YourEstimateEditor({ tripId, day, days, onCancel, onSaved, onReviewed }: {
+function YourEstimateEditor({ tripId, day, days, from, onCancel, onSaved, onReviewed }: {
   tripId: string;
-  day: TripDriveDay;
+  /** The drive it's for: the day's, or one of its departures (#333). */
+  day: TripDriveRoute;
   days: TripDriveDay[];
+  /** Yours it starts from: this drive's, or one for a drive the day no longer has, which saving replaces. */
+  from: TripDriveManualEstimate | null;
   onCancel: () => void;
   onSaved: (message: string) => void;
   /** Fetches the estimates again after a conflict, so the card matches. */
   onReviewed: () => void;
 }) {
-  const saved = day.manual;
+  const saved = from;
   const [seen, setSeen] = useState({ day, days });
   const [hours, setHours] = useState(saved ? String(Math.floor(saved.duration_seconds / 3600)) : "");
   const [minutes, setMinutes] = useState(saved ? String(Math.round((saved.duration_seconds % 3600) / 60)) : "");
   const [note, setNote] = useState(saved?.note ?? "");
   // The days it was saved for together stay ticked; unticking one removes it there.
-  const together = (current: TripDriveDay) => current.manual?.current ? current.manual.dates : [current.date];
+  const together = (current: TripDriveRoute) => current.manual?.current ? current.manual.dates : [current.date];
   const [ticked, setTicked] = useState(() => together(day));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -571,13 +745,16 @@ function YourEstimateEditor({ tripId, day, days, onCancel, onSaved, onReviewed }
     event.preventDefault();
     if (busy || !seen.day.pair_key) return;
     const seconds = Number(hours.trim() || 0) * 3600 + Number(minutes.trim() || 0) * 60;
+    const pair = seen.day.pair_key;
     const dates = [seen.day.date, ...others.filter((date) => ticked.includes(date))];
-    const clear = together(seen.day).filter((date) => !dates.includes(date));
+    // Unticked days that shared it, and an estimate for an earlier drive this one replaces.
+    const clear = [...together(seen.day).filter((date) => !dates.includes(date)).map((date) => ({ date, pair_key: pair })),
+      ...saved && !saved.current ? [{ date: seen.day.date, pair_key: saved.pair_key }] : []];
     setBusy(true); edit(); setReviewed(null);
     try {
       await timedTripRequest(`/api/v1/trips/${tripId}/days/${seen.day.date}/drive-estimate`, "PUT", {
         pair_key: seen.day.pair_key, duration_seconds: Number.isFinite(seconds) ? seconds : null, note,
-        dates, clear, expected: seenEstimates(seen.days, [...dates, ...clear]),
+        dates, clear, expected: seenEstimates(seen.days, [...dates.map((date) => ({ date, pair_key: pair })), ...clear]),
       });
       onSaved(dates.length > 1 ? `Your estimate saved for ${listed(dates.map(labelOf))}.` : "Your estimate saved.");
     } catch (err) {
@@ -590,7 +767,8 @@ function YourEstimateEditor({ tripId, day, days, onCancel, onSaved, onReviewed }
     setBusy(true); edit();
     try {
       const current = await timedTripRequest<TripDriveEstimates>(`/api/v1/trips/${tripId}/drive-estimates`, "GET");
-      const now = current.days.find((candidate) => candidate.date === seen.day.date);
+      // The same drive if the day still has it, otherwise the day's own.
+      const now = routeOn(current.days, seen.day.date, seen.day.pair_key) ?? current.days.find((candidate) => candidate.date === seen.day.date);
       if (!now) throw new Error("This day isn't on the trip anymore. Reload the trip.");
       setSeen({ day: now, days: current.days }); setConflict(false);
       setReviewed(!now.pair_key ? "This day has no drive to estimate now. Cancel to see why."
@@ -616,7 +794,7 @@ function YourEstimateEditor({ tripId, day, days, onCancel, onSaved, onReviewed }
 
   return (
     <form ref={form} onSubmit={save} aria-labelledby={`${id}-title`} aria-busy={busy} className="mt-3 space-y-3 border-t border-border pt-3">
-      <h4 id={`${id}-title`} className="text-base font-semibold text-foreground">{saved ? "Edit your estimate" : "Add your estimate"}</h4>
+      <h4 id={`${id}-title`} className="text-base font-semibold text-foreground">{saved?.current ? "Edit your estimate" : saved ? "Use your estimate for this drive" : "Add your estimate"}</h4>
       <p className="break-words text-sm text-muted-foreground">{seen.day.origin?.label} → {seen.day.destination?.label} · by car, one way</p>
       {reviewed && <p className={noticeClass}>{reviewed}</p>}
       {error && <p id={`${id}-error`} role="alert" className="text-base text-destructive">{error}</p>}
@@ -639,7 +817,7 @@ function YourEstimateEditor({ tripId, day, days, onCancel, onSaved, onReviewed }
                 <span className="text-base text-foreground">{labelOf(date)} (this day)</span>
               </label>;
             }
-            const other = seen.days.find((candidate) => candidate.date === date)?.manual;
+            const other = routeOn(seen.days, date, seen.day.pair_key)?.manual;
             const replaces = other?.current && !together(seen.day).includes(date) ? ` (replaces your estimate of ${other.duration_label})` : "";
             return <label key={date} className="flex min-h-11 cursor-pointer items-start gap-3">
               <input type="checkbox" checked={ticked.includes(date)} className="mt-1 size-5 shrink-0"
@@ -665,17 +843,20 @@ function YourEstimateEditor({ tripId, day, days, onCancel, onSaved, onReviewed }
  * After a conflict, Review saved estimate shows what's saved now and removes
  * against that.
  */
-function RemoveYourEstimate({ tripId, day, days, onCancel, onRemoved, onConflict }: {
+function RemoveYourEstimate({ tripId, day, days, estimate, onCancel, onRemoved, onConflict }: {
   tripId: string;
-  day: TripDriveDay;
+  /** The drive it's for: the day's, or one of its departures (#333). */
+  day: TripDriveRoute;
   days: TripDriveDay[];
+  /** Yours to remove: this drive's, or one for a drive the day no longer has. */
+  estimate: TripDriveManualEstimate;
   onCancel: () => void;
   onRemoved: () => void;
   /** Fetches the estimates again after a conflict, so the card matches. */
   onConflict: () => void;
 }) {
-  const [seen, setSeen] = useState({ day, days });
-  const saved = seen.day.manual;
+  const [seen, setSeen] = useState<{ day: TripDriveRoute; days: TripDriveDay[]; estimate: TripDriveManualEstimate | null }>({ day, days, estimate });
+  const saved = seen.estimate;
   const dates = !saved ? [] : saved.current ? saved.dates : [seen.day.date];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -687,7 +868,9 @@ function RemoveYourEstimate({ tripId, day, days, onCancel, onRemoved, onConflict
   const remove = async () => {
     setBusy(true); setError(null);
     try {
-      await timedTripRequest(`/api/v1/trips/${tripId}/days/${seen.day.date}/drive-estimate`, "DELETE", { dates, expected: seenEstimates(seen.days, dates) });
+      const pair = saved!.pair_key;
+      await timedTripRequest(`/api/v1/trips/${tripId}/days/${seen.day.date}/drive-estimate`, "DELETE",
+        { pair_key: pair, dates, expected: seenEstimates(seen.days, dates.map((date) => ({ date, pair_key: pair }))) });
       onRemoved();
     } catch (err) {
       setError(errorMessage(err));
@@ -698,9 +881,12 @@ function RemoveYourEstimate({ tripId, day, days, onCancel, onRemoved, onConflict
     setBusy(true); setError(null);
     try {
       const current = await timedTripRequest<TripDriveEstimates>(`/api/v1/trips/${tripId}/drive-estimates`, "GET");
-      const now = current.days.find((candidate) => candidate.date === seen.day.date);
+      // The same drive if the day still has it, otherwise the day's own.
+      const now = routeOn(current.days, seen.day.date, seen.day.pair_key) ?? current.days.find((candidate) => candidate.date === seen.day.date);
       if (!now) throw new Error("This day isn't on the trip anymore. Reload the trip.");
-      setSeen({ day: now, days: current.days }); setConflict(false); setReviewed(true);
+      // The same estimate, by its drive, as it's saved now.
+      const again = [now.manual, ...now.obsolete ?? []].find((entry) => entry?.pair_key === estimate.pair_key) ?? null;
+      setSeen({ day: now, days: current.days, estimate: again }); setConflict(false); setReviewed(true);
       question.current?.focus();
     } catch (err) { setError(errorMessage(err)); }
     finally { setBusy(false); }
