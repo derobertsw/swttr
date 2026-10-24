@@ -29,10 +29,24 @@ Plan's own page and its days share a route-group layout (`src/app/trips/[id]/(pl
 
 The previous and next arrows on a day are gone: the strip and the list replace them.
 
+## Day brief
+
+A day reads in one order on every width ([#334](https://github.com/derobertsw/swttr/issues/334)), so a phone shows the essentials first and a wide screen keeps them beside the days:
+
+1. **What the day is.** The date, the activity and the destination, and on a Backcountry day the route. It says when you aren't taking part, or aren't on the trip that day, and offers **Choose an activity** when the day has none. A Backcountry day, or any day with official sources, adds one line for your conditions reviews (recorded, out of how many, and how many were recorded before the plan changed), linked to Conditions below.
+2. **Meet and start.** The meet time (a Backcountry day's tour plan holds it until #333 moves it onto the day for every sport) and place, then where you start, with the crew's where it differs.
+3. **Getting there.** The access point, your drive and everyone's departures, then the ski or walk approach, kept apart from the road.
+4. **Tonight.** Where you sleep, with the crew's where it differs. On a morning you move stays it names both, with their check-out and check-in times when they're saved.
+5. **The tour and its conditions** on a Backcountry day: the tour plan, then each source with your review. A review shows as an icon and text, never a badge or a box: not recorded, recorded by you at a time, or recorded before the plan changed and why.
+6. **Weather, My kit and My equipment**, then the crew's kits.
+7. **The activity**, a control rather than part of the reading, then Copy this day.
+
+**Downhill skiing** and **Backcountry skiing** are the labels for the stored `Alpine` and `Backcountry` activities everywhere a day's activity is shown, including itinerary reviews and a review's "Activity changed to" reason. Storage, links and older app versions keep the stored names (`tripActivityLabel` in `src/lib/trip-activities.ts`). **Travel** joins Rest as a day type with no clothing to plan (`tripActivityNeedsClothing`): neither asks anyone for a kit, and neither do days someone isn't taking part in, by the attendance the server works out (#331). The days list's Next step skips them too.
+
 ## No content cards
 
 Plan, Stays, Crew and Packing put their content on the page without cards. Headings and spacing group it, and quiet rules separate comparable rows: crew and their kits, stays, shared gear and packing lists. Editors, sheets, popovers, the map and alerts keep their containment. On a trip day, Gear up's saved outfit views drop their frames too (`framed={false}` on `PlanDayCard` and `CarryCard`); Gear up itself is unchanged.
 
 ## What this doesn't change
 
-Data, permissions and calculations are as they were. Per-person nightly lodging (#331), split-stay views (#332, in [trip-stays.md](trip-stays.md)), meeting details and departures (#333), sport-specific day briefs (#334), trip-day context in Gear up (#335) and dated crew tasks and statuses (#336) build on this frame.
+Data, permissions and calculations are as they were. Per-person nightly lodging (#331), split-stay views (#332, in [trip-stays.md](trip-stays.md)), meeting details and departures (#333), trip-day context in Gear up (#335) and dated crew tasks and statuses (#336) build on this frame.

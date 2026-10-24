@@ -2,13 +2,13 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DayDrive, StayDepartures, type DriveEstimatesState } from "@/components/trips/DriveEstimate";
-import { DayLodging } from "@/components/trips/TripStays";
+import { DayStart, DayTonight } from "@/components/trips/TripStays";
 import { TripMapDaySummary } from "@/components/trips/TripMapDay";
 import { followDeparture } from "@/components/trips/trip-map-presentation";
 import { tripDriveEstimates } from "@/lib/trip-drive-estimates";
 import { projectTripMap } from "@/lib/trip-map";
 import { LODGE_PLACE, PINE_PLACE, splitDriveTrip, VILLAGE_PLACE } from "@/test/driveTrip";
-import { ALEX, BLAIR, CASEY, ELI, FRAN, FRI, personNight, PINE, SAT, splitRows, SUN, VILLAGE } from "@/test/splitStays";
+import { ALEX, BLAIR, CASEY, ELI, FRAN, FRI, LODGE, personNight, PINE, SAT, splitRows, SUN, VILLAGE } from "@/test/splitStays";
 import { departurePlans } from "@/lib/trip-drive";
 import type { TripDriveEstimates, TripFull } from "@/types/trips";
 
@@ -29,23 +29,40 @@ const row = (scope: HTMLElement, term: string) => within(scope).getByText(term, 
 describe("Your departure on the day (#333)", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("leads with your own stay, then the crew's where it differs", () => {
-    const { container } = render(<DayLodging data={splitDriveTrip()} date={SAT} memberId={ELI.id} />);
-    expect(screen.getByText("Your stay")).toBeInTheDocument();
-    expect(row(container, "Starting from")).toHaveTextContent("Village hotel");
-    expect(row(container, "Staying tonight")).toHaveTextContent("Village hotel");
-    expect(row(container, "Crew starting from")).toHaveTextContent("Pine rental (3) · Village hotel (2)");
+  const day = (memberId: string | null) => render(<>
+    <DayStart data={splitDriveTrip()} date={SAT} memberId={memberId} />
+    <DayTonight data={splitDriveTrip()} date={SAT} memberId={memberId} />
+  </>);
+  it("leads with your own start and stay, then the crew's where it differs", () => {
+    const { container } = day(ELI.id);
+    const start = screen.getByRole("region", { name: "Start of the day" });
+    expect(row(start, "Starting from")).toHaveTextContent("Village hotel");
+    expect(row(start, "Crew starting from")).toHaveTextContent("Pine rental (3) · Village hotel (2)");
+    const tonight = screen.getByRole("region", { name: "Tonight" });
+    expect(row(tonight, "Staying tonight")).toHaveTextContent("Village hotel");
     expect(row(container, "Crew staying tonight")).toHaveTextContent("Pine rental (4) · Village hotel (2)");
   });
   it("says when you aren't taking part, and keeps the crew's view for someone not on the crew", () => {
-    const { container, unmount } = render(<DayLodging data={splitDriveTrip()} date={SAT} memberId={CASEY.id} />);
+    const { container, unmount } = day(CASEY.id);
     expect(row(container, "Starting from")).toHaveTextContent("Not taking part");
     expect(row(container, "Staying tonight")).toHaveTextContent("Pine rental");
     unmount();
-    const crew = render(<DayLodging data={splitDriveTrip()} date={SAT} memberId={null} />);
-    expect(screen.getByText("Crew stay")).toBeInTheDocument();
+    const crew = day(null);
     expect(row(crew.container, "Starting from")).toHaveTextContent("Pine rental (3) · Village hotel (2)");
     expect(within(crew.container).queryByText("Crew starting from")).not.toBeInTheDocument();
+  });
+  it("names the move on a changeover morning, with the stays' check-out and check-in times (#334)", () => {
+    const rows = splitRows();
+    rows.stays = rows.stays.map((stay) => stay.id === PINE.id ? { ...stay, check_out_time: "10:00:00" }
+      : stay.id === LODGE.id ? { ...stay, check_in_time: "16:00:00" } : stay);
+    render(<DayTonight data={splitDriveTrip({ rows })} date={SUN} memberId={ALEX.id} />);
+    const tonight = screen.getByRole("region", { name: "Tonight" });
+    expect(row(tonight, "Staying tonight")).toHaveTextContent("Mountain lodge");
+    expect(row(tonight, "Moving")).toHaveTextContent("Pine rental → Mountain lodge"
+      + "Check out of Pine rental by 10:00 · Check in at Mountain lodge from 16:00 · property local time");
+    // Nobody moves on Saturday.
+    render(<DayTonight data={splitDriveTrip({ rows })} date={SAT} memberId={ALEX.id} />);
+    expect(screen.getAllByRole("region", { name: "Tonight" })[1]).not.toHaveTextContent("Moving");
   });
   it("shows your own drive first, and every departure by name for anyone to open", async () => {
     vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (X11; Linux x86_64)");

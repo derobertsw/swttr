@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TripStays, DayLodging } from "./TripStays";
+import { TripStays, DayStart, DayTonight } from "./TripStays";
 import { buildLodging, previewCrewLodging } from "@/lib/trip-lodging";
 import { previewLodgingChange, type LodgingChange } from "@/lib/trip-lodging-changes";
 import { fakeTripApi, ORGANIZER, reply, sentBodies, TRIP, tripFull } from "@/test/tripApi";
@@ -230,7 +230,7 @@ describe("Crew stays editor", () => {
   it("shows today's origin separately from tonight's stay", () => {
     const hut = { ...hotel, id: "a682b8af-d26b-4213-a816-39de3eb155eb", name: "Hut" };
     const data = full([hotel, hut], [...assigned, { trip_id: TRIP.id, date: "2026-10-11", stay_id: hut.id, status: "assigned" }]);
-    render(<DayLodging data={data} date="2026-10-11" />);
+    render(<><DayStart data={data} date="2026-10-11" /><DayTonight data={data} date="2026-10-11" /></>);
     expect(screen.getByText("Starting from").nextElementSibling).toHaveTextContent("Hotel");
     expect(screen.getByText("Staying tonight").nextElementSibling).toHaveTextContent("Hut");
   });

@@ -210,8 +210,8 @@ describe("Tour plans in itinerary reviews (#210)", () => {
     const [copy] = options(previewItinerary(touring, { action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: false, plan: true }, "user-1"));
     expect(copy).toMatchObject({
       key: "copy", label: "Copy Sat Oct 10 and its tour plan to 1 day",
-      detail: "Stowe, Vermont · Backcountry, and its tour plan (Tuckerman Ravine).",
-      changes: [{ date: "2026-10-11", before: "Stowe, Vermont · Backcountry", after: "Stowe, Vermont · Backcountry", notes: ["Gets the tour plan from Sat Oct 10: Tuckerman Ravine."] }],
+      detail: "Stowe, Vermont · Backcountry skiing, and its tour plan (Tuckerman Ravine).",
+      changes: [{ date: "2026-10-11", before: "Stowe, Vermont · Backcountry skiing", after: "Stowe, Vermont · Backcountry skiing", notes: ["Gets the tour plan from Sat Oct 10: Tuckerman Ravine."] }],
       payload: { kit: "none", plan: "replace", tour_plans: { [TUCKERMAN]: { date: "2026-10-10", revision: 3 }, [JAY_CLOUD]: { date: "2026-10-12", revision: 1 } } },
     });
   });
@@ -220,7 +220,7 @@ describe("Tour plans in itinerary reviews (#210)", () => {
     const [replace, keep] = options(previewItinerary(touring, { action: "copy_day", from: "2026-10-10", dates: ["2026-10-11", "2026-10-12"], kit: false, plan: true }, "user-1"));
     expect(replace).toMatchObject({
       key: "replace", label: "Replace the tour plan on Mon Oct 12",
-      detail: "Every day gets Stowe, Vermont · Backcountry and its tour plan (Tuckerman Ravine).",
+      detail: "Every day gets Stowe, Vermont · Backcountry skiing and its tour plan (Tuckerman Ravine).",
       payload: { kit: "none", plan: "replace" },
     });
     expect(notes(replace)).toEqual([
@@ -229,7 +229,7 @@ describe("Tour plans in itinerary reviews (#210)", () => {
     ]);
     expect(keep).toMatchObject({
       key: "keep", label: "Keep the tour plan on Mon Oct 12",
-      detail: "Every day gets Stowe, Vermont · Backcountry. What's already there stays (the tour plan on Mon Oct 12), and the rest comes from Sat Oct 10.",
+      detail: "Every day gets Stowe, Vermont · Backcountry skiing. What's already there stays (the tour plan on Mon Oct 12), and the rest comes from Sat Oct 10.",
       payload: { plan: "keep" },
     });
     // Monday's own plan is back in use, at Stowe now.

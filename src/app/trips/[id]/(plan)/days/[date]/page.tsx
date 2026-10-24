@@ -27,17 +27,16 @@ import { SavedKitView } from "@/components/trips/SavedKitView";
 import { CopyDayCard } from "@/components/trips/CopyDayCard";
 import { canEditMemberKit } from "@/lib/trip-permissions";
 import { kitAdvice, kitWear } from "@/lib/trip-saved-kits";
-import { DayLodging } from "@/components/trips/TripStays";
+import { DayStart, DayTonight } from "@/components/trips/TripStays";
 import { DayAccessPoint } from "@/components/trips/DayAccessPoint";
 import { DayDrive, useDriveEstimates } from "@/components/trips/DriveEstimate";
 import { DayTourPlan } from "@/components/trips/TourPlan";
-import { DayConditions } from "@/components/trips/DayConditions";
+import { ConditionsTask, DayConditions } from "@/components/trips/DayConditions";
 import { DayEquipment } from "@/components/trips/TouringEquipment";
-import { TOUR_ACTIVITY } from "@/lib/trip-activities";
 import { accessPointFor } from "@/lib/trip-location";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
-import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
+import { TOUR_ACTIVITY, TRIP_ACTIVITY_OPTIONS, tripActivityLabel, tripActivityNeedsClothing } from "@/lib/trip-activities";
 import { outfitMismatches } from "@/lib/trip-kit-fit";
 import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -45,7 +44,7 @@ import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { ItineraryChangeSheet } from "@/components/trips/ItineraryChangeSheet";
 import type { TripDayForecastResponse } from "@/types/trip-coverage";
-import type { TripEffort, TripKitState, TripMember, TripMemberDayKit, TripPlace, TripStop } from "@/types/trips";
+import type { TripDayParticipation, TripEffort, TripKitState, TripMember, TripMemberDayKit, TripPlace, TripStop, TripTourPlanSummary } from "@/types/trips";
 
 const KIT_SLOTS = ["shirt", "midlayer", "jacket", "shell", "pants", "gloves"] as const;
 const EFFORT_OPTIONS: TripEffort[] = ["easy", "steady", "hard"];
@@ -53,6 +52,14 @@ const KIT_STATE_LABEL: Record<TripKitState, string> = { ok: "OK", warn: "Needs h
 // Dims a control that ignores taps while a save runs. aria-disabled, unlike
 // disabled, keeps a keyboard user's focus on the control they used.
 const savingClassName = "aria-disabled:cursor-progress aria-disabled:opacity-50";
+const NOT_TAKING_PART: Record<Exclude<TripDayParticipation, "participating">, string> = {
+  skipping: "Not taking part", not_on_trip: "Not on the trip",
+};
+
+/** The day's meet time. A Backcountry day's tour plan holds it until #333 moves it onto the day for every sport. */
+function meetTime(activity: string | null, tourPlan: TripTourPlanSummary | undefined): string | null {
+  return activity === TOUR_ACTIVITY ? tourPlan?.meet_label ?? null : null;
+}
 
 /** The saved day plan, including access, conditions, crew kits and touring notes. */
 export default function DayDetailPage({
@@ -151,11 +158,21 @@ export default function DayDetailPage({
     [data?.members]
   );
   const me = activeMembers.find((m) => m.user_id !== null && m.user_id === userId);
-  const crew = activeMembers.filter((m) => m !== me);
   const kitFor = (member: TripMember) => data?.kits.find((k) => k.trip_member_id === member.id && k.trip_day_id === day?.id);
   const myKit = me ? kitFor(me) : undefined;
+  // Whether each person takes part this day, from their trip dates (#331).
+  // People without per-person lodging read as taking part, as before it.
+  const participationOf = (member: TripMember): TripDayParticipation =>
+    data?.lodging?.people.find((person) => person.member_id === member.id)?.days.find((entry) => entry.date === date)?.participation ?? "participating";
+  const myParticipation = me ? participationOf(me) : "participating";
   // The activity the header shows: the day's own, or its stop's first.
   const activity = day?.activity ?? effectiveStop?.activities[0] ?? null;
+  // Travel and Rest days, and days someone isn't taking part, have no clothing to plan (#334).
+  const needsClothing = tripActivityNeedsClothing(activity);
+  const hasKit = (kit: TripMemberDayKit | undefined) => !!kit?.outfit || !!kit?.items.length;
+  const crew = activeMembers.filter((m) => m !== me);
+  const crewKits = crew.filter((m) => hasKit(kitFor(m)) || (needsClothing && participationOf(m) === "participating"));
+  const crewAway = crew.filter((m) => !crewKits.includes(m) && participationOf(m) !== "participating");
   const tourPlan = data?.tour_plans?.find((plan) => plan.date === date);
   const isOrganizer = !!userId && data?.trip.owner_user_id === userId;
   // The tour plan's meeting point is the day's access point (#208, #210).
@@ -168,7 +185,9 @@ export default function DayDetailPage({
   return (
     // The workspace around it holds the trip's days: a list beside the day on
     // wide screens, a date strip above it on narrow ones (#330). The day's
-    // parts sit on the page without cards, apart by spacing and headings.
+    // parts sit on the page without cards, apart by spacing and headings, in
+    // the brief's reading order (#334): what the day is, the meet and your
+    // way there and back, the tour and its conditions, then clothing and crew.
     <div className="flex w-full max-w-3xl flex-col gap-8">
       {loading && <Skeleton className="h-32 w-full rounded-card" />}
       {error && <TripError>{error}</TripError>}
@@ -179,22 +198,25 @@ export default function DayDetailPage({
       {data && day && (
         <>
           <header>
-            <SectionLabel>
-              Day {dayIndex + 1} of {data.days.length} ·{" "}
-              {activity ?? "no activity"}
-            </SectionLabel>
+            <SectionLabel>Day {dayIndex + 1} of {data.days.length}</SectionLabel>
             <h1 id="trip-day-heading" tabIndex={-1} className="mt-1 text-title font-semibold text-foreground md:text-title-lg">
               {dateLabel}
             </h1>
-            {effectiveStop && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                {effectiveStop.name}
-                {usingBaseFallback && <span className="ml-1.5">· base location</span>}
+            <p className="mt-1 break-words text-base text-foreground">
+              {activity ? tripActivityLabel(activity) : "Activity not set"}
+              {effectiveStop && <> · {effectiveStop.name}{usingBaseFallback && <span className="text-muted-foreground"> · base location</span>}</>}
+            </p>
+            {activity === TOUR_ACTIVITY && tourPlan && <p className="break-words text-base text-foreground">Route: {tourPlan.objective}</p>}
+            {me && myParticipation !== "participating" && (
+              <p className="mt-1 text-base text-muted-foreground">
+                {myParticipation === "skipping" ? "You're not taking part this day." : "You're not on the trip this day."}
               </p>
             )}
+            {!activity && <a href="#day-activity-heading" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary">Choose an activity</a>}
+            <ConditionsTask data={data} date={date} activity={activity} userId={userId} />
           </header>
 
-          <DayLodging data={data} date={date} meet={activity === TOUR_ACTIVITY ? tourPlan?.meet_label : null} meetingPoint={meetingPoint} memberId={me?.id} />
+          <DayStart data={data} date={date} meet={meetTime(activity, tourPlan)} meetingPoint={meetingPoint} memberId={me?.id} />
 
           <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()}>
             <DayDrive data={data} date={date} dateLabel={dateLabel} drive={drive} canEdit={data.trip.owner_user_id === userId} onSaved={refresh} memberId={me?.id} />
@@ -208,39 +230,7 @@ export default function DayDetailPage({
             </Link>
           </DayAccessPoint>
 
-          <ActivityPicker
-            tripId={id}
-            date={date}
-            current={day.activity ?? null}
-            suggested={effectiveStop?.activities ?? []}
-            onSaved={refresh}
-          />
-
-          <WeatherCard
-            tripId={id}
-            date={date}
-            dateLabel={dateLabel}
-            stop={effectiveStop ?? null}
-            result={forecast}
-            onRetry={() => setWeatherAttempt((attempt) => attempt + 1)}
-            onLocationSaved={() => refresh()}
-          />
-
-          {me && (myKit?.outfit ? (
-            <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} />
-          ) : (
-            <section aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
-              <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
-              <p className="text-sm text-muted-foreground">
-                No outfit saved for this day.{" "}
-                <Link href="/" className="font-medium text-foreground underline underline-offset-2">Get layers in Gear up</Link>
-                {" "}and use Save to trip, or mark what you&apos;ll bring below.
-              </p>
-              <MemberKitRow tripId={id} date={date} member={me} kit={myKit} editable onSaved={refresh} />
-            </section>
-          ))}
-
-          {me && activity === TOUR_ACTIVITY && <DayEquipment tripId={id} gear={data.gear} memberId={me.id} />}
+          <DayTonight data={data} date={date} memberId={me?.id} />
 
           <DayTourPlan
             data={data}
@@ -257,11 +247,46 @@ export default function DayDetailPage({
 
           <DayConditions data={data} date={date} dateLabel={dateLabel} activity={activity} userId={userId} onSaved={refresh} />
 
-          {crew.length > 0 && (
+          <WeatherCard
+            tripId={id}
+            date={date}
+            dateLabel={dateLabel}
+            stop={effectiveStop ?? null}
+            result={forecast}
+            onRetry={() => setWeatherAttempt((attempt) => attempt + 1)}
+            onLocationSaved={() => refresh()}
+          />
+
+          {me && (myKit?.outfit ? (
+            <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} />
+          ) : !hasKit(myKit) && (!needsClothing || myParticipation !== "participating") ? (
+            <section aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
+              <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
+              <p className="text-sm text-muted-foreground">
+                {myParticipation === "skipping" ? "You're not taking part this day, so there's no kit to plan."
+                  : myParticipation === "not_on_trip" ? "You're not on the trip this day, so there's no kit to plan."
+                  : `Nothing to plan for a ${tripActivityLabel(activity!)} day.`}
+              </p>
+            </section>
+          ) : (
+            <section aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
+              <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
+              <p className="text-sm text-muted-foreground">
+                No outfit saved for this day.{" "}
+                <Link href="/" className="font-medium text-foreground underline underline-offset-2">Get layers in Gear up</Link>
+                {" "}and use Save to trip, or mark what you&apos;ll bring below.
+              </p>
+              <MemberKitRow tripId={id} date={date} member={me} kit={myKit} editable onSaved={refresh} />
+            </section>
+          ))}
+
+          {me && activity === TOUR_ACTIVITY && <DayEquipment tripId={id} gear={data.gear} memberId={me.id} />}
+
+          {(crewKits.length > 0 || crewAway.length > 0) && (
             <section aria-labelledby="crew-kits-heading" className="flex flex-col gap-1">
               <h2 id="crew-kits-heading" className={sectionLabelClassName}>{me ? "Crew kits" : "Kits"}</h2>
-              <div className="divide-y divide-border border-y border-border">
-                {crew.map((m) => (
+              {crewKits.length > 0 && <div className="divide-y divide-border border-y border-border">
+                {crewKits.map((m) => (
                   <MemberKitRow
                     key={m.id}
                     tripId={id}
@@ -273,9 +298,22 @@ export default function DayDetailPage({
                     onSaved={refresh}
                   />
                 ))}
-              </div>
+              </div>}
+              {/* Someone away this day has no kit to plan, so no row asks for one. */}
+              {(["skipping", "not_on_trip"] as const).map((state) => {
+                const names = crewAway.filter((m) => participationOf(m) === state).map((m) => m.display_name);
+                return names.length > 0 && <p key={state} className="break-words py-2 text-sm text-muted-foreground">{NOT_TAKING_PART[state]} this day: {names.join(", ")}</p>;
+              })}
             </section>
           )}
+
+          <ActivityPicker
+            tripId={id}
+            date={date}
+            current={day.activity ?? null}
+            suggested={effectiveStop?.activities ?? []}
+            onSaved={refresh}
+          />
 
           <CopyDayCard
             tripId={id}
@@ -549,7 +587,7 @@ function ActivityPicker({
               aria-pressed={on}
               className={cn(chipClassName, savingClassName)}
             >
-              {a}
+              {tripActivityLabel(a)}
               {fromStop && !on && <span className="text-muted-foreground">·</span>}
             </button>
           );

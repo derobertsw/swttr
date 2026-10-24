@@ -55,11 +55,11 @@ Save to trip keeps an outing's outfit, or each day of a multi-day plan, on a tri
 
 ### Trip day
 
-`/trips/:id/days/:date` leads with **My kit**:
+`/trips/:id/days/:date` shows **My kit** after the day's logistics, tour and conditions and its weather (the day brief's order, #334, in [trip-workspace.md](trip-workspace.md#day-brief)):
 
 - A saved outfit shows as Gear up showed it: the outing, the forecast and its source, the advice kind, the comfort check when saved, then Wear (and Carry for a ski tour). A saved plan day shows the plan's outing, which day of it this is and its hours, then the day's card from the plan: conditions, Wear, what changes through the day, and Carry. Each says when it was saved, notes where it doesn't fit the day (another place, date or activity, from `outfitMismatches` in `src/lib/trip-kit-fit.ts`), and offers Update in Gear up.
-- Without one, it links to Gear up and keeps the category checklist.
-- Crew kits come below. Others' kits are read-only summaries.
+- Without one, it links to Gear up and keeps the category checklist. A Travel or Rest day, or a day you aren't taking part in, has no kit to plan, so it says so instead.
+- Crew kits come below. Others' kits are read-only summaries. Someone away that day is named once, as not taking part or not on the trip, rather than asked for a kit; on a Travel or Rest day only kits someone saved are listed.
 
 ## Not in this release
 

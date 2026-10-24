@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Directions, driveSummary } from "./DriveEstimate";
 import { placeStatus } from "./trip-map-presentation";
+import { tripActivityLabel } from "@/lib/trip-activities";
 import type { TripMapDay, TripMapPlace } from "@/types/trip-map";
 
 const linkClass = "inline-flex min-h-11 items-center font-semibold text-primary underline";
@@ -60,7 +61,7 @@ export function TripMapDaySummary({ tripId, day, places, canEdit, memberId = nul
   const fix = driveFix(tripId, day, canEdit);
   const calculated = drive.estimate && (drive.state === "available" || drive.state === "stale") ? drive.estimate : null;
   return <section aria-labelledby="map-day-heading" className="min-w-0 rounded-card border border-border bg-card p-4 text-base">
-    <h2 id="map-day-heading" className="font-semibold wrap-anywhere">{[day.date_label, day.activity, destination?.name].filter(Boolean).join(" · ")}</h2>
+    <h2 id="map-day-heading" className="font-semibold wrap-anywhere">{[day.date_label, day.activity && tripActivityLabel(day.activity), destination?.name].filter(Boolean).join(" · ")}</h2>
     <dl className="mt-3 space-y-3">
       <Row term="Starting from">
         {day.starting_from}{drive.origin?.own ? " · only this day" : ""}
