@@ -178,7 +178,7 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
 /** Call only after requireTripAccess. Read each source by trip_id; never load kits, invites or bookings into the response. */
 export async function loadTripMapContext(supabase: SupabaseClient, trip: Trip, date: string | null): Promise<{ full: TripFull; map: TripMap } | null> {
   const [stops, days, lodging, tours, memberOrigins] = await Promise.all([
-    supabase.from("trip_stops").select("id, trip_id, position, name, latitude, longitude, access_point").eq("trip_id", trip.id).order("position"),
+    supabase.from("trip_stops").select("id, trip_id, position, name, latitude, longitude, access_point, activities").eq("trip_id", trip.id).order("position"),
     supabase.from("trip_days").select("id, trip_id, date, stop_id, activity, access_point, access_point_stop_id, origin, origin_stay_id, no_drive").eq("trip_id", trip.id).order("date"),
     loadLodging(supabase, trip), loadTourPlans(supabase, trip.id), loadMemberDayOrigins(supabase, trip.id),
   ]);
