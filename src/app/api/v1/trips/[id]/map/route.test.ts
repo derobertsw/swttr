@@ -36,7 +36,11 @@ function database(status = "joined", userId = "member", failures: string[] = [],
         return [...url.searchParams].every(([column, filter]) => !filter.startsWith("eq.") && !filter.startsWith("neq.")
           || (filter.startsWith("eq.") ? String(row[column]) === filter.slice(3) : String(row[column]) !== filter.slice(4)));
       });
-      return Response.json(rows);
+      // Only the selected columns, as PostgREST returns, so a column the loader forgets is missing here too.
+      const columns = url.searchParams.get("select");
+      if (!columns || /[*(]/.test(columns)) return Response.json(rows);
+      return Response.json(rows.map((row) => Object.fromEntries(columns.split(",").filter((column) => column in (row as object))
+        .map((column) => [column, (row as Record<string, unknown>)[column]]))));
     } },
   });
   vi.mocked(requireUser).mockResolvedValue({ supabase, userId });
@@ -90,6 +94,13 @@ describe("GET trip map", () => {
     const response = await get();
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ days: [expect.anything(), { drive: { state: "unavailable" } }, expect.anything(), expect.anything()] });
+  });
+  it("uses the stop's first activity for a day without its own", async () => {
+    const { tables } = database();
+    tables.trip_days = full.days.map((day) => ({ ...day, activity: null }));
+    const response = await get("?date=2027-01-10");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ days: [{ activity: "Backcountry" }] });
   });
   it("returns a private 401 when signed out", async () => {
     vi.mocked(requireUser).mockResolvedValue(NextResponse.json({ error: "Authentication required" }, { status: 401 }));
