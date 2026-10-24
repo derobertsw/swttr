@@ -7,6 +7,7 @@ import * as packingList from "@/lib/packingList";
 import { createFakeSupabase } from "@/test/fakeSupabase";
 import { ORGANIZER, SAM } from "@/test/tripApi";
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
+import { buildLodging } from "@/lib/trip-lodging";
 import { addDaysToDateString } from "@/lib/forecastRange";
 import { savedOutfit, WEAR } from "@/test/savedKit";
 import type { TripPackResponse } from "@/types/trip-packing";
@@ -376,6 +377,26 @@ describe("GET /api/v1/trips/[id]/pack", () => {
         : { status: "not_requested", reason: "not_needed" });
       expect(day.forecast.message).not.toMatch(/Choose a location/);
     }
+  });
+
+  it("plans no clothing for days you aren't on, and keeps a kit you saved there (#334)", async () => {
+    const dates = ["2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10"];
+    const full = mockTrip(dates);
+    full.members = [ORGANIZER];
+    // Arrives Friday the 9th and skips it, so the 7th and 8th aren't trip days for them.
+    full.lodging = buildLodging(full.trip, [], [], { members: [ORGANIZER], per_member: true,
+      attendance: [{ trip_id: "trip-1", member_id: ORGANIZER.id, arrival_date: "2026-10-09", departure_date: null, skipped_dates: ["2026-10-09"] }] });
+    full.kits = [{ id: "kit-8", trip_day_id: "2026-10-08", trip_member_id: ORGANIZER.id,
+      effort: "steady", items: ["shell"], note: null, state: "ok", updated_at: "2026-10-01T00:00Z" }];
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () =>
+      forecastFixture("America/New_York", "2026-10-07T04:00Z", 96, () => -4) });
+    const data = await (await getPack()).json();
+    expect(data.coverage.map((day: { advice: string; reason?: string }) => [day.advice, day.reason])).toEqual([
+      ["rest", "not_taking_part"], ["manual", "manual_kit"], ["rest", "not_taking_part"], ["available", undefined],
+    ]);
+    expect(data.coverage[0]).toMatchObject({ message: "You're not on the trip this day.", action: "review_day" });
+    expect(data.coverage[2]).toMatchObject({ message: "You're not taking part this day; review personal items manually.", action: "review_day" });
+    expect(data.suggestedDays).toBe(1);
   });
 
   it("requests only the stop needed by automatic guidance in a mixed trip", async () => {

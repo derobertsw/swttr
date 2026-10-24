@@ -171,6 +171,7 @@ export default function DayDetailPage({
   // Travel and Rest days, and days someone isn't taking part, have no clothing to plan (#334).
   const needsClothing = tripActivityNeedsClothing(activity);
   const hasKit = (kit: TripMemberDayKit | undefined) => !!kit?.outfit || !!kit?.items.length;
+  const planMyKit = needsClothing && myParticipation === "participating";
   const crew = activeMembers.filter((m) => m !== me);
   const crewKits = crew.filter((m) => hasKit(kitFor(m)) || (needsClothing && participationOf(m) === "participating"));
   const crewAway = crew.filter((m) => !crewKits.includes(m) && participationOf(m) !== "participating");
@@ -262,25 +263,25 @@ export default function DayDetailPage({
             <div id={`kit-${me.id}`}>
               <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} />
             </div>
-          ) : !hasKit(myKit) && (!needsClothing || myParticipation !== "participating") ? (
-            // The Day checklist links here (#336).
-            <section id={`kit-${me.id}`} aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
-              <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
-              <p className="text-sm text-muted-foreground">
-                {myParticipation === "skipping" ? "You're not taking part this day, so there's no kit to plan."
-                  : myParticipation === "not_on_trip" ? "You're not on the trip this day, so there's no kit to plan."
-                  : `Nothing to plan for a ${tripActivityLabel(activity!)} day.`}
-              </p>
-            </section>
           ) : (
-            <section aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
+            // Without a row, the Day checklist links to the section itself (#336).
+            <section id={planMyKit || hasKit(myKit) ? undefined : `kit-${me.id}`} aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
               <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
-              <p className="text-sm text-muted-foreground">
-                No outfit saved for this day.{" "}
-                <Link href="/" className="font-medium text-foreground underline underline-offset-2">Get layers in Gear up</Link>
-                {" "}and use Save to trip, or mark what you&apos;ll bring below.
-              </p>
-              <MemberKitRow tripId={id} date={date} member={me} kit={myKit} editable onSaved={refresh} />
+              {planMyKit ? (
+                <p className="text-sm text-muted-foreground">
+                  No outfit saved for this day.{" "}
+                  <Link href="/" className="font-medium text-foreground underline underline-offset-2">Get layers in Gear up</Link>
+                  {" "}and use Save to trip, or mark what you&apos;ll bring below.
+                </p>
+              ) : (
+                // A checklist saved before the day changed stays visible, without asking for more.
+                <p className="text-sm text-muted-foreground">
+                  {myParticipation === "skipping" ? "You're not taking part this day, so there's no kit to plan."
+                    : myParticipation === "not_on_trip" ? "You're not on the trip this day, so there's no kit to plan."
+                    : `Nothing to plan for a ${tripActivityLabel(activity!)} day.`}
+                </p>
+              )}
+              {(planMyKit || hasKit(myKit)) && <MemberKitRow tripId={id} date={date} member={me} kit={myKit} editable onSaved={refresh} />}
             </section>
           ))}
 
@@ -298,6 +299,7 @@ export default function DayDetailPage({
                     member={m}
                     kit={kitFor(m)}
                     fit={fitOf(kitFor(m))}
+                    away={participationOf(m) === "participating" ? undefined : `${NOT_TAKING_PART[participationOf(m) as Exclude<TripDayParticipation, "participating">]} this day`}
                     editable={canEditMemberKit(data.trip, m, userId)}
                     onSaved={refresh}
                   />
@@ -614,6 +616,7 @@ function MemberKitRow({
   member,
   kit,
   fit = [],
+  away,
   editable,
   onSaved,
 }: {
@@ -623,16 +626,18 @@ function MemberKitRow({
   kit: TripMemberDayKit | undefined;
   /** Where a saved outfit doesn't fit the day: another place, date or activity. */
   fit?: string[];
+  /** Why someone with a kit isn't on the day, so the kit doesn't read as attendance (#334). */
+  away?: string;
   editable: boolean;
   /** Reloads the trip; the row's controls stay disabled until it finishes. */
   onSaved: () => Promise<void>;
 }) {
-  if (kit?.outfit || !editable) return <MemberKitSummary member={member} kit={kit} fit={fit} />;
-  return <EditableMemberKitRow tripId={tripId} date={date} member={member} kit={kit} onSaved={onSaved} />;
+  if (kit?.outfit || !editable) return <MemberKitSummary member={member} kit={kit} fit={fit} away={away} />;
+  return <EditableMemberKitRow tripId={tripId} date={date} member={member} kit={kit} away={away} onSaved={onSaved} />;
 }
 
 /** Someone else's kit, read-only: their saved outfit, or their checklist. */
-function MemberKitSummary({ member, kit, fit }: { member: TripMember; kit: TripMemberDayKit | undefined; fit: string[] }) {
+function MemberKitSummary({ member, kit, fit, away }: { member: TripMember; kit: TripMemberDayKit | undefined; fit: string[]; away?: string }) {
   const outfit = kit?.outfit;
   const wear = outfit ? kitWear(outfit)[0]?.wear : undefined;
   const worn = wear
@@ -645,6 +650,7 @@ function MemberKitSummary({ member, kit, fit }: { member: TripMember; kit: TripM
         <MemberAvatar name={member.display_name} size={28} state={member.role === "organizer" ? "self" : "default"} />
         <div className="min-w-32 flex-1">
           <p className="truncate text-sm font-medium text-foreground">{member.display_name}</p>
+          {away && <p className="text-sm text-muted-foreground">{away}</p>}
           <p className="text-sm text-muted-foreground">
             {outfit
               ? `Outfit saved · ${kitAdvice(outfit).kind === "personalized" ? "Personalized" : "General guide"} · ${worn} ${worn === 1 ? "item" : "items"}`
@@ -667,12 +673,14 @@ function EditableMemberKitRow({
   date,
   member,
   kit,
+  away,
   onSaved,
 }: {
   tripId: string;
   date: string;
   member: TripMember;
   kit: TripMemberDayKit | undefined;
+  away?: string;
   onSaved: () => Promise<void>;
 }) {
   const [effort, setEffort] = useState<TripEffort>(kit?.effort ?? "steady");
@@ -735,6 +743,7 @@ function EditableMemberKitRow({
         />
         <div className="min-w-32 flex-1">
           <p className="truncate text-sm font-medium text-foreground">{member.display_name}</p>
+          {away && <p className="text-sm text-muted-foreground">{away}</p>}
           <p className="text-sm text-muted-foreground">
             {state === "warn"
               ? "thin — borrow a layer?"

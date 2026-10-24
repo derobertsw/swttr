@@ -61,6 +61,12 @@ describe("Your departure on the day (#333)", () => {
     expect(row(tonight, "Staying tonight")).toHaveTextContent("Mountain lodge");
     expect(row(tonight, "Moving")).toHaveTextContent("Pine rental → Mountain lodge"
       + "Check out of Pine rental by 10:00 · Check in at Mountain lodge from 16:00 · property local time");
+    // Skipping Sunday doesn't drop the check-out: Alex still leaves the rental that morning.
+    const skipping = splitRows({ attendance: [{ trip_id: rows.stays[0].trip_id, member_id: ALEX.id, arrival_date: null, departure_date: null, skipped_dates: [SUN] }] });
+    skipping.stays = rows.stays;
+    const { unmount } = render(<DayTonight data={splitDriveTrip({ rows: skipping })} date={SUN} memberId={ALEX.id} />);
+    expect(row(screen.getAllByRole("region", { name: "Tonight" })[1], "Moving")).toHaveTextContent("Check out of Pine rental by 10:00");
+    unmount();
     // Nobody moves on Saturday.
     render(<DayTonight data={splitDriveTrip({ rows })} date={SAT} memberId={ALEX.id} />);
     expect(screen.getAllByRole("region", { name: "Tonight" })[1]).not.toHaveTextContent("Moving");

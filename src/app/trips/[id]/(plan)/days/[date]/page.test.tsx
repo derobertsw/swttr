@@ -1109,6 +1109,15 @@ describe("Trip day page", () => {
       expect(screen.queryByRole("heading", { name: "Crew kits" })).not.toBeInTheDocument();
     });
 
+    it("keeps my checklist saved before a day became Rest, without asking for clothing", async () => {
+      vi.stubGlobal("fetch", api(tripFull({ stops: [STOWE_STOP], days: [{ ...DAY, activity: "Rest" }], kits: [kitOf(ORGANIZER, { items: ["shell"] })] })));
+      await renderPage();
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      expect(myKit).toHaveTextContent("Nothing to plan for a Rest day.");
+      expect(within(myKit).queryByRole("link", { name: "Get layers in Gear up" })).not.toBeInTheDocument();
+      expect(within(myKit).getByRole("button", { name: "Shell" })).toHaveAttribute("aria-pressed", "true");
+    });
+
     it("still shows a kit someone saved for a Rest day", async () => {
       vi.stubGlobal("fetch", api(tripFull({ stops: [STOWE_STOP], days: [{ ...DAY, activity: "Rest" }], members: [ORGANIZER, ANA, SAM],
         kits: [kitOf(ANA, { items: ["shell"] })] })));
@@ -1133,6 +1142,17 @@ describe("Trip day page", () => {
       const crew = screen.getByRole("heading", { name: "Crew kits" }).closest("section")!;
       expect(within(crew).getByText("Sam")).toBeInTheDocument();
       expect(within(crew).getByText("Not on the trip this day: Ana")).toBeInTheDocument();
+    });
+
+    it("says a kit kept for someone away is for a day they aren't on", async () => {
+      const members = [ORGANIZER, ANA, SAM];
+      const attendance = [{ trip_id: TRIP.id, member_id: ANA.id, arrival_date: null, departure_date: null, skipped_dates: [DAY.date] }];
+      vi.stubGlobal("fetch", api(tripFull({ stops: [STOWE_STOP], days: [{ ...DAY, activity: "Alpine" }], members,
+        kits: [kitOf(ANA, { items: ["shell"] })], lodging: buildLodging(TRIP, [], [], { members, attendance, per_member: true }) })));
+      await renderPage();
+      const crew = (await screen.findByRole("heading", { name: "Crew kits" })).closest("section")!;
+      expect(within(crew).getByText("Ana").parentElement).toHaveTextContent("Not taking part this day");
+      expect(within(crew).queryByText(/Not taking part this day:/)).not.toBeInTheDocument();
     });
 
     it("leads a backcountry day with its route and your conditions reviews, and puts the tour before clothing", async () => {

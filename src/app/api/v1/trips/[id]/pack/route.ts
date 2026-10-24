@@ -64,6 +64,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   const dates = enumerateDates(full.trip.start_date, full.trip.end_date);
   const myMember = myMemberOf(full, userId);
   const kits = myKits(full, myMember?.id);
+  const myLodging = full.lodging?.people.find((person) => person.member_id === myMember?.id);
   const daysForCoverage = dates.map((date) => {
     const day = full.days.find((day) => day.date === date);
     const stop = resolveTripStop(day ?? { stop_id: null }, full.stops);
@@ -74,9 +75,11 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     // An older category checklist, without a saved outfit.
     const manualKit = !outfit && !!kit && kit.items.length > 0 ? kit : undefined;
     const outsideWindow = tripForecastDateOutsideWindow(date);
-    const needsForecast = !!day && tripActivityNeedsClothing(activity) && !outfit && !manualKit && !!activityKey
+    // A day you aren't taking part in has no clothing to plan (#334), by the server's attendance (#331).
+    const participation = myLodging?.days.find((entry) => entry.date === date)?.participation ?? "participating";
+    const needsForecast = !!day && participation === "participating" && tripActivityNeedsClothing(activity) && !outfit && !manualKit && !!activityKey
       && Object.hasOwn(layerRecommendations, activityKey) && hasTripCoordinates(stop) && !outsideWindow;
-    return { date, day, stop, activity, activityKey, outfit, manualKit, outsideWindow, needsForecast };
+    return { date, day, stop, activity, activityKey, outfit, manualKit, outsideWindow, needsForecast, participation };
   });
   const requestedStops = new Map<string, NonNullable<ReturnType<typeof resolveTripStop>>>();
   for (const { stop, needsForecast } of daysForCoverage) {
@@ -95,7 +98,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   }));
 
   const dailyPlans: DailyLayerPlan[] = [];
-  const coverage: TripDayCoverage[] = daysForCoverage.map(({ date, day, stop, activity, activityKey, outfit, manualKit, outsideWindow }) => {
+  const coverage: TripDayCoverage[] = daysForCoverage.map(({ date, day, stop, activity, activityKey, outfit, manualKit, outsideWindow, participation }) => {
     const { forecast, hours } = tripDayForecast(date,
       outsideWindow ? undefined : stop ? sources.get(stop.id) : undefined,
       outsideWindow ?? (hasTripCoordinates(stop) ? "not_needed" : "no_location"));
@@ -114,6 +117,10 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     }
     if (manualKit) {
       return { ...entry, advice: "manual", reason: "manual_kit", message: "Older checklist saved. It names layers, not your items, so it isn't in your list. Save an outfit from Gear up to add them." };
+    }
+    if (participation !== "participating") {
+      return { ...entry, advice: "rest", reason: "not_taking_part", action: "review_day",
+        message: participation === "skipping" ? "You're not taking part this day; review personal items manually." : "You're not on the trip this day." };
     }
     // Travel and Rest days have no clothing to plan (#334): the day page says so, so this links to the day, not a kit task.
     if (activity && !tripActivityNeedsClothing(activity)) {

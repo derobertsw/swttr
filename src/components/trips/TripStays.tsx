@@ -312,7 +312,9 @@ export function DayTonight({ data, date, memberId = null }: { data: TripFull; da
   if (!context) return null;
   const move = person?.changeovers.find((entry) => entry.date === date);
   const stay = (id: string | null | undefined) => data.lodging?.stays.find((candidate) => candidate.id === id);
-  const leaving = move && stay(mine?.starting_stay_id);
+  // The night before, as saved: a day you skip has no starting stay, but you still check out.
+  const nightIndex = person?.nights.findIndex((night) => night.date === date) ?? -1;
+  const leaving = move && nightIndex > 0 ? stay(person?.nights[nightIndex - 1].stay_id) : undefined;
   const arriving = move && stay(mine?.tonight_stay_id);
   const times = [
     leaving?.check_out_time && `Check out of ${leaving.name} by ${leaving.check_out_time.slice(0, 5)}`,
