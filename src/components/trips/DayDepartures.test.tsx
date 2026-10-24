@@ -139,6 +139,19 @@ describe("Starting points for chosen people (#333)", () => {
     expect(onSaved).toHaveBeenCalled();
     expect(await screen.findByText("Starting point saved for Eli.")).toBeInTheDocument();
   });
+  it("starts over with the other group's people when switched to it while open", async () => {
+    const full = splitDriveTrip();
+    vi.stubGlobal("fetch", fakeTripApi({}));
+    render(<DayDrive data={full} date={SAT} dateLabel="Sat Oct 10" onSaved={vi.fn()} canEdit memberId={ALEX.id} drive={state(await estimatesFor(full))} />);
+    await userEvent.click(screen.getByText("Departures · 2 starting points"));
+    const [rental, hotel] = screen.getAllByRole("listitem");
+    await userEvent.click(within(hotel).getByRole("button", { name: "Change their starting point" }));
+    await userEvent.click(within(screen.getByRole("form")).getByRole("radio", { name: /^Pine rental/ }));
+    await userEvent.click(within(rental).getByRole("button", { name: "Change their starting point" }));
+    const form = screen.getByRole("form", { name: "Starting point for chosen people · Sat Oct 10" });
+    expect(within(form).getAllByRole("checkbox", { checked: true }).map((box) => box.closest("label")?.querySelector("span span")?.textContent)).toEqual(["You", "Blair", "Dana"]);
+    expect(within(form).getByRole("radio", { name: /^Where they'd start anyway/ })).toBeChecked();
+  });
   it("marks people starting from their own place, and offers it with one departure too", async () => {
     const full = splitDriveTrip();
     full.member_origins = [{ trip_id: full.trip.id, trip_day_id: `day-${MON}`, member_id: ELI.id, origin: null, origin_stay_id: null, no_drive: true }];

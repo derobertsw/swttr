@@ -617,7 +617,7 @@ export interface TripDriveManualEstimate {
   entered_at: string;
   origin_label: string;
   destination_label: string;
-  /** False when the day's drive is now another pair: shown for review, never as the day's estimate. */
+  /** False for a drive nobody has that day any more: shown for review, never as the day's estimate. */
   current: boolean;
   /** The organizer chose the calculated estimate for the same pair instead. */
   use_calculated: boolean;
@@ -643,8 +643,13 @@ export interface TripDriveRoute {
   destination: { label: string } | null;
   /** The calculated estimate for this pair, when there is one: the day's estimate, or the one offered instead of yours. */
   estimate: TripDriveEstimate | null;
-  /** The organizer's own estimate for the day, when there is one and the day has a drive to estimate. */
+  /** The organizer's own estimate for this drive, when there is one and the day has a drive to estimate. */
   manual: TripDriveManualEstimate | null;
+  /**
+   * On the crew's drive (#333): the organizer's estimates for drives nobody
+   * has that day any more, each for review, to use for this drive or remove.
+   */
+  obsolete: TripDriveManualEstimate[];
   /** An earlier estimate for a different origin or access point: only for Estimate details, with its own pair. */
   previous: (TripDriveEstimate & { origin_label: string; destination_label: string }) | null;
   /** Names this origin, access point and mode, so a save can say which drive it was for; null without one. */

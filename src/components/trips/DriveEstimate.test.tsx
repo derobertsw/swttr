@@ -543,11 +543,29 @@ describe("Your estimate", () => {
     await userEvent.click(within(form).getByRole("button", { name: "Save your estimate" }));
     expect(sentBodies(fetchMock, `PUT ${ESTIMATE_URL}`)[0]).toMatchObject({ dates: [SAT], clear: [{ date: SUN, pair_key: "drive|44.4875,-72.7262>44.53,-72.7816" }], duration_seconds: 2400 });
   });
-  it("asks for a review once the day's drive is another pair", async () => {
+  it("asks for a review once the day's drive is another pair, and uses it for the new drive or removes it", async () => {
     const full = withDays({ date: SAT, origin: CABIN });
-    render(<DayDrive data={full} date={SAT} dateLabel="Sat Jan 9" canEdit drive={state(await withManual(full, [yours(SAT, 40)]))} onSaved={vi.fn()} />);
+    const fetchMock = fakeTripApi({ [`PUT ${ESTIMATE_URL}`]: reply(200, { ok: true }), [`DELETE ${ESTIMATE_URL}`]: reply(200, { ok: true }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<DayDrive data={full} date={SAT} dateLabel="Sat Jan 9" canEdit drive={state(await withManual(full, [yours(SAT, 40), yours(SAT, 55, { pair_key: "drive|1,1>2,2", origin_label: "Old inn" })]))} onSaved={vi.fn()} />);
     expect(screen.getByText("About 12 min drive · 5.6 mi · one way")).toBeInTheDocument();
-    expect(screen.getByText("Your estimate, about 40 min, was for Stowe Motel → Spruce Peak lot. Edit it to use it for this drive, or remove it.")).toBeInTheDocument();
+    // Both, each with its own controls.
+    expect(screen.getByText("Your estimate, about 40 min, was for Stowe Motel → Spruce Peak lot. Use it for this drive, or remove it.")).toBeInTheDocument();
+    expect(screen.getByText("Your estimate, about 55 min, was for Old inn → Spruce Peak lot. Use it for this drive, or remove it.")).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole("button", { name: "Use it for this drive" })[1]);
+    const form = screen.getByRole("form", { name: "Use your estimate for this drive" });
+    expect(within(form).getByRole("textbox", { name: "Minutes" })).toHaveValue("55");
+    await userEvent.click(within(form).getByRole("button", { name: "Save your estimate" }));
+    const cabin = `drive|${CABIN.latitude},${CABIN.longitude}>44.53,-72.7816`;
+    expect(sentBodies(fetchMock, `PUT ${ESTIMATE_URL}`)[0]).toMatchObject({
+      pair_key: cabin, dates: [SAT], clear: [{ date: SAT, pair_key: "drive|1,1>2,2" }],
+      expected: [{ date: SAT, pair_key: cabin, entered_at: null, use_calculated: null },
+        { date: SAT, pair_key: "drive|1,1>2,2", entered_at: "2027-01-04T12:00:00.000Z", use_calculated: false }],
+    });
+    await userEvent.click(screen.getAllByRole("button", { name: "Remove it" })[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Remove your estimate" }));
+    expect(sentBodies(fetchMock, `DELETE ${ESTIMATE_URL}`)[0]).toEqual({ pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", dates: [SAT],
+      expected: [{ date: SAT, pair_key: "drive|44.4875,-72.7262>44.53,-72.7816", entered_at: "2027-01-04T12:00:00.000Z", use_calculated: false }] });
   });
 });
 

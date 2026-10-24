@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { driveMatrix, MATRIX_MAX_CELLS } from "@/lib/locations/routing";
+import { readAll } from "@/lib/trip-lodging";
 import {
   closureKey, departurePlans, DRIVE_ESTIMATE_MAX_AGE_MS, driveDay, stayDepartures,
   type DeparturePlan, type DrivePlan, type StoredDriveEstimate, type StoredManualEstimate,
@@ -176,10 +177,15 @@ export async function tripDriveEstimates(full: TripFull, store: DriveEstimateSto
   };
 }
 
-/** People's own starting points (#333). Before its migration there are none; any other failure fails the load rather than hide them. */
+/**
+ * People's own starting points (#333). A row per person and day can pass
+ * max_rows, so they're read a page at a time in key order. Before its
+ * migration there are none; any other failure fails the load rather than hide them.
+ */
 export async function loadMemberDayOrigins(supabase: SupabaseClient, tripId: string): Promise<TripMemberDayOrigin[]> {
-  const { data, error } = await supabase.from("trip_member_day_origins")
-    .select("trip_id, trip_day_id, member_id, origin, origin_stay_id, no_drive").eq("trip_id", tripId);
+  const { data, error } = await readAll<TripMemberDayOrigin>((from, to) => supabase.from("trip_member_day_origins")
+    .select("trip_id, trip_day_id, member_id, origin, origin_stay_id, no_drive").eq("trip_id", tripId)
+    .order("trip_day_id").order("member_id").range(from, to));
   if (error && ["42P01", "PGRST205"].includes(error.code)) return [];
   if (error) throw new Error("Couldn't load starting points. Try again.");
   return (data ?? []) as TripMemberDayOrigin[];

@@ -1,7 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 import { departurePlans, drivePlans, stayDepartures, type StoredDriveEstimate } from "@/lib/trip-drive";
-import { tripDriveEstimates, type DriveEstimateStore, type ManualEstimateRow } from "@/lib/trip-drive-estimates";
+import { loadMemberDayOrigins, tripDriveEstimates, type DriveEstimateStore, type ManualEstimateRow } from "@/lib/trip-drive-estimates";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createFakeSupabase } from "@/test/fakeSupabase";
 import { RoutingUnavailable, type DriveLeg } from "@/lib/locations/routing";
 import { LODGE_PLACE, PINE_PLACE, place, splitDriveTrip, SPRUCE_LOT, VILLAGE_PLACE } from "@/test/driveTrip";
 import { ALEX, BLAIR, CASEY, DANA, ELI, FRAN, FRI, MON, PINE, personNight, SAT, splitRows, SUN, VILLAGE } from "@/test/splitStays";
@@ -249,6 +251,41 @@ describe("A person's own starting point (#333)", () => {
       ["Pine rental", "manual", "15 min", true], ["Village hotel", "manual", "25 min", true],
     ]);
     const gone = (await tripDriveEstimates(full, memoryStore([row("drive|1,1>2,2", 40)]), { now: NOW, matrix: failing() })).days.find((day) => day.date === SAT)!;
-    expect(gone.departures.map((departure) => departure.manual && [departure.manual.current, departure.manual.pair_key])).toEqual([[false, "drive|1,1>2,2"], null]);
+    expect(gone.departures.map((departure) => [departure.manual, departure.obsolete.map((entry) => [entry.current, entry.pair_key])]))
+      .toEqual([[null, [[false, "drive|1,1>2,2"]]], [null, []]]);
+  });
+  it("lists every estimate for a drive the day no longer has, and keeps them once the crew's drive has one", async () => {
+    const full = splitDriveTrip();
+    const [pine, hotel] = departuresOn(full, SAT);
+    const row = (pair: string, minutes: number): ManualEstimateRow => ({ trip_day_id: `day-${SAT}`, pair_key: pair, origin_label: "x", destination_label: "Spruce Peak lot",
+      duration_seconds: minutes * 60, note: null, use_calculated: false, entered_at: "2026-10-04T12:00:00.000Z" });
+    // The access point moves: both saved drives are gone.
+    const moved = splitDriveTrip();
+    moved.stops[0] = { ...moved.stops[0], access_point: place("Mountain Road lot", 44.528, -72.7853) };
+    const saturday = async (rows: ManualEstimateRow[]) =>
+      (await tripDriveEstimates(moved, memoryStore(rows), { now: NOW, matrix: failing() })).days.find((day) => day.date === SAT)!;
+    expect((await saturday([row(pine.pair_key!, 15), row(hotel.pair_key!, 25)])).obsolete.map((entry) => entry.duration_label)).toEqual(["15 min", "25 min"]);
+    const newPine = departuresOn(moved, SAT)[0].pair_key!;
+    const rebound = await saturday([row(newPine, 15), row(hotel.pair_key!, 25)]);
+    expect([rebound.manual?.duration_label, rebound.obsolete.map((entry) => entry.duration_label)]).toEqual(["15 min", ["25 min"]]);
+  });
+});
+
+describe("Loading people's own starting points (#333)", () => {
+  it("reads every row of a trip longer than one PostgREST page, in key order", async () => {
+    // 40 people on 30 days: 1,200 rows, past max_rows.
+    const rows: TripMemberDayOrigin[] = Array.from({ length: 30 }, (_, day) => Array.from({ length: 40 }, (_, person) => ({
+      trip_id: "trip-1", trip_day_id: `day-${String(day).padStart(2, "0")}`, member_id: `member-${String(person).padStart(2, "0")}`,
+      origin: null, origin_stay_id: null, no_drive: true,
+    }))).flat().reverse();
+    const supabase = createFakeSupabase({ trip_member_day_origins: rows } as never, { maxRows: 1000 });
+    const loaded = await loadMemberDayOrigins(supabase as unknown as SupabaseClient, "trip-1");
+    expect(loaded).toHaveLength(1200);
+    expect(new Set(loaded.map((row) => `${row.trip_day_id} ${row.member_id}`)).size).toBe(1200);
+    expect(loaded[0]).toMatchObject({ trip_day_id: "day-00", member_id: "member-00" });
+  });
+  it("has none before its migration", async () => {
+    const supabase = createFakeSupabase({}, { missing: ["trip_member_day_origins"] });
+    expect(await loadMemberDayOrigins(supabase as unknown as SupabaseClient, "trip-1")).toEqual([]);
   });
 });

@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LocationPicker } from "@/components/trips/LocationPicker";
 import { GEOAPIFY_CREDIT, OSM_CREDIT } from "@/lib/trip-location";
 import { errorMessage, timedTripRequest, tripRequest, TripRequestError } from "@/lib/trip-requests";
-import type { TripDay, TripDriveDay, TripDriveEstimates, TripDriveRoute, TripFull, TripLocation } from "@/types/trips";
+import type { TripDay, TripDriveDay, TripDriveEstimates, TripDriveManualEstimate, TripDriveRoute, TripFull, TripLocation } from "@/types/trips";
 
 const linkClass = "text-primary underline";
 
@@ -204,7 +204,7 @@ const routeOn = (days: TripDriveDay[], date: string, pair: string | null): TripD
 /** What an editor showed for each drive on a day: what a your-estimate change expects to find. */
 const seenEstimates = (days: TripDriveDay[], drives: Array<{ date: string; pair_key: string }>) => drives.map(({ date, pair_key }) => {
   const day = days.find((candidate) => candidate.date === date);
-  const manual = [day, ...day?.departures ?? []].map((route) => route?.manual).find((entry) => entry?.pair_key === pair_key);
+  const manual = [day, ...day?.departures ?? []].flatMap((route) => [route?.manual, ...route?.obsolete ?? []]).find((entry) => entry?.pair_key === pair_key);
   return { date, pair_key, entered_at: manual?.entered_at ?? null, use_calculated: manual ? manual.use_calculated : null };
 });
 /** The day's starting point as an editor showed it. */
@@ -252,7 +252,7 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
   const [people, setPeople] = useState<{ ids: string[]; focusId: string } | null>(null);
   // The drive as it was when your estimate's editor opened. The editor keeps
   // it, so a refresh that changes or removes the drive never drops an entry.
-  const [opened, setOpened] = useState<{ day: TripDriveRoute; days: TripDriveDay[] } | null>(null);
+  const [opened, setOpened] = useState<{ day: TripDriveRoute; days: TripDriveDay[]; estimate: TripDriveManualEstimate | null; focusId: string } | null>(null);
   const [status, setStatus] = useState("");
   const [working, setWorking] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -263,9 +263,10 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
     .map((candidate) => document.getElementById(candidate)).find(Boolean)?.focus(), 0);
   const stays = <Link href={`/trips/${tripId}/stays#trip-stays-heading`} className={linkClass}>Go to Stays</Link>;
 
-  const open = (next: NonNullable<typeof editing>) => {
+  /** `estimate` is yours that the editor starts from: this drive's, one for a drive the day no longer has, or none. */
+  const open = (next: NonNullable<typeof editing>, estimate: TripDriveManualEstimate | null = day?.manual ?? null, focusId = estimateId) => {
     setEditing(next); setStatus(""); setActionError(null);
-    setOpened(day && drive.estimates ? { day, days: drive.estimates.days } : null);
+    setOpened(day && drive.estimates ? { day, days: drive.estimates.days, estimate, focusId } : null);
   };
   const close = (focusId: string, message?: string) => {
     setEditing(null);
@@ -383,9 +384,17 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
         <p className="break-words text-sm text-foreground">{whose}: about {yours.duration_label} · {entered(yours)}</p>
         {manage && <Button type="button" size="sm" variant="outline" disabled={working} onClick={() => void prefer(false)}>Use your estimate</Button>}
       </div>}
-      {manage && yours && !yours.current && <p className="break-words text-sm text-foreground">
-        Your estimate, about {yours.duration_label}, was for {yours.origin_label} → {yours.destination_label}. Edit it to use it for this drive, or remove it.
-      </p>}
+      {/* Each of yours for a drive nobody has that day any more (#333), on the crew's drive. */}
+      {manage && day.obsolete?.map((old, index) => <div key={old.pair_key} className="space-y-1">
+        <p className="break-words text-sm text-foreground">
+          Your estimate, about {old.duration_label}, was for {old.origin_label} → {old.destination_label}. Use it for this drive, or remove it.
+        </p>
+        {!editing && <div className="flex flex-wrap gap-2">
+          <Button id={`${estimateId}-old-${index}`} type="button" size="sm" variant="outline"
+            onClick={() => open("estimate", old, `${estimateId}-old-${index}`)}>Use it for this drive</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => open("remove", old, `${estimateId}-old-${index}`)}>Remove it</Button>
+        </div>}
+      </div>)}
       <div className="flex flex-wrap gap-2">
         <Directions day={day} />
         {(day.state === "unavailable" || day.state === "stale") && <Button type="button" size="sm" variant="outline" disabled={drive.refreshing} onClick={drive.retry}>Retry</Button>}
@@ -416,18 +425,19 @@ export function DayDrive({ data, date, dateLabel, drive, canEdit, onSaved, membe
           onChangeStart={canEdit && tripDay ? (ids, focusId) => { setPeople({ ids, focusId }); setEditing("people"); setStatus(""); setActionError(null); } : undefined} />
       )}
       {editing === "people" && people && tripDay && crewDay && (
-        <PeopleStartingPointEditor data={data} day={tripDay} drive={crewDay} dateLabel={dateLabel} memberId={memberId} initial={people.ids}
+        // A new form for each group it's opened from, so switching never keeps the last group's choices.
+        <PeopleStartingPointEditor key={people.focusId} data={data} day={tripDay} drive={crewDay} dateLabel={dateLabel} memberId={memberId} initial={people.ids}
           onCancel={() => close(people.focusId)}
           onSaved={async (message) => { await onSaved(); close(people.focusId, message); }} />
       )}
       {editing === "estimate" && opened && (
-        <YourEstimateEditor tripId={tripId} day={opened.day} days={opened.days}
-          onCancel={() => close(estimateId)} onReviewed={drive.retry}
+        <YourEstimateEditor tripId={tripId} day={opened.day} days={opened.days} from={opened.estimate}
+          onCancel={() => close(opened.focusId)} onReviewed={drive.retry}
           onSaved={(message) => { drive.retry(); close(headingId, message); }} />
       )}
-      {editing === "remove" && opened && (
-        <RemoveYourEstimate tripId={tripId} day={opened.day} days={opened.days}
-          onCancel={() => close(estimateId)} onConflict={drive.retry}
+      {editing === "remove" && opened && opened.estimate && (
+        <RemoveYourEstimate tripId={tripId} day={opened.day} days={opened.days} estimate={opened.estimate}
+          onCancel={() => close(opened.focusId)} onConflict={drive.retry}
           onRemoved={() => { drive.retry(); close(headingId, "Your estimate removed."); }} />
       )}
       <p aria-live="polite" className="text-sm text-success">{status}</p>
@@ -695,17 +705,19 @@ function PeopleStartingPointEditor({ data, day, drive, dateLabel, memberId, init
  * Your own one-way drive time, for when routing has none. It's for the drive
  * shown, and can be saved for the other days with the same drive.
  */
-function YourEstimateEditor({ tripId, day, days, onCancel, onSaved, onReviewed }: {
+function YourEstimateEditor({ tripId, day, days, from, onCancel, onSaved, onReviewed }: {
   tripId: string;
   /** The drive it's for: the day's, or one of its departures (#333). */
   day: TripDriveRoute;
   days: TripDriveDay[];
+  /** Yours it starts from: this drive's, or one for a drive the day no longer has, which saving replaces. */
+  from: TripDriveManualEstimate | null;
   onCancel: () => void;
   onSaved: (message: string) => void;
   /** Fetches the estimates again after a conflict, so the card matches. */
   onReviewed: () => void;
 }) {
-  const saved = day.manual;
+  const saved = from;
   const [seen, setSeen] = useState({ day, days });
   const [hours, setHours] = useState(saved ? String(Math.floor(saved.duration_seconds / 3600)) : "");
   const [minutes, setMinutes] = useState(saved ? String(Math.round((saved.duration_seconds % 3600) / 60)) : "");
@@ -737,7 +749,7 @@ function YourEstimateEditor({ tripId, day, days, onCancel, onSaved, onReviewed }
     const dates = [seen.day.date, ...others.filter((date) => ticked.includes(date))];
     // Unticked days that shared it, and an estimate for an earlier drive this one replaces.
     const clear = [...together(seen.day).filter((date) => !dates.includes(date)).map((date) => ({ date, pair_key: pair })),
-      ...seen.day.manual && !seen.day.manual.current ? [{ date: seen.day.date, pair_key: seen.day.manual.pair_key }] : []];
+      ...saved && !saved.current ? [{ date: seen.day.date, pair_key: saved.pair_key }] : []];
     setBusy(true); edit(); setReviewed(null);
     try {
       await timedTripRequest(`/api/v1/trips/${tripId}/days/${seen.day.date}/drive-estimate`, "PUT", {
@@ -782,7 +794,7 @@ function YourEstimateEditor({ tripId, day, days, onCancel, onSaved, onReviewed }
 
   return (
     <form ref={form} onSubmit={save} aria-labelledby={`${id}-title`} aria-busy={busy} className="mt-3 space-y-3 border-t border-border pt-3">
-      <h4 id={`${id}-title`} className="text-base font-semibold text-foreground">{saved ? "Edit your estimate" : "Add your estimate"}</h4>
+      <h4 id={`${id}-title`} className="text-base font-semibold text-foreground">{saved?.current ? "Edit your estimate" : saved ? "Use your estimate for this drive" : "Add your estimate"}</h4>
       <p className="break-words text-sm text-muted-foreground">{seen.day.origin?.label} → {seen.day.destination?.label} · by car, one way</p>
       {reviewed && <p className={noticeClass}>{reviewed}</p>}
       {error && <p id={`${id}-error`} role="alert" className="text-base text-destructive">{error}</p>}
@@ -831,18 +843,20 @@ function YourEstimateEditor({ tripId, day, days, onCancel, onSaved, onReviewed }
  * After a conflict, Review saved estimate shows what's saved now and removes
  * against that.
  */
-function RemoveYourEstimate({ tripId, day, days, onCancel, onRemoved, onConflict }: {
+function RemoveYourEstimate({ tripId, day, days, estimate, onCancel, onRemoved, onConflict }: {
   tripId: string;
   /** The drive it's for: the day's, or one of its departures (#333). */
   day: TripDriveRoute;
   days: TripDriveDay[];
+  /** Yours to remove: this drive's, or one for a drive the day no longer has. */
+  estimate: TripDriveManualEstimate;
   onCancel: () => void;
   onRemoved: () => void;
   /** Fetches the estimates again after a conflict, so the card matches. */
   onConflict: () => void;
 }) {
-  const [seen, setSeen] = useState({ day, days });
-  const saved = seen.day.manual;
+  const [seen, setSeen] = useState<{ day: TripDriveRoute; days: TripDriveDay[]; estimate: TripDriveManualEstimate | null }>({ day, days, estimate });
+  const saved = seen.estimate;
   const dates = !saved ? [] : saved.current ? saved.dates : [seen.day.date];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -870,7 +884,9 @@ function RemoveYourEstimate({ tripId, day, days, onCancel, onRemoved, onConflict
       // The same drive if the day still has it, otherwise the day's own.
       const now = routeOn(current.days, seen.day.date, seen.day.pair_key) ?? current.days.find((candidate) => candidate.date === seen.day.date);
       if (!now) throw new Error("This day isn't on the trip anymore. Reload the trip.");
-      setSeen({ day: now, days: current.days }); setConflict(false); setReviewed(true);
+      // The same estimate, by its drive, as it's saved now.
+      const again = [now.manual, ...now.obsolete ?? []].find((entry) => entry?.pair_key === estimate.pair_key) ?? null;
+      setSeen({ day: now, days: current.days, estimate: again }); setConflict(false); setReviewed(true);
       question.current?.focus();
     } catch (err) { setError(errorMessage(err)); }
     finally { setBusy(false); }

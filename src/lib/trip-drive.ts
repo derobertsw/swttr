@@ -259,7 +259,7 @@ const sameManual = (a: StoredManualEstimate, b: StoredManualEstimate) =>
  * estimate of your own, each for a drive on a day (#333), and `plans` every
  * drive on the trip; yours for this drive is in use unless the organizer chose
  * a calculated estimate for it and there is one. With `earlier`, the crew's
- * drive also shows yours for a drive the day no longer has, for review only.
+ * drive also lists every one of yours for a drive the day no longer has, for review only.
  */
 export function driveDay(plan: DrivePlan, row: StoredDriveEstimate | undefined, failed: boolean, now: number,
   context: { plans?: DrivePlan[]; manual?: StoredManualEstimate[]; earlier?: boolean } = {}): TripDriveRoute {
@@ -270,21 +270,23 @@ export function driveDay(plan: DrivePlan, row: StoredDriveEstimate | undefined, 
     crew_stay: plan.crew_stay,
     destination: plan.destination && { label: plan.destination.label },
     closures: plan.closures.map((closure) => `${closure.label}, ${closure.season}`),
-    estimate: null, manual: null, previous: null, directions: null, pair_key: plan.pair_key, same_drive_dates: [],
+    estimate: null, manual: null, obsolete: [], previous: null, directions: null, pair_key: plan.pair_key, same_drive_dates: [],
   };
   if (plan.state !== "ready") return { ...base, state: plan.state };
   const directions = directionsUrls(plan.origin!.location!, plan.destination!.location);
   const sameDrive = [...new Set(plans.filter((other) => other.pair_key === plan.pair_key).map((other) => other.date))];
   const drives = (date: string, pair: string) => plans.some((other) => other.date === date && other.pair_key === pair);
-  const own = manual.find((entry) => entry.date === plan.date && entry.pair_key === plan.pair_key)
-    ?? (context.earlier ? manual.find((entry) => entry.date === plan.date && !drives(entry.date, entry.pair_key)) : undefined);
-  const yours: TripDriveManualEstimate | null = own ? {
+  const asYours = (own: StoredManualEstimate): TripDriveManualEstimate => ({
     pair_key: own.pair_key, duration_label: durationLabel(own.duration_seconds), duration_seconds: own.duration_seconds, note: own.note,
     entered_at: own.entered_at, origin_label: own.origin_label, destination_label: own.destination_label,
     current: own.pair_key === plan.pair_key, use_calculated: own.use_calculated,
     dates: manual.filter((entry) => sameManual(entry, own) && drives(entry.date, own.pair_key)).map((entry) => entry.date),
-  } : null;
-  const day = { ...base, directions, manual: yours, same_drive_dates: sameDrive };
+  });
+  const own = manual.find((entry) => entry.date === plan.date && entry.pair_key === plan.pair_key);
+  const yours = own ? asYours(own) : null;
+  // Every one for a drive nobody has that day any more, so each can be reviewed.
+  const obsolete = context.earlier ? manual.filter((entry) => entry.date === plan.date && !drives(entry.date, entry.pair_key)).map(asYours) : [];
+  const day = { ...base, directions, manual: yours, obsolete, same_drive_dates: sameDrive };
 
   let calculated: TripDriveRoute;
   if (row?.route_key === plan.route_key) {
