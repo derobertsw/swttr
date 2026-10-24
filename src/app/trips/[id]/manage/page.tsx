@@ -133,7 +133,7 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
           Manage crew
         </h1>
         <Link href={`/trips/${id}/rollcall`} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary">
-          Roll call
+          Day checklist
           <ChevronRight className="size-4" aria-hidden="true" />
         </Link>
       </header>
