@@ -10,14 +10,14 @@ import { formatLocationName } from "@/hooks/useLocationSearch";
 import { useGearUp } from "@/hooks/useGearUp";
 import { layerDisplayAdvice } from "@/lib/gearUp";
 import { useUserId } from "@/hooks/useUserId";
+import { gearUpTools } from "@/lib/webmcp/tools";
 import { useWebMCPTools } from "@/hooks/useWebMCPTools";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OutingRequestNotice } from "@/components/OutingRequestNotice";
 import { SaveToTrip } from "@/components/trips/SaveToTrip";
 
 const HomeContent = () => {
-  // #185/#186 supply the real tools once the shared outing action is ready.
-  useWebMCPTools([], useUserId() ?? "signed-out");
+  const userId = useUserId();
   const {
     activity,
     setActivity,
@@ -54,7 +54,13 @@ const HomeContent = () => {
     accountChanging,
     opensSave,
     saveTripId,
+    reportDisplayedLayers,
+    handleLayerEdit,
+    submitOuting,
+    getCurrentOuting,
   } = useGearUp();
+
+  useWebMCPTools(gearUpTools({ signedIn: Boolean(userId), submitOuting, getCurrentOuting }), userId ?? "signed-out");
 
   const { itemMappings } = useItemMappings();
 
@@ -127,6 +133,8 @@ const HomeContent = () => {
           // Everything shown comes from the result, so it stays tied to the
           // outing it was requested for while a change loads or fails.
           <LayerDisplay
+            onLayerEdit={handleLayerEdit}
+            onDisplayedLayers={(layers) => reportDisplayedLayers(result, layers)}
             outing={result.outing}
             activity={result.outing.activity}
             exertion={result.outing.exertion}

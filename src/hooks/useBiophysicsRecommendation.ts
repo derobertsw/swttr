@@ -26,7 +26,8 @@ interface UseBiophysicsResult {
     activity: string,
     weather: BiophysicsWeather,
     exertion: ExertionLevel,
-    bodyMetrics: UserBodyMetrics
+    bodyMetrics: UserBodyMetrics,
+    signal?: AbortSignal
   ) => Promise<BiophysicsOutcome>;
   reset: () => void;
 }
@@ -51,8 +52,10 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
       activity: string,
       weather: BiophysicsWeather,
       exertion: ExertionLevel,
-      bodyMetrics: UserBodyMetrics
+      bodyMetrics: UserBodyMetrics,
+      signal?: AbortSignal
     ): Promise<BiophysicsOutcome> => {
+      signal?.throwIfAborted();
       if (!isBiophysicsSupported(activity)) {
         setData(null);
         return { status: "unsupported", data: null };
@@ -64,6 +67,7 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
 
       try {
         const response = await fetch(endpoint, {
+          signal,
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -85,6 +89,7 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
           }),
         });
 
+        signal?.throwIfAborted();
         // Signed-out callers are turned away by src/proxy.ts.
         if (response.status === 401) {
           setData(null);
@@ -95,6 +100,7 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
         }
 
         const result = await response.json();
+        signal?.throwIfAborted();
         if (result?.recommendation?.score !== undefined) {
           setData(result);
           return { status: "ok", data: result };
@@ -106,6 +112,7 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
         }
         throw new Error("API response has no recommendation");
       } catch (err) {
+        signal?.throwIfAborted();
         const errorObj = err instanceof Error ? err : new Error("Unknown error");
         setError(errorObj);
         setData(null);

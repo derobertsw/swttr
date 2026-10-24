@@ -1,0 +1,116 @@
+{
+  "browser": "Chrome/155.0.8059.85",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "api": "document.modelContext",
+  "registered": [
+    "swttr_get_capabilities",
+    "swttr_get_current_outing",
+    "swttr_recommend_outing",
+    "swttr_search_locations"
+  ],
+  "search": {
+    "selected": "Stowe, Vermont",
+    "candidates": 5
+  },
+  "input": {
+    "activity": "hiking_snowshoeing",
+    "exertion": "easy",
+    "place": {
+      "id": 5241611,
+      "name": "Stowe",
+      "region": "Vermont",
+      "country": "United States",
+      "latitude": 44.46533,
+      "longitude": -72.68456,
+      "timeZone": "America/New_York"
+    },
+    "when": {
+      "mode": "later",
+      "date": "2026-10-22",
+      "time": "09:15",
+      "durationDays": 1
+    }
+  },
+  "advice": {
+    "kind": "general",
+    "reason": "unsupported"
+  },
+  "weather": {
+    "temperature": 43,
+    "windSpeed": 5,
+    "precipitation": false,
+    "context": {
+      "source": "forecast",
+      "place": "Stowe, Vermont, United States",
+      "forecastTime": "2026-10-22T09:00-04:00",
+      "timeZone": "America/New_York",
+      "provenance": {
+        "provider": "Open-Meteo",
+        "units": {
+          "temperature": "fahrenheit",
+          "windSpeed": "mph"
+        },
+        "timeZone": "America/New_York",
+        "coverage": {
+          "firstHour": "2026-10-21T00:00-04:00",
+          "lastHour": "2026-11-05T22:00-05:00",
+          "availableHours": 384
+        }
+      }
+    },
+    "units": {
+      "temperature": "fahrenheit",
+      "windSpeed": "mph"
+    }
+  },
+  "layers": {
+    "activePhase": "outing",
+    "phases": [
+      {
+        "id": "outing",
+        "wear": {
+          "torso": {
+            "base": [
+              "Light"
+            ],
+            "mid": [],
+            "outer": []
+          },
+          "legs": {
+            "base": [],
+            "mid": [],
+            "outer": [
+              "Shorts"
+            ]
+          },
+          "headNeck": {
+            "base": [],
+            "mid": [],
+            "outer": []
+          },
+          "hands": {
+            "base": [],
+            "mid": [],
+            "outer": []
+          }
+        },
+        "carry": [],
+        "decision": null
+      }
+    ],
+    "guidance": [],
+    "missingGear": [],
+    "warnings": [],
+    "transition": null,
+    "edited": false,
+    "evaluation": "unavailable"
+  },
+  "readbackMatches": true,
+  "visibleMatches": true,
+  "guestRunning": {
+    "kind": "none",
+    "reason": "auth_required"
+  },
+  "invalidInputRejected": true,
+  "removedOnNavigation": true
+}

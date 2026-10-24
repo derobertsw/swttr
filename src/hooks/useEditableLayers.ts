@@ -167,6 +167,8 @@ export function useEditableLayers(initialLayers: BodyPartLayers) {
 
   return {
     layers,
+    /** Changes with the suggested layers' content, when edits are discarded. */
+    suggestionKey: current.key,
     /** The layers differ from the suggested ones. */
     edited,
     canUndo: history.length > 0,
