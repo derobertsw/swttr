@@ -10,7 +10,7 @@ Every earlier URL still works and belongs to the section that now holds it (`src
 |---|---|---|
 | Plan | `/trips/:id` | `/days/:date`, `/map`, `/stops`, `/settings` |
 | Stays | `/trips/:id/stays` | |
-| Crew | `/trips/:id/manage` | `/rollcall` |
+| Crew | `/trips/:id/manage` | `/rollcall` (the Day checklist, [trip-crew-checklist.md](trip-crew-checklist.md)) |
 | Packing | `/trips/:id/pack` | `/gear` (shared gear) |
 
 - Plan, opened from another section, returns to the day it last showed, even after that section reloads (the tab's session storage, per trip). From inside Plan it opens Plan's own page with every day.
@@ -35,4 +35,4 @@ Plan, Stays, Crew and Packing put their content on the page without cards. Headi
 
 ## What this doesn't change
 
-Data, permissions and calculations are as they were. Per-person nightly lodging (#331), split-stay views (#332, in [trip-stays.md](trip-stays.md)), meeting details and departures (#333), sport-specific day briefs (#334), trip-day context in Gear up (#335) and dated crew tasks and statuses (#336) build on this frame.
+Data, permissions and calculations are as they were. Per-person nightly lodging (#331), split-stay views (#332, in [trip-stays.md](trip-stays.md)), meeting details and departures (#333), sport-specific day briefs (#334), trip-day context in Gear up (#335) and dated crew tasks and statuses (#336, [trip-crew-checklist.md](trip-crew-checklist.md)) build on this frame.

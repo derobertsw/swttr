@@ -200,7 +200,7 @@ describe("Trip day page", () => {
         description: "Database unavailable",
       })
     );
-    expect(screen.getByText("no kit set")).toBeInTheDocument();
+    expect(screen.getByText("Not started", { selector: "p" })).toBeInTheDocument();
   });
 
   it("finishes saving one kit change before taking another, so a failed one keeps the saved kit", async () => {
@@ -660,6 +660,11 @@ describe("Trip day page", () => {
       expect(await screen.findByRole("heading", { name: "My kit" })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Get layers in Gear up" })).toHaveAttribute("href", "/");
       expect(screen.getByRole("group", { name: "Effort for You" })).toBeInTheDocument();
+      // An empty kit is Not started, never OK (#336), and the Day checklist links to its row.
+      const row = document.getElementById("kit-member-you")!;
+      expect(within(row).getAllByText("Not started")).toHaveLength(2);
+      expect(within(row).queryByText("OK")).not.toBeInTheDocument();
+      expect(within(row).getByRole("button", { name: "Flag needs help" })).toBeInTheDocument();
     });
 
     it("lets the organizer change a guest's kit but only see another member's", async () => {
@@ -668,7 +673,7 @@ describe("Trip day page", () => {
       await screen.findByText("Crew kits");
       expect(screen.getByRole("group", { name: "Effort for Sam" })).toBeInTheDocument();
       expect(screen.queryByRole("group", { name: "Effort for Ana" })).not.toBeInTheDocument();
-      expect(screen.getByText("Steady · Shell")).toBeInTheDocument();
+      expect(screen.getByText("Checklist · Steady · Shell")).toBeInTheDocument();
       expect(screen.getByText("Needs help")).toBeInTheDocument();
     });
 
