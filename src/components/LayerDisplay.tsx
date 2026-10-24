@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useId, useMemo, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, Undo2 } from "lucide-react";
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
 import type { LocationSuggestion, Recommendation } from "@/types/recommendations";
 import type { PrecipitationType, WeatherContext } from "@/types/weather";
+import type { DisplayedLayers } from "@/types/outingAction";
 import type { Outing } from "@/types/outing";
 import type { SavedKitPhase, SavedOutfit } from "@/types/savedKit";
 import type {
@@ -81,6 +82,10 @@ interface LayerDisplayProps {
    * edits included, or null when there's nothing to save.
    */
   saveToTrip?: (outfit: SavedOutfit | null) => ReactNode;
+  /** Reports committed visible advice, including edits and evaluation updates. */
+  onDisplayedLayers?: (layers: DisplayedLayers) => void;
+  /** Retires pending tool advice before a manual change to the worn layers. */
+  onLayerEdit?: () => void;
 }
 
 type Phase = "climb" | "descent";
@@ -168,10 +173,13 @@ const LayerDisplay = ({
   onActivityChange,
   weatherLoading,
   saveToTrip,
+  onDisplayedLayers,
+  onLayerEdit,
 }: LayerDisplayProps) => {
   const [weatherDrawerOpen, setWeatherDrawerOpen] = useState(false);
   const [activePhase, setActivePhase] = useState<Phase>("climb");
-  const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
+  // With the suggested layers it was opened on (see below).
+  const [pickerTarget, setPickerTarget] = useState<(PickerTarget & { suggestionKey: string }) | null>(null);
   const weatherFocus = useReturnFocus();
   const pickerFocus = useReturnFocus();
   const wearHeadingId = useId();
@@ -207,9 +215,16 @@ const LayerDisplay = ({
   const climb = useEditableLayers(recommendedLayers);
   const descent = useEditableLayers(initialDescentLayers);
   const phaseLayers = (phase: Phase) => (phase === "descent" ? descent : climb);
+  // A newer result's layers (a browser agent's can land while the picker is
+  // open) replace the ones it was opened on, so it closes rather than
+  // changing the new outfit at the old item's position.
+  if (pickerTarget && phaseLayers(pickerTarget.phase).suggestionKey !== pickerTarget.suggestionKey) {
+    setPickerTarget(null);
+  }
   // The phase of the latest edit, which a failed check's Undo change reverts.
   const [lastEditedPhase, setLastEditedPhase] = useState<Phase>("climb");
   const editLayers = (phase: Phase) => {
+    onLayerEdit?.();
     setLastEditedPhase(phase);
     return phaseLayers(phase);
   };
@@ -325,7 +340,7 @@ const LayerDisplay = ({
     pickerFocus.remember(
       () => fallbackIds.map((id) => document.getElementById(id)).find((element) => element !== null) ?? null
     );
-    setPickerTarget(target);
+    setPickerTarget({ ...target, suggestionKey: phaseLayers(target.phase).suggestionKey });
   };
 
   const handlePickerSelect = (item: PickerItem) => {
@@ -434,6 +449,7 @@ const LayerDisplay = ({
   // A failed check's Undo change reverts the latest edit, and shows its phase.
   const failedEditLayers = phaseLayers(lastEditedPhase);
   const undoFailedEdit = () => {
+    onLayerEdit?.();
     setActivePhase(lastEditedPhase);
     failedEditLayers.undo();
   };
@@ -471,6 +487,34 @@ const LayerDisplay = ({
         edited: climb.edited || descent.edited,
       }
     : null;
+
+  // Report the same committed Wear/Carry projection used by the visible result.
+  // Keep item IDs, thermal inputs and raw recommendation payloads out of readback.
+  useLayoutEffect(() => {
+    onDisplayedLayers?.({
+      activePhase: showDescent ? shownPhase : "outing",
+      phases: hasLayers ? savedPhases.map(phase => ({
+        id: phase.id,
+        wear: Object.fromEntries(BODY_PARTS.map(part => [part,
+          Object.fromEntries((["base", "mid", "outer"] as const).map(layer => [layer,
+            (phase.wear[part][layer] ?? []).map(item => item.name),
+          ])),
+        ])) as DisplayedLayers["phases"][number]["wear"],
+        carry: [...phase.carry],
+        decision: phase.decision,
+      })) : [],
+      guidance: [...visibleGuidance],
+      missingGear: missingRequirements.map(r => r.message),
+      warnings: [...new Set([...(biophysicsData?.warnings ?? []), ...(showDescent ? biophysicsData?.transition_protocol?.warnings ?? [] : [])])],
+      transition: showDescent && biophysicsData?.transition_protocol ? {
+        priority: biophysicsData.transition_protocol.priority,
+        timeLimitMinutes: biophysicsData.transition_protocol.time_limit_minutes,
+        steps: [...biophysicsData.transition_protocol.steps],
+      } : null,
+      edited: biophysicsActive && (climb.edited || descent.edited),
+      evaluation: !biophysicsActive ? "unavailable" : evaluationPending ? "pending" : evaluationFailed ? "failed" : "ready",
+    });
+  });
 
   return (
     <div className="flex w-full flex-col gap-6 pb-24">

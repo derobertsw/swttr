@@ -107,6 +107,9 @@ export function createSinglePhaseSport(
       const ensemble = functional ? filterUnsuitableEnsemble(builtEnsemble, targets.regional, functional) : builtEnsemble;
       const accessories = selectPhaseAccessories(config.activity, targets, pool, request.tempC, ensemble);
       const { handwear, headwear } = accessories;
+      // Scoring, the echoed targets and manual edits share the upper limits
+      // the accessories were chosen against.
+      const judged = accessories.extremityMax ? { ...targets, extremity: { ...targets.extremity, max: accessories.extremityMax } } : targets;
 
       const { recommendation, warnings } = buildScoredRecommendation(
         {
@@ -127,7 +130,7 @@ export function createSinglePhaseSport(
             targetRange: targets.targetRange,
             regionalMinTarget: targets.regional.min,
             extremityMinTarget: targets.extremity.min,
-            extremityMaxTarget: targets.extremity.max,
+            extremityMaxTarget: judged.extremity.max,
           },
         },
         handwear,
@@ -153,7 +156,7 @@ export function createSinglePhaseSport(
           exertion: request.exertion,
           ...config.conditions(request),
         },
-        ireq: formatSinglePhaseIreq(targets.ireq, targets),
+        ireq: formatSinglePhaseIreq(targets.ireq, judged),
         ...(requirements ? { requirements } : {}),
         recommendation,
         warnings: [...warnings, ...(protectedOutfit?.warnings ?? []), ...accessories.warnings],
