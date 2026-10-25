@@ -131,6 +131,10 @@ export interface TripFull {
   conditions?: TripDayConditionsSource[];
   /** People's own starting points (#333); missing or empty before its migration. */
   member_origins?: TripMemberDayOrigin[];
+  /** Backcountry days' day checks (#212); optional like `lodging`. */
+  day_checks?: TripDayChecks[];
+  /** Tour preparation the signed-in person can act on, for Plan's own page (#212); optional like `lodging`. */
+  preparation?: TripPreparationItem[];
 }
 
 /**
@@ -267,6 +271,85 @@ export interface TripDayConditionsSource extends TripConditionsSource {
   /** The day's plan and this source as the server reads them now; recording a review sends it back. */
   context_key: string;
   reviews: TripConditionsReview[];
+}
+
+/** A day check on a Backcountry day (#212): see docs/trip-touring-prep.md. */
+export type TripDayCheckKind = "plan_review" | "transceiver";
+
+/** What a plan review was recorded against. Notes and figures aren't part of it. */
+export interface TripPlanReviewContext {
+  date: string;
+  plan: {
+    objective: string;
+    route_url: string | null;
+    backup_plan: string | null;
+    /** "HH:MM" on the destination's clock. */
+    meet_time: string | null;
+    meet_day_offset: number;
+    return_time: string | null;
+    return_day_offset: number;
+  } | null;
+  meeting_point: { latitude: number; longitude: number } | null;
+}
+
+/** What a transceiver check was recorded against: the transceiver in the person's packing list, if any. */
+export interface TripTransceiverContext {
+  date: string;
+  /** `added_at` is when it was put in the list; null for one added before it was recorded. */
+  transceiver: { added_at: string | null } | null;
+}
+
+/** One entry in a check's history. */
+export interface TripDayCheckEntry {
+  id: string;
+  action: "recorded" | "withdrawn";
+  /** Who saved it: the person, or the organizer for a managed guest. */
+  recorded_by: string;
+  created_at: string;
+  /** e.g. "6:12 AM MST · Sat Feb 13", on the destination's clock. */
+  time_label: string;
+  /** The tour plan's revision a plan review was recorded against. */
+  plan_revision: number | null;
+}
+
+/** One person's check on a day. */
+export interface TripDayCheck {
+  kind: TripDayCheckKind;
+  member_id: string;
+  /** Out of date: recorded, but what it covers has changed since. */
+  status: "not_recorded" | "recorded" | "out_of_date";
+  /** The latest entry: the check, or its withdrawal; null before anything was recorded. */
+  current: TripDayCheckEntry | null;
+  /** Earlier entries, newest first. */
+  history: TripDayCheckEntry[];
+  /** What changed since it was recorded, e.g. "Route changed"; empty unless it's out of date. */
+  stale_reasons: string[];
+  /** Whether the signed-in person may record or withdraw it: their own, or a managed guest's for the organizer. */
+  can_record: boolean;
+  /** What it covers as the server reads it now, sent back to record it; null for anyone who can't. */
+  context_key: string | null;
+}
+
+/** A Backcountry day's checks, for each person taking part. */
+export interface TripDayChecks {
+  date: string;
+  trip_day_id: string;
+  /** False without a tour plan, when there's no plan to review yet. */
+  plan_available: boolean;
+  checks: TripDayCheck[];
+}
+
+/**
+ * A fact about tour preparation that the signed-in person can act on, for
+ * Plan's own page. Never a readiness score. `scope` puts their own first.
+ */
+export interface TripPreparationItem {
+  kind: "plan_out_of_date" | "transceiver_out_of_date" | "plan_not_reviewed" | "transceiver_not_checked"
+    | "no_tour_plan" | "guest_check" | "crew_out_of_date";
+  scope: "personal" | "crew";
+  date: string;
+  label: string;
+  action: { label: string; href: string };
 }
 
 export type TripStayType = "hotel" | "rental" | "hut" | "campground" | "other";
@@ -794,6 +877,8 @@ export interface TripChecklistPerson {
    * none, or for someone without an account, who can't record one.
    */
   conditions: { sources: number; reviewed: number; out_of_date: number; latest: string | null; label: string } | null;
+  /** Their day checks on a Backcountry day they take part in (#212); null otherwise, and for a pending invitation. */
+  day_checks: Array<{ kind: TripDayCheckKind; status: TripDayCheck["status"]; label: string }> | null;
 }
 
 export interface TripDayChecklist {

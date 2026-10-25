@@ -19,6 +19,7 @@ import { planDayKits } from "@/lib/trip-saved-kits";
 import { buildLodging } from "@/lib/trip-lodging";
 import { buildTourPlanSummary } from "@/lib/trip-tour-plans";
 import { buildTouringEquipment } from "@/lib/touring-equipment";
+import { dayChecksFor, summarizeDayChecks } from "@/lib/trip-day-checks";
 import type { TripDay, TripFull, TripItineraryRequest, TripLocation, TripMember, TripMemberDayKit, TripTourPlan } from "@/types/trips";
 import { savedOutfit, savedPlan } from "@/test/savedKit";
 import DayDetailPage from "./page";
@@ -851,6 +852,8 @@ describe("Trip day page", () => {
       gear: [
         { id: "gear-1", trip_id: TRIP.id, description: "Group shelter", assignee_member_id: ORGANIZER.id, sort_order: 0, created_at: "" },
         { id: "gear-2", trip_id: TRIP.id, description: "Stove", assignee_member_id: SAM.id, sort_order: 1, created_at: "" },
+        // With #179's states, assignment alone isn't agreement.
+        { id: "gear-3", trip_id: TRIP.id, description: "Repair kit", assignee_member_id: ORGANIZER.id, sort_order: 2, created_at: "", accepted_at: null, packed_at: null },
       ],
     }));
 
@@ -867,7 +870,7 @@ describe("Trip day page", () => {
       const section = (await screen.findByRole("heading", { name: "My equipment" })).closest("section")!;
       const rows = await within(section).findAllByRole("listitem");
       expect(rows.map((row) => row.textContent)).toEqual([
-        "Avalanche transceiverPacked", "Avalanche probe ×2Not packed yet", "Group shelterAssigned",
+        "Avalanche transceiverPacked", "Avalanche probe ×2Not packed yet", "Group shelterAssigned", "Repair kitAwaiting acceptance",
       ]);
       // No checkbox here: packing is checked on the packing list.
       expect(within(section).queryByRole("checkbox")).not.toBeInTheDocument();
@@ -1185,6 +1188,61 @@ describe("Trip day page", () => {
         .map((name) => screen.getByRole("heading", { name }));
       expect(before(screen.getByRole("heading", { name: "Getting there" }), plan_)).toBe(true);
       expect(before(plan_, conditions_) && before(conditions_, weather) && before(weather, kit) && before(kit, equipment)).toBe(true);
+    });
+  });
+
+  describe("Day checks (#212)", () => {
+    const tourDay: TripDay = { ...DAY, activity: "Backcountry" };
+    const ana: TripMember = { ...SAM, id: "member-ana", user_id: "user-2", display_name: "Ana", status: "joined", invite_token: null };
+    const plan = buildTourPlanSummary({
+      id: "plan-1", trip_id: TRIP.id, trip_day_id: DAY.id, objective: "Tuckerman Ravine", route_url: null,
+      meet_time: "06:30:00", meet_day_offset: 0, distance: null, distance_unit: null, ascent: null, ascent_unit: null,
+      duration_minutes: null, metrics_source: null, metrics_source_url: null, approach_notes: null, access_notes: null,
+      access_url: null, backup_plan: null, return_time: null, return_day_offset: 0, checkin_notes: null,
+      pickup_notes: null, time_zone: "America/New_York", revision: 1, created_by: "user-1", updated_by: "user-1",
+      created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z",
+    }, DAY.date);
+    /** The trip as the organizer reads it, with their transceiver check recorded or not. */
+    const trip = (recorded: boolean) => {
+      const base = tripFull({ stops: [STOWE_STOP], days: [tourDay], members: [ORGANIZER, ana], tour_plans: [plan], lodging: buildLodging(TRIP, [], []) });
+      const entries = recorded ? [{ id: "entry-1", entry_number: 1, trip_day_id: DAY.id, trip_member_id: ORGANIZER.id, kind: "transceiver" as const,
+        action: "recorded" as const, recorded_by: "user-1", context: { date: DAY.date, transceiver: null }, plan_revision: null,
+        time_zone: "America/New_York", created_at: "2026-10-10T10:12:00Z" }] : [];
+      return { ...base, day_checks: dayChecksFor(summarizeDayChecks({ entries, equipment: new Map() }, base), base, "user-1") };
+    };
+
+    it("puts your checks after My equipment, then the crew's, and reloads the trip to show a recorded check", async () => {
+      let reads = 0;
+      const api = fakeTripApi({
+        "GET /api/v1/trips/trip-1": () => reply(200, trip(++reads > 1)),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        "GET /api/v1/trips/trip-1/pack/equipment": reply(200, { equipment: buildTouringEquipment({ dates: [DAY.date], saved: {}, names: [], editable: true }), checks: {} }),
+        "POST /api/v1/trips/trip-1/days/2026-10-10/checks": reply(200, { entry_id: "entry-1" }),
+      });
+      vi.stubGlobal("fetch", api);
+      await renderPage();
+      const checks = await screen.findByRole("heading", { name: "Day checks" });
+      const after = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(after(screen.getByRole("heading", { name: "My equipment" }), checks)).toBe(true);
+      const crew = screen.getByRole("heading", { name: /^Crew preparation/ });
+      expect(after(checks, crew)).toBe(true);
+      expect(screen.getByText("Plan reviewed: 0 of 1 · Transceiver checks: 0 of 1")).toBeInTheDocument();
+      const transceiver = screen.getByRole("checkbox", { name: /^Transceiver check, you, / });
+      await userEvent.setup().click(transceiver);
+      await waitFor(() => expect(screen.getByRole("checkbox", { name: /^Transceiver check, you, / })).toBeChecked());
+      expect(sentBodies(api, "POST /api/v1/trips/trip-1/days/2026-10-10/checks")).toMatchObject([{ action: "record", kind: "transceiver", member_id: ORGANIZER.id }]);
+      expect(reads).toBe(2);
+    });
+
+    it("isn't shown on a day that isn't Backcountry", async () => {
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, { ...trip(false), days: [{ ...DAY, activity: "Alpine" }] }),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      await screen.findByRole("heading", { name: "My kit" });
+      expect(screen.queryByRole("heading", { name: "Day checks" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: /^Crew preparation/ })).not.toBeInTheDocument();
     });
   });
 });
