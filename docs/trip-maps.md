@@ -1,6 +1,6 @@
 # Trip map data and provider contract (#232)
 
-Implementation step 1 of [#222](https://github.com/derobertsw/swttr/issues/222). This supplies the server foundation for the shared overview map/list (#233) and daily logistics (#234). It does not add the canvas or change trip navigation. No migration or new itinerary persistence is required.
+Implementation step 1 of [#222](https://github.com/derobertsw/swttr/issues/222). This supplies the server foundation for the shared overview map/list (#233) and daily logistics (#234). It does not add the canvas or change trip navigation. No migration or new itinerary persistence is required for the map itself. A day's meet time (#333) comes from `trip_days` columns added by `20261024230000_trip_day_meet_times.sql`, applied before its API is deployed (see [trip-locations.md](trip-locations.md#deployment)).
 
 ## Saved data API
 

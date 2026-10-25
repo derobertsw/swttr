@@ -1,6 +1,6 @@
 # Selected-day road geometry and provider support (#232)
 
-Implemented October 19, 2026 on top of the map foundation delivered in #319. The existing [map/list contract](trip-maps.md) remains in place: `TripMap`, stable source identities, scoped places/days, all selectable dates, counts, timezone/provenance, candidate exclusions, and the fail-closed source loader. No new persistence model or schema migration is introduced.
+Implemented October 19, 2026 on top of the map foundation delivered in #319. The existing [map/list contract](trip-maps.md) remains in place: `TripMap`, stable source identities, scoped places/days, all selectable dates, counts, timezone/provenance, candidate exclusions, and the fail-closed source loader. No new persistence model or schema migration is introduced here. The day's `meet` (#333) reads `trip_days` columns from `20261024230000_trip_day_meet_times.sql`; before it's applied, the map shows each tour plan's meet time instead.
 
 ## API and revision binding
 
