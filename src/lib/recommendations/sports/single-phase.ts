@@ -45,13 +45,15 @@ interface SinglePhaseSportConfig {
   ): GarmentRow[];
   /** Extra fields echoed in `conditions` after temperature, wind and exertion. */
   conditions(request: RecommendationRequest): object;
-  guidance(request: RecommendationRequest, ireq: IreqResult): string[];
+  guidance(request: RecommendationRequest, ireq: IreqResult, ensemble?: GarmentRow[], targets?: SinglePhaseTargets): string[];
   /** Retain functional protection when a calibrated budget changes. */
   protect?(ensemble: GarmentRow[], categorized: CategorizedGarments, targets: SinglePhaseTargets): { ensemble: GarmentRow[]; warnings: string[] };
   /** Air permeability of the outer layer this sport dresses in these conditions, l/(m²·s). */
   outerAirPermeability(request: RecommendationRequest): number;
   /** Requirement-first flow: report suitable-clothing needs separately from wardrobe matches. */
   requirementFirst?: boolean;
+  /** Selector has already assessed suitability of the complete outfit. */
+  completeOutfit?: boolean;
   /** Whether the torso requirement includes a wind layer for this request. */
   windTorsoRequirement?(request: RecommendationRequest): boolean;
 }
@@ -104,7 +106,7 @@ export function createSinglePhaseSport(
           protection: targets.policy?.protection,
         }
         : undefined;
-      const ensemble = functional ? filterUnsuitableEnsemble(builtEnsemble, targets.regional, functional) : builtEnsemble;
+      const ensemble = functional && !config.completeOutfit ? filterUnsuitableEnsemble(builtEnsemble, targets.regional, functional) : builtEnsemble;
       const accessories = selectPhaseAccessories(config.activity, targets, pool, request.tempC, ensemble);
       const { handwear, headwear } = accessories;
       // Scoring, the echoed targets and manual edits share the upper limits
@@ -144,6 +146,7 @@ export function createSinglePhaseSport(
           handwear: pool.handwear, headwear: pool.headwear,
           ownership: { garments: pool.usingWardrobe, handwear: pool.handwearOwned ?? false, headwear: pool.headwearOwned ?? false },
           functional,
+          ...(config.completeOutfit ? { selectedGarments: ensemble } : {}),
           accessories: accessories.assessments,
           selectedIds: new Set([...ensemble.map((g) => g.id), handwear?.id, headwear.headWarmth?.id, headwear.neckWarmth?.id].filter((id): id is string => Boolean(id))),
         })
@@ -160,7 +163,7 @@ export function createSinglePhaseSport(
         ...(requirements ? { requirements } : {}),
         recommendation,
         warnings: [...warnings, ...(protectedOutfit?.warnings ?? []), ...accessories.warnings],
-        guidance: [...new Set([...config.guidance(request, targets.basicIreq), ...missingGuidance,
+        guidance: [...new Set([...config.guidance(request, targets.basicIreq, ensemble, targets), ...missingGuidance,
           ...Object.values(accessories.assessments ?? {}).map(assessment => assessment.message),
           ...(targets.policy?.assumptions ?? [])])],
       };

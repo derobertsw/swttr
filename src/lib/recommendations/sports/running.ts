@@ -1,85 +1,37 @@
-/**
- * Running: breathability first, with shells only when the runner is under
- * the IREQ minimum, conditions are very cold, or it is wet.
- */
-import type { CategorizedGarments, GarmentRow } from '../types';
-import { createSinglePhaseSport } from './single-phase';
-import { buildBreathableEnsemble } from './breathable-ensemble';
-import { retainRunningProtection } from './running-protection';
+/** Running selects a complete moving outfit before evaluating accessories. */
 import { OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
+import { createSinglePhaseSport } from './single-phase';
+import { buildRunningEnsemble, runningProtectionWarnings, runningRegionMatches } from './running-outfit';
+
+export { buildRunningEnsemble } from './running-outfit';
 
 const MIN_EVAP_POTENTIAL = 0.3;
 
-/**
- * Build a garment ensemble for running, prioritizing breathability.
- * Selects base layers, mid-layers, and shells for torso and legs
- * while respecting IREQ targets and preventing duplicate garments.
- */
-export function buildRunningEnsemble(
-  categorized: CategorizedGarments,
-  ireq: { ireqMin: number; ireqNeutral: number },
-  maxClo: number,
-  minEvapPotential: number,
-  precipitation = false
-): GarmentRow[] {
-  return buildBreathableEnsemble(
-    categorized,
-    ireq,
-    maxClo,
-    minEvapPotential,
-    (currentClo) => currentClo < ireq.ireqMin || ireq.ireqMin > 1.0 || precipitation
-  );
-}
-
-function getRunningGuidance(
-  tempC: number,
-  ireq: { ireqMin: number; ireqNeutral: number },
-  precipitation = false
-): string[] {
-  const guidance: string[] = [];
-
-  if (tempC > 0) {
-    guidance.push('Mild conditions - focus on breathability');
-  } else if (tempC > -10) {
-    guidance.push('Cool conditions - light insulation + wind protection');
-  } else {
-    guidance.push('Cold conditions - add a light midlayer and wind shell');
-  }
-
-  if (ireq.ireqNeutral < 1.0) {
-    guidance.push('Avoid over-layering to prevent overheating');
-  }
-
-  if (precipitation) {
-    guidance.push('Wet conditions - wear a water-resistant outer layer');
-  }
-
-  return guidance;
-}
-
 export const running = createSinglePhaseSport({
   requirementFirst: true,
+  completeOutfit: true,
   activity: 'running',
   profile: { name: 'Running', windExposure: 'normal' },
-  // Match the weakest protection retainRunningProtection accepts. A wet-only
-  // requirement accepts water-resistant fabric without a wind rating, so it
-  // cannot establish any reduction in air permeability. When wind protection
-  // is required, wind-resistant (not necessarily windproof) fabric qualifies.
-  // Keep targets independent of wardrobe ownership or a particular shell.
+  // Retain the current server exposure policy independently of wardrobe selection.
   outerAirPermeability: ({ tempC, windMs }) => tempC <= 0 || windMs > 8
     ? OUTER_AIR_PERMEABILITY.windResistant : OUTER_AIR_PERMEABILITY.open,
   minEvapPotential: MIN_EVAP_POTENTIAL,
-  protect: (ensemble, categorized, targets) => targets.policy
-    ? retainRunningProtection(ensemble, categorized, targets.policy.protection)
-    : { ensemble, warnings: [] },
-  buildEnsemble: (categorized, targets, request) =>
-    buildRunningEnsemble(
-      categorized,
-      targets.basicIreq,
-      targets.targetRange[1],
-      MIN_EVAP_POTENTIAL,
-      request.precipitation
-    ),
+  protect: (ensemble, _categorized, targets) => ({ ensemble, warnings: runningProtectionWarnings(ensemble, targets) }),
+  buildEnsemble: (categorized, targets) => buildRunningEnsemble(categorized, targets, MIN_EVAP_POTENTIAL),
   conditions: (request) => ({ precipitation: request.precipitation }),
-  guidance: (request, ireq) => getRunningGuidance(request.tempC, ireq, request.precipitation),
+  guidance: (_request, _ireq, ensemble, targets) => {
+    if (!ensemble || !targets) return ['Choose a running top and shorts or standalone tights to meet the moving-phase targets.'];
+    const incomplete = !runningRegionMatches(ensemble, targets, 'torso') || !runningRegionMatches(ensemble, targets, 'legs');
+    const names = ensemble.map(g => `${g.brand} ${g.model_name}`).join(', ');
+    const guidance = ensemble.length
+      ? [incomplete
+        ? `Best available clothing while running: ${names}. This outfit still has clothing gaps; see the requirements for what remains needed.`
+        : `While running, wear: ${names}.`]
+      : ['No available clothing forms a suitable moving outfit; fill the clothing gaps below.'];
+    if (ensemble.some(g => g.garment_type === 'shorts')) guidance.push('Shorts intentionally leave the lower legs exposed; their regional insulation includes that exposure.');
+    if (ensemble.some(g => g.garment_type === 'top_short_sleeve')) guidance.push('Short sleeves intentionally leave part of the arms exposed.');
+    if (targets.policy?.protection.wet) guidance.push('Wet conditions require rain protection as well as suitable insulation.');
+    else if (targets.policy?.protection.wind) guidance.push('Cold or windy conditions require wind protection as well as suitable insulation.');
+    return guidance;
+  },
 });

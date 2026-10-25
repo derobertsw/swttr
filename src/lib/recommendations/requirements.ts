@@ -10,6 +10,7 @@ import type { GarmentRow, HandwearRow, HeadwearRow } from './types';
 import { garmentCapabilities, hasUsableThermalData } from './garment-semantics';
 import { HEAD_WARMTH_TYPES } from './extremities';
 import type { PhaseTargets } from './thermal-targets';
+import { runningBasic, runningRegionMatches, runningRegionIssues, runningRequirementLabel } from './sports/running-outfit';
 
 const CLO_MARGIN = 0.15;
 const EXTREMITY_NEEDED_CLO = 0.05;
@@ -104,6 +105,7 @@ interface RequirementPool {
   ownership: { garments: boolean; handwear: boolean; headwear: boolean };
   functional?: FunctionalNeeds;
   selectedIds?: ReadonlySet<string>;
+  selectedGarments?: GarmentRow[];
   accessories?: AccessoryAssessments;
 }
 
@@ -118,6 +120,23 @@ export function buildClothingRequirements(
 
   for (const region of ['torso', 'legs'] as const) {
     const neutral = targets.regional.neutral[region];
+    if (activity === 'running' && (pool.selectedGarments || pool.garments.length === 0)) {
+      const selected = pool.selectedGarments ?? [];
+      const matched = runningRegionMatches(selected, targets, region) ? runningBasic(selected, region) : undefined;
+      const result = requirement(activity, region, runningRequirementLabel(targets, region), neutral, matched, pool.ownership.garments);
+      const names = selected.filter(g => g[`covers_${region}`]).map(g => `${g.brand} ${g.model_name}`).join(' + ');
+      if (matched) {
+        result.matched_garment_name = names;
+        result.message = `${result.label} — ${pool.ownership.garments ? 'matched in your wardrobe' : 'suggested (not in your wardrobe)'}: ${names}`;
+      } else if (runningBasic(selected, region)) {
+        // Missing refers to the ideal requirement, not to ownership of the
+        // best available clothing that is actually selected and evaluated.
+        const source = pool.ownership.garments ? 'in your wardrobe' : 'from the catalog (not owned)';
+        result.message = `${result.label} — best available ${source}: ${names}; ${runningRegionIssues(selected, targets, region).join('; ')}. Additional or alternative clothing is needed to meet this requirement.`;
+      }
+      requirements.push(result);
+      continue;
+    }
     let label = labels[region][neutral < 0.2 ? 'light' : 'standard'];
     if (activity === 'xc_skiing' && region === 'torso' && !pool.functional?.torsoWind) label = 'Breathable Nordic top';
     const candidates = pool.garments.filter((g) => isSuitableForRegion(g, region, targets.regional, pool.functional));
