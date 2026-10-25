@@ -2,19 +2,43 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Check, Circle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
+import { packingDay } from "@/components/trips/TripPacking";
+import { sectionLabelClassName } from "@/components/trips/trip-primitives";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { equipmentKey, withEquipmentChoices } from "@/lib/touring-equipment";
-import { errorMessage, tripRequest } from "@/lib/trip-requests";
+import { errorMessage, tripRequest, TripRequestError } from "@/lib/trip-requests";
 import type {
-  EquipmentTemplateOption, PackingChange, PackingChoices, TouringEquipment, TripEquipmentResponse,
+  EquipmentTemplateOption, PackingChange, PackingChoices, SharedTouringAdded, SharedTouringTemplate, TouringEquipment,
+  TripEquipmentResponse,
 } from "@/types/trip-packing";
 import type { TripGroupGear } from "@/types/trips";
 
 const GEAR_GUIDANCE_URL = "https://avalanche.org/avalanche-tutorial/get-the-gear.php";
+
+/** The preview's words: for a person's own packing list, or the trip's shared gear. */
+const SHEET_COPY = {
+  personal: {
+    title: "Touring equipment",
+    description: "For your Backcountry days. Nothing is added to your packing list until you choose Add selected items.",
+    inList: "Already in your list",
+    listedAs: "in your list as",
+    nothingToAdd: "Everything on this list is in yours.",
+    guidance: "These are packing suggestions, not a complete safety assessment. The rescue gear follows the National Avalanche Center's guidance: always carry a transceiver, probe and shovel, and know how to use them.",
+  },
+  shared: {
+    title: "Shared touring items",
+    description: "For the group on the trip's Backcountry days. Nothing is added to shared gear until you choose Add selected items. Added items start unassigned, so you can choose who's bringing each one.",
+    inList: "Already in shared gear",
+    listedAs: "in shared gear as",
+    nothingToAdd: "Everything on this list is in shared gear.",
+    guidance: "These are suggestions for the group, not a complete safety assessment. Shared items don't replace anyone's own rescue gear: following the National Avalanche Center's guidance, each person carries their own transceiver, probe and shovel, and knows how to use them.",
+  },
+} as const;
 
 /** What the preview starts with: the suggested additions that aren't in the list. */
 const preselected = (template: EquipmentTemplateOption[]) =>
@@ -34,10 +58,13 @@ function Purpose({ option }: { option: EquipmentTemplateOption }) {
 /**
  * Add touring equipment (#212): the template as the person's list stands, in
  * groups, and Add selected items. Nothing is added until they choose it.
- * Render it to open it; it closes itself, then calls `onClosed`.
+ * With `kind` "shared", the shared touring items template as the trip's
+ * shared gear stands, for the organizer. Render it to open it; it closes
+ * itself, then calls `onClosed`.
  */
-export function EquipmentTemplateSheet({ equipment, onAdd, onClosed, onCloseAutoFocus }: {
-  equipment: TouringEquipment;
+export function EquipmentTemplateSheet({ equipment, kind = "personal", onAdd, onClosed, onCloseAutoFocus }: {
+  equipment: Pick<TouringEquipment, "template">;
+  kind?: keyof typeof SHEET_COPY;
   /** Saves the selected items; resolves with an error to show, or null once they're added. */
   onAdd: (ids: string[]) => Promise<string | null>;
   /** Once it has closed, so the opener can unmount it. */
@@ -45,6 +72,7 @@ export function EquipmentTemplateSheet({ equipment, onAdd, onClosed, onCloseAuto
   onCloseAutoFocus?: (event: Event) => void;
 }) {
   const errorId = useId();
+  const copy = SHEET_COPY[kind];
   const [selected, setSelected] = useState(() => preselected(equipment.template));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,10 +125,8 @@ export function EquipmentTemplateSheet({ equipment, onAdd, onClosed, onCloseAuto
     <TripSheet open={!closed} busy={saving} onClose={close} className="sm:max-w-lg"
       onCloseAutoFocus={(event) => { onCloseAutoFocus?.(event); onClosed(); }}
       header={<>
-        <TripSheetTitle>Touring equipment</TripSheetTitle>
-        <TripSheetDescription>
-          For your Backcountry days. Nothing is added to your packing list until you choose Add selected items.
-        </TripSheetDescription>
+        <TripSheetTitle>{copy.title}</TripSheetTitle>
+        <TripSheetDescription>{copy.description}</TripSheetDescription>
       </>}
       footer={nothingToAdd ? (
         <Button type="button" variant="outline" onClick={close}>Close</Button>
@@ -114,13 +140,13 @@ export function EquipmentTemplateSheet({ equipment, onAdd, onClosed, onCloseAuto
       <div className="space-y-5">
         {inList.length > 0 && (
           <section aria-labelledby={`${errorId}-in-list`}>
-            <h3 id={`${errorId}-in-list`} className="text-base font-semibold text-foreground">Already in your list</h3>
+            <h3 id={`${errorId}-in-list`} className="text-base font-semibold text-foreground">{copy.inList}</h3>
             <ul className="mt-1 space-y-1">
               {inList.map((option) => (
                 <li key={option.id} className="break-words text-base text-foreground">
                   {option.name}
                   {option.state === "listed" && option.listedAs && (
-                    <span className="text-muted-foreground"> · in your list as {option.listedAs}</span>
+                    <span className="text-muted-foreground"> · {copy.listedAs} {option.listedAs}</span>
                   )}
                 </li>
               ))}
@@ -149,11 +175,10 @@ export function EquipmentTemplateSheet({ equipment, onAdd, onClosed, onCloseAuto
           </fieldset>
         ))}
 
-        {nothingToAdd && <p className="text-base text-foreground">Everything on this list is in yours.</p>}
+        {nothingToAdd && <p className="text-base text-foreground">{copy.nothingToAdd}</p>}
 
         <p className="text-sm text-muted-foreground">
-          These are packing suggestions, not a complete safety assessment. The rescue gear follows the National Avalanche
-          Center&apos;s guidance: always carry a transceiver, probe and shovel, and know how to use them.{" "}
+          {copy.guidance}{" "}
           <a href={GEAR_GUIDANCE_URL} target="_blank" rel="noopener noreferrer"
             className="font-medium text-foreground underline underline-offset-2">
             Read the gear guidance<span className="sr-only"> (opens in a new tab)</span>
@@ -288,6 +313,95 @@ export function DayEquipment({ tripId, gear, memberId }: {
       {data && adding && (
         <EquipmentTemplateSheet equipment={data.equipment} onAdd={add}
           onClosed={() => setAdding(false)} onCloseAutoFocus={focus.restore} />
+      )}
+    </section>
+  );
+}
+
+/** "First aid kit", "First aid kit and Repair kit", "A, B and C". */
+const joinNames = (names: string[]) => names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+
+/**
+ * Shared touring items (#212), for the organizer on the shared gear page. On
+ * a trip with Backcountry days, Add shared touring items previews the
+ * template's group items as shared gear stands. Added items start
+ * unassigned, for the organizer to assign in the list (#179).
+ */
+export function SharedTouringItems({ tripId, onAdded }: {
+  tripId: string;
+  /** Reloads shared gear; resolves false when the latest list couldn't be loaded. */
+  onAdded: () => Promise<boolean>;
+}) {
+  const url = `/api/v1/trips/${tripId}/gear/touring`;
+  const [touring, setTouring] = useState<SharedTouringTemplate | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState("");
+  const button = useRef<HTMLButtonElement>(null);
+  const focus = useReturnFocus();
+
+  // Whether the trip has Backcountry days; opening the preview reads it again.
+  useEffect(() => {
+    let cancelled = false;
+    tripRequest<SharedTouringTemplate>(url)
+      .then((body) => { if (!cancelled) setTouring(body); })
+      // Without it there's nothing to offer, and the rest of shared gear works as before.
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [url]);
+
+  const openPreview = async () => {
+    if (opening) return;
+    focus.remember(() => button.current);
+    setOpening(true);
+    setStatus("");
+    try {
+      setTouring(await tripRequest<SharedTouringTemplate>(url));
+      setOpen(true);
+    } catch (err) {
+      focus.forget();
+      toast.error("Couldn't load shared touring items", { description: errorMessage(err) });
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  const add = async (ids: string[]): Promise<string | null> => {
+    try {
+      const { added } = await tripRequest<SharedTouringAdded>(url, "POST", { ids });
+      const loaded = await onAdded();
+      const what = added.length === 1 ? "1 item" : `${added.length} items`;
+      setStatus(added.length === 0 ? "Those items are already in shared gear."
+        : loaded ? `Added ${what} to shared gear. Choose who's bringing each one.`
+        : `Added ${what} to shared gear, but the latest list couldn't be loaded. Refresh shared gear to see them.`);
+      return null;
+    } catch (err) {
+      const added = err instanceof TripRequestError && Array.isArray(err.details?.added) ? err.details.added as string[] : [];
+      // Read shared gear again, so the preview can't offer an item that was added.
+      await Promise.allSettled([onAdded(), tripRequest<SharedTouringTemplate>(url).then(setTouring)]);
+      return added.length > 0
+        ? `Added ${joinNames(added)}, but couldn't add the rest: ${errorMessage(err)}`
+        : `Couldn't add the items: ${errorMessage(err)}`;
+    }
+  };
+
+  if (!touring || (touring.dates.length === 0 && !open)) return null;
+  return (
+    <section aria-labelledby="shared-touring-heading">
+      <h2 id="shared-touring-heading" className={sectionLabelClassName}>Shared touring items</h2>
+      {touring.dates.length > 0 && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          Group items for the Backcountry days: {touring.dates.map(packingDay).join(", ")}.
+        </p>
+      )}
+      <Button ref={button} type="button" variant="outline" className="mt-3" loading={opening} onClick={() => void openPreview()}>
+        {!opening && <Plus aria-hidden="true" />}
+        Add shared touring items
+      </Button>
+      <p role="status" className={`break-words text-sm text-muted-foreground${status ? " mt-2" : ""}`}>{status}</p>
+      {open && (
+        <EquipmentTemplateSheet equipment={touring} kind="shared" onAdd={add}
+          onClosed={() => setOpen(false)} onCloseAutoFocus={focus.restore} />
       )}
     </section>
   );
