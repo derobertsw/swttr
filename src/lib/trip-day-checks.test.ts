@@ -15,13 +15,13 @@ import type { TripDay, TripFull, TripLocation, TripMember, TripStop, TripTourPla
 
 const FRI = "2027-02-12", SAT = "2027-02-13", SUN = "2027-02-14", MON = "2027-02-15";
 const point = (latitude: number): TripLocation => ({ label: "Rogers Pass lot", address: null, latitude, longitude: -117.52, precision: "exact",
-  time_zone: "America/Vancouver", source: "manual", provider: null, provider_id: null, attribution: null });
+  time_zone: "America/Los_Angeles", source: "manual", provider: null, provider_id: null, attribution: null });
 const stop: TripStop = { id: "stop-1", trip_id: "trip-1", position: 0, name: "Rogers Pass", latitude: 51.3, longitude: -117.52,
   activities: ["Backcountry"], created_at: "2027-01-01T00:00:00Z", access_point: point(51.301) };
 const day = (id: string, date: string, activity: string | null = null): TripDay => ({ id, trip_id: "trip-1", stop_id: null, date, activity });
 const plan = (extra: Partial<TripTourPlanSummary> = {}) => ({
   trip_day_id: "day-sat", objective: "Asulkan Valley", route_url: "https://example.com/asulkan", backup_plan: "Glacier Crest trees",
-  meet_time: "06:30:00", meet_day_offset: 0, return_time: "15:00:00", return_day_offset: 0, time_zone: "America/Vancouver",
+  meet_time: "06:30:00", meet_day_offset: 0, return_time: "15:00:00", return_day_offset: 0, time_zone: "America/Los_Angeles",
   approach_notes: "Skin the old road", distance: 12, distance_unit: "km", revision: 2, ...extra,
 }) as TripTourPlanSummary;
 const member = (id: string, name: string, user: string | null, status: TripMember["status"], role: TripMember["role"] = "member"): TripMember =>
@@ -38,7 +38,7 @@ const full = (extra: Partial<TripFull> = {}): TripFull => ({ trip, stops: [stop]
 let entryNumber = 0;
 const row = (extra: Partial<DayCheckRows["entries"][number]> & Pick<DayCheckRows["entries"][number], "trip_member_id" | "kind" | "context">) => ({
   id: `entry-${++entryNumber}`, entry_number: entryNumber, trip_day_id: "day-sat", action: "recorded" as const, recorded_by: "user-2",
-  plan_revision: extra.kind === "plan_review" ? 2 : null, time_zone: "America/Vancouver", created_at: "2027-02-13T14:12:00Z", ...extra,
+  plan_revision: extra.kind === "plan_review" ? 2 : null, time_zone: "America/Los_Angeles", created_at: "2027-02-13T14:12:00Z", ...extra,
 });
 const planNow = planReviewContext(full(), days[1]);
 
@@ -101,8 +101,8 @@ describe("dayCheckStaleReasons", () => {
 
 describe("checkTimeLabel", () => {
   it("shows the time on the destination's clock, or in UTC without its zone", () => {
-    expect(checkTimeLabel("2027-02-13T14:12:00Z", "America/Vancouver")).toBe("6:12 AM PST · Sat Feb 13");
-    expect(checkTimeLabel("2027-02-13T07:30:00Z", "America/Vancouver")).toBe("11:30 PM PST · Fri Feb 12");
+    expect(checkTimeLabel("2027-02-13T14:12:00Z", "America/Los_Angeles")).toBe("6:12 AM PST · Sat Feb 13");
+    expect(checkTimeLabel("2027-02-13T07:30:00Z", "America/Los_Angeles")).toBe("11:30 PM PST · Fri Feb 12");
     expect(checkTimeLabel("2027-02-13T14:12:00Z", null)).toBe("2:12 PM UTC · Sat Feb 13");
   });
 });
