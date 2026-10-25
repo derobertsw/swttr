@@ -13,7 +13,7 @@ import { buildRunningEnsemble, running } from './running';
 import { requiredBasicInsulation, walkingSpeedFromMetabolicRate } from "@/lib/biophysics/ireq";
 import { createFakeSupabase } from "@/test/fakeSupabase";
 import type { RecommendationRequest } from "../request";
-import { runningBasic, runningProtection, runningProtectionWarnings, runningRegionMatches } from './running-outfit';
+import { runningBasic, runningProtection, runningProtectionWarnings, runningRegionMatches, runningRegionIssues } from './running-outfit';
 
 const garments = catalog.garments as GarmentRow[];
 const tee = garments.find(g => g.garment_type === 'top_short_sleeve')!;
@@ -79,6 +79,23 @@ describe('complete running outfits', () => {
     const outfit = select([tee, rainShorts, fakeShell], t);
     expect(runningProtectionWarnings(outfit, t)).toHaveLength(2);
     expect(runningProtection(outfit, 'legs', t.policy!.protection)).toBe(false);
+  });
+
+  it.each([
+    { name: 'wind only missing', protection: { waterproof_rating: 'water_resistant' }, missing: ['wind'] },
+    { name: 'rain only missing', protection: { windproof_rating: 'windproof' }, missing: ['wet'] },
+    { name: 'both missing', protection: {}, missing: ['wind', 'wet'] },
+    { name: 'both provided', protection: { windproof_rating: 'windproof', waterproof_rating: 'waterproof' }, missing: [] },
+  ])('names each unmet protection kind when wind and rain are required: $name', ({ protection, missing }) => {
+    const t = targets(-1, 'moderate', 9, true);
+    t.regional = { min: { torso: 0, arms: 0, legs: 0 }, neutral: { torso: 2, arms: 2, legs: 2 } };
+    const outfit = [tee, tights].map(g => ({ ...g, garment_protection: protection }));
+    expect(runningProtectionWarnings(outfit, t)).toEqual(['torso', 'legs'].flatMap(region =>
+      missing.map(kind => `Available clothing does not provide the required ${kind} protection for ${region}.`)));
+    for (const region of ['torso', 'legs'] as const) {
+      expect(runningRegionIssues(outfit, t, region)).toEqual(missing.map(kind =>
+        `still missing required ${kind === 'wet' ? 'rain' : 'wind'} protection for ${region}`));
+    }
   });
 
   it('reports ideal basics as missing with only heavy thermal underwear', () => {
@@ -243,6 +260,52 @@ describe('complete running outfits', () => {
     expect(runningRegionMatches(outfit, t, 'legs')).toBe(true);
     const props = predictEnsembleThermal(ensembleToThermalGarments(outfit));
     expect(props.rcl.leg).toBeCloseTo((0.06 + 0.15) * 0.961, 12);
+  });
+
+  it('uses arm insulation on a garment covering arms and legs to meet the complete outfit targets', () => {
+    const armLeg: GarmentRow = { ...tights, id: 'zz-arm-leg', covers_arms: true, coverage_arms: 1,
+      garment_thermal_properties: { ...tights.garment_thermal_properties, rcl_arms: 0.45, recl_arms: 1 } };
+    const t = targets();
+    t.targetRange = [0.1, 0.3];
+    t.regional = { min: { torso: 0.03, arms: 0.25, legs: 0.15 }, neutral: { torso: 0.2, arms: 0.45, legs: 0.35 } };
+    const outfit = select([tee, tights, armLeg], t);
+    expect(ids(outfit).sort()).toEqual([tee.id, armLeg.id].sort());
+    expect(runningRegionMatches(outfit, t, 'torso')).toBe(true);
+    expect(runningRegionMatches(outfit, t, 'legs')).toBe(true);
+    const props = predictEnsembleThermal(ensembleToThermalGarments(outfit));
+    expect(props.rcl.arm).toBeCloseTo((0.02 + 0.45) * 0.809, 12);
+  });
+
+  it('does not hide overheavy arm insulation in a breathable leg candidate', () => {
+    const armLeg: GarmentRow = { ...shorts, id: '000-overheated-arms', covers_arms: true, coverage_arms: 1,
+      garment_thermal_properties: { ...shorts.garment_thermal_properties, rcl_arms: 1.5, recl_arms: 0.1, recl_legs: 0.01 } };
+    const outfit = select([tee, shorts, armLeg], targets(22, 'hard', 1));
+    expect(ids(outfit).sort()).toEqual([tee.id, shorts.id].sort());
+  });
+
+  it('uses arm evaporative resistance when ranking arm-and-leg alternatives', () => {
+    const armLeg: GarmentRow = { ...tights, covers_arms: true, coverage_arms: 1,
+      garment_thermal_properties: { ...tights.garment_thermal_properties, rcl_arms: 0.1, recl_arms: 100 } };
+    const stuffy = { ...armLeg, id: '000-stuffy-arms' };
+    const breathable: GarmentRow = { ...armLeg, id: 'zz-breathable-arms',
+      garment_thermal_properties: { ...armLeg.garment_thermal_properties, recl_arms: 0.1 } };
+    const t = targets();
+    t.targetRange = [0, 0.5];
+    t.regional = { min: { torso: 0, arms: 0, legs: 0 }, neutral: { torso: 0.5, arms: 0.5, legs: 0.5 } };
+    const outfit = select([tee, stuffy, breathable], t);
+    expect(ids(outfit).sort()).toEqual([tee.id, breathable.id].sort());
+  });
+
+  it('can keep arm-and-leg clothing when a standalone torso basic is absent', () => {
+    const armLeg: GarmentRow = { ...tights, id: 'arm-leg-only', covers_arms: true, coverage_arms: 1,
+      garment_thermal_properties: { ...tights.garment_thermal_properties, rcl_arms: 0.25, recl_arms: 1 } };
+    const t = targets();
+    t.targetRange = [0.1, 0.4];
+    t.regional = { min: { torso: 0.03, arms: 0.1, legs: 0.15 }, neutral: { torso: 0.2, arms: 0.4, legs: 0.35 } };
+    const outfit = select([armLeg], t);
+    expect(ids(outfit)).toEqual([armLeg.id]);
+    expect(runningBasic(outfit, 'torso')).toBeUndefined();
+    expect(runningBasic(outfit, 'legs')?.id).toBe(armLeg.id);
   });
 
   it.each([true, false])('explains best available clothing that still misses a target, owned=%s', owned => {

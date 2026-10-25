@@ -44,6 +44,14 @@ export function runningProtection(ensemble: GarmentRow[], region: Region, needs:
     && (!needs.wet || ensemble.some(g => fullCoverage(g) && garmentCapabilities(g).wet));
 }
 
+/** Check each requested property independently so a wet garment cannot
+ * cause a missing wind layer to be described as missing rain protection. */
+function missingProtection(ensemble: GarmentRow[], region: Region, needs: Protection): Array<'wind' | 'wet'> {
+  return (['wind', 'wet'] as const).filter(kind => needs[kind] && !runningProtection(ensemble, region, {
+    ...needs, wind: kind === 'wind', wet: kind === 'wet',
+  }));
+}
+
 function runningOutfitProperties(ensemble: GarmentRow[]) {
   return predictEnsembleThermal(ensembleToThermalGarments(ensemble));
 }
@@ -81,8 +89,9 @@ export function runningRegionIssues(ensemble: GarmentRow[], targets: PhaseTarget
     if (clo[part] < Math.max(0, targets.regional.min[part] - THERMAL_DISPLAY_CLO_EPSILON)) issues.push(`still below the insulation target for ${part}`);
     if (clo[part] > targets.regional.neutral[part] + excessMargin(ensemble.some(g => (g[`coverage_${part}`] ?? 0) > 0.65), targets, part)) issues.push(`still above the suitable warmth range for ${part}`);
   }
-  if (targets.policy && !runningProtection(ensemble, region, targets.policy.protection)) {
-    issues.push(`still missing required ${targets.policy.protection.wet ? 'rain' : 'wind'} protection for ${region}`);
+  if (targets.policy) {
+    issues.push(...missingProtection(ensemble, region, targets.policy.protection).map(kind =>
+      `still missing required ${kind === 'wet' ? 'rain' : 'wind'} protection for ${region}`));
   }
   return issues;
 }
@@ -92,6 +101,7 @@ export function runningRegionMatches(ensemble: GarmentRow[], targets: PhaseTarge
 }
 
 interface SearchTotals {
+  coversMask: number;
   basicMask: number;
   windMask: number;
   wetMask: number;
@@ -113,7 +123,7 @@ interface SearchItem {
 }
 
 const EMPTY_TOTALS: SearchTotals = {
-  basicMask: 0, windMask: 0, wetMask: 0, waterproofMask: 0, fullMask: 0,
+  coversMask: 0, basicMask: 0, windMask: 0, wetMask: 0, waterproofMask: 0, fullMask: 0,
   torso: 0, arms: 0, legs: 0, torsoWhole: 0, legsWhole: 0, count: 0, unbreathable: 0,
 };
 
@@ -121,6 +131,7 @@ function extendTotals(previous: SearchTotals, item: SearchItem | undefined): Sea
   if (!item) return previous;
   const next = item.totals;
   return {
+    coversMask: previous.coversMask | next.coversMask,
     basicMask: previous.basicMask | next.basicMask,
     windMask: previous.windMask | next.windMask,
     wetMask: previous.wetMask | next.wetMask,
@@ -213,6 +224,7 @@ function searchItem(garment: GarmentRow, thermal: ThermalGarment, minEvapPotenti
   const torso = predictEnsembleThermal([regionalThermal([{ thermal }], 'torso')]);
   const legs = predictEnsembleThermal([regionalThermal([{ thermal }], 'legs')]);
   return { garment, thermal, totals: {
+    coversMask: (garment.covers_torso ? 1 : 0) | (garment.covers_legs ? 4 : 0),
     basicMask, windMask, wetMask, waterproofMask, fullMask,
     torso: torso.rcl.torso, arms: torso.rcl.arm, legs: legs.rcl.leg,
     torsoWhole: torso.rcl.wholeBody, legsWhole: legs.rcl.wholeBody, count: 1,
@@ -246,7 +258,8 @@ function regionalChoices(
         if (outer && ((base && !compatible(base.garment, outer.garment)) || (mid && !compatible(mid.garment, outer.garment)))) continue;
         // Reject unsupported underwear before allocating/predicting an outfit.
         const basic = Boolean((partial.basicMask | (outer?.totals.basicMask ?? 0)) & mask);
-        if (!basic && (partial.count || outer)) continue;
+        const coversRegion = Boolean((partial.coversMask | (outer?.totals.coversMask ?? 0)) & mask);
+        if (!basic && coversRegion) continue;
         const totals = extendTotals(partial, outer);
         let deficit = 0, excess = 0, severeExcess = 0;
         for (const part of parts) {
@@ -302,7 +315,11 @@ export function buildRunningEnsemble(
   const candidates = [...unique.values()];
   const converted = ensembleToThermalGarments(candidates);
   const items = candidates.map((garment, i) => searchItem(garment, converted[i], minEvapPotential));
-  const shared = items.filter(item => item.garment.covers_torso && item.garment.covers_legs);
+  // Arm insulation belongs to the upper projection even if the garment
+  // covers legs but not torso. Fix these items before regional pruning too;
+  // adding their arms only to the leg projection would still hide local
+  // arm warmth/shortfalls when ranking the upper outfit.
+  const shared = items.filter(item => item.garment.covers_legs && (item.garment.covers_torso || item.garment.covers_arms));
   const separate = items.filter(item => !shared.includes(item));
   const sharedPools = [0, 1, 2].map(layer => [undefined, ...shared.filter(item => slot(item.garment) === layer)]);
   const needs = targets.policy?.protection ?? { wind: false, wet: false, poleGrip: false };
@@ -341,6 +358,6 @@ export function buildRunningEnsemble(
 export function runningProtectionWarnings(ensemble: GarmentRow[], targets: PhaseTargets): string[] {
   const needs = targets.policy?.protection;
   if (!needs) return [];
-  return REGIONS.filter(r => !runningProtection(ensemble, r, needs))
-    .map(r => `Available clothing does not provide the required ${needs.wet ? 'wet' : 'wind'} protection for ${r}.`);
+  return REGIONS.flatMap(region => missingProtection(ensemble, region, needs)
+    .map(kind => `Available clothing does not provide the required ${kind} protection for ${region}.`));
 }
