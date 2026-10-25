@@ -6,6 +6,7 @@ import { loadMemberDayOrigins, supabaseDriveStore, tripDriveEstimates } from "@/
 import { TOUR_ACTIVITY } from "@/lib/trip-activities";
 import { buildLodging, dateLabel, loadLodging } from "@/lib/trip-lodging";
 import { accessPointFor } from "@/lib/trip-location";
+import { buildDayMeets } from "@/lib/trip-meets";
 import { loadTourPlans, summarizeTourPlans } from "@/lib/trip-tour-plans";
 import type { Trip, TripDay, TripDriveEstimates, TripDriveRoute, TripFull, TripLocation, TripStop } from "@/types/trips";
 import type { TripMap, TripMapDay, TripMapDeparture, TripMapDrive, TripMapGeometry, TripMapPerson, TripMapPlace, TripMapRole, TripMapSource } from "@/types/trip-map";
@@ -97,6 +98,7 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
     // plan is in use only on a touring day; otherwise it's kept but not planned (#210).
     const activity = day?.activity ?? stop?.activities[0] ?? null;
     const tour = activity === TOUR_ACTIVITY ? full.tour_plans?.find((entry) => entry.trip_day_id === id) : undefined;
+    const meet = full.meets?.find((entry) => entry.date === plan.date);
     const estimate = estimates.days.find((entry) => entry.date === plan.date);
     if (!estimate) throw new Error("Missing map drive state");
     const { departures: routes, ...drive } = estimate;
@@ -143,12 +145,13 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
       id, date: plan.date, date_label: dateLabel(plan.date), activity,
       destination_place_id: destinationId, origin_place_id: originId, access_place_id: accessId, tonight_place_id: tonightId,
       crew_stay_place_id: crewStayId,
-      meeting_place_id: tour ? accessId : null,
+      // The crew meets at the access point on a tour, or whenever the day has a meet time (#333).
+      meeting_place_id: tour || meet ? accessId : null,
       starting_from: plan.origin?.label ?? "Not set", staying_tonight: context.staying_tonight,
       tonight_status: lodging.nights.find((night) => night.date === plan.date)?.status ?? "unplanned",
       pickup: { place_id: null, state: tour?.pickup_notes ? "notes_only" : "not_set", notes: tour?.pickup_notes ?? null },
-      tour: tour ? { objective: tour.objective, route_url: tour.route_url, meet_label: tour.meet_label, time_zone_label: tour.time_zone_label,
-        access_notes: tour.access_notes, approach_notes: tour.approach_notes } : null,
+      meet: meet ? { label: meet.meet_label, time_zone_label: meet.time_zone_label } : null,
+      tour: tour ? { objective: tour.objective, route_url: tour.route_url, access_notes: tour.access_notes, approach_notes: tour.approach_notes } : null,
       ...crewRoute,
       departures,
       people,
@@ -177,9 +180,15 @@ export function projectTripMap(full: TripFull, estimates: TripDriveEstimates, se
 
 /** Call only after requireTripAccess. Read each source by trip_id; never load kits, invites or bookings into the response. */
 export async function loadTripMapContext(supabase: SupabaseClient, trip: Trip, date: string | null): Promise<{ full: TripFull; map: TripMap } | null> {
+  const dayColumns = "id, trip_id, date, stop_id, activity, access_point, access_point_stop_id, origin, origin_stay_id, no_drive";
+  const loadDays = async () => {
+    const days = await supabase.from("trip_days").select(`${dayColumns}, meet_time, meet_day_offset, meet_time_zone`).eq("trip_id", trip.id).order("date");
+    // Before migration 20261024230000 there are no meet columns: the days read their tour plans' (#333).
+    return ["42703", "PGRST204"].includes(days.error?.code ?? "") ? supabase.from("trip_days").select(dayColumns).eq("trip_id", trip.id).order("date") : days;
+  };
   const [stops, days, lodging, tours, memberOrigins] = await Promise.all([
     supabase.from("trip_stops").select("id, trip_id, position, name, latitude, longitude, access_point, activities").eq("trip_id", trip.id).order("position"),
-    supabase.from("trip_days").select("id, trip_id, date, stop_id, activity, access_point, access_point_stop_id, origin, origin_stay_id, no_drive").eq("trip_id", trip.id).order("date"),
+    loadDays(),
     loadLodging(supabase, trip), loadTourPlans(supabase, trip.id), loadMemberDayOrigins(supabase, trip.id),
   ]);
   if (stops.error || days.error) throw new Error("Couldn't load map places");
@@ -189,7 +198,8 @@ export async function loadTripMapContext(supabase: SupabaseClient, trip: Trip, d
   }
   const full: TripFull = {
     trip, stops: (stops.data ?? []) as TripStop[], days: (days.data ?? []) as TripDay[], lodging,
-    tour_plans: summarizeTourPlans(tours, (days.data ?? []) as TripDay[]), members: [], kits: [], gear: [], member_origins: memberOrigins,
+    tour_plans: summarizeTourPlans(tours, (days.data ?? []) as TripDay[]), meets: buildDayMeets((days.data ?? []) as TripDay[], tours),
+    members: [], kits: [], gear: [], member_origins: memberOrigins,
   };
   validateSources(full);
   const estimates = await tripDriveEstimates(full, supabaseDriveStore(supabase, trip.id), { refresh: false });

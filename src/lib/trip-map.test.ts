@@ -4,6 +4,7 @@ import { drivePlans, type StoredDriveEstimate } from "@/lib/trip-drive";
 import { tripDriveEstimates, type ManualEstimateRow } from "@/lib/trip-drive-estimates";
 import { projectTripMap } from "@/lib/trip-map";
 import { buildLodging } from "@/lib/trip-lodging";
+import { buildDayMeets } from "@/lib/trip-meets";
 import { buildTourPlanSummary } from "@/lib/trip-tour-plans";
 import { driveTrip, driveStay, MOTEL, place, splitDriveTrip } from "@/test/driveTrip";
 import { PINE, VILLAGE } from "@/test/splitStays";
@@ -207,7 +208,7 @@ describe("Trip map projection", () => {
   });
   it("provides touring meeting/access information and an honest notes-only pickup", async () => {
     const full = driveTrip();
-    const plan = { id: "tour", trip_id: full.trip.id, trip_day_id: full.days[1].id, objective: "North Ridge", route_url: "https://example.com/tour", meet_time: null, return_time: null,
+    const plan = { id: "tour", trip_id: full.trip.id, trip_day_id: full.days[1].id, objective: "North Ridge", route_url: "https://example.com/tour", return_time: null,
       time_zone: "America/New_York", revision: 1, updated_at: "2027-01-01T12:00:00Z", access_notes: "Permit required", pickup_notes: "Meet at the lower lot",
       approach_notes: "Skin up the summer road" } as TripTourPlan;
     full.tour_plans = [buildTourPlanSummary(plan, SAT)];
@@ -222,7 +223,7 @@ describe("Trip map projection", () => {
   });
   it("uses a saved tour plan only while the day's activity is touring, as the Day page does", async () => {
     const full = driveTrip();
-    const plan = { id: "tour", trip_id: full.trip.id, trip_day_id: full.days[1].id, objective: "North Ridge", route_url: "https://example.com/tour", meet_time: "08:00", meet_day_offset: 0,
+    const plan = { id: "tour", trip_id: full.trip.id, trip_day_id: full.days[1].id, objective: "North Ridge", route_url: "https://example.com/tour",
       return_time: null, time_zone: "America/New_York", revision: 1, updated_at: "2027-01-01T12:00:00Z", access_notes: "Permit required", pickup_notes: "Lower lot", approach_notes: "Skin up" } as TripTourPlan;
     full.tour_plans = [buildTourPlanSummary(plan, SAT)];
     full.days[1] = { ...full.days[1], activity: "Alpine" };
@@ -233,6 +234,15 @@ describe("Trip map projection", () => {
     const inherited = (await mapFor(full)).days[1];
     expect(inherited).toMatchObject({ activity: "Backcountry", tour: { objective: "North Ridge" }, pickup: { state: "notes_only" } });
     expect(inherited.meeting_place_id).toBe(inherited.access_place_id);
+  });
+  it("gives any sport's day with a meet time its meet, at the access point (#333)", async () => {
+    const full = driveTrip();
+    full.days[1] = { ...full.days[1], activity: "Alpine", meet_time: "08:30:00", meet_day_offset: 0, meet_time_zone: "America/New_York" };
+    full.meets = buildDayMeets(full.days, []);
+    const map = await mapFor(full);
+    expect(map.days[1]).toMatchObject({ meet: { label: "8:30 AM EST · Sat Jan 9", time_zone_label: "Local time at the destination (America/New_York)." }, tour: null });
+    expect(map.days[1].meeting_place_id).toBe(map.days[1].access_place_id);
+    expect(map.days[0]).toMatchObject({ meet: null, meeting_place_id: null });
   });
   it.each(["stop", "day", "stay", "night", "stop-reference", "night-reference", "tour-reference"])("rejects cross-trip %s sources/references", async (kind) => {
     const full = driveTrip();

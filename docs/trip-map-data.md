@@ -4,7 +4,7 @@ Implemented October 19, 2026 on top of the map foundation delivered in #319. The
 
 ## API and revision binding
 
-`GET /api/v1/trips/:id/map?date=YYYY-MM-DD` keeps its delivered response shape. Days now also expose `crew_stay_place_id` and `meeting_place_id`; meeting uses #210's canonical access point. Pickup remains notes-only because the delivered schema has no structured pickup coordinates. A date without a saved day row stays selectable, with no invented destination or access reference.
+`GET /api/v1/trips/:id/map?date=YYYY-MM-DD` keeps its delivered response shape. Days now also expose `crew_stay_place_id` and `meeting_place_id`; meeting uses #210's canonical access point. Since #333 a day has `meet` (its meet time and time zone label, for every sport), `meeting_place_id` is the access point whenever the day has a meet time or a tour in use, and `tour` no longer has meet or time zone labels. Pickup remains notes-only because the delivered schema has no structured pickup coordinates. A date without a saved day row stays selectable, with no invented destination or access reference.
 
 Each day's `geometry` metadata retains mode, endpoint references and its opaque **route revision**, with `reason: "not_requested"` for eligible drives. `provider.geometry` is `"on_demand"`. The map/day snapshot revisions may change as estimates change; `day.geometry.revision` remains stable while the endpoint identities, coordinates, mode, traffic model and closure options remain unchanged. Tokens are equality checks, not sequence numbers.
 

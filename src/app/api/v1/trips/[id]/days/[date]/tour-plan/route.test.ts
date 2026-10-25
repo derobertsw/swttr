@@ -17,13 +17,15 @@ const request = (body: unknown, method = "PUT") => new NextRequest(`http://local
 const context = (date = "2026-10-10") => ({ params: Promise.resolve({ id: TRIP.id, date }) });
 const body = { plan: { objective: " Tuckerman Ravine " }, day_id: dayId, expected_revision: 0, mutation_id: mutationId };
 const stop = { id: "stop-1", trip_id: TRIP.id, position: 0, name: "Pinkham Notch", latitude: 44.257, longitude: -71.253, activities: ["Backcountry"] };
-const day = { id: dayId, trip_id: TRIP.id, date: "2026-10-10", stop_id: null, activity: "Backcountry" };
+// The day before migration 20261024230000, without meet columns, and after it.
+const dayBefore = { id: dayId, trip_id: TRIP.id, date: "2026-10-10", stop_id: null, activity: "Backcountry" };
+const day = { ...dayBefore, meet_time: null, meet_day_offset: 0, meet_time_zone: null };
 let supabase: SupabaseClient;
 
-function identity(userId: string, { status = "joined", stops = [stop] as Record<string, unknown>[], plans = [] as Record<string, unknown>[] } = {}) {
+function identity(userId: string, { status = "joined", stops = [stop] as Record<string, unknown>[], plans = [] as Record<string, unknown>[], days = [day] as Record<string, unknown>[] } = {}) {
   supabase = { ...createFakeSupabase({
     trips: [TRIP as unknown as Record<string, unknown>], trip_members: [{ trip_id: TRIP.id, user_id: "member-user", status }],
-    trip_days: [day], trip_stops: stops, trip_day_tour_plans: plans,
+    trip_days: days, trip_stops: stops, trip_day_tour_plans: plans,
   }), rpc } as unknown as SupabaseClient;
   vi.mocked(requireUser).mockResolvedValue({ userId, supabase });
 }
@@ -44,17 +46,50 @@ describe("Tour plan API", () => {
     expect(await response.json()).toEqual({ revision: 1 });
     expect(rpc).toHaveBeenCalledWith("mutate_trip_tour_plan", expect.objectContaining({
       p_trip_id: TRIP.id, p_user_id: "user-1", p_date: "2026-10-10", p_day_id: dayId, p_expected_revision: 0, p_request_id: mutationId, p_action: "save",
-      p_payload: expect.objectContaining({ objective: "Tuckerman Ravine", meet_time: null, time_zone: null }),
+      p_payload: expect.objectContaining({ objective: "Tuckerman Ravine", return_time: null, time_zone: null }),
     }));
+    // The meet time is the day's (#333), so the plan's payload leaves it out.
+    expect(rpc.mock.calls[0][1].p_payload).not.toHaveProperty("meet_time");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("saves times with the time zone of the day's destination", async () => {
-    await PUT(request({ ...body, plan: { objective: "Tuckerman", meet_time: "06:30" } }), context());
+  it("saves a return time with the time zone of the day's destination", async () => {
+    await PUT(request({ ...body, plan: { objective: "Tuckerman", return_time: "15:30" } }), context());
     expect(String(fetchMock.mock.calls[0][0])).toContain("latitude=44.257&longitude=-71.253&timezone=auto");
     expect(rpc).toHaveBeenCalledWith("mutate_trip_tour_plan", expect.objectContaining({
-      p_payload: expect.objectContaining({ meet_time: "06:30", time_zone: "America/New_York" }),
+      p_payload: expect.objectContaining({ return_time: "15:30", time_zone: "America/New_York" }),
     }));
+  });
+
+  it("keeps the return after the day's meet time, unless it's the next day", async () => {
+    identity("user-1", { days: [{ ...day, meet_time: "09:00:00" }] });
+    const response = await PUT(request({ ...body, plan: { objective: "A", return_time: "08:00" } }), context());
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ field: "return_time" });
+    expect(rpc).not.toHaveBeenCalled();
+    expect((await PUT(request({ ...body, plan: { objective: "A", return_time: "08:00", return_day_offset: 1 } }), context())).status).toBe(200);
+    identity("user-1", { days: [{ ...day, meet_time: "18:00:00", meet_day_offset: -1 }] });
+    expect((await PUT(request({ ...body, plan: { objective: "A", return_time: "08:00" } }), context())).status).toBe(200);
+  });
+
+  it("asks an app from before #333, which sends the meet time with the plan, to reload", async () => {
+    const response = await PUT(request({ ...body, plan: { objective: "A", meet_time: null, meet_day_offset: 0 } }), context());
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "This page is out of date. Reload it, then save the tour plan again." });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("changes nothing before the meet time moves to the day, so a plan's meet time isn't cleared", async () => {
+    identity("user-1", { days: [dayBefore] });
+    expect((await PUT(request(body), context())).status).toBe(503);
+    expect((await DELETE(request({ day_id: dayId, expected_revision: 1, mutation_id: mutationId }, "DELETE"), context())).status).toBe(503);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("says the day is gone without a transaction", async () => {
+    identity("user-1", { days: [] });
+    expect((await PUT(request(body), context())).status).toBe(404);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -97,7 +132,7 @@ describe("Tour plan API", () => {
   it.each([
     [{ ...body, plan: { objective: "" } }, "objective"],
     [{ ...body, plan: { objective: "A", route_url: "javascript:alert(1)" } }, "route_url"],
-    [{ ...body, plan: { objective: "A", meet_time: "09:00", return_time: "08:00" } }, "return_time"],
+    [{ ...body, plan: { objective: "A", return_time: "8:00" } }, "return_time"],
     [{ ...body, expected_revision: -1 }, undefined],
     [{ ...body, expected_revision: "0" }, undefined],
     [{ ...body, mutation_id: "bad" }, undefined],
@@ -132,11 +167,20 @@ describe("Tour plan API", () => {
     await expect(loadTripFull(failing("57014"), TRIP.id)).rejects.toThrow("Couldn't load tour plans");
   });
 
-  it("loads saved plans with the trip, labelled for their day", async () => {
-    identity("user-1", { plans: [{ id: "plan-1", trip_id: TRIP.id, trip_day_id: dayId, objective: "Tuckerman", meet_time: "06:30:00",
-      meet_day_offset: 0, return_time: null, return_day_offset: 0, distance: null, distance_unit: null, ascent: null, ascent_unit: null,
-      duration_minutes: null, metrics_source: null, time_zone: "America/New_York", updated_at: "2026-10-14T20:00:00Z" }] });
+  it("loads saved plans with the trip, labelled for their day, and the day's meet time", async () => {
+    const plan = { id: "plan-1", trip_id: TRIP.id, trip_day_id: dayId, objective: "Tuckerman", meet_time: "05:00:00",
+      meet_day_offset: 0, return_time: "14:00:00", return_day_offset: 0, distance: null, distance_unit: null, ascent: null, ascent_unit: null,
+      duration_minutes: null, metrics_source: null, time_zone: "America/New_York", updated_at: "2026-10-14T20:00:00Z" };
+    identity("user-1", { plans: [plan], days: [{ ...day, meet_time: "06:30:00", meet_time_zone: "America/New_York" }] });
     const full = await loadTripFull(supabase, TRIP.id);
-    expect(full?.tour_plans).toEqual([expect.objectContaining({ date: "2026-10-10", objective: "Tuckerman", meet_label: "6:30 AM EDT · Sat Oct 10" })]);
+    expect(full?.tour_plans).toEqual([expect.objectContaining({ date: "2026-10-10", objective: "Tuckerman", return_label: "2:00 PM EDT · Sat Oct 10" })]);
+    expect(full?.tour_plans?.[0]).not.toHaveProperty("meet_time");
+    expect(full?.meets).toEqual([{ date: "2026-10-10", meet_label: "6:30 AM EDT · Sat Oct 10", time_zone_label: "Local time at the destination (America/New_York)." }]);
+  });
+
+  it("loads a tour plan's meet time as the day's before the migration", async () => {
+    identity("user-1", { days: [dayBefore], plans: [{ id: "plan-1", trip_id: TRIP.id, trip_day_id: dayId, objective: "Tuckerman", meet_time: "05:00:00",
+      meet_day_offset: 0, return_time: null, return_day_offset: 0, time_zone: null, updated_at: "2026-10-14T20:00:00Z" }] });
+    expect((await loadTripFull(supabase, TRIP.id))?.meets).toEqual([expect.objectContaining({ date: "2026-10-10", meet_label: "5:00 AM destination time · Sat Oct 10" })]);
   });
 });
