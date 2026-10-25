@@ -5,18 +5,25 @@ import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import ActivitySelection from "./ActivitySelection";
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
+import type { XCContext } from "@/types/xc";
 
 describe("ActivitySelection", () => {
   it('offers independent stop and exposure controls for XC without changing effort', async () => {
     const user = userEvent.setup();
     const onXCContextChange = vi.fn();
     const onExertionChange = vi.fn();
-    render(<ActivitySelection value="xc_skiing" onChange={vi.fn()} exertion="hard" onExertionChange={onExertionChange}
-      xcContext={{ outingPattern: 'continuous' }} onXCContextChange={onXCContextChange} />);
+    function StatefulSelection() {
+      const [xcContext, setXCContext] = React.useState<XCContext>({ outingPattern: 'continuous' });
+      return <ActivitySelection value="xc_skiing" onChange={vi.fn()} exertion="hard" onExertionChange={onExertionChange}
+        xcContext={xcContext} onXCContextChange={context => { setXCContext(context); onXCContextChange(context); }} />;
+    }
+    render(<StatefulSelection />);
     await user.click(screen.getByRole('radio', { name: 'Frequent stops' }));
     expect(onXCContextChange).toHaveBeenLastCalledWith({ outingPattern: 'frequent_stops' });
     await user.click(screen.getByRole('radio', { name: 'Long descents' }));
-    expect(onXCContextChange).toHaveBeenLastCalledWith({ outingPattern: 'continuous', xcExposure: 'descents' });
+    expect(onXCContextChange).toHaveBeenLastCalledWith({ outingPattern: 'frequent_stops', xcExposure: 'descents' });
+    expect(screen.getByRole('radio', { name: 'Frequent stops' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Long descents' })).toBeChecked();
     expect(onExertionChange).not.toHaveBeenCalled();
   });
   const ControlledSelection = ({

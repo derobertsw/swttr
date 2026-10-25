@@ -368,10 +368,10 @@ export function useGearUp() {
   // The form takes the new activity only with its layers, so Edit outing
   // while they load, or after they fail, opens on the activity still shown.
   const handleActivityChange = useCallback(async (newActivity: string) => {
-    if (await recommendForShownWeather({ activity: newActivity }, "Failed to update activity")) {
+    if (await recommendForShownWeather({ activity: newActivity, ...(newActivity === 'xc_skiing' ? xcContext : {}) }, "Failed to update activity")) {
       setActivity(newActivity);
     }
-  }, [setActivity, recommendForShownWeather]);
+  }, [setActivity, xcContext, recommendForShownWeather]);
 
   const handleRetry = useCallback(
     () => recommendForShownWeather({}, "Failed to load layers"),
@@ -653,7 +653,7 @@ export function useGearUp() {
 
   return {
     xcContext,
-    setXCContext,
+    setXCContext: (value: XCContext) => { cancelAgentEdit(); setXCContext(value); },
     activity,
     setActivity: (value: string) => { cancelAgentEdit(); setActivity(value); },
     activityInitializing: initializing,

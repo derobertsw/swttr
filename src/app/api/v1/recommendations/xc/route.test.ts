@@ -22,6 +22,27 @@ beforeEach(() => {
 });
 
 describe('XC request and response integration', () => {
+  it.each([
+    { wind: false, wet: true, missing: 'wind' },
+    { wind: true, wet: false, missing: 'wet-weather' },
+    { wind: false, wet: false, missing: 'wind and wet-weather' },
+    { wind: true, wet: true, missing: null },
+  ])('names only missing protection with wind=$wind and wet=$wet coverage', async ({ wind, wet, missing }) => {
+    const garments = catalog.garments.filter(g => g.model_name === 'Capilene Cool Lightweight'
+      || g.model_name === 'Generic Standalone Running/Nordic Tights').map(g => ({ ...g, garment_protection: {
+      windproof_rating: wind ? 'windproof' : 'none', waterproof_rating: wet ? 'waterproof' : 'none',
+    } }));
+    expect(garments).toHaveLength(2);
+    state.client = createFakeSupabase({ garments, handwear: [], headwear: [], user_wardrobe: [] });
+    const { data } = await call({ weather: { temperature: 32, wind_speed: 12, precipitation: true, precipitation_type: 'rain' } });
+    expect(data.ireq.policy?.protection).toMatchObject({ wind: true, wet: true });
+    expect(data.recommendation.garments).toHaveLength(2);
+    expect(data.warnings.filter(warning => warning.startsWith('Available XC clothing'))).toEqual(missing ? [
+      `Available XC clothing lacks required ${missing} protection for torso.`,
+      `Available XC clothing lacks required ${missing} protection for legs.`,
+    ] : []);
+  });
+
   it('echoes outing pattern and exposure, retaining the same moving outfit/score when stops only change carry advice', async () => {
     const continuous = await call({ outing_pattern: 'continuous', xc_exposure: 'sheltered' });
     const stops = await call({ outing_pattern: 'frequent_stops', xc_exposure: 'sheltered' });

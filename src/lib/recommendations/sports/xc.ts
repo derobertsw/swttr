@@ -63,10 +63,16 @@ export const xc = createSinglePhaseSport({
   catalog: { minScore: { field: 'xc_skiing_score', minScore: 6 } },
   buildEnsemble: (categorized, targets) =>
     buildXCEnsemble(categorized, targets.regional, MIN_EVAP_POTENTIAL, targets.policy!.protection),
-  protect: (ensemble, _categorized, targets) => ({ ensemble, warnings:
-    (['torso', 'legs'] as const).filter(region => !xcProtection(ensemble, region, targets.policy!.protection))
-      .map(region => `Available XC clothing lacks required ${targets.policy!.protection.wet ? 'wet-weather' : 'wind'} protection for ${region}.`),
-  }),
+  protect: (ensemble, _categorized, targets) => {
+    const needs = targets.policy!.protection;
+    const warnings = (['torso', 'legs'] as const).flatMap(region => {
+      const lacking: string[] = [];
+      if (needs.wind && !xcProtection(ensemble, region, { wind: true, wet: false })) lacking.push('wind');
+      if (needs.wet && !xcProtection(ensemble, region, { wind: false, wet: true })) lacking.push('wet-weather');
+      return lacking.length ? [`Available XC clothing lacks required ${lacking.join(' and ')} protection for ${region}.`] : [];
+    });
+    return { ensemble, warnings };
+  },
   conditions: (request) => ({ intensity: exertionToXcIntensity(request.exertion),
     outing_pattern: request.outingPattern ?? 'unknown', xc_exposure: request.xcExposure ?? 'unknown' }),
   guidance: (_request, _ireq, ensemble, targets) => {

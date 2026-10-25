@@ -7,7 +7,7 @@ import { ACTIVITY_WEIGHTS, OUTER_AIR_PERMEABILITY, REGIONAL_WEIGHTS, type Activi
 import type { EnsembleScore } from '@/types/garments';
 
 /** Wind speed (m/s) above which an ensemble without a shell loses weather protection. */
-export const SIGNIFICANT_WIND_MS = 8;
+const SIGNIFICANT_WIND_MS = 8;
 
 const REGIONS = [
   ['torso', 'coversTorso', REGIONAL_WEIGHTS.torso],

@@ -71,6 +71,27 @@ describe("useGearUp request completion", () => {
     await waitFor(() => expect(restored.result.current.xcContext).toEqual({ outingPattern: 'frequent_stops', xcExposure: 'descents' }));
   });
 
+  it('uses the current XC settings when switching a displayed running outing to XC', async () => {
+    const { result } = renderHook(() => useGearUp());
+    await waitFor(() => expect(result.current.activityInitializing).toBe(false));
+    const context = { outingPattern: 'frequent_stops', xcExposure: 'descents' } as const;
+    act(() => {
+      result.current.setXCContext(context);
+      result.current.setActivity('running');
+      result.current.locationSearch.handleSelectLocation(STOWE);
+    });
+    await act(() => result.current.handleSubmit());
+    const runningBody = JSON.parse(fetchMock.mock.calls.at(-1)![1].body);
+    expect(runningBody).not.toHaveProperty('outing_pattern');
+    expect(runningBody).not.toHaveProperty('xc_exposure');
+    fetchMock.mockClear();
+    await act(() => result.current.handleActivityChange('xc_skiing'));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ outing_pattern: 'frequent_stops', xc_exposure: 'descents' });
+    expect(result.current.result?.outing).toMatchObject({ activity: 'xc_skiing', ...context });
+    act(() => result.current.editOuting());
+    expect(result.current.xcContext).toEqual(context);
+  });
+
   it.each(["weather", "recommendation"])(
     "resolves a weather change as false when it is retired during its %s request",
     async (stage) => {
