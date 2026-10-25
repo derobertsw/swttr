@@ -437,9 +437,20 @@ const LayerDisplay = ({
   ]);
   const phaseLabel = showDescent ? (shownPhase === "climb" ? "Climb" : "Descent") : undefined;
   const missingRequirements = biophysicsData?.requirements?.filter((r) => r.status === 'missing') ?? [];
+  const originalClimbReasons = biophysicsData?.recommendation.evaluation?.decision?.reasons ?? [];
+  const originalAssessmentReasons = new Set([
+    ...originalClimbReasons,
+    ...originalClimbReasons.map(reason => `Climb: ${reason}`),
+    ...(biophysicsData?.descent_evaluation?.decision?.reasons ?? []).map(reason => `Descent: ${reason}`),
+    ...missingRequirements.map(requirement => requirement.message),
+  ]);
+  const recommendationAdvice = [...new Set([
+    ...(biophysicsData?.guidance ?? []),
+    ...(biophysicsData?.ireq.policy?.assumptions ?? []),
+  ])].filter(line => !originalAssessmentReasons.has(line));
+  const outfitEdited = climb.edited || (showDescent && descent.edited);
   const visibleGuidance = shownEvaluation?.decision
-    ? [...(shownEvaluation.decision.reasons ?? []),
-      ...(biophysicsData?.ireq.policy?.assumptions ?? [])]
+    ? shownEvaluation.decision.reasons ?? []
     : shownEvaluation ? ['No current comfort assessment is available for this outfit because usable thermal data or targets are missing.'] : [];
 
   const shownLayers = phaseLayers(shownPhase);
@@ -671,7 +682,7 @@ const LayerDisplay = ({
                   warnings={biophysicsData.warnings.filter(warning => !originalAssessmentWarnings.has(warning))}
                   currentWarnings={shownEvaluation?.decision?.warnings}
                   transition={showDescent ? biophysicsData.transition_protocol : undefined}
-                  edited={climb.edited || (showDescent && descent.edited)}
+                  edited={outfitEdited}
                 />
               )}
 
@@ -692,6 +703,19 @@ const LayerDisplay = ({
                     {visibleGuidance.map((line) => (
                       <li key={line}>{line}</li>
                     ))}
+                  </ul>
+                </ResultDisclosure>
+              )}
+
+              {recommendationAdvice.length > 0 && (
+                <ResultDisclosure title={outfitEdited ? "Original recommendation advice" : "Weather and activity advice"}>
+                  {outfitEdited && (
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      For the original outfit and conditions. Your layer changes are assessed separately.
+                    </p>
+                  )}
+                  <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-foreground">
+                    {recommendationAdvice.map(line => <li key={line}>{line}</li>)}
                   </ul>
                 </ResultDisclosure>
               )}

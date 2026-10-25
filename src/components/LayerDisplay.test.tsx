@@ -3,6 +3,7 @@ import { fireEvent, getNodeText, render, screen, waitFor, within } from "@testin
 import { NextRequest } from "next/server";
 import { toast } from "sonner";
 import { POST as evaluateLayers } from "@/app/api/v1/ensembles/evaluate/route";
+import { evaluatePhase } from "@/lib/recommendations/layer-evaluation";
 import type { PickerItem } from "@/hooks/useLayerPicker";
 import { buildLayersResult, layerDisplayAdvice } from "@/lib/gearUp";
 import type { SavedOutfit } from "@/types/savedKit";
@@ -1343,6 +1344,68 @@ describe("LayerDisplay", () => {
         expect(within(why).getAllByRole("listitem").map(item => item.textContent).join(" ")).toContain("below the estimated target band");
       });
 
+      it("preserves weather and activity advice separately from replaced assessment reasons through edits and undo", async () => {
+        const originalReason = "Original outfit assessment reason";
+        const rainAdvice = "Precipitation expected - waterproof shell recommended";
+        const chairliftAdvice = "Remember: chairlift time requires more insulation than skiing";
+        const missingMessage = "Suitable leg clothing is missing from your wardrobe.";
+        const originalEvaluation = evaluatePhase({
+          itemClo: { torso: [1], legs: [1], hands: [], headNeck: [] },
+          targets: {}, arms: { clo: 1 }, targetRange: [0.5, 1],
+        });
+        originalEvaluation.decision!.reasons = [originalReason];
+        renderPersonalized({ biophysicsData: {
+          ...mockBiophysicsData,
+          recommendation: { ...mockBiophysicsData.recommendation, evaluation: originalEvaluation },
+          requirements: [{ id: "legs", region: "legs", label: "Leg clothing", status: "missing", message: missingMessage }],
+          guidance: [originalReason, rainAdvice, chairliftAdvice, chairliftAdvice, missingMessage],
+        } });
+
+        const advice = screen.getByText("Weather and activity advice").closest("details")!;
+        expect(within(advice).getByText(rainAdvice)).toBeInTheDocument();
+        expect(within(advice).getAllByText(chairliftAdvice)).toHaveLength(1);
+        expect(screen.getAllByText(missingMessage)).toHaveLength(1);
+        expect(screen.queryByText(originalReason)).not.toBeInTheDocument();
+        await screen.findByText("Why these layers?");
+
+        const legs = screen.getByRole("region", { name: "Legs" });
+        fireEvent.click(within(legs).getByRole("button", { name: "Change legs" }));
+        fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
+        fireEvent.click(screen.getByText("Pick catalog fleece"));
+
+        expect(screen.getByText("Original recommendation advice")).toBeInTheDocument();
+        expect(within(advice).getByText(/For the original outfit and conditions/)).toBeInTheDocument();
+        expect(within(advice).getByText(rainAdvice)).toBeInTheDocument();
+        await within(legs).findByText("Needs more warmth");
+        expect(screen.queryByText(originalReason)).not.toBeInTheDocument();
+        const currentReasons = screen.getByText("Why these layers?").closest("details")!;
+        expect(within(currentReasons).queryByText(rainAdvice)).not.toBeInTheDocument();
+        expect(within(currentReasons).getAllByRole("listitem").map(item => item.textContent).join(" ")).toContain("below the estimated target band");
+
+        fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+        expect(screen.getByText("Weather and activity advice")).toBeInTheDocument();
+        expect(within(advice).queryByText(/For the original outfit and conditions/)).not.toBeInTheDocument();
+        expect(within(advice).getByText(chairliftAdvice)).toBeInTheDocument();
+      });
+
+      it("filters both touring phases' original assessment reasons out of independent advice", () => {
+        const originalEvaluation = evaluatePhase({
+          itemClo: { torso: [1], legs: [1], hands: [], headNeck: [] },
+          targets: {}, arms: { clo: 1 }, targetRange: [0.5, 1],
+        });
+        originalEvaluation.decision!.reasons = ["Original climb reason"];
+        renderPersonalized({ activity: "backcountry_skiing", biophysicsData: {
+          ...mockBiophysicsData,
+          ireq: { ...mockBiophysicsData.ireq, downhill_target_range: [1, 2] },
+          recommendation: { ...mockBiophysicsData.recommendation, evaluation: originalEvaluation },
+          descent_evaluation: { ...originalEvaluation, decision: { ...originalEvaluation.decision!, reasons: ["Original descent reason"] } },
+          guidance: ["Climb: Original climb reason", "Descent: Original descent reason", "Bring insulation for the transition."],
+        } });
+        const advice = screen.getByText("Weather and activity advice").closest("details")!;
+        expect(within(advice).getByText("Bring insulation for the transition.")).toBeInTheDocument();
+        expect(within(advice).getAllByRole("listitem")).toHaveLength(1);
+      });
+
       it("shows empty layers and editing controls only after Change", () => {
         renderPersonalized();
         const legs = screen.getByRole("region", { name: "Legs" });
@@ -1407,6 +1470,21 @@ describe("LayerDisplay", () => {
         fireEvent.click(within(legs).getByRole("button", { name: "Add mid" }));
         fireEvent.click(screen.getByText("Pick catalog fleece"));
       }
+
+      it("retains labeled original advice while an edit is pending and after its check fails", async () => {
+        const evaluation = stubEvaluation();
+        const legs = await renderChecked();
+        evaluation.failing = true;
+        addCatalogFleece(legs);
+
+        const advice = screen.getByText("Original recommendation advice").closest("details")!;
+        expect(within(advice).getByText("Layer up for the chairlift")).toBeInTheDocument();
+        expect(screen.queryByText("Why these layers?")).not.toBeInTheDocument();
+        await screen.findByRole("region", { name: "Couldn't check these layers" });
+        expect(within(advice).getByText(/For the original outfit and conditions/)).toBeInTheDocument();
+        expect(within(advice).getByText("Layer up for the chairlift")).toBeInTheDocument();
+        expect(screen.queryByText("Why these layers?")).not.toBeInTheDocument();
+      });
 
       it("labels the comfort check as updating until the changed outfit is checked", async () => {
         const legs = await renderChecked();
