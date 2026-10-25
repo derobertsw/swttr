@@ -280,6 +280,21 @@ describe('running accessory selection and manual evaluation', () => {
     ]));
   });
 
+  it.each(MODES)('explains remaining gaps in the best available extreme-cold outfit: $name', async mode => {
+    useDatabase(mode.userId, mode.wardrobe);
+    const { body } = await callRoute(running, { ...CONDITIONS[3].body, ...mode.extraBody });
+    const missing = (body as BiophysicsRecommendation).requirements!.filter(r =>
+      (r.region === 'torso' || r.region === 'legs') && r.status === 'missing');
+    expect(missing.length).toBeGreaterThan(0);
+    for (const requirement of missing) {
+      expect(requirement.message).toContain('best available');
+      expect(requirement.message).toMatch(/still (below|above|missing)/);
+      expect(requirement.message).not.toContain('no matching item');
+    }
+    expect(body.guidance[0]).toContain('Best available clothing while running:');
+    expect(body.guidance[0]).toContain('still has clothing gaps');
+  });
+
   it('gives matching accessory assessments to automatic selection and manual removal', async () => {
     const garments = catalog.garments.filter(g => ['top_short_sleeve', 'shorts'].includes(g.garment_type ?? ''));
     state.userId = null;

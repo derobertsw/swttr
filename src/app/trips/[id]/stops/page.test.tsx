@@ -163,7 +163,7 @@ describe("Destinations after creation", () => {
     const dialog = screen.getByRole("dialog", { name: "Edit stop Burlington" });
     const sunday = within(dialog).getByRole("button", { name: /Sunday, October 11/ });
     const monday = within(dialog).getByRole("button", { name: /Monday, October 12/ });
-    const alpine = within(dialog).getByRole("button", { name: "Alpine" });
+    const alpine = within(dialog).getByRole("button", { name: "Downhill skiing" });
     const hike = within(dialog).getByRole("button", { name: "Hike" });
     await waitFor(() => expect(sunday).toBeEnabled());
     await user.click(sunday); await user.click(alpine);

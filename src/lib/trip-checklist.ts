@@ -1,4 +1,5 @@
 import "server-only";
+import { tripActivityNeedsClothing } from "@/lib/trip-activities";
 import { dateLabel, participationLabel } from "@/lib/trip-lodging";
 import { outfitMismatches } from "@/lib/trip-kit-fit";
 import type { TripChecklist, TripChecklistPerson, TripDayChecklist, TripFull, TripGroupGear, TripMember } from "@/types/trips";
@@ -40,11 +41,13 @@ export function buildDayChecklists(full: TripFull, viewerUserId: string | null, 
       const notes = kit?.outfit ? outfitMismatches(kit.outfit, { date: day.date, activity: day.activity, stop }) : [];
       const flag: TripChecklistPerson["clothing"]["flag"] = kit && !kit.outfit && kit.state !== "ok"
         ? { state: kit.state, label: kit.state === "warn" ? "Flagged: needs help" : "Flagged: missing" } : null;
+      // Travel and Rest days, and days someone isn't taking part in, have no clothing to plan (#334).
+      const needed = participation === "participating" && tripActivityNeedsClothing(activity);
       const clothing: TripChecklistPerson["clothing"] = kit?.outfit
         ? { state: notes.length ? "outfit_review" : "outfit", label: notes.length ? "Outfit saved for another plan" : "Outfit saved", notes, flag: null }
         : kit && kit.items.length
           ? { state: "checklist", label: `Older checklist: ${kit.items.map(sentence).join(", ")}`, notes, flag }
-          : { state: "not_started", label: "Not started", notes, flag };
+          : needed ? { state: "not_started", label: "Not started", notes, flag } : { state: "not_needed", label: "Nothing to plan", notes, flag };
       const night = lodging?.nights.find((entry) => entry.date === day.date);
       let conditions: TripChecklistPerson["conditions"] = null;
       if (sources.length && member.user_id) {

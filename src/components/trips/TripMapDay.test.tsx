@@ -175,7 +175,7 @@ describe("Selected day logistics on the trip map", () => {
     full.days[1] = { ...full.days[1], activity: "Alpine" };
     const map = await tripMapFixture(full);
     const { day, card } = summary(map, SAT);
-    expect(within(card).getByRole("heading")).toHaveTextContent("Sat Jan 9 · Alpine · Stowe, Vermont");
+    expect(within(card).getByRole("heading")).toHaveTextContent("Sat Jan 9 · Downhill skiing · Stowe, Vermont");
     for (const term of ["Meet", "Pickup", "Approach (ski or walk)", "Access notes"]) expect(within(card).queryByText(term, { selector: "dt" })).not.toBeInTheDocument();
     expect(within(card).queryByRole("link", { name: /tour route|tour plan/ })).not.toBeInTheDocument();
     expect(dayRoles(map.places.find((entry) => entry.id === day.access_place_id)!, day)).toEqual(["access"]);

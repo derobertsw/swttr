@@ -167,7 +167,7 @@ export function createSinglePhaseSport(
         ...(requirements ? { requirements } : {}),
         recommendation,
         warnings: [...warnings, ...(protectedOutfit?.warnings ?? []), ...accessories.warnings],
-        guidance: [...new Set([...(recommendation.evaluation?.decision?.reasons ?? []), ...config.guidance(request, targets.basicIreq, ensemble, targets), ...missingGuidance,
+        guidance: [...new Set([...config.guidance(request, targets.basicIreq, ensemble, targets), ...(recommendation.evaluation?.decision?.reasons ?? []), ...missingGuidance,
           ...Object.values(accessories.assessments ?? {}).map(assessment => assessment.message),
           ...(targets.policy?.assumptions ?? [])])],
       };

@@ -20,7 +20,7 @@ Touring climb and descent are assessed independently. Carried layers contribute 
 
 ## Validation limits
 
-Clothing and local targets remain estimates requiring field feedback. No new physiological model, injury prediction or sport calibration is claimed. The isolated #250 branch is based on `codex/247-running-outfits` and preserves the newer upstream wind/motion and basic-clo calibration. It excludes concurrent XC and trip work from the original checkout. Full tests on the host's newer Node runtime use `NODE_OPTIONS=--no-experimental-webstorage` so jsdom supplies browser storage; CI uses the repository's documented Node 22 runtime.
+Clothing and local targets remain estimates requiring field feedback. No new physiological model, injury prediction or sport calibration is claimed. The #250 branch now integrates `main`, including the merged #247 running selector and its reviewed performance, protection and clothing-gap fixes. It preserves upstream wind/motion and basic-clo calibration. It excludes concurrent XC and trip work from the original checkout. Full tests on the host's newer Node runtime use `NODE_OPTIONS=--no-experimental-webstorage` so jsdom supplies browser storage; CI uses the repository's documented Node 22 runtime.
 
 ## Recorded results
 
@@ -31,3 +31,11 @@ Clothing and local targets remain estimates requiring field feedback. No new phy
 - Repository lint: `npm run lint` passed with zero warnings.
 - Full-suite coverage: 198 test files / 2,998 tests verified. The full run passed 197 files; the remaining file passed all 90 tests after replacing an obsolete assertion that treated whole-body fit as sufficient despite excess head insulation. The replacement explicitly checks the server's local-excess reason and warmer status.
 - `git diff --check` passed.
+
+## Main integration
+
+After #247 was squash-merged, retargeting #352 to main exposed overlapping changes. The integration retains main's running selector, protection and clothing-gap behavior, restores #250's assessment contract and diagrams, and regenerates the response snapshots. Activity guidance remains first in the single-phase API response, followed by canonical assessment reasons. All 76 shared snapshots preserve main's selected garments, accessories and pack items.
+
+The production build, typecheck, lint and Knip pass after integration; all 92 golden tests pass.
+
+Full integration verification: `NODE_OPTIONS=--no-experimental-webstorage npx vitest run --maxWorkers=2` passed all 197 files / 3,028 tests. `npm run build`, `npm run typecheck`, `npm run lint`, `npm run knip`, and both staged and unstaged whitespace checks passed.

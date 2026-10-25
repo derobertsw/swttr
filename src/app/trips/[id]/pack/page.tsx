@@ -17,6 +17,7 @@ import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { usePublishTripSummary } from "@/hooks/useTrip";
 import { PackingNav } from "@/components/trips/PackingNav";
 import { equipmentKey, withEquipmentChoices } from "@/lib/touring-equipment";
+import { tripActivityLabel } from "@/lib/trip-activities";
 import { errorMessage, timedTripRequest, tripRequest, TripRequestError } from "@/lib/trip-requests";
 import type { TripDayCoverage } from "@/types/trip-coverage";
 import type {
@@ -389,7 +390,7 @@ export default function PackListPage({ params }: { params: Promise<{ id: string 
             {review.map((day) => (
               <li key={day.date} className="py-3 text-sm">
                 <p className="font-medium text-foreground">
-                  {packingDay(day.date)} · {day.activity ?? "Activity not set"}
+                  {packingDay(day.date)} · {day.activity ? tripActivityLabel(day.activity) : "Activity not set"}
                 </p>
                 {day.stopName && <p className="break-words text-muted-foreground">{day.stopName}</p>}
                 <p className="mt-1 text-foreground">{day.message}</p>

@@ -7,7 +7,7 @@ import { fieldClassName } from "@/components/ui/input";
 import { ItineraryChangeSheet } from "@/components/trips/ItineraryChangeSheet";
 import { sectionLabelClassName } from "@/components/trips/trip-primitives";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
-import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
+import { TRIP_ACTIVITY_OPTIONS, tripActivityLabel } from "@/lib/trip-activities";
 import type { TripDay, TripItineraryRequest, TripStop } from "@/types/trips";
 
 // Select values for "leave each day as it is" and "clear the activity". Saved
@@ -21,7 +21,7 @@ const dayLabel = (date: string) => new Date(`${date}T00:00:00`).toLocaleDateStri
 export function dayPlanLabel(stops: TripStop[], day: TripDay) {
   const stop = day.stop_id ? stops.find((candidate) => candidate.id === day.stop_id) : undefined;
   const destination = stop?.name ?? (stops[0] ? `${stops[0].name} (base)` : "No destination");
-  return `${destination} · ${day.activity ?? "No activity"}`;
+  return `${destination} · ${day.activity ? tripActivityLabel(day.activity) : "No activity"}`;
 }
 
 /** Checkboxes for days, each with its destination and activity, and Select all. */
@@ -129,7 +129,7 @@ export function TripDaysEditor({ tripId, stops, days, onSaved }: {
           <select name="activity" value={activity} onChange={(event) => setActivity(event.target.value)} className={fieldClassName}>
             <option value={KEEP}>Keep each day&apos;s activity</option>
             <option value={NO_ACTIVITY}>No activity</option>
-            {activities.map((option) => <option key={option} value={option}>{option}</option>)}
+            {activities.map((option) => <option key={option} value={option}>{tripActivityLabel(option)}</option>)}
           </select>
         </label>
       </div>

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
-import { fakeTripApi, reply, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { fakeTripApi, ORGANIZER, reply, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
+import { buildLodging } from "@/lib/trip-lodging";
 import type { TripDay, TripStop } from "@/types/trips";
 import { PlanWorkspace } from "./PlanWorkspace";
 
@@ -48,6 +49,19 @@ describe("Plan workspace (#330)", () => {
     // The first day has an activity but no kit of yours yet.
     expect(screen.getByText("Plan your kit for your next unplanned day.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Plan this day" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-10");
+  });
+
+  it("skips Travel and Rest days and days you aren't on, which have no kit to plan (#334)", async () => {
+    const days = [day("2026-10-10", { activity: "Travel" }), day("2026-10-11", { activity: "Rest" }), day("2026-10-12")];
+    await open("/trips/trip-1", tripFull({ stops: [STOWE_STOP], days }));
+    expect(screen.getByRole("link", { name: "Plan this day" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-12");
+    expect(within(screen.getByRole("navigation", { name: "Days" })).getAllByRole("link", { name: /Oct/ }).map((link) => link.textContent))
+      .toEqual(["Sat, Oct 10Travel", "Sun, Oct 11Rest", "Mon, Oct 12Downhill skiing"]);
+    cleanup();
+    const members = [ORGANIZER];
+    const attendance = [{ trip_id: TRIP.id, member_id: ORGANIZER.id, arrival_date: null, departure_date: null, skipped_dates: ["2026-10-12"] }];
+    await open("/trips/trip-1", tripFull({ stops: [STOWE_STOP], days, members, lodging: buildLodging(TRIP, [], [], { members, attendance, per_member: true }) }));
+    expect(screen.queryByRole("link", { name: "Plan this day" })).not.toBeInTheDocument();
   });
 
   it("sends an older draft without destinations to the destination editor", async () => {
