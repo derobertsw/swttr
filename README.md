@@ -134,11 +134,18 @@ graph TD
 
 ### 3. Ensemble Building Flow
 
-Other sports select base layers, then mid layers, then shells. Alpine and XC compare complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. They allow at most one item in each slot per covered region, including items that span multiple regions, so insulated outerwear takes the outer slot and no shell goes over it. Alpine puts a puffy only under a hard shell; XC allows one under any shell, but not under insulated outerwear. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. XC uses the same regional enumeration with a separate assessment: reviewed standalone coverage, actual wind/wet protection, excessive warmth before filling clothing gaps, then regional thermal fit and breathability. It permits one suitable Nordic tight or pant without an extra base or outer. XC requirements assess the selected combination, including all its warmth and protection. XC never leaves a region in underwear alone. Weather-protection scoring counts windbreakers and insulated outerwear as shells. When targets cannot be met, alpine returns the best available wearable combination. Regional warnings require both a shortfall and an available wearable alternative that could reduce it by more than 0.12 clo while preserving coverage and rain protection. The thermal comfort score and overall cold warnings still report cold conditions when regional targets are unreachable.
+Running compares complete wearable moving outfits made from reviewed standalone tops, shorts or tights, optional underlayers/mids and protective outers. A thermal base is never mandatory. Shorts and short sleeves intentionally leave skin exposed; regional thermal data already includes that exposure. The running search caches shared-model regional contributions, fixes any garments spanning the upper body and legs (including arms without torso coverage), and prunes inferior regional priorities before pairing the surviving choices. Identical selection capabilities keep the first sorted ID; no candidate cap or thermal bins discard distinct outfits. It preserves actual wind/rain protection, prefers waterproof coverage in precipitation, rejects excessive warmth before filling a clothing gap, and balances whole-body/regional shortfalls and excess before using layer count and breathability as tie-breaks. Selection and final/manual evaluation use the same regional ensemble regression and calibrated targets, with the shared 0.05 clo cold tolerance. A light clothing need cannot be satisfied by overly warm full coverage; absent suitable basics remain missing requirements with generic suggestions. Requirements assess the selected combination, including outer warmth and protection, and reasons name the worn outfit. When the best available combination still misses a target, both requirements and guidance name that clothing and explain the remaining shortfall, excess warmth, or protection gap. Missing wind and rain protection are reported separately. Extra clothing for stops stays separate. Ski bibs and insulated outerwear without explicit running suitability are excluded from moving outfits. The small mismatch allowances are wardrobe heuristics, not measured physiological limits. Cycling and touring retain their existing builders.
+
+Alpine and XC compare complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. They allow at most one item in each slot per covered region, including items that span multiple regions, so insulated outerwear takes the outer slot and no shell goes over it. Alpine puts a puffy only under a hard shell; XC allows one under any shell, but not under insulated outerwear. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. XC uses the same regional enumeration with a separate assessment: reviewed standalone coverage, actual wind/wet protection, excessive warmth before filling clothing gaps, then regional thermal fit and breathability. It permits one suitable Nordic tight or pant without an extra base or outer. XC requirements assess the selected combination, including all its warmth and protection. XC never leaves a region in underwear alone. Weather-protection scoring counts windbreakers and insulated outerwear as shells. When targets cannot be met, alpine returns the best available wearable combination. Regional warnings require both a shortfall and an available wearable alternative that could reduce it by more than 0.12 clo while preserving coverage and rain protection. The thermal comfort score and overall cold warnings still report cold conditions when regional targets are unreachable.
 
 ```mermaid
 graph TD
-    START[Target Clo Range from Pipeline] --> SPORT{Alpine or XC?}
+    START[Target Clo Range from Pipeline] --> RUNNING{Running?}
+    RUNNING -->|Yes| RUNOPT[Compare complete top and leg outfit combinations<br/>Standalone coverage without mandatory thermal bases<br/>Short sleeves and shorts allowed<br/>Exclude unreviewed ski bibs and insulated outers]
+    RUNOPT --> RCACHE[Cache regional contributions and partial totals<br/>Fix torso/arms + leg garments; prune inferior regional choices]
+    RCACHE --> RUNRANK[Actual wind/rain protection, then excess warmth<br/>Clothing coverage, thermal fit, layers, breathability]
+    RUNRANK --> RUNREQ[Evaluate with shared regional regression and targets<br/>Match selected combinations or report missing basics<br/>Distinguish best available clothing from absent basics]
+    RUNNING -->|No| SPORT{Alpine or XC?}
     SPORT -->|Yes| CACHE[Cache garment features once<br/>Reuse prefix and base/mid totals]
     CACHE --> COMB[Compare optional base, mid/puffy and outer<br/>for torso, then legs<br/>XC can use a standalone garment]
     COMB --> CAP[One item per slot per covered region<br/>Insulated outer replaces shell<br/>Bibs fill leg slots under a jacket]
@@ -175,7 +182,7 @@ graph TD
 
 ### 4. Sport Ensemble Variants
 
-While all sports follow the same general selection order, each has architectural differences in sorting strategy, budget model, and layer handling.
+Sports differ in candidate generation, ranking, budget model, and layer handling.
 
 ```mermaid
 graph TD
@@ -185,11 +192,12 @@ graph TD
     SPORT --> XC[XC Skiing]
     SPORT --> TOUR[Ski Touring]
 
-    subgraph "Running — shared breathable builder"
-        RUN --> R1[Breathability-sorted at every layer]
-        R1 --> R2[Shells conditional:<br/>clo deficit or precipitation]
-        R2 --> R3[Basic clo budget for insulation<br/>Protective shells outside clo cap<br/>Targets assume wind-resistant protection only when required<br/>Wet protection alone implies no wind resistance]
-        R3 --> R4[Retain actual wind/wet protection independently<br/>Warn when available clothing cannot provide it]
+    subgraph "Running — complete outfit search"
+        RUN --> R1[Standalone top and shorts or tights<br/>Optional base, mid and outer combinations]
+        R1 --> R2[Fix shared garments, prune regional choices<br/>Pair survivors using cached shared-model contributions<br/>One item per layer slot and covered region]
+        R2 --> R3[Same regional ensemble model and targets<br/>as final and manual evaluation]
+        R3 --> R4[Protection and thermal fit before breathability<br/>Missing suitable basics remain clothing gaps]
+        R4 --> R5[Reasons describe worn outfit<br/>Stop layers are separate]
     end
 
     subgraph "Biking — shared breathable builder"
@@ -235,11 +243,12 @@ graph TD
     START --> XC[XC Skiing]
     START --> TOUR[Ski Touring]
 
-    RUN --> RCHECK{Clo deficit<br/>OR precipitation?}
-    RCHECK -->|Yes| RADD[Add breathability-sorted shells]
-    RCHECK -->|No| RSKIP[Skip thermal shell step]
-    RADD --> RPROTECT[Check policy wind/wet needs against garment data<br/>Retain protection even above thermal budget]
-    RSKIP --> RPROTECT
+    RUN --> RCHECK{Policy wind or wet protection needed?}
+    RCHECK -->|Yes| RPROTECT[Compare actual protective properties and coverage<br/>Prefer waterproof coverage in precipitation<br/>Protection takes priority over thermal budget]
+    RCHECK -->|No| ROPT[Outer optional within complete outfit<br/>Keep only when it improves thermal fit]
+    RPROTECT --> RRANK[Rank complete outfit using shared regional model<br/>No extra shell over insulated outerwear]
+    ROPT --> RRANK
+    RRANK --> RGAP[Warn and report clothing gaps<br/>when available protection is insufficient]
 
     BIKE --> BADD[Always consider shells<br/>— breathability-sorted]
 

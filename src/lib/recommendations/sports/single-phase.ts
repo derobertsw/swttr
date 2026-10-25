@@ -48,7 +48,6 @@ interface SinglePhaseSportConfig {
   /** Extra fields echoed in `conditions` after temperature, wind and exertion. */
   conditions(request: RecommendationRequest): object;
   guidance(request: RecommendationRequest, ireq: IreqResult, ensemble?: GarmentRow[], targets?: SinglePhaseTargets): string[];
-  completeOutfit?: boolean;
   carry?(request: RecommendationRequest, targets: SinglePhaseTargets): BiophysicsRecommendation['carry_items'];
   /** Retain functional protection when a calibrated budget changes. */
   protect?(ensemble: GarmentRow[], categorized: CategorizedGarments, targets: SinglePhaseTargets): { ensemble: GarmentRow[]; warnings: string[] };
@@ -56,6 +55,8 @@ interface SinglePhaseSportConfig {
   outerAirPermeability(request: RecommendationRequest): number;
   /** Requirement-first flow: report suitable-clothing needs separately from wardrobe matches. */
   requirementFirst?: boolean;
+  /** Selector has already assessed suitability of the complete outfit. */
+  completeOutfit?: boolean;
   /** Whether the torso requirement includes a wind layer for this request. */
   windTorsoRequirement?(request: RecommendationRequest): boolean;
 }

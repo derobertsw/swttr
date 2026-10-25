@@ -246,6 +246,21 @@ describe.each([
 });
 
 describe('running accessory selection and manual evaluation', () => {
+  it('selects or suggests a T-shirt and shorts for the reported mild run from the full catalog', async () => {
+    useDatabase(null, []);
+    const { status, body } = await callRoute(running, { weather: { temperature: 56, wind_speed: 8 }, exertion: 'moderate' });
+    expect(status).toBe(200);
+    expect(body.recommendation.garments.map((g: RecommendedGarment) => g.garment_type).sort()).toEqual(['shorts', 'top_short_sleeve']);
+    expect(body.requirements).toEqual(expect.arrayContaining([
+      expect.objectContaining({ region: 'torso', label: 'Lightweight short-sleeve running top', status: 'generic_suggestion', matched_is_owned: false }),
+      expect.objectContaining({ region: 'legs', label: 'Running shorts', status: 'generic_suggestion', matched_is_owned: false }),
+    ]));
+    expect(body.guidance.join(' ')).toContain('While running, wear:');
+    expect(body.guidance.join(' ')).toContain('Bring extra layers for breaks');
+    expect(body.recommendation.handwear).toBeNull();
+    expect(body.recommendation.headwear.head_warmth).toBeNull();
+  });
+
   it('does not force thermal accessories in the originally reported four-item wardrobe', async () => {
     state.userId = USER_ID;
     const garments = catalog.garments.filter(g => ['Capilene Cool Lightweight', 'Capilene Thermal Weight Boot-Length Bottoms'].includes(g.model_name));
@@ -262,6 +277,27 @@ describe('running accessory selection and manual evaluation', () => {
     expect(body.recommendation.handwear).toBeNull();
     expect(body.recommendation.headwear.head_warmth).toBeNull();
     expect(body.recommendation.accessories.hands.state).toBe('not_needed');
+    expect(body.recommendation.garments).toEqual(expect.not.arrayContaining([
+      expect.objectContaining({ id: garments.find(g => g.usage === 'underlayer')!.id }),
+    ]));
+    expect(body.requirements).toEqual(expect.arrayContaining([
+      expect.objectContaining({ region: 'legs', label: 'Running shorts', status: 'missing' }),
+    ]));
+  });
+
+  it.each(MODES)('explains remaining gaps in the best available extreme-cold outfit: $name', async mode => {
+    useDatabase(mode.userId, mode.wardrobe);
+    const { body } = await callRoute(running, { ...CONDITIONS[3].body, ...mode.extraBody });
+    const missing = (body as BiophysicsRecommendation).requirements!.filter(r =>
+      (r.region === 'torso' || r.region === 'legs') && r.status === 'missing');
+    expect(missing.length).toBeGreaterThan(0);
+    for (const requirement of missing) {
+      expect(requirement.message).toContain('best available');
+      expect(requirement.message).toMatch(/still (below|above|missing)/);
+      expect(requirement.message).not.toContain('no matching item');
+    }
+    expect(body.guidance[0]).toContain('Best available clothing while running:');
+    expect(body.guidance[0]).toContain('still has clothing gaps');
   });
 
   it('gives matching accessory assessments to automatic selection and manual removal', async () => {
