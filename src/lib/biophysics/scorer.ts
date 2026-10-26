@@ -5,6 +5,12 @@ import { calculateIreq, requiredBasicInsulation, walkingSpeedFromMetabolicRate }
 import { predictEnsembleThermal } from './ensemble';
 import { ACTIVITY_WEIGHTS, OUTER_AIR_PERMEABILITY, REGIONAL_WEIGHTS, type ActivityType } from './constants';
 import type { EnsembleScore } from '@/types/garments';
+import type { PhaseEvaluation } from '@/types/biophysics';
+
+/** Existing #67 heuristic; evaporative resistance never changes insulation. */
+export function breathabilityTarget(metabolicRate: number): number {
+  return metabolicRate > 250 ? 0.30 : metabolicRate > 150 ? 0.22 : 0.15;
+}
 
 /** Wind speed (m/s) above which an ensemble without a shell loses weather protection. */
 export const SIGNIFICANT_WIND_MS = 8;
@@ -59,7 +65,8 @@ export function scoreEnsemble(
   garments: GarmentWithProtection[],
   weather: WeatherConditions,
   activity: ActivityProfile,
-  activityType: ActivityType
+  activityType: ActivityType,
+  comfort?: Pick<PhaseEvaluation, 'decision' | 'comfortScore'>,
 ): EnsembleScore {
   // Get predicted ensemble properties
   const ensemble = predictEnsembleThermal(garments);
@@ -106,65 +113,65 @@ export function scoreEnsemble(
   const recommendations: string[] = [];
 
   const rcl = ensemble.rcl.wholeBody;
+  const decision = comfort?.decision;
 
   // Small tolerance for floating-point comparisons
   const EPSILON = 0.01;
 
-  // 1. Cold Protection Score (are you warm enough?)
-  if (rcl >= ireq.ireqNeutral - EPSILON) {
-    scores.coldProtection = 100;
-  } else if (rcl >= ireq.ireqMin - EPSILON) {
-    // Linear scale between min and neutral
-    const rangeSize = ireq.ireqNeutral - ireq.ireqMin;
-    const position = rcl - ireq.ireqMin;
-    scores.coldProtection = rangeSize > 0
-      ? 50 + 50 * (position / rangeSize)
-      : 75;
+  if (comfort) {
+    const thermalScore = comfort.comfortScore ?? 0;
+    warnings.push(...(decision?.warnings ?? []));
+    recommendations.push(...(decision?.reasons ?? []));
+    scores.coldProtection = decision?.riskType === 'cold' || decision?.status === 'mixed' ? thermalScore : decision ? 100 : 0;
+    scores.overheatPrevention = decision?.riskType === 'overheat' || decision?.status === 'mixed' ? thermalScore : decision ? 100 : 0;
   } else {
-    // Below minimum - significant penalty
-    const deficit = ireq.ireqMin - rcl;
-    scores.coldProtection = Math.max(0, 50 - deficit * 20);
-    warnings.push(
-      `Insufficient overall insulation: ${rcl.toFixed(1)} clo vs ${ireq.ireqMin.toFixed(1)} clo required`
-    );
-  }
-
-  // 2. Overheat Prevention Score (are you too warm?)
-  const excessInsulation = rcl - ireq.ireqNeutral;
-  if (excessInsulation <= 0) {
-    scores.overheatPrevention = 100;
-  } else if (excessInsulation < 1.0) {
-    scores.overheatPrevention = 100 - excessInsulation * 30;
-  } else {
-    scores.overheatPrevention = Math.max(0, 70 - excessInsulation * 20);
-    if (activity.metabolicRate > 200) {
-      // High exertion
-      warnings.push('Risk of overheating during high exertion');
-      recommendations.push('Consider more breathable layers or adding vents');
+    // 1. Cold Protection Score (are you warm enough?)
+    if (rcl >= ireq.ireqNeutral - EPSILON) {
+      scores.coldProtection = 100;
+    } else if (rcl >= ireq.ireqMin - EPSILON) {
+      // Linear scale between min and neutral
+      const rangeSize = ireq.ireqNeutral - ireq.ireqMin;
+      const position = rcl - ireq.ireqMin;
+      scores.coldProtection = rangeSize > 0
+        ? 50 + 50 * (position / rangeSize)
+        : 75;
+    } else {
+      // Below minimum - significant penalty
+      const deficit = ireq.ireqMin - rcl;
+      scores.coldProtection = Math.max(0, 50 - deficit * 20);
+      warnings.push(
+        `Insufficient overall insulation: ${rcl.toFixed(1)} clo vs ${ireq.ireqMin.toFixed(1)} clo required`
+      );
     }
+
+    // 2. Overheat Prevention Score (are you too warm?)
+    const excessInsulation = rcl - ireq.ireqNeutral;
+    if (excessInsulation <= 0) {
+      scores.overheatPrevention = 100;
+    } else if (excessInsulation < 1.0) {
+      scores.overheatPrevention = 100 - excessInsulation * 30;
+    } else {
+      scores.overheatPrevention = Math.max(0, 70 - excessInsulation * 20);
+      if (activity.metabolicRate > 200) {
+        // High exertion
+        warnings.push('Risk of overheating during high exertion');
+        recommendations.push('Consider more breathable layers or adding vents');
+      }
+    }
+
   }
 
   // 3. Breathability Score
   const evapPotential = ensemble.evapPotential;
   // Targets vary by activity intensity
-  let targetEp: number;
-  if (activity.metabolicRate > 250) {
-    // High intensity (XC skiing)
-    targetEp = 0.30;
-  } else if (activity.metabolicRate > 150) {
-    // Moderate (touring uphill)
-    targetEp = 0.22;
-  } else {
-    // Low intensity
-    targetEp = 0.15;
-  }
+  const targetEp = breathabilityTarget(activity.metabolicRate);
 
   if (evapPotential >= targetEp) {
     scores.breathability = 100;
   } else {
     const ratio = evapPotential / targetEp;
     scores.breathability = ratio * 100;
-    if (ratio < 0.7) {
+    if (!comfort && ratio < 0.7) {
       warnings.push('Limited breathability may cause moisture buildup');
     }
   }
