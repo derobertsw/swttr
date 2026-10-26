@@ -34,6 +34,7 @@ import { DayDrive, useDriveEstimates } from "@/components/trips/DriveEstimate";
 import { DayTourPlan } from "@/components/trips/TourPlan";
 import { ConditionsTask, DayConditions } from "@/components/trips/DayConditions";
 import { DayEquipment } from "@/components/trips/TouringEquipment";
+import { CrewPreparation, DayChecks } from "@/components/trips/DayChecks";
 import { accessPointFor } from "@/lib/trip-location";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
@@ -58,7 +59,7 @@ const NOT_TAKING_PART: Record<Exclude<TripDayParticipation, "participating">, st
   skipping: "Not taking part", not_on_trip: "Not on the trip",
 };
 
-/** The saved day plan, including access, conditions, crew kits and touring notes. */
+/** The saved day plan, including access, conditions, crew kits, touring notes and day checks. */
 export default function DayDetailPage({
   params,
 }: {
@@ -285,6 +286,11 @@ export default function DayDetailPage({
           ))}
 
           {me && activity === TOUR_ACTIVITY && <DayEquipment tripId={id} gear={data.gear} memberId={me.id} />}
+
+          {activity === TOUR_ACTIVITY && <>
+            <DayChecks data={data} date={date} dateLabel={dateLabel} userId={userId} onSaved={refresh} />
+            <CrewPreparation data={data} date={date} dateLabel={dateLabel} userId={userId} />
+          </>}
 
           {(crewKits.length > 0 || crewAway.length > 0) && (
             <section aria-labelledby="crew-kits-heading" className="flex flex-col gap-1">

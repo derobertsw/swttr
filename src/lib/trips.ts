@@ -7,6 +7,7 @@ import { loadTourPlans, summarizeTourPlans } from "@/lib/trip-tour-plans";
 import { buildDayMeets } from "@/lib/trip-meets";
 import { loadConditions, summarizeConditions } from "@/lib/trip-conditions";
 import { loadMemberDayOrigins } from "@/lib/trip-drive-estimates";
+import { dayChecksFor, loadDayChecks, preparationFor, summarizeDayChecks } from "@/lib/trip-day-checks";
 import type {
   Trip,
   TripDay,
@@ -169,7 +170,7 @@ export async function loadTripFull(
   const tripId = trip.id;
 
   // Kits depend only on days; don't wait for stops, members or gear to start
-  // them. Accommodation, tour plans and conditions are independent of all of these reads.
+  // them. Accommodation, tour plans, conditions and day checks are independent of all of these reads.
   const loadDaysAndKits = async () => {
     const { data } = await supabase
       .from("trip_days").select("*").eq("trip_id", tripId).order("date");
@@ -182,7 +183,7 @@ export async function loadTripFull(
     return { days, kits: (kits ?? []) as TripMemberDayKit[] };
   };
 
-  const [stopsRes, membersRes, { days, kits }, gearRes, lodgingRows, tourPlans, conditions, memberOrigins] = await Promise.all([
+  const [stopsRes, membersRes, { days, kits }, gearRes, lodgingRows, tourPlans, conditions, memberOrigins, dayChecks] = await Promise.all([
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("position"),
     supabase.from("trip_members").select("*").eq("trip_id", tripId),
     loadDaysAndKits(),
@@ -195,13 +196,15 @@ export async function loadTripFull(
     loadTourPlans(supabase, tripId),
     loadConditions(supabase, tripId),
     loadMemberDayOrigins(supabase, tripId),
+    loadDayChecks(supabase, tripId),
   ]);
 
   if (gearRes.error) throw new Error("Couldn't load shared gear. Try again.");
   const stops = (stopsRes.data ?? []) as TripStop[];
   const tour_plans = summarizeTourPlans(tourPlans, days);
+  const members = (membersRes.data ?? []) as TripMember[];
   const lodging = buildLodging(trip, lodgingRows.stays, lodgingRows.assignments,
-    { members: (membersRes.data ?? []) as TripMember[], attendance: lodgingRows.attendance, per_member: lodgingRows.per_member });
+    { members, attendance: lodgingRows.attendance, per_member: lodgingRows.per_member });
   return {
     trip: { ...trip, status: classifyTripStatus(trip.start_date, trip.end_date) },
     stops,
@@ -217,6 +220,8 @@ export async function loadTripFull(
     meets: buildDayMeets(days, tourPlans),
     conditions: summarizeConditions(conditions, { stops, days, tour_plans }),
     member_origins: memberOrigins,
+    // Before the day checks migration there are none to show or record.
+    ...(dayChecks ? { day_checks: summarizeDayChecks(dayChecks, { trip, stops, days, members, tour_plans, lodging }) } : {}),
   };
 }
 
@@ -226,17 +231,20 @@ export const ORGANIZER_OWN_NAME = "You";
 /**
  * The trip as `userId` sees it. Only the organizer sees invitation links, or
  * their own row named "You"; to everyone else, until the organizer renames
- * it, that row is "Organizer".
+ * it, that row is "Organizer". Day checks say which are theirs to record, and
+ * `preparation` lists what they can act on (#212).
  */
 export function tripFullFor(full: TripFull, userId: string): TripFull {
-  if (userId === full.trip.owner_user_id) return full;
   const nameFor = (m: { role: TripMember["role"]; display_name: string }) =>
     m.role === "organizer" && m.display_name === ORGANIZER_OWN_NAME ? "Organizer" : m.display_name;
-  return {
+  const viewed = userId === full.trip.owner_user_id ? full : {
     ...full,
     members: full.members.map((m) => ({ ...m, invite_token: null, display_name: nameFor(m) })),
     ...(full.lodging ? { lodging: { ...full.lodging, people: full.lodging.people.map((p) => ({ ...p, display_name: nameFor(p) })) } } : {}),
   };
+  if (!full.day_checks) return viewed;
+  const day_checks = dayChecksFor(full.day_checks, full, userId);
+  return { ...viewed, day_checks, preparation: preparationFor(viewed, day_checks, userId) };
 }
 
 /** Date-based status on the UTC calendar; the stored status can be stale. */

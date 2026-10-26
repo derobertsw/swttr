@@ -68,7 +68,7 @@ export function conditionsContext(
 }
 
 /** JSON with sorted keys, so a context read back from jsonb compares equal to one built here. */
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
   if (value === undefined || value === null) return "null";
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (typeof value === "object") {

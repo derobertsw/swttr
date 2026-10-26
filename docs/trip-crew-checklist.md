@@ -16,11 +16,12 @@ The Day checklist (`/trips/:id/rollcall`, in Crew) replaces Roll call, which jud
 - **Tonight**: their stay that night, or Not planned yet for a gap, linked to Stays.
 - **Shared gear** assigned to them, for the whole trip, with #179's states: Awaiting acceptance, Accepted · not packed, Packed. A response from before acceptance tracking says only Assigned. Each item links to it on the shared gear page (`/gear#shared-<id>`), which scrolls to it once the list loads.
 - **Source reviews**, on days with official sources (#211): how many of the day's sources they've reviewed, how many reviews were recorded before the plan changed, and the latest review's date. A review is a dated fact, not a verdict about conditions. Managed guests and pending invitations have no account to record one, so they have none.
+- **Day checks**, on Backcountry days they take part in (#212, [trip-touring-prep.md](trip-touring-prep.md#day-checks)): Tour and backup plan reviewed and Transceiver check, each recorded with its time and who saved it, recorded before what it covers changed, or not recorded yet. Your own link to Day checks on the day, everyone else's to Crew preparation. Pending invitations have none.
 - **Your packing**, on your own row only: a link to Packing. Packing checks are private (#171), so nobody's checks or counts appear here, and touring equipment checks (#212) stay on Packing.
 
 ## API
 
-`GET /api/v1/trips/:id/checklist`, for anyone on the trip (`requireTripAccess`), returns `{trip, default_date, viewer_member_id, days}`. Each day has its `date_label`, activity and place, and `people`, each with `membership`, `participation`, `clothing`, `tonight`, `shared` and `conditions` and their labels. `buildDayChecklists` in `src/lib/trip-checklist.ts` works it out from the trip as `GET /api/v1/trips/:id` loads it, with names as the viewer sees them (the organizer is "You" only to themself). Responses are `private, no-store`.
+`GET /api/v1/trips/:id/checklist`, for anyone on the trip (`requireTripAccess`), returns `{trip, default_date, viewer_member_id, days}`. Each day has its `date_label`, activity and place, and `people`, each with `membership`, `participation`, `clothing`, `tonight`, `shared`, `conditions` and `day_checks` and their labels. `buildDayChecklists` in `src/lib/trip-checklist.ts` works it out from the trip as `GET /api/v1/trips/:id` loads it, with names as the viewer sees them (the organizer is "You" only to themself). Responses are `private, no-store`.
 
 ## Elsewhere
 

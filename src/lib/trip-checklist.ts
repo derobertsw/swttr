@@ -2,18 +2,31 @@ import "server-only";
 import { tripActivityNeedsClothing } from "@/lib/trip-activities";
 import { dateLabel, participationLabel } from "@/lib/trip-lodging";
 import { outfitMismatches } from "@/lib/trip-kit-fit";
-import type { TripChecklist, TripChecklistPerson, TripDayChecklist, TripFull, TripGroupGear, TripMember } from "@/types/trips";
+import { sharedGearStatus } from "@/lib/shared-gear-status";
+import type { TripChecklist, TripChecklistPerson, TripDayCheck, TripDayChecklist, TripFull, TripGroupGear, TripMember } from "@/types/trips";
 
 const MEMBERSHIP_LABELS: Record<TripMember["status"], string> = { joined: "Joined", invited: "Invitation pending", guest: "Managed guest", left: "Left the trip" };
 const sentence = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
-/** As the shared gear list says it (#179); a snapshot from before acceptance tracking can only say Assigned. */
-function sharedStatus(item: TripGroupGear): TripChecklistPerson["shared"][number] {
-  const base = { id: item.id, description: item.description };
-  if (item.accepted_at === undefined) return { ...base, status: "assigned", label: "Assigned" };
-  if (item.packed_at) return { ...base, status: "packed", label: "Packed" };
-  if (item.accepted_at) return { ...base, status: "accepted", label: "Accepted · not packed" };
-  return { ...base, status: "awaiting", label: "Awaiting acceptance" };
+const sharedStatus = (item: TripGroupGear): TripChecklistPerson["shared"][number] =>
+  ({ id: item.id, description: item.description, ...sharedGearStatus(item) });
+
+const CHECK_NAMES: Record<TripDayCheck["kind"], [done: string, missing: string]> = {
+  plan_review: ["Tour and backup plan reviewed", "Tour and backup plan review not recorded yet"],
+  transceiver: ["Transceiver check recorded", "Transceiver check not recorded yet"],
+};
+
+/** A day check as the checklist states it (#212): when it was recorded and by whom, or that it isn't yet. */
+function dayCheckLabel(full: TripFull, member: TripMember, check: TripDayCheck, plan: boolean): string {
+  const [done, missing] = CHECK_NAMES[check.kind];
+  if (check.kind === "plan_review" && !plan) return "No tour plan to review yet";
+  if (check.status === "not_recorded") return missing;
+  const entry = check.current!;
+  const by = entry.recorded_by !== member.user_id
+    ? ` · by ${full.members.find((candidate) => candidate.user_id === entry.recorded_by)?.display_name ?? "the organizer"}` : "";
+  return check.status === "out_of_date"
+    ? `${done} before it changed: ${check.stale_reasons.join(" · ")}`
+    : `${done} · ${entry.time_label}${by}`;
 }
 
 /** The first trip day on or after today, or the last day once the trip is over. */
@@ -23,12 +36,14 @@ function defaultDate(dates: string[], today: string): string | null {
 
 /**
  * Each trip day's checklist (#336): who's taking part, and for each person
- * their clothing, tonight's stay, shared gear and source reviews as separate
- * facts. Personal packing checks are private, so they're never here.
+ * their clothing, tonight's stay, shared gear, source reviews and day checks
+ * as separate facts. Personal packing checks are private, so they're never
+ * here.
  */
 export function buildDayChecklists(full: TripFull, viewerUserId: string | null, today = new Date().toISOString().slice(0, 10)): TripChecklist {
   const members = full.members.filter((member) => member.status !== "left");
   const days = [...full.days].sort((a, b) => a.date.localeCompare(b.date));
+  const plans = new Map(full.day_checks?.map((entry) => [entry.trip_day_id, entry.plan_available]));
   const checklists = days.map((day): TripDayChecklist => {
     // The day's own stop, or the trip's first, as the day page reads it.
     const stop = full.stops.find((candidate) => candidate.id === day.stop_id) ?? full.stops[0] ?? null;
@@ -59,6 +74,7 @@ export function buildDayChecklists(full: TripFull, viewerUserId: string | null, 
           label: [reviews.length ? `${reviewed} of ${sources.length} ${sources.length === 1 ? "source" : "sources"} reviewed` : "No sources reviewed yet",
             outOfDate && `${outOfDate} reviewed before the plan changed`, latest && `latest ${dateLabel(latest.slice(0, 10))}`].filter(Boolean).join(" · ") };
       }
+      const checks = full.day_checks?.find((entry) => entry.date === day.date)?.checks.filter((check) => check.member_id === member.id) ?? [];
       return {
         member_id: member.id, display_name: member.display_name, role: member.role, membership: member.status,
         membership_label: member.role === "organizer" ? "Organizer" : MEMBERSHIP_LABELS[member.status],
@@ -67,6 +83,7 @@ export function buildDayChecklists(full: TripFull, viewerUserId: string | null, 
         tonight: night ? { state: night.state, stay_id: night.stay_id, label: night.label, gap: !!lodging?.gaps.includes(day.date) } : null,
         shared: full.gear.filter((item) => item.assignee_member_id === member.id).map(sharedStatus),
         conditions,
+        day_checks: checks.length ? checks.map((check) => ({ kind: check.kind, status: check.status, label: dayCheckLabel(full, member, check, !!plans.get(day.id)) })) : null,
       };
     });
     return { date: day.date, date_label: dateLabel(day.date), activity, place: stop?.name ?? null, people };

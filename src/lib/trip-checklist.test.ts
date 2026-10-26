@@ -4,7 +4,8 @@ import { buildLodging } from "@/lib/trip-lodging";
 import { checklistMembers as members, checklistTrip as trip, gear, kit, source } from "@/test/dayChecklist";
 import { savedOutfit } from "@/test/savedKit";
 import { ALEX, BLAIR, CASEY, DANA, ELI, FRAN, FRI, MON, PINE, SAT, SPLIT_MEMBERS, SPLIT_TRIP, SUN, splitRows } from "@/test/splitStays";
-import type { TripFull } from "@/types/trips";
+import { planReviewContext, summarizeDayChecks } from "@/lib/trip-day-checks";
+import type { TripFull, TripTourPlanSummary } from "@/types/trips";
 
 const person = (full: TripFull, date: string, memberId: string) =>
   buildDayChecklists(full, null, FRI).days.find((day) => day.date === date)!.people.find((entry) => entry.member_id === memberId)!;
@@ -89,6 +90,34 @@ describe("Day checklist (#336)", () => {
     expect(person(full, SAT, ELI.id).conditions?.label).toBe("No sources reviewed yet");
     expect(person(full, SAT, DANA.id).conditions).toBeNull();
     expect(person(full, FRI, ALEX.id).conditions).toBeNull();
+  });
+
+  it("states each person's day checks on Backcountry days they take part in, and who recorded a guest's (#212)", () => {
+    const tour = (date: string) => ({ id: `day-${date}`, trip_id: SPLIT_TRIP.id, stop_id: "stop-stowe", date, activity: "Backcountry" });
+    const plan = { trip_day_id: `day-${SAT}`, objective: "Mount Mansfield", route_url: null, backup_plan: null,
+      return_time: null, return_day_offset: 0, time_zone: "America/New_York" } as TripTourPlanSummary;
+    const base = trip({ days: [tour(SAT), tour(SUN)], tour_plans: [plan] });
+    const recorded = (memberId: string, kind: "plan_review" | "transceiver", by: string, number: number, context: object) => ({
+      id: `entry-${number}`, entry_number: number, trip_day_id: `day-${SAT}`, trip_member_id: memberId, kind, action: "recorded" as const,
+      recorded_by: by, context, plan_revision: null, time_zone: "America/New_York", created_at: "2026-10-10T10:12:00Z" });
+    const planNow = planReviewContext(base, base.days[0]);
+    const entries = [
+      recorded(ALEX.id, "plan_review", "user-alex", 1, planNow),
+      recorded(BLAIR.id, "plan_review", "user-blair", 2, { ...planNow, plan: { ...planNow.plan!, objective: "Smugglers' Notch" } }),
+      recorded(DANA.id, "transceiver", "user-alex", 3, { date: SAT, transceiver: null }),
+    ];
+    const full = { ...base, day_checks: summarizeDayChecks({ entries, equipment: new Map() }, base) };
+    expect(person(full, SAT, ALEX.id).day_checks).toEqual([
+      { kind: "plan_review", status: "recorded", label: "Tour and backup plan reviewed · 6:12 AM EDT · Sat Oct 10" },
+      { kind: "transceiver", status: "not_recorded", label: "Transceiver check not recorded yet" },
+    ]);
+    expect(person(full, SAT, BLAIR.id).day_checks?.[0]).toEqual({ kind: "plan_review", status: "out_of_date", label: "Tour and backup plan reviewed before it changed: Route changed" });
+    expect(person(full, SAT, DANA.id).day_checks?.[1].label).toBe("Transceiver check recorded · 6:12 AM EDT · Sat Oct 10 · by Alex");
+    // Casey isn't taking part on Saturday, and a pending invitation has no checks.
+    expect(person(full, SAT, CASEY.id).day_checks).toBeNull();
+    expect(person(full, SAT, FRAN.id).day_checks).toBeNull();
+    expect(person(full, SUN, ALEX.id).day_checks?.[0].label).toBe("No tour plan to review yet");
+    expect(person(trip(), SAT, ALEX.id).day_checks).toBeNull();
   });
 
   it("opens on today during the trip, the first day before it and the last after it, and names the viewer", () => {
