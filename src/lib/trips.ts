@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { jsonError, requireUser, type AuthedContext } from "@/lib/api";
 import { buildLodging, loadLodgingRows } from "@/lib/trip-lodging";
 import { loadTourPlans, summarizeTourPlans } from "@/lib/trip-tour-plans";
+import { buildDayMeets } from "@/lib/trip-meets";
 import { loadConditions, summarizeConditions } from "@/lib/trip-conditions";
 import { loadMemberDayOrigins } from "@/lib/trip-drive-estimates";
 import { dayChecksFor, loadDayChecks, preparationFor, summarizeDayChecks } from "@/lib/trip-day-checks";
@@ -216,6 +217,7 @@ export async function loadTripFull(
     gear: (gearRes.data ?? []) as TripGroupGear[],
     lodging,
     tour_plans,
+    meets: buildDayMeets(days, tourPlans),
     conditions: summarizeConditions(conditions, { stops, days, tour_plans }),
     member_origins: memberOrigins,
     // Before the day checks migration there are none to show or record.

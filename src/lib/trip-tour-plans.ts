@@ -1,8 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { dateLabel, shiftDate } from "@/lib/trip-lodging";
+import { dateLabel } from "@/lib/trip-lodging";
 import { hasTripCoordinates } from "@/lib/trip-forecast";
-import { isTimeZone, zonedTimeToInstant } from "@/lib/timeZones";
+import { clockTime, timeLabel } from "@/lib/trip-meets";
+import { isTimeZone } from "@/lib/timeZones";
 import type { TripDay, TripStop, TripTourPlan, TripTourPlanInput, TripTourPlanSummary } from "@/types/trips";
 
 type FieldError = { error: string; field: string };
@@ -18,9 +19,11 @@ const LABELS: Record<string, string> = {
   backup_plan: "backup plan", checkin_notes: "check-in plan", pickup_notes: "exit or pickup notes",
 };
 
-const minutesOf = (time: string, offset: number) => offset * 1440 + Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
-
-/** The organizer's tour plan, or the first field to fix. Every field but the objective is optional. */
+/**
+ * The organizer's tour plan, or the first field to fix. Every field but the
+ * objective is optional. The meet time is the day's (#333), so the API checks
+ * the return against it.
+ */
 export function parseTourPlan(value: unknown): TripTourPlanInput | FieldError {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { error: "Enter a route or objective.", field: "objective" };
   const input = value as Record<string, unknown>;
@@ -41,17 +44,10 @@ export function parseTourPlan(value: unknown): TripTourPlanInput | FieldError {
     } catch { return { error: `Use a complete http or https ${LABELS[key]}.`, field: key }; }
   }
 
-  const time = (key: string) => input[key] == null || input[key] === "" ? null
-    : typeof input[key] === "string" && /^([01]\d|2[0-3]):[0-5]\d(:00)?$/.test(input[key]) ? input[key].slice(0, 5) : undefined;
-  const meet = time("meet_time"), back = time("return_time");
-  if (meet === undefined) return { error: "Choose a valid meet time.", field: "meet_time" };
+  const back = clockTime(input.return_time);
   if (back === undefined) return { error: "Choose a valid return time.", field: "return_time" };
-  const meetOffset = input.meet_day_offset ?? 0, returnOffset = input.return_day_offset ?? 0;
-  if (meetOffset !== 0 && meetOffset !== -1) return { error: "Choose the day you meet.", field: "meet_day_offset" };
+  const returnOffset = input.return_day_offset ?? 0;
   if (returnOffset !== 0 && returnOffset !== 1) return { error: "Choose the day you return.", field: "return_day_offset" };
-  if (meet && back && minutesOf(back, returnOffset) <= minutesOf(meet, meetOffset)) {
-    return { error: "The return target must be after the meet time. Choose the next day for an overnight return.", field: "return_time" };
-  }
 
   const number = (key: string, min: number, max: number, integer: boolean) => {
     const entry = input[key];
@@ -75,29 +71,12 @@ export function parseTourPlan(value: unknown): TripTourPlanInput | FieldError {
 
   return {
     objective: text.objective, route_url: text.route_url ?? null,
-    meet_time: meet, meet_day_offset: meetOffset, return_time: back, return_day_offset: returnOffset,
+    return_time: back, return_day_offset: returnOffset,
     distance, distance_unit: distanceUnit, ascent, ascent_unit: ascentUnit, duration_minutes: duration,
     metrics_source: text.metrics_source ?? null, metrics_source_url: text.metrics_source_url ?? null,
     approach_notes: text.approach_notes ?? null, access_notes: text.access_notes ?? null, access_url: text.access_url ?? null,
     backup_plan: text.backup_plan ?? null, checkin_notes: text.checkin_notes ?? null, pickup_notes: text.pickup_notes ?? null,
   };
-}
-
-const clock = (time: string) => new Date(Date.UTC(2000, 0, 1, Number(time.slice(0, 2)), Number(time.slice(3, 5))))
-  .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
-
-/** "6:30 AM MDT · Sat Oct 10", on the destination's clock; its zone's abbreviation for that date when known. */
-function timeLabel(date: string, time: string | null, offset: number, zone: string | null): string | null {
-  if (!time) return null;
-  const day = shiftDate(date, offset);
-  let suffix = "destination time";
-  if (zone) {
-    const instant = zonedTimeToInstant(`${day}T${time.slice(0, 5)}`, zone);
-    suffix = new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "short" }).formatToParts(instant)
-      .find((part) => part.type === "timeZoneName")?.value ?? zone;
-  }
-  const relative = offset < 0 ? ", the day before" : offset > 0 ? ", the day after" : "";
-  return `${clock(time.slice(0, 5))} ${suffix} · ${dateLabel(day)}${relative}`;
 }
 
 function metricsLabel(plan: TripTourPlanInput): string | null {
@@ -111,34 +90,40 @@ function metricsLabel(plan: TripTourPlanInput): string | null {
   return parts.length ? parts.join(" · ") : null;
 }
 
+/**
+ * A tour plan as stored. Its meet columns stay for an older API, unread here
+ * apart from the days' fallback before migration 20261024230000 (#333).
+ */
+type TourPlanRow = TripTourPlan & { meet_time?: string | null; meet_day_offset?: number };
+
 /** A saved plan with the labels the day page shows. Every time is the destination's wall clock. */
-export function buildTourPlanSummary(plan: TripTourPlan, date: string): TripTourPlanSummary {
+export function buildTourPlanSummary(row: TourPlanRow, date: string): TripTourPlanSummary {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out of the response
+  const { meet_time, meet_day_offset, ...plan } = row;
   const zone = plan.time_zone && isTimeZone(plan.time_zone) ? plan.time_zone : null;
   const metrics = metricsLabel(plan);
-  const hasTimes = !!(plan.meet_time || plan.return_time);
   return {
     ...plan, date,
-    meet_label: timeLabel(date, plan.meet_time, plan.meet_day_offset, zone),
     return_label: timeLabel(date, plan.return_time, plan.return_day_offset, zone),
     metrics_label: metrics,
     metrics_source_label: metrics ? plan.metrics_source ? `Source: ${plan.metrics_source}` : "Crew estimate" : null,
-    time_zone_label: !hasTimes ? null : zone ? `Times are local to the destination (${zone}).`
+    time_zone_label: !plan.return_time ? null : zone ? `Times are local to the destination (${zone}).`
       : "Times are local to the destination. Its time zone wasn't confirmed when this plan was saved.",
     updated_label: `Last changed ${dateLabel(plan.updated_at.slice(0, 10))} by the organizer`,
   };
 }
 
 /** The trip's saved plans. Plans don't wait for days, so the trip loads in its usual two stages. */
-export async function loadTourPlans(supabase: SupabaseClient, tripId: string): Promise<TripTourPlan[]> {
+export async function loadTourPlans(supabase: SupabaseClient, tripId: string): Promise<TourPlanRow[]> {
   const { data, error } = await supabase.from("trip_day_tour_plans").select("*").eq("trip_id", tripId);
   // Before migration 026 there's no table, and so no saved plan to hide. Any other failure might hide one.
   if (error && ["42P01", "PGRST205"].includes(error.code)) return [];
   if (error) throw new Error("Couldn't load tour plans. Try again.");
-  return (data ?? []) as TripTourPlan[];
+  return (data ?? []) as TourPlanRow[];
 }
 
 /** Each plan labelled for its day's date, in date order. */
-export function summarizeTourPlans(plans: TripTourPlan[], days: TripDay[]): TripTourPlanSummary[] {
+export function summarizeTourPlans(plans: TourPlanRow[], days: TripDay[]): TripTourPlanSummary[] {
   const dates = new Map(days.map((day) => [day.id, day.date]));
   return plans
     .filter((plan) => dates.has(plan.trip_day_id))

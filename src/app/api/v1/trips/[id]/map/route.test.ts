@@ -12,9 +12,10 @@ const get = (query = "", id = full.trip.id) => GET(new Request(`https://example.
 
 /**
  * Exercise actual access helper, PostgREST query builder, loading and projection together.
- * Without `perMember`, the database is from before per-person nights (#331) and has only the crew's.
+ * Without `perMember`, the database is from before per-person nights (#331) and has only the crew's;
+ * without `meets`, from before the day's meet time (#333).
  */
-function database(status = "joined", userId = "member", failures: string[] = [], perMember = true) {
+function database(status = "joined", userId = "member", failures: string[] = [], perMember = true, meets = true) {
   const requests: URL[] = [];
   const tables: Record<string, unknown[]> = {
     trips: [full.trip], trip_stops: full.stops, trip_days: full.days, trip_stays: full.lodging!.stays,
@@ -31,6 +32,9 @@ function database(status = "joined", userId = "member", failures: string[] = [],
       const table = url.pathname.split("/").at(-1)!;
       if (failures.includes(table)) return Response.json({ code: "XX000", message: "database secret" }, { status: 500 });
       if (!perMember && table.startsWith("trip_member_")) return Response.json({ code: "PGRST205", message: "missing table" }, { status: 404 });
+      if (!meets && table === "trip_days" && url.searchParams.get("select")?.includes("meet_")) {
+        return Response.json({ code: "42703", message: "column trip_days.meet_time does not exist" }, { status: 400 });
+      }
       const rows = (tables[table] ?? []).filter((value) => {
         const row = value as Record<string, unknown>;
         return [...url.searchParams].every(([column, filter]) => !filter.startsWith("eq.") && !filter.startsWith("neq.")
@@ -101,6 +105,25 @@ describe("GET trip map", () => {
     const response = await get("?date=2027-01-10");
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ days: [{ activity: "Backcountry" }] });
+  });
+  it("reads each day's meet time for any sport, at its access point (#333)", async () => {
+    const { tables } = database();
+    tables.trip_days = full.days.map((day, index) => ({ ...day, activity: "Alpine", meet_time: index === 2 ? "08:15:00" : null, meet_day_offset: 0,
+      meet_time_zone: index === 2 ? "America/New_York" : null }));
+    const response = await get("?date=2027-01-10");
+    expect(response.status).toBe(200);
+    const [day] = (await response.json()).days;
+    expect(day).toMatchObject({ meet: { label: "8:15 AM EST · Sun Jan 10", time_zone_label: "Local time at the destination (America/New_York)." } });
+    expect(day.meeting_place_id).toBe(day.access_place_id);
+  });
+  it("reads a tour plan's meet time before the meet time moves to the day", async () => {
+    const { tables, requests } = database("joined", "member", [], true, false);
+    tables.trip_day_tour_plans = [{ id: "tour", trip_id: full.trip.id, trip_day_id: full.days[2].id, objective: "North Ridge", meet_time: "07:00:00",
+      meet_day_offset: 0, return_time: null, return_day_offset: 0, time_zone: null, updated_at: "2027-01-01T12:00:00Z" }];
+    const response = await get("?date=2027-01-10");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ days: [{ meet: { label: "7:00 AM destination time · Sun Jan 10" } }] });
+    expect(requests.filter((url) => url.pathname.endsWith("trip_days"))).toHaveLength(2);
   });
   it("returns a private 401 when signed out", async () => {
     vi.mocked(requireUser).mockResolvedValue(NextResponse.json({ error: "Authentication required" }, { status: 401 }));

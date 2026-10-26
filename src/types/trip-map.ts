@@ -48,8 +48,10 @@ export interface TripMapDay {
   tonight_status: "assigned" | "no_stay" | "unplanned";
   /** #210 currently has free text only; there is no separately mappable pickup. */
   pickup: { place_id: null; state: "notes_only" | "not_set"; notes: string | null };
+  /** The day's meet time (#333), for every sport; where is `meeting_place_id`, the access point. */
+  meet: { label: string; time_zone_label: string } | null;
   /** approach_notes is the organizer's ski/walk approach as entered: never a calculated route or time. */
-  tour: { objective: string; route_url: string | null; meet_label: string | null; time_zone_label: string | null; access_notes: string | null; approach_notes: string | null } | null;
+  tour: { objective: string; route_url: string | null; access_notes: string | null; approach_notes: string | null } | null;
   drive: TripMapDrive;
   geometry: TripMapGeometry;
   /**

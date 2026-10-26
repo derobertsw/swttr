@@ -4,23 +4,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DayTourPlan } from "./TourPlan";
 import { buildTourPlanSummary } from "@/lib/trip-tour-plans";
 import { fakeTripApi, reply, sentBodies, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
-import type { TripLocation, TripTourPlan, TripTourPlanSummary } from "@/types/trips";
+import type { TripDayMeet, TripLocation, TripTourPlan, TripTourPlanSummary } from "@/types/trips";
 
 const DATE = "2026-10-10";
 const route = `/api/v1/trips/${TRIP.id}/days/${DATE}/tour-plan`;
 const saved = (extra: Partial<TripTourPlan> = {}): TripTourPlanSummary => buildTourPlanSummary({
   id: "plan-1", trip_id: TRIP.id, trip_day_id: "day-1", objective: "Tuckerman Ravine", route_url: "https://example.com/route",
-  meet_time: "06:30:00", meet_day_offset: 0, distance: 9.5, distance_unit: "km", ascent: 1100, ascent_unit: "m",
+  distance: 9.5, distance_unit: "km", ascent: 1100, ascent_unit: "m",
   duration_minutes: 360, metrics_source: null, metrics_source_url: null, approach_notes: "Skin up the Tuckerman trail", access_notes: "Pinkham Notch lot fills by 7",
   access_url: null, backup_plan: "Hillman's Highway if the bowl is loaded", return_time: "15:00:00", return_day_offset: 0,
   checkin_notes: "Text Sam by 5 PM", pickup_notes: null, time_zone: "America/New_York", revision: 3, created_by: "user-1",
   updated_by: "user-1", created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z", ...extra,
 }, DATE);
-const DAYS = [{ id: "day-1", trip_id: TRIP.id, stop_id: null, date: DATE, activity: "Backcountry" }];
+const DAYS = [{ id: "day-1", trip_id: TRIP.id, stop_id: null, date: DATE, activity: "Backcountry", meet_time: "06:30:00", meet_day_offset: 0 as const, meet_time_zone: "America/New_York" }];
+// The day's meet time (#333), as the server labels it.
+const MEETS: TripDayMeet[] = [{ date: DATE, meet_label: "6:30 AM EDT · Sat Oct 10", time_zone_label: "Local time at the destination (America/New_York)." }];
 const onSaved = vi.fn().mockResolvedValue(undefined);
 const onRestore = vi.fn().mockResolvedValue(undefined);
 function renderPlan({ plans = [] as TripTourPlanSummary[], activity = "Backcountry" as string | null, canEdit = true } = {}) {
-  return render(<DayTourPlan data={tripFull({ days: DAYS, tour_plans: plans })} date={DATE} dateLabel="Sat Oct 10" activity={activity}
+  return render(<DayTourPlan data={tripFull({ days: DAYS, tour_plans: plans, meets: MEETS })} date={DATE} dateLabel="Sat Oct 10" activity={activity}
     canEdit={canEdit} onSaved={onSaved} onRestore={onRestore} />);
 }
 
@@ -48,10 +50,14 @@ describe("Day tour plan", () => {
     await act(async () => finish());
     expect(await screen.findByText("Tour plan saved.")).toBeInTheDocument();
     expect(onSaved).toHaveBeenCalledOnce();
-    expect(sentBodies(api, `PUT ${route}`)[0]).toMatchObject({
+    const [body] = sentBodies(api, `PUT ${route}`) as Array<{ plan: object }>;
+    expect(body).toMatchObject({
       day_id: "day-1", expected_revision: 0,
-      plan: { objective: "Tuckerman Ravine", meet_time: null, meet_day_offset: 0, distance: null, distance_unit: null, duration_minutes: null, return_day_offset: 0 },
+      plan: { objective: "Tuckerman Ravine", distance: null, distance_unit: null, duration_minutes: null, return_day_offset: 0 },
     });
+    // The meet time is the day's (#333).
+    expect(body.plan).not.toHaveProperty("meet_time");
+    expect(body.plan).not.toHaveProperty("meet_day_offset");
   });
 
   it("keeps the input and its save identity after a failure, so a retry can't save twice", async () => {
@@ -61,8 +67,6 @@ describe("Day tour plan", () => {
     renderPlan();
     await user.click(screen.getByRole("button", { name: "Add tour plan" }));
     await user.type(screen.getByLabelText("Route or objective"), "Tuckerman Ravine");
-    await user.type(screen.getByLabelText("Meet time (destination time)"), "06:30");
-    await user.selectOptions(screen.getByLabelText("Meet on"), "The day before");
     await user.click(screen.getByRole("button", { name: "Save tour plan" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Database unavailable");
     expect(screen.getByLabelText("Route or objective")).toHaveValue("Tuckerman Ravine");
@@ -70,7 +74,7 @@ describe("Day tour plan", () => {
     const bodies = sentBodies(api, `PUT ${route}`) as Array<{ mutation_id: string; plan: object }>;
     expect(bodies).toHaveLength(2);
     expect(bodies[0].mutation_id).toBe(bodies[1].mutation_id);
-    expect(bodies[0].plan).toMatchObject({ meet_time: "06:30", meet_day_offset: -1 });
+    expect(bodies[1].plan).toMatchObject({ objective: "Tuckerman Ravine" });
   });
 
   it("focuses the field the server rejects, opening its section", async () => {
@@ -118,20 +122,24 @@ describe("Day tour plan", () => {
     expect(screen.getByText("Times are local to the destination (America/New_York).")).toBeInTheDocument();
   });
 
-  it("meets at the day's access point from Getting there, its own or its stop's", async () => {
+  it("meets at the day's meet time and access point, its own or its stop's", async () => {
     const lot = (label: string): TripLocation => ({ label, address: null, latitude: 44.2571, longitude: -71.2531, precision: "exact",
       time_zone: null, source: "manual", provider: null, provider_id: null, attribution: null });
     const stop = { ...STOWE_STOP, access_point: lot("Pinkham Notch lot") };
-    const { rerender } = render(<DayTourPlan data={tripFull({ stops: [stop], days: DAYS, tour_plans: [saved()] })} date={DATE} dateLabel="Sat Oct 10"
+    const { rerender } = render(<DayTourPlan data={tripFull({ stops: [stop], days: DAYS, tour_plans: [saved()], meets: MEETS })} date={DATE} dateLabel="Sat Oct 10"
       activity="Backcountry" canEdit onSaved={onSaved} onRestore={onRestore} />);
     expect(screen.getByText("6:30 AM EDT · Sat Oct 10 · Pinkham Notch lot")).toBeInTheDocument();
-    const own = [{ ...DAYS[0], access_point: lot("Cog Railway base"), access_point_stop_id: STOWE_STOP.id }];
-    rerender(<DayTourPlan data={tripFull({ stops: [stop], days: own, tour_plans: [saved({ meet_time: null })] })} date={DATE} dateLabel="Sat Oct 10"
+    const own = [{ ...DAYS[0], meet_time: null, meet_time_zone: null, access_point: lot("Cog Railway base"), access_point_stop_id: STOWE_STOP.id }];
+    rerender(<DayTourPlan data={tripFull({ stops: [stop], days: own, tour_plans: [saved()], meets: [] })} date={DATE} dateLabel="Sat Oct 10"
       activity="Backcountry" canEdit onSaved={onSaved} onRestore={onRestore} />);
     expect(screen.getByText("Time not set · Cog Railway base")).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "Change tour plan" }));
-    expect(within(screen.getByRole("dialog")).getByText("Cog Railway base")).toBeVisible();
-    expect(within(screen.getByRole("dialog")).getByText("Change the day's access point in Getting there.")).toBeVisible();
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Time not set · Cog Railway base")).toBeVisible();
+    expect(within(dialog).getByText("Change the day's meet time in Meet and start, and its access point in Getting there.")).toBeVisible();
+    // The editor has no meet time of its own.
+    expect(within(dialog).queryByLabelText(/Meet time/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Meet on")).not.toBeInTheDocument();
   });
 
   it("gives members the plan without organizer actions", () => {

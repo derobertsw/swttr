@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { drivePlans } from "@/lib/trip-drive";
 import type { ManualEstimateRow } from "@/lib/trip-drive-estimates";
+import { buildDayMeets } from "@/lib/trip-meets";
 import { buildTourPlanSummary } from "@/lib/trip-tour-plans";
 import { driveTrip, place } from "@/test/driveTrip";
 import { storedDrive, tripMapFixture } from "@/test/tripMap";
@@ -149,13 +150,15 @@ describe("Selected day logistics on the trip map", () => {
   it("separates the meeting, pickup notes, approach and tour route from the drive", async () => {
     const full = driveTrip();
     const plan = { id: "tour", trip_id: full.trip.id, trip_day_id: full.days[1].id, objective: "North Ridge", route_url: "https://example.com/tour",
-      meet_time: "08:00", meet_day_offset: 0, return_time: null, time_zone: "America/New_York", revision: 1, updated_at: "2027-01-01T12:00:00Z",
+      return_time: null, time_zone: "America/New_York", revision: 1, updated_at: "2027-01-01T12:00:00Z",
       access_notes: "Permit required at the kiosk", pickup_notes: "Second car at the lower lot", approach_notes: "Skin 40 min up the summer road" } as TripTourPlan;
     full.tour_plans = [buildTourPlanSummary(plan, SAT)];
+    full.days[1] = { ...full.days[1], meet_time: "08:00:00", meet_day_offset: 0, meet_time_zone: "America/New_York" };
+    full.meets = buildDayMeets(full.days, []);
     const map = await tripMapFixture(full);
     const { card } = summary(map, SAT);
-    expect(row(card, "Meet")).toHaveTextContent(/8:00.* · Spruce Peak lot/);
-    expect(row(card, "Meet")).toHaveTextContent("Times are local to the destination (America/New_York).");
+    expect(row(card, "Meet")).toHaveTextContent("8:00 AM EST · Sat Jan 9 · Spruce Peak lot");
+    expect(row(card, "Meet")).toHaveTextContent("Local time at the destination (America/New_York).");
     expect(row(card, "Pickup")).toHaveTextContent("Second car at the lower lotNotes only · not on the map");
     expect(row(card, "Approach (ski or walk)")).toHaveTextContent("Skin 40 min up the summer roadFrom the tour plan · not a calculated route or time");
     expect(row(card, "Access notes")).toHaveTextContent("Permit required at the kiosk");
@@ -169,7 +172,7 @@ describe("Selected day logistics on the trip map", () => {
   it("leaves out a saved tour plan that isn't in use after the day changed activity", async () => {
     const full = driveTrip();
     const plan = { id: "tour", trip_id: full.trip.id, trip_day_id: full.days[1].id, objective: "North Ridge", route_url: "https://example.com/tour",
-      meet_time: "08:00", meet_day_offset: 0, return_time: null, time_zone: "America/New_York", revision: 1, updated_at: "2027-01-01T12:00:00Z",
+      return_time: null, time_zone: "America/New_York", revision: 1, updated_at: "2027-01-01T12:00:00Z",
       access_notes: "Permit required at the kiosk", pickup_notes: "Second car at the lower lot", approach_notes: "Skin 40 min up the summer road" } as TripTourPlan;
     full.tour_plans = [buildTourPlanSummary(plan, SAT)];
     full.days[1] = { ...full.days[1], activity: "Alpine" };
@@ -180,5 +183,17 @@ describe("Selected day logistics on the trip map", () => {
     expect(within(card).queryByRole("link", { name: /tour route|tour plan/ })).not.toBeInTheDocument();
     expect(dayRoles(map.places.find((entry) => entry.id === day.access_place_id)!, day)).toEqual(["access"]);
     expect(within(card).getByRole("link", { name: /Directions to Spruce Peak lot/ })).toBeVisible();
+  });
+
+  it("meets at the access point on any sport's day with a meet time (#333)", async () => {
+    const full = driveTrip();
+    full.days[1] = { ...full.days[1], activity: "Alpine", meet_time: "17:30:00", meet_day_offset: -1, meet_time_zone: null };
+    full.meets = buildDayMeets(full.days, []);
+    const map = await tripMapFixture(full);
+    const { day, card } = summary(map, SAT);
+    expect(row(card, "Meet")).toHaveTextContent("5:30 PM destination time · Fri Jan 8, the day before · Spruce Peak lot");
+    expect(row(card, "Meet")).toHaveTextContent("Its time zone wasn't confirmed");
+    expect(dayRoles(map.places.find((entry) => entry.id === day.access_place_id)!, day)).toEqual(["meeting"]);
+    expect(within(card).queryByText("Pickup", { selector: "dt" })).not.toBeInTheDocument();
   });
 });

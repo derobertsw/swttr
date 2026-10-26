@@ -28,6 +28,7 @@ import { CopyDayCard } from "@/components/trips/CopyDayCard";
 import { canEditMemberKit } from "@/lib/trip-permissions";
 import { kitAdvice, kitWear } from "@/lib/trip-saved-kits";
 import { DayStart, DayTonight } from "@/components/trips/TripStays";
+import { DayMeetControls } from "@/components/trips/DayMeet";
 import { DayAccessPoint } from "@/components/trips/DayAccessPoint";
 import { DayDrive, useDriveEstimates } from "@/components/trips/DriveEstimate";
 import { DayTourPlan } from "@/components/trips/TourPlan";
@@ -45,7 +46,7 @@ import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { ItineraryChangeSheet } from "@/components/trips/ItineraryChangeSheet";
 import type { TripDayForecastResponse } from "@/types/trip-coverage";
-import type { TripDayParticipation, TripEffort, TripKitState, TripMember, TripMemberDayKit, TripPlace, TripStop, TripTourPlanSummary } from "@/types/trips";
+import type { TripDayParticipation, TripEffort, TripKitState, TripMember, TripMemberDayKit, TripPlace, TripStop } from "@/types/trips";
 
 const KIT_SLOTS = ["shirt", "midlayer", "jacket", "shell", "pants", "gloves"] as const;
 const EFFORT_OPTIONS: TripEffort[] = ["easy", "steady", "hard"];
@@ -57,11 +58,6 @@ const savingClassName = "aria-disabled:cursor-progress aria-disabled:opacity-50"
 const NOT_TAKING_PART: Record<Exclude<TripDayParticipation, "participating">, string> = {
   skipping: "Not taking part", not_on_trip: "Not on the trip",
 };
-
-/** The day's meet time. A Backcountry day's tour plan holds it until #333 moves it onto the day for every sport. */
-function meetTime(activity: string | null, tourPlan: TripTourPlanSummary | undefined): string | null {
-  return activity === TOUR_ACTIVITY ? tourPlan?.meet_label ?? null : null;
-}
 
 /** The saved day plan, including access, conditions, crew kits, touring notes and day checks. */
 export default function DayDetailPage({
@@ -178,7 +174,8 @@ export default function DayDetailPage({
   const crewAway = crew.filter((m) => !crewKits.includes(m) && participationOf(m) !== "participating");
   const tourPlan = data?.tour_plans?.find((plan) => plan.date === date);
   const isOrganizer = !!userId && data?.trip.owner_user_id === userId;
-  // The tour plan's meeting point is the day's access point (#208, #210).
+  // The day's meet time, for every sport (#333), at the day's access point (#208, #210).
+  const meet = data?.meets?.find((entry) => entry.date === date);
   const meetingPoint = data && day ? accessPointFor(data.stops, day)?.location.label ?? null : null;
   const fitOf = (kit: TripMemberDayKit | undefined) =>
     kit?.outfit && day ? outfitMismatches(kit.outfit, { date, activity: day.activity, stop: effectiveStop ?? null }) : [];
@@ -219,7 +216,9 @@ export default function DayDetailPage({
             <ConditionsTask data={data} date={date} activity={activity} userId={userId} />
           </header>
 
-          <DayStart data={data} date={date} meet={meetTime(activity, tourPlan)} meetingPoint={meetingPoint} memberId={me?.id} />
+          <DayStart data={data} date={date} meet={meet} meetingPoint={meetingPoint} memberId={me?.id}>
+            {isOrganizer && <DayMeetControls tripId={id} day={day} dateLabel={dateLabel} onSaved={refresh} />}
+          </DayStart>
 
           <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()}>
             <DayDrive data={data} date={date} dateLabel={dateLabel} drive={drive} canEdit={data.trip.owner_user_id === userId} onSaved={refresh} memberId={me?.id} />

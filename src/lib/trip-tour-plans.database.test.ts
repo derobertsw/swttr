@@ -30,6 +30,8 @@ describe("Tour plan transactions in Postgres", () => {
       await db.exec(await readFile(`supabase/migrations/${migration}.sql`, "utf8"));
     }
     await db.exec(await readFile("supabase/migrations/20261020000407_trip_conflicts_no_retry.sql", "utf8"));
+    // The meet time moved to the day (#333): an older API's saves, as here, still keep it in the plan.
+    await db.exec(await readFile("supabase/migrations/20261024230000_trip_day_meet_times.sql", "utf8"));
   }, 20_000);
   beforeEach(async () => {
     await db.exec("TRUNCATE trips CASCADE;");
@@ -50,8 +52,8 @@ describe("Tour plan transactions in Postgres", () => {
     expect((await saved())[0]).toMatchObject({ meet_time: "18:00:00", meet_day_offset: -1, return_time: "11:00:00", return_day_offset: 1, time_zone: "America/New_York" });
   });
 
-  it("refuses a return before the meet, figures without units and other day offsets", async () => {
-    await expect(mutate({ payload: plan({ meet_time: "08:00", return_time: "07:00" }) })).rejects.toMatchObject({ code: "23514" });
+  it("refuses figures without units and other day offsets", async () => {
+    // The return is checked against the day's meet time by the API since #333.
     await expect(mutate({ payload: plan({ distance: 12 }) })).rejects.toMatchObject({ code: "23514" });
     await expect(mutate({ payload: plan({ meet_day_offset: 1 }) })).rejects.toMatchObject({ code: "23514" });
     expect(await saved()).toEqual([]);
