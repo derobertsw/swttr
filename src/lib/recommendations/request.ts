@@ -10,6 +10,7 @@ import { getAuthUserId } from '@/lib/auth';
 import { readJson } from '@/lib/api';
 import type { UserBodyMetrics } from '@/types/preferences';
 import type { PrecipitationType } from '@/types/weather';
+import { isXCContext, type XCContext } from '@/types/xc';
 
 export interface WeatherInput {
   temperature: number;
@@ -29,9 +30,11 @@ type RecommendationBody = {
   prioritize_light_pack?: unknown;
   height_inches?: unknown;
   weight_lbs?: unknown;
+  outing_pattern?: unknown;
+  xc_exposure?: unknown;
 };
 
-export interface RecommendationRequest {
+export interface RecommendationRequest extends XCContext {
   supabase: NonNullable<ReturnType<typeof getSupabase>>;
   userId: string | null;
   /** Weather as sent (°F, mph), echoed back in `conditions`. */
@@ -77,6 +80,13 @@ export async function parseRecommendationRequest(
   }
 
   const weather = body.weather as WeatherInput;
+  const xcContext = {
+    outingPattern: body.outing_pattern === undefined ? 'unknown' : body.outing_pattern,
+    xcExposure: body.xc_exposure === undefined ? 'unknown' : body.xc_exposure,
+  };
+  if (!isXCContext(xcContext)) {
+    return NextResponse.json({ error: 'Invalid outing_pattern or xc_exposure' }, { status: 400 });
+  }
   return {
     supabase,
     userId,
@@ -89,5 +99,6 @@ export async function parseRecommendationRequest(
     bodyMetrics: parseBodyMetricsFromRequestBody(body),
     useWardrobeOnly: body.use_wardrobe_only === true,
     prioritizeLightPack: Boolean(body.prioritize_light_pack),
+    ...xcContext,
   };
 }

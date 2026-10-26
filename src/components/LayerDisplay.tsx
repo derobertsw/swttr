@@ -240,6 +240,9 @@ const LayerDisplay = ({
   // Thermal evaluation of the worn layers (including edits) runs on the server.
   const climbInput: PhaseEvaluationInput = {
     items: evaluationItemsByBodyPart(climb.layers),
+    requireStandalone: Boolean(ireq?.policy),
+    protectionNeeds: ireq?.policy?.protection,
+    breathabilityTarget: biophysicsData?.recommendation.evaluation?.breathabilityTarget,
     targets: bodyPartTargets(ireq?.regional, ireq?.extremity),
     minTargets: bodyPartTargets(ireq?.regional, ireq?.extremity, "min"),
     extremityMaxTargets: ireq?.extremity?.max ? {
@@ -254,6 +257,7 @@ const LayerDisplay = ({
   const descentRegional = descentBreakdown?.regional_ireq ?? ireq?.regional;
   const descentInput: PhaseEvaluationInput = {
     items: evaluationItemsByBodyPart(descent.layers),
+    breathabilityTarget: biophysicsData?.descent_evaluation?.breathabilityTarget,
     targets: descentBreakdown
       ? bodyPartTargets(descentBreakdown.regional_ireq, descentBreakdown.extremity_ireq)
       : climbInput.targets,
@@ -262,7 +266,7 @@ const LayerDisplay = ({
       : climbInput.minTargets,
     arms: regionalClo
       ? {
-          clo: regionalClo.arms,
+          clo: descentBreakdown?.regional_clo?.arms ?? regionalClo.arms,
           target: descentRegional?.neutral?.arms,
           minTarget: descentRegional?.min?.arms,
           deficitClo: descentBreakdown?.regional_clo?.arms ?? regionalClo.arms,
@@ -282,16 +286,12 @@ const LayerDisplay = ({
   );
   // After a failed check the last evaluation is for earlier layers, so nothing
   // but its labeled decision is shown for the current ones.
-  const evaluation = evaluationFailed ? null : lastEvaluation;
+  const evaluation = evaluationFailed || evaluationPending ? null : lastEvaluation;
   const climbEvaluation = evaluation?.[0];
   const descentEvaluation = showDescent ? evaluation?.[1] : undefined;
   const phaseEvaluation = (phase: Phase) => (phase === "descent" ? descentEvaluation : climbEvaluation);
 
-  const comfortScore = climbEvaluation?.thermal_data_status === "unknown" ? undefined : climbEvaluation
-    ? (climbEvaluation.comfortScore
-      ?? biophysicsData?.recommendation?.thermal_comfort_score
-      ?? biophysicsData?.recommendation?.score)
-    : undefined;
+  const comfortScore = climbEvaluation?.comfortScore ?? undefined;
 
   // --- Layer picker ---
   // An item worn on the other phase is available here: the same garment can
@@ -426,15 +426,32 @@ const LayerDisplay = ({
   const recommendedItems = recommendedCatalogItems([climb.layers, descent.layers]);
 
   const shownEvaluation = phaseEvaluation(shownPhase);
-  const shownComfortEvaluation = evaluationFailed
+  const shownComfortEvaluation = evaluationFailed || evaluationPending
     ? lastEvaluation?.[showDescent && shownPhase === "descent" ? 1 : 0]
     : shownEvaluation;
   const shownDecision = shownComfortEvaluation?.decision;
+  const originalAssessmentWarnings = new Set([
+    ...(biophysicsData?.recommendation.evaluation?.decision?.warnings ?? []),
+    ...(biophysicsData?.recommendation.evaluation?.decision?.warnings ?? []).map(warning => `Climb: ${warning}`),
+    ...(biophysicsData?.descent_evaluation?.decision?.warnings ?? []).map(warning => `Descent: ${warning}`),
+  ]);
   const phaseLabel = showDescent ? (shownPhase === "climb" ? "Climb" : "Descent") : undefined;
-  const guidance = biophysicsData?.guidance ?? [];
   const missingRequirements = biophysicsData?.requirements?.filter((r) => r.status === 'missing') ?? [];
-  const missingMessages = new Set(missingRequirements.map((r) => r.message));
-  const visibleGuidance = guidance.filter((line) => !missingMessages.has(line));
+  const originalClimbReasons = biophysicsData?.recommendation.evaluation?.decision?.reasons ?? [];
+  const originalAssessmentReasons = new Set([
+    ...originalClimbReasons,
+    ...originalClimbReasons.map(reason => `Climb: ${reason}`),
+    ...(biophysicsData?.descent_evaluation?.decision?.reasons ?? []).map(reason => `Descent: ${reason}`),
+    ...missingRequirements.map(requirement => requirement.message),
+  ]);
+  const recommendationAdvice = [...new Set([
+    ...(biophysicsData?.guidance ?? []),
+    ...(biophysicsData?.ireq.policy?.assumptions ?? []),
+  ])].filter(line => !originalAssessmentReasons.has(line));
+  const outfitEdited = climb.edited || (showDescent && descent.edited);
+  const visibleGuidance = shownEvaluation?.decision
+    ? shownEvaluation.decision.reasons ?? []
+    : shownEvaluation ? ['No current comfort assessment is available for this outfit because usable thermal data or targets are missing.'] : [];
 
   const shownLayers = phaseLayers(shownPhase);
   const focusWear = useCallback(() => wearHeadingRef.current?.focus(), []);
@@ -466,7 +483,7 @@ const LayerDisplay = ({
     : [{
         id: "outing",
         wear: !biophysicsActive && recommendation ? applyRecommendationMappings(recommendation, itemMappings) : climb.layers,
-        carry: [],
+        carry: biophysicsData?.carry_items?.map(item => `${item.label}: ${item.reason}`) ?? [],
         decision: biophysicsActive ? savedDecision("climb") : null,
       }];
   const savedOutfit: SavedOutfit | null = outing && hasLayers
@@ -567,7 +584,7 @@ const LayerDisplay = ({
                       const label = phase === "climb" ? "Climb" : "Descent";
                       // A risk in the phase not shown stays visible on its tab.
                       const risk = phaseEvaluation(phase)?.decision?.riskType;
-                      const riskLabel = risk === "cold" ? "cold risk" : risk === "overheat" ? "overheating risk" : null;
+                      const riskLabel = risk && risk !== "comfortable" ? phaseEvaluation(phase)?.decision?.summary?.toLowerCase() ?? (risk === "cold" ? "cooler than recommended" : "warmer than recommended") : null;
                       return (
                         <button
                           key={phase}
@@ -657,14 +674,18 @@ const LayerDisplay = ({
 
             <div className="flex min-w-0 flex-col gap-6">
               {showDescent && <CarryCard items={packedItems} phase={shownPhase} />}
+              {!showDescent && !!biophysicsData?.carry_items?.length && (
+                <CarryCard items={biophysicsData.carry_items.map(item => `${item.label}: ${item.reason}`)} phase="outing" />
+              )}
 
               <RecommendedItemsCard items={recommendedItems} onOwned={handleItemOwned} />
 
               {biophysicsData && (
                 <RecommendationWarnings
-                  warnings={biophysicsData.warnings}
+                  warnings={biophysicsData.warnings.filter(warning => !originalAssessmentWarnings.has(warning))}
+                  currentWarnings={shownEvaluation?.decision?.warnings}
                   transition={showDescent ? biophysicsData.transition_protocol : undefined}
-                  edited={climb.edited || (showDescent && descent.edited)}
+                  edited={outfitEdited}
                 />
               )}
 
@@ -685,6 +706,19 @@ const LayerDisplay = ({
                     {visibleGuidance.map((line) => (
                       <li key={line}>{line}</li>
                     ))}
+                  </ul>
+                </ResultDisclosure>
+              )}
+
+              {recommendationAdvice.length > 0 && (
+                <ResultDisclosure title={outfitEdited ? "Original recommendation advice" : "Weather and activity advice"}>
+                  {outfitEdited && (
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      For the original outfit and conditions. Your layer changes are assessed separately.
+                    </p>
+                  )}
+                  <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-foreground">
+                    {recommendationAdvice.map(line => <li key={line}>{line}</li>)}
                   </ul>
                 </ResultDisclosure>
               )}

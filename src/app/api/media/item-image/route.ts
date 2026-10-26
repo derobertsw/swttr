@@ -11,10 +11,13 @@ const TABLE_BY_ITEM_TYPE: Record<ItemType, "garments" | "handwear" | "headwear">
 
 const DIRECT_ITEM_IMAGE_BY_KEY: Record<string, string> = {
   // Existing entries
-  "32 degrees|heat midweight crew": "https://www.rei.com/media/e95a1679-4f82-4d6b-b67c-0502c6af70f9.jpg?size=784x588",
+  "32 degrees|heat midweight crew": "/images/items/32-degrees-heat-midweight-crew.jpg",
+  "avalanche|weather shield ski jacket": "/images/items/avalanche-weather-shield-ski-jacket.jpg",
   "helly hansen|swift ht gloves": "https://www.rei.com/media/7ea4c6a0-efc4-43fc-835f-2ce81e0172b1.jpg?size=784x588",
   "lululemon|pace breaker jacket": "/images/items/lululemon-pace-breaker-jacket.jpg",
   "norrona|falketind flex1 pants": "/images/items/norrona-falketind-flex1-pants.jpg",
+  "norrona|falketind thermo40 zip hood": "/images/items/norrona-falketind-thermo40-zip-hood.jpg",
+  "norrona|senja alpha90 hood": "/images/items/norrona-senja-alpha90-hood.jpg",
   "norrona|lofoten gore tex pro jacket": "/images/items/norrona-lofoten-gore-tex-pro-jacket.jpg",
   "outdoor research|stormtracker sensor gloves": "/images/items/outdoor-research-stormtracker-sensor-gloves.png",
   "patagonia|capilene cool lightweight": "https://www.rei.com/media/fd1306e6-96cb-46da-8f06-4ca4eff32420.jpg?size=2000",
@@ -38,6 +41,8 @@ const DIRECT_ITEM_IMAGE_BY_KEY: Record<string, string> = {
   "arc teryx|venta glove": "/images/items/arcteryx-venta-glove.jpg",
   "arc teryx|rho ltw beanie": "/images/items/arcteryx-rho-ltw-beanie.jpg",
   // Icebreaker
+  "icebreaker|shifter long sleeve zip hood": "/images/items/icebreaker-shifter-long-sleeve-zip-hood.jpg",
+  "icebreaker|gt260 quantum hood": "/images/items/icebreaker-gt260-quantum-hood.jpg",
   "icebreaker|merino 260 tech long sleeve crewe": "/images/items/icebreaker-merino-260-tech-long-sleeve-crewe.jpg",
   "icebreaker|merino 260 tech long sleeve half zip": "/images/items/icebreaker-merino-260-tech-long-sleeve-half-zip.jpg",
   "icebreaker|merino 260 tech leggings": "/images/items/icebreaker-merino-260-tech-leggings.jpg",

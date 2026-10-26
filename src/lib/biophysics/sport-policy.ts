@@ -1,6 +1,7 @@
 /** Server-owned policy for sustained running/XC. See docs/running-xc-foundations.md. */
 import type { ActivityType } from './constants';
 import type { ExertionLevel } from './exertion';
+import { needsXCWindProtection, type XCPhaseContext } from './xc-policy';
 
 export const SUSTAINED_ACTIVITY_METS = {
   running: { easy: 6.5, moderate: 8.5, hard: 11.0 },
@@ -22,6 +23,7 @@ export interface SustainedSportPolicy {
   coldExposureFactor: number;
   protection: { wind: boolean; wet: boolean; poleGrip: boolean };
   assumptions: string[];
+  xc?: XCPhaseContext;
 }
 
 /** Narrow to the activities governed by the sustained running/XC policy. */
@@ -34,7 +36,7 @@ export function sustainedSportPolicy(
   activity: SustainedSportPolicy['activity'],
   effort: ExertionLevel,
   metabolicRateWm2: number,
-  conditions: { tempC: number; precipitation?: boolean },
+  conditions: { tempC: number; precipitation?: boolean; xc?: XCPhaseContext },
   windMs: number,
 ): SustainedSportPolicy {
   // Continuous taper: full cold margins at freezing, none at 10°C in dry
@@ -49,10 +51,11 @@ export function sustainedSportPolicy(
     version: 'running_xc_v1', activity, phase: 'sustained', effort,
     metabolicRateWm2, coldExposureFactor,
     protection: {
-      wind: conditions.tempC <= 0 || windMs > 8,
+      wind: activity === 'xc_skiing' ? needsXCWindProtection(conditions.tempC, windMs) : conditions.tempC <= 0 || windMs > 8,
       wet: conditions.precipitation ?? false,
       poleGrip: activity === 'xc_skiing',
     },
+    ...(conditions.xc ? { xc: conditions.xc } : {}),
     assumptions: [
       'These targets assume continuous movement. Bring extra layers for breaks and frequent stops.',
       'These are clothing estimates; adjust layers for your comfort and changing conditions.',

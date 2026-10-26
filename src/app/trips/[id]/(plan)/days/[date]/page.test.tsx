@@ -571,7 +571,7 @@ describe("Trip day page", () => {
       expect(within(myKit).getByText("Merino crew")).toBeInTheDocument();
       // Suggested items stay distinct from gear the person owns.
       expect(within(myKit).getByText("Fleece").parentElement).toHaveTextContent("Not in your wardrobe");
-      expect(within(myKit).getByText(/In the comfort range/)).toBeInTheDocument();
+      expect(within(myKit).getByText(/Likely comfortable/)).toBeInTheDocument();
       expect(within(myKit).queryByRole("button", { name: /Change/ })).not.toBeInTheDocument();
       expect(within(myKit).getByRole("button", { name: "Update in Gear up" })).toBeInTheDocument();
     });

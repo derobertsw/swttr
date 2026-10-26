@@ -20,6 +20,7 @@ export function useLayerEvaluation(phases: PhaseEvaluationInput[] | null, scope?
   // The serialized request doubles as the effect key, so equal inputs rebuilt
   // on re-render don't trigger a new request.
   const body = phases ? JSON.stringify({ phases }) : null;
+  const phaseCount = phases?.length ?? 0;
   const [result, setResult] = useState<{
     body: string;
     scope: unknown;
@@ -49,7 +50,18 @@ export function useLayerEvaluation(phases: PhaseEvaluationInput[] | null, scope?
     })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Evaluate failed (${res.status})`))))
       .then((data: { phases?: PhaseEvaluation[] }) => {
-        if (!Array.isArray(data?.phases)) throw new Error("Malformed evaluation response");
+        if (!Array.isArray(data?.phases) || data.phases.length !== phaseCount
+          || data.phases.some(phase => !phase || !phase.bodyParts
+            || !['torso', 'legs', 'hands', 'headNeck'].every(part => {
+              const area = phase.bodyParts[part as keyof typeof phase.bodyParts];
+              return area !== null && typeof area === 'object';
+            })
+            || (phase.decision !== null && (!phase.decision
+              || !['comfortable', 'cold', 'overheat'].includes(phase.decision.riskType)
+              || !Number.isFinite(phase.decision.delta)))
+            || (phase.comfortScore !== null && !Number.isFinite(phase.comfortScore)))) {
+          throw new Error("Malformed evaluation response");
+        }
         if (!controller.signal.aborted) {
           setResult({ body, scope, phases: data.phases });
         }
@@ -61,7 +73,7 @@ export function useLayerEvaluation(phases: PhaseEvaluationInput[] | null, scope?
       });
 
     return () => controller.abort();
-  }, [body, scope, attempt]);
+  }, [body, scope, attempt, phaseCount]);
 
   const retry = useCallback(() => setAttempt((count) => count + 1), []);
 

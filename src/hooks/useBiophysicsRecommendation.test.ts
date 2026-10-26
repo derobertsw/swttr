@@ -42,6 +42,17 @@ describe("useBiophysicsRecommendation", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/recommendations/running", expect.anything());
   });
 
+  it('forwards XC outing context with the selected effort', async () => {
+    fetchMock.mockResolvedValue(Response.json({ recommendation: { score: 80, garments: [] } }));
+    const { result } = renderHook(() => useBiophysicsRecommendation());
+    await act(async () => {
+      await result.current.fetch('xc_skiing', WEATHER, 'hard', BODY, undefined, { outingPattern: 'frequent_stops', xcExposure: 'descents' });
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      exertion: 'hard', outing_pattern: 'frequent_stops', xc_exposure: 'descents',
+    });
+  });
+
   it("reports activities without a biophysics model as unsupported, without a request", async () => {
     expect(await fetchOutcome("hiking_snowshoeing")).toEqual({ status: "unsupported", data: null });
     expect(fetchMock).not.toHaveBeenCalled();

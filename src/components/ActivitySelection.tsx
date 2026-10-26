@@ -4,6 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { ACTIVITIES } from "@/data/activities";
 import { arrowKeyTarget, SegmentedChoice } from "@/components/SegmentedChoice";
+import type { XCContext } from '@/types/xc';
 import {
   type ExertionLevel,
   EXERTION_DESCRIPTIONS,
@@ -18,6 +19,8 @@ interface ActivitySelectionProps {
   onChange: (value: string) => void;
   exertion: ExertionLevel;
   onExertionChange: (value: ExertionLevel) => void;
+  xcContext?: XCContext;
+  onXCContextChange?: (context: XCContext) => void;
 }
 
 /**
@@ -30,6 +33,8 @@ const ActivitySelection = ({
   onChange,
   exertion,
   onExertionChange,
+  xcContext,
+  onXCContextChange,
 }: ActivitySelectionProps) => {
   const activityRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
   const selectedIndex = Math.max(0, ACTIVITIES.findIndex((activity) => activity.value === value));
@@ -91,6 +96,22 @@ const ActivitySelection = ({
         onChange={onExertionChange}
         description={EXERTION_DESCRIPTIONS[exertion]}
       />
+      {value === 'xc_skiing' && onXCContextChange && <>
+        <SegmentedChoice
+          label="Outing pattern"
+          options={[{ value: 'unknown', label: 'Not sure' }, { value: 'continuous', label: 'Continuous' }, { value: 'frequent_stops', label: 'Frequent stops' }] as const}
+          value={xcContext?.outingPattern ?? 'unknown'}
+          onChange={outingPattern => onXCContextChange({ ...xcContext, outingPattern })}
+          description="Effort describes skiing while moving. Extra warmth for stops appears under Carry."
+        />
+        <SegmentedChoice
+          label="XC exposure"
+          options={[{ value: 'unknown', label: 'Not sure' }, { value: 'sheltered', label: 'Sheltered' }, { value: 'exposed', label: 'Exposed' }, { value: 'descents', label: 'Long descents' }] as const}
+          groupClassName="grid-flow-row grid-cols-2"
+          value={xcContext?.xcExposure ?? 'unknown'}
+          onChange={xcExposure => onXCContextChange({ ...xcContext, xcExposure })}
+        />
+      </>}
     </div>
   );
 };

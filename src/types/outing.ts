@@ -1,3 +1,4 @@
+import type { XCContext } from '@/types/xc';
 /**
  * The Gear up outing contract: what a person asked for layers for, and the
  * result that came back for exactly that request. See docs/outing-contract.md.
@@ -19,7 +20,7 @@ export type OutingTime =
 export type LaterTime = Extract<OutingTime, { mode: "later" }>;
 
 /** An outing as submitted. Every request reads its inputs from one of these. */
-export interface Outing {
+export interface Outing extends XCContext {
   /** An activity ID from src/data/activities.ts. */
   activity: string;
   exertion: ExertionLevel;

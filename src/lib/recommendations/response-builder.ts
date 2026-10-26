@@ -1,20 +1,20 @@
 /**
  * Scores an ensemble and builds the standard `recommendation` block used by
- * every sport except ski touring, which scores climb and descent separately.
+ * every sport. Ski touring calls this once per worn phase.
  */
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { scoreEnsemble, type WeatherConditions, type ActivityProfile } from '@/lib/biophysics/scorer';
 import type { ActivityType } from '@/lib/biophysics/constants';
 import {
-  calculateThermalComfortScore,
-  withMinimums,
   type RegionalCloValues,
   type ExtremityCloValues,
 } from '@/lib/biophysics/comfort';
-import type { BiophysicsRecommendation } from '@/types/biophysics';
+import type { BiophysicsRecommendation, PhaseEvaluationInput } from '@/types/biophysics';
 import type { GarmentRow, HandwearRow, HeadwearRecommendations } from './types';
 import { formatGarmentResponse, formatHandwearResponse, formatHeadwearSet, ensembleToThermalGarments } from './formatting';
 import { hoodInsulation } from './extremities';
+import { evaluatePhase } from './layer-evaluation';
+import { breathabilityTarget } from '@/lib/biophysics/scorer';
 
 interface EnsembleScoringInput {
   ensemble: GarmentRow[];
@@ -22,11 +22,15 @@ interface EnsembleScoringInput {
   activity: ActivityProfile;
   activityKey: ActivityType;
   comfortContext?: {
+    requireStandalone?: boolean;
+    protectionNeeds?: PhaseEvaluationInput['protectionNeeds'];
     targetRange: [number, number];
     /** Minimum clo per region: below it the region is short. */
     regionalMinTarget?: RegionalCloValues;
+    regionalTarget?: RegionalCloValues;
     /** Minimum clo for the hands and head. */
     extremityMinTarget?: ExtremityCloValues;
+    extremityTarget?: ExtremityCloValues;
     extremityMaxTarget?: ExtremityCloValues;
   };
 }
@@ -44,13 +48,6 @@ export function buildScoredRecommendation(
   const thermalGarments = ensembleToThermalGarments(input.ensemble);
   const ensembleProps = predictEnsembleThermal(thermalGarments);
 
-  const score = scoreEnsemble(
-    thermalGarments,
-    input.weather,
-    input.activity,
-    input.activityKey
-  );
-
   const regionalClo = {
     torso: ensembleProps.rcl.torso,
     arms: ensembleProps.rcl.arm,
@@ -61,27 +58,41 @@ export function buildScoredRecommendation(
   // (attached/removable hoods can't be worn under a helmet).
   const hoodClo = hoodInsulation(input.ensemble, headwear.helmet != null);
 
-  const extremityClo = {
-    hands: handwear?.rcl_clo ?? 0,
-    head: (headwear.helmet?.rcl_clo ?? 0) + (headwear.headWarmth?.rcl_clo ?? 0) + (headwear.neckWarmth?.rcl_clo ?? 0) + hoodClo,
-  } satisfies ExtremityCloValues;
-  const comfortScore = input.comfortContext
-    ? calculateThermalComfortScore({
-      totalClo: ensembleProps.rcl.wholeBody,
-      targetRange: input.comfortContext.targetRange,
-      bodyParts: [
-        ...withMinimums(regionalClo, input.comfortContext.regionalMinTarget),
-        ...withMinimums(extremityClo, input.comfortContext.extremityMinTarget, input.comfortContext.extremityMaxTarget),
-      ],
-    })
-    : null;
-  const fallbackComfortScore = Math.round(
-    ((score.componentScores.coldProtection + score.componentScores.overheatPrevention) / 2) * 10
-  ) / 10;
+  const garments = input.ensemble.map(formatGarmentResponse);
+  const torso = garments.filter(g => g.covers_torso);
+  const legs = garments.filter(g => g.covers_legs);
+  const context = input.comfortContext;
+  const evaluation = context ? evaluatePhase({
+    requireStandalone: context.requireStandalone,
+    protectionNeeds: context.protectionNeeds,
+    items: {
+      torso,
+      legs,
+      hands: handwear ? [{ name: `${handwear.brand} ${handwear.model_name}` }] : [],
+      headNeck: [headwear.helmet, headwear.headWarmth, headwear.neckWarmth].flatMap(g => g ? [{ name: `${g.brand} ${g.model_name}` }] : []),
+    },
+    itemClo: {
+      torso: torso.map(g => g.thermal_data_status === 'known' ? g.rcl_torso ?? null : null),
+      legs: legs.map(g => g.thermal_data_status === 'known' ? g.rcl_legs ?? null : null),
+      hands: handwear ? [handwear.rcl_clo] : [],
+      headNeck: [headwear.helmet, headwear.headWarmth, headwear.neckWarmth].flatMap(g => g ? [g.rcl_clo] : []),
+    },
+    hoodClo,
+    armClo: Number.isFinite(regionalClo.arms) ? regionalClo.arms : null,
+    arms: { clo: regionalClo.arms, minTarget: context.regionalMinTarget?.arms, target: context.regionalTarget?.arms },
+    targets: { torso: context.regionalTarget?.torso, legs: context.regionalTarget?.legs,
+      hands: context.extremityTarget?.hands, headNeck: context.extremityTarget?.head },
+    minTargets: { torso: context.regionalMinTarget?.torso, legs: context.regionalMinTarget?.legs,
+      hands: context.extremityMinTarget?.hands, headNeck: context.extremityMinTarget?.head },
+    extremityMaxTargets: context.extremityMaxTarget ? { hands: context.extremityMaxTarget.hands, headNeck: context.extremityMaxTarget.head } : undefined,
+    targetRange: context.targetRange,
+    breathability: input.ensemble.length ? { evapPotential: ensembleProps.evapPotential, target: breathabilityTarget(input.activity.metabolicRate) } : undefined,
+  }) : undefined;
+  const score = scoreEnsemble(thermalGarments, input.weather, input.activity, input.activityKey, evaluation);
 
   return {
     recommendation: {
-      garments: input.ensemble.map(formatGarmentResponse),
+      garments,
       handwear: handwear ? formatHandwearResponse(handwear) : null,
       headwear: formatHeadwearSet(headwear),
       ensemble_properties: {
@@ -95,9 +106,10 @@ export function buildScoredRecommendation(
         permeability_index: ensembleProps.im,
       },
       score: score.totalScore,
-      thermal_comfort_score: comfortScore ?? fallbackComfortScore,
+      thermal_comfort_score: evaluation?.comfortScore ?? undefined,
+      evaluation: evaluation ? { ...evaluation, items: undefined } : undefined,
       component_scores: score.componentScores,
     },
-    warnings: score.warnings,
+    warnings: evaluation ? [...(evaluation.decision?.warnings ?? [])] : score.warnings,
   };
 }

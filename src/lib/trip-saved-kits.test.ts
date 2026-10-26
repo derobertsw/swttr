@@ -21,6 +21,12 @@ const SAVE_ID = "6f1f0a52-8d43-4c55-9a39-1b2c3d4e5f60";
 const TRIP_ID = "a2eb3ecb-a7ac-4b6d-98e3-701c694d8563";
 
 describe("readSavedOutfit", () => {
+  it('preserves XC stop and exposure context when saving or resuming a kit', () => {
+    const outfit = savedOutfit();
+    outfit.outing = { ...outfit.outing, activity: 'xc_skiing', outingPattern: 'frequent_stops', xcExposure: 'descents' };
+    expect(readSavedOutfit(outfit)?.outing).toEqual(outfit.outing);
+    expect(readSavedOutfit({ ...outfit, outing: { ...outfit.outing, outingPattern: 'classic' } })).toBeNull();
+  });
   it("keeps a valid outfit as it was shown", () => {
     expect(readSavedOutfit(savedOutfit())).toEqual(savedOutfit());
   });
