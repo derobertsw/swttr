@@ -95,6 +95,19 @@ describe("POST /api/v1/ensembles/evaluate", () => {
     expect(unknown.comfortScore).toBeNull();
   });
 
+  it.each([false, true])('withholds comfort for a source-free garment estimate alongside catalog torso clothing: %s', async withCatalog => {
+    const estimate: EvaluationItem = { item_type: 'garment', rcl: 0.2, thermal_provenance: { generic_estimate: true } };
+    const torso = withCatalog ? [reference(shirt.id), estimate] : [estimate];
+    const response = await post({ phases: [itemPhase(torso, [reference(shorts.id)])] });
+    expect(response.status).toBe(200);
+    const { phases: [result] } = await response.json();
+    expect(result.items.torso.at(-1)).toMatchObject({ rcl: 0.2, thermal_data_status: 'known' });
+    expect(result.bodyParts.torso.clo).toBeCloseTo((0.2 + (withCatalog ? 0.1 : 0)) * 0.836);
+    expect(result).toMatchObject({ thermal_data_status: 'unknown', decision: null, comfortScore: null });
+    expect(result.breakdown).toBeUndefined();
+    expect(result.totalClo).toBeUndefined();
+  });
+
   it('limits custom item reads to the signed-in owner and matching body area', async () => {
     state.client = createFakeSupabase({ user_custom_items: [
       { id: '00000000-0000-0000-0000-000000000001', user_id: 'user-1', body_part: 'torso', rcl_clo: 0.3 },

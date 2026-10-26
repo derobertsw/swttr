@@ -96,7 +96,7 @@ export async function resolveEvaluationItems(
     const properties = predictEnsembleThermal(ensembleToThermalGarments(wornGarments));
     const hasUnresolvedGarment = [...items.torso, ...items.legs].some(item =>
       item.item_type === 'garment' && item.thermal_data_status === 'unknown');
-    const catalogTorso = items.torso.every(item => item.item_type === 'garment');
+    const catalogTorso = items.torso.every(item => item.item_type === 'garment' && Boolean(item.sourceId));
     return {
       ...phase, items,
       armClo: !catalogTorso || hasUnresolvedGarment || !Number.isFinite(properties.rcl.arm) ? null : properties.rcl.arm,
