@@ -13,7 +13,7 @@ export function breathabilityTarget(metabolicRate: number): number {
 }
 
 /** Wind speed (m/s) above which an ensemble without a shell loses weather protection. */
-export const SIGNIFICANT_WIND_MS = 8;
+const SIGNIFICANT_WIND_MS = 8;
 
 const REGIONS = [
   ['torso', 'coversTorso', REGIONAL_WEIGHTS.torso],

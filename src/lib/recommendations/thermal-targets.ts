@@ -22,11 +22,13 @@ import {
 import type { ActivityType } from '@/lib/biophysics/constants';
 import type { IreqResult } from '@/types/garments';
 import type { UserBodyMetrics } from '@/types/preferences';
+import type { XCPhaseContext } from '@/lib/biophysics/xc-policy';
 
 interface Conditions {
   tempC: number;
   humidity: number;
   precipitation?: boolean;
+  xc?: XCPhaseContext;
 }
 
 /** Metabolic rate for an activity at the given exertion, scaled for body size. */

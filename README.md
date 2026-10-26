@@ -50,7 +50,8 @@ Every biophysics recommendation passes through the same pipeline, from metabolic
 ```mermaid
 graph TD
     A[Activity + Exertion Level] --> B[Metabolic Rate Selection<br/>Running/XC: shared MET-to-W/m² conversion<br/>Rate helper uses default mass and body area<br/>Recommendation uses user mass and body area<br/>Other sports: existing rate and size heuristic]
-    B --> C[IREQ Calculation]
+    B --> XCP[XC only: outing pattern and exposure context<br/>Effective wind is max of ambient and exposure floor<br/>Keep existing motion correction; distinguish dry snow from wet]
+    XCP --> C[IREQ Calculation]
     C --> D[Activity Target Range<br/>Running/XC: retain heat-balance minimum<br/>Taper only added activity allowance]
     D --> E[CoWEDA-inspired heuristic buffer<br/>Running/XC: taper with cold, wind and wet exposure]
     E --> F[Regional & Extremity Targets<br/>Whole-body and regional bands converted to basic clo<br/>ISO 11079 wind and motion correction<br/>Inferred movement capped at 0.7 m/s<br/>Hands and head keep resultant IREQ]
@@ -58,7 +59,8 @@ graph TD
     P -->|No usable garments| T[Targets-only response]
     P --> G[Ensemble Building]
     G --> R[Running/XC only: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
-    R --> I[Canonical server phase assessment:<br/>actual worn regional and extremity basic clo<br/>local shortfalls and excess, moisture and clothing gaps]
+    R --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
+    XCCARRY --> I[Canonical server phase assessment:<br/>actual worn regional and extremity basic clo<br/>local shortfalls and excess, moisture and clothing gaps]
     I --> H[Ensemble thermal scoring and API/UI reasons<br/>consume the same phase assessment]
 
     subgraph "Shared Biophysics Core — thermal-targets.ts"
@@ -134,7 +136,7 @@ graph TD
 
 Running compares complete wearable moving outfits made from reviewed standalone tops, shorts or tights, optional underlayers/mids and protective outers. A thermal base is never mandatory. Shorts and short sleeves intentionally leave skin exposed; regional thermal data already includes that exposure. The running search caches shared-model regional contributions, fixes any garments spanning the upper body and legs (including arms without torso coverage), and prunes inferior regional priorities before pairing the surviving choices. Identical selection capabilities keep the first sorted ID; no candidate cap or thermal bins discard distinct outfits. It preserves actual wind/rain protection, prefers waterproof coverage in precipitation, rejects excessive warmth before filling a clothing gap, and balances whole-body/regional shortfalls and excess before using layer count and breathability as tie-breaks. Selection and final/manual evaluation use the same regional ensemble regression and calibrated targets, with the shared 0.05 clo cold tolerance. A light clothing need cannot be satisfied by overly warm full coverage; absent suitable basics remain missing requirements with generic suggestions. Requirements assess the selected combination, including outer warmth and protection, and reasons name the worn outfit. When the best available combination still misses a target, both requirements and guidance name that clothing and explain the remaining shortfall, excess warmth, or protection gap. Missing wind and rain protection are reported separately. Extra clothing for stops stays separate. Ski bibs and insulated outerwear without explicit running suitability are excluded from moving outfits. The small mismatch allowances are wardrobe heuristics, not measured physiological limits. Cycling and touring retain their existing builders.
 
-Alpine and XC compare complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. They allow at most one item in each slot per covered region, including items that span multiple regions, so insulated outerwear takes the outer slot and no shell goes over it. Alpine puts a puffy only under a hard shell; XC allows one under any shell, but not under insulated outerwear. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. XC requires an outer layer on the torso and legs when it is freezing, windy, or wet, minimizes the same shortfall and excess, and then prefers breathable layers. XC never leaves a region in underwear alone. Weather-protection scoring counts windbreakers and insulated outerwear as shells. When targets cannot be met, alpine returns the best available wearable combination. Regional warnings require both a shortfall and an available wearable alternative that could reduce it by more than 0.12 clo while preserving coverage and rain protection. The thermal comfort score and overall cold warnings still report cold conditions when regional targets are unreachable.
+Alpine and XC compare complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. They allow at most one item in each slot per covered region, including items that span multiple regions, so insulated outerwear takes the outer slot and no shell goes over it. Alpine puts a puffy only under a hard shell; XC allows one under any shell, but not under insulated outerwear. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. XC uses the same regional enumeration with a separate assessment: reviewed standalone coverage, actual wind/wet protection, excessive warmth before filling clothing gaps, then regional thermal fit and breathability. It permits one suitable Nordic tight or pant without an extra base or outer. XC requirements assess the selected combination, including all its warmth and protection. XC never leaves a region in underwear alone. Weather-protection scoring counts windbreakers and insulated outerwear as shells. When targets cannot be met, alpine returns the best available wearable combination. Regional warnings require both a shortfall and an available wearable alternative that could reduce it by more than 0.12 clo while preserving coverage and rain protection. The thermal comfort score and overall cold warnings still report cold conditions when regional targets are unreachable.
 
 ```mermaid
 graph TD
@@ -145,13 +147,14 @@ graph TD
     RUNRANK --> RUNREQ[Evaluate with shared regional regression and targets<br/>Match selected combinations or report missing basics<br/>Distinguish best available clothing from absent basics]
     RUNNING -->|No| SPORT{Alpine or XC?}
     SPORT -->|Yes| CACHE[Cache garment features once<br/>Reuse prefix and base/mid totals]
-    CACHE --> COMB[Compare base + optional mid/puffy + outer<br/>for torso, then legs]
+    CACHE --> COMB[Compare optional base, mid/puffy and outer<br/>for torso, then legs<br/>XC can use a standalone garment]
     COMB --> CAP[One item per slot per covered region<br/>Insulated outer replaces shell<br/>Bibs fill leg slots under a jacket]
     CAP --> RANK{Sport}
     RANK -->|Alpine| REG[Preserve coverage and rain protection<br/>Minimize combined shortfall and excess, then layers]
     REG --> WARM[Search all compatible outfit combinations for regional maxima<br/>Keep selected coverage and rain protection]
     WARM --> WARN[Warn only when a regional shortfall<br/>can be reduced by more than 0.12 clo]
-    RANK -->|XC| XREG[Outer on torso and legs when freezing, windy, or wet<br/>No underwear-only regions<br/>Minimize combined shortfall and excess<br/>Then breathable and fewer layers]
+    RANK -->|XC| XREG[Actual full-region wind/wet protection<br/>Bound excess, require reviewed standalone coverage<br/>Fit regional bands, then breathable and fewer layers]
+    XREG --> XREQ[Match selected combinations or report gaps<br/>Carry stop warmth separately]
     SPORT -->|No| SORT[Sort Pool by Sport Strategy]
     SORT --> BASE[Select Base Layer]
     BASE --> MID[Select Mid Layer]
@@ -213,9 +216,10 @@ graph TD
 
     subgraph "XC Skiing — regional builder shared with alpine"
         XC --> X1[Compare complete regional outfits:<br/>torso and legs independent]
-        X1 --> X2[Outer layer required on torso and legs<br/>when freezing, windy, or wet<br/>Never leave a region in underwear alone]
+        X1 --> X2[Standalone Nordic tights/pants or layered outfits<br/>Wind/wet needs follow exposure and precipitation<br/>Unknown usage and underwear alone cannot meet coverage]
         X2 --> X3[Insulated outerwear occupies outer slot<br/>Puffies fit under any shell, not insulated outerwear]
-        X3 --> X4[Budget by regional clo, then prefer<br/>breathable and fewer layers]
+        X3 --> X4[Actual protection, bounded excess, coverage and regional fit<br/>Then breathable and fewer layers]
+        X4 --> X5[Thin functional XC accessories use local bands<br/>Carry extra warmth for stops, outside moving score]
     end
 
     subgraph "Ski Touring"
@@ -255,11 +259,9 @@ graph TD
     AWP --> ABUDGET
     ABUDGET --> ACAP[One outer per covered region<br/>No shell over insulated outerwear<br/>Bibs sit under the jacket]
 
-    XC --> XNEED{Freezing, wind over 8 m/s,<br/>or precipitation?}
-    XNEED -->|Yes| XREQ[Require an outer on torso and legs]
-    XNEED -->|No| XOPT[Outer optional —<br/>kept only if it helps fit regional targets]
-    XREQ --> XFIT[Fit regional insulation targets<br/>then prefer breathable outers, evap ≥ 0.20]
-    XOPT --> XFIT
+    XC --> XNEED[XC exposure: max of ambient and exposure floor<br/>Ordinary motion stays in the existing insulation correction<br/>Rain/mixed/near-melting snow is wet; colder snow is dry]
+    XNEED --> XREQ[Protect full torso/arms and legs using actual properties<br/>Standalone garments can supply protection]
+    XREQ --> XFIT[Freezing alone never forces an extra garment<br/>Fit regional bands and standalone coverage<br/>then prefer breathable outers, evap ≥ 0.20]
     XFIT --> XCAP[One outer per covered region<br/>No shell over insulated outerwear]
 
     TOUR --> THARD{Hard shell available?}
@@ -420,7 +422,7 @@ npm run test:coverage
 
 Route tests use `src/test/fakeSupabase.ts`, an in-memory stand-in for the Supabase query builder. The recommendation golden tests run against `src/test/fixtures/gear-catalog.json`, a snapshot of the real gear catalog.
 
-The alpine/XC outfit search also has parity tests against its previous implementation and an isolated [performance benchmark](docs/regional-outfit-performance.md).
+The alpine outfit search retains parity tests against its previous implementation; XC has standalone/protection behavioral tests. The shared search also has an isolated [performance benchmark](docs/regional-outfit-performance.md).
 
 Trip packing reports one coverage record per trip date, with forecast availability separate from clothing guidance. It uses the static table (Alpine, XC and Hiking; Climb is an explicit hiking approximation), rather than the sport-specific biophysics endpoints. Partial daytime forecasts remain visible, past/out-of-window dates stay planned, and saved manual kits are reviewed separately until packing can derive requirements from those kits. Packing fetches forecasts only for stops needed by automatic guidance, with up to three requests in flight, and labels skipped weather requests explicitly. Missing day plans can be restored from day detail without overwriting existing plans. Trip day weather is summarized server-side by the authenticated `/api/v1/trips/[id]/days/[date]/weather` route.
 

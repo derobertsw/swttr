@@ -3,6 +3,8 @@
  * biking, XC skiing): a single IREQ and target range, active-use extremity
  * gear, and no helmet.
  */
+import { xcPhaseContext } from '@/lib/biophysics/xc-policy';
+import type { BiophysicsRecommendation } from '@/types/biophysics';
 import type { ActivityType } from '@/lib/biophysics/constants';
 import type { ActivityProfile } from '@/lib/biophysics/scorer';
 import type { IreqResult } from '@/types/garments';
@@ -46,6 +48,8 @@ interface SinglePhaseSportConfig {
   /** Extra fields echoed in `conditions` after temperature, wind and exertion. */
   conditions(request: RecommendationRequest): object;
   guidance(request: RecommendationRequest, ireq: IreqResult, ensemble?: GarmentRow[], targets?: SinglePhaseTargets): string[];
+  /** Advice for packed items, excluded from the worn ensemble and its comfort score. */
+  carry?(request: RecommendationRequest, targets: SinglePhaseTargets): BiophysicsRecommendation['carry_items'];
   /** Retain functional protection when a calibrated budget changes. */
   protect?(ensemble: GarmentRow[], categorized: CategorizedGarments, targets: SinglePhaseTargets): { ensemble: GarmentRow[]; warnings: string[] };
   /** Air permeability of the outer layer this sport dresses in these conditions, l/(m²·s). */
@@ -65,23 +69,29 @@ export function createSinglePhaseSport(
   return {
     catalog: { ...config.catalog, activity: config.activity },
 
+    /** Derive moving targets with the same exposure and precipitation policy used for scoring. */
     computeTargets(request) {
-      const conditions = { tempC: request.tempC, humidity: request.humidity, precipitation: request.precipitation };
+      const xc = config.activity === 'xc_skiing' ? xcPhaseContext({ ...request, precipitationType: request.weather.precipitation_type }) : undefined;
+      const conditions = { tempC: request.tempC, humidity: request.humidity,
+        precipitation: xc ? xc.precipitation === 'wet' : request.precipitation, ...(xc ? { xc } : {}) };
+      const windMs = xc?.effectiveWindMs ?? request.windMs;
       const metabolicRate = metabolicRateFor(config.activity, request.exertion, request.bodyMetrics);
-      const ireq = phaseIreq(conditions, request.windMs, metabolicRate);
-      const exposure = phaseExposure(request.windMs, metabolicRate, config.outerAirPermeability(request));
+      const ireq = phaseIreq(conditions, windMs, metabolicRate);
+      const exposure = phaseExposure(windMs, metabolicRate, config.outerAirPermeability(request));
       return {
         metabolicRate,
         ireq,
         basicIreq: basicIreq(ireq, exposure),
-        ...phaseTargets(config.activity, ireq, metabolicRate, conditions, request.windMs, ireq, request.exertion, exposure),
+        ...phaseTargets(config.activity, ireq, metabolicRate, conditions, windMs, ireq, request.exertion, exposure),
       };
     },
 
+    /** Report clothing gaps and carry advice when no usable garments are available. */
     emptyResponse(request, targets) {
       // The no-garment fast path has not inspected accessory availability.
       const accessories = selectPhaseAccessories(config.activity, targets, { handwear: [], headwear: [], availability: 'unknown' }, request.tempC);
       return {
+        ...(config.carry ? { carry_items: config.carry(request, targets) } : {}),
         ireq: targets.policy ? formatSinglePhaseIreq(targets.ireq, targets) : { min: targets.ireq.ireqMin, neutral: targets.ireq.ireqNeutral },
         ...(config.requirementFirst ? {
           requirements: buildClothingRequirements(config.activity, targets, { garments: [], handwear: [], headwear: [], ownership: { garments: false, handwear: false, headwear: false }, accessories: accessories.assessments }),
@@ -90,11 +100,12 @@ export function createSinglePhaseSport(
           target_clo_range: targets.targetRange,
           min_evap_potential: config.minEvapPotential,
           ...(accessories.assessments ? { accessories: accessories.assessments } : {}),
-          guidance: [...config.guidance(request, targets.basicIreq), ...(targets.policy?.assumptions ?? [])],
+          guidance: [...(config.activity === 'xc_skiing' ? config.guidance(request, targets.basicIreq, [], targets) : config.guidance(request, targets.basicIreq)), ...(targets.policy?.assumptions ?? [])],
         },
       };
     },
 
+    /** Select and score worn clothing, then report requirements, protection gaps, and carry advice. */
     recommend(request, targets, pool) {
       const built = config.buildEnsemble(pool.categorized, targets, request);
       const protectedOutfit = config.protect?.(built, pool.categorized, targets);
@@ -118,9 +129,10 @@ export function createSinglePhaseSport(
           ensemble,
           weather: {
             temperature: request.tempC,
-            windSpeed: request.windMs,
+            windSpeed: targets.policy?.xc?.effectiveWindMs ?? request.windMs,
             humidity: request.humidity,
-            precipitation: request.precipitation,
+            precipitation: targets.policy?.xc ? targets.policy.xc.precipitation === 'wet' : request.precipitation,
+            ...(targets.policy?.xc ? { precipitationType: request.weather.precipitation_type } : {}),
           },
           activity: {
             ...config.profile,
@@ -158,6 +170,7 @@ export function createSinglePhaseSport(
       const missingGuidance = requirements?.filter((r) => r.status === 'missing').map((r) => r.message) ?? [];
 
       return {
+        ...(config.carry ? { carry_items: config.carry(request, targets) } : {}),
         conditions: {
           ...formatConditions(request.weather),
           exertion: request.exertion,

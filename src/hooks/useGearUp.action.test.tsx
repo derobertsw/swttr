@@ -224,6 +224,28 @@ describe("atomic one-day outing action", () => {
     expect(result.current.result?.outing.exertion).toBe("hard");
   });
 
+  it.each(['weather', 'recommendation'])('cancels agent advice when XC context changes during %s', async stage => {
+    const held = Promise.withResolvers<Response>();
+    fetchMock.mockImplementation(async (url: string) => stage === 'weather' || !url.startsWith('/api/weather') ? held.promise : Response.json(weather));
+    const { result } = await setup();
+    let pending!: Promise<OutingActionOutcome>;
+    act(() => { pending = result.current.submitOuting({ ...input, activity: 'xc_skiing' }); });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(stage === 'weather' ? 1 : 2));
+    const signal = fetchMock.mock.calls.at(-1)![1].signal;
+    const context = { outingPattern: 'frequent_stops', xcExposure: 'descents' } as const;
+    await act(async () => {
+      result.current.setXCContext(context);
+      expect(await pending).toMatchObject({ status: 'error', code: 'cancelled' });
+    });
+    expect(signal.aborted).toBe(true);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.xcContext).toEqual(context);
+    // A transport that ignores abort must not restore the old advice.
+    await act(async () => { held.resolve(Response.json(stage === 'weather' ? weather : advice)); });
+    expect(result.current.result).toBeNull();
+    expect(result.current.xcContext).toEqual(context);
+  });
+
   it("clears private readback and cancels old callbacks on account changes and unmount", async () => {
     const { result, rerender, unmount } = await setup();
     await act(() => result.current.submitOuting(input));
