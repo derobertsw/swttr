@@ -1,16 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import catalog from '@/test/fixtures/gear-catalog.json';
-import { referenceAlpineEnsemble, referenceXCEnsemble } from '@/test/referenceRegionalEnsemble';
+import { referenceAlpineEnsemble } from '@/test/referenceRegionalEnsemble';
 import { DEFAULT_BODY_METRICS } from '@/lib/biophysics/bodyMetrics';
 import { createFakeSupabase } from '@/test/fakeSupabase';
 import { categorizeGarments } from '../categorization';
-import { metabolicRateFor, phaseIreq, phaseTargets } from '../thermal-targets';
 import type { GarmentRow } from '../types';
 import type { RecommendationRequest } from '../request';
 import { alpine } from './alpine';
 import { buildAlpineEnsemble } from './alpine-ensemble';
-import { buildXCEnsemble, needsWindLayer } from './xc';
 
 const garments = catalog.garments as GarmentRow[];
 const conditions = [-30, -25, -20, -15, -10, -5, 0, 5, 10, 15].flatMap((tempC) =>
@@ -23,11 +21,9 @@ const conditions = [-30, -25, -20, -15, -10, -5, 0, 5, 10, 15].flatMap((tempC) =
 const ids = (outfit: GarmentRow[]) => outfit.map((g) => g.id);
 
 describe.each(['catalog', 'wardrobe', 'sparse wardrobe'] as const)('regional search parity: %s', (mode) => {
-  it.each(['alpine', 'xc'] as const)('preserves %s choices and order across 240 conditions', (sport) => {
+  it('preserves alpine choices and order across 240 conditions', () => {
     const pool = mode === 'catalog'
-      ? garments.filter((g) => sport === 'alpine'
-        ? (g.garment_activity_ratings?.alpine_skiing_score ?? 0) >= 5
-        : (g.garment_activity_ratings?.xc_skiing_score ?? 0) >= 6)
+      ? garments.filter((g) => (g.garment_activity_ratings?.alpine_skiing_score ?? 0) >= 5)
       : garments.filter((_, index) => index % (mode === 'wardrobe' ? 2 : 11) === 0);
     const categorized = categorizeGarments(pool);
     const supabase = createFakeSupabase({}) as unknown as RecommendationRequest['supabase'];
@@ -38,18 +34,9 @@ describe.each(['catalog', 'wardrobe', 'sparse wardrobe'] as const)('regional sea
         weather: { temperature: condition.tempC * 9 / 5 + 32, wind_speed: condition.windMs / 0.44704 },
         useWardrobeOnly: mode !== 'catalog', prioritizeLightPack: false,
       };
-      if (sport === 'alpine') {
-        const targets = alpine.computeTargets(request).regional;
-        expect(ids(buildAlpineEnsemble(categorized, targets, condition.precipitation)), JSON.stringify(condition))
-          .toEqual(ids(referenceAlpineEnsemble(categorized, targets, condition.precipitation)));
-      } else {
-        const rate = metabolicRateFor('xc_skiing', condition.exertion, DEFAULT_BODY_METRICS);
-        const ireq = phaseIreq(request, condition.windMs, rate);
-        const targets = phaseTargets('xc_skiing', ireq, rate, request, condition.windMs).regional;
-        const windLayer = needsWindLayer(request);
-        expect(ids(buildXCEnsemble(categorized, targets, 0.25, windLayer)), JSON.stringify(condition))
-          .toEqual(ids(referenceXCEnsemble(categorized, targets, 0.25, windLayer)));
-      }
+      const targets = alpine.computeTargets(request).regional;
+      expect(ids(buildAlpineEnsemble(categorized, targets, condition.precipitation)), JSON.stringify(condition))
+        .toEqual(ids(referenceAlpineEnsemble(categorized, targets, condition.precipitation)));
     }
   }, 60_000);
 });
@@ -70,7 +57,6 @@ describe('regional search edge cases', () => {
     const second = { ...base, id: 'second' };
     const categorized = categorizeGarments([first, second]);
     expect(buildAlpineEnsemble(categorized, targets, false)).toEqual([first]);
-    expect(buildXCEnsemble(categorized, targets, 0.25, false)).toEqual([first]);
     expect(categorized.baseLayers).toEqual([first, second]);
   });
 
@@ -80,6 +66,5 @@ describe('regional search edge cases', () => {
     const categorized = categorizeGarments([base, duplicate, shell]);
     expect(ids(buildAlpineEnsemble(categorized, targets, true))).toEqual(['base', 'shell']);
     expect(buildAlpineEnsemble(categorized, targets, true)).toEqual(referenceAlpineEnsemble(categorized, targets, true));
-    expect(buildXCEnsemble(categorized, targets, 0.25, true)).toEqual(referenceXCEnsemble(categorized, targets, 0.25, true));
   });
 });

@@ -13,7 +13,7 @@ function garment(id: string, category: string, clo: number): GarmentRow {
   return {
     id, brand: 'Test', model_name: id, category,
     covers_torso: true, covers_arms: true, covers_legs: true,
-    garment_thermal_properties: { rcl_torso: clo, rcl_arms: clo, rcl_legs: clo, evap_potential: 0.3 },
+    garment_thermal_properties: { rcl_whole_body: clo, rcl_torso: clo, rcl_arms: clo, rcl_legs: clo, recl_torso: 20, recl_arms: 20, recl_legs: 20, evap_potential: 0.3 },
   };
 }
 
@@ -57,7 +57,7 @@ describe('alpine regional warnings', () => {
 
     expect(result.recommendation.garments.map((g) => g.id)).toEqual(['base', 'fleece', 'shell']);
     expect(regionalWarnings(result)).toEqual([]);
-    expect(result.warnings).toContainEqual(expect.stringMatching(/^Insufficient overall insulation:/));
+    expect(result.warnings).toContainEqual(expect.stringMatching(/^Significant insulation shortfall:/));
     expect(result.recommendation.thermal_comfort_score).toBeLessThan(85);
   });
 

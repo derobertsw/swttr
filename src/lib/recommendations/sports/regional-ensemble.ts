@@ -49,6 +49,8 @@ interface SearchOptions {
   puffyFitsUnder: (outer: GarmentRow) => boolean;
   rank: (outfit: OutfitRankInput) => number[];
   breathableFrom?: Record<Layer, number>;
+  /** Sport-specific rank; null rejects a candidate. Alpine keeps its original rank. */
+  assess?: (outfit: GarmentRow[], region: 'torso' | 'legs') => number[] | null;
 }
 
 const EMPTY: OutfitTotals = {
@@ -267,7 +269,10 @@ export function buildRegionalEnsemble(
           const torso = (partial.torsoClo + (outer?.torsoClo ?? 0)) * ENSEMBLE_REGRESSION.thermal.torso.coef;
           const arms = (partial.armsClo + (outer?.armsClo ?? 0)) * ENSEMBLE_REGRESSION.thermal.arm.coef;
           const legs = (partial.legsClo + (outer?.legsClo ?? 0)) * ENSEMBLE_REGRESSION.thermal.leg.coef;
-          const candidateRank = options.rank({
+          const candidateRank = options.assess ? options.assess(
+            [...ensemble, ...[base, mid, outer].filter((g) => g !== undefined)].map(g => g.garment),
+            region === LEGS ? 'legs' : 'torso',
+          ) : options.rank({
             missingBase: missing(partial.baseMask | (outer?.baseMask ?? 0), region),
             missingOuter: missing(partial.outerMask | (outer?.outerMask ?? 0), region),
             missingWearable: missing(partial.wearableMask | (outer?.wearableMask ?? 0), region),
@@ -281,6 +286,7 @@ export function buildRegionalEnsemble(
             breathability: partial.breathability + (outer?.breathability ?? 0),
             unbreathable: partial.unbreathable + (outer?.unbreathable ?? 0),
           });
+          if (!candidateRank) continue;
           if (isBetter(candidateRank, bestRank)) {
             best = [...ensemble, ...[base, mid, outer].filter((g) => g !== undefined)];
             bestRank = candidateRank;

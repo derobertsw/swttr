@@ -1,11 +1,6 @@
 /**
- * Frozen pre-#154 search and ranking, used only as a behavioral/performance
- * reference, plus XC's rule against leaving a region in underwear alone.
- */
-/**
- * Ensemble builder shared by alpine and XC skiing: compares complete
- * base + optional mid + outer outfits for each body region, and each sport
- * ranks them by its own priorities.
+ * Frozen pre-#154 alpine search and ranking, used only as a behavioral and
+ * performance reference for complete regional base + optional mid + outer outfits.
  */
 import { ENSEMBLE_REGRESSION } from '@/lib/biophysics/constants';
 import type { PhaseTargets } from '@/lib/recommendations/thermal-targets';
@@ -169,23 +164,5 @@ export function referenceAlpineEnsemble(
     const { excess, deficit, surplus } = targetFit(candidate, targets, scoredRegions);
     const breathability = candidate.reduce((sum, g) => sum + evapPotential(g), 0);
     return [missingCoverage, wetExposure, deficit + excess, candidate.length, surplus, -breathability];
-  });
-}
-
-export function referenceXCEnsemble(
-  categorized: CategorizedGarments,
-  targets: PhaseTargets['regional'],
-  minEvapPotential: number,
-  windLayer: boolean
-): GarmentRow[] {
-  const breathableFrom = { base: minEvapPotential, mid: minEvapPotential, outer: 0.2 };
-  return buildRegionalEnsemble(categorized, (outer) => outer.category !== 'outer_insulated', (candidate, scoredRegions) => {
-    const missingCoverage = missingLayers(candidate, scoredRegions, 'base') +
-      (windLayer ? missingLayers(candidate, scoredRegions, 'outer') : 0);
-    const underwearOnly = scoredRegions.filter((r) => !candidate.some((g) => occupies(g, r) && g.usage !== 'underlayer')).length;
-    const { excess, deficit, surplus } = targetFit(candidate, targets, scoredRegions);
-    const unbreathable = candidate.filter((g) => evapPotential(g) < breathableFrom[layer(g)]).length;
-    const breathability = candidate.reduce((sum, g) => sum + evapPotential(g), 0);
-    return [missingCoverage, underwearOnly, deficit + excess, unbreathable, candidate.length, -breathability, surplus];
   });
 }

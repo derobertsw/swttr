@@ -19,6 +19,35 @@ describe("withMinimums", () => {
 });
 
 describe("evaluateThermalComfort", () => {
+  it('calls the reported 0.353 clo outfit warmer without asserting a medical risk', () => {
+    const input = { totalClo: 0.353, targetRange: [0.18, 0.31] as [number, number] };
+    expect(evaluateThermalComfort(input)).toMatchObject({
+      status: 'warmer', summary: 'Warmer than recommended', warnings: [],
+    });
+    expect(calculateThermalComfortScore(input)).toBeLessThan(85);
+  });
+
+  it('reports local warmth and cold together without letting extra torso insulation cover bare hands', () => {
+    const decision = evaluateThermalComfort({ totalClo: 1.1, targetRange: [1, 1.2], bodyParts: [
+      { name: 'Torso', clo: 2, minimum: 1, maximum: 1.2 },
+      { name: 'Hands', clo: 0, minimum: 0.8, maximum: 1 },
+    ] });
+    expect(decision).toMatchObject({ status: 'mixed', summary: 'Uneven warmth' });
+    expect(decision?.reasons?.join(' ')).toContain('Hands needs more insulation');
+    expect(decision?.warnings).toHaveLength(2);
+  });
+
+  it('keeps moisture reasoning separate from insulation and retains the existing heuristic', () => {
+    const dry = { totalClo: 0.25, targetRange: [0.18, 0.31] as [number, number] };
+    const moisture = { ...dry, breathability: { evapPotential: 0.1, target: 0.3 } };
+    expect(calculateThermalComfortScore(moisture)).toBe(calculateThermalComfortScore(dry));
+    expect(evaluateThermalComfort(moisture)?.warnings?.join(' ')).toContain('moisture buildup');
+  });
+
+  it.each([NaN, Infinity, -1])('leaves invalid insulation unknown: %s', totalClo => {
+    expect(evaluateThermalComfort({ totalClo, targetRange: [0.18, 0.31] })).toBeNull();
+    expect(calculateThermalComfortScore({ totalClo, targetRange: [0.18, 0.31] })).toBeNull();
+  });
   it("marks cold risk when a body part visibly misses its minimum even if whole-body is in range", () => {
     const result = evaluateThermalComfort({
       totalClo: 1.6,
@@ -65,6 +94,11 @@ describe("evaluateThermalComfort", () => {
 });
 
 describe("calculateThermalComfortScore", () => {
+  it('keeps severe thermal excesses distinguishable rather than flattening them to zero', () => {
+    const score = (totalClo: number) => calculateThermalComfortScore({ totalClo, targetRange: [1, 1.2] })!;
+    expect(score(5)).toBeGreaterThan(0);
+    expect(score(4)).toBeGreaterThan(score(5));
+  });
   it("penalizes score for large extremity deficits", () => {
     const base = calculateThermalComfortScore({
       totalClo: 1.6,

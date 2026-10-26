@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { OutingRequestNotice } from "@/components/OutingRequestNotice";
 import { SaveToTrip } from "@/components/trips/SaveToTrip";
 
+/** Connect outing inputs, including XC context, to recommendations and saved kits. */
 const HomeContent = () => {
   const userId = useUserId();
   const {
@@ -24,6 +25,8 @@ const HomeContent = () => {
     activityInitializing,
     exertion,
     setExertion,
+    xcContext,
+    setXCContext,
     result,
     inputMode,
     setInputMode,
@@ -90,6 +93,8 @@ const HomeContent = () => {
               activityInitializing={activityInitializing}
               exertion={exertion}
               onExertionChange={setExertion}
+              xcContext={xcContext}
+              onXCContextChange={setXCContext}
               location={locationSearch.location}
               locationQuery={locationSearch.locationQuery}
               suggestions={locationSearch.suggestions}

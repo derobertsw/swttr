@@ -37,10 +37,10 @@ describe("evaluatePhase", () => {
     expect(result.hasExtremityGap).toBe(true);
   });
 
-  it("uses the arm deficit override without changing the total", () => {
+  it("uses the phase arm override for both deficits and the total", () => {
     const withOverride = evaluatePhase({ ...base, arms: { clo: 0.8, target: 0.9, deficitClo: 1.0 } });
     expect(withOverride.maxRegionalDeficit).toBeCloseTo(0.6 - 0.6 * 0.961, 10);
-    expect(withOverride.totalClo).toBeCloseTo(evaluatePhase(base).totalClo!, 10);
+    expect(withOverride.totalClo).toBeCloseTo(evaluatePhase(base).totalClo! + 0.2 * 0.25, 10);
   });
 
   it("marks body parts under their minimum, over their target, or in range", () => {

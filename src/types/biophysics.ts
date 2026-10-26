@@ -5,6 +5,7 @@
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
 import type { EnsembleScore, GarmentSemantics, ThermalProvenance } from "@/types/garments";
 import type { SustainedSportPolicy } from '@/lib/biophysics/sport-policy';
+import type { OutingPattern, XCExposure } from '@/types/xc';
 
 export interface IreqData {
   min: number;
@@ -202,6 +203,8 @@ export interface BiophysicsRecommendation {
     precipitation?: boolean;
     /** XC skiing only: exertion expressed as XC intensity. */
     intensity?: "easy" | "moderate" | "racing";
+    outing_pattern?: OutingPattern;
+    xc_exposure?: XCExposure;
   };
   ireq: IreqRange;
   recommendation: {
@@ -212,10 +215,13 @@ export interface BiophysicsRecommendation {
     ensemble_properties: EnsembleProperties;
     score: number;
     thermal_comfort_score?: number;
+    /** Assessment of the actual worn outfit, using the same contract as edits. */
+    evaluation?: PhaseEvaluation;
     component_scores: ComponentScores;
   };
   warnings: string[];
   guidance: string[];
+  descent_evaluation?: PhaseEvaluation;
   descent_headwear?: RecommendedHeadwear | null;
   descent_handwear?: RecommendedHandwear | null;
   descent_breakdown?: {
@@ -225,6 +231,8 @@ export interface BiophysicsRecommendation {
     extremity_ireq: ExtremityIreqRange;
   };
   pack_items?: PackItems;
+  /** Generic carry advice, excluded from moving insulation and ownership. */
+  carry_items?: Array<{ label: string; reason: string }>;
   transition_protocol?: TransitionProtocol;
 }
 
@@ -235,6 +243,11 @@ export interface BiophysicsRecommendation {
 export type EvaluatedBodyPart = "torso" | "legs" | "hands" | "headNeck";
 
 export interface ThermalDecision {
+  /** Comfort guidance is distinct from significant thermal mismatch warnings. */
+  status?: 'near_target' | 'warmer' | 'cooler' | 'mixed' | 'incomplete';
+  summary?: string;
+  reasons?: string[];
+  warnings?: string[];
   riskType: "comfortable" | "cold" | "overheat";
   severity: "moderate" | "high";
   /** How far outside the target the clo is. */
@@ -244,6 +257,8 @@ export interface ThermalDecision {
 /** Metadata survives recommendation, picker and manual evaluation. Catalog
  * references are resolved on the server; client clo never overrides them. */
 export interface EvaluationItem extends GarmentSemantics {
+  /** Resolved server-side, never accepted as catalog authority from clients. */
+  name?: string;
   sourceId?: string;
   item_type?: 'garment' | 'handwear' | 'headwear' | 'custom';
   rcl?: number | null;
@@ -253,6 +268,12 @@ export interface EvaluationItem extends GarmentSemantics {
 }
 
 export interface PhaseEvaluationInput {
+  requireStandalone?: boolean;
+  protectionNeeds?: { wind: boolean; wet: boolean; poleGrip: boolean };
+  /** Server-issued moisture heuristic threshold, forwarded with phase targets. */
+  breathabilityTarget?: number;
+  /** Internal: calculated from resolved worn garments, never trusted from clients. */
+  armClo?: number | null;
   /** Internal: resolved from the worn catalog garments on the server. */
   hoodClo?: number;
   /** Server-issued running/XC limits, forwarded unchanged for manual edits. */
@@ -269,12 +290,14 @@ export interface PhaseEvaluationInput {
    */
   minTargets?: Partial<Record<EvaluatedBodyPart, number>>;
   /**
-   * Arms aren't edited directly, so their clo comes from the recommendation.
-   * `deficitClo` overrides `clo` for the arm deficit (the descent reports its
-   * own arm clo); the whole-body total always uses `clo`.
+   * Catalog requests recompute arms from the current worn garments. These
+   * values are a fallback for legacy numeric requests; `deficitClo` is a
+   * legacy phase override used consistently for the total and local deficit.
    */
   arms?: { clo: number; target?: number; minTarget?: number; deficitClo?: number };
   targetRange?: [number, number];
+  /** Internal: existing evaporative-potential heuristic, independent of insulation. */
+  breathability?: { evapPotential: number; target: number };
 }
 
 export interface BodyPartEvaluation {
@@ -288,6 +311,7 @@ export interface BodyPartEvaluation {
 }
 
 export interface PhaseEvaluation {
+  breathabilityTarget?: number;
   thermal_data_status?: 'known' | 'unknown';
   items?: Record<EvaluatedBodyPart, EvaluationItem[]>;
   bodyParts: Record<EvaluatedBodyPart, BodyPartEvaluation>;
