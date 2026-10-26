@@ -1,10 +1,10 @@
 # Selected-day road geometry and provider support (#232)
 
-Implemented October 19, 2026 on top of the map foundation delivered in #319. The existing [map/list contract](trip-maps.md) remains in place: `TripMap`, stable source identities, scoped places/days, all selectable dates, counts, timezone/provenance, candidate exclusions, and the fail-closed source loader. No new persistence model or schema migration is introduced.
+Implemented October 19, 2026 on top of the map foundation delivered in #319. The existing [map/list contract](trip-maps.md) remains in place: `TripMap`, stable source identities, scoped places/days, all selectable dates, counts, timezone/provenance, candidate exclusions, and the fail-closed source loader. No new persistence model or schema migration is introduced here. The day's `meet` (#333) reads `trip_days` columns from `20261024230000_trip_day_meet_times.sql`; before it's applied, the map shows each tour plan's meet time instead.
 
 ## API and revision binding
 
-`GET /api/v1/trips/:id/map?date=YYYY-MM-DD` keeps its delivered response shape. Days now also expose `crew_stay_place_id` and `meeting_place_id`; meeting uses #210's canonical access point. Pickup remains notes-only because the delivered schema has no structured pickup coordinates. A date without a saved day row stays selectable, with no invented destination or access reference.
+`GET /api/v1/trips/:id/map?date=YYYY-MM-DD` keeps its delivered response shape. Days now also expose `crew_stay_place_id` and `meeting_place_id`; meeting uses #210's canonical access point. Since #333 a day has `meet` (its meet time and time zone label, for every sport), `meeting_place_id` is the access point whenever the day has a meet time or a tour in use, and `tour` no longer has meet or time zone labels. Pickup remains notes-only because the delivered schema has no structured pickup coordinates. A date without a saved day row stays selectable, with no invented destination or access reference.
 
 Each day's `geometry` metadata retains mode, endpoint references and its opaque **route revision**, with `reason: "not_requested"` for eligible drives. `provider.geometry` is `"on_demand"`. The map/day snapshot revisions may change as estimates change; `day.geometry.revision` remains stable while the endpoint identities, coordinates, mode, traffic model and closure options remain unchanged. Tokens are equality checks, not sequence numbers.
 

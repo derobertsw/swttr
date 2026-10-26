@@ -60,6 +60,25 @@ export interface TripDay {
   origin_stay_id?: string | null;
   /** No drive planned: the day starts on foot or skis, or the crew meets there. */
   no_drive?: boolean;
+  /**
+   * When the crew meets (#333), "HH:MM:SS" on the destination's clock, for
+   * every sport; where is the day's access point. Missing before migration
+   * 20261024230000. `meet_day_offset` -1 meets the evening before.
+   */
+  meet_time?: string | null;
+  meet_day_offset?: -1 | 0;
+  /** The destination's IANA time zone when the meet time was saved, if it could be found. */
+  meet_time_zone?: string | null;
+}
+
+/** A day's meet time with the server's labels (#333). */
+export interface TripDayMeet {
+  /** The trip day it's for. */
+  date: string;
+  /** e.g. "6:30 AM MDT · Sat Oct 10", or "6:00 PM MDT · Fri Oct 9, the day before". */
+  meet_label: string;
+  /** Says whose clock the time uses. */
+  time_zone_label: string;
 }
 
 export interface TripMemberDayKit {
@@ -127,6 +146,8 @@ export interface TripFull {
   lodging?: TripLodging;
   /** Backcountry days' tour plans (#210); optional like `lodging`. */
   tour_plans?: TripTourPlanSummary[];
+  /** Each day's meet time (#333), in date order; optional like `lodging`. */
+  meets?: TripDayMeet[];
   /** Each day's conditions sources with the crew's reviews (#211); optional like `lodging`. */
   conditions?: TripDayConditionsSource[];
   /** People's own starting points (#333); missing or empty before its migration. */
@@ -148,14 +169,13 @@ export interface TripMemberDayOrigin {
   no_drive: boolean;
 }
 
-/** A Backcountry day's tour plan as the organizer enters it: see docs/trip-tour-plans.md. */
+/**
+ * A Backcountry day's tour plan as the organizer enters it: see
+ * docs/trip-tour-plans.md. The meet time is the day's (#333).
+ */
 export interface TripTourPlanInput {
   objective: string;
   route_url: string | null;
-  /** "HH:MM" on the destination's clock. */
-  meet_time: string | null;
-  /** -1 meets the evening before. */
-  meet_day_offset: -1 | 0;
   distance: number | null;
   distance_unit: "km" | "mi" | null;
   ascent: number | null;
@@ -179,7 +199,7 @@ export interface TripTourPlan extends TripTourPlanInput {
   id: string;
   trip_id: string;
   trip_day_id: string;
-  /** The destination's IANA time zone when the plan was saved, if it could be found. */
+  /** The destination's IANA time zone when the plan's return time was saved, if it could be found. */
   time_zone: string | null;
   revision: number;
   created_by: string;
@@ -191,8 +211,7 @@ export interface TripTourPlan extends TripTourPlanInput {
 /** A saved tour plan with the server's labels for it. */
 export interface TripTourPlanSummary extends TripTourPlan {
   date: string;
-  /** e.g. "6:30 AM MDT · Sat Oct 10", or with ", the day before". */
-  meet_label: string | null;
+  /** e.g. "11:00 AM MDT · Sun Oct 11, the day after". */
   return_label: string | null;
   /** e.g. "14.2 km · 1,200 m ascent · 6 h 30 min". */
   metrics_label: string | null;

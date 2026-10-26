@@ -4,7 +4,7 @@ import type { TripTourPlan } from "@/types/trips";
 
 const saved = (extra: Partial<TripTourPlan> = {}): TripTourPlan => ({
   id: "plan-1", trip_id: "trip-1", trip_day_id: "day-1", objective: "Tuckerman Ravine", route_url: null,
-  meet_time: null, meet_day_offset: 0, distance: null, distance_unit: null, ascent: null, ascent_unit: null,
+  distance: null, distance_unit: null, ascent: null, ascent_unit: null,
   duration_minutes: null, metrics_source: null, metrics_source_url: null, approach_notes: null, access_notes: null,
   access_url: null, backup_plan: null, return_time: null, return_day_offset: 0, checkin_notes: null, pickup_notes: null,
   time_zone: null, revision: 1, created_by: "user-1", updated_by: "user-1",
@@ -14,19 +14,23 @@ const saved = (extra: Partial<TripTourPlan> = {}): TripTourPlan => ({
 describe("parseTourPlan", () => {
   it("accepts a route-only draft and fills every optional field with null", () => {
     expect(parseTourPlan({ objective: "  Tuckerman Ravine " })).toEqual({
-      objective: "Tuckerman Ravine", route_url: null, meet_time: null, meet_day_offset: 0, return_time: null, return_day_offset: 0,
+      objective: "Tuckerman Ravine", route_url: null, return_time: null, return_day_offset: 0,
       distance: null, distance_unit: null, ascent: null, ascent_unit: null, duration_minutes: null, metrics_source: null,
       metrics_source_url: null, approach_notes: null, access_notes: null, access_url: null, backup_plan: null,
       checkin_notes: null, pickup_notes: null,
     });
   });
 
-  it("keeps figures with their units and the day offsets", () => {
-    expect(parseTourPlan({ objective: "Hut", meet_time: "18:30", meet_day_offset: -1, return_time: "11:00:00", return_day_offset: 1,
+  it("keeps figures with their units and the return's day offset", () => {
+    expect(parseTourPlan({ objective: "Hut", return_time: "11:00:00", return_day_offset: 1,
       distance: "14.25", distance_unit: "km", ascent: 1200, ascent_unit: "m", duration_minutes: 390 })).toMatchObject({
-      meet_time: "18:30", meet_day_offset: -1, return_time: "11:00", return_day_offset: 1,
+      return_time: "11:00", return_day_offset: 1,
       distance: 14.3, distance_unit: "km", ascent: 1200, ascent_unit: "m", duration_minutes: 390,
     });
+  });
+
+  it("leaves the meet time out: it's the day's (#333)", () => {
+    expect(parseTourPlan({ objective: "Hut", meet_time: "18:30", meet_day_offset: -1 })).not.toHaveProperty("meet_time");
   });
 
   it.each([
@@ -36,11 +40,8 @@ describe("parseTourPlan", () => {
     [{ objective: "A", route_url: "javascript:alert(1)" }, "route_url"],
     [{ objective: "A", access_url: "https://user:pw@example.com" }, "access_url"],
     [{ objective: "A", metrics_source_url: "example.com/route" }, "metrics_source_url"],
-    [{ objective: "A", meet_time: "25:00" }, "meet_time"],
-    [{ objective: "A", meet_day_offset: 1 }, "meet_day_offset"],
+    [{ objective: "A", return_time: "25:00" }, "return_time"],
     [{ objective: "A", return_day_offset: -1 }, "return_day_offset"],
-    [{ objective: "A", meet_time: "08:00", return_time: "07:30" }, "return_time"],
-    [{ objective: "A", meet_time: "08:00", return_time: "08:00" }, "return_time"],
     [{ objective: "A", distance: "12" }, "distance_unit"],
     [{ objective: "A", distance: "-1", distance_unit: "km" }, "distance"],
     [{ objective: "A", ascent: "1200.5", ascent_unit: "m" }, "ascent"],
@@ -50,33 +51,34 @@ describe("parseTourPlan", () => {
   ])("names the field to fix (%#)", (input, field) => {
     expect(parseTourPlan(input)).toMatchObject({ field });
   });
-
-  it("accepts an overnight return earlier on the clock than the meet", () => {
-    expect(parseTourPlan({ objective: "A", meet_time: "18:00", meet_day_offset: -1, return_time: "09:00" })).not.toHaveProperty("error");
-    expect(parseTourPlan({ objective: "A", meet_time: "08:00", return_time: "07:00", return_day_offset: 1 })).not.toHaveProperty("error");
-  });
 });
 
 describe("buildTourPlanSummary", () => {
   it("labels a route-only draft without times or figures", () => {
     expect(buildTourPlanSummary(saved(), "2026-10-10")).toMatchObject({
-      date: "2026-10-10", meet_label: null, return_label: null, metrics_label: null, metrics_source_label: null,
+      date: "2026-10-10", return_label: null, metrics_label: null, metrics_source_label: null,
       time_zone_label: null, updated_label: "Last changed Wed Oct 14 by the organizer",
     });
   });
 
   it("shows times on the destination's clock with that date's zone abbreviation", () => {
-    const summary = buildTourPlanSummary(saved({ meet_time: "18:00:00", meet_day_offset: -1, return_time: "06:30:00", return_day_offset: 1, time_zone: "America/Denver" }), "2026-10-31");
-    expect(summary.meet_label).toBe("6:00 PM MDT · Fri Oct 30, the day before");
+    const summary = buildTourPlanSummary(saved({ return_time: "06:30:00", return_day_offset: 1, time_zone: "America/Denver" }), "2026-10-31");
     // US daylight saving ends on Sunday November 1, 2026.
     expect(summary.return_label).toBe("6:30 AM MST · Sun Nov 1, the day after");
     expect(summary.time_zone_label).toBe("Times are local to the destination (America/Denver).");
   });
 
   it("says when the destination's time zone isn't known", () => {
-    const summary = buildTourPlanSummary(saved({ meet_time: "06:30:00" }), "2026-10-10");
-    expect(summary.meet_label).toBe("6:30 AM destination time · Sat Oct 10");
+    const summary = buildTourPlanSummary(saved({ return_time: "15:30:00" }), "2026-10-10");
+    expect(summary.return_label).toBe("3:30 PM destination time · Sat Oct 10");
     expect(summary.time_zone_label).toMatch(/time zone wasn't confirmed/);
+  });
+
+  it("leaves out the meet columns an older API still writes (#333)", () => {
+    const summary = buildTourPlanSummary({ ...saved(), meet_time: "06:30:00", meet_day_offset: -1 }, "2026-10-10");
+    expect(summary).not.toHaveProperty("meet_time");
+    expect(summary).not.toHaveProperty("meet_day_offset");
+    expect(summary.time_zone_label).toBeNull();
   });
 
   it("lists crew figures with units as entered and says where they come from", () => {

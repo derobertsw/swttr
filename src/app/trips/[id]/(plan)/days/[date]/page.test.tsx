@@ -931,18 +931,64 @@ describe("Trip day page", () => {
     });
   });
 
+  describe("Meet time (#333)", () => {
+    const LOT: TripLocation = { label: "Spruce Peak lot", address: null, latitude: 44.53, longitude: -72.78, precision: "exact",
+      time_zone: "America/New_York", source: "manual", provider: null, provider_id: null, attribution: null };
+    const downhill: TripDay = { ...DAY, activity: "Alpine", meet_time: "08:30:00", meet_day_offset: 0, meet_time_zone: "America/New_York" };
+    const meets = [{ date: DAY.date, meet_label: "8:30 AM EDT · Sat Oct 10", time_zone_label: "Local time at the destination (America/New_York)." }];
+    const trip = (members: TripMember[]) => reply(200, tripFull({
+      stops: [{ ...STOWE_STOP, access_point: LOT }], days: [downhill], members, lodging: buildLodging(TRIP, [], []), meets,
+    }));
+
+    it("starts any sport's day with its meet time at the access point, for the organizer to change", async () => {
+      vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": trip([ORGANIZER]), "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST }));
+      await renderPage();
+      const start = await screen.findByRole("region", { name: "Meet and start" });
+      expect(within(start).getByText("8:30 AM EDT · Sat Oct 10 · Spruce Peak lot")).toBeInTheDocument();
+      expect(within(start).getByText("Local time at the destination (America/New_York).")).toBeInTheDocument();
+      expect(within(start).getByRole("button", { name: "Change meet time" })).toBeInTheDocument();
+      expect(within(start).getByRole("button", { name: "Remove meet time" })).toBeInTheDocument();
+      // It comes before Getting there.
+      expect(start.compareDocumentPosition(screen.getByRole("heading", { name: "Getting there" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("shows members the meet time without its controls, and the organizer a way to set one", async () => {
+      mockAuth.userId = "user-2";
+      const member: TripMember = { ...SAM, user_id: "user-2", status: "joined" };
+      vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": trip([ORGANIZER, member]), "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST }));
+      await renderPage();
+      const start = await screen.findByRole("region", { name: "Meet and start" });
+      expect(within(start).getByText("8:30 AM EDT · Sat Oct 10 · Spruce Peak lot")).toBeInTheDocument();
+      expect(within(start).queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("offers the organizer Set meet time on a day without one", async () => {
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP], days: [{ ...DAY, meet_time: null, meet_day_offset: 0, meet_time_zone: null }],
+          lodging: buildLodging(TRIP, [], []), meets: [] })),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      const start = await screen.findByRole("region", { name: "Start of the day" });
+      expect(within(start).getByRole("button", { name: "Set meet time" })).toBeInTheDocument();
+      expect(within(start).queryByText("Meet", { selector: "dt" })).not.toBeInTheDocument();
+    });
+  });
+
   describe("Tour plan", () => {
-    const tourDay: TripDay = { ...DAY, activity: "Backcountry" };
+    // The meet time is the day's (#333), labelled by the server.
+    const tourDay: TripDay = { ...DAY, activity: "Backcountry", meet_time: "06:30:00", meet_day_offset: 0, meet_time_zone: "America/New_York" };
+    const meets = [{ date: DAY.date, meet_label: "6:30 AM EDT · Sat Oct 10", time_zone_label: "Local time at the destination (America/New_York)." }];
     const plan = buildTourPlanSummary({
       id: "plan-1", trip_id: TRIP.id, trip_day_id: DAY.id, objective: "Tuckerman Ravine", route_url: null,
-      meet_time: "06:30:00", meet_day_offset: 0, distance: null, distance_unit: null, ascent: null, ascent_unit: null,
+      distance: null, distance_unit: null, ascent: null, ascent_unit: null,
       duration_minutes: null, metrics_source: null, metrics_source_url: null, approach_notes: null, access_notes: null,
       access_url: null, backup_plan: "Lower snowfields", return_time: null, return_day_offset: 0, checkin_notes: null,
       pickup_notes: null, time_zone: "America/New_York", revision: 1, created_by: "user-1", updated_by: "user-1",
       created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z",
     }, DAY.date);
     const trip = (day: TripDay, members: TripMember[] = [ORGANIZER]) => reply(200, tripFull({
-      stops: [STOWE_STOP], days: [day], members, lodging: buildLodging(TRIP, [], []), tour_plans: [plan],
+      stops: [STOWE_STOP], days: [day], members, lodging: buildLodging(TRIP, [], []), tour_plans: [plan], meets: day.meet_time ? meets : [],
     }));
 
     it("puts the meet time at the start of the day, and the plan before clothing (#334)", async () => {
@@ -964,7 +1010,7 @@ describe("Trip day page", () => {
         time_zone: "America/New_York", source: "manual", provider: null, provider_id: null, attribution: null };
       vi.stubGlobal("fetch", fakeTripApi({
         "GET /api/v1/trips/trip-1": reply(200, tripFull({
-          stops: [{ ...STOWE_STOP, access_point: LOT }], days: [tourDay], members: [ORGANIZER], lodging: buildLodging(TRIP, [], []), tour_plans: [plan],
+          stops: [{ ...STOWE_STOP, access_point: LOT }], days: [tourDay], members: [ORGANIZER], lodging: buildLodging(TRIP, [], []), tour_plans: [plan], meets,
         })),
         "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
       }));
@@ -1024,7 +1070,7 @@ describe("Trip day page", () => {
     });
 
     it("restores a plan kept from Backcountry by setting the activity back", async () => {
-      let day: TripDay = { ...DAY, activity: "Alpine" };
+      let day: TripDay = { ...tourDay, activity: "Alpine" };
       const api = fakeTripApi({
         "GET /api/v1/trips/trip-1": () => trip(day),
         "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
@@ -1034,7 +1080,8 @@ describe("Trip day page", () => {
       const user = userEvent.setup();
       await renderPage();
       await user.click(await screen.findByText("Saved tour plan · Tuckerman Ravine"));
-      expect(screen.queryByRole("region", { name: "Meet and start" })).not.toBeInTheDocument();
+      // The meet time is the day's, whatever its activity (#333).
+      expect(within(screen.getByRole("region", { name: "Meet and start" })).getByText("6:30 AM EDT · Sat Oct 10 · Meeting point not set")).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Restore tour plan" }));
       expect(await screen.findByRole("heading", { name: "Tour plan" })).toBeInTheDocument();
       expect(sentBodies(api, "PATCH /api/v1/trips/trip-1/days/2026-10-10")).toEqual([{ activity: "Backcountry" }]);

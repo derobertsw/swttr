@@ -9,7 +9,7 @@ import { LocationSummary } from "@/components/trips/LocationPicker";
 import { StayDepartures, useDriveEstimates } from "@/components/trips/DriveEstimate";
 import { LodgingEditor, personNote, possessive, STAY_EXACT, type LodgingEditorTarget } from "@/components/trips/LodgingEditor";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
-import type { TripFull, TripLodging, TripLodgingPerson, TripPersonRun, TripStaySummary } from "@/types/trips";
+import type { TripDayMeet, TripFull, TripLodging, TripLodgingPerson, TripPersonRun, TripStaySummary } from "@/types/trips";
 
 type Open = (target: LodgingEditorTarget) => void;
 
@@ -280,25 +280,31 @@ const lodgingRow = (term: string, value: string) =>
   <div key={term}><dt className="text-muted-foreground">{term}</dt><dd className="break-words text-foreground">{value}</dd></div>;
 
 /**
- * The start of a day's brief (#334): the meet, with the tour plan's time and
- * the day's access point, where the crew meets (#210), then where you start.
- * A person on the trip sees their own start first, then the crew's where it
- * differs (#333). The drive follows in Getting there, and tonight's stay after it.
+ * The start of a day's brief (#334): the meet, the day's time (#333) at its
+ * access point, where the crew meets (#210), then where you start. A person on
+ * the trip sees their own start first, then the crew's where it differs
+ * (#333). The drive follows in Getting there, and tonight's stay after it.
  */
-export function DayStart({ data, date, meet, meetingPoint = null, memberId = null }: {
-  data: TripFull; date: string; meet?: string | null; meetingPoint?: string | null;
+export function DayStart({ data, date, meet, meetingPoint = null, memberId = null, children }: {
+  data: TripFull; date: string; meet?: TripDayMeet | null; meetingPoint?: string | null;
   /** The signed-in person's membership, whose own start leads. */
   memberId?: string | null;
+  /** The organizer's meet time controls. */
+  children?: ReactNode;
 }) {
   const { context, mine } = dayLodging(data, date, memberId);
-  if (!context) return null;
+  if (!context && !meet && !children) return null;
   return <section aria-labelledby={`day-start-${date}`} className="min-w-0">
     <h2 id={`day-start-${date}`} className={sectionLabelClassName}>{meet ? "Meet and start" : "Start of the day"}</h2>
     <dl className="mt-2 space-y-2 text-base">
-      {meet && lodgingRow("Meet", `${meet} · ${meetingPoint ?? "Meeting point not set"}`)}
-      {lodgingRow("Starting from", mine?.starting_from ?? context.starting_from)}
-      {mine && mine.starting_from !== context.starting_from && lodgingRow("Crew starting from", context.starting_from)}
+      {meet && <div><dt className="text-muted-foreground">Meet</dt><dd className="break-words text-foreground">
+        {meet.meet_label} · {meetingPoint ?? "Meeting point not set"}
+        <span className="block text-sm text-muted-foreground">{meet.time_zone_label}</span>
+      </dd></div>}
+      {context && lodgingRow("Starting from", mine?.starting_from ?? context.starting_from)}
+      {context && mine && mine.starting_from !== context.starting_from && lodgingRow("Crew starting from", context.starting_from)}
     </dl>
+    {children}
   </section>;
 }
 
