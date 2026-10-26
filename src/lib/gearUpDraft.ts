@@ -66,6 +66,7 @@ function isOutingTime(value: unknown): value is OutingTime {
   return value.mode === "later" && isDate(value.date) && isTime(value.time) && isDuration(value.durationDays);
 }
 
+/** Validate a stored outing, allowing absent XC context for older drafts. */
 function isOuting(value: unknown): value is Outing {
   return (
     isObject(value) &&
@@ -77,6 +78,7 @@ function isOuting(value: unknown): value is Outing {
   );
 }
 
+/** Validate persisted form inputs and the last outing before restoring a draft. */
 function isDraft(value: unknown): value is GearUpDraft {
   return (
     isObject(value) &&

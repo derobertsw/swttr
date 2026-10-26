@@ -48,6 +48,7 @@ interface SinglePhaseSportConfig {
   /** Extra fields echoed in `conditions` after temperature, wind and exertion. */
   conditions(request: RecommendationRequest): object;
   guidance(request: RecommendationRequest, ireq: IreqResult, ensemble?: GarmentRow[], targets?: SinglePhaseTargets): string[];
+  /** Advice for packed items, excluded from the worn ensemble and its comfort score. */
   carry?(request: RecommendationRequest, targets: SinglePhaseTargets): BiophysicsRecommendation['carry_items'];
   /** Retain functional protection when a calibrated budget changes. */
   protect?(ensemble: GarmentRow[], categorized: CategorizedGarments, targets: SinglePhaseTargets): { ensemble: GarmentRow[]; warnings: string[] };
@@ -68,6 +69,7 @@ export function createSinglePhaseSport(
   return {
     catalog: { ...config.catalog, activity: config.activity },
 
+    /** Derive moving targets with the same exposure and precipitation policy used for scoring. */
     computeTargets(request) {
       const xc = config.activity === 'xc_skiing' ? xcPhaseContext({ ...request, precipitationType: request.weather.precipitation_type }) : undefined;
       const conditions = { tempC: request.tempC, humidity: request.humidity,
@@ -84,6 +86,7 @@ export function createSinglePhaseSport(
       };
     },
 
+    /** Report clothing gaps and carry advice when no usable garments are available. */
     emptyResponse(request, targets) {
       // The no-garment fast path has not inspected accessory availability.
       const accessories = selectPhaseAccessories(config.activity, targets, { handwear: [], headwear: [], availability: 'unknown' }, request.tempC);
@@ -102,6 +105,7 @@ export function createSinglePhaseSport(
       };
     },
 
+    /** Select and score worn clothing, then report requirements, protection gaps, and carry advice. */
     recommend(request, targets, pool) {
       const built = config.buildEnsemble(pool.categorized, targets, request);
       const protectedOutfit = config.protect?.(built, pool.categorized, targets);

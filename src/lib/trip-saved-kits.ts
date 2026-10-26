@@ -85,6 +85,7 @@ function readWhen(value: unknown): OutingTime | null {
   return { mode: "later", date: value.date, time: value.time, durationDays: Number(value.durationDays) };
 }
 
+/** Parse a saved outing, retaining valid XC context and rejecting malformed stored inputs. */
 function readOuting(value: unknown): Outing | null {
   if (!isObject(value) || typeof value.activity !== "string" || !tripActivityFromRecommendationKey(value.activity)
     || !EXERTION_LEVELS.includes(value.exertion as ExertionLevel)) return null;

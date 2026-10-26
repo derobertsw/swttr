@@ -49,6 +49,7 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  /** Fetch advice with optional cancellation and XC context; return a fallback status on failure. */
   const fetchBiophysics = useCallback(
     async (
       activity: string,

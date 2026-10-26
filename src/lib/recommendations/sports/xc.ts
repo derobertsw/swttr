@@ -10,6 +10,7 @@ import { buildRegionalEnsemble } from './regional-ensemble';
 import { xcBasic, xcProtection, xcRegionFit, xcRegionMatches } from './xc-outfit';
 
 const MIN_EVAP_POTENTIAL = 0.25;
+/** Allow insulation beneath a shell, but avoid stacking it beneath an insulated outer. */
 const puffyFitsUnder = (outer: GarmentRow) => outer.category !== 'outer_insulated';
 
 /** Keep the shared regional enumeration, identity and slot compatibility.
@@ -30,6 +31,7 @@ export function buildXCEnsemble(
   return buildRegionalEnsemble(known, targets, {
     puffyFitsUnder,
     rank: () => [], // XC uses the explicit outfit assessment below.
+    /** Rank coverage, protection, thermal fit, and breathability without mandatory layer slots. */
     assess: (outfit, region) => {
       const regional = outfit.filter(g => g[`covers_${region}`]);
       const basic = xcBasic(outfit, region);
@@ -52,6 +54,7 @@ export function buildXCEnsemble(
 export const xc = createSinglePhaseSport({
   requirementFirst: true,
   completeOutfit: true,
+  /** Choose the modeled outer permeability from wetness and exposure-adjusted wind needs. */
   outerAirPermeability: request => {
     const context = xcPhaseContext({ ...request, precipitationType: request.weather.precipitation_type });
     return context.precipitation === 'wet' ? OUTER_AIR_PERMEABILITY.membrane
@@ -61,8 +64,10 @@ export const xc = createSinglePhaseSport({
   profile: { name: 'XC Skiing', windExposure: 'normal' },
   minEvapPotential: MIN_EVAP_POTENTIAL,
   catalog: { minScore: { field: 'xc_skiing_score', minScore: 6 } },
+  /** Select the moving outfit against regional targets and required protection. */
   buildEnsemble: (categorized, targets) =>
     buildXCEnsemble(categorized, targets.regional, MIN_EVAP_POTENTIAL, targets.policy!.protection),
+  /** Preserve the selected outfit and report only the protection each region actually lacks. */
   protect: (ensemble, _categorized, targets) => {
     const needs = targets.policy!.protection;
     const warnings = (['torso', 'legs'] as const).flatMap(region => {
@@ -73,8 +78,10 @@ export const xc = createSinglePhaseSport({
     });
     return { ensemble, warnings };
   },
+  /** Echo effort and explicit unknown defaults so clients can retain the recommendation context. */
   conditions: (request) => ({ intensity: exertionToXcIntensity(request.exertion),
     outing_pattern: request.outingPattern ?? 'unknown', xc_exposure: request.xcExposure ?? 'unknown' }),
+  /** Explain the moving outfit, protection assumptions, and separate warmth for stops. */
   guidance: (_request, _ireq, ensemble, targets) => {
     if (!targets) return ['Choose a breathable Nordic top and standalone tights or pants for the moving phase.'];
     const context = targets.policy!.xc!;
@@ -96,6 +103,7 @@ export const xc = createSinglePhaseSport({
         : 'Continuous training: moving targets use your selected effort, independently of classic or skate technique.');
     return guidance;
   },
+  /** Suggest unworn warmth for frequent stops or cold/wet outings, outside moving comfort. */
   carry: (_request, targets) => targets.policy?.xc?.carryWarmth ? [{
     label: 'Extra insulation for breaks and after skiing',
     reason: targets.policy.xc.outingPattern === 'frequent_stops' ? 'Frequent stops reduce heat production; add this only while stopped.'

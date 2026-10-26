@@ -7,7 +7,9 @@ import type { GarmentRow } from '../types';
 
 type Region = 'torso' | 'legs';
 type Needs = { wind: boolean; wet: boolean };
+/** Include arms in the upper-body region so torso coverage cannot hide exposed arms. */
 const parts = (region: Region) => region === 'torso' ? ['torso', 'arms'] as const : ['legs'] as const;
+/** Require full coverage, using the catalog's legacy default when the fraction is absent. */
 const covers = (g: GarmentRow, part: 'torso' | 'arms' | 'legs') => g[`covers_${part}`] && (g[`coverage_${part}`] ?? 1) === 1;
 
 /** Reviewed standalone clothing meets the clothing need, including a
@@ -18,6 +20,7 @@ export function xcBasic(outfit: GarmentRow[], region: Region): GarmentRow | unde
   return outfit.find(g => full(g) && garmentCapabilities(g).standalone);
 }
 
+/** Require each regional body part to have every requested protection somewhere in the outfit. */
 export function xcProtection(outfit: GarmentRow[], region: Region, needs: Needs): boolean {
   return parts(region).every(part => (!needs.wind || outfit.some(g => covers(g, part) && garmentCapabilities(g).wind))
     && (!needs.wet || outfit.some(g => covers(g, part) && garmentCapabilities(g).wet)));
@@ -36,6 +39,7 @@ export function xcRegionFit(outfit: GarmentRow[], targets: PhaseTargets['regiona
   };
 }
 
+/** Match only standalone clothing with usable thermal data, acceptable fit, and required protection. */
 export function xcRegionMatches(outfit: GarmentRow[], targets: PhaseTargets, region: Region): boolean {
   if (!xcBasic(outfit, region) || outfit.some(g => !hasUsableThermalData(g))) return false;
   const fit = xcRegionFit(outfit, targets.regional, region);
@@ -43,6 +47,7 @@ export function xcRegionMatches(outfit: GarmentRow[], targets: PhaseTargets, reg
     && xcProtection(outfit, region, targets.policy?.protection ?? { wind: false, wet: false });
 }
 
+/** Name the regional clothing need and its condition-dependent protection requirement. */
 export function xcRequirementLabel(targets: PhaseTargets, region: Region): string {
   const basic = region === 'torso' ? 'Breathable Nordic top with insulation as needed' : 'Standalone Nordic tights or pants';
   const needs = targets.policy?.protection;

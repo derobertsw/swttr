@@ -288,6 +288,7 @@ export function useGearUp() {
     if (coordinates) locationSearch.handleSelectLocation(yourLocation(coordinates));
   }, [locate, locationSearch]);
 
+  /** Validate the form and request advice for a snapshot of the outing and its XC context. */
   const handleSubmit = useCallback(async () => {
     // The iOS shell's Gear Up action can fire again while a request is running,
     // or before a requested location arrives.
@@ -367,6 +368,7 @@ export function useGearUp() {
 
   // The form takes the new activity only with its layers, so Edit outing
   // while they load, or after they fail, opens on the activity still shown.
+  /** Reuse the shown weather for another activity, restoring current XC choices when applicable. */
   const handleActivityChange = useCallback(async (newActivity: string) => {
     if (await recommendForShownWeather({ activity: newActivity, ...(newActivity === 'xc_skiing' ? xcContext : {}) }, "Failed to update activity")) {
       setActivity(newActivity);

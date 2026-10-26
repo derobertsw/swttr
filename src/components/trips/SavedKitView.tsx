@@ -61,6 +61,7 @@ export function SavedKitView({ outfit, savedAt, day, tripId }: SavedKitViewProps
     : <SavedOutfitView outfit={outfit} note={note} />;
 }
 
+/** Render the saved worn outfit and separate carry advice for its selected phase. */
 function SavedOutfitView({ outfit, note }: { outfit: SavedOutfit; note: React.ReactNode }) {
   const [phaseId, setPhaseId] = useState(outfit.phases[0].id);
   const wearHeadingId = useId();
