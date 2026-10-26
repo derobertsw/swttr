@@ -41,10 +41,10 @@ export const isTourDay = (full: Pick<TripFull, "stops">, day: TripDay) =>
   (day.activity ?? stopOf(full, day)?.activities[0] ?? null) === TOUR_ACTIVITY;
 
 /**
- * The tour plan as a plan review covers it: the route, backup plan, meet and
- * return times and meeting point. Notes and figures don't count.
- * record_trip_day_check builds the same shape under the trip lock to check
- * it, so change both together.
+ * The tour plan as a plan review covers it: the route, backup plan, the day's
+ * meet time (#333 keeps it on the day, not the plan), the return time and the
+ * meeting point. Notes and figures don't count. record_trip_day_check builds
+ * the same shape under the trip lock to check it, so change both together.
  */
 export function planReviewContext(full: Plans, day: TripDay): TripPlanReviewContext {
   const plan = full.tour_plans?.find((candidate) => candidate.trip_day_id === day.id);
@@ -53,7 +53,7 @@ export function planReviewContext(full: Plans, day: TripDay): TripPlanReviewCont
     date: day.date,
     plan: plan ? {
       objective: plan.objective, route_url: plan.route_url, backup_plan: plan.backup_plan,
-      meet_time: plan.meet_time?.slice(0, 5) ?? null, meet_day_offset: plan.meet_day_offset,
+      meet_time: day.meet_time?.slice(0, 5) ?? null, meet_day_offset: day.meet_day_offset ?? 0,
       return_time: plan.return_time?.slice(0, 5) ?? null, return_day_offset: plan.return_day_offset,
     } : null,
     meeting_point: point ? { latitude: point.latitude, longitude: point.longitude } : null,

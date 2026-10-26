@@ -7,17 +7,17 @@
 -- Entries are only ever added: recording a check and withdrawing it each add
 -- one, and a person's latest entry for a check on a day is where it stands.
 -- Each entry keeps what the check was recorded against (its context, built by
--- the app): the day's tour plan for a plan review, and the transceiver in the
--- person's packing list for a transceiver check. The app says when that has
--- changed since.
+-- the app): the day's tour plan and meet time (#333 keeps the meet time on the
+-- day) for a plan review, and the transceiver in the person's packing list for
+-- a transceiver check. The app says when that has changed since.
 --
 -- A transceiver is "replaced" when the one in the list is taken off it and
 -- one is added again, so each touring equipment item now records when it was
 -- added (added_at), set by a trigger rather than by update_trip_packing.
 --
--- Deploy the API first, then apply this after 026, 027, 032 and
--- 20261020000407. Until it's applied, trips load without day checks and
--- recording one returns 503.
+-- Deploy the API first, then apply this after 026, 027, 032, 20261020000407
+-- and 20261024230000 (#333's meet time on the day, which this reads). Until
+-- it's applied, trips load without day checks and recording one returns 503.
 
 CREATE TABLE public.trip_day_checks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -178,7 +178,8 @@ BEGIN
         'date', v_day.date::text,
         'plan', jsonb_build_object('objective', v_plan.objective, 'route_url', v_plan.route_url,
           'backup_plan', v_plan.backup_plan,
-          'meet_time', to_char(v_plan.meet_time, 'HH24:MI'), 'meet_day_offset', v_plan.meet_day_offset,
+          -- The meet time is the day's (#333); the plan's meet columns are only for an older API.
+          'meet_time', to_char(v_day.meet_time, 'HH24:MI'), 'meet_day_offset', v_day.meet_day_offset,
           'return_time', to_char(v_plan.return_time, 'HH24:MI'), 'return_day_offset', v_plan.return_day_offset),
         -- The day's own access point while it's at the stop it was set for, otherwise the stop's (as in 031).
         'meeting_point', (SELECT jsonb_build_object('latitude', point->'latitude', 'longitude', point->'longitude')

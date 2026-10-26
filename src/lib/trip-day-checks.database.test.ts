@@ -19,9 +19,9 @@ const dayId = async (date: string, trip = tripId) =>
 
 /** The context the app builds for a person's check on a day, from the rows as they are now. */
 const appContext = async (kind: TripDayCheckKind, name: string, date = SAT) => {
-  const [day] = await rows<TripDay>("SELECT id, trip_id, date::text, stop_id, activity, access_point, access_point_stop_id FROM trip_days WHERE trip_id = $1 AND date = $2", [tripId, date]);
+  const [day] = await rows<TripDay>("SELECT id, trip_id, date::text, stop_id, activity, access_point, access_point_stop_id, meet_time::text, meet_day_offset, meet_time_zone FROM trip_days WHERE trip_id = $1 AND date = $2", [tripId, date]);
   const stops = await rows<TripStop>("SELECT id, position, name, latitude::float8 AS latitude, longitude::float8 AS longitude, activities, access_point FROM trip_stops WHERE trip_id = $1 ORDER BY position", [tripId]);
-  const plans = await rows<TripTourPlanSummary>("SELECT trip_day_id, objective, route_url, backup_plan, meet_time::text, meet_day_offset, return_time::text, return_day_offset FROM trip_day_tour_plans WHERE trip_id = $1", [tripId]);
+  const plans = await rows<TripTourPlanSummary>("SELECT trip_day_id, objective, route_url, backup_plan, return_time::text, return_day_offset FROM trip_day_tour_plans WHERE trip_id = $1", [tripId]);
   const [packing] = await rows<{ equipment: Record<string, { status: string; added_at?: string }> }>("SELECT equipment FROM trip_member_packing WHERE trip_member_id = $1", [await memberId(name)]);
   return dayCheckContext(kind, { stops, tour_plans: plans }, day, packing?.equipment);
 };
@@ -56,7 +56,7 @@ describe("Day checks in Postgres", () => {
     for (const migration of ["012_trips", "016_atomic_trip_creation", "017_trip_stays", "018_trip_saved_kits", "021_trip_date_changes",
       "022_trip_itinerary_edits", "023_trip_copy_day", "024_trip_packing", "20261016231848_trip_personal_packing_checks", "025_trip_stay_locations",
       "026_trip_tour_plans", "027_trip_access_points", "032_trip_touring_equipment", "20261020000407_trip_conflicts_no_retry",
-      "20261024200000_trip_day_checks"]) {
+      "20261024230000_trip_day_meet_times", "20261026120000_trip_day_checks"]) {
       await db.exec(await readFile(`supabase/migrations/${migration}.sql`, "utf8"));
     }
   }, 30_000);
@@ -76,7 +76,9 @@ describe("Day checks in Postgres", () => {
     await db.query("UPDATE trip_days SET activity = 'Alpine' WHERE trip_id = $1 AND date = '2026-10-11'", [tripId]);
     await db.query("INSERT INTO trip_days (trip_id, date, activity) VALUES ($1, $2, 'Backcountry')", [otherTrip, SAT]);
     await savePlan({ objective: "Tuckerman Ravine", route_url: "https://example.com/route", backup_plan: "Lion Head if the bowl is loaded",
-      meet_time: "06:30", return_time: "15:00", approach_notes: "Skin up the fire road", distance: 9.6, distance_unit: "km" });
+      return_time: "15:00", approach_notes: "Skin up the fire road", distance: 9.6, distance_unit: "km" });
+    // The meet time is the day's (#333).
+    await db.query("UPDATE trip_days SET meet_time = '06:30', meet_time_zone = 'America/New_York' WHERE trip_id = $1 AND date = $2", [tripId, SAT]);
   });
   afterAll(async () => { await db?.close(); });
 
@@ -186,8 +188,9 @@ describe("Day checks in Postgres", () => {
       ["the route", "UPDATE trip_day_tour_plans SET objective = 'Gulf of Slides' WHERE trip_id = $1"],
       ["the route link", "UPDATE trip_day_tour_plans SET route_url = NULL WHERE trip_id = $1"],
       ["the backup plan", "UPDATE trip_day_tour_plans SET backup_plan = 'Hillman''s Highway' WHERE trip_id = $1"],
-      ["the meet time", "UPDATE trip_day_tour_plans SET meet_time = '06:00' WHERE trip_id = $1"],
-      ["the meet day", "UPDATE trip_day_tour_plans SET meet_day_offset = -1 WHERE trip_id = $1"],
+      ["the day's meet time", "UPDATE trip_days SET meet_time = '06:00' WHERE trip_id = $1 AND meet_time IS NOT NULL"],
+      ["the day's meet day", "UPDATE trip_days SET meet_day_offset = -1 WHERE trip_id = $1 AND meet_time IS NOT NULL"],
+      ["the day's meet time, cleared", "UPDATE trip_days SET meet_time = NULL, meet_time_zone = NULL WHERE trip_id = $1"],
       ["the return time", "UPDATE trip_day_tour_plans SET return_time = '16:00' WHERE trip_id = $1"],
       ["the meeting point", "UPDATE trip_stops SET access_point = NULL WHERE trip_id = $1"],
       ["the tour plan's existence", "DELETE FROM trip_day_tour_plans WHERE trip_id = $1"],
@@ -202,6 +205,9 @@ describe("Day checks in Postgres", () => {
       const seen = await appContext("plan_review", "Sam");
       await db.query("UPDATE trip_day_tour_plans SET approach_notes = 'Bring ski crampons', access_notes = 'Lot fills by 7', checkin_notes = 'Text Ana', distance = 10.2, ascent = 1200, ascent_unit = 'm' WHERE trip_id = $1", [tripId]);
       await db.query("UPDATE trip_stops SET name = 'Pinkham Notch Visitor Center' WHERE trip_id = $1 AND position = 0", [tripId]);
+      // The plan's own meet columns are only for an older API, and the meet's saved zone isn't a new time.
+      await db.query("UPDATE trip_day_tour_plans SET meet_time = '05:00', meet_day_offset = -1 WHERE trip_id = $1", [tripId]);
+      await db.query("UPDATE trip_days SET meet_time_zone = 'America/Toronto' WHERE trip_id = $1 AND meet_time IS NOT NULL", [tripId]);
       await record({ ctx: seen });
       expect(await entries()).toHaveLength(1);
     });

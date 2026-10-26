@@ -8,12 +8,14 @@ import { dayChecksFor, planReviewContext, preparationFor, summarizeDayChecks, ty
 import type { TripDay, TripFull, TripGroupGear, TripMember } from "@/types/trips";
 import { CrewPreparation, DayChecks, TourPreparation } from "./DayChecks";
 
-const DAY: TripDay = { id: "day-1", trip_id: TRIP.id, stop_id: STOWE_STOP.id, date: "2026-10-10", activity: "Backcountry" };
+// The meet time is the day's (#333).
+const DAY: TripDay = { id: "day-1", trip_id: TRIP.id, stop_id: STOWE_STOP.id, date: "2026-10-10", activity: "Backcountry",
+  meet_time: "06:30:00", meet_day_offset: 0, meet_time_zone: "America/New_York" };
 const ANA: TripMember = { ...SAM, id: "member-ana", user_id: "user-2", display_name: "Ana", status: "joined", invite_token: null };
 const GUS: TripMember = { ...SAM, id: "member-gus", user_id: null, display_name: "Gus", status: "guest", invite_token: null };
 const PLAN = buildTourPlanSummary({
   id: "plan-1", trip_id: TRIP.id, trip_day_id: DAY.id, objective: "Tuckerman Ravine", route_url: null,
-  meet_time: "06:30:00", meet_day_offset: 0, distance: null, distance_unit: null, ascent: null, ascent_unit: null,
+  distance: null, distance_unit: null, ascent: null, ascent_unit: null,
   duration_minutes: null, metrics_source: null, metrics_source_url: null, approach_notes: null, access_notes: null,
   access_url: null, backup_plan: "Lower snowfields", return_time: null, return_day_offset: 0, checkin_notes: null,
   pickup_notes: null, time_zone: "America/New_York", revision: 1, created_by: "user-1", updated_by: "user-1",
@@ -32,8 +34,8 @@ const entry = (extra: Partial<Entry> & Pick<Entry, "trip_member_id" | "kind">): 
 });
 
 /** The trip as `viewer` reads it, with checks from `entries`. */
-function trip(viewer: string, entries: Entry[] = [], { members = [ORGANIZER, ANA, GUS], plans = [PLAN], gear = [] as TripGroupGear[] } = {}): TripFull {
-  const base = tripFull({ stops: [STOWE_STOP], days: [DAY], members: viewer === "user-1" ? members : members.map((m) => m === ORGANIZER ? ORGANIZER_TO_CREW : m),
+function trip(viewer: string, entries: Entry[] = [], { members = [ORGANIZER, ANA, GUS], plans = [PLAN], gear = [] as TripGroupGear[], day = DAY } = {}): TripFull {
+  const base = tripFull({ stops: [STOWE_STOP], days: [day], members: viewer === "user-1" ? members : members.map((m) => m === ORGANIZER ? ORGANIZER_TO_CREW : m),
     tour_plans: plans, gear });
   const day_checks = dayChecksFor(summarizeDayChecks({ entries, equipment: new Map() }, base), base, viewer);
   return { ...base, day_checks, preparation: preparationFor(base, day_checks, viewer, Date.parse("2026-10-01T12:00:00Z")) };
@@ -134,7 +136,7 @@ describe("Day checks", () => {
 
   it("says when the plan changed since it was reviewed, and records it again", async () => {
     const first = entry({ trip_member_id: ANA.id, kind: "plan_review", recorded_by: "user-2" });
-    const changed = trip("user-2", [first], { plans: [{ ...PLAN, backup_plan: "Stay low", meet_time: "07:00:00" }] });
+    const changed = trip("user-2", [first], { plans: [{ ...PLAN, backup_plan: "Stay low" }], day: { ...DAY, meet_time: "07:00:00" } });
     const api = fakeTripApi({ [URL]: reply(200, { entry_id: "entry-2" }) });
     vi.stubGlobal("fetch", api);
     render(<Harness initial={changed} userId="user-2" />);

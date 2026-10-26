@@ -94,7 +94,7 @@ describe("Day checklist (#336)", () => {
 
   it("states each person's day checks on Backcountry days they take part in, and who recorded a guest's (#212)", () => {
     const tour = (date: string) => ({ id: `day-${date}`, trip_id: SPLIT_TRIP.id, stop_id: "stop-stowe", date, activity: "Backcountry" });
-    const plan = { trip_day_id: `day-${SAT}`, objective: "Mount Mansfield", route_url: null, backup_plan: null, meet_time: null, meet_day_offset: 0,
+    const plan = { trip_day_id: `day-${SAT}`, objective: "Mount Mansfield", route_url: null, backup_plan: null,
       return_time: null, return_day_offset: 0, time_zone: "America/New_York" } as TripTourPlanSummary;
     const base = trip({ days: [tour(SAT), tour(SUN)], tour_plans: [plan] });
     const recorded = (memberId: string, kind: "plan_review" | "transceiver", by: string, number: number, context: object) => ({

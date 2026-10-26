@@ -28,9 +28,11 @@ function identity(userId: string, { objective = "Tuckerman Ravine", activity = "
       { id: members.sam, trip_id: TRIP.id, user_id: "member-user", display_name: "Sam", role: "member", status: "joined" },
       { id: members.gus, trip_id: TRIP.id, user_id: null, display_name: "Gus", role: "member", status: "guest" },
     ],
-    trip_days: [{ id: dayId, trip_id: TRIP.id, date: "2026-10-10", stop_id: null, activity }], trip_stops: [stop],
-    trip_day_tour_plans: plan ? [{ id: "plan-1", trip_id: TRIP.id, trip_day_id: dayId, objective, route_url: null, backup_plan: null, meet_time: "06:30:00",
-      meet_day_offset: 0, return_time: null, return_day_offset: 0, time_zone: zone, revision: 1, updated_at: "2026-10-01T00:00:00Z" }] : [],
+    // The meet time is the day's (#333).
+    trip_days: [{ id: dayId, trip_id: TRIP.id, date: "2026-10-10", stop_id: null, activity, meet_time: "06:30:00", meet_day_offset: 0, meet_time_zone: zone }],
+    trip_stops: [stop],
+    trip_day_tour_plans: plan ? [{ id: "plan-1", trip_id: TRIP.id, trip_day_id: dayId, objective, route_url: null, backup_plan: null,
+      return_time: null, return_day_offset: 0, time_zone: zone, revision: 1, updated_at: "2026-10-01T00:00:00Z" }] : [],
     trip_member_packing: [{ trip_member_id: members.sam, trip_id: TRIP.id, equipment: { transceiver: { status: "added", quantity: 1, added_at: "2026-10-01T12:00:00Z" } } }],
   };
   supabase = { ...createFakeSupabase(tables), rpc } as unknown as SupabaseClient;

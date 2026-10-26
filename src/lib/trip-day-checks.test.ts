@@ -18,10 +18,11 @@ const point = (latitude: number): TripLocation => ({ label: "Rogers Pass lot", a
   time_zone: "America/Los_Angeles", source: "manual", provider: null, provider_id: null, attribution: null });
 const stop: TripStop = { id: "stop-1", trip_id: "trip-1", position: 0, name: "Rogers Pass", latitude: 51.3, longitude: -117.52,
   activities: ["Backcountry"], created_at: "2027-01-01T00:00:00Z", access_point: point(51.301) };
-const day = (id: string, date: string, activity: string | null = null): TripDay => ({ id, trip_id: "trip-1", stop_id: null, date, activity });
+const day = (id: string, date: string, activity: string | null = null, extra: Partial<TripDay> = {}): TripDay =>
+  ({ id, trip_id: "trip-1", stop_id: null, date, activity, ...extra });
 const plan = (extra: Partial<TripTourPlanSummary> = {}) => ({
   trip_day_id: "day-sat", objective: "Asulkan Valley", route_url: "https://example.com/asulkan", backup_plan: "Glacier Crest trees",
-  meet_time: "06:30:00", meet_day_offset: 0, return_time: "15:00:00", return_day_offset: 0, time_zone: "America/Los_Angeles",
+  return_time: "15:00:00", return_day_offset: 0, time_zone: "America/Los_Angeles",
   approach_notes: "Skin the old road", distance: 12, distance_unit: "km", revision: 2, ...extra,
 }) as TripTourPlanSummary;
 const member = (id: string, name: string, user: string | null, status: TripMember["status"], role: TripMember["role"] = "member"): TripMember =>
@@ -30,7 +31,9 @@ const members = [
   member("m-you", "You", "user-1", "joined", "organizer"), member("m-ana", "Ana", "user-2", "joined"), member("m-gus", "Gus", null, "guest"),
   member("m-ivy", "Ivy", null, "invited"), member("m-lee", "Lee", "user-4", "left"),
 ];
-const days = [day("day-fri", FRI, "Alpine"), day("day-sat", SAT), day("day-sun", SUN, "Backcountry"), day("day-mon", MON, "Backcountry")];
+// Saturday's meet time is the day's (#333).
+const days = [day("day-fri", FRI, "Alpine"), day("day-sat", SAT, null, { meet_time: "06:30:00", meet_day_offset: 0, meet_time_zone: "America/Los_Angeles" }),
+  day("day-sun", SUN, "Backcountry"), day("day-mon", MON, "Backcountry")];
 const trip = { id: "trip-1", owner_user_id: "user-1", name: "Rogers Pass", start_date: SAT, end_date: SUN, status: "planning",
   created_at: "", updated_at: "" } as TripFull["trip"];
 const full = (extra: Partial<TripFull> = {}): TripFull => ({ trip, stops: [stop], members, days, kits: [], gear: [], tour_plans: [plan()], ...extra });
@@ -43,7 +46,7 @@ const row = (extra: Partial<DayCheckRows["entries"][number]> & Pick<DayCheckRows
 const planNow = planReviewContext(full(), days[1]);
 
 describe("planReviewContext", () => {
-  it("covers the route, backup plan, meet and return times and the meeting point, not notes or figures", () => {
+  it("covers the route, backup plan, the day's meet time, the return time and the meeting point, not notes or figures", () => {
     expect(planNow).toEqual({
       date: SAT,
       plan: { objective: "Asulkan Valley", route_url: "https://example.com/asulkan", backup_plan: "Glacier Crest trees",
@@ -52,6 +55,13 @@ describe("planReviewContext", () => {
     });
     expect(planReviewContext(full({ tour_plans: [plan({ approach_notes: "Bring ski crampons", distance: 14, revision: 3 })] }), days[1])).toEqual(planNow);
     expect(planReviewContext(full({ tour_plans: [] }), days[1]).plan).toBeNull();
+  });
+
+  it("reads the meet time from the day, not the tour plan's old meet columns", () => {
+    const legacy = { ...plan(), meet_time: "05:00:00", meet_day_offset: -1 } as TripTourPlanSummary;
+    expect(planReviewContext(full({ tour_plans: [legacy] }), days[1])).toEqual(planNow);
+    // A day read before #333's migration has no meet columns: no meet time.
+    expect(planReviewContext(full(), day("day-sat", SAT)).plan).toMatchObject({ meet_time: null, meet_day_offset: 0 });
   });
 });
 
@@ -73,12 +83,20 @@ describe("dayCheckStaleReasons", () => {
     [{ objective: "Bonney Glacier" }, ["Route changed"]],
     [{ route_url: null }, ["Route changed"]],
     [{ backup_plan: null }, ["Backup plan changed"]],
-    [{ meet_time: "06:00:00" }, ["Meet time changed"]],
-    [{ meet_day_offset: -1 as const }, ["Meet time changed"]],
     [{ return_time: "16:00:00", return_day_offset: 0 as const }, ["Return time changed"]],
     [{ approach_notes: "Ski crampons", checkin_notes: "Text Ana", distance: 15 }, []],
   ])("says what changed in a plan: %o", (extra, reasons) => {
     expect(changed(extra)).toEqual(reasons);
+  });
+
+  it.each([
+    [{ meet_time: "06:00:00" }, ["Meet time changed"]],
+    [{ meet_day_offset: -1 as const }, ["Meet time changed"]],
+    [{ meet_time: null, meet_time_zone: null }, ["Meet time changed"]],
+    // The zone is the destination's, saved with the time; on its own it isn't a new meet time.
+    [{ meet_time_zone: "America/Edmonton" }, []],
+  ])("says when the day's meet time changed: %o", (extra, reasons) => {
+    expect(dayCheckStaleReasons("plan_review", planNow, planReviewContext(full(), { ...days[1], ...extra }))).toEqual(reasons);
   });
 
   it("says when the meeting point, the date or the plan itself changed", () => {
@@ -197,7 +215,7 @@ describe("preparationFor", () => {
   it("lists unrecorded checks on the day at the destination, and the organizer's guest checks and crew behind a change", () => {
     // 6 AM on Saturday in Rogers Pass.
     const saturday = at("2027-02-13T14:00:00Z");
-    const changed = full({ tour_plans: [plan({ meet_time: "07:00:00" })] });
+    const changed = full({ days: days.map((entry) => entry.id === "day-sat" ? { ...entry, meet_time: "07:00:00" } : entry) });
     const entries = [row({ trip_member_id: "m-ana", kind: "plan_review", context: planNow })];
     expect(forViewer(changed, "user-1", entries, saturday).map((item) => `${item.scope}:${item.kind}:${item.label}`)).toEqual([
       "personal:plan_not_reviewed:Your tour and backup plan review for today, Sat Feb 13 isn't recorded yet",
