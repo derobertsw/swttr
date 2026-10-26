@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import type { TripFull, TripTourPlanInput, TripTourPlanSummary } from "@/types/trips";
 
 type Draft = Record<
-  | "objective" | "route_url" | "meet_time" | "meet_day_offset" | "distance" | "distance_unit" | "ascent" | "ascent_unit"
+  | "objective" | "route_url" | "distance" | "distance_unit" | "ascent" | "ascent_unit"
   | "duration_hours" | "duration_mins" | "metrics_source" | "metrics_source_url" | "approach_notes" | "access_notes"
   | "access_url" | "backup_plan" | "return_time" | "return_day_offset" | "checkin_notes" | "pickup_notes",
   string
@@ -24,7 +24,6 @@ function draftOf(plan: TripTourPlanSummary | undefined, metric: boolean): Draft 
   const text = (value: string | number | null | undefined) => value == null ? "" : String(value);
   return {
     objective: text(plan?.objective), route_url: text(plan?.route_url),
-    meet_time: plan?.meet_time?.slice(0, 5) ?? "", meet_day_offset: text(plan?.meet_day_offset ?? 0),
     distance: text(plan?.distance), distance_unit: plan?.distance_unit ?? (metric ? "km" : "mi"),
     ascent: text(plan?.ascent), ascent_unit: plan?.ascent_unit ?? (metric ? "m" : "ft"),
     duration_hours: plan?.duration_minutes == null ? "" : String(Math.floor(plan.duration_minutes / 60)),
@@ -42,7 +41,6 @@ function planBody(draft: Draft): Record<keyof TripTourPlanInput, unknown> {
   const hours = draft.duration_hours.trim(), minutes = draft.duration_mins.trim();
   return {
     objective: draft.objective, route_url: value("route_url"),
-    meet_time: value("meet_time"), meet_day_offset: Number(draft.meet_day_offset),
     distance: value("distance"), distance_unit: value("distance") ? draft.distance_unit : null,
     ascent: value("ascent"), ascent_unit: value("ascent") ? draft.ascent_unit : null,
     duration_minutes: hours || minutes ? Number(hours || 0) * 60 + Number(minutes || 0) : null,
@@ -56,7 +54,8 @@ function planBody(draft: Draft): Record<keyof TripTourPlanInput, unknown> {
 /**
  * A Backcountry day's tour plan (#210): the saved plan to read, with Add or
  * Change for the organizer. On a day with another activity, a saved plan is
- * kept behind a disclosure with Restore, which sets the activity back.
+ * kept behind a disclosure with Restore, which sets the activity back. Its
+ * Meet row is the day's meet time (#333) at the day's access point.
  */
 export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved, onRestore }: {
   data: TripFull;
@@ -71,7 +70,9 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
 }) {
   const plan = data.tour_plans?.find((saved) => saved.date === date);
   const day = data.days.find((candidate) => candidate.date === date);
-  // Where the crew meets is the day's access point (#208), set under Getting there.
+  // When the crew meets is the day's (#333), set under Meet and start, and
+  // where is the day's access point (#208), set under Getting there.
+  const meet = data.meets?.find((entry) => entry.date === date)?.meet_label ?? null;
   const meetingPoint = day ? accessPointFor(data.stops, day)?.location.label ?? null : null;
   // Keep the opened plan/day as the editor's baseline across trip refreshes.
   // New revisions must go through conflict review, never reset a pending draft.
@@ -105,7 +106,7 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
     finally { setRestoring(false); }
   };
   const editor = editorSession && <TourPlanEditor tripId={data.trip.id} date={date} dateLabel={dateLabel} plan={editorSession.plan}
-    dayId={editorSession.dayId} meetingPoint={meetingPoint}
+    dayId={editorSession.dayId} meet={meet} meetingPoint={meetingPoint}
     onClose={() => setEditorSession(null)} onCloseAutoFocus={focus.restore}
     onSaved={async (message) => { setStatus(message); await onSaved(); }} />;
 
@@ -117,7 +118,7 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
           <p className="mt-1 text-base text-foreground">
             This day&apos;s activity is {activity ? tripActivityLabel(activity) : "not set"}, so the tour plan isn&apos;t in use. It&apos;s kept as saved.
           </p>
-          <div className="mt-3"><TourPlanSummary plan={plan} meetingPoint={meetingPoint} /></div>
+          <div className="mt-3"><TourPlanSummary plan={plan} meet={meet} meetingPoint={meetingPoint} /></div>
           {canEdit ? <>
             <Button type="button" variant="outline" className="mt-3" loading={restoring} onClick={() => void restore()}>
               Restore tour plan
@@ -140,9 +141,9 @@ export function DayTourPlan({ data, date, dateLabel, activity, canEdit, onSaved,
       </div>
       {!canEdit && <p className="mt-1 text-base text-muted-foreground">Managed by the organizer</p>}
       <p aria-live="polite" className="text-sm text-success">{status}</p>
-      {plan ? <div className="mt-2"><TourPlanSummary plan={plan} meetingPoint={meetingPoint} /></div> : (
+      {plan ? <div className="mt-2"><TourPlanSummary plan={plan} meet={meet} meetingPoint={meetingPoint} /></div> : (
         <p className="mt-2 text-base text-muted-foreground">
-          No tour plan yet.{canEdit ? " Add the route, when to meet and a backup plan; everything but the route is optional." : ""}
+          No tour plan yet.{canEdit ? " Add the route, a backup plan and when to be back; everything but the route is optional." : ""}
         </p>
       )}
     </section>}
@@ -163,9 +164,10 @@ const externalLink = "inline-flex min-h-11 items-center text-primary underline";
 
 /**
  * A saved plan, read-only: the essentials first, then the rest on demand. The
- * meeting point is the day's access point, so Getting there changes it.
+ * meet is the day's: its time from Meet and start, at its access point from
+ * Getting there.
  */
-function TourPlanSummary({ plan, meetingPoint }: { plan: TripTourPlanSummary; meetingPoint: string | null }) {
+function TourPlanSummary({ plan, meet, meetingPoint }: { plan: TripTourPlanSummary; meet: string | null; meetingPoint: string | null }) {
   const more = plan.metrics_label || plan.approach_notes || plan.pickup_notes;
   return (
     <div className="text-base">
@@ -174,7 +176,7 @@ function TourPlanSummary({ plan, meetingPoint }: { plan: TripTourPlanSummary; me
           {plan.objective}
           {plan.route_url && <><br /><a href={plan.route_url} target="_blank" rel="noopener noreferrer" className={externalLink}>Open route link (new tab)</a></>}
         </Row>
-        <Row label="Meet">{plan.meet_label ?? "Time not set"} · {meetingPoint ?? "Meeting point not set"}</Row>
+        <Row label="Meet">{meet ?? "Time not set"} · {meetingPoint ?? "Meeting point not set"}</Row>
         <Row label="Backup plan">{plan.backup_plan ?? "Not set"}</Row>
         <Row label="Return target">{plan.return_label ?? "Not set"}</Row>
         {plan.checkin_notes && <Row label="Check-in plan (crew notes)">{plan.checkin_notes}</Row>}
@@ -207,13 +209,14 @@ function TourPlanSummary({ plan, meetingPoint }: { plan: TripTourPlanSummary; me
   );
 }
 
-function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, meetingPoint, onClose, onSaved, onCloseAutoFocus }: {
+function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, meet, meetingPoint, onClose, onSaved, onCloseAutoFocus }: {
   tripId: string;
   date: string;
   dateLabel: string;
   plan: TripTourPlanSummary | undefined;
   /** The day the editor opened for; after a date change another day can hold this date. */
   dayId: string | undefined;
+  meet: string | null;
   meetingPoint: string | null;
   onClose: () => void;
   onSaved: (message: string) => Promise<void>;
@@ -361,7 +364,7 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, meetingPoint, on
         {savedPlan !== undefined && (
           <div className="rounded-control border border-warning p-3 text-base text-foreground">
             <p>{savedPlan ? "The saved plan is below. Your changes are still in the form; save to replace it." : "There's no saved tour plan for this day now. Save to add yours."}</p>
-            {savedPlan && <div className="mt-2"><TourPlanSummary plan={savedPlan} meetingPoint={meetingPoint} /></div>}
+            {savedPlan && <div className="mt-2"><TourPlanSummary plan={savedPlan} meet={meet} meetingPoint={meetingPoint} /></div>}
           </div>
         )}
         {error && <p id="tour-plan-error" role="alert" className="text-base text-destructive">{error}</p>}
@@ -373,14 +376,10 @@ function TourPlanEditor({ tripId, date, dateLabel, plan, dayId, meetingPoint, on
           <form id="tour-plan-form" ref={form} onSubmit={save} className="space-y-4" aria-busy={busy}>
             <fieldset disabled={busy} className="min-w-0 space-y-4">
               {field("objective", "Route or objective", { required: true, maxLength: 200 })}
-              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                {field("meet_time", "Meet time (destination time)", { type: "time" })}
-                {select("meet_day_offset", "Meet on", [["0", dateLabel], ["-1", "The day before"]])}
-              </div>
               <div className="min-w-0 text-base">
-                <p className="text-muted-foreground">Meeting point</p>
-                <p className="break-words text-foreground">{meetingPoint ?? "Meeting point not set"}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Change the day&apos;s access point in Getting there.</p>
+                <p className="text-muted-foreground">Meet</p>
+                <p className="break-words text-foreground">{meet ?? "Time not set"} · {meetingPoint ?? "Meeting point not set"}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Change the day&apos;s meet time in Meet and start, and its access point in Getting there.</p>
               </div>
               <details className="text-base text-foreground">
                 <summary className="min-h-11 cursor-pointer py-2">Route link, distance and time (optional)</summary>

@@ -10,6 +10,7 @@ import type { GarmentRow, HandwearRow, HeadwearRow } from './types';
 import { garmentCapabilities, hasUsableThermalData } from './garment-semantics';
 import { HEAD_WARMTH_TYPES } from './extremities';
 import type { PhaseTargets } from './thermal-targets';
+import { xcBasic, xcRegionMatches, xcRequirementLabel } from './sports/xc-outfit';
 import { runningBasic, runningRegionMatches, runningRegionIssues, runningRequirementLabel } from './sports/running-outfit';
 
 const CLO_MARGIN = 0.15;
@@ -120,6 +121,22 @@ export function buildClothingRequirements(
 
   for (const region of ['torso', 'legs'] as const) {
     const neutral = targets.regional.neutral[region];
+    if (activity === 'xc_skiing' && (pool.selectedGarments || pool.garments.length === 0)) {
+      const selected = pool.selectedGarments ?? [];
+      const matches = xcRegionMatches;
+      const basic = xcBasic;
+      const label = xcRequirementLabel;
+      const matched = matches(selected, targets, region) ? basic(selected, region) : undefined;
+      const result = requirement(activity, region, label(targets, region), neutral, matched, pool.ownership.garments);
+      if (matched) {
+        const names = selected.filter(g => g[`covers_${region}`]).map(g => `${g.brand} ${g.model_name}`).join(' + ');
+        result.matched_garment_name = names;
+        result.message = `${result.label} — ${pool.ownership.garments ? 'matched in your wardrobe' : 'suggested (not in your wardrobe)'}: ${names}`;
+      }
+      requirements.push(result);
+      continue;
+    }
+
     if (activity === 'running' && (pool.selectedGarments || pool.garments.length === 0)) {
       const selected = pool.selectedGarments ?? [];
       const matched = runningRegionMatches(selected, targets, region) ? runningBasic(selected, region) : undefined;

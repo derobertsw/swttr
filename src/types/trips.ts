@@ -60,6 +60,25 @@ export interface TripDay {
   origin_stay_id?: string | null;
   /** No drive planned: the day starts on foot or skis, or the crew meets there. */
   no_drive?: boolean;
+  /**
+   * When the crew meets (#333), "HH:MM:SS" on the destination's clock, for
+   * every sport; where is the day's access point. Missing before migration
+   * 20261024230000. `meet_day_offset` -1 meets the evening before.
+   */
+  meet_time?: string | null;
+  meet_day_offset?: -1 | 0;
+  /** The destination's IANA time zone when the meet time was saved, if it could be found. */
+  meet_time_zone?: string | null;
+}
+
+/** A day's meet time with the server's labels (#333). */
+export interface TripDayMeet {
+  /** The trip day it's for. */
+  date: string;
+  /** e.g. "6:30 AM MDT · Sat Oct 10", or "6:00 PM MDT · Fri Oct 9, the day before". */
+  meet_label: string;
+  /** Says whose clock the time uses. */
+  time_zone_label: string;
 }
 
 export interface TripMemberDayKit {
@@ -127,10 +146,16 @@ export interface TripFull {
   lodging?: TripLodging;
   /** Backcountry days' tour plans (#210); optional like `lodging`. */
   tour_plans?: TripTourPlanSummary[];
+  /** Each day's meet time (#333), in date order; optional like `lodging`. */
+  meets?: TripDayMeet[];
   /** Each day's conditions sources with the crew's reviews (#211); optional like `lodging`. */
   conditions?: TripDayConditionsSource[];
   /** People's own starting points (#333); missing or empty before its migration. */
   member_origins?: TripMemberDayOrigin[];
+  /** Backcountry days' day checks (#212); optional like `lodging`. */
+  day_checks?: TripDayChecks[];
+  /** Tour preparation the signed-in person can act on, for Plan's own page (#212); optional like `lodging`. */
+  preparation?: TripPreparationItem[];
 }
 
 /**
@@ -148,14 +173,13 @@ export interface TripMemberDayOrigin {
   no_drive: boolean;
 }
 
-/** A Backcountry day's tour plan as the organizer enters it: see docs/trip-tour-plans.md. */
+/**
+ * A Backcountry day's tour plan as the organizer enters it: see
+ * docs/trip-tour-plans.md. The meet time is the day's (#333).
+ */
 export interface TripTourPlanInput {
   objective: string;
   route_url: string | null;
-  /** "HH:MM" on the destination's clock. */
-  meet_time: string | null;
-  /** -1 meets the evening before. */
-  meet_day_offset: -1 | 0;
   distance: number | null;
   distance_unit: "km" | "mi" | null;
   ascent: number | null;
@@ -179,7 +203,7 @@ export interface TripTourPlan extends TripTourPlanInput {
   id: string;
   trip_id: string;
   trip_day_id: string;
-  /** The destination's IANA time zone when the plan was saved, if it could be found. */
+  /** The destination's IANA time zone when the plan's return time was saved, if it could be found. */
   time_zone: string | null;
   revision: number;
   created_by: string;
@@ -191,8 +215,7 @@ export interface TripTourPlan extends TripTourPlanInput {
 /** A saved tour plan with the server's labels for it. */
 export interface TripTourPlanSummary extends TripTourPlan {
   date: string;
-  /** e.g. "6:30 AM MDT · Sat Oct 10", or with ", the day before". */
-  meet_label: string | null;
+  /** e.g. "11:00 AM MDT · Sun Oct 11, the day after". */
   return_label: string | null;
   /** e.g. "14.2 km · 1,200 m ascent · 6 h 30 min". */
   metrics_label: string | null;
@@ -267,6 +290,85 @@ export interface TripDayConditionsSource extends TripConditionsSource {
   /** The day's plan and this source as the server reads them now; recording a review sends it back. */
   context_key: string;
   reviews: TripConditionsReview[];
+}
+
+/** A day check on a Backcountry day (#212): see docs/trip-touring-prep.md. */
+export type TripDayCheckKind = "plan_review" | "transceiver";
+
+/** What a plan review was recorded against. Notes and figures aren't part of it. */
+export interface TripPlanReviewContext {
+  date: string;
+  plan: {
+    objective: string;
+    route_url: string | null;
+    backup_plan: string | null;
+    /** "HH:MM" on the destination's clock. */
+    meet_time: string | null;
+    meet_day_offset: number;
+    return_time: string | null;
+    return_day_offset: number;
+  } | null;
+  meeting_point: { latitude: number; longitude: number } | null;
+}
+
+/** What a transceiver check was recorded against: the transceiver in the person's packing list, if any. */
+export interface TripTransceiverContext {
+  date: string;
+  /** `added_at` is when it was put in the list; null for one added before it was recorded. */
+  transceiver: { added_at: string | null } | null;
+}
+
+/** One entry in a check's history. */
+export interface TripDayCheckEntry {
+  id: string;
+  action: "recorded" | "withdrawn";
+  /** Who saved it: the person, or the organizer for a managed guest. */
+  recorded_by: string;
+  created_at: string;
+  /** e.g. "6:12 AM MST · Sat Feb 13", on the destination's clock. */
+  time_label: string;
+  /** The tour plan's revision a plan review was recorded against. */
+  plan_revision: number | null;
+}
+
+/** One person's check on a day. */
+export interface TripDayCheck {
+  kind: TripDayCheckKind;
+  member_id: string;
+  /** Out of date: recorded, but what it covers has changed since. */
+  status: "not_recorded" | "recorded" | "out_of_date";
+  /** The latest entry: the check, or its withdrawal; null before anything was recorded. */
+  current: TripDayCheckEntry | null;
+  /** Earlier entries, newest first. */
+  history: TripDayCheckEntry[];
+  /** What changed since it was recorded, e.g. "Route changed"; empty unless it's out of date. */
+  stale_reasons: string[];
+  /** Whether the signed-in person may record or withdraw it: their own, or a managed guest's for the organizer. */
+  can_record: boolean;
+  /** What it covers as the server reads it now, sent back to record it; null for anyone who can't. */
+  context_key: string | null;
+}
+
+/** A Backcountry day's checks, for each person taking part. */
+export interface TripDayChecks {
+  date: string;
+  trip_day_id: string;
+  /** False without a tour plan, when there's no plan to review yet. */
+  plan_available: boolean;
+  checks: TripDayCheck[];
+}
+
+/**
+ * A fact about tour preparation that the signed-in person can act on, for
+ * Plan's own page. Never a readiness score. `scope` puts their own first.
+ */
+export interface TripPreparationItem {
+  kind: "plan_out_of_date" | "transceiver_out_of_date" | "plan_not_reviewed" | "transceiver_not_checked"
+    | "no_tour_plan" | "guest_check" | "crew_out_of_date";
+  scope: "personal" | "crew";
+  date: string;
+  label: string;
+  action: { label: string; href: string };
 }
 
 export type TripStayType = "hotel" | "rental" | "hut" | "campground" | "other";
@@ -794,6 +896,8 @@ export interface TripChecklistPerson {
    * none, or for someone without an account, who can't record one.
    */
   conditions: { sources: number; reviewed: number; out_of_date: number; latest: string | null; label: string } | null;
+  /** Their day checks on a Backcountry day they take part in (#212); null otherwise, and for a pending invitation. */
+  day_checks: Array<{ kind: TripDayCheckKind; status: TripDayCheck["status"]; label: string }> | null;
 }
 
 export interface TripDayChecklist {

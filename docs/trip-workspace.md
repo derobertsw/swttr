@@ -34,7 +34,7 @@ The previous and next arrows on a day are gone: the strip and the list replace t
 A day reads in one order on every width ([#334](https://github.com/derobertsw/swttr/issues/334)), so a phone shows the essentials first and a wide screen keeps them beside the days:
 
 1. **What the day is.** The date, the activity and the destination, and on a Backcountry day the route. It says when you aren't taking part, or aren't on the trip that day, and offers **Choose an activity** when the day has none. A Backcountry day, or any day with official sources, adds one line for your conditions reviews (recorded, out of how many, and how many were recorded before the plan changed), linked to Conditions below.
-2. **Meet and start.** The meet time (a Backcountry day's tour plan holds it until #333 moves it onto the day for every sport) and place, then where you start, with the crew's where it differs.
+2. **Meet and start.** The day's meet time, for every sport, at its access point ([#333](trip-locations.md#meet-time), set here by the organizer), then where you start, with the crew's where it differs.
 3. **Getting there.** The access point, your drive and everyone's departures, then the ski or walk approach, kept apart from the road.
 4. **Tonight.** Where you sleep, with the crew's where it differs. On a morning you move stays it names both, with their check-out and check-in times when they're saved.
 5. **The tour and its conditions** on a Backcountry day: the tour plan, then each source with your review. A review shows as an icon and text, never a badge or a box: not recorded, recorded by you at a time, or recorded before the plan changed and why.

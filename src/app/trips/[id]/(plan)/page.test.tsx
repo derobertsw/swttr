@@ -29,6 +29,18 @@ describe("Plan's own page (#330)", () => {
     expect(screen.queryByRole("link", { name: "Day checklist" })).not.toBeInTheDocument();
   });
 
+  it("leads with the tour preparation the server says the person can act on (#212)", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP], days: [day], preparation: [
+      { kind: "transceiver_not_checked", scope: "personal", date: "2026-10-10", label: "Your transceiver check for today, Sat Oct 10 isn't recorded yet",
+        action: { label: "Open the day's checks", href: "/trips/trip-1/days/2026-10-10#day-checks" } },
+    ] })) }));
+    await open();
+    const preparation = await screen.findByRole("region", { name: "Tour preparation" });
+    expect(preparation).toHaveTextContent("Your transceiver check for today, Sat Oct 10 isn't recorded yet");
+    expect(screen.getByRole("link", { name: "Open the day's checks, Sat Oct 10" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-10#day-checks");
+    expect(preparation.compareDocumentPosition(screen.getByRole("region", { name: "Destinations" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("says when an older draft has no destinations yet", async () => {
     vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": reply(200, tripFull({ days: [day] })) }));
     await open();

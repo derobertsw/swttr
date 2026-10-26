@@ -56,7 +56,7 @@ export function TripMapDaySummary({ tripId, day, places, canEdit, memberId = nul
   const place = (id: string | null) => id ? places.find((candidate) => candidate.id === id) ?? null : null;
   const origin = place(day.origin_place_id), access = place(day.access_place_id), tonight = place(day.tonight_place_id);
   const destination = place(day.destination_place_id);
-  const { drive, tour } = day;
+  const { drive, tour, meet } = day;
   const dayHref = `/trips/${tripId}/days/${day.date}`;
   const fix = driveFix(tripId, day, canEdit);
   const calculated = drive.estimate && (drive.state === "available" || drive.state === "stale") ? drive.estimate : null;
@@ -77,9 +77,9 @@ export function TripMapDaySummary({ tripId, day, places, canEdit, memberId = nul
         {drive.closures.map((closure) => <span key={closure} className={noteClass}>Avoids {closure}</span>)}
         {(calculated || drive.state === "manual") && <span className={noteClass}>Check road conditions before you drive.</span>}
       </Row>
-      {tour?.meet_label && <Row term="Meet">
-        {tour.meet_label} · {day.meeting_place_id ? place(day.meeting_place_id)?.name ?? "Meeting point not set" : "Meeting point not set"}
-        {tour.time_zone_label && <span className={noteClass}>{tour.time_zone_label}</span>}
+      {meet && <Row term="Meet">
+        {meet.label} · {day.meeting_place_id ? place(day.meeting_place_id)?.name ?? "Meeting point not set" : "Meeting point not set"}
+        <span className={noteClass}>{meet.time_zone_label}</span>
       </Row>}
       {day.pickup.state === "notes_only" && <Row term="Pickup">
         <span className="whitespace-pre-wrap">{day.pickup.notes}</span>

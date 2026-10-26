@@ -198,6 +198,18 @@ describe("Trip loading", () => {
     expect(tripFullFor(full, TRIP.owner_user_id)).toBe(full);
   });
 
+  it("marks the day checks each viewer may record and lists what they can act on (#212)", () => {
+    const sam = { ...SAM, user_id: "user-2", status: "joined" as const };
+    const check = (memberId: string) => ({ kind: "transceiver" as const, member_id: memberId, status: "not_recorded" as const, current: null,
+      history: [], stale_reasons: [], can_record: false, context_key: `key-${memberId}` });
+    const full = { trip: TRIP, members: [ORGANIZER, sam], stops: [], kits: [], gear: [], days: [{ id: "day-1", trip_id: TRIP.id, stop_id: null, date: "2999-01-01", activity: "Backcountry" }],
+      day_checks: [{ date: "2999-01-01", trip_day_id: "day-1", plan_available: false, checks: [check(ORGANIZER.id), check(sam.id)] }] } as TripFull;
+    const forSam = tripFullFor(full, "user-2");
+    expect(forSam.day_checks![0].checks.map((entry) => [entry.can_record, entry.context_key])).toEqual([[false, null], [true, `key-${sam.id}`]]);
+    expect(forSam.preparation).toEqual([]);
+    expect(tripFullFor(full, TRIP.owner_user_id).preparation?.map((item) => item.kind)).toEqual(["no_tour_plan"]);
+  });
+
   it("returns the existing error response when accommodation fails in parallel", async () => {
     vi.useFakeTimers();
     const { supabase } = database({ trips: [{ ...TRIP }] }, {}, ["trip_stays"]);

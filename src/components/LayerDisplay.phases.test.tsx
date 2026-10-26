@@ -92,6 +92,24 @@ function renderTouring() {
   return userEvent.setup();
 }
 
+it('shows XC stop warmth only in Carry and keeps it out of worn and saved layers', async () => {
+  const data: BiophysicsRecommendation = {
+    ...touring,
+    descent_handwear: undefined,
+    descent_breakdown: undefined,
+    carry_items: [{ label: 'Break insulation', reason: 'Put on while stopped.' }],
+  };
+  const saved: { current: import('@/types/savedKit').SavedOutfit | null } = { current: null };
+  render(<LayerDisplay activity="xc_skiing" recommendation={null} temperature={25} windspeed={10} biophysicsData={data}
+    outing={{ activity: 'xc_skiing', exertion: 'moderate', outingPattern: 'frequent_stops', place: { id: 1, name: 'Stowe', country: 'US', latitude: 44, longitude: -72 }, when: { mode: 'now' } }}
+    saveToTrip={outfit => { saved.current = outfit; return null; }} />);
+  const carry = screen.getByRole('region', { name: 'Carry' });
+  expect(within(carry).getByText(/Break insulation/)).toBeInTheDocument();
+  expect(within(screen.getByRole('region', { name: 'Wear' })).queryByText(/Break insulation/)).not.toBeInTheDocument();
+  await waitFor(() => expect(saved.current?.phases[0].carry).toEqual(['Break insulation: Put on while stopped.']));
+  expect(JSON.stringify(saved.current?.phases[0].wear)).not.toContain('Break insulation');
+});
+
 describe("backcountry phase editing with the real picker", () => {
   it("ranks options using the shown phase's target and names that phase", async () => {
     const user = renderTouring();

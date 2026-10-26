@@ -163,6 +163,12 @@ function PersonTasks({ tripId, day, person, viewer }: { tripId: string; day: Tri
       {conditions && <Fact term="Source reviews">
         <Link href={`${dayHref}#conditions-heading`} className={linkClassName} aria-label={`${person.display_name}'s source reviews for ${day.date_label}: ${conditions.label}`}>{conditions.label}</Link>
       </Fact>}
+      {person.day_checks && <Fact term="Day checks">
+        <ul>{person.day_checks.map((check) => <li key={check.kind} className="break-words">
+          <Link href={`${dayHref}#${viewer ? "day-checks" : "crew-preparation"}`} className={linkClassName}
+            aria-label={`${person.display_name}'s day checks for ${day.date_label}: ${check.label}`}>{check.label}</Link>
+        </li>)}</ul>
+      </Fact>}
       {viewer && <Fact term="Your packing">
         <Link href={`/trips/${encodeURIComponent(tripId)}/pack`} className={linkClassName}>Your packing list</Link>
         <span className="text-muted-foreground"> · checks are private to you</span>

@@ -4,6 +4,7 @@ import { use, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SharedGearAttention } from "@/components/trips/SharedGear";
+import { TourPreparation } from "@/components/trips/DayChecks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StopDot, TripError } from "@/components/trips/trip-primitives";
 import { useTrip } from "@/hooks/useTrip";
@@ -37,6 +38,7 @@ export default function TripPlanPage({ params }: { params: Promise<{ id: string 
 
       {data && (
         <>
+          <TourPreparation items={data.preparation} />
           <SharedGearAttention tripId={id} gear={data.gear} />
           <TripPlacesSummary tripId={id} revision={data} />
           <section aria-labelledby="trip-destinations-heading" className="flex min-w-0 flex-col gap-1">

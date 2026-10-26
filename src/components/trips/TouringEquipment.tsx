@@ -11,6 +11,7 @@ import { packingDay } from "@/components/trips/TripPacking";
 import { sectionLabelClassName } from "@/components/trips/trip-primitives";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { equipmentKey, withEquipmentChoices } from "@/lib/touring-equipment";
+import { sharedGearStatus } from "@/lib/shared-gear-status";
 import { errorMessage, tripRequest, TripRequestError } from "@/lib/trip-requests";
 import type {
   EquipmentTemplateOption, PackingChange, PackingChoices, SharedTouringAdded, SharedTouringTemplate, TouringEquipment,
@@ -303,7 +304,7 @@ export function DayEquipment({ tripId, gear, memberId }: {
             {assigned.map((item) => (
               <li key={item.id} className="flex flex-wrap items-center justify-between gap-x-3 py-2.5">
                 <span className="min-w-0 break-words text-base text-foreground">{item.description}</span>
-                <span className="text-sm text-muted-foreground">Assigned</span>
+                <span className="text-sm text-muted-foreground">{sharedGearStatus(item).label}</span>
               </li>
             ))}
           </ul>

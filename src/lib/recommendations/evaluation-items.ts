@@ -7,6 +7,8 @@ import { cacheCatalogRows, cachedCatalogRow } from './evaluation-catalog-cache';
 import { garmentMetadata } from '@/lib/garment-metadata';
 import { hoodInsulation } from './extremities';
 import type { GarmentRow } from './types';
+import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
+import { ensembleToThermalGarments } from './formatting';
 
 type ItemType = NonNullable<EvaluationItem['item_type']>;
 type Row = Record<string, unknown> & { id: string };
@@ -35,6 +37,7 @@ function resolveItem(item: EvaluationItem, part: EvaluatedBodyPart, row: Row | u
   const rcl = matchesPart && metadata.thermal_data_status === 'known' && knownClo(localClo) ? localClo : undefined;
   return {
     ...unknown, ...garmentMetadata(metadata), rcl,
+    name: item.item_type === 'custom' ? String(row.name ?? 'Custom item') : `${row.brand} ${row.model_name}`,
     thermal_data_status: knownClo(rcl) ? 'known' : 'unknown',
   };
 }
@@ -77,19 +80,33 @@ export async function resolveEvaluationItems(
       phase.items![part].map(item => resolveItem(item, part,
         item.item_type && item.sourceId ? rows.get(item.item_type)?.get(item.sourceId) : undefined)),
     ])) as NonNullable<PhaseEvaluationInput['items']>;
+    const wornGarments = [...new Set([...items.torso, ...items.legs]
+      .filter(item => item.item_type === 'garment').map(item => item.sourceId))]
+      .flatMap(id => {
+        const row = id ? rows.get('garment')?.get(id) : undefined;
+        if (!row) return [];
+        // Supabase joins may return a singleton relation as an array.
+        return [{ ...row,
+          garment_thermal_properties: Array.isArray(row.garment_thermal_properties)
+            ? row.garment_thermal_properties[0] : row.garment_thermal_properties,
+          garment_protection: Array.isArray(row.garment_protection)
+            ? row.garment_protection[0] : row.garment_protection,
+        } as unknown as GarmentRow];
+      });
+    const properties = predictEnsembleThermal(ensembleToThermalGarments(wornGarments));
+    const hasUnresolvedGarment = [...items.torso, ...items.legs].some(item =>
+      item.item_type === 'garment' && item.thermal_data_status === 'unknown');
+    const catalogTorso = items.torso.every(item => item.item_type === 'garment' && Boolean(item.sourceId));
     return {
       ...phase, items,
-      ...(phase.extremityMaxTargets ? {
-        hoodClo: hoodInsulation(
-          [...new Set(items.torso.filter(item => item.item_type === 'garment').map(item => item.sourceId))]
-            .flatMap(id => {
-              const row = id ? rows.get('garment')?.get(id) : undefined;
-              return row ? [row as unknown as GarmentRow] : [];
-            }),
+      armClo: !catalogTorso || hasUnresolvedGarment || !Number.isFinite(properties.rcl.arm) ? null : properties.rcl.arm,
+      ...(phase.breathabilityTarget && wornGarments.length && !hasUnresolvedGarment ? {
+        breathability: { evapPotential: properties.evapPotential, target: phase.breathabilityTarget },
+      } : {}),
+      hoodClo: hoodInsulation(wornGarments,
           items.headNeck.some(item => item.item_type === 'headwear' && item.sourceId
             && rows.get('headwear')?.get(item.sourceId)?.headwear_type === 'ski_helmet'),
         ),
-      } : {}),
       itemClo: Object.fromEntries(EVALUATED_BODY_PARTS.map(part => [part,
         items[part].map(item => item.rcl ?? null),
       ])) as PhaseEvaluationInput['itemClo'],
