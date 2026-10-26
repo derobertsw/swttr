@@ -1,9 +1,11 @@
 import { Suspense } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { ORGANIZER, SAM, TRIP, fakeTripApi, reply, sentBodies, tripFull } from "@/test/tripApi";
+import { buildSharedTouringTemplate, sharedTouringGearId } from "@/lib/trip-shared-touring";
+import type { SharedTouringTemplate } from "@/types/trip-packing";
 import type { TripGroupGear } from "@/types/trips";
 import GroupGearPage from "./page";
 
@@ -202,5 +204,136 @@ describe("Group gear page", () => {
       })
     );
     expect(screen.getByText("Tent")).toBeInTheDocument();
+  });
+
+  describe("Shared touring items (#212)", () => {
+    const BOTHY: TripGroupGear = { ...TENT, id: "gear-bothy", description: "Bothy bag", revision: "c171593c-5c29-4c09-96c4-c27e65b641e8" };
+    const fromTemplate = (templateId: string, description: string, sort_order: number): TripGroupGear =>
+      ({ ...TENT, id: sharedTouringGearId(TRIP.id, templateId), description, sort_order });
+    /** A trip with a Backcountry day, its shared gear `gear()` as it stands at each read. */
+    function touringTrip(gear: () => TripGroupGear[], routes: Parameters<typeof fakeTripApi>[0] = {}) {
+      return fakeTripApi({
+        "GET /api/v1/trips/trip-1": () => reply(200, tripFull({ members: [ORGANIZER, SAM], gear: gear() })),
+        "GET /api/v1/trips/trip-1/gear/touring": () => reply(200, {
+          dates: ["2026-10-10", "2026-10-11"], template: buildSharedTouringTemplate(TRIP.id, gear()),
+        } satisfies SharedTouringTemplate),
+        ...routes,
+      });
+    }
+
+    it("previews the template as shared gear stands, and adds the chosen items unassigned", async () => {
+      let gear = [BOTHY];
+      const api = touringTrip(() => gear, {
+        "POST /api/v1/trips/trip-1/gear/touring": () => {
+          gear = [BOTHY, fromTemplate("first_aid", "First aid kit", 1), fromTemplate("repair_kit", "Repair kit", 2)];
+          return reply(201, { added: ["First aid kit", "Repair kit"] });
+        },
+      });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      await renderPage();
+
+      const section = (await screen.findByRole("heading", { name: "Shared touring items" })).closest("section")!;
+      expect(section).toHaveTextContent("Group items for the Backcountry days: Sat Oct 10, Sun Oct 11.");
+      const open = within(section).getByRole("button", { name: "Add shared touring items" });
+      await user.click(open);
+      const dialog = await screen.findByRole("dialog", { name: "Shared touring items" });
+      expect(dialog).toHaveTextContent("Added items start unassigned");
+      const inGear = within(dialog).getByRole("heading", { name: "Already in shared gear" }).closest("section")!;
+      expect(inGear).toHaveTextContent("Group shelter · in shared gear as Bothy bag");
+      const suggested = within(dialog).getByRole("group", { name: "Suggested additions" });
+      expect(within(suggested).getByRole("checkbox", { name: "First aid kit" })).toBeChecked();
+      expect(within(suggested).getByRole("checkbox", { name: "Repair kit" })).toBeChecked();
+      expect(within(dialog).queryByRole("checkbox", { name: "Group shelter" })).not.toBeInTheDocument();
+      expect(dialog).toHaveTextContent("Shared items don't replace anyone's own rescue gear");
+
+      await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(sentBodies(api, "POST /api/v1/trips/trip-1/gear/touring")).toEqual([{ ids: ["first_aid", "repair_kit"] }]);
+      expect(within(section).getByRole("status")).toHaveTextContent("Added 2 items to shared gear. Choose who's bringing each one.");
+      expect(screen.getByRole("combobox", { name: "Who's bringing First aid kit" })).toHaveValue("");
+      expect(screen.getByRole("combobox", { name: "Who's bringing Repair kit" })).toHaveValue("");
+      await waitFor(() => expect(open).toHaveFocus());
+
+      // Opening it again reads shared gear again: everything is there now.
+      await user.click(open);
+      const again = await screen.findByRole("dialog", { name: "Shared touring items" });
+      expect(again).toHaveTextContent("Everything on this list is in shared gear.");
+      expect(within(again).queryByRole("button", { name: "Add selected items" })).not.toBeInTheDocument();
+    });
+
+    it("keeps the preview open after a failure, with what was added moved out of the selection", async () => {
+      let gear: TripGroupGear[] = [];
+      let posts = 0;
+      const api = touringTrip(() => gear, {
+        "POST /api/v1/trips/trip-1/gear/touring": () => {
+          posts += 1;
+          if (posts === 1) {
+            gear = [fromTemplate("first_aid", "First aid kit", 0)];
+            return reply(500, { error: "Couldn't save shared gear. Reload to check whether it saved, then try again.", added: ["First aid kit"] });
+          }
+          gear = [...gear, fromTemplate("repair_kit", "Repair kit", 1), fromTemplate("group_shelter", "Group shelter", 2)];
+          return reply(201, { added: ["Repair kit", "Group shelter"] });
+        },
+      });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      await renderPage();
+
+      await user.click(await screen.findByRole("button", { name: "Add shared touring items" }));
+      const dialog = await screen.findByRole("dialog", { name: "Shared touring items" });
+      await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+        "Added First aid kit, but couldn't add the rest: Couldn't save shared gear. Reload to check whether it saved, then try again.");
+      // The list behind the open preview shows what was added, and the preview no longer offers it.
+      expect(await screen.findByRole("combobox", { name: "Who's bringing First aid kit", hidden: true })).toBeInTheDocument();
+      await waitFor(() => expect(within(dialog).getByRole("heading", { name: "Already in shared gear" }).closest("section")).toHaveTextContent("First aid kit"));
+      expect(within(dialog).queryByRole("checkbox", { name: "First aid kit" })).not.toBeInTheDocument();
+      expect(within(dialog).getByRole("checkbox", { name: "Repair kit" })).toBeChecked();
+
+      await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(sentBodies(api, "POST /api/v1/trips/trip-1/gear/touring")).toEqual([
+        { ids: ["first_aid", "repair_kit", "group_shelter"] }, { ids: ["repair_kit", "group_shelter"] },
+      ]);
+    });
+
+    it("says so, and opens nothing, when the preview can't be loaded", async () => {
+      let reads = 0;
+      vi.stubGlobal("fetch", touringTrip(() => [], {
+        "GET /api/v1/trips/trip-1/gear/touring": () => {
+          reads += 1;
+          return reads === 1 ? reply(200, { dates: ["2026-10-10"], template: buildSharedTouringTemplate(TRIP.id, []) })
+            : reply(503, { error: "Database unavailable" });
+        },
+      }));
+      const user = userEvent.setup();
+      await renderPage();
+      await user.click(await screen.findByRole("button", { name: "Add shared touring items" }));
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn't load shared touring items", { description: "Database unavailable" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("isn't offered on a trip without Backcountry days", async () => {
+      vi.stubGlobal("fetch", touringTrip(() => [], {
+        "GET /api/v1/trips/trip-1/gear/touring": reply(200, { dates: [], template: buildSharedTouringTemplate(TRIP.id, []) }),
+      }));
+      await renderPage();
+      await screen.findByText("No group gear yet.");
+      await act(async () => {});
+      expect(screen.queryByRole("heading", { name: "Shared touring items" })).not.toBeInTheDocument();
+    });
+
+    it("isn't offered to a crew member, and isn't read for them", async () => {
+      const member = { ...ORGANIZER, id: "member-me", role: "member" as const };
+      const api = fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({ trip: { ...TRIP, owner_user_id: "user-9" }, members: [member] })),
+      });
+      vi.stubGlobal("fetch", api);
+      await renderPage();
+      await screen.findByText("No group gear yet.");
+      expect(screen.queryByRole("heading", { name: "Shared touring items" })).not.toBeInTheDocument();
+      expect(api.mock.calls.some(([url]) => String(url).includes("/gear/touring"))).toBe(false);
+    });
   });
 });

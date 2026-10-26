@@ -157,6 +157,26 @@ export interface TripEquipmentResponse {
   checks: PackingChecks;
 }
 
+/**
+ * What GET /api/v1/trips/:id/gear/touring returns: the shared touring items
+ * template as the trip's shared gear stands, for the organizer (#212).
+ */
+export interface SharedTouringTemplate {
+  /** The trip's Backcountry days, which the items are for. */
+  dates: string[];
+  /**
+   * added: in shared gear under its own name. listed: in shared gear under
+   * another of its names (`listedAs`). available: neither. Shared items are
+   * never `removed`: a removed one is just gone.
+   */
+  template: EquipmentTemplateOption[];
+}
+
+/** What POST /api/v1/trips/:id/gear/touring returns, and its error's `added`: the names it added. */
+export interface SharedTouringAdded {
+  added: string[];
+}
+
 export interface TripPackResponse {
   trip: { id: string; name: string; start_date: string; end_date: string };
   totalDays: number;

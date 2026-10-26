@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { sharedTouringGearId } from "@/lib/trip-shared-touring";
 import type { TripGroupGear } from "@/types/trips";
 
 let db: PGlite;
@@ -136,6 +137,19 @@ describe("Shared responsibility and physical packing in Postgres", () => {
     expect(await code(act(first, "delete", "owner"))).toBe("P0409");
     await act(accepted, "delete", "owner");
     expect(await read(id)).toBeUndefined();
+  });
+
+  it("adds a shared touring item once under its fixed id, and again after it's removed (#212)", async () => {
+    const id = sharedTouringGearId(trip, "first_aid");
+    const add = () => change(id, { action: "create", description: "First aid kit", assignee_member_id: null });
+    const first = await add();
+    expect(await add()).toEqual(first);
+    const assigned = await act(first, "assign", "owner", { assignee_member_id: ana });
+    // Adding it again once it's assigned returns it as it is, without resetting it.
+    expect(await add()).toMatchObject({ id, assignee_member_id: ana, revision: assigned.revision });
+    expect((await db.query("SELECT * FROM trip_group_gear WHERE trip_id = $1", [trip])).rows).toHaveLength(1);
+    await act(assigned, "delete", "owner");
+    expect(await add()).toMatchObject({ id, assignee_member_id: null });
   });
 
   it("denies anon/authenticated direct table and RPC access while the service RPC works", async () => {

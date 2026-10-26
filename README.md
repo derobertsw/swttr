@@ -15,7 +15,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - **Edit trip** renames a saved trip and changes its dates after reviewing what moves, what's added and what's removed; Destinations reorders and removes stops and sets several days at once, each after a review of the days it changes ([editing rules](docs/trip-editing.md))
 - **What to pack** lists what each person's saved outfits call for, once per item with its days, flags changes since they last looked, and keeps their own items and quantities ([packing rules](docs/trip-packing.md))
 - **Crew stays** save optional lodging, assign nights and show each day's morning origin and tonight's stay ([stay planning and deployment](docs/trip-stays.md))
-- **Touring equipment** adds a transceiver, probe, shovel and other touring items to each person's packing list for Backcountry days, from a template they choose from ([touring preparation](docs/trip-touring-prep.md))
+- **Touring equipment** adds a transceiver, probe, shovel and other touring items to each person's packing list for Backcountry days, from a template they choose from, and the organizer can add shared touring items like a first aid kit and group shelter to shared gear ([touring preparation](docs/trip-touring-prep.md))
 - **Paid agent API** for machine callers, metered per request over HTTP 402 ([docs](docs/paid-agent-api-mpp.md))
 - **Mobile-first UX**, also shipped as an iOS app via Capacitor
 

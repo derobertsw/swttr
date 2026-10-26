@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useTrip } from "@/hooks/useTrip";
 import { errorMessage, timedTripRequest } from "@/lib/trip-requests";
 import { SharedGearList } from "@/components/trips/SharedGear";
+import { SharedTouringItems } from "@/components/trips/TouringEquipment";
 import { PackingNav } from "@/components/trips/PackingNav";
 import { useUserId } from "@/hooks/useUserId";
 
@@ -147,6 +148,9 @@ export default function GroupGearPage({ params }: { params: Promise<{ id: string
               </Button>
             </div>
           </div>}
+
+          {/* Shared touring items from a template, for Backcountry days (#212). */}
+          {organizer && <SharedTouringItems tripId={id} onAdded={reload} />}
 
           <div className="h-24" />
         </>
