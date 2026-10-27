@@ -3,6 +3,8 @@
  * page URLs keep working: each belongs to the section that now holds it, so
  * its tab shows as current.
  */
+import type { TripFull } from "@/types/trips";
+
 export type TripSectionId = "plan" | "stays" | "crew" | "packing";
 
 interface TripSection {
@@ -64,4 +66,65 @@ function safeDecode(value: string) {
 
 export function tripSectionHref(tripId: string, section: TripSection) {
   return `/trips/${tripId}${section.path}`;
+}
+
+/** Opens the trip on the right day for the person (#334): see `openTripPath`. */
+export function tripOpenHref(tripId: string) {
+  return `/trips/${tripId}/days`;
+}
+
+const planPathKey = (tripId: string) => `swttr-trip-plan-path:${tripId}`;
+const openedPathKey = (tripId: string) => `swttr-trip-opened-path:${tripId}`;
+
+/** Plan's own page or one of its days, on this trip. */
+export function isPlanPath(path: string, tripId: string) {
+  const location = tripLocation(path, tripId);
+  return location?.section === "plan" && (location.subpath === "" || location.date !== null);
+}
+
+function readSession(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    // Storage can be blocked.
+    return null;
+  }
+}
+
+function writeSession(key: string, value: string) {
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    // Not saved: Plan still remembers within the page.
+  }
+}
+
+/** The Plan page this tab last showed for the trip. */
+export function savedPlanPath(tripId: string): string | null {
+  const saved = readSession(planPathKey(tripId));
+  return saved && isPlanPath(saved, tripId) ? saved : null;
+}
+
+export function savePlanPath(tripId: string, path: string) {
+  writeSession(planPathKey(tripId), path);
+}
+
+/**
+ * Where opening the trip goes (#334). A day this tab picked wins, unless the
+ * trip is underway and that day is over. Otherwise it's the day the server
+ * chose for the person, or Plan's own page on a trip that's over. A day it
+ * opens on isn't a pick: opening again asks the server again, so planning a
+ * day moves the trip on to the next.
+ */
+export function openTripPath(tripId: string, trip: Pick<TripFull, "days" | "focus">): string {
+  const saved = savedPlanPath(tripId);
+  const picked = saved && saved !== readSession(openedPathKey(tripId)) ? tripLocation(saved, tripId)?.date : null;
+  const focus = trip.focus;
+  if (picked && trip.days.some((day) => day.date === picked) && !(focus?.reason === "today" && focus.date && picked < focus.date)) {
+    return saved!;
+  }
+  if (!focus?.date) return `/trips/${tripId}`;
+  const path = `/trips/${tripId}/days/${focus.date}`;
+  writeSession(openedPathKey(tripId), path);
+  return path;
 }

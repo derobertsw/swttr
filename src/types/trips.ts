@@ -156,6 +156,21 @@ export interface TripFull {
   day_checks?: TripDayChecks[];
   /** Tour preparation the signed-in person can act on, for Plan's own page (#212); optional like `lodging`. */
   preparation?: TripPreparationItem[];
+  /** Where the trip opens for the signed-in person, and their next step (#334); optional like `lodging`. */
+  focus?: TripFocus;
+}
+
+/** The day a trip opens on for one person, and what they'd do next (#334): see docs/trip-workspace.md#opening-a-trip. */
+export interface TripFocus {
+  /** The day to open, or null for Plan's own page: the trip has no days, or it's over. */
+  date: string | null;
+  /**
+   * "today" during the trip, by the destination's clock; "unfinished" their
+   * first day ahead still to plan; "first_day" when every day ahead is planned.
+   */
+  reason: "today" | "unfinished" | "first_day" | null;
+  /** The first thing still to do from today on, or null when nothing is. */
+  next_step: { kind: "add_destination" | "choose_activity" | "plan_kit"; date: string | null } | null;
 }
 
 /**

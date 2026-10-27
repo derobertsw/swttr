@@ -87,6 +87,11 @@ describe("Trip workspace (#330)", () => {
     expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1/days/2026-10-11");
   });
 
+  it("opens the trip's day for you from another section before Plan has shown a page (#334)", async () => {
+    await open("/trips/trip-1/pack");
+    expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1/days");
+  });
+
   it("keeps Plan's last day when another section reloads", async () => {
     const view = await open("/trips/trip-1/days/2026-10-11");
     view.unmount();
@@ -101,7 +106,7 @@ describe("Trip workspace (#330)", () => {
   ])("ignores a saved Plan page that is %s", async (_, saved) => {
     window.sessionStorage.setItem("swttr-trip-plan-path:trip-1", saved);
     await open("/trips/trip-1/stays");
-    expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1");
+    expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1/days");
   });
 
   it("remembers Plan's day within the page when storage is blocked", async () => {
@@ -113,7 +118,7 @@ describe("Trip workspace (#330)", () => {
     expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1/days/2026-10-11");
     view.unmount();
     await open("/trips/trip-1/stays");
-    expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1");
+    expect(tab("Plan")).toHaveAttribute("href", "/trips/trip-1/days");
   });
 
   it("titles Plan's own page with the trip and names it on every other page", async () => {
