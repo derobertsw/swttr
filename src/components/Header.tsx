@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { Share2, HelpCircle, Menu, MessageSquare, Settings } from "lucide-react";
 import { toast } from "sonner";
@@ -43,6 +44,10 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   const nativeShell = useNativeShell();
   const isNativeShell = nativeShell !== null;
   const mobileOnly = isNativeShell ? undefined : "md:hidden";
+  // Sign-in and sign-up link to each other and keep the return path; a bare
+  // Sign in link there would drop it.
+  const pathname = usePathname();
+  const showSignIn = !/^\/sign-(in|up)(\/|$)/.test(pathname);
   const {
     sensitivity,
     defaultActivity,
@@ -140,17 +145,19 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
           <SignedIn>
             <AccountMenu ref={accountMenuRef} onOpenSettings={openPreferencesFromAvatar} onShare={handleShare} />
           </SignedIn>
-          <SignedOut>
-            <Link
-              href="/sign-in"
-              className={cn(
-                "hidden min-h-11 items-center rounded-control px-2 text-sm font-semibold text-foreground underline-offset-4 hover:underline",
-                !isNativeShell && "md:inline-flex"
-              )}
-            >
-              Sign in
-            </Link>
-          </SignedOut>
+          {showSignIn && (
+            <SignedOut>
+              <Link
+                href="/sign-in"
+                className={cn(
+                  "hidden min-h-11 items-center rounded-control px-2 text-sm font-semibold text-foreground underline-offset-4 hover:underline",
+                  !isNativeShell && "md:inline-flex"
+                )}
+              >
+                Sign in
+              </Link>
+            </SignedOut>
+          )}
         </div>
 
         {/* Mobile: hamburger menu */}
@@ -177,16 +184,18 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
               <SheetDescription className="sr-only">Settings, help and sharing</SheetDescription>
             </SheetHeader>
             <nav aria-label="Menu" className="flex flex-col gap-1 px-2 pb-4">
-              <SignedOut>
-                <SheetClose asChild>
-                  <Link
-                    href="/sign-in"
-                    className={MENU_ITEM_CLASS}
-                  >
-                    Sign in
-                  </Link>
-                </SheetClose>
-              </SignedOut>
+              {showSignIn && (
+                <SignedOut>
+                  <SheetClose asChild>
+                    <Link
+                      href="/sign-in"
+                      className={MENU_ITEM_CLASS}
+                    >
+                      Sign in
+                    </Link>
+                  </SheetClose>
+                </SignedOut>
+              )}
               <button
                 onClick={openPreferencesFromMenu}
                 className={MENU_ITEM_CLASS}
