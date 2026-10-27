@@ -6,7 +6,6 @@ import { NextRequest } from 'next/server';
 import catalog from '@/test/fixtures/gear-catalog.json';
 import { createFakeSupabase } from '@/test/fakeSupabase';
 import { GET as available } from '@/app/api/wardrobe/available/route';
-import { GET as image } from '@/app/api/media/item-image/route';
 import { POST as touring } from '@/app/api/v1/recommendations/ski-touring/route';
 import { POST as alpine } from '@/app/api/v1/recommendations/alpine/route';
 import { formatGarmentResponse } from './formatting';
@@ -102,7 +101,7 @@ describe('#41 catalog migration and API integration', () => {
     expect((await db.query("SELECT g.brand,t.confidence_score FROM garments g JOIN garment_thermal_properties t ON t.garment_id=g.id WHERE lower(g.model_name)='senja alpha90 hood'")).rows).toEqual([{ brand: 'Norrona', confidence_score: '0.90' }]);
   });
 
-  it('serves the migrated products to wardrobe search and resolves local product photos', async () => {
+  it('serves the migrated products and direct local photo URLs to wardrobe search', async () => {
     state.client = createFakeSupabase({ garments: rows, handwear: [], headwear: [] });
     const response = await available();
     expect(response.status).toBe(200);
@@ -115,10 +114,10 @@ describe('#41 catalog migration and API integration', () => {
     }
     for (const model of [...models, 'Heat Midweight Crew']) {
       const g = rows.find(r => r.model_name === model)!;
-      const photo = await image(new NextRequest(`http://localhost/api/media/item-image?item_type=garment&item_id=${g.id}`));
-      expect(photo.status).toBe(307);
-      expect(new URL(photo.headers.get('location')!).pathname).toBe(g.item_image_url);
-      await access(`public${g.item_image_url}`);
+      const photoUrl = body.items.find((item: { id: string }) => item.id === g.id).item_image_url;
+      expect(photoUrl).toBe(g.item_image_url);
+      expect(photoUrl).toMatch(/^\/images\/items\//);
+      await access(`public${photoUrl}`);
     }
   });
 
