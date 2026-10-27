@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { SignUp } from "@clerk/nextjs";
+import PageLayout from "@/components/PageLayout";
+import { AUTH_CARD_APPEARANCE } from "@/lib/clerk-appearance";
 import { detectNativeShell } from "@/lib/native-shell";
 import { safeReturnPath } from "@/lib/outingReturn";
+
+export const metadata: Metadata = { title: "Sign up" };
 
 export default async function SignUpPage({
   searchParams,
@@ -13,14 +18,15 @@ export default async function SignUpPage({
   const returnTo = safeReturnPath((await searchParams).redirect_url, requestHeaders.get("host"));
   const nativeShell = detectNativeShell(requestHeaders.get("user-agent"));
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <PageLayout>
       <SignUp
+        appearance={AUTH_CARD_APPEARANCE}
         forceRedirectUrl={returnTo}
         signInForceRedirectUrl={returnTo}
         {...(nativeShell ? {
           signInUrl: `/sign-in?redirect_url=${encodeURIComponent(returnTo)}`,
         } : {})}
       />
-    </div>
+    </PageLayout>
   );
 }

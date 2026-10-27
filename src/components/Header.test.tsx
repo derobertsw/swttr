@@ -8,7 +8,8 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { fakeClerkState, resetFakeClerk } from "@/test/fakeClerk";
 
 vi.mock("@clerk/nextjs", async () => (await import("@/test/fakeClerk")).fakeClerkModule);
-vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+const navigation = vi.hoisted(() => ({ pathname: "/" }));
+vi.mock("next/navigation", () => ({ usePathname: () => navigation.pathname }));
 
 const chrome = () => (
   <TemperatureUnitProvider>
@@ -39,6 +40,7 @@ describe("Header settings entry points", () => {
 
   beforeEach(() => {
     resetFakeClerk();
+    navigation.pathname = "/";
     noAnimation = document.createElement("style");
     noAnimation.textContent = "[data-vaul-drawer] { animation-name: none !important; }";
     document.head.appendChild(noAnimation);
@@ -172,6 +174,19 @@ describe("Header settings entry points", () => {
       "Feedback",
       "Share",
     ]);
+  });
+
+  it.each(["/sign-in", "/sign-up/verify-email-address"])("leaves Sign in out of the header and menu on %s", async (pathname) => {
+    navigation.pathname = pathname;
+    fakeClerkState.signedIn = false;
+    const user = userEvent.setup();
+    render(chrome());
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
+
+    const menu = screen.getByRole("navigation", { name: "Menu" });
+    expect(Array.from(menu.children, (item) => item.textContent)).toEqual(["Settings", "FAQ", "Feedback", "Share"]);
   });
 
   it("keeps Settings in the mobile menu", async () => {
