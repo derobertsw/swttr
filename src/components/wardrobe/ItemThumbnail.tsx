@@ -1,6 +1,6 @@
 import type { WardrobeItem } from "@/types/wardrobe";
 import { cn } from "@/lib/utils";
-import { getWardrobeMediaRef, resolveItemImageUrl, toCssBackgroundImage } from "./media";
+import { ItemImage } from "./ItemImage";
 import { ItemIcon } from "./wardrobe-utils";
 
 /**
@@ -23,13 +23,12 @@ export function ItemThumbnail({ item, className }: { item: WardrobeItem; classNa
   }
 
   return (
-    <div
-      aria-hidden="true"
+    <ItemImage
+      item={item}
       className={cn(
-        "size-12 shrink-0 rounded-control border border-border bg-white bg-contain bg-center bg-no-repeat",
+        "size-12 shrink-0 overflow-hidden rounded-control border border-border bg-white",
         className
       )}
-      style={{ backgroundImage: toCssBackgroundImage(resolveItemImageUrl(getWardrobeMediaRef(item))) }}
     />
   );
 }

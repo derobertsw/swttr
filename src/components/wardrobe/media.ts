@@ -5,17 +5,13 @@ type ItemType = "garment" | "handwear" | "headwear" | "custom";
 type ItemDetailsWithLegacyMedia = WardrobeItem["details"] & {
   brand_logo?: string;
   logo_url?: string;
-  image_url?: string;
-  photo_url?: string;
-  thumbnail_url?: string;
-  item_photo_url?: string;
 };
 
 interface MediaRef {
   itemType: ItemType;
   itemId: string;
   brandLogoUrl?: string;
-  itemImageUrl?: string;
+  itemImageUrl?: string | null;
 }
 
 const MEDIA_URL_REVISION = "2026-03-09-brand-logos-v3";
@@ -23,10 +19,6 @@ const MEDIA_URL_REVISION = "2026-03-09-brand-logos-v3";
 function isLegacyBrandWrapper(url?: string): boolean {
   if (typeof url !== "string") return false;
   return url.startsWith("/media/brands/") || url.startsWith("/api/media/brand-logo");
-}
-
-function isLegacyItemWrapper(url?: string): boolean {
-  return typeof url === "string" && url.startsWith("/media/items/");
 }
 
 function buildMediaUrl(path: string, itemType: ItemType, itemId: string): string {
@@ -71,11 +63,13 @@ export function resolveBrandLogoUrl(media: MediaRef): string {
   return buildMediaUrl("/api/media/brand-logo", media.itemType, media.itemId);
 }
 
-export function resolveItemImageUrl(media: MediaRef): string {
-  if (media.itemImageUrl && !isLegacyItemWrapper(media.itemImageUrl)) {
-    return media.itemImageUrl;
+export function resolveItemImageUrl(media: MediaRef): string | undefined {
+  const url = media.itemImageUrl?.trim();
+  // Old cached catalog responses should fall back locally, not call the removed endpoint.
+  if (!url || url.startsWith("/media/items/") || url.startsWith("/api/media/item-image")) {
+    return undefined;
   }
-  return buildMediaUrl("/api/media/item-image", media.itemType, media.itemId);
+  return url;
 }
 
 export function getWardrobeMediaRef(item: WardrobeItem): MediaRef {
@@ -84,12 +78,7 @@ export function getWardrobeMediaRef(item: WardrobeItem): MediaRef {
     itemType: item.item_type,
     itemId: item.item_id,
     brandLogoUrl: details.brand_logo_url || details.logo_url || details.brand_logo,
-    itemImageUrl:
-      details.item_image_url ||
-      details.image_url ||
-      details.photo_url ||
-      details.thumbnail_url ||
-      details.item_photo_url,
+    itemImageUrl: details.item_image_url,
   };
 }
 

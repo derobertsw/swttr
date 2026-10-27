@@ -4,7 +4,8 @@ import { GarmentDetails } from "./GarmentDetails";
 import { HandwearDetails } from "./HandwearDetails";
 import { HeadwearDetails } from "./HeadwearDetails";
 import { getItemFacts } from "./detail-formatters";
-import { getWardrobeMediaRef, resolveItemImageUrl, resolveBrandLogoUrl, toCssBackgroundImage, getBrandInitials } from "../media";
+import { getWardrobeMediaRef, resolveBrandLogoUrl, toCssBackgroundImage, getBrandInitials } from "../media";
+import { ItemImage } from "../ItemImage";
 import { LAYER_LABELS } from "../wardrobe-utils";
 
 export function ItemDetailContent({ item }: { item: WardrobeItem }) {
@@ -59,10 +60,10 @@ function ItemPhoto({ item }: { item: WardrobeItem }) {
   // both appearances.
   return (
     <div className="relative aspect-[4/3] max-h-64 w-full overflow-hidden rounded-card border border-border bg-white">
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-contain bg-center bg-no-repeat"
-        style={{ backgroundImage: toCssBackgroundImage(resolveItemImageUrl(media)) }}
+      <ItemImage
+        item={item}
+        className="absolute inset-0"
+        iconClassName="size-16"
       />
       <div
         className="absolute top-3 left-3 flex h-10 w-24 items-center justify-center overflow-hidden rounded-control border border-black/10 bg-white px-2 shadow-sm"
