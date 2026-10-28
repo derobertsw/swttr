@@ -91,9 +91,10 @@ function readSession(key: string): string | null {
   }
 }
 
-function writeSession(key: string, value: string) {
+function writeSession(key: string, value: string | null) {
   try {
-    window.sessionStorage.setItem(key, value);
+    if (value === null) window.sessionStorage.removeItem(key);
+    else window.sessionStorage.setItem(key, value);
   } catch {
     // Not saved: Plan still remembers within the page.
   }
@@ -107,14 +108,16 @@ export function savedPlanPath(tripId: string): string | null {
 
 export function savePlanPath(tripId: string, path: string) {
   writeSession(planPathKey(tripId), path);
+  // Once Plan shows another page, coming back to the day the trip opened on is a pick.
+  if (path !== readSession(openedPathKey(tripId))) writeSession(openedPathKey(tripId), null);
 }
 
 /**
  * Where opening the trip goes (#334). A day this tab picked wins, unless the
  * trip is underway and that day is over. Otherwise it's the day the server
  * chose for the person, or Plan's own page on a trip that's over. A day it
- * opens on isn't a pick: opening again asks the server again, so planning a
- * day moves the trip on to the next.
+ * opens on isn't a pick until Plan shows another page: opening again asks
+ * the server again, so planning that day moves the trip on to the next.
  */
 export function openTripPath(tripId: string, trip: Pick<TripFull, "days" | "focus">): string {
   const saved = savedPlanPath(tripId);

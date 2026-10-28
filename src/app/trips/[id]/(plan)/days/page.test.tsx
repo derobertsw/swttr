@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { fakeTripApi, reply, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
+import { savePlanPath } from "@/lib/trip-sections";
 import type { TripDay, TripFocus } from "@/types/trips";
 import OpenTripPage from "./page";
 
@@ -51,10 +52,22 @@ describe("Opening a trip (#334)", () => {
     await open(focusOn("2026-10-10"));
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1/days/2026-10-10"));
     // The workspace saves the day it showed, as Plan's last page.
-    window.sessionStorage.setItem(PLAN_PATH, "/trips/trip-1/days/2026-10-10");
+    savePlanPath("trip-1", "/trips/trip-1/days/2026-10-10");
     replace.mockClear();
     await open(focusOn("2026-10-11"));
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1/days/2026-10-11"));
+  });
+
+  it("counts the day it opened as a pick once you go back to it from another day", async () => {
+    await open(focusOn("2026-10-10"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1/days/2026-10-10"));
+    // The workspace saves each Plan page it shows: the opened day, another, then the opened day again.
+    savePlanPath("trip-1", "/trips/trip-1/days/2026-10-10");
+    savePlanPath("trip-1", "/trips/trip-1/days/2026-10-12");
+    savePlanPath("trip-1", "/trips/trip-1/days/2026-10-10");
+    replace.mockClear();
+    await open(focusOn("2026-10-11"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1/days/2026-10-10"));
   });
 
   it("opens today during the trip rather than a day picked earlier that's over", async () => {
