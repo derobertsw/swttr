@@ -7,8 +7,10 @@ import { ALEX, BLAIR, CASEY, DANA, ELI, FRAN, FRI, MON, PINE, SAT, SPLIT_MEMBERS
 import { planReviewContext, summarizeDayChecks } from "@/lib/trip-day-checks";
 import type { TripFull, TripTourPlanSummary } from "@/types/trips";
 
+/** Noon UTC on a date, which is the same date at Stowe. */
+const at = (date: string) => Date.parse(`${date}T12:00:00Z`);
 const person = (full: TripFull, date: string, memberId: string) =>
-  buildDayChecklists(full, null, FRI).days.find((day) => day.date === date)!.people.find((entry) => entry.member_id === memberId)!;
+  buildDayChecklists(full, null, at(FRI)).days.find((day) => day.date === date)!.people.find((entry) => entry.member_id === memberId)!;
 
 describe("Day checklist (#336)", () => {
   it("never calls an empty kit OK, and keeps a checklist, a saved outfit and a changed plan apart", () => {
@@ -122,18 +124,18 @@ describe("Day checklist (#336)", () => {
 
   it("opens on today during the trip, the first day before it and the last after it, and names the viewer", () => {
     const full = trip();
-    expect(buildDayChecklists(full, null, "2026-09-01").default_date).toBe(FRI);
-    expect(buildDayChecklists(full, null, SUN).default_date).toBe(SUN);
-    expect(buildDayChecklists(full, null, "2026-11-01").default_date).toBe(MON);
-    expect(buildDayChecklists(full, "user-blair", FRI).viewer_member_id).toBe(BLAIR.id);
-    expect(buildDayChecklists(full, "user-outsider", FRI).viewer_member_id).toBeNull();
-    expect(buildDayChecklists(trip({ days: [] }), null, FRI)).toMatchObject({ default_date: null, days: [] });
-    expect(buildDayChecklists(full, null, FRI).days.map((day) => [day.date_label, day.activity, day.place])).toEqual([
+    expect(buildDayChecklists(full, null, at("2026-09-01")).default_date).toBe(FRI);
+    expect(buildDayChecklists(full, null, at(SUN)).default_date).toBe(SUN);
+    expect(buildDayChecklists(full, null, at("2026-11-01")).default_date).toBe(MON);
+    expect(buildDayChecklists(full, "user-blair", at(FRI)).viewer_member_id).toBe(BLAIR.id);
+    expect(buildDayChecklists(full, "user-outsider", at(FRI)).viewer_member_id).toBeNull();
+    expect(buildDayChecklists(trip({ days: [] }), null, at(FRI))).toMatchObject({ default_date: null, days: [] });
+    expect(buildDayChecklists(full, null, at(FRI)).days.map((day) => [day.date_label, day.activity, day.place])).toEqual([
       ["Fri Oct 9", "Downhill", "Stowe"], ["Sat Oct 10", "Downhill", "Stowe"], ["Sun Oct 11", "Downhill", "Stowe"], ["Mon Oct 12", "Downhill", "Stowe"]]);
   });
 
   it("leaves out people who left", () => {
     const full = trip({ members: members.map((member) => member.id === ELI.id ? { ...member, status: "left" as const } : member) });
-    expect(buildDayChecklists(full, null, FRI).days[0].people.map((entry) => entry.display_name)).toEqual(["Alex", "Blair", "Casey", "Dana", "Fran"]);
+    expect(buildDayChecklists(full, null, at(FRI)).days[0].people.map((entry) => entry.display_name)).toEqual(["Alex", "Blair", "Casey", "Dana", "Fran"]);
   });
 });

@@ -1,13 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
-import { fakeTripApi, ORGANIZER, reply, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
-import { buildLodging } from "@/lib/trip-lodging";
-import type { TripDay, TripStop } from "@/types/trips";
+import { fakeTripApi, reply, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
+import type { TripDay, TripFocus, TripStop } from "@/types/trips";
 import { PlanWorkspace } from "./PlanWorkspace";
 
 let pathname = "/trips/trip-1";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
-vi.mock("@/hooks/useUserId", () => ({ useUserId: () => "user-1" }));
 
 const KILLINGTON: TripStop = { ...STOWE_STOP, id: "stop-killington", position: 1, name: "Killington, Vermont" };
 const day = (date: string, overrides: Partial<TripDay> = {}): TripDay =>
@@ -44,29 +42,40 @@ describe("Plan workspace (#330)", () => {
     expect(screen.queryByRole("navigation", { name: "Choose a day" })).not.toBeInTheDocument();
   });
 
-  it("leads with the next unplanned day", async () => {
-    await open("/trips/trip-1");
-    // The first day has an activity but no kit of yours yet.
+  it("leads with the next step the server works out for you (#334)", async () => {
+    const focus = (next_step: TripFocus["next_step"]): TripFocus => ({ date: "2026-10-10", reason: "unfinished", next_step });
+    await open("/trips/trip-1", tripFull({ stops: [STOWE_STOP, KILLINGTON], days: DAYS, focus: focus({ kind: "plan_kit", date: "2026-10-10" }) }));
     expect(screen.getByText("Plan your kit for your next unplanned day.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Plan this day" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-10");
+    cleanup();
+    await open("/trips/trip-1", tripFull({ stops: [STOWE_STOP, KILLINGTON], days: DAYS, focus: focus({ kind: "choose_activity", date: "2026-10-11" }) }));
+    expect(screen.getByText("Choose an activity for your next unplanned day.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Plan this day" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-11");
+    cleanup();
+    await open("/trips/trip-1", tripFull({ stops: [STOWE_STOP, KILLINGTON], days: DAYS, focus: focus(null) }));
+    expect(screen.queryByText("Next step")).not.toBeInTheDocument();
   });
 
-  it("skips Travel and Rest days and days you aren't on, which have no kit to plan (#334)", async () => {
+  it("labels Travel and Rest days (#334)", async () => {
     const days = [day("2026-10-10", { activity: "Travel" }), day("2026-10-11", { activity: "Rest" }), day("2026-10-12")];
     await open("/trips/trip-1", tripFull({ stops: [STOWE_STOP], days }));
-    expect(screen.getByRole("link", { name: "Plan this day" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-12");
     expect(within(screen.getByRole("navigation", { name: "Days" })).getAllByRole("link", { name: /Oct/ }).map((link) => link.textContent))
       .toEqual(["Sat, Oct 10Travel", "Sun, Oct 11Rest", "Mon, Oct 12Downhill skiing"]);
-    cleanup();
-    const members = [ORGANIZER];
-    const attendance = [{ trip_id: TRIP.id, member_id: ORGANIZER.id, arrival_date: null, departure_date: null, skipped_dates: ["2026-10-12"] }];
-    await open("/trips/trip-1", tripFull({ stops: [STOWE_STOP], days, members, lodging: buildLodging(TRIP, [], [], { members, attendance, per_member: true }) }));
-    expect(screen.queryByRole("link", { name: "Plan this day" })).not.toBeInTheDocument();
   });
 
   it("sends an older draft without destinations to the destination editor", async () => {
-    await open("/trips/trip-1", tripFull({ days: [day("2026-10-10", { stop_id: null })] }));
+    const focus: TripFocus = { date: "2026-10-10", reason: "unfinished", next_step: { kind: "add_destination", date: null } };
+    await open("/trips/trip-1", tripFull({ days: [day("2026-10-10", { stop_id: null })], focus }));
     expect(screen.getByRole("link", { name: "Add first destination" })).toHaveAttribute("href", "/trips/trip-1/stops");
+  });
+
+  it("keeps the days list out of a phone's way while the trip opens on a day (#334)", async () => {
+    await open("/trips/trip-1/days");
+    expect(screen.getByRole("navigation", { name: "Days" })).toHaveClass("hidden");
+    expect(screen.queryByRole("navigation", { name: "Choose a day" })).not.toBeInTheDocument();
+    cleanup();
+    await open("/trips/trip-1");
+    expect(screen.getByRole("navigation", { name: "Days" })).not.toHaveClass("hidden");
   });
 
   it("names a day without its own destination after the base", async () => {

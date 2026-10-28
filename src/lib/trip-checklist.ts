@@ -1,9 +1,10 @@
 import "server-only";
 import { tripActivityNeedsClothing } from "@/lib/trip-activities";
+import { destinationToday } from "@/lib/trip-day-checks";
 import { dateLabel, participationLabel } from "@/lib/trip-lodging";
 import { outfitMismatches } from "@/lib/trip-kit-fit";
 import { sharedGearStatus } from "@/lib/shared-gear-status";
-import type { TripChecklist, TripChecklistPerson, TripDayCheck, TripDayChecklist, TripFull, TripGroupGear, TripMember } from "@/types/trips";
+import type { TripChecklist, TripChecklistPerson, TripDay, TripDayCheck, TripDayChecklist, TripFull, TripGroupGear, TripMember } from "@/types/trips";
 
 const MEMBERSHIP_LABELS: Record<TripMember["status"], string> = { joined: "Joined", invited: "Invitation pending", guest: "Managed guest", left: "Left the trip" };
 const sentence = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
@@ -29,9 +30,10 @@ function dayCheckLabel(full: TripFull, member: TripMember, check: TripDayCheck, 
     : `${done} · ${entry.time_label}${by}`;
 }
 
-/** The first trip day on or after today, or the last day once the trip is over. */
-function defaultDate(dates: string[], today: string): string | null {
-  return dates.find((date) => date >= today) ?? dates.at(-1) ?? null;
+
+/** The first trip day on or after today at the destination, or the last day once the trip is over. */
+function defaultDate(full: TripFull, days: TripDay[], now: number): string | null {
+  return days.find((day) => day.date >= destinationToday(full, day, now))?.date ?? days.at(-1)?.date ?? null;
 }
 
 /**
@@ -40,7 +42,7 @@ function defaultDate(dates: string[], today: string): string | null {
  * as separate facts. Personal packing checks are private, so they're never
  * here.
  */
-export function buildDayChecklists(full: TripFull, viewerUserId: string | null, today = new Date().toISOString().slice(0, 10)): TripChecklist {
+export function buildDayChecklists(full: TripFull, viewerUserId: string | null, now = Date.now()): TripChecklist {
   const members = full.members.filter((member) => member.status !== "left");
   const days = [...full.days].sort((a, b) => a.date.localeCompare(b.date));
   const plans = new Map(full.day_checks?.map((entry) => [entry.trip_day_id, entry.plan_available]));
@@ -89,6 +91,6 @@ export function buildDayChecklists(full: TripFull, viewerUserId: string | null, 
     return { date: day.date, date_label: dateLabel(day.date), activity, place: stop?.name ?? null, people };
   });
   const { id, name, start_date, end_date } = full.trip;
-  return { trip: { id, name, start_date, end_date }, default_date: defaultDate(days.map((day) => day.date), today),
+  return { trip: { id, name, start_date, end_date }, default_date: defaultDate(full, days, now),
     viewer_member_id: (viewerUserId && members.find((member) => member.user_id === viewerUserId)?.id) || null, days: checklists };
 }

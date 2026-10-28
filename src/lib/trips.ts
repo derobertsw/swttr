@@ -8,6 +8,7 @@ import { buildDayMeets } from "@/lib/trip-meets";
 import { loadConditions, summarizeConditions } from "@/lib/trip-conditions";
 import { loadMemberDayOrigins } from "@/lib/trip-drive-estimates";
 import { dayChecksFor, loadDayChecks, preparationFor, summarizeDayChecks } from "@/lib/trip-day-checks";
+import { tripFocusFor } from "@/lib/trip-focus";
 import type {
   Trip,
   TripDay,
@@ -231,8 +232,9 @@ export const ORGANIZER_OWN_NAME = "You";
 /**
  * The trip as `userId` sees it. Only the organizer sees invitation links, or
  * their own row named "You"; to everyone else, until the organizer renames
- * it, that row is "Organizer". Day checks say which are theirs to record, and
- * `preparation` lists what they can act on (#212).
+ * it, that row is "Organizer". Day checks say which are theirs to record,
+ * `preparation` lists what they can act on (#212), and `focus` is the day
+ * their trip opens on (#334).
  */
 export function tripFullFor(full: TripFull, userId: string): TripFull {
   const nameFor = (m: { role: TripMember["role"]; display_name: string }) =>
@@ -242,9 +244,10 @@ export function tripFullFor(full: TripFull, userId: string): TripFull {
     members: full.members.map((m) => ({ ...m, invite_token: null, display_name: nameFor(m) })),
     ...(full.lodging ? { lodging: { ...full.lodging, people: full.lodging.people.map((p) => ({ ...p, display_name: nameFor(p) })) } } : {}),
   };
-  if (!full.day_checks) return viewed;
+  const focus = tripFocusFor(viewed, userId);
+  if (!full.day_checks) return { ...viewed, focus };
   const day_checks = dayChecksFor(full.day_checks, full, userId);
-  return { ...viewed, day_checks, preparation: preparationFor(viewed, day_checks, userId) };
+  return { ...viewed, day_checks, preparation: preparationFor(viewed, day_checks, userId), focus };
 }
 
 /** Date-based status on the UTC calendar; the stored status can be stale. */

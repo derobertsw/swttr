@@ -15,7 +15,7 @@ const checklist = buildDayChecklists(checklistTrip({
   kits: [kit(ALEX.id, SAT, { outfit: savedOutfit() })],
   gear: [gear("Stove", BLAIR.id)],
   conditions: [source("avalanche", SAT, [{ user: "user-blair" }])],
-}), "user-blair", SAT);
+}), "user-blair", Date.parse(`${SAT}T12:00:00Z`));
 
 async function renderPage() {
   await act(async () => {
@@ -87,7 +87,7 @@ describe("Day checklist page (#336)", () => {
   });
 
   it("reads the checklist again on coming back to the tab, keeping the chosen day, and ignores an older answer that arrives late", async () => {
-    const later = buildDayChecklists(checklistTrip({ kits: [kit(BLAIR.id, SAT, { outfit: savedOutfit() })] }), "user-blair", SAT);
+    const later = buildDayChecklists(checklistTrip({ kits: [kit(BLAIR.id, SAT, { outfit: savedOutfit() })] }), "user-blair", Date.parse(`${SAT}T12:00:00Z`));
     const answers: Array<(value: ReturnType<typeof reply>) => void> = [];
     let calls = 0;
     vi.stubGlobal("fetch", fakeTripApi({ [ROUTE]: () => ++calls === 1 ? reply(200, checklist) : new Promise((resolve) => answers.push(resolve)) }));
