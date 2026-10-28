@@ -3,14 +3,21 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { previewDateChange } from "@/lib/trip-dates";
+import type { Trip, TripDay, TripFull } from "@/types/trips";
 
 const tripId = "a2eb3ecb-a7ac-4b6d-98e3-701c694d8563";
 const otherTrip = "2d6b6e38-77b6-46bc-8d6c-906fbb40d633";
 
+// The trip migrations as prod has them, with change_trip_dates as 026 wrote it and 20261021201500 changed it.
+const BEFORE = ["012_trips", "016_atomic_trip_creation", "017_trip_stays", "018_trip_saved_kits", "021_trip_date_changes", "022_trip_itinerary_edits",
+  "023_trip_copy_day", "025_trip_stay_locations", "026_trip_tour_plans", "027_trip_access_points", "031_trip_conditions",
+  "20261020000407_trip_conflicts_no_retry", "20261021201500_trip_attendance_lodging"];
+
 async function createDatabase() {
   const db = await PGlite.create();
   await db.exec("CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS; CREATE FUNCTION public.update_updated_at_column() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END $$;");
-  for (const migration of ["012_trips", "017_trip_stays", "021_trip_date_changes", "023_trip_copy_day", "20261028130000_trip_day_notes"]) {
+  for (const migration of [...BEFORE, "20261028130000_trip_day_notes"]) {
     await db.exec(await readFile(`supabase/migrations/${migration}.sql`, "utf8"));
   }
   return db;
@@ -87,6 +94,54 @@ describe("Day notes", () => {
     expect((await db.query("SELECT activity, notes FROM trip_days WHERE trip_id = $1 AND date = '2026-10-10'", [tripId])).rows)
       .toEqual([{ activity: "Backcountry", notes: "Saturday's notes" }]);
     expect(await notes(db)).toEqual([{ date: "2026-10-09", notes: "Friday's notes" }, { date: "2026-10-10", notes: "Saturday's notes" }]);
+  });
+
+  describe("when a date change removes the day", () => {
+    const loadFull = async (): Promise<TripFull> => {
+      const rows = async <T,>(sql: string) => (await db.query<T>(sql, [tripId])).rows;
+      return {
+        trip: (await rows<Trip>("SELECT id, owner_user_id, name, start_date::text, end_date::text, status, lodging_revision FROM trips WHERE id = $1"))[0],
+        stops: [], members: [], kits: [], gear: [], tour_plans: [],
+        days: await rows<TripDay>("SELECT id, date::text, stop_id, activity, notes FROM trip_days WHERE trip_id = $1"),
+      };
+    };
+    // Shortening the trip to Friday–Saturday removes Sunday.
+    const shorten = (removed: unknown) => db.query(
+      "SELECT public.change_trip_dates($1, 'user-1', '2026-10-09', '2026-10-11', '2026-10-09', '2026-10-10', 'keep', 'planning', NULL, NULL, $2) AS result",
+      [tripId, JSON.stringify(removed)]);
+    const removedFor = async () => previewDateChange(await loadFull(), "2026-10-09", "2026-10-10").plans.keep;
+
+    it("lists the day's notes in the review and removes them with the day", async () => {
+      await setNotes({ date: "2026-10-11", text: "Sunday's notes" });
+      const plan = await removedFor();
+      expect(plan.removed.map((day) => day.notes)).toEqual(["Sunday's notes"]);
+      expect(plan.expected_removed).toEqual([expect.objectContaining({ date: "2026-10-11", notes: "Sunday's notes" })]);
+      await shorten(plan.expected_removed);
+      expect(await notes(db)).toEqual([]);
+    });
+
+    it("refuses a review from before the notes were added or changed", async () => {
+      const unseen = (await removedFor()).expected_removed;
+      await setNotes({ date: "2026-10-11", text: "Sunday's notes" });
+      await expect(shorten(unseen)).rejects.toMatchObject({ code: "PT409" });
+      const seen = (await removedFor()).expected_removed;
+      await setNotes({ date: "2026-10-11", text: "Sunday's new notes", expected: { notes: "Sunday's notes" } });
+      await expect(shorten(seen)).rejects.toMatchObject({ code: "PT409" });
+      expect(await notes(db)).toEqual([{ date: "2026-10-11", notes: "Sunday's new notes" }]);
+    });
+
+    it("lists a day without notes as before", async () => {
+      expect((await removedFor()).expected_removed).toEqual([{ date: "2026-10-11", stop_id: null, activity: "Alpine", kit_ids: [] }]);
+      await shorten([{ date: "2026-10-11", stop_id: null, activity: "Alpine", kit_ids: [] }]);
+      expect((await db.query("SELECT count(*)::int AS days FROM trip_days WHERE trip_id = $1", [tripId])).rows).toEqual([{ days: 2 }]);
+    });
+
+    it("keeps 20261021201500's lodging check", async () => {
+      const source = (await db.query<{ src: string }>("SELECT prosrc AS src FROM pg_proc WHERE proname = 'change_trip_dates' AND strpos(prosrc, 'tour_plan_id') > 0")).rows;
+      expect(source).toHaveLength(1);
+      expect(source[0].src).toContain("trip_member_attendance");
+      expect(source[0].src).toContain("jsonb_build_object('notes', d.notes)");
+    });
   });
 
   it("is organizer only, for a day on this trip", async () => {

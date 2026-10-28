@@ -606,6 +606,8 @@ export interface TripDateChangeDay {
   kits: string[];
   /** The objective of the day's tour plan, if it has one. */
   tour_plan?: string | null;
+  /** The day's notes (#334), if it has some. */
+  notes?: string | null;
 }
 
 /** A removed day as the server last saw it; sent back to confirm the removal. */
@@ -617,6 +619,8 @@ export interface TripRemovedDayCheck {
   /** Present only when the day has a tour plan: its id and the revision the review showed. */
   tour_plan_id?: string;
   tour_plan_revision?: number;
+  /** Present only when the day has notes: the notes the review showed. */
+  notes?: string;
 }
 
 export interface TripDateChangePlan {

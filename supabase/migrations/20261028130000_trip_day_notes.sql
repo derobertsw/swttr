@@ -1,14 +1,16 @@
 -- A note on each trip day for everyone on the trip (#334): tickets, rentals,
 -- parking, where to find each other. See docs/trip-workspace.md#day-notes.
 --
--- Apply this on its own, before or after deploying the API that reads it. An
--- API from before this change never reads the column. An API from after it
--- that runs without it shows no notes, and refuses (503) to save them.
+-- Apply this on its own, after 026 and 20261021201500, before or after
+-- deploying the API that reads it. An API from before this change never reads
+-- the column. An API from after it that runs without it shows no notes, and
+-- refuses (503) to save them.
 
 -- Plain text, trimmed by the API, never empty: no notes is null. It's on the
 -- day, so moving the trip's dates (021) keeps it with the day, as it keeps the
--- day's meet time (20261024230000). Copy day (023, 030) copies the day's
--- destination and activity only, so it leaves it alone.
+-- day's meet time (20261024230000), and removing the day removes it. Copy day
+-- (023, 030) copies the day's destination and activity only, so it leaves it
+-- alone.
 ALTER TABLE public.trip_days
   ADD COLUMN notes text CONSTRAINT trip_days_notes_length CHECK (char_length(notes) BETWEEN 1 AND 2000);
 
@@ -58,5 +60,30 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.set_trip_day_notes(uuid, text, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.set_trip_day_notes(uuid, text, jsonb) TO service_role;
+
+-- A date change that removes a day checks the day's notes against the review
+-- that listed them, as it checks the day's tour plan, so notes saved after the
+-- review aren't deleted unseen (409, and the API sends the current review). A
+-- day without notes is listed as before. Only that list changes in
+-- change_trip_dates (026, as 20261021201500 left it).
+DO $migration$
+DECLARE
+  target oid;
+  legacy constant text := 'FROM public.trip_day_tour_plans t WHERE t.trip_day_id = d.id), ''{}''::jsonb)';
+  replaced constant text := legacy || ' || CASE WHEN d.notes IS NULL THEN ''{}''::jsonb ELSE jsonb_build_object(''notes'', d.notes) END';
+  updated integer := 0;
+BEGIN
+  FOR target IN
+    SELECT p.oid FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'change_trip_dates' AND strpos(p.prosrc, legacy) > 0
+  LOOP
+    EXECUTE replace(pg_get_functiondef(target), legacy, replaced);
+    updated := updated + 1;
+  END LOOP;
+  IF updated = 0 THEN
+    RAISE EXCEPTION 'change_trip_dates removed-day check not found; apply 026 first';
+  END IF;
+END;
+$migration$;
 
 NOTIFY pgrst, 'reload schema';

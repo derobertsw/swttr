@@ -170,6 +170,7 @@ function DayList({ title, days, describe = (day) => day.date_label, warning = fa
             <p>{describe(day)} · {day.destination} · {day.activity ? tripActivityLabel(day.activity) : "No activity"}</p>
             {day.kits.length > 0 && <p className="text-muted-foreground">{day.kits.length === 1 ? "Kit" : "Kits"}: {day.kits.join(", ")}</p>}
             {day.tour_plan && <p className="text-muted-foreground">Tour plan: {day.tour_plan}</p>}
+            {day.notes && <p className="line-clamp-2 whitespace-pre-wrap text-muted-foreground">Notes: {day.notes}</p>}
           </li>
         ))}
       </ul>

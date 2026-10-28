@@ -142,6 +142,20 @@ describe("Trip settings", () => {
     });
   });
 
+  it("shows a removed day's notes, and confirms the notes it showed (#334)", async () => {
+    const withNotes = { ...full, days: days.map((day) => day.date === "2026-10-12" ? { ...day, notes: "Rentals at Base Lodge.\nParking lot B." } : day) };
+    const { api, user } = await open({ "PATCH /api/v1/trips/trip-1": (body) => (body as Body).preview ? reply(200, previewOf(body, withNotes)) : saved(body) });
+    setDates("2026-10-10", "2026-10-11");
+    await user.click(screen.getByRole("button", { name: "Review date change" }));
+    const dialog = await screen.findByRole("dialog", { name: "Review date change" });
+    expect(await within(dialog).findByText(/^Notes: Rentals at Base Lodge/)).toHaveTextContent("Notes: Rentals at Base Lodge. Parking lot B.");
+    await user.click(within(dialog).getByRole("button", { name: "Remove 1 day and change dates" }));
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
+    expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")[1]).toMatchObject({
+      expected_removed: [{ date: "2026-10-12", kit_ids: ["kit-sam"], notes: "Rentals at Base Lodge.\nParking lot B." }],
+    });
+  });
+
   it("shows the change as it is now when the trip changed after the review", async () => {
     const changed = { ...full, kits: [...full.kits, { ...full.kits[0], id: "kit-you", trip_member_id: ORGANIZER.id }] };
     let saves = 0;
