@@ -2,12 +2,15 @@ import { Suspense } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { fakeTripApi, reply, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
+import { TripProvider } from "@/components/trips/TripProvider";
+import { useTrip } from "@/hooks/useTrip";
 import { savePlanPath } from "@/lib/trip-sections";
 import type { TripDay, TripFocus } from "@/types/trips";
 import OpenTripPage from "./page";
 
 const replace = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ userId: "user-1", sessionId: "session-1", isLoaded: true }) }));
 
 const day = (date: string): TripDay =>
   ({ id: `day-${date}`, trip_id: TRIP.id, date, stop_id: STOWE_STOP.id, activity: "Alpine" }) as TripDay;
@@ -90,6 +93,28 @@ describe("Opening a trip (#334)", () => {
     await open(focusOn("2026-10-12"));
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1/days/2026-10-12"));
     vi.restoreAllMocks();
+  });
+
+  it("reads the trip again when another section already loaded it, and opens the day from the new read", async () => {
+    const reads = [focusOn("2026-10-10"), focusOn("2026-10-11")];
+    let calls = 0;
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": () => reply(200, tripFull({ stops: [STOWE_STOP], days: DAYS, focus: reads[Math.min(calls++, 1)] })),
+    }));
+    // Stays, say, loaded the trip with Saturday still to plan.
+    function StaysPage() {
+      const { data } = useTrip(TRIP.id);
+      return <p>{data ? "Stays loaded" : "Loading"}</p>;
+    }
+    const page = (child: React.ReactNode) => <TripProvider tripId={TRIP.id}><Suspense fallback={null}>{child}</Suspense></TripProvider>;
+    let view!: ReturnType<typeof render>;
+    await act(async () => { view = render(page(<StaysPage />)); });
+    await screen.findByText("Stays loaded");
+    // Saturday was planned since: the new read moves on to Sunday.
+    await act(async () => { view.rerender(page(<OpenTripPage params={Promise.resolve({ id: TRIP.id })} />)); });
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1/days/2026-10-11"));
+    expect(replace).not.toHaveBeenCalledWith("/trips/trip-1/days/2026-10-10");
+    expect(calls).toBe(2);
   });
 
   it("says why when the trip doesn't load, and goes nowhere", async () => {
