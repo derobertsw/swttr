@@ -69,6 +69,11 @@ export interface TripDay {
   meet_day_offset?: -1 | 0;
   /** The destination's IANA time zone when the meet time was saved, if it could be found. */
   meet_time_zone?: string | null;
+  /**
+   * The organizer's notes for everyone on the day (#334): tickets, rentals,
+   * parking. Plain text; missing before migration 20261028130000.
+   */
+  notes?: string | null;
 }
 
 /** A day's meet time with the server's labels (#333). */
