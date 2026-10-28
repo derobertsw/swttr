@@ -73,7 +73,7 @@ describe("Opening a trip (#334)", () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1/days/2026-10-10"));
   });
 
-  it("opens today during the trip rather than a day picked earlier that's over", async () => {
+  it("opens today during the trip rather than a day picked earlier that's over, and Plan's own page after it", async () => {
     window.sessionStorage.setItem(PLAN_PATH, "/trips/trip-1/days/2026-10-10");
     await open(focusOn("2026-10-11", "today"));
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1/days/2026-10-11"));
@@ -81,6 +81,9 @@ describe("Opening a trip (#334)", () => {
     window.sessionStorage.setItem(PLAN_PATH, "/trips/trip-1/days/2026-10-12");
     await open(focusOn("2026-10-11", "today"));
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1/days/2026-10-12"));
+    replace.mockClear();
+    await open(focusOn(null, null));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1"));
   });
 
   it("opens the focus day when All days was Plan's last page, or storage is blocked", async () => {
@@ -115,6 +118,38 @@ describe("Opening a trip (#334)", () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/trips/trip-1/days/2026-10-11"));
     expect(replace).not.toHaveBeenCalledWith("/trips/trip-1/days/2026-10-10");
     expect(calls).toBe(2);
+  });
+
+  it("opens the trip as it was when the new read stalls, and stays put when it finishes late", async () => {
+    let finish!: () => void;
+    let calls = 0;
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": () => calls++ === 0
+        ? reply(200, tripFull({ stops: [STOWE_STOP], days: DAYS, focus: focusOn("2026-10-10") }))
+        : new Promise((resolve) => { finish = () => resolve(reply(200, tripFull({ stops: [STOWE_STOP], days: DAYS, focus: focusOn("2026-10-11") }))); }),
+    }));
+    function StaysPage() {
+      const { data } = useTrip(TRIP.id);
+      return <p>{data ? "Stays loaded" : "Loading"}</p>;
+    }
+    const page = (child: React.ReactNode) => <TripProvider tripId={TRIP.id}><Suspense fallback={null}>{child}</Suspense></TripProvider>;
+    let view!: ReturnType<typeof render>;
+    await act(async () => { view = render(page(<StaysPage />)); });
+    await screen.findByText("Stays loaded");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await act(async () => { view.rerender(page(<OpenTripPage params={Promise.resolve({ id: TRIP.id })} />)); });
+      expect(calls).toBe(2);
+      await act(async () => { vi.advanceTimersByTime(4999); });
+      expect(replace).not.toHaveBeenCalled();
+      // FRESH_READ_MS
+      await act(async () => { vi.advanceTimersByTime(1); });
+      expect(replace).toHaveBeenCalledWith("/trips/trip-1/days/2026-10-10");
+    } finally {
+      vi.useRealTimers();
+    }
+    await act(async () => { finish(); });
+    expect(replace).toHaveBeenCalledTimes(1);
   });
 
   it("says why when the trip doesn't load, and goes nowhere", async () => {

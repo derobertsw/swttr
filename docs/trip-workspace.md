@@ -36,7 +36,7 @@ A trip opens on the day that matters to you ([#334](https://github.com/deroberts
 - **During the trip:** today, by the destination's clock.
 - **Before it:** your first day still to plan: a day with no activity, or one you take part in, with clothing to plan, that has no kit of yours yet. Travel and Rest days, and days you aren't taking part in, have nothing to plan. Once every day is planned, the first day.
 - **After it**, or with no days: Plan's own page.
-- **A day you picked in this tab wins**, while it's still on the trip. During the trip a picked day that's over gives way to today. The day the trip opened on isn't a pick, so once you've planned it, opening the trip again moves on to the next one. Going to another day and back to it makes it one.
+- **A day you picked in this tab wins**, while it's still on the trip and not over. During the trip a picked day that's over gives way to today, and after it to Plan's own page. The day the trip opened on isn't a pick, so once you've planned it, opening the trip again moves on to the next one. Going to another day and back to it makes it one.
 
 The server works out the day and the next step for whoever's signed in, as `focus` on `GET /api/v1/trips/:id` (`tripFocusFor` in `src/lib/trip-focus.ts`): `date`, `reason` (`today`, `unfinished` or `first_day`) and `next_step` (`add_destination`, `choose_activity` or `plan_kit`, with its date). The days list's Next step reads it, and only looks from today on, so a day that's over is never next. The destination's clock is the day's tour plan zone or its access point's, else UTC, as day checks use it. The tab remembers the day it picked and the day the trip opened on in session storage (`openTripPath` in `src/lib/trip-sections.ts`).
 

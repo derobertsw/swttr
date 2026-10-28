@@ -1,11 +1,14 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TripError } from "@/components/trips/trip-primitives";
 import { useTrip } from "@/hooks/useTrip";
 import { openTripPath } from "@/lib/trip-sections";
+
+/** How long opening waits for a new read of a trip it already holds. */
+const FRESH_READ_MS = 5000;
 
 /**
  * Opening a trip (#334): the trip list and Plan, from another section, come
@@ -19,17 +22,27 @@ export default function OpenTripPage({ params }: { params: Promise<{ id: string 
   // From another section the workspace can already hold the trip, read a
   // while ago, and the day depends on today and on what's been planned since:
   // read it again before choosing. Without it, the first read is fresh. If
-  // the new read fails, the trip as it was still opens.
+  // the new read fails, or hasn't finished in FRESH_READ_MS, the trip as it
+  // was still opens.
   const [fresh, setFresh] = useState(() => data === null);
   useEffect(() => {
     if (fresh) return;
     let current = true;
-    void reload().then(() => { if (current) setFresh(true); });
-    return () => { current = false; };
+    const settle = () => { if (current) setFresh(true); };
+    const timer = window.setTimeout(settle, FRESH_READ_MS);
+    void reload().then(settle);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
   }, [fresh, reload]);
 
+  // Once: a read that finishes after opening chose doesn't send you elsewhere.
+  const opened = useRef(false);
   useEffect(() => {
-    if (fresh && data) router.replace(openTripPath(id, data));
+    if (!fresh || !data || opened.current) return;
+    opened.current = true;
+    router.replace(openTripPath(id, data));
   }, [fresh, data, id, router]);
 
   return (

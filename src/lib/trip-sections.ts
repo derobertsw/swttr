@@ -113,20 +113,21 @@ export function savePlanPath(tripId: string, path: string) {
 }
 
 /**
- * Where opening the trip goes (#334). A day this tab picked wins, unless the
- * trip is underway and that day is over. Otherwise it's the day the server
- * chose for the person, or Plan's own page on a trip that's over. A day it
- * opens on isn't a pick until Plan shows another page: opening again asks
- * the server again, so planning that day moves the trip on to the next.
+ * Where opening the trip goes (#334). A day this tab picked wins, unless
+ * that day is over: during the trip, today wins, and after it, as with no
+ * focus day at all, Plan's own page. Otherwise it's the day the server chose
+ * for the person. A day it opens on isn't a pick until Plan shows another
+ * page: opening again asks the server again, so planning that day moves the
+ * trip on to the next.
  */
 export function openTripPath(tripId: string, trip: Pick<TripFull, "days" | "focus">): string {
   const saved = savedPlanPath(tripId);
   const picked = saved && saved !== readSession(openedPathKey(tripId)) ? tripLocation(saved, tripId)?.date : null;
   const focus = trip.focus;
-  if (picked && trip.days.some((day) => day.date === picked) && !(focus?.reason === "today" && focus.date && picked < focus.date)) {
+  if (!focus?.date) return `/trips/${tripId}`;
+  if (picked && trip.days.some((day) => day.date === picked) && !(focus.reason === "today" && picked < focus.date)) {
     return saved!;
   }
-  if (!focus?.date) return `/trips/${tripId}`;
   const path = `/trips/${tripId}/days/${focus.date}`;
   writeSession(openedPathKey(tripId), path);
   return path;
