@@ -47,7 +47,7 @@ A new trip still opens on Plan's own page, which confirms it's saved (#169), and
 A day reads in one order on every width ([#334](https://github.com/derobertsw/swttr/issues/334)), so a phone shows the essentials first and a wide screen keeps them beside the days:
 
 1. **What the day is.** The date, the activity and the destination, and on a Backcountry day the route. It says when you aren't taking part, or aren't on the trip that day, and offers **Choose an activity** when the day has none. A Backcountry day, or any day with official sources, adds one line for your conditions reviews (recorded, out of how many, and how many were recorded before the plan changed), linked to Conditions below.
-2. **Meet and start.** The day's meet time, for every sport, at its access point ([#333](trip-locations.md#meet-time), set here by the organizer), then where you start, with the crew's where it differs.
+2. **Meet and start.** The day's meet time, for every sport, at its access point ([#333](trip-locations.md#meet-time), set here by the organizer), the day's [notes](#day-notes), then where you start, with the crew's where it differs.
 3. **Getting there.** The access point, your drive and everyone's departures, then the ski or walk approach, kept apart from the road.
 4. **Tonight.** Where you sleep, with the crew's where it differs. On a morning you move stays it names both, with their check-out and check-in times when they're saved.
 5. **The tour and its conditions** on a Backcountry day: the tour plan, then each source with your review. A review shows as an icon and text, never a badge or a box: not recorded, recorded by you at a time, or recorded before the plan changed and why.
@@ -55,6 +55,21 @@ A day reads in one order on every width ([#334](https://github.com/derobertsw/sw
 7. **The activity**, a control rather than part of the reading, then Copy this day.
 
 **Downhill skiing** and **Backcountry skiing** are the labels for the stored `Alpine` and `Backcountry` activities everywhere a day's activity is shown, including itinerary reviews and a review's "Activity changed to" reason. Storage, links and older app versions keep the stored names (`tripActivityLabel` in `src/lib/trip-activities.ts`). **Travel** joins Rest as a day type with no clothing to plan (`tripActivityNeedsClothing`): neither asks anyone for a kit, and neither do days someone isn't taking part in, by the attendance the server works out (#331). The days list's Next step skips them too, and on the packing list a Travel or Rest day, or a day you aren't taking part in, gets no clothing guidance and links to its day ("Review day") rather than to Plan kit manually.
+
+## Day notes
+
+A day has one plain-text note for everyone on the trip, for every sport ([#334](https://github.com/derobertsw/swttr/issues/334)): tickets and rentals on a Downhill day, parking, where to find each other. Touring details stay in a Backcountry day's tour plan.
+
+- **Where they show.** Under the meet in **Meet and start**, as **Notes**, with their line breaks. Without a meet time the section is **Start of the day**.
+- **Who.** The organizer, inline: **Add notes** or **Edit notes** opens Notes for everyone (up to 2,000 characters), with Save notes and Cancel. Clearing the box turns Save notes into **Remove notes**, so there's no one-tap removal. "Notes saved." or "Notes removed." is announced, and focus goes back to the button. Members see the notes without controls. It's `DayNotesControls` in `src/components/trips/DayNotes.tsx`.
+- **Unsaved text.** Cancel with changes asks "Discard your changes to the notes?" (Discard changes or Keep editing), and reloading or closing the tab asks too. Notes aren't kept in browser storage.
+- **Conflicts.** A save checks the day the editor opened for (a date change can put another day on the date) and its notes as shown. A mismatch is refused (409) with the text kept in the form; **Review saved notes** shows what's saved now, and saving then replaces it.
+- **Moves with the day.** They're on the day (`trip_days.notes`), so moving the trip's dates keeps them with their day. Copy day copies the destination and activity only, so it neither brings nor replaces notes.
+- **Removed with the day, only as reviewed.** A date change's review shows a removed day's notes, and its `expected_removed` lists them (`notes`, only when the day has some). `change_trip_dates` compares them, so notes added or changed after the review make the save a 409 with the current review ([trip-editing.md](trip-editing.md)).
+
+`PUT /api/v1/trips/:id/days/:date/notes` takes `{day_id, notes, expected}`: `notes` is the text, trimmed by the server, with null or blank to clear it, and `expected` is `{notes}` as the editor showed them. It saves through `set_trip_day_notes`, which locks the trip, checks the organizer, and refuses (409) a day or notes that no longer match. 403 for anyone but the organizer, 400 with `field: "notes"` for more than 2,000 characters or notes that aren't text, a 400 asking to reload without `day_id` or `expected`, 404 for a date the trip doesn't have, 503 before the migration. `GET /api/v1/trips/:id` returns them as each day's `notes`.
+
+**Deployment:** apply `supabase/migrations/20261028130000_trip_day_notes.sql` by hand, on its own, after 026 and `20261021201500`, before or after deploying the API. It adds `trip_days.notes` and `set_trip_day_notes`, and adds a day's notes to `change_trip_dates`' removed-day check (editing the function in place, as `20261021201500` does). An older API never reads the column, and no notes exist until the newer API saves some; until it's applied, a newer API shows no notes and saving them returns 503. Check afterwards that `SELECT count(*) FROM pg_proc WHERE proname = 'change_trip_dates' AND prosrc LIKE '%''notes'', d.notes%'` is 1.
 
 ## No content cards
 
