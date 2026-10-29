@@ -224,7 +224,7 @@ export function dayChecksFor(days: TripDayChecks[], full: Pick<TripFull, "trip" 
 }
 
 /** The destination's date now, or the UTC date when its zone isn't known. */
-function destinationToday(full: Plans, day: TripDay, now: number): string {
+export function destinationToday(full: Plans, day: TripDay, now: number): string {
   const zone = dayTimeZone(full, day);
   return zone ? formatZonedTime(now, zone).slice(0, 10) : new Date(now).toISOString().slice(0, 10);
 }

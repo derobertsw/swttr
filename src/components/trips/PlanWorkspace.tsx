@@ -7,9 +7,8 @@ import { ChevronRight, List } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spine, StopDot } from "@/components/trips/trip-primitives";
 import { useTrip } from "@/hooks/useTrip";
-import { useUserId } from "@/hooks/useUserId";
-import { tripActivityLabel, tripActivityNeedsClothing } from "@/lib/trip-activities";
-import { tripLocation } from "@/lib/trip-sections";
+import { tripActivityLabel } from "@/lib/trip-activities";
+import { tripLocation, tripOpenHref } from "@/lib/trip-sections";
 import { cn } from "@/lib/utils";
 import type { TripDay, TripFull } from "@/types/trips";
 
@@ -23,6 +22,9 @@ import type { TripDay, TripFull } from "@/types/trips";
 export function PlanWorkspace({ tripId, children }: { tripId: string; children: ReactNode }) {
   const pathname = usePathname();
   const date = tripLocation(pathname, tripId)?.date ?? null;
+  // Opening the trip (#334) is on its way to a day, so narrow screens don't
+  // flash the days list first.
+  const opening = pathname === tripOpenHref(tripId);
   const { data, loading } = useTrip(tripId);
   return (
     <div className="@container w-full min-w-0">
@@ -36,7 +38,7 @@ export function PlanWorkspace({ tripId, children }: { tripId: string; children: 
           // when the trip has more days than fit.
           className={cn(
             "@4xl:sticky @4xl:top-[calc(env(safe-area-inset-top)+3.5rem)] @4xl:max-h-[calc(100dvh-env(safe-area-inset-top)-4.5rem)] @4xl:self-start @4xl:overflow-y-auto @4xl:pr-6",
-            date && "hidden @4xl:flex"
+            (date || opening) && "hidden @4xl:flex"
           )}
         />
         <div className="min-w-0 @4xl:border-l @4xl:border-border @4xl:pl-8">
@@ -71,11 +73,14 @@ function revealWithin(box: HTMLElement, item: HTMLElement, axis: "x" | "y") {
 }
 
 /**
- * What to do next: the first day without an activity, or without your kit on
- * a day you take part in that has clothing to plan (not Travel or Rest, #334).
+ * What to do next, as the server works it out for you (#334): the first day
+ * from today without an activity, or without your kit on a day you take part
+ * in that has clothing to plan (not Travel or Rest).
  */
-function nextStep(data: TripFull, userId: string | null) {
-  if (data.stops.length === 0) {
+function nextStep(data: TripFull) {
+  const step = data.focus?.next_step;
+  if (!step) return null;
+  if (step.kind === "add_destination") {
     return {
       text: "Add a destination to start your daily plan.",
       label: "Add first destination",
@@ -83,18 +88,11 @@ function nextStep(data: TripFull, userId: string | null) {
       date: null,
     };
   }
-  const member = data.members.find((m) => m.user_id === userId && m.status !== "left");
-  const person = data.lodging?.people.find((entry) => entry.member_id === member?.id);
-  const takesPart = (date: string) => (person?.days.find((entry) => entry.date === date)?.participation ?? "participating") === "participating";
-  const day = data.days.find((candidate) => !candidate.activity
-    || (tripActivityNeedsClothing(candidate.activity) && takesPart(candidate.date)
-      && !data.kits.some((kit) => kit.trip_day_id === candidate.id && kit.trip_member_id === member?.id)));
-  if (!day) return null;
   return {
-    text: !day.activity ? "Choose an activity for your next unplanned day." : "Plan your kit for your next unplanned day.",
+    text: step.kind === "choose_activity" ? "Choose an activity for your next unplanned day." : "Plan your kit for your next unplanned day.",
     label: "Plan this day",
-    href: `/trips/${data.trip.id}/days/${day.date}`,
-    date: day.date,
+    href: `/trips/${data.trip.id}/days/${step.date}`,
+    date: step.date,
   };
 }
 
@@ -106,7 +104,6 @@ function TripItinerary({ tripId, data, loading, selected, className }: {
   selected: string | null;
   className?: string;
 }) {
-  const userId = useUserId();
   const box = useRef<HTMLElement>(null);
   useEffect(() => {
     const current = box.current?.querySelector<HTMLElement>('[aria-current="page"]');
@@ -123,7 +120,7 @@ function TripItinerary({ tripId, data, loading, selected, className }: {
     ) : null;
   }
 
-  const step = nextStep(data, userId);
+  const step = nextStep(data);
   const stopById = new Map(data.stops.map((stop, index) => [stop.id, { stop, index }]));
   const base = data.stops[0];
   const stopOf = (day: TripDay) => day.stop_id ?? base?.id ?? null;

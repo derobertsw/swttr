@@ -15,6 +15,7 @@ import {
   formatCrewCounts,
   daysBetween,
 } from "@/components/trips/trip-primitives";
+import { tripOpenHref } from "@/lib/trip-sections";
 import type { TripSummary } from "@/types/trips";
 
 const STATUS_LABEL: Record<TripSummary["status"], string> = {
@@ -131,7 +132,7 @@ function TripRow({ trip, next = false }: { trip: TripSummary; next?: boolean }) 
   const total = daysBetween(trip.start_date, trip.end_date);
   return (
     <Card asChild interactive>
-      <Link href={`/trips/${trip.id}`}>
+      <Link href={tripOpenHref(trip.id)}>
         <div className="flex items-center gap-3">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-control bg-muted">
             <MapPin className="size-5 text-muted-foreground" />

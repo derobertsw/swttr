@@ -23,7 +23,7 @@ describe("Trips list status", () => {
     vi.stubGlobal("fetch", api);
     render(<TripsHomePage />);
     await screen.findByText(trip.name);
-    expect(within(section("Past")).getByRole("link", { name: /Whistler/ })).toHaveAttribute("href", `/trips/${trip.id}`);
+    expect(within(section("Past")).getByRole("link", { name: /Whistler/ })).toHaveAttribute("href", `/trips/${trip.id}/days`);
     expect(within(section("Past")).getByText("Past", { selector: "span" })).toBeInTheDocument();
     expect(within(section("Upcoming")).queryByText(trip.name)).not.toBeInTheDocument();
     expect(within(section("Upcoming")).getByText("Planning")).toBeInTheDocument();

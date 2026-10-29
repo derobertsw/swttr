@@ -193,9 +193,10 @@ describe("Trip loading", () => {
   });
 
   it("keeps a name the organizer gave their row, and a guest's name, for everyone", () => {
-    const full = { trip: TRIP, members: [{ ...ORGANIZER, display_name: "Will" }, { ...SAM, role: "guest", status: "guest", user_id: null, display_name: "You" }] } as TripFull;
+    const full = { trip: TRIP, stops: [], days: [], kits: [], gear: [],
+      members: [{ ...ORGANIZER, display_name: "Will" }, { ...SAM, role: "guest", status: "guest", user_id: null, display_name: "You" }] } as TripFull;
     expect(tripFullFor(full, "user-2").members.map((m) => m.display_name)).toEqual(["Will", "You"]);
-    expect(tripFullFor(full, TRIP.owner_user_id)).toBe(full);
+    expect(tripFullFor(full, TRIP.owner_user_id).members).toBe(full.members);
   });
 
   it("marks the day checks each viewer may record and lists what they can act on (#212)", () => {
