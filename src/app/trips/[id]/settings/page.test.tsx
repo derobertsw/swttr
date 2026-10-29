@@ -148,7 +148,10 @@ describe("Trip settings", () => {
     setDates("2026-10-10", "2026-10-11");
     await user.click(screen.getByRole("button", { name: "Review date change" }));
     const dialog = await screen.findByRole("dialog", { name: "Review date change" });
-    expect(await within(dialog).findByText(/^Notes: Rentals at Base Lodge/)).toHaveTextContent("Notes: Rentals at Base Lodge. Parking lot B.");
+    const notes = await within(dialog).findByText(/^Notes: Rentals at Base Lodge/);
+    expect(notes).toHaveTextContent("Notes: Rentals at Base Lodge. Parking lot B.");
+    // The review is the last place to read them before they're deleted, so none of them is clamped.
+    expect(notes.className).not.toMatch(/line-clamp/);
     await user.click(within(dialog).getByRole("button", { name: "Remove 1 day and change dates" }));
     await waitFor(() => expect(mockPush).toHaveBeenCalled());
     expect(sentBodies(api, "PATCH /api/v1/trips/trip-1")[1]).toMatchObject({
