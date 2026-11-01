@@ -149,8 +149,10 @@ describe("Trip settings", () => {
     await user.click(screen.getByRole("button", { name: "Review date change" }));
     const dialog = await screen.findByRole("dialog", { name: "Review date change" });
     const notes = await within(dialog).findByText(/^Notes: Rentals at Base Lodge/);
-    expect(notes).toHaveTextContent("Notes: Rentals at Base Lodge. Parking lot B.");
-    // The review is the last place to read them before they're deleted, so none of them is clamped.
+    expect(notes).toHaveTextContent("Notes: Rentals at Base Lodge.\nParking lot B.", { normalizeWhitespace: false });
+    // The review is the last place to read them before they're deleted, so none of them is clamped,
+    // and their line breaks show.
+    expect(notes).toHaveClass("whitespace-pre-wrap");
     expect(notes.className).not.toMatch(/line-clamp/);
     await user.click(within(dialog).getByRole("button", { name: "Remove 1 day and change dates" }));
     await waitFor(() => expect(mockPush).toHaveBeenCalled());
