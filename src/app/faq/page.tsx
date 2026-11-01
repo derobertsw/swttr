@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
 import type { TemperatureUnit } from "@/types/preferences";
@@ -146,6 +147,27 @@ export default function FAQ() {
 
         <FaqSection id="faq-using" title="Using SWTTR" faqs={USING_SWTTR} />
         <FaqSection id="faq-how-it-works" title="How the advice is worked out" faqs={getHowItWorks(temperatureUnit)} />
+
+        <section id="contact" aria-labelledby="contact-heading" className="scroll-mt-6 space-y-3 border-t border-border pt-6">
+          <h2 id="contact-heading" className="text-lg font-semibold text-foreground">
+            Contact
+          </h2>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Need help, found a bug, or have a question about your data? Use our{" "}
+            <a href="/feedback" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-4">
+              feedback form (opens in a new tab)
+            </a>
+            . It opens in Google Forms. Include an email address if you would like a reply,
+            and never include passwords or sign-in codes.
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Read our{" "}
+            <Link href="/privacy" className="text-primary underline underline-offset-4">
+              Privacy Policy
+            </Link>{" "}
+            for how SWTTR uses and stores your information, including how to request deletion.
+          </p>
+        </section>
       </div>
     </PageLayout>
   );

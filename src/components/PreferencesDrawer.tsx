@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Drawer,
   DrawerBody,
@@ -351,6 +352,18 @@ export function PreferencesDrawer({
                 Used only for personalized thermal modeling.
               </p>
             </section>
+            <nav aria-label="Privacy and support" className="flex flex-wrap gap-x-5 gap-y-3 border-t border-border pt-5 text-sm">
+              <DrawerClose asChild>
+                <Link href="/privacy" className="text-primary underline underline-offset-4">
+                  Privacy Policy
+                </Link>
+              </DrawerClose>
+              <DrawerClose asChild>
+                <Link href="/faq#contact" className="text-primary underline underline-offset-4">
+                  Contact support
+                </Link>
+              </DrawerClose>
+            </nav>
           </DrawerBody>
         </div>
       </DrawerContent>

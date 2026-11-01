@@ -1,12 +1,13 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { detectNativeShell } from "@/lib/native-shell";
 import { safeReturnPath, signInHref } from "@/lib/outingReturn";
 
+const PUBLIC_INFORMATION_ROUTES = ["/privacy", "/faq", "/feedback"];
+
 const isPublicRoute = createRouteMatcher([
   "/",
-  "/faq",
-  "/feedback",
+  ...PUBLIC_INFORMATION_ROUTES,
   // Design reference; 404s outside dev and Vercel previews (see src/app/design/page.tsx).
   "/design",
   "/sign-in(.*)",
@@ -37,7 +38,7 @@ const isGatedRecommendationRoute = createRouteMatcher([
   "/api/v1/ensembles(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, request) => {
+const authenticate = clerkMiddleware(async (auth, request) => {
   if (isGatedRecommendationRoute(request)) {
     const { userId } = await auth();
     if (!userId) {
@@ -64,6 +65,16 @@ export default clerkMiddleware(async (auth, request) => {
     }
   }
 });
+
+export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  // Clerk can redirect even public HTML requests through its development
+  // handshake. App Review and fresh browsers must reach these pages directly.
+  // They use client-side account UI and do not need server authentication.
+  if (PUBLIC_INFORMATION_ROUTES.includes(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+  return authenticate(request, event);
+}
 
 export const config = {
   matcher: [

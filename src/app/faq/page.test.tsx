@@ -46,6 +46,7 @@ describe("FAQ support claims", () => {
     expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([
       "Using SWTTR",
       "How the advice is worked out",
+      "Contact",
     ]);
   });
 

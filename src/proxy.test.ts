@@ -5,24 +5,28 @@ import { NextRequest, type NextFetchEvent } from "next/server";
 // A signed-out visitor. protect() is Clerk's sign-in gate, which answers with a
 // redirect to sign-in (development) or a 404 page (production).
 const auth = vi.hoisted(() => Object.assign(async () => ({ userId: null }), { protect: vi.fn() }));
+const authenticateRequest = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@clerk/nextjs/server")>()),
   clerkMiddleware:
-    (handler: (clerkAuth: typeof auth, request: NextRequest) => unknown) => (request: NextRequest) =>
-      handler(auth, request),
+    (handler: (clerkAuth: typeof auth, request: NextRequest) => unknown) => (request: NextRequest) => {
+      authenticateRequest(request);
+      return handler(auth, request);
+    },
 }));
 
 import proxy from "./proxy";
 
 async function visit(path: string, method = "GET", userAgent = "Mozilla/5.0") {
-  const request = new NextRequest(`http://localhost:3000${path}`, { method, headers: { "user-agent": userAgent } });
+  const request = new NextRequest(`http://localhost:3000${path}`, { method, headers: { "user-agent": userAgent, accept: "text/html" } });
   return (await proxy(request, {} as NextFetchEvent)) as Response | undefined;
 }
 
 describe("proxy, signed out", () => {
   beforeEach(() => {
     auth.protect.mockClear();
+    authenticateRequest.mockClear();
   });
 
   it("lets visitors build a multi-day plan and its packing list", async () => {
@@ -35,6 +39,24 @@ describe("proxy, signed out", () => {
     await visit("/api/wardrobe/items");
     await visit("/trips");
     expect(auth.protect).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["Mozilla/5.0", "SWTTRNativeMac/1", "SWTTRNativeTabs"])("keeps privacy and support public in %s", async (userAgent) => {
+    for (const path of ["/privacy", "/privacy?source=settings", "/faq", "/feedback"]) {
+      const response = await visit(path, "GET", userAgent);
+      expect(response?.status).toBe(200);
+      expect(response?.headers.get("location")).toBeNull();
+    }
+    expect(auth.protect).not.toHaveBeenCalled();
+    expect(authenticateRequest).not.toHaveBeenCalled();
+  });
+
+  it("does not skip authentication for paths that only start with an information route", async () => {
+    for (const path of ["/privacy-settings", "/faq/private", "/feedback/admin"]) {
+      await visit(path);
+    }
+    expect(authenticateRequest).toHaveBeenCalledTimes(3);
+    expect(auth.protect).toHaveBeenCalledTimes(3);
   });
 
   it.each(["SWTTRNativeMac/1", "SWTTRNativeTabs"])("keeps protected page auth on the app origin in %s", async (marker) => {

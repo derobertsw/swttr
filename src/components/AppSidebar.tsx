@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Settings, HelpCircle, MessageSquare } from "lucide-react";
+import { Settings, HelpCircle, MessageSquare, Shield } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 const FOOTER_ITEMS = [
   { href: "/faq", label: "FAQ", icon: HelpCircle },
+  { href: "/privacy", label: "Privacy Policy", icon: Shield },
   {
     href: "/feedback",
     label: "Feedback",
