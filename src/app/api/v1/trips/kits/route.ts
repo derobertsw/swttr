@@ -41,16 +41,22 @@ export async function POST(request: NextRequest) {
       || !isTripDayOuting(source.outing, input.tripDay.planned)) {
       return jsonError("These layers aren't for that trip day. Plan them from the day again.", 422);
     }
-    const trip = await assertCanAccessTrip(supabase, input.tripId, userId);
-    if (!trip) return jsonError("Trip not found. It may have been deleted, or you're no longer on it.", 404);
-    let full;
-    try { full = await loadTripFull(supabase, trip); }
-    catch { return jsonError("Couldn't save to the trip. Retry with the same save.", 500); }
-    const current = full && tripDayPlannedFor(full, userId, date);
-    const changes = tripDayChanges(input.tripDay.planned, current?.planned ?? null, current?.stopName ?? null);
-    // Nothing is saved; sent without `trip_day`, the same save attaches these layers anyway.
-    if (changes.length > 0) {
-      return NextResponse.json({ error: "This day changed while you were planning.", code: "day_changed", changes }, { status: 409 });
+    // A retry of a save that already went through gets its first answer from
+    // save_trip_kits, which checks it's the same save, however the day changed since.
+    const { data: receipt } = await supabase.from("trip_kit_saves").select("save_id")
+      .eq("save_id", input.saveId).eq("user_id", userId).maybeSingle();
+    if (!receipt) {
+      const trip = await assertCanAccessTrip(supabase, input.tripId, userId);
+      if (!trip) return jsonError("Trip not found. It may have been deleted, or you're no longer on it.", 404);
+      let full;
+      try { full = await loadTripFull(supabase, trip); }
+      catch { return jsonError("Couldn't save to the trip. Retry with the same save.", 500); }
+      const current = full && tripDayPlannedFor(full, userId, date);
+      const changes = tripDayChanges(input.tripDay.planned, current?.planned ?? null, current?.stopName ?? null);
+      // Nothing is saved; sent without `trip_day`, the same save attaches these layers anyway.
+      if (changes.length > 0) {
+        return NextResponse.json({ error: "This day changed while you were planning.", code: "day_changed", changes }, { status: 409 });
+      }
     }
   }
 

@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/api";
 import { assertCanAccessTrip, loadTripFull } from "@/lib/trips";
 import { planDay, savedOutfit, savedPlan, WEAR } from "@/test/savedKit";
 import { ORGANIZER, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
+import { createFakeSupabase } from "@/test/fakeSupabase";
 import type { TripDay, TripMemberDayKit } from "@/types/trips";
 import { POST } from "./route";
 
@@ -185,8 +186,11 @@ describe("Save an outing's kit to a trip", () => {
     const STOP = { ...STOWE_STOP, id: STOP_ID, trip_id: TRIP_ID };
     const planned = { day_id: DAY_ID, activity: "Alpine", stop: { id: STOP_ID, latitude: 44.47, longitude: -72.69 }, participation: "participating" };
     const fromDay = (overrides: object = {}) => request({ trip_day: { date: "2026-10-10", planned }, ...overrides });
+    let receipts: Record<string, unknown>[];
 
     beforeEach(() => {
+      receipts = [];
+      vi.mocked(requireUser).mockResolvedValue({ userId: "user-1", supabase: { ...createFakeSupabase({ trip_kit_saves: receipts }), rpc } as unknown as SupabaseClient });
       vi.mocked(assertCanAccessTrip).mockResolvedValue({ ...TRIP, id: TRIP_ID });
       vi.mocked(loadTripFull).mockResolvedValue(tripFull({ trip: { ...TRIP, id: TRIP_ID }, stops: [STOP], days: [DAY], members: [ORGANIZER] }));
     });
@@ -209,6 +213,24 @@ describe("Save an outing's kit to a trip", () => {
       // Sent without the day, the same save goes ahead: Save anyway.
       expect((await save(request())).status).toBe(200);
       expect(rpc).toHaveBeenCalledOnce();
+    });
+
+    it("replays a save that already went through, however the day changed since", async () => {
+      // The first answer was lost; the organizer changed the day before the retry.
+      receipts.push({ save_id: SAVE_ID, trip_id: TRIP_ID, user_id: "user-1", input_hash: "h", result: {} });
+      vi.mocked(loadTripFull).mockResolvedValue(tripFull({
+        trip: { ...TRIP, id: TRIP_ID }, stops: [STOP], days: [{ ...DAY, activity: "Hike" }], members: [ORGANIZER],
+      }));
+      rpc.mockResolvedValue({ data: { status: "saved", trip: TRIP, created: false, replayed: true, kits: [{ ...KIT, date: "2026-10-10" }] }, error: null });
+      const response = await save(fromDay());
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ status: "saved", replayed: true });
+      expect(loadTripFull).not.toHaveBeenCalled();
+      // Another account's receipt for the same identity is left to the save function to refuse.
+      receipts[0].user_id = "user-2";
+      vi.mocked(rpc).mockClear();
+      expect((await save(fromDay())).status).toBe(409);
+      expect(rpc).not.toHaveBeenCalled();
     });
 
     it.each([
