@@ -61,12 +61,20 @@ type DayOutingState =
   | { trip: TripFull; attempt: number; outing: TripDayOuting; error?: undefined }
   | { trip: TripFull; attempt: number; outing?: undefined; error: string };
 
+/** The day's outing as it's loading, or loaded, or why it couldn't be, with a way to ask again. */
+export interface TripDayOutingState {
+  outing: TripDayOuting | null;
+  error: string | null;
+  loading: boolean;
+  retry: () => void;
+}
+
 /**
  * The signed-in person's outing for the trip day from the server (#335):
  * what Plan my layers asks Gear up for, or why layers can't be planned. It's
  * asked for again whenever the trip is, so it follows the day's changes.
  */
-export function useTripDayOuting(tripId: string, date: string, trip: TripFull | null, enabled: boolean) {
+export function useTripDayOuting(tripId: string, date: string, trip: TripFull | null, enabled: boolean): TripDayOutingState {
   const [state, setState] = useState<DayOutingState | null>(null);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {

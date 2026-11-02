@@ -27,9 +27,8 @@ import { outfitMismatches, type KitDay } from "@/lib/trip-kit-fit";
 import { kitAdvice, outingToUpdate } from "@/lib/trip-saved-kits";
 import { forgetKitSaveFor } from "@/lib/tripKitSave";
 import { cn } from "@/lib/utils";
-import { usePlanTripDay } from "@/components/trips/TripDayGearUp";
+import { usePlanTripDay, type TripDayOutingState } from "@/components/trips/TripDayGearUp";
 import type { SavedKit, SavedKitPhase, SavedOutfit, SavedPlanDay } from "@/types/savedKit";
-import type { TripDayOuting } from "@/types/trip-day-outing";
 
 const PHASE_LABELS: Record<SavedKitPhase["id"], string> = { outing: "Outing", climb: "Climb", descent: "Descent" };
 const noop = () => {};
@@ -51,7 +50,7 @@ interface SavedKitViewProps {
    * The day's outing as it is now, from the server (#335): what Update in
    * Gear up plans a one-day outfit for. Without it, it isn't offered.
    */
-  dayOuting?: TripDayOuting | null;
+  dayOuting?: TripDayOutingState | null;
 }
 
 /**
@@ -203,7 +202,7 @@ function SavedNote({ kit, savedAt, day, tripId, dayOuting }: Omit<SavedKitViewPr
       {mismatches.map((mismatch) => <p key={mismatch} className="text-foreground">{mismatch}</p>)}
       {kit.kind === "plan_day"
         ? <UpdateInGearUp kit={kit} tripId={tripId} date={day.date} />
-        : dayOuting && <UpdateDayInGearUp day={dayOuting} />}
+        : dayOuting && <UpdateDayInGearUp dayOuting={dayOuting} />}
     </div>
   );
 }
@@ -211,12 +210,23 @@ function SavedNote({ kit, savedAt, day, tripId, dayOuting }: Omit<SavedKitViewPr
 /**
  * Asks Gear up for layers for a one-day outfit's day as it is now (#335):
  * its stop, activity and date, with the kit's effort. They save back to this
- * day, showing what changes before the kit is replaced. Not offered when
- * layers can't be planned for the day, as once it has passed.
+ * day, showing what changes before the kit is replaced. When layers can't be
+ * planned for the day, as once it has passed, it says why instead, and when
+ * that couldn't be checked, offers Try again.
  */
-function UpdateDayInGearUp({ day }: { day: TripDayOuting }) {
+function UpdateDayInGearUp({ dayOuting }: { dayOuting: TripDayOutingState }) {
   const plan = usePlanTripDay();
-  if (day.status !== "ready") return null;
+  const { outing: day, error, retry } = dayOuting;
+  if (error) {
+    return (
+      <div className="mt-2 flex flex-col items-start gap-2">
+        <p className="text-muted-foreground">Couldn&apos;t check whether Gear up can update it: {error}</p>
+        <Button type="button" variant="outline" size="sm" onClick={retry}>Try again</Button>
+      </div>
+    );
+  }
+  if (!day) return null;
+  if (day.status !== "ready") return <p className="text-muted-foreground">{day.message}</p>;
   return (
     <div className="mt-2 flex flex-col items-start gap-2">
       <p className="text-muted-foreground">

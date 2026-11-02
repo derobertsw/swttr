@@ -493,6 +493,21 @@ describe("Save layers planned from a trip day (#335)", () => {
     expect(within(dialog).queryByRole("button", { name: "Plan again" })).not.toBeInTheDocument();
   });
 
+  it("keeps Plan again when the day couldn't be loaded, since asking again may work", async () => {
+    setup({ "POST /api/v1/trips/kits": reply(409, DAY_CHANGED) });
+    const onPlanDayAgain = vi.fn()
+      .mockRejectedValueOnce(new Error("Network error"))
+      .mockResolvedValueOnce(null);
+    const { user, dialog } = await openForDay({ onPlanDayAgain });
+    await user.click(await within(dialog).findByRole("button", { name: "Save kit" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Plan again" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Couldn't load the day: Network error");
+    expect(within(dialog).queryByRole("link", { name: "Back to trip day" })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Plan again" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(onPlanDayAgain).toHaveBeenCalledTimes(2);
+  });
+
   it("closes once Gear up is planning the day again", async () => {
     setup({ "POST /api/v1/trips/kits": reply(409, DAY_CHANGED) });
     const onPlanDayAgain = vi.fn().mockResolvedValue(null);

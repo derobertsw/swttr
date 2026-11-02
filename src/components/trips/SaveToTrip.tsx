@@ -176,7 +176,8 @@ type Step =
   | { kind: "saving"; request: SaveKitRequest }
   | { kind: "conflict"; trip: Trip; conflicts: SaveKitConflict[]; request: SaveKitRequest }
   /** The trip day changed since the layers were planned for it (#335); nothing was saved. */
-  | { kind: "day_changed"; changes: string[]; request: SaveKitRequest; replanning?: boolean; replanError?: string }
+  /** `retryable` when planning again failed to reach the server, rather than the server saying the day can't be planned. */
+  | { kind: "day_changed"; changes: string[]; request: SaveKitRequest; replanning?: boolean; replanError?: string; retryable?: boolean }
   | { kind: "saved"; outcome: KitSaveOutcome }
   /** With a request, Retry repeats it; without, the person chooses again. */
   | { kind: "failed"; message: string; request: SaveKitRequest | null };
@@ -382,7 +383,7 @@ function SaveToTripSheet({ open, source, defaultTripId, tripDay, onPlanDayAgain,
     );
     footer = (
       <>
-        {onPlanDayAgain && !current.replanError && (
+        {onPlanDayAgain && (!current.replanError || current.retryable) && (
           <Button
             type="button"
             loading={current.replanning}
@@ -390,10 +391,15 @@ function SaveToTripSheet({ open, source, defaultTripId, tripDay, onPlanDayAgain,
             onClick={async () => {
               setStep({ ...current, replanning: true });
               let failed: string | null;
+              let retryable = false;
               try { failed = await onPlanDayAgain(); }
-              catch (err) { failed = `Couldn't load the day: ${errorMessage(err)}`; }
+              catch (err) {
+                // Asking again may work, unlike a day the server says can't be planned.
+                failed = `Couldn't load the day: ${errorMessage(err)}`;
+                retryable = true;
+              }
               if (failed) {
-                setStep({ ...current, replanning: false, replanError: failed });
+                setStep({ ...current, replanning: false, replanError: failed, retryable });
               } else {
                 forgetKitSave();
                 onClose();
@@ -403,7 +409,7 @@ function SaveToTripSheet({ open, source, defaultTripId, tripDay, onPlanDayAgain,
             Plan again
           </Button>
         )}
-        {current.replanError && tripDay && <Button asChild><Link href={tripDayHref(tripDay.context)}>Back to trip day</Link></Button>}
+        {current.replanError && !current.retryable && tripDay && <Button asChild><Link href={tripDayHref(tripDay.context)}>Back to trip day</Link></Button>}
         <Button
           type="button"
           variant="outline"

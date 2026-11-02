@@ -627,7 +627,25 @@ describe("Trip day page", () => {
       vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit() })]));
       await renderPage();
       const myKit = await screen.findByRole("region", { name: "My kit" });
+      expect(await within(myKit).findByText("This day is over, so there's no forecast to plan layers from.")).toBeInTheDocument();
       expect(within(myKit).queryByRole("button", { name: "Update in Gear up" })).not.toBeInTheDocument();
+    });
+
+    it("says when it can't tell whether Gear up can update my outfit, and lets me try again (#335)", async () => {
+      const full = tripFull({ stops: [STOWE_STOP], days: [{ ...DAY, activity: "Alpine" }], members: [ORGANIZER], kits: [kit(ORGANIZER, { outfit: savedOutfit() })] });
+      let attempts = 0;
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, full),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        "GET /api/v1/trips/trip-1/days/2026-10-10/outing": () => ++attempts === 1
+          ? reply(500, { error: "Couldn't load the trip. Try again." })
+          : reply(200, tripDayOutingFor(full, "user-1", DAY.date, "America/New_York", Date.now())),
+      }));
+      await renderPage();
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      expect(await within(myKit).findByText("Couldn't check whether Gear up can update it: Couldn't load the trip. Try again.")).toBeInTheDocument();
+      await userEvent.click(within(myKit).getByRole("button", { name: "Try again" }));
+      expect(await within(myKit).findByRole("button", { name: "Update in Gear up" })).toBeInTheDocument();
     });
 
     it("shows a saved plan day as the plan showed it, and updates the whole plan", async () => {
