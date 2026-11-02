@@ -30,6 +30,7 @@ import { canEditMemberKit } from "@/lib/trip-permissions";
 import { kitAdvice, kitWear } from "@/lib/trip-saved-kits";
 import { DayStart, DayTonight } from "@/components/trips/TripStays";
 import { DayMeetControls } from "@/components/trips/DayMeet";
+import { DayNotesControls } from "@/components/trips/DayNotes";
 import { DayAccessPoint } from "@/components/trips/DayAccessPoint";
 import { DayDrive, useDriveEstimates } from "@/components/trips/DriveEstimate";
 import { DayTourPlan } from "@/components/trips/TourPlan";
@@ -225,8 +226,11 @@ export default function DayDetailPage({
             )}
           </header>
 
-          <DayStart data={data} date={date} meet={meet} meetingPoint={meetingPoint} memberId={me?.id}>
-            {isOrganizer && <DayMeetControls tripId={id} day={day} dateLabel={dateLabel} onSaved={refresh} />}
+          <DayStart data={data} date={date} meet={meet} meetingPoint={meetingPoint} notes={day.notes} memberId={me?.id}>
+            {isOrganizer && <>
+              <DayMeetControls tripId={id} day={day} dateLabel={dateLabel} onSaved={refresh} />
+              <DayNotesControls tripId={id} day={day} dateLabel={dateLabel} onSaved={refresh} />
+            </>}
           </DayStart>
 
           <DayAccessPoint data={data} day={day} dateLabel={dateLabel} canEdit={data.trip.owner_user_id === userId} onSaved={() => void refresh()}>
