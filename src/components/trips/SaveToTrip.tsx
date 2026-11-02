@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { CalendarPlus, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +21,7 @@ import { RESUME_SAVE_PATH, signInHref } from "@/lib/outingReturn";
 import { errorMessage, TripRequestError, tripRequest } from "@/lib/trip-requests";
 import { kitAdvice } from "@/lib/trip-saved-kits";
 import { forgetKitSave, keepKitSave, readKitSave, type KitSaveOutcome } from "@/lib/tripKitSave";
+import { tripDayHref, tripDayLabel } from "@/lib/trip-day-gear-up";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { formatLocationName } from "@/hooks/useLocationSearch";
 import { formatForecastTime } from "@/components/layers/ResultHeader";
@@ -37,6 +40,7 @@ import type {
   SaveKitRequest,
   SaveKitResponse,
 } from "@/types/savedKit";
+import type { GearUpTripDay } from "@/types/trip-day-outing";
 import type { Trip } from "@/types/trips";
 
 const NEW_TRIP = "new";
@@ -94,6 +98,19 @@ interface SaveToTripProps {
   defaultOpen?: boolean;
   /** The trip to pick, when it includes the dates: the one whose kit is being updated. */
   defaultTripId?: string | null;
+  /**
+   * The trip day these layers were planned for (#335), while they're still
+   * for its outing: they save to that day unless the person picks another
+   * trip, and Gear up goes back to the day once they're saved.
+   */
+  tripDay?: GearUpTripDay | null;
+  /**
+   * Asks for layers for the trip day as it is now, after it changed while
+   * these were planned; resolves with why it couldn't, or null once it has.
+   */
+  onPlanDayAgain?: () => Promise<string | null>;
+  /** Called once saved to the trip day, before going back to it. */
+  onSavedToDay?: () => void;
 }
 
 /**
@@ -103,7 +120,9 @@ interface SaveToTripProps {
  * each day it has layers for. Guests sign in first and come back to the
  * outing. See docs/trip-saved-kits.md.
  */
-export function SaveToTrip({ outfit = null, plan = null, defaultOpen = false, defaultTripId = null }: SaveToTripProps) {
+export function SaveToTrip({
+  outfit = null, plan = null, defaultOpen = false, defaultTripId = null, tripDay = null, onPlanDayAgain, onSavedToDay,
+}: SaveToTripProps) {
   const source = plan ?? outfit;
   const [open, setOpen] = useState(defaultOpen && source !== null);
   // Each opening starts from the outfit shown then.
@@ -134,6 +153,9 @@ export function SaveToTrip({ outfit = null, plan = null, defaultOpen = false, de
         open={open}
         source={source}
         defaultTripId={defaultTripId}
+        tripDay={plan ? null : tripDay}
+        onPlanDayAgain={onPlanDayAgain}
+        onSavedToDay={onSavedToDay}
         onClose={() => setOpen(false)}
         onCloseAutoFocus={(event) => {
           if (opening === 0) {
@@ -153,20 +175,31 @@ type Step =
   | { kind: "choose" }
   | { kind: "saving"; request: SaveKitRequest }
   | { kind: "conflict"; trip: Trip; conflicts: SaveKitConflict[]; request: SaveKitRequest }
+  /** The trip day changed since the layers were planned for it (#335); nothing was saved. */
+  | { kind: "day_changed"; changes: string[]; request: SaveKitRequest; replanning?: boolean; replanError?: string }
   | { kind: "saved"; outcome: KitSaveOutcome }
   /** With a request, Retry repeats it; without, the person chooses again. */
   | { kind: "failed"; message: string; request: SaveKitRequest | null };
 
 type OptionsState = { status: "loading" } | { status: "ready"; options: SaveKitOptions } | { status: "failed"; message: string };
 
-function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocus }: {
+function SaveToTripSheet({ open, source, defaultTripId, tripDay, onPlanDayAgain, onSavedToDay, onClose, onCloseAutoFocus }: {
   open: boolean;
   source: SaveSource;
   defaultTripId: string | null;
+  tripDay: GearUpTripDay | null;
+  onPlanDayAgain?: () => Promise<string | null>;
+  onSavedToDay?: () => void;
   onClose: () => void;
   onCloseAutoFocus: (event: Event) => void;
 }) {
   const { isLoaded, userId } = useAuth();
+  const router = useRouter();
+  // Saves to the trip day the layers were planned for, until the person
+  // picks another trip, or the trip no longer includes the day.
+  const [pinned, setPinned] = useState(tripDay !== null);
+  const [unpinned, setUnpinned] = useState<string | null>(null);
+  const day = pinned ? tripDay : null;
   // Where it can be saved depends only on the outing, which stays the same
   // while the sheet is open. The outfit itself is read when it's saved, so a
   // comfort check that finishes meanwhile is kept with it.
@@ -198,14 +231,19 @@ function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocu
         // An existing trip is picked on purpose, or is the one whose kit is
         // being updated; with none that fit, a new one is the choice.
         const fitting = options.trips.filter((trip) => trip.day_number !== null);
-        setTarget((current) => current
+        const dayTrip = tripDay && fitting.some((trip) => trip.id === tripDay.context.trip_id) ? tripDay.context.trip_id : null;
+        if (tripDay && !dayTrip) {
+          setPinned(false);
+          setUnpinned(`${tripDay.context.trip_name} no longer includes ${formatKitDate(tripDay.context.date)}, so choose where to save these layers.`);
+        }
+        setTarget((current) => current ?? dayTrip
           ?? (fitting.some((trip) => trip.id === defaultTripId) ? defaultTripId : fitting.length > 0 ? null : NEW_TRIP));
       })
       .catch((err) => {
         if (!controller.signal.aborted) setOptionsState({ status: "failed", message: errorMessage(err) });
       });
     return () => controller.abort();
-  }, [open, signedIn, optionsFor, optionsAttempt, defaultTripId]);
+  }, [open, signedIn, optionsFor, optionsAttempt, defaultTripId, tripDay]);
 
   const send = useCallback(async (request: SaveKitRequest) => {
     if (!userId || inFlight.current) return;
@@ -224,10 +262,20 @@ function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocu
       };
       keepKitSave(userId, source.outing, { saved: outcome });
       setStep({ kind: "saved", outcome });
+      if (tripDay && outcome.tripId === tripDay.context.trip_id && outcome.date === tripDay.context.date) {
+        // Back to the day the layers were planned from, which now shows them.
+        onSavedToDay?.();
+        toast.success(`Saved to ${tripDayLabel(tripDay.context)}`);
+        router.push(tripDayHref(tripDay.context));
+      }
     } catch (err) {
       const details = err instanceof TripRequestError ? err.details : undefined;
       const status = err instanceof TripRequestError ? err.status : undefined;
-      if (status === 409 && details?.status === "conflict") {
+      if (status === 409 && details?.code === "day_changed") {
+        // Nothing was saved: the person plans again, or saves these anyway.
+        keepKitSave(userId, source.outing, {});
+        setStep({ kind: "day_changed", changes: details.changes as string[], request });
+      } else if (status === 409 && details?.status === "conflict") {
         // Nothing was saved; the same save can go ahead once a replacement is confirmed.
         keepKitSave(userId, source.outing, {});
         setStep({ kind: "conflict", trip: details.trip as Trip, conflicts: details.conflicts as SaveKitConflict[], request });
@@ -241,7 +289,7 @@ function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocu
     } finally {
       inFlight.current = false;
     }
-  }, [userId, source]);
+  }, [userId, source, tripDay, onSavedToDay, router]);
 
   const options = optionsState.status === "ready" ? optionsState.options : null;
   const severalDays = (options?.dates.length ?? 0) > 1;
@@ -258,6 +306,7 @@ function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocu
         ? { new_trip: { id: crypto.randomUUID(), name: tripName.trim() } }
         : { trip_id: target },
       ...sourceBody(source),
+      ...(day && target === day.context.trip_id && { trip_day: { date: day.context.date, planned: day.context.planned } }),
     });
   };
 
@@ -315,6 +364,55 @@ function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocu
             : <Link href={`${tripHref}/days/${outcome.date}`}>Open trip day</Link>}
         </Button>
         <Button type="button" variant="outline" onClick={chooseAgain}>Save again</Button>
+      </>
+    );
+  } else if (step.kind === "day_changed") {
+    const current = step;
+    title = "This day changed while you were planning";
+    body = (
+      <div className="flex flex-col gap-3">
+        <TripSheetDescription>
+          Nothing is saved yet. Plan again gets layers for the day as it is now. Save anyway keeps these layers, and the day notes where they don&apos;t fit.
+        </TripSheetDescription>
+        <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-foreground">
+          {current.changes.map((change) => <li key={change}>{change}</li>)}
+        </ul>
+        {current.replanError && <p role="alert" className="text-sm font-medium text-destructive">{current.replanError}</p>}
+      </div>
+    );
+    footer = (
+      <>
+        {onPlanDayAgain && !current.replanError && (
+          <Button
+            type="button"
+            loading={current.replanning}
+            disabled={current.replanning}
+            onClick={async () => {
+              setStep({ ...current, replanning: true });
+              let failed: string | null;
+              try { failed = await onPlanDayAgain(); }
+              catch (err) { failed = `Couldn't load the day: ${errorMessage(err)}`; }
+              if (failed) {
+                setStep({ ...current, replanning: false, replanError: failed });
+              } else {
+                forgetKitSave();
+                onClose();
+              }
+            }}
+          >
+            Plan again
+          </Button>
+        )}
+        {current.replanError && tripDay && <Button asChild><Link href={tripDayHref(tripDay.context)}>Back to trip day</Link></Button>}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={current.replanning}
+          // Sent without the day, the same save attaches these layers as they are.
+          onClick={() => void send({ ...current.request, trip_day: undefined })}
+        >
+          Save anyway
+        </Button>
       </>
     );
   } else if (step.kind === "conflict") {
@@ -397,7 +495,22 @@ function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocu
             </Button>
           </div>
         )}
-        {options && (
+        {options && day && (
+          <div className="flex flex-col items-start gap-1">
+            <p className="text-sm font-semibold text-foreground">Save to</p>
+            <p className="break-words text-base font-semibold text-foreground">{day.context.trip_name}</p>
+            <p className="text-sm text-foreground">{tripDayLabel(day.context)} · your kit for the day you planned from</p>
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-primary"
+              onClick={() => { setPinned(false); setTarget(null); }}
+            >
+              Save to another trip instead
+            </button>
+          </div>
+        )}
+        {unpinned && <p className="text-sm text-muted-foreground">{unpinned}</p>}
+        {options && !day && (
           <fieldset className="flex min-w-0 flex-col gap-2">
             <legend className="mb-2 text-sm font-semibold text-foreground">Save to</legend>
             {fittingTrips.map((trip) => (
@@ -446,7 +559,7 @@ function SaveToTripSheet({ open, source, defaultTripId, onClose, onCloseAutoFocu
       onCloseAutoFocus={onCloseAutoFocus}
       header={<TripSheetTitle>{title}</TripSheetTitle>}
       footer={footer}
-      described={isLoaded && (!userId || step.kind === "saved" || step.kind === "conflict")}
+      described={isLoaded && (!userId || step.kind === "saved" || step.kind === "conflict" || step.kind === "day_changed")}
     >
       {body}
     </TripSheet>

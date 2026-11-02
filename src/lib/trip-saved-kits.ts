@@ -26,7 +26,8 @@ import type {
   SavedPlan,
   SavedPlanDay,
 } from "@/types/savedKit";
-import type { TripEffort, TripMemberDayKit } from "@/types/trips";
+import type { SaveKitTripDay } from "@/types/trip-day-outing";
+import type { TripDayParticipation, TripEffort, TripMemberDayKit } from "@/types/trips";
 import type { WeatherContext, WeatherData } from "@/types/weather";
 import { BODY_PARTS, type LayerType } from "@/types/wardrobe";
 
@@ -293,6 +294,29 @@ interface ParsedSaveKit {
   /** A one-day outing's outfit, or a multi-day plan. */
   source: SavedOutfit | SavedPlan;
   replace: Record<string, string>;
+  /** The trip day Gear up planned the layers for (#335), when it planned for one. */
+  tripDay?: SaveKitTripDay;
+}
+
+const PARTICIPATION: ReadonlySet<unknown> = new Set(["participating", "skipping", "not_on_trip"]);
+
+/** A save's `trip_day`: the day as Gear up planned for it, or null when it doesn't check out. */
+function readTripDay(value: unknown): SaveKitTripDay | null {
+  if (!isObject(value) || !isIsoDate(value.date) || !isObject(value.planned)) return null;
+  const { day_id, activity, stop, participation } = value.planned;
+  if (typeof day_id !== "string" || !UUID.test(day_id) || !PARTICIPATION.has(participation)
+    || (activity !== null && (typeof activity !== "string" || activity.length > 200))) return null;
+  if (stop !== null && (!isObject(stop) || typeof stop.id !== "string" || !UUID.test(stop.id)
+    || !isNumber(stop.latitude) || !isNumber(stop.longitude))) return null;
+  return {
+    date: value.date,
+    planned: {
+      day_id,
+      activity: activity as string | null,
+      stop: stop && { id: stop.id as string, latitude: stop.latitude as number, longitude: stop.longitude as number },
+      participation: participation as TripDayParticipation,
+    },
+  };
 }
 
 /** Checks a save request; a string says what's wrong with it. */
@@ -322,7 +346,9 @@ export function parseSaveKitRequest(body: unknown): ParsedSaveKit | string {
       replace[date] = version;
     }
   }
-  return { saveId: body.save_id, tripId, ...(newTripName !== undefined && { newTripName }), source, replace };
+  const tripDay = body.trip_day === undefined ? undefined : readTripDay(body.trip_day);
+  if (tripDay === null) return "Plan these layers from the trip day again.";
+  return { saveId: body.save_id, tripId, ...(newTripName !== undefined && { newTripName }), source, replace, ...(tripDay && { tripDay }) };
 }
 
 /** The `outfit` or `plan` a request asks to save, or null when it has neither, both, or one that doesn't check out. */

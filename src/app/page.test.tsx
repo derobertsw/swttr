@@ -5,7 +5,8 @@ import userEvent from "@testing-library/user-event";
 import { LOCATION_TIMEOUT_MS } from "@/hooks/useDeviceLocation";
 import type { MultiDayLayerPlan } from "@/types/plan";
 import type { LocationSuggestion } from "@/types/recommendations";
-import { readGearUpDraft } from "@/lib/gearUpDraft";
+import { keepOutingForGearUp, readGearUpDraft } from "@/lib/gearUpDraft";
+import type { TripDayContext } from "@/types/trip-day-outing";
 import Home from "./page";
 import type { WebMCPTool } from "@/lib/webmcp/adapter";
 import type { OutingActionOutcome } from "@/types/outingAction";
@@ -20,10 +21,11 @@ vi.mock("sonner", () => ({
 
 // Mock next/navigation
 const mockSearchParams = new URLSearchParams();
+const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
   useSearchParams: () => mockSearchParams,
   usePathname: () => "/",
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push: mockPush, replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
 // Mock Clerk components — default to a signed-in user
@@ -1111,6 +1113,151 @@ describe("Home Page", () => {
 
         await waitFor(() => expect(placeField()).toHaveValue("Stowe, Vermont, United States"));
         expect(within(activity()).getByRole("radio", { name: /running/i })).toBeChecked();
+      });
+
+      describe("planning a trip day (#335)", () => {
+        const CONTEXT: TripDayContext = {
+          trip_id: "trip-1", trip_name: "Whistler", date: "2026-10-08", day_number: 2, day_count: 4, member_id: "member-you",
+          planned: { day_id: "day-2", activity: "Run", stop: { id: "stop-stowe", latitude: 44.47, longitude: -72.69 }, participation: "participating" },
+        };
+        const DAY_OUTING = {
+          activity: "running", exertion: "moderate" as const, place: { ...STOWE, id: -1, name: "Stowe, Vermont", country: "" },
+          when: { mode: "later" as const, date: "2026-10-08", time: "07:30", durationDays: 1 },
+        };
+        const TRIP_OPTION = { id: "trip-1", name: "Whistler", start_date: "2026-10-07", end_date: "2026-10-10", member_count: 2, day_number: 2 };
+        const OPTIONS = { dates: ["2026-10-08"], start_date: "2026-10-08", end_date: "2026-10-08", suggested_name: "Stowe trip", destination: "Stowe, Vermont", trips: [TRIP_OPTION] };
+
+        /** Running layers for Thursday morning at Stowe, and the trip's save routes. */
+        function mockTripDayApis(save: (body: Record<string, unknown>) => MockResponse = () => respond(200, {
+          status: "saved", trip: { id: "trip-1", name: "Whistler" }, created: false, kits: [{ date: "2026-10-08" }],
+        })) {
+          const { recommendationRequests } = mockAccountApis();
+          const accountApis = mockFetch.getMockImplementation()!;
+          const saves: Array<Record<string, unknown>> = [];
+          mockFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+            if (url.includes("/api/weather")) {
+              return respond(200, { temperature: 28, windSpeed: 12, isForecast: true, forecastTime: "2026-10-08T07:00-04:00", timeZone: "America/New_York" });
+            }
+            if (url === "/api/v1/trips/kits/options") return respond(200, OPTIONS);
+            if (url === "/api/v1/trips/kits") {
+              const body = JSON.parse(String(init?.body));
+              saves.push(body);
+              return save(body);
+            }
+            return accountApis(url, init);
+          });
+          return { saves, recommendationRequests };
+        }
+
+        beforeEach(() => {
+          // Today is Thursday, October 1, 2026, in New York.
+          vi.setSystemTime(new Date("2026-10-01T16:00:00Z"));
+          mockPush.mockClear();
+          sessionStorage.clear();
+        });
+        afterEach(() => vi.useRealTimers());
+
+        it("asks for the day's layers right away, saves them to that day and goes back to it", async () => {
+          const { saves } = mockTripDayApis();
+          const user = userEvent.setup();
+          // Plan my layers on the trip day keeps its outing, with the day, then comes here.
+          keepOutingForGearUp(SIGNED_IN.userId!, DAY_OUTING, CONTEXT);
+          comeBackTo("/?resume=outing");
+
+          expect(await screen.findByText("Forecast for Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+          const bar = screen.getByRole("region", { name: "Whistler · Day 2 of 4 · Thu, Oct 8" });
+          expect(within(bar).getByRole("link", { name: "Back to trip day" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-08#kit-member-you");
+          await user.click(screen.getByRole("button", { name: "Save to trip" }));
+          const dialog = await screen.findByRole("dialog", { name: "Save to trip" });
+          expect(await within(dialog).findByText(/Day 2 of 4 · Thu, Oct 8 · your kit for the day you planned from/)).toBeInTheDocument();
+          await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+
+          await waitFor(() => expect(mockPush).toHaveBeenCalledExactlyOnceWith("/trips/trip-1/days/2026-10-08#kit-member-you"));
+          expect(saves).toEqual([expect.objectContaining({
+            target: { trip_id: "trip-1" },
+            outfit: expect.objectContaining({ outing: DAY_OUTING }),
+            trip_day: { date: "2026-10-08", planned: CONTEXT.planned },
+          })]);
+          // Done with the day: Gear up isn't for it any more.
+          await waitFor(() => expect(readGearUpDraft(SIGNED_IN.userId)?.tripDay).toBeNull());
+        });
+
+        it("keeps the day through a reload of the results", async () => {
+          mockTripDayApis();
+          keepOutingForGearUp(SIGNED_IN.userId!, DAY_OUTING, CONTEXT);
+          const { unmount } = comeBackTo("/?resume=outing");
+          expect(await screen.findByText("Forecast for Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+          unmount();
+          // A reload on the results asks for the same outing again.
+          render(<Home />);
+          expect(await screen.findByText("Forecast for Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+          expect(screen.getByRole("region", { name: "Whistler · Day 2 of 4 · Thu, Oct 8" })).toBeInTheDocument();
+        });
+
+        it("comes back to the day's save after signing in again, and never shows the day to another account", async () => {
+          const { saves } = mockTripDayApis();
+          keepOutingForGearUp(SIGNED_IN.userId!, DAY_OUTING, CONTEXT);
+          const first = comeBackTo("/?resume=outing");
+          expect(await screen.findByText("Forecast for Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+          first.unmount();
+
+          // The session ran out, or someone else signed in, in this tab.
+          for (const next of [GUEST, OTHER_ACCOUNT]) {
+            mockUseAuth.mockReturnValue(next);
+            const { unmount } = comeBackTo("/?resume=save");
+            await act(async () => {});
+            expect(screen.queryByRole("region", { name: /Whistler/ })).not.toBeInTheDocument();
+            unmount();
+          }
+          mockUseAuth.mockReturnValue(SIGNED_IN);
+          const user = userEvent.setup();
+          comeBackTo("/?resume=save");
+
+          const dialog = await screen.findByRole("dialog", { name: "Save to trip" });
+          expect(await within(dialog).findByText(/Day 2 of 4 · Thu, Oct 8/)).toBeInTheDocument();
+          await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+          await waitFor(() => expect(mockPush).toHaveBeenCalledOnce());
+          expect(saves[0]).toMatchObject({ trip_day: { date: "2026-10-08" } });
+        });
+
+        it("says when the outing was changed away from the day, and saves only where the person picks", async () => {
+          const { saves } = mockTripDayApis();
+          const user = userEvent.setup();
+          keepOutingForGearUp(SIGNED_IN.userId!, DAY_OUTING, CONTEXT);
+          comeBackTo("/?resume=outing");
+          expect(await screen.findByText("Forecast for Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+
+          await user.click(screen.getByRole("button", { name: "Edit outing" }));
+          await user.click(screen.getByRole("button", { name: "Start date Oct 8, 2026" }));
+          await user.click(screen.getByRole("button", { name: /October 9th/ }));
+          await user.click(screen.getByRole("button", { name: "See my layers" }));
+
+          const bar = await screen.findByRole("region", { name: "Whistler · Day 2 of 4 · Thu, Oct 8" });
+          expect(await within(bar).findByText(/You changed the outing, so these layers aren't for this day any more/)).toBeInTheDocument();
+          await user.click(screen.getByRole("button", { name: "Save to trip" }));
+          const dialog = await screen.findByRole("dialog", { name: "Save to trip" });
+          // No trip is picked for them: the options are another outing's now.
+          expect(within(dialog).queryByText(/your kit for the day you planned from/)).not.toBeInTheDocument();
+          expect(saves).toEqual([]);
+
+          // Planning for the day again is one tap.
+          await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+          await user.click(within(bar).getByRole("button", { name: "Plan for the day again" }));
+          await waitFor(() => expect(within(bar).queryByText(/You changed the outing/)).not.toBeInTheDocument());
+          expect(await screen.findByText("Forecast for Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+        });
+
+        it("plans without the trip only when asked", async () => {
+          mockTripDayApis();
+          const user = userEvent.setup();
+          keepOutingForGearUp(SIGNED_IN.userId!, DAY_OUTING, CONTEXT);
+          comeBackTo("/?resume=outing");
+          expect(await screen.findByText("Forecast for Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+          await user.click(screen.getByRole("button", { name: "Plan without the trip" }));
+          await waitFor(() => expect(screen.queryByRole("region", { name: /Whistler/ })).not.toBeInTheDocument());
+          await waitFor(() => expect(readGearUpDraft(SIGNED_IN.userId)?.tripDay).toBeNull());
+          expect(screen.getByText("Forecast for Thu, Oct 8, 7:00 AM EDT")).toBeInTheDocument();
+        });
       });
 
       it("drops layers still loading for an account that signs out", async () => {

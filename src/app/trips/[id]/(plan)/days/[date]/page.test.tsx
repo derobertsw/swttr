@@ -20,6 +20,7 @@ import { buildLodging } from "@/lib/trip-lodging";
 import { buildTourPlanSummary } from "@/lib/trip-tour-plans";
 import { buildTouringEquipment } from "@/lib/touring-equipment";
 import { dayChecksFor, summarizeDayChecks } from "@/lib/trip-day-checks";
+import { tripDayOutingFor } from "@/lib/trip-day-outing";
 import type { TripDay, TripFull, TripItineraryRequest, TripLocation, TripMember, TripMemberDayKit, TripTourPlan } from "@/types/trips";
 import { savedOutfit, savedPlan } from "@/test/savedKit";
 import DayDetailPage from "./page";
@@ -505,10 +506,16 @@ describe("Trip day page", () => {
       id: `kit-${member.id}`, trip_day_id: DAY.id, trip_member_id: member.id, effort: "steady", items: [], note: null,
       state: "ok", updated_at: "2026-10-06T20:01:02Z", outfit: null, outfit_saved_at: null, ...extra,
     });
-    const crewTrip = (kits: TripMemberDayKit[], members = [ORGANIZER, ANA, SAM]) => fakeTripApi({
-      "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP], days: [DAY], members, kits })),
-      "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
-    });
+    // A downhill day at Stowe, with the person's outing for it as the server works it out (#335).
+    const crewTrip = (kits: TripMemberDayKit[], members = [ORGANIZER, ANA, SAM], days = [{ ...DAY, activity: "Alpine" }]) => {
+      const full = tripFull({ stops: [STOWE_STOP], days, members, kits });
+      return fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, full),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        "GET /api/v1/trips/trip-1/days/2026-10-10/outing": () =>
+          reply(200, tripDayOutingFor(full, mockAuth.userId!, DAY.date, "America/New_York", Date.now())),
+      });
+    };
 
     // Before the saved outing's day at Stowe.
     beforeEach(() => {
@@ -573,24 +580,36 @@ describe("Trip day page", () => {
       expect(within(myKit).getByText("Fleece").parentElement).toHaveTextContent("Not in your wardrobe");
       expect(within(myKit).getByText(/Likely comfortable/)).toBeInTheDocument();
       expect(within(myKit).queryByRole("button", { name: /Change/ })).not.toBeInTheDocument();
-      expect(within(myKit).getByRole("button", { name: "Update in Gear up" })).toBeInTheDocument();
+      expect(await within(myKit).findByRole("button", { name: "Update in Gear up" })).toBeInTheDocument();
+      // The brief points to them rather than asking for layers again.
+      expect(screen.getByRole("link", { name: "Review saved layers" })).toHaveAttribute("href", "#kit-member-you");
+      expect(screen.queryByRole("button", { name: "Plan my layers" })).not.toBeInTheDocument();
     });
 
-    it("updates my kit in Gear up: asks again for its outing, then saving picks this trip", async () => {
-      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit() })]));
+    it("updates my kit in Gear up for the day as it is now, saving back to this day (#335)", async () => {
+      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit({ outing: { ...savedOutfit().outing, exertion: "hard" } }) })]));
       await renderPage();
       const myKit = await screen.findByRole("region", { name: "My kit" });
-      expect(within(myKit).getByText(/Saving them to this day shows what changes before anything is replaced\./)).toBeInTheDocument();
+      expect(await within(myKit).findByText(/Saving them here shows what changes before anything is replaced\./)).toBeInTheDocument();
+      const dayOuting = { ...savedOutfit().outing, exertion: "hard", place: { id: -1, name: "Stowe, Vermont", country: "", latitude: 44.47, longitude: -72.69, timeZone: "America/New_York" } };
       // Saved earlier in this tab: that save is forgotten, so the new layers start a new one.
       sessionStorage.setItem(STORAGE_KEYS.TRIP_KIT_SAVE, JSON.stringify({
-        owner: "user-1", outing: JSON.stringify(savedOutfit().outing), saved: { tripId: "trip-1", tripName: "Whistler", date: "2026-10-10" },
+        owner: "user-1", outing: JSON.stringify(dayOuting), saved: { tripId: "trip-1", tripName: "Whistler", date: "2026-10-10" },
       }));
       await userEvent.click(within(myKit).getByRole("button", { name: "Update in Gear up" }));
 
       expect(sessionStorage.getItem(STORAGE_KEYS.TRIP_KIT_SAVE)).toBeNull();
-      expect(push).toHaveBeenCalledExactlyOnceWith("/?resume=update&trip=trip-1");
+      expect(push).toHaveBeenCalledExactlyOnceWith("/?resume=outing");
       const draft = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.GEAR_UP_DRAFT)!)["user-1"];
-      expect(draft).toMatchObject({ lastOuting: savedOutfit().outing, activity: "alpine_skiing", date: "2026-10-10", time: "09:00", inputMode: "later" });
+      // The day's stop and date, with the kit's effort.
+      expect(draft).toMatchObject({ lastOuting: dayOuting, activity: "alpine_skiing", exertion: "hard", date: "2026-10-10", time: "09:00", inputMode: "later" });
+      expect(draft.tripDay).toEqual({
+        outing: dayOuting,
+        context: {
+          trip_id: "trip-1", trip_name: "Whistler", date: "2026-10-10", day_number: 1, day_count: 1, member_id: "member-you",
+          planned: { day_id: "day-1", activity: "Alpine", stop: { id: "stop-stowe", latitude: 44.47, longitude: -72.69 }, participation: "participating" },
+        },
+      });
     });
 
     it("says when the trip moved after the kit was saved, and updates it for the day it's on now", async () => {
@@ -598,7 +617,7 @@ describe("Trip day page", () => {
       await renderPage();
       const myKit = await screen.findByRole("region", { name: "My kit" });
       expect(within(myKit).getByText("Planned for the forecast on Fri Oct 9, not this day's.")).toBeInTheDocument();
-      await userEvent.click(within(myKit).getByRole("button", { name: "Update in Gear up" }));
+      await userEvent.click(await within(myKit).findByRole("button", { name: "Update in Gear up" }));
       const draft = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.GEAR_UP_DRAFT)!)["user-1"];
       expect(draft.lastOuting.when).toEqual({ mode: "later", date: "2026-10-10", time: "09:00", durationDays: 1 });
     });
@@ -655,17 +674,67 @@ describe("Trip day page", () => {
       expect(within(myKit).getByText("Saved for Stowe, Vermont, United States, not this day's stop (Stowe, Vermont).")).toBeInTheDocument();
     });
 
-    it("offers Gear up and my checklist when I have no saved outfit", async () => {
-      vi.stubGlobal("fetch", crewTrip([]));
+    it("offers Plan my layers for the day and my checklist when I have no saved outfit (#335)", async () => {
+      vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { effort: "easy" })]));
       await renderPage();
       expect(await screen.findByRole("heading", { name: "My kit" })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Get layers in Gear up" })).toHaveAttribute("href", "/");
+      // In the brief's header, and in My kit.
+      const plan = await screen.findAllByRole("button", { name: "Plan my layers" });
+      expect(plan).toHaveLength(2);
       expect(screen.getByRole("group", { name: "Effort for You" })).toBeInTheDocument();
+      await userEvent.click(plan[0]);
+      expect(push).toHaveBeenCalledExactlyOnceWith("/?resume=outing");
+      const draft = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.GEAR_UP_DRAFT)!)["user-1"];
+      // The checklist's effort, at the day's stop, from 9 AM without a meet time.
+      expect(draft.lastOuting).toEqual({
+        activity: "alpine_skiing", exertion: "easy",
+        place: { id: -1, name: "Stowe, Vermont", country: "", latitude: 44.47, longitude: -72.69, timeZone: "America/New_York" },
+        when: { mode: "later", date: "2026-10-10", time: "09:00", durationDays: 1 },
+      });
+      expect(draft.tripDay.context).toMatchObject({ trip_id: "trip-1", date: "2026-10-10", member_id: "member-you" });
       // An empty kit is Not started, never OK (#336), and the Day checklist links to its row.
       const row = document.getElementById("kit-member-you")!;
       expect(within(row).getAllByText("Not started")).toHaveLength(2);
       expect(within(row).queryByText("OK")).not.toBeInTheDocument();
       expect(within(row).getByRole("button", { name: "Flag needs help" })).toBeInTheDocument();
+    });
+
+    it("starts the day's outing at its meet time that morning (#335)", async () => {
+      vi.stubGlobal("fetch", crewTrip([], undefined, [{ ...DAY, activity: "Alpine", meet_time: "07:15:00", meet_day_offset: 0 }]));
+      await renderPage();
+      await userEvent.click((await screen.findAllByRole("button", { name: "Plan my layers" }))[0]);
+      const draft = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.GEAR_UP_DRAFT)!)["user-1"];
+      expect(draft.lastOuting.when).toEqual({ mode: "later", date: "2026-10-10", time: "07:15", durationDays: 1 });
+    });
+
+    it.each([
+      ["beyond the forecast", "2026-09-20T12:00:00Z", "Alpine", "The forecast reaches this day on Sep 25. Plan layers then, or mark what you'll bring below."],
+      ["a sport Gear up has no layers for", "2026-10-07T12:00:00Z", "Surf", "Gear up can't plan layers for Surf yet. Mark what you'll bring below."],
+    ])("says why layers can't be planned %s, and keeps my checklist (#335)", async (_case, now, activity, message) => {
+      vi.setSystemTime(Date.parse(now));
+      vi.stubGlobal("fetch", crewTrip([], undefined, [{ ...DAY, activity }]));
+      await renderPage();
+      const myKit = (await screen.findByRole("heading", { name: "My kit" })).closest("section")!;
+      expect(await within(myKit).findByText(`No outfit saved for this day. ${message}`)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Plan my layers" })).not.toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Effort for You" })).toBeInTheDocument();
+    });
+
+    it("lets me try again when it can't tell whether Gear up can plan the day (#335)", async () => {
+      const full = tripFull({ stops: [STOWE_STOP], days: [{ ...DAY, activity: "Alpine" }], members: [ORGANIZER] });
+      let attempts = 0;
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, full),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        "GET /api/v1/trips/trip-1/days/2026-10-10/outing": () => ++attempts === 1
+          ? reply(500, { error: "Couldn't load the trip. Try again." })
+          : reply(200, tripDayOutingFor(full, "user-1", DAY.date, "America/New_York", Date.now())),
+      }));
+      await renderPage();
+      expect(await screen.findByText(/Couldn't check whether Gear up can plan it: Couldn't load the trip\. Try again\./)).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Effort for You" })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(await screen.findAllByRole("button", { name: "Plan my layers" })).toHaveLength(2);
     });
 
     it("lets the organizer change a guest's kit but only see another member's", async () => {
@@ -1155,7 +1224,7 @@ describe("Trip day page", () => {
       await renderPage();
       const myKit = await screen.findByRole("region", { name: "My kit" });
       expect(myKit).toHaveTextContent(`Nothing to plan for a ${activity} day.`);
-      expect(within(myKit).queryByRole("link", { name: "Get layers in Gear up" })).not.toBeInTheDocument();
+      expect(within(myKit).queryByRole("button", { name: "Plan my layers" })).not.toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Crew kits" })).not.toBeInTheDocument();
     });
 
@@ -1164,7 +1233,7 @@ describe("Trip day page", () => {
       await renderPage();
       const myKit = await screen.findByRole("region", { name: "My kit" });
       expect(myKit).toHaveTextContent("Nothing to plan for a Rest day.");
-      expect(within(myKit).queryByRole("link", { name: "Get layers in Gear up" })).not.toBeInTheDocument();
+      expect(within(myKit).queryByRole("button", { name: "Plan my layers" })).not.toBeInTheDocument();
       expect(within(myKit).getByRole("button", { name: "Shell" })).toHaveAttribute("aria-pressed", "true");
     });
 

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { jsonError, requireUser } from "@/lib/api";
 import { tripActivityFromRecommendationKey } from "@/lib/trip-activities";
 import { destinationToday, kitChanges, kitsToSave, parseSaveKitRequest, tripDestination, tripEffort } from "@/lib/trip-saved-kits";
-import { classifyTripStatus } from "@/lib/trips";
+import { isTripDayOuting, tripDayChanges, tripDayPlannedFor } from "@/lib/trip-day-outing";
+import { assertCanAccessTrip, classifyTripStatus, loadTripFull } from "@/lib/trips";
 import type { SaveKitConflict, SaveKitResponse } from "@/types/savedKit";
 
 /** Generous for a seven-day plan or one outfit with two phases; anything bigger isn't one. */
@@ -14,7 +15,10 @@ const MAX_BODY_LENGTH = 200_000;
  * for, on an existing trip or a new one made from the outing. A day that
  * already has a kit stops the save with a 409 listing it, until the request
  * names it in `replace`. A retry with the same `save_id` and body returns
- * the first answer. See docs/trip-saved-kits.md.
+ * the first answer. With `trip_day`, the layers were planned from that trip
+ * day (#335): a change to it since is a 409 with `code: "day_changed"`,
+ * saving nothing, until the save is sent without it. See
+ * docs/trip-saved-kits.md.
  */
 export async function POST(request: NextRequest) {
   const auth = await requireUser();
@@ -31,6 +35,25 @@ export async function POST(request: NextRequest) {
   const { source } = input;
   const planned = kitsToSave(source);
   if (!planned) return jsonError("Couldn't tell the date at this place. Get layers for a later time there, then save.", 400);
+  if (input.tripDay) {
+    const { date } = input.tripDay;
+    if (input.newTripName !== undefined || planned.kits.length !== 1 || planned.kits[0].date !== date
+      || !isTripDayOuting(source.outing, input.tripDay.planned)) {
+      return jsonError("These layers aren't for that trip day. Plan them from the day again.", 422);
+    }
+    const trip = await assertCanAccessTrip(supabase, input.tripId, userId);
+    if (!trip) return jsonError("Trip not found. It may have been deleted, or you're no longer on it.", 404);
+    let full;
+    try { full = await loadTripFull(supabase, trip); }
+    catch { return jsonError("Couldn't save to the trip. Retry with the same save.", 500); }
+    const current = full && tripDayPlannedFor(full, userId, date);
+    const changes = tripDayChanges(input.tripDay.planned, current?.planned ?? null, current?.stopName ?? null);
+    // Nothing is saved; sent without `trip_day`, the same save attaches these layers anyway.
+    if (changes.length > 0) {
+      return NextResponse.json({ error: "This day changed while you were planning.", code: "day_changed", changes }, { status: 409 });
+    }
+  }
+
   const { outing } = source;
   const activity = tripActivityFromRecommendationKey(outing.activity);
   const effort = tripEffort(outing.exertion);

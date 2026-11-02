@@ -27,7 +27,9 @@ import { outfitMismatches, type KitDay } from "@/lib/trip-kit-fit";
 import { kitAdvice, outingToUpdate } from "@/lib/trip-saved-kits";
 import { forgetKitSaveFor } from "@/lib/tripKitSave";
 import { cn } from "@/lib/utils";
+import { usePlanTripDay } from "@/components/trips/TripDayGearUp";
 import type { SavedKit, SavedKitPhase, SavedOutfit, SavedPlanDay } from "@/types/savedKit";
+import type { TripDayOuting } from "@/types/trip-day-outing";
 
 const PHASE_LABELS: Record<SavedKitPhase["id"], string> = { outing: "Outing", climb: "Climb", descent: "Descent" };
 const noop = () => {};
@@ -45,6 +47,11 @@ interface SavedKitViewProps {
    */
   day: KitDay;
   tripId: string;
+  /**
+   * The day's outing as it is now, from the server (#335): what Update in
+   * Gear up plans a one-day outfit for. Without it, it isn't offered.
+   */
+  dayOuting?: TripDayOuting | null;
 }
 
 /**
@@ -52,10 +59,11 @@ interface SavedKitViewProps {
  * shown as Gear up showed it, with the outing and forecast it was for. It's a
  * snapshot, so it says when it was saved, doesn't change with newer weather,
  * and says when it was planned for another place, date or activity than the
- * day's (#176). Update in Gear up asks for layers again for the same outing.
+ * day's (#176). Update in Gear up asks for layers again: for a one-day
+ * outfit, for the day as it is now (#335); for a plan day, the same plan.
  */
-export function SavedKitView({ outfit, savedAt, day, tripId }: SavedKitViewProps) {
-  const note = <SavedNote kit={outfit} savedAt={savedAt} day={day} tripId={tripId} />;
+export function SavedKitView({ outfit, savedAt, day, tripId, dayOuting = null }: SavedKitViewProps) {
+  const note = <SavedNote kit={outfit} savedAt={savedAt} day={day} tripId={tripId} dayOuting={dayOuting} />;
   return outfit.kind === "plan_day"
     ? <SavedPlanDayView kit={outfit} note={note} />
     : <SavedOutfitView outfit={outfit} note={note} />;
@@ -181,7 +189,7 @@ function SavedPlanDayView({ kit, note }: { kit: SavedPlanDay; note: React.ReactN
 }
 
 /** When and how the kit was saved, what it's for, and how to update it. */
-function SavedNote({ kit, savedAt, day, tripId }: Omit<SavedKitViewProps, "outfit"> & { kit: SavedKit }) {
+function SavedNote({ kit, savedAt, day, tripId, dayOuting }: Omit<SavedKitViewProps, "outfit"> & { kit: SavedKit }) {
   const reason = generalAdviceReason(kit.outing.activity, kitAdvice(kit));
   const mismatches = outfitMismatches(kit, day);
   const from = kit.kind === "plan_day" ? `from a ${kit.outing.when.durationDays}-day plan in Gear up` : "from Gear up";
@@ -193,15 +201,39 @@ function SavedNote({ kit, savedAt, day, tripId }: Omit<SavedKitViewProps, "outfi
       </p>
       {reason && <p className="text-muted-foreground">{reason}</p>}
       {mismatches.map((mismatch) => <p key={mismatch} className="text-foreground">{mismatch}</p>)}
-      <UpdateInGearUp kit={kit} tripId={tripId} date={day.date} />
+      {kit.kind === "plan_day"
+        ? <UpdateInGearUp kit={kit} tripId={tripId} date={day.date} />
+        : dayOuting && <UpdateDayInGearUp day={dayOuting} />}
     </div>
   );
 }
 
 /**
- * Asks Gear up for layers for the kit's outing again, with Save to trip
- * picking this trip, so saving them shows what changes before replacing the
- * kit. Not offered once the day has passed at the destination.
+ * Asks Gear up for layers for a one-day outfit's day as it is now (#335):
+ * its stop, activity and date, with the kit's effort. They save back to this
+ * day, showing what changes before the kit is replaced. Not offered when
+ * layers can't be planned for the day, as once it has passed.
+ */
+function UpdateDayInGearUp({ day }: { day: TripDayOuting }) {
+  const plan = usePlanTripDay();
+  if (day.status !== "ready") return null;
+  return (
+    <div className="mt-2 flex flex-col items-start gap-2">
+      <p className="text-muted-foreground">
+        Update gets layers again for this day&apos;s plan. Saving them here shows what changes before anything is replaced.
+      </p>
+      <Button type="button" variant="outline" size="sm" onClick={() => plan(day)}>
+        <RefreshCw aria-hidden="true" />
+        Update in Gear up
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Asks Gear up for a plan day's whole plan again, with Save to trip
+ * picking this trip, so saving it shows what changes on each day before
+ * replacing the kits. Not offered once the day has passed at the destination.
  */
 function UpdateInGearUp({ kit, tripId, date }: { kit: SavedKit; tripId: string; date: string }) {
   const router = useRouter();

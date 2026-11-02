@@ -2,12 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUser } from "@/lib/api";
+import { assertCanAccessTrip, loadTripFull } from "@/lib/trips";
 import { planDay, savedOutfit, savedPlan, WEAR } from "@/test/savedKit";
-import { TRIP } from "@/test/tripApi";
-import type { TripMemberDayKit } from "@/types/trips";
+import { ORGANIZER, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
+import type { TripDay, TripMemberDayKit } from "@/types/trips";
 import { POST } from "./route";
 
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), requireUser: vi.fn() }));
+vi.mock("@/lib/trips", async (original) => ({
+  ...await original<typeof import("@/lib/trips")>(), assertCanAccessTrip: vi.fn(), loadTripFull: vi.fn(),
+}));
 
 const rpc = vi.fn();
 const SAVE_ID = "6f1f0a52-8d43-4c55-9a39-1b2c3d4e5f60";
@@ -172,5 +176,57 @@ describe("Save an outing's kit to a trip", () => {
     vi.mocked(requireUser).mockResolvedValue(NextResponse.json({ error: "Authentication required" }, { status: 401 }));
     expect((await save(request())).status).toBe(401);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  describe("layers planned from a trip day (#335)", () => {
+    const DAY_ID = "0b5a3a52-6a8e-4c1f-9f3e-4b2d1c0a9e81";
+    const STOP_ID = "5f9d2c1b-3e4a-4b6c-8d7e-9a0b1c2d3e4f";
+    const DAY: TripDay = { id: DAY_ID, trip_id: TRIP_ID, stop_id: STOP_ID, date: "2026-10-10", activity: "Alpine" };
+    const STOP = { ...STOWE_STOP, id: STOP_ID, trip_id: TRIP_ID };
+    const planned = { day_id: DAY_ID, activity: "Alpine", stop: { id: STOP_ID, latitude: 44.47, longitude: -72.69 }, participation: "participating" };
+    const fromDay = (overrides: object = {}) => request({ trip_day: { date: "2026-10-10", planned }, ...overrides });
+
+    beforeEach(() => {
+      vi.mocked(assertCanAccessTrip).mockResolvedValue({ ...TRIP, id: TRIP_ID });
+      vi.mocked(loadTripFull).mockResolvedValue(tripFull({ trip: { ...TRIP, id: TRIP_ID }, stops: [STOP], days: [DAY], members: [ORGANIZER] }));
+    });
+
+    it("saves them when the day is as it was planned", async () => {
+      const response = await save(fromDay());
+      expect(response.status).toBe(200);
+      expect(assertCanAccessTrip).toHaveBeenCalledWith(expect.anything(), TRIP_ID, "user-1");
+      expect(rpc).toHaveBeenCalledWith("save_trip_kits", expect.objectContaining({ p_trip_id: TRIP_ID, p_days: [expect.objectContaining({ date: "2026-10-10" })] }));
+    });
+
+    it("saves nothing and says what changed when the day changed since", async () => {
+      vi.mocked(loadTripFull).mockResolvedValue(tripFull({
+        trip: { ...TRIP, id: TRIP_ID }, stops: [STOP], days: [{ ...DAY, activity: "Hike" }], members: [ORGANIZER],
+      }));
+      const response = await save(fromDay());
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ error: "This day changed while you were planning.", code: "day_changed", changes: ["Activity changed to Hike."] });
+      expect(rpc).not.toHaveBeenCalled();
+      // Sent without the day, the same save goes ahead: Save anyway.
+      expect((await save(request())).status).toBe(200);
+      expect(rpc).toHaveBeenCalledOnce();
+    });
+
+    it.each([
+      ["another day's", { outfit: savedOutfit({ outing: { ...savedOutfit().outing, when: { mode: "later", date: "2026-10-11", time: "09:00", durationDays: 1 } } }) }],
+      ["another activity's", { outfit: savedOutfit({ outing: { ...savedOutfit().outing, activity: "hiking_snowshoeing" } }) }],
+      ["another place's", { outfit: savedOutfit({ outing: { ...savedOutfit().outing, place: { ...savedOutfit().outing.place, latitude: 45 } } }) }],
+      ["a new trip's", { target: { new_trip: { id: NEW_ID, name: "Stowe trip" } } }],
+    ])("refuses %s layers as the trip day's", async (_case, overrides) => {
+      expect((await save(fromDay(overrides))).status).toBe(422);
+      expect(loadTripFull).not.toHaveBeenCalled();
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
+    it("refuses a trip the person isn't on, and a malformed day", async () => {
+      vi.mocked(assertCanAccessTrip).mockResolvedValue(null);
+      expect((await save(fromDay())).status).toBe(404);
+      expect((await save(request({ trip_day: { date: "2026-10-10", planned: { ...planned, day_id: "day-1" } } }))).status).toBe(400);
+      expect(rpc).not.toHaveBeenCalled();
+    });
   });
 });

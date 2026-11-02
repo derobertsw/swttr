@@ -12,6 +12,7 @@ import { ACTIVITIES } from "@/data/activities";
 import { EXERTION_LEVELS, type ExertionLevel } from "@/lib/biophysics/exertion";
 import { STORAGE_KEYS } from "@/lib/storage";
 import type { Outing, OutingTime } from "@/types/outing";
+import type { GearUpTripDay, TripDayContext } from "@/types/trip-day-outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { XCContext } from '@/types/xc';
 import { isXCContext } from '@/types/xc';
@@ -29,6 +30,8 @@ export interface GearUpDraft extends XCContext {
   durationDays: number;
   /** The outing of the last result shown, which a reload or Forward on the results asks for again. */
   lastOuting: Outing | null;
+  /** The trip day it's planned for, from Plan my layers on that day (#335). Only an account's draft has one. */
+  tripDay?: GearUpTripDay | null;
 }
 
 type Fields = Record<string, unknown>;
@@ -78,6 +81,15 @@ function isOuting(value: unknown): value is Outing {
   );
 }
 
+/** A kept trip day: which day and whose kit, and the outing asked for for it. */
+function isTripDay(value: unknown): value is GearUpTripDay {
+  if (!isObject(value) || !isOuting(value.outing) || !isObject(value.context)) return false;
+  const { trip_id, trip_name, date, day_number, day_count, member_id, planned } = value.context;
+  return typeof trip_id === "string" && typeof trip_name === "string" && isDate(date)
+    && Number.isInteger(day_number) && Number.isInteger(day_count) && typeof member_id === "string"
+    && isObject(planned) && typeof planned.day_id === "string";
+}
+
 /** Validate persisted form inputs and the last outing before restoring a draft. */
 function isDraft(value: unknown): value is GearUpDraft {
   return (
@@ -90,7 +102,8 @@ function isDraft(value: unknown): value is GearUpDraft {
     (value.date === null || isDate(value.date)) &&
     isTime(value.time) &&
     isDuration(value.durationDays) &&
-    (value.lastOuting === null || isOuting(value.lastOuting))
+    (value.lastOuting === null || isOuting(value.lastOuting)) &&
+    (value.tripDay === undefined || value.tripDay === null || isTripDay(value.tripDay))
   );
 }
 
@@ -124,7 +137,8 @@ const hasOuting = (draft: GearUpDraft) => draft.place !== null || draft.lastOuti
  */
 export function readGearUpDraft(owner: string | null): GearUpDraft | null {
   const kept = readKept();
-  const guest = kept[GUEST] ?? null;
+  // A trip day is an account's: whoever reads a guest's draft gets none.
+  const guest = kept[GUEST]?.tripDay ? { ...kept[GUEST], tripDay: null } : kept[GUEST] ?? null;
   if (owner === null) return guest;
   if (guest && hasOuting(guest)) return guest;
   return kept[owner] ?? guest;
@@ -144,9 +158,10 @@ export function claimGuestGearUpDraft(owner: string): void {
 /**
  * Makes `outing` the last one `owner` got results for, as if Gear up had just
  * shown them, so /?resume=… asks for it again: how a saved trip kit is
- * updated (#170). What else was entered is kept where the outing has none.
+ * updated (#170), and how a trip day plans layers (#335), for that day when
+ * `tripDay` names it. What else was entered is kept where the outing has none.
  */
-export function keepOutingForGearUp(owner: string, outing: Outing): void {
+export function keepOutingForGearUp(owner: string, outing: Outing, tripDay: TripDayContext | null = null): void {
   const kept = readGearUpDraft(owner);
   const later = outing.when.mode === "later" ? outing.when : null;
   saveGearUpDraft(owner, {
@@ -160,6 +175,7 @@ export function keepOutingForGearUp(owner: string, outing: Outing): void {
     time: later?.time ?? kept?.time ?? "12:00",
     durationDays: later?.durationDays ?? kept?.durationDays ?? 1,
     lastOuting: outing,
+    ...(tripDay && { tripDay: { context: tripDay, outing } }),
   });
 }
 

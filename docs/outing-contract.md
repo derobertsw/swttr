@@ -109,7 +109,8 @@ Known gap: following a link to `/` while on the results, like Gear up in the sid
 [`src/lib/gearUpDraft.ts`](../src/lib/gearUpDraft.ts) keeps the form and the last outing in `sessionStorage`, under `swttr-gear-up`:
 - the activity, effort and picked place, which is "Your location" with the device's coordinates when it came from the device;
 - Now or Later, the start date and time, and the number of days;
-- the last result's outing.
+- the last result's outing;
+- for an account, the trip day that outing was planned for, from Plan my layers on that day (#335, [trip-saved-kits.md](trip-saved-kits.md#planning-from-a-trip-day)): the trip and day, whose kit, the day as it was planned, and the outing asked for for it. A guest's draft never has one, so whoever takes a guest's draft over gets none.
 
 It's never put in the URL. It's gone when the tab closes. A draft that doesn't validate is ignored, including a date or time that isn't real, like `2026-02-31`. Weather, advice, body metrics and the wardrobe aren't kept.
 
@@ -148,7 +149,8 @@ A return path names a page and what to do there, never the outing itself. The ou
 | Sign in, on a guest's multi-day packing list | `/sign-in?redirect_url=%2F%3Fresume%3Dpacking` | `/?resume=packing` |
 | Add gear, on a signed-in packing list with items not matched | `/wardrobe?from=outing` | "Get my packing list" on Wardrobe's card, which links to `/?resume=packing` |
 | Save to trip, on the results of a guest (#170) | `/sign-in?redirect_url=%2F%3Fresume%3Dsave` | `/?resume=save`, which then opens Save to trip once ([trip-saved-kits.md](trip-saved-kits.md)) |
-| Update in Gear up, on a saved trip kit (#170) | `/?resume=update&trip=<trip id>`, after the kit's outing is kept as the account's last | The same; Save to trip on its results picks that trip |
+| Update in Gear up, on a saved plan day (#170) | `/?resume=update&trip=<trip id>`, after the kit's outing is kept as the account's last | The same; Save to trip on its results picks that trip |
+| Plan my layers, or Update in Gear up on a one-day outfit, on a trip day (#335) | `/?resume=outing`, after the day's outing is kept as the account's last, with the day | The same; Save to trip on its results saves to that day, then goes back to it |
 
 **`/?resume=outing`** takes `resume` out of the address with `history.replaceState`, then asks for the draft's last outing again, once sign-in and preferences have loaded. **`/?resume=packing`** does the same, and a multi-day plan then opens on its Packing tab, matched to the account's wardrobe. Plans after it open on the daily plan again. **`/?resume=save`** does the same, then opens Save to trip once on that outing's one-day result (#170). The form shows in the outing's mode with the request running, then the results show on a new history entry. A signed-in account gets advice built from its body and gear, labeled Personalized. Advice that still isn't personalized says why: no usable gear, or a failed request with Try again. With no last outing in the tab, as in a new tab, the form shows what was entered, and nothing is asked for. Start over while it loads drops the request.
 
