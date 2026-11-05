@@ -73,6 +73,7 @@ function planFor(full: TripFull, start: string, end: string, mode: TripDateChang
     destination: destination(day.stop_id), activity: day.activity,
     kits: kitsOn(day).map((kit) => memberNames.get(kit.trip_member_id) ?? "Crew member"),
     tour_plan: tourPlanOn(day)?.objective ?? null,
+    notes: day.notes ?? null,
   });
 
   const days = [...full.days].sort((a, b) => a.date.localeCompare(b.date));
@@ -96,11 +97,13 @@ function planFor(full: TripFull, start: string, end: string, mode: TripDateChang
     })),
     removed: removed.map((day) => describe(day, day.date, null)),
     kept: shift === 0 ? staying.length : 0,
-    // A day's tour plan is listed only when it has one, as change_trip_dates (026) lists it.
+    // A day's tour plan and notes are listed only when it has them, as
+    // change_trip_dates (026, 20261028130000) lists them.
     expected_removed: removed.map((day) => {
       const plan = tourPlanOn(day);
       return { date: day.date, stop_id: day.stop_id, activity: day.activity, kit_ids: kitsOn(day).map((kit) => kit.id),
-        ...(plan ? { tour_plan_id: plan.id, tour_plan_revision: plan.revision } : {}) };
+        ...(plan ? { tour_plan_id: plan.id, tour_plan_revision: plan.revision } : {}),
+        ...(day.notes ? { notes: day.notes } : {}) };
     }),
   };
 }

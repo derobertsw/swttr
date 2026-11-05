@@ -978,6 +978,45 @@ describe("Trip day page", () => {
     });
   });
 
+  describe("Day notes (#334)", () => {
+    const meets = [{ date: DAY.date, meet_label: "8:30 AM EDT · Sat Oct 10", time_zone_label: "Local time at the destination (America/New_York)." }];
+    const notes = "Tickets at will-call.\nRentals at Base Lodge by 8:15.";
+    const trip = (members: TripMember[], day: TripDay) => reply(200, tripFull({
+      stops: [STOWE_STOP], days: [day], members, lodging: buildLodging(TRIP, [], []), meets: day.meet_time ? meets : [],
+    }));
+
+    it("shows everyone the day's notes under the meet, without controls for members", async () => {
+      mockAuth.userId = "user-2";
+      const member: TripMember = { ...SAM, user_id: "user-2", status: "joined" };
+      const day: TripDay = { ...DAY, activity: "Alpine", meet_time: "08:30:00", meet_day_offset: 0, meet_time_zone: "America/New_York", notes };
+      vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": trip([ORGANIZER, member], day), "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST }));
+      await renderPage();
+      const start = await screen.findByRole("region", { name: "Meet and start" });
+      const terms = within(start).getAllByRole("term").map((term) => term.textContent);
+      expect(terms.slice(0, 2)).toEqual(["Meet", "Notes"]);
+      const text = within(start).getByText(/Tickets at will-call/);
+      expect(text.textContent).toBe(notes);
+      expect(text).toHaveClass("whitespace-pre-wrap");
+      expect(within(start).queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("offers the organizer Add notes on a day without any", async () => {
+      vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": trip([ORGANIZER], { ...DAY, notes: null }), "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST }));
+      await renderPage();
+      const start = await screen.findByRole("region", { name: "Start of the day" });
+      expect(within(start).getByRole("button", { name: "Add notes" })).toBeInTheDocument();
+      expect(within(start).queryByText("Notes", { selector: "dt" })).not.toBeInTheDocument();
+    });
+
+    it("offers the organizer Edit notes once there are some", async () => {
+      vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips/trip-1": trip([ORGANIZER], { ...DAY, notes }), "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST }));
+      await renderPage();
+      const start = await screen.findByRole("region", { name: "Start of the day" });
+      expect(within(start).getByRole("button", { name: "Edit notes" })).toBeInTheDocument();
+      expect(within(start).getByText("Notes", { selector: "dt" })).toBeInTheDocument();
+    });
+  });
+
   describe("Tour plan", () => {
     // The meet time is the day's (#333), labelled by the server.
     const tourDay: TripDay = { ...DAY, activity: "Backcountry", meet_time: "06:30:00", meet_day_offset: 0, meet_time_zone: "America/New_York" };
