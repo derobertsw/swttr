@@ -5,6 +5,7 @@
 import type { ThermalDecision } from "@/types/biophysics";
 import type { LaterTime, Outing, PersonalizationGap } from "@/types/outing";
 import type { DailyLayerPlan, DaypartId, LayerChanges } from "@/types/plan";
+import type { SaveKitTripDay } from "@/types/trip-day-outing";
 import type { Recommendation } from "@/types/recommendations";
 import type { Trip, TripCrewCounts, TripMemberDayKit } from "@/types/trips";
 import type { WeatherData, WeatherProvenance } from "@/types/weather";
@@ -100,6 +101,8 @@ export interface SaveKitRequest {
   plan?: SavedPlan;
   /** Kits to replace: each day's date → the `updated_at` of the kit that was shown for it. */
   replace?: Record<string, string>;
+  /** The trip day Gear up planned these layers for (#335): a change to it since stops the save. */
+  trip_day?: SaveKitTripDay;
 }
 
 /**
