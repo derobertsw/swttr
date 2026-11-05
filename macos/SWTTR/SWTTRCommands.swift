@@ -30,6 +30,7 @@ struct SWTTRCommands: Commands {
         }
         CommandGroup(replacing: .help) {
             Button("SWTTR Help") { browser.navigate(to: "/faq") }
+            Button("Privacy Policy") { browser.navigate(to: "/privacy") }
             Button("Send Feedback…") {
                 browser.openFeedback()
             }
