@@ -57,9 +57,10 @@ export function TripDayBar({ tripDay, shown, onPlanAgain, onLeave }: {
   );
 }
 
-type DayOutingState =
-  | { trip: TripFull; attempt: number; outing: TripDayOuting; error?: undefined }
-  | { trip: TripFull; attempt: number; outing?: undefined; error: string };
+type DayOutingState = { day: string; attempt: number } & (
+  | { outing: TripDayOuting; error?: undefined }
+  | { outing?: undefined; error: string }
+);
 
 /** The day's outing as it's loading, or loaded, or why it couldn't be, with a way to ask again. */
 export interface TripDayOutingState {
@@ -72,7 +73,9 @@ export interface TripDayOutingState {
 /**
  * The signed-in person's outing for the trip day from the server (#335):
  * what Plan my layers asks Gear up for, or why layers can't be planned. It's
- * asked for again whenever the trip is, so it follows the day's changes.
+ * asked for again whenever the trip is, so it follows the day's changes. The
+ * day's last answer stays while it is, so the brief doesn't jump after every
+ * checklist change; the save checks the day again anyway.
  */
 export function useTripDayOuting(tripId: string, date: string, trip: TripFull | null, enabled: boolean): TripDayOutingState {
   const [state, setState] = useState<DayOutingState | null>(null);
@@ -80,12 +83,14 @@ export function useTripDayOuting(tripId: string, date: string, trip: TripFull | 
   useEffect(() => {
     if (!trip || !enabled) return;
     const controller = new AbortController();
+    const day = `${tripId}:${date}`;
     fetchTripDayOuting(tripId, date, controller.signal)
-      .then((outing) => setState({ trip, attempt, outing }))
-      .catch((err) => { if (!controller.signal.aborted) setState({ trip, attempt, error: errorMessage(err) }); });
+      .then((outing) => setState({ day, attempt, outing }))
+      .catch((err) => { if (!controller.signal.aborted) setState({ day, attempt, error: errorMessage(err) }); });
     return () => controller.abort();
   }, [tripId, date, trip, enabled, attempt]);
-  const current = state && state.trip === trip && state.attempt === attempt ? state : null;
+  // Another day's answer never shows; Try again waits for its own.
+  const current = state && state.day === `${tripId}:${date}` && state.attempt === attempt ? state : null;
   return {
     outing: current?.outing ?? null,
     error: current?.error ?? null,

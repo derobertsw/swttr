@@ -226,11 +226,17 @@ describe("Save an outing's kit to a trip", () => {
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({ status: "saved", replayed: true });
       expect(loadTripFull).not.toHaveBeenCalled();
-      // Another account's receipt for the same identity is left to the save function to refuse.
+      // Another account's receipt doesn't skip the check: on an unchanged day,
+      // the save function refuses the identity.
       receipts[0].user_id = "user-2";
       vi.mocked(rpc).mockClear();
-      expect((await save(fromDay())).status).toBe(409);
-      expect(rpc).not.toHaveBeenCalled();
+      vi.mocked(loadTripFull).mockResolvedValue(tripFull({ trip: { ...TRIP, id: TRIP_ID }, stops: [STOP], days: [DAY], members: [ORGANIZER] }));
+      rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
+      const refused = await save(fromDay());
+      expect(refused.status).toBe(409);
+      expect(await refused.json()).toMatchObject({ code: "identity" });
+      expect(loadTripFull).toHaveBeenCalledOnce();
+      expect(rpc).toHaveBeenCalledOnce();
     });
 
     it.each([

@@ -717,6 +717,26 @@ describe("Trip day page", () => {
       expect(within(row).getByRole("button", { name: "Flag needs help" })).toBeInTheDocument();
     });
 
+    it("keeps Plan my layers in place while the day is checked again after a checklist change (#335)", async () => {
+      const full = tripFull({ stops: [STOWE_STOP], days: [{ ...DAY, activity: "Alpine" }], members: [ORGANIZER] });
+      let checks = 0;
+      vi.stubGlobal("fetch", fakeTripApi({
+        // A new trip each time, as a response is.
+        "GET /api/v1/trips/trip-1": () => reply(200, structuredClone(full)),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        // The check after the change never answers.
+        "GET /api/v1/trips/trip-1/days/2026-10-10/outing": () => ++checks === 1
+          ? reply(200, tripDayOutingFor(full, "user-1", DAY.date, "America/New_York", Date.now()))
+          : new Promise(() => {}),
+        "PUT /api/v1/trips/trip-1/days/2026-10-10/kits/member-you": reply(200, { kit: kit(ORGANIZER, { items: ["shell"] }) }),
+      }));
+      await renderPage();
+      expect(await screen.findAllByRole("button", { name: "Plan my layers" })).toHaveLength(2);
+      await userEvent.click(screen.getByRole("button", { name: "Shell" }));
+      await waitFor(() => expect(checks).toBe(2));
+      expect(screen.getAllByRole("button", { name: "Plan my layers" })).toHaveLength(2);
+    });
+
     it("starts the day's outing at its meet time that morning (#335)", async () => {
       vi.stubGlobal("fetch", crewTrip([], undefined, [{ ...DAY, activity: "Alpine", meet_time: "07:15:00", meet_day_offset: 0 }]));
       await renderPage();
