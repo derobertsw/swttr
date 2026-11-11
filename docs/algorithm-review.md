@@ -33,7 +33,7 @@ Give the model the context listed above, then:
 
 | Step in #116 | Verdict | Why |
 |---|---|---|
-| Review with multiple newer models; record versions, prompts and date | **Partly done; narrow it** | One model is recorded here. Since the issue was written, the algorithms went through more than a dozen reviewed PRs from Claude and Codex sessions. What found the defects below was running the code and reading the sources, which a second model can repeat from the prompt above. A second model is optional, not a blocker. |
+| Review with multiple newer models; record versions, prompts and date | **Outstanding** | One model is recorded here, so this step is not met. It stays open on #116 until further models are run or the issue is changed. Recommendation, for the maintainer to decide: narrow it to one recorded review plus the rerunnable prompt above. Since the issue was written, the algorithms went through more than a dozen reviewed PRs from Claude and Codex sessions, and what found the defects below was running the code and reading the sources, which a second model can repeat. |
 | Ask for weaknesses, assumptions, edge cases and ideas | **Done** | Findings and assumptions below. |
 | Compare findings, validate against implementation and sources, prioritize | **Done, except comparing models** | Findings are ordered by expected effect on recommendations, then effort. |
 | Update the algorithm docs | **Done in this change** | See "Doc corrections in this change". |
@@ -80,7 +80,7 @@ Causes, all in the selectors:
 
 ### 2. Legacy head and neck rule picks the warmest item at 0°C and below, on top of the helmet
 
-`selectBestFromCategory` takes the lightest rated item above 0°C and the warmest rated item otherwise, and adds a neck piece below 0°C. The evaluator then counts the helmet as well. Head and neck are over target in 13 of 20 alpine responses and all 20 for cycling and the touring climb.
+`selectBestFromCategory` considers items rated for the temperature or unrated, or every item when none qualifies. It takes the lightest of them above 0°C and the warmest otherwise, and a neck piece is added below 0°C. The evaluator then counts the helmet as well. Head and neck are over target in 13 of 20 alpine responses and all 20 for cycling and the touring climb.
 
 - **Alpine, 25°F / 12 mph / moderate, catalog.** Helmet, helmet-compatible hood, a 1.5 clo balaclava and a 0.9 clo neck piece: 3.75 clo against 2.29. Torso, legs and hands are in range, yet the verdict is "Warmer than recommended" with comfort 29.8 in the committed snapshot. The calibration doc recorded at least 85 for this case before #250.
 - **Cycling, catalog.** A liner beanie at 36°F, a 1.5 clo balaclava at 32°F against a 0.55 target.
@@ -98,7 +98,7 @@ Alpine and the touring descent always select a helmet when one is available, in 
 ### 5. Whole-body clo: the 0.5 / 0.25 / 0.25 weights and the leg bias have no source
 
 - **Weights.** `REGIONAL_WEIGHTS` was commented as "USARIEM Eq. 1". That equation is a parallel average over manikin zone areas. By area, torso, arms and legs are 40 / 20 / 39 % of the three (T18-01) or 44 / 17 / 39 % (CoWEDA), so legs carry about 0.39, not 0.25.
-- **Scale.** SWTTR's whole-body clo is a linear mean of torso, arms and legs. It leaves out head, hands and feet and is not comparable with a manikin's whole-body clo. T21-03's ECWCS Ensemble 4 is 1.7 clo whole-body and 5.9 on SWTTR's scale. Comparing it with IREQ amounts to requiring roughly uniform insulation, which is why cold alpine targets are out of reach and why T18-02's ensembles "fail" resting IREQ. `catalog-thermal-calibration.md` flagged this and left it open.
+- **Scale.** SWTTR's whole-body clo is a linear mean of torso, arms and legs. It leaves out head, hands and feet and is not comparable with a manikin's whole-body clo. T21-03's ECWCS Ensemble 4 is 1.7 clo whole-body and 5.9 on SWTTR's scale. Comparing SWTTR's number with IREQ amounts to requiring roughly uniform insulation over torso, arms and legs, which real cold-weather outfits do not have. That is one reason cold alpine targets cannot be met from the catalog. T18-02's result is separate and sits on the paper's own scale: its ensembles measure 1.3–3.1 clo whole-body against a resting IREQ of 5.1–5.5 clo at −10°C, so steady-state IREQ at rest is beyond real clothing whatever the scale. `catalog-thermal-calibration.md` flagged the scale question and left it open.
 - **Leg bias.** Running, cycling, XC and the touring phases ask legs for 1.15–1.4× the torso's clo (`REGIONAL_IREQ_MULTIPLIERS`), with no cited source. T21-03's ensembles carry about half the torso's clo on the legs, which is why #317 set alpine's legs to 1.0.
 
 ### 6. Hand and head catalog clo has no lab anchor
@@ -158,7 +158,7 @@ Recorded, not validated. None of these has field data behind it (#8).
 - **#251.** Warm and cold preference, including its cross-sport check.
 - **#86.** Exposure estimate, footwear and timed profiles. Add finding 7 and T18-01's foot values (sock 0.39 clo, extreme-cold bootie 1.42 clo) as a starting point for footwear.
 - **#8.** Field feedback, the only thing that can validate any band above.
-- **#67.** The 0.1 clo hard shells were a catalog-scale error, fixed by migration 036 (hard shells are 0.53 whole-body clo). Its proposed mechanism, breathability raising insulation, contradicts the rule kept in #250 that evaporative resistance never changes clo. It can close once 036 is confirmed in production; the migration listing timed out on 2026-11-10, so that is unconfirmed.
+- **#67.** The 0.1 clo hard shells it reported were a catalog-scale error, corrected by migration 036 (hard shells are 0.53 whole-body clo). Whether 036 is applied in production is unconfirmed: the migration listing timed out on 2026-11-10. Its wider request is still open. Evaporative resistance enters only the separate moisture heuristic and the breathability score, and the heat balance has no skin-evaporation term (finding 7), so a garment's vapor permeability does not yet affect the thermal result. #250's rule that evaporative resistance never changes clo rules out one fix, raising clo for unbreathable shells; it does not close the gap. Keep #67 open and re-scope it to evaporative heat loss.
 - **#290.** Vent advice.
 - **`catalog-thermal-calibration.md` open items.** The Capilene Midweight lab row, and the touring climb's hard-shell rule (#372).
 
