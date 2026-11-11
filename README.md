@@ -32,7 +32,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 
 ## How Layer Recommendations Work
 
-The biophysics-supported activities share a common recommendation pipeline built on the IREQ standard (ISO 11079). The diagrams below describe the architecture for contributors. All calculations live server-side:
+The biophysics-supported activities share a common recommendation pipeline built on the IREQ method (ISO 11079). The diagrams below describe the architecture for contributors. All calculations live server-side:
 
 - `src/lib/biophysics/` — the thermal models (IREQ, target ranges, CoWEDA buffer, ensemble prediction, scoring)
 - `src/lib/recommendations/` — the shared pipeline: request parsing, `thermal-targets.ts`, gear-pool loading, and the route factory in `handler.ts`
@@ -41,7 +41,9 @@ The biophysics-supported activities share a common recommendation pipeline built
 
 Golden tests in `src/app/api/v1/recommendations/golden.test.ts` pin every sport's full response against a snapshot of the real gear catalog; an intended output change shows up as a snapshot diff to review and update with `npx vitest run -u`.
 
-Running/XC garment and sustained-effort policy contracts, calibration evidence, generic catalog estimates, migration order and validation limits are documented in [Running and XC foundations](docs/running-xc-foundations.md). These foundations precede the remaining selector and presentation changes in #243.
+Running/XC garment and sustained-effort policy contracts, calibration evidence, generic catalog estimates, migration order and validation limits are documented in [Running and XC foundations](docs/running-xc-foundations.md). The running and XC selectors and the shared comfort check built on them have shipped; of #243's work only the warm/cold preference (#251) remains.
+
+The IREQ solver is a simplified heat balance, not the standard's full program: it fixes skin temperature at 33.7°C (neutral) and 30°C (minimum) and has no skin-evaporation term. Against an ISO 11079 reference its neutral value is within 0.25 clo, and its minimum runs 0.1–0.2 clo warm for high-output sports. The [algorithm review](docs/algorithm-review.md) records what was checked against the source papers, the assumptions that have no support yet, and the open gaps in alpine, cycling and touring.
 
 ### 1. Recommendation Pipeline
 
@@ -134,7 +136,7 @@ graph TD
 
 ### 3. Ensemble Building Flow
 
-Running compares complete wearable moving outfits made from reviewed standalone tops, shorts or tights, optional underlayers/mids and protective outers. A thermal base is never mandatory. Shorts and short sleeves intentionally leave skin exposed; regional thermal data already includes that exposure. The running search caches shared-model regional contributions, fixes any garments spanning the upper body and legs (including arms without torso coverage), and prunes inferior regional priorities before pairing the surviving choices. Identical selection capabilities keep the first sorted ID; no candidate cap or thermal bins discard distinct outfits. It preserves actual wind/rain protection, prefers waterproof coverage in precipitation, rejects excessive warmth before filling a clothing gap, and balances whole-body/regional shortfalls and excess before using layer count and breathability as tie-breaks. Selection and final/manual evaluation use the same regional ensemble regression and calibrated targets, with the shared 0.05 clo cold tolerance. A light clothing need cannot be satisfied by overly warm full coverage; absent suitable basics remain missing requirements with generic suggestions. Requirements assess the selected combination, including outer warmth and protection, and reasons name the worn outfit. When the best available combination still misses a target, both requirements and guidance name that clothing and explain the remaining shortfall, excess warmth, or protection gap. Missing wind and rain protection are reported separately. Extra clothing for stops stays separate. Ski bibs and insulated outerwear without explicit running suitability are excluded from moving outfits. The small mismatch allowances are wardrobe heuristics, not measured physiological limits. Cycling and touring retain their existing builders.
+Running compares complete wearable moving outfits made from reviewed standalone tops, shorts or tights, optional underlayers/mids and protective outers. A thermal base is never mandatory. Shorts and short sleeves intentionally leave skin exposed; regional thermal data already includes that exposure. The running search caches shared-model regional contributions, fixes any garments spanning the upper body and legs (including arms without torso coverage), and prunes inferior regional priorities before pairing the surviving choices. Identical selection capabilities keep the first sorted ID; no candidate cap or thermal bins discard distinct outfits. It preserves actual wind/rain protection, prefers waterproof coverage in precipitation, rejects excessive warmth before filling a clothing gap, and balances whole-body/regional shortfalls and excess before using layer count and breathability as tie-breaks. Selection and final/manual evaluation use the same regional ensemble regression and calibrated targets, with the shared 0.05 clo cold tolerance. A light clothing need cannot be satisfied by overly warm full coverage; absent suitable basics remain missing requirements with generic suggestions. Requirements assess the selected combination, including outer warmth and protection, and reasons name the worn outfit. When the best available combination still misses a target, both requirements and guidance name that clothing and explain the remaining shortfall, excess warmth, or protection gap. Missing wind and rain protection are reported separately. Extra clothing for stops stays separate. Ski bibs and insulated outerwear without explicit running suitability are excluded from moving outfits. The small mismatch allowances are wardrobe heuristics, not measured physiological limits. Cycling and touring retain their earlier builders: a base top and bottom, mid layers only while the summed clo is under the IREQ minimum, then shells. They have no regional search and report no clothing gaps, so their outfits often fail the shared comfort check ([algorithm review](docs/algorithm-review.md), finding 1).
 
 Alpine and XC compare complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. They allow at most one item in each slot per covered region, including items that span multiple regions, so insulated outerwear takes the outer slot and no shell goes over it. Alpine puts a puffy only under a hard shell; XC allows one under any shell, but not under insulated outerwear. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. XC uses the same regional enumeration with a separate assessment: reviewed standalone coverage, actual wind/wet protection, excessive warmth before filling clothing gaps, then regional thermal fit and breathability. It permits one suitable Nordic tight or pant without an extra base or outer. XC requirements assess the selected combination, including all its warmth and protection. XC never leaves a region in underwear alone. Weather-protection scoring counts windbreakers and insulated outerwear as shells. When targets cannot be met, alpine returns the best available wearable combination. Regional warnings require both a shortfall and an available wearable alternative that could reduce it by more than 0.12 clo while preserving coverage and rain protection. The thermal comfort score and overall cold warnings still report cold conditions when regional targets are unreachable.
 
@@ -157,7 +159,7 @@ graph TD
     XREG --> XREQ[Match selected combinations or report gaps<br/>Carry stop warmth separately]
     SPORT -->|No| SORT[Sort Pool by Sport Strategy]
     SORT --> BASE[Select Base Layer]
-    BASE --> MID[Select Mid Layer]
+    BASE --> MID[Select Mid Layer<br/>only while summed clo is under the IREQ minimum]
     MID --> SHELL[Select Shell]
 
     BASE --> T1[Pick torso garment]
@@ -165,9 +167,9 @@ graph TD
 
     subgraph "Guards Applied at Each Step"
         G1{Garment already selected?}
-        G2{Insulating layers within budget?<br/>Running/biking shells bypass clo cap}
+        G2{Mid layers within the clo budget?<br/>Biking shells bypass the cap<br/>Touring climb shells must fit it}
         G3{Covers required body region?}
-        G4{Meets breathability threshold?<br/>Required protective outer layers qualify<br/>by wind/wet capability}
+        G4{Meets breathability threshold?<br/>Bases prefer it, else the most breathable<br/>Touring mids must reach 80 percent of it<br/>Biking mids and all shells are not filtered}
     end
 
     G1 -->|Duplicate| SKIP[Skip Garment]
@@ -203,7 +205,7 @@ graph TD
     subgraph "Biking — shared breathable builder"
         BIKE --> B1[Breathability-sorted]
         B1 --> B2[Shells always processed]
-        B2 --> B3[Basic clo budget for insulation<br/>Protective shells outside clo cap]
+        B2 --> B3[Basic clo budget for mid layers<br/>Shells outside the clo cap<br/>Puffies and insulated outerwear never selected]
     end
 
     subgraph "Alpine Skiing"
@@ -226,7 +228,7 @@ graph TD
         TOUR --> T1a[Triple-phase IREQ:<br/>uphill / downhill / transition]
         T1a --> T2a[Uphill ensemble only —<br/>breathability-first]
         T2a --> T3a[Insulation pool excluded<br/>from uphill — pack items only]
-        T3a --> T4a[Pack items scored by<br/>warmth-to-weight ratio]
+        T3a --> T4a[One pack insulation piece, scored by<br/>fit to the descent shortfall and by weight<br/>No separate leg layer for the descent]
         T4a --> T5a[Transition protocol:<br/>urgent / quick / normal]
     end
 ```
@@ -250,7 +252,7 @@ graph TD
     ROPT --> RRANK
     RRANK --> RGAP[Warn and report clothing gaps<br/>when available protection is insufficient]
 
-    BIKE --> BADD[Always consider shells<br/>— breathability-sorted]
+    BIKE --> BADD[Always add the most breathable<br/>torso shell and leg shell]
 
     ALP --> AOUT[Compare shell or insulated outer<br/>as part of each regional outfit]
     AOUT --> AWET{Precipitation?}
@@ -267,11 +269,13 @@ graph TD
     TOUR --> THARD{Hard shell available?}
     THARD -->|Yes| THSEL[Select hard shell —<br/>soft shells excluded]
     THARD -->|No| TOTHER[Fall back to<br/>soft shells / windbreakers]
+    THSEL --> TCAP[Worn on the climb only if it fits the climb clo cap<br/>Otherwise a hard shell is packed for the descent]
+    TOTHER --> TCAP
 ```
 
 ### 6. Extremity Selection
 
-Running/XC evaluate optional thermal coverage against the phase's local min/max bands. The absence of insulation competes with known suitable gear. When nothing fits, going without is weighed against the nearest item, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings check the heuristic bands in deep cold: items rated for these conditions win, and the lightest rated choice sets the upper limit that scoring and manual checks use. Functional XC gloves have a separate pole-grip purpose. Cycling, alpine and touring explicitly retain the earlier selection rules pending calibration; required alpine/descent helmets remain outside the optional path.
+Running/XC evaluate optional thermal coverage against the phase's local min/max bands. The absence of insulation competes with known suitable gear. When nothing fits, going without is weighed against the nearest item, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings check the heuristic bands in deep cold: items rated for these conditions win, and the lightest rated choice sets the upper limit that scoring and manual checks use. Functional XC gloves have a separate pole-grip purpose. Cycling, alpine and touring explicitly retain the earlier selection rules pending calibration; required alpine/descent helmets remain outside the optional path. Those rules switch from the lightest to the warmest rated head layer at 0°C and do not count the helmet or a worn hood, so the shared comfort check often judges head and neck too warm. A helmet that is not owned is left out without a warning, and cycling has no helmet in the model ([algorithm review](docs/algorithm-review.md), findings 2 and 4).
 
 ```mermaid
 graph TD
@@ -289,10 +293,10 @@ graph TD
     STATE --> MATCH[Head requirements prefer selected head warmth<br/>Neck fallback only when no head layer is selected]
     MATCH --> EDIT[Manual edits use the same local limits, raised ones included<br/>Catalog data and worn hoods resolved on server<br/>Cold shortfalls and local excess affect comfort]
     MODE -->|No: compatibility policy| LEGACY[Temperature and target selection retained]
-    LEGACY --> LHAND[Biking: active glove thresholds<br/>Alpine and touring: static glove thresholds]
-    LEGACY --> LHEAD[Head warmth by temperature<br/>Neck layer below freezing]
+    LEGACY --> LHAND[Glove nearest the hand target, excess counts double<br/>Penalty below its rating: active rating for biking,<br/>static rating for alpine and touring]
+    LEGACY --> LHEAD[Head: lightest rated item above 0°C,<br/>warmest rated item at 0°C and below<br/>Neck layer below freezing<br/>Helmet and hood are not counted]
     LHEAD --> HELMET{Alpine or touring descent?}
-    HELMET -->|Yes| REQUIRED[Required helmet selected separately<br/>Only compatible hoods contribute]
+    HELMET -->|Yes| REQUIRED[Required helmet selected separately<br/>Only compatible hoods contribute<br/>No warning when none is owned]
     HELMET -->|No| NOHELMET[No helmet from thermal selection]
 ```
 
@@ -305,12 +309,14 @@ The old fixed +0.3 clo extension no longer makes an outfit comfortable. Whole-bo
 
 Body-part targets are bands, like the whole-body target range. Whole-body and regional bands are converted from resultant IREQ to basic garment clo using each phase’s wind, movement and assumed outer permeability; the conversion never lowers a positive resultant requirement. Recommendations and manual edits compare actual regional garment clo with the same basic-clo phase bands. Standalone scoring retains its regional permeability conversion when no canonical phase assessment is supplied. Running targets assume only wind-resistant fabric when wind protection is required; a wet-only requirement accepts water-resistant fabrics with no known wind rating, so it cannot imply a membrane. These conservative targets stay independent of wardrobe ownership.
 
-Running/XC taper added cold margins while preserving the calculated whole-body heat-balance minimum; mild air alone cannot erase a positive requirement for a smaller body or an easy effort. The torso, arms and legs split the whole-body range by the activity's regional multipliers, rescaled so their area-weighted mean is 1: an outfit with every region at its minimum sits exactly at the whole-body minimum. Alpine uses equal multipliers for torso, arms and legs, with no extra leg bias. Hands and head scale the whole-body IREQ of the phase they follow; alpine uses the skiing phase, since its extremity multipliers already add chairlift and wind exposure. These local targets are heuristics, so running/XC taper their full bands to permit zero thermal accessory requirements in suitable mild conditions. The comfort status, the body-part pills, and the comfort score all judge shortfalls against the bottom of each band, in `src/lib/biophysics/comfort.ts`. Running/XC also apply the same 0.05 clo tolerance above explicit accessory upper limits during selection and manual evaluation. XC allows existing thin liner gloves up to 0.55 clo (plus that tolerance) for pole grip; this is a catalog-based engineering allowance, not a physiological threshold.
+Running/XC taper added cold margins while preserving the calculated whole-body heat-balance minimum; mild air alone cannot erase a positive requirement for a smaller body or an easy effort. The torso, arms and legs split the whole-body range by the activity's regional multipliers, rescaled so their weighted mean is 1 (weights 0.5 / 0.25 / 0.25, a SWTTR convention rather than measured body areas): an outfit with every region at its minimum sits exactly at the whole-body minimum. Alpine uses equal multipliers for torso, arms and legs, with no extra leg bias. Hands and head scale the whole-body IREQ of the phase they follow; alpine uses the skiing phase, since its extremity multipliers already add chairlift and wind exposure. These local targets are heuristics, so running/XC taper their full bands to permit zero thermal accessory requirements in suitable mild conditions. The comfort status, the body-part pills, and the comfort score all judge shortfalls against the bottom of each band, in `src/lib/biophysics/comfort.ts`. Running/XC also apply the same 0.05 clo tolerance above explicit accessory upper limits during selection and manual evaluation. XC allows existing thin liner gloves up to 0.55 clo (plus that tolerance) for pole grip; this is a catalog-based engineering allowance, not a physiological threshold.
+
+Whole-body clo here is the 0.5 / 0.25 / 0.25 mean of torso, arm and leg clo. It leaves out head, hands and feet, so it reads several times higher than a manikin's whole-body clo for the same cold-weather outfit (5.9 against 1.7 for one USARIEM T21-03 ensemble) and is comparable only with SWTTR's own targets. The [algorithm review](docs/algorithm-review.md) lists this with the other assumptions that have no support yet: metabolic rates outside running and XC, air speed from movement, the regional and extremity multipliers, and the margins.
 
 ```mermaid
 graph TD
     BALANCE[Whole-body heat-balance minimum] --> RANGE[Whole-body target range<br/>Running/XC taper added margins only<br/>Minimum never below heat balance]
-    RANGE --> SPLIT[Split across torso, arms and legs<br/>multipliers rescaled to an area-weighted mean of 1<br/>Alpine: equal torso, arm and leg targets]
+    RANGE --> SPLIT[Split across torso, arms and legs<br/>multipliers rescaled to a 0.5 / 0.25 / 0.25 weighted mean of 1<br/>Alpine: equal torso, arm and leg targets]
     SPLIT --> REG[Convert whole-body and regional bands to basic clo<br/>Phase-specific wind, motion and outer permeability<br/>Shared clothing area factor<br/>Never below resultant heat balance]
     PIREQ[Whole-body IREQ of the phase the hands and head follow<br/>alpine: skiing phase] --> EXT[Hand and head targets:<br/>activity multiplier × wind factor<br/>× temperature factor from 0.8 to 1<br/>+ CoWEDA-inspired extremity buffer<br/>Running/XC: taper both bands and buffer<br/>Allow zero thermal coverage in mild dry exercise]
 
