@@ -10,6 +10,7 @@ import type { WeatherData } from "@/types/weather";
 import type { BiophysicsOutcome, BiophysicsRecommendation, BiophysicsStatus } from "@/types/biophysics";
 import type { MultiDayLayerPlan } from "@/types/plan";
 import type { TemperatureSensitivity } from "@/types/preferences";
+import type { GearUpTripDay } from "@/types/trip-day-outing";
 import { readWeatherProvenance } from "@/lib/weatherProvenance";
 import type {
   Advice,
@@ -66,6 +67,8 @@ interface GearUpState {
   opensSave: boolean;
   /** The trip Save to trip picks for the result on screen, when it's the outing of a kit being updated. */
   saveTripId: string | null;
+  /** The trip day the outing is planned for, from Plan my layers on it (#335), or null. */
+  tripDay: GearUpTripDay | null;
 }
 
 /** An outing asked for again to save it, and how Save to trip starts on its results (#170). */
@@ -78,7 +81,7 @@ interface SaveOnReturn {
 }
 
 /** What's kept for the tab besides the activity, effort and place. */
-type RestoredFields = Pick<GearUpState, "inputMode" | "date" | "time" | "durationDays" | "lastOuting">;
+type RestoredFields = Pick<GearUpState, "inputMode" | "date" | "time" | "durationDays" | "lastOuting"> & Partial<Pick<GearUpState, "tripDay">>;
 
 type GearUpAction =
   | { type: "SET_INPUT_MODE"; mode: InputMode }
@@ -97,6 +100,8 @@ type GearUpAction =
   | { type: "SHOW_FORM"; mode: InputMode; keepLoading: boolean }
   /** `kept` is null when nothing was kept for `owner`. */
   | { type: "RESTORE"; owner: string | null; kept: RestoredFields | null; saveOnReturn?: SaveOnReturn | null }
+  /** Plans for a trip day, or with null, no longer for one. */
+  | { type: "SET_TRIP_DAY"; tripDay: GearUpTripDay | null }
   | { type: "RESET" };
 
 export function createInitialState(inputMode: InputMode): GearUpState {
@@ -115,6 +120,7 @@ export function createInitialState(inputMode: InputMode): GearUpState {
     saveOnReturn: null,
     opensSave: false,
     saveTripId: null,
+    tripDay: null,
   };
 }
 
@@ -173,13 +179,17 @@ export function gearUpReducer(state: GearUpState, action: GearUpAction): GearUpS
     case "SHOW_FORM": {
       // Keeps what was entered, and the last outing. Asking again for an
       // outing after signing in to save it starts here too.
-      const { date, time, durationDays, lastOuting, restored, owner, saveOnReturn } = state;
+      const { date, time, durationDays, lastOuting, restored, owner, saveOnReturn, tripDay } = state;
       const request: OutingRequestState = state.request.status === "loading" && action.keepLoading
         ? state.request : { status: "idle" };
-      return { ...createInitialState(action.mode), date, time, durationDays, lastOuting, restored, owner, saveOnReturn, request };
+      return { ...createInitialState(action.mode), date, time, durationDays, lastOuting, restored, owner, saveOnReturn, tripDay, request };
     }
     case "RESTORE":
-      return { ...state, ...action.kept, restored: true, owner: action.owner, saveOnReturn: action.saveOnReturn ?? null };
+      return {
+        ...state, ...action.kept, tripDay: action.kept?.tripDay ?? null, restored: true, owner: action.owner, saveOnReturn: action.saveOnReturn ?? null,
+      };
+    case "SET_TRIP_DAY":
+      return { ...state, tripDay: action.tripDay };
     case "RESET":
       return { ...createInitialState("now"), restored: state.restored, owner: state.owner };
     default:

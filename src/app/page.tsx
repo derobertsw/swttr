@@ -15,6 +15,8 @@ import { useWebMCPTools } from "@/hooks/useWebMCPTools";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OutingRequestNotice } from "@/components/OutingRequestNotice";
 import { SaveToTrip } from "@/components/trips/SaveToTrip";
+import { TripDayBar } from "@/components/trips/TripDayGearUp";
+import { isTripDayResult, planTripDayAgain } from "@/lib/trip-day-gear-up";
 
 /** Connect outing inputs, including XC context, to recommendations and saved kits. */
 const HomeContent = () => {
@@ -57,6 +59,9 @@ const HomeContent = () => {
     accountChanging,
     opensSave,
     saveTripId,
+    tripDay,
+    planTripDay,
+    leaveTripDay,
     reportDisplayedLayers,
     handleLayerEdit,
     submitOuting,
@@ -77,6 +82,9 @@ const HomeContent = () => {
         className="flex w-full flex-col items-center gap-6 animate-in fade-in duration-300 sm:gap-7"
       >
         {result && <h1 id="outing-result-heading" tabIndex={-1} className="sr-only">Gear up</h1>}
+        {tripDay && (
+          <TripDayBar tripDay={tripDay} shown={result?.outing ?? null} onPlanAgain={() => planTripDay(tripDay)} onLeave={leaveTripDay} />
+        )}
         {(result || (request.status === "error" && !request.field)) && (
           <OutingRequestNotice request={request} shownOuting={result?.outing} onRetry={handleRetryUpdate} />
         )}
@@ -157,7 +165,17 @@ const HomeContent = () => {
             weatherLoading={loading}
             // Back from signing in to save, the resumed outing's results open it
             // as they appear; to update a saved kit, it picks the kit's trip.
-            saveToTrip={(outfit) => <SaveToTrip outfit={outfit} defaultOpen={opensSave} defaultTripId={saveTripId} />}
+            // Planned from a trip day, it saves to that day (#335).
+            saveToTrip={(outfit) => (
+              <SaveToTrip
+                outfit={outfit}
+                defaultOpen={opensSave}
+                defaultTripId={saveTripId}
+                tripDay={tripDay && isTripDayResult(tripDay, result.outing) ? tripDay : null}
+                onPlanDayAgain={() => tripDay ? planTripDayAgain(tripDay.context, planTripDay) : Promise.resolve(null)}
+                onSavedToDay={leaveTripDay}
+              />
+            )}
           />
         )}
       </div>

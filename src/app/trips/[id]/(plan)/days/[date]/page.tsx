@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { useTrip } from "@/hooks/useTrip";
 import { useUserId } from "@/hooks/useUserId";
 import { SavedKitView } from "@/components/trips/SavedKitView";
+import { PlanMyLayersButton, useTripDayOuting } from "@/components/trips/TripDayGearUp";
 import { CopyDayCard } from "@/components/trips/CopyDayCard";
 import { canEditMemberKit } from "@/lib/trip-permissions";
 import { kitAdvice, kitWear } from "@/lib/trip-saved-kits";
@@ -178,6 +179,8 @@ export default function DayDetailPage({
   // The day's meet time, for every sport (#333), at the day's access point (#208, #210).
   const meet = data?.meets?.find((entry) => entry.date === date);
   const meetingPoint = data && day ? accessPointFor(data.stops, day)?.location.label ?? null : null;
+  // Whether Gear up can plan this person's layers for the day, worked out by the server (#335).
+  const dayOuting = useTripDayOuting(id, date, data ?? null, !!day && !!me && (planMyKit || !!myKit?.outfit));
   const fitOf = (kit: TripMemberDayKit | undefined) =>
     kit?.outfit && day ? outfitMismatches(kit.outfit, { date, activity: day.activity, stop: effectiveStop ?? null }) : [];
 
@@ -215,6 +218,12 @@ export default function DayDetailPage({
             )}
             {!activity && <a href="#day-activity-heading" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary">Choose an activity</a>}
             <ConditionsTask data={data} date={date} activity={activity} userId={userId} />
+            {/* The brief's clothing step: layers to plan, or the ones saved (#335). */}
+            {me && myKit?.outfit ? (
+              <a href={`#kit-${me.id}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-primary">Review saved layers</a>
+            ) : planMyKit && dayOuting.outing?.status === "ready" && (
+              <div className="mt-2"><PlanMyLayersButton day={dayOuting.outing} /></div>
+            )}
           </header>
 
           <DayStart data={data} date={date} meet={meet} meetingPoint={meetingPoint} notes={day.notes} memberId={me?.id}>
@@ -265,18 +274,14 @@ export default function DayDetailPage({
 
           {me && (myKit?.outfit ? (
             <div id={`kit-${me.id}`}>
-              <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} />
+              <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} dayOuting={dayOuting} />
             </div>
           ) : (
             // Without a row, the Day checklist links to the section itself (#336).
             <section id={planMyKit || hasKit(myKit) ? undefined : `kit-${me.id}`} aria-labelledby="my-kit-heading" className="flex flex-col gap-2.5">
               <h2 id="my-kit-heading" className="text-title font-semibold text-foreground">My kit</h2>
               {planMyKit ? (
-                <p className="text-sm text-muted-foreground">
-                  No outfit saved for this day.{" "}
-                  <Link href="/" className="font-medium text-foreground underline underline-offset-2">Get layers in Gear up</Link>
-                  {" "}and use Save to trip, or mark what you&apos;ll bring below.
-                </p>
+                <PlanMyKit dayOuting={dayOuting} />
               ) : (
                 // A checklist saved before the day changed stays visible, without asking for more.
                 <p className="text-sm text-muted-foreground">
@@ -646,6 +651,35 @@ function MemberKitRow({
 }
 
 /** Someone else's kit, read-only: their saved outfit, or their checklist. */
+/**
+ * My kit without a saved outfit (#335): Plan my layers opens Gear up on the
+ * day's outing and saves its layers back here, or, when the server says
+ * layers can't be planned for the day, why not. The checklist below stays
+ * the way to plan it by hand.
+ */
+function PlanMyKit({ dayOuting }: { dayOuting: ReturnType<typeof useTripDayOuting> }) {
+  const { outing, error, loading, retry } = dayOuting;
+  if (loading) return <p className="text-sm text-muted-foreground">No outfit saved for this day.</p>;
+  if (error || !outing) {
+    return (
+      <div className="flex flex-col items-start gap-1 text-sm">
+        <p className="text-muted-foreground">No outfit saved for this day. Couldn&apos;t check whether Gear up can plan it: {error}</p>
+        <Button type="button" variant="outline" size="sm" onClick={retry}>Try again</Button>
+        <p className="text-muted-foreground">Or mark what you&apos;ll bring below.</p>
+      </div>
+    );
+  }
+  if (outing.status !== "ready") return <p className="text-sm text-muted-foreground">No outfit saved for this day. {outing.message}</p>;
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <p className="text-sm text-muted-foreground">
+        No outfit saved for this day. Plan my layers gets them in Gear up for this day&apos;s plan and saves them here, or mark what you&apos;ll bring below.
+      </p>
+      <PlanMyLayersButton day={outing} variant="outline" />
+    </div>
+  );
+}
+
 function MemberKitSummary({ member, kit, fit, away }: { member: TripMember; kit: TripMemberDayKit | undefined; fit: string[]; away?: string }) {
   const outfit = kit?.outfit;
   const wear = outfit ? kitWear(outfit)[0]?.wear : undefined;

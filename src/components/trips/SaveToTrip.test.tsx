@@ -4,12 +4,17 @@ import userEvent from "@testing-library/user-event";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { savedOutfit, savedPlan } from "@/test/savedKit";
 import { fakeTripApi, reply, sentBodies, TRIP } from "@/test/tripApi";
+import { toast } from "sonner";
 import type { SaveKitOptions, SaveKitRequest } from "@/types/savedKit";
+import type { GearUpTripDay } from "@/types/trip-day-outing";
 import type { TripMemberDayKit } from "@/types/trips";
 import { SaveToTrip } from "./SaveToTrip";
 
 const mockAuth = vi.hoisted(() => ({ userId: "user-1" as string | null, isLoaded: true }));
 vi.mock("@clerk/nextjs", () => ({ useAuth: () => mockAuth }));
+const mockPush = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush }) }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
 
 const OPTIONS: SaveKitOptions = {
   dates: ["2026-10-10"],
@@ -391,5 +396,146 @@ describe("Save a multi-day plan to a trip", () => {
     await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
     await user.click(await within(dialog).findByRole("button", { name: "Keep saved kits" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+});
+
+describe("Save layers planned from a trip day (#335)", () => {
+  const TRIP_DAY: GearUpTripDay = {
+    outing: savedOutfit().outing,
+    context: {
+      trip_id: TRIP.id, trip_name: "Whistler", date: "2026-10-10", day_number: 2, day_count: 4, member_id: "member-you",
+      planned: { day_id: "day-1", activity: "Alpine", stop: { id: "stop-stowe", latitude: 44.47, longitude: -72.69 }, participation: "participating" },
+    },
+  };
+  const DAY_CHANGED = { error: "This day changed while you were planning.", code: "day_changed", changes: ["Activity changed to Hike."] };
+
+  async function openForDay(props: Partial<Parameters<typeof SaveToTrip>[0]> = {}) {
+    const user = userEvent.setup();
+    const onSavedToDay = vi.fn();
+    render(<SaveToTrip outfit={savedOutfit()} tripDay={TRIP_DAY} onSavedToDay={onSavedToDay} {...props} />);
+    await user.click(screen.getByRole("button", { name: "Save to trip" }));
+    return { user, onSavedToDay, dialog: await screen.findByRole("dialog") };
+  }
+
+  beforeEach(() => {
+    mockAuth.userId = "user-1";
+    sessionStorage.clear();
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("saves to the day it was planned for, with the day as planned, then goes back to it", async () => {
+    const fetchMock = setup({ "POST /api/v1/trips/kits": reply(200, SAVED) });
+    const { user, dialog, onSavedToDay } = await openForDay();
+    expect(await within(dialog).findByText("Day 2 of 4 · Sat, Oct 10 · your kit for the day you planned from")).toBeInTheDocument();
+    // No other trip to pick by mistake.
+    expect(within(dialog).queryByRole("radio")).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledExactlyOnceWith("/trips/trip-1/days/2026-10-10#kit-member-you"));
+    expect(onSavedToDay).toHaveBeenCalledOnce();
+    expect(toast.success).toHaveBeenCalledWith("Saved to Day 2 of 4 · Sat, Oct 10");
+    const [sent] = sentBodies(fetchMock, "POST /api/v1/trips/kits") as SaveKitRequest[];
+    expect(sent).toEqual({
+      save_id: expect.any(String), target: { trip_id: TRIP.id }, outfit: savedOutfit(),
+      trip_day: { date: "2026-10-10", planned: TRIP_DAY.context.planned },
+    });
+  });
+
+  it("saves to another trip only when the person picks one, and stays on the layers", async () => {
+    const fetchMock = setup({ "POST /api/v1/trips/kits": reply(201, { ...SAVED, created: true, trip: { ...TRIP, id: "trip-9" } }) });
+    const { user, dialog, onSavedToDay } = await openForDay();
+    await user.click(await within(dialog).findByRole("button", { name: "Save to another trip instead" }));
+    await user.click(within(dialog).getByRole("radio", { name: /New trip/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save kit" }));
+    await within(dialog).findByRole("link", { name: "Open trip day" });
+    const [sent] = sentBodies(fetchMock, "POST /api/v1/trips/kits") as SaveKitRequest[];
+    expect(sent).not.toHaveProperty("trip_day");
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(onSavedToDay).not.toHaveBeenCalled();
+  });
+
+  it("asks where to save when the trip no longer includes the day", async () => {
+    setup({ "POST /api/v1/trips/kits/options": reply(200, { ...OPTIONS, trips: [{ ...OPTIONS.trips[0], day_number: null }] }) });
+    const { dialog } = await openForDay();
+    expect(await within(dialog).findByText("Whistler no longer includes Sat, Oct 10, so choose where to save these layers.")).toBeInTheDocument();
+    expect(within(dialog).getByRole("radio", { name: /New trip/ })).toBeChecked();
+  });
+
+  it("stops when the day changed while planning, and saves these layers anyway only when asked", async () => {
+    let attempts = 0;
+    const fetchMock = setup({ "POST /api/v1/trips/kits": () => (++attempts === 1 ? reply(409, DAY_CHANGED) : reply(200, SAVED)) });
+    const { user, dialog } = await openForDay();
+    await user.click(await within(dialog).findByRole("button", { name: "Save kit" }));
+    expect(await within(dialog).findByRole("heading", { name: "This day changed while you were planning" })).toBeInTheDocument();
+    expect(within(dialog).getByText("Activity changed to Hike.")).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Save anyway" }));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledExactlyOnceWith("/trips/trip-1/days/2026-10-10#kit-member-you"));
+    const [first, anyway] = sentBodies(fetchMock, "POST /api/v1/trips/kits") as SaveKitRequest[];
+    expect(anyway).toEqual({ ...first, trip_day: undefined });
+    expect(anyway).not.toHaveProperty("trip_day");
+  });
+
+  it("plans again for the day as it is now, or says why it can't", async () => {
+    setup({ "POST /api/v1/trips/kits": reply(409, DAY_CHANGED) });
+    const onPlanDayAgain = vi.fn()
+      .mockResolvedValueOnce("Nothing to plan for a Travel day.")
+      .mockResolvedValueOnce(null);
+    const { user, dialog } = await openForDay({ onPlanDayAgain });
+    await user.click(await within(dialog).findByRole("button", { name: "Save kit" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Plan again" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Nothing to plan for a Travel day.");
+    expect(within(dialog).getByRole("link", { name: "Back to trip day" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-10#kit-member-you");
+    expect(within(dialog).queryByRole("button", { name: "Plan again" })).not.toBeInTheDocument();
+  });
+
+  it("keeps Plan again when the day couldn't be loaded, since asking again may work", async () => {
+    setup({ "POST /api/v1/trips/kits": reply(409, DAY_CHANGED) });
+    const onPlanDayAgain = vi.fn()
+      .mockRejectedValueOnce(new Error("Network error"))
+      .mockResolvedValueOnce(null);
+    const { user, dialog } = await openForDay({ onPlanDayAgain });
+    await user.click(await within(dialog).findByRole("button", { name: "Save kit" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Plan again" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Couldn't load the day: Network error");
+    expect(within(dialog).queryByRole("link", { name: "Back to trip day" })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Plan again" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(onPlanDayAgain).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes once Gear up is planning the day again", async () => {
+    setup({ "POST /api/v1/trips/kits": reply(409, DAY_CHANGED) });
+    const onPlanDayAgain = vi.fn().mockResolvedValue(null);
+    const { user, dialog } = await openForDay({ onPlanDayAgain });
+    await user.click(await within(dialog).findByRole("button", { name: "Save kit" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Plan again" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(onPlanDayAgain).toHaveBeenCalledOnce();
+  });
+
+  it("asks before replacing the day's kit, then goes back to the day", async () => {
+    let attempts = 0;
+    const fetchMock = setup({ "POST /api/v1/trips/kits": () => (++attempts === 1 ? reply(409, CONFLICT) : reply(200, SAVED)) });
+    const { user, dialog } = await openForDay();
+    await user.click(await within(dialog).findByRole("button", { name: "Save kit" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Replace kit" }));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledOnce());
+    const [, replaced] = sentBodies(fetchMock, "POST /api/v1/trips/kits") as SaveKitRequest[];
+    expect(replaced).toMatchObject({ trip_day: { date: "2026-10-10" }, replace: { "2026-10-10": KIT.updated_at } });
+  });
+
+  it("keeps a failed save to retry, without leaving the layers", async () => {
+    let attempts = 0;
+    setup({ "POST /api/v1/trips/kits": () => (++attempts === 1 ? reply(503, { error: "Unavailable" }) : reply(200, SAVED)) });
+    const { user, dialog } = await openForDay();
+    await user.click(await within(dialog).findByRole("button", { name: "Save kit" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Retry save" }));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledOnce());
+    expect(attempts).toBe(2);
   });
 });

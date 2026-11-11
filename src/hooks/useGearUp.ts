@@ -29,6 +29,7 @@ import type { CurrentOutingSnapshot, DisplayedLayers, OutingActionOutcome, Readb
 import { logWarn } from "@/lib/logger";
 import { RESUME_PARAM, resumeView, TRIP_PARAM, type ResumeView } from "@/lib/outingReturn";
 import type { LaterTime, LayersResult, Outing, OutingTime } from "@/types/outing";
+import type { GearUpTripDay } from "@/types/trip-day-outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
 import type { XCContext } from '@/types/xc';
@@ -72,7 +73,8 @@ function removeResumeParam() {
  * The results have their own browser history entry, and what was entered is
  * kept for the tab, so Back, Forward and a reload keep the outing. Sign-in
  * and Wardrobe come back to /?resume=outing, which asks for it again, or to
- * /?resume=packing, which also opens the plan on its packing list.
+ * /?resume=packing, which also opens the plan on its packing list. Plan my
+ * layers on a trip day keeps that day with the outing it asks for (#335).
  */
 export function useGearUp() {
   const [xcContext, setXCContext] = useReducer((_previous: XCContext, next: XCContext) => next, {});
@@ -438,6 +440,8 @@ export function useGearUp() {
    */
   const setInputMode = backToForm;
   const showPlanForm = useCallback(() => backToForm("later"), [backToForm]);
+  /** No longer plans for a trip day: Save to trip asks where to save again. */
+  const leaveTripDay = useCallback(() => dispatch({ type: "SET_TRIP_DAY", tripDay: null }), []);
   /** Edit outing starts from the shown result, including changes to its place or time. */
   const editOuting = useCallback(() => backToForm(state.result?.outing.when.mode ?? state.inputMode), [backToForm, state.result, state.inputMode]);
 
@@ -454,6 +458,11 @@ export function useGearUp() {
     const shown = await showOuting(isCurrent, outing);
     if (!shown && isCurrent()) leaveResultsEntry();
   }, [showForm, applyOutingInputs, startRequest, showOuting, leaveResultsEntry]);
+  /** Asks for layers for a trip day's outing, as Plan my layers on that day does (#335). */
+  const planTripDay = useCallback((tripDay: GearUpTripDay) => {
+    dispatch({ type: "SET_TRIP_DAY", tripDay });
+    void resume(tripDay.outing);
+  }, [resume]);
 
   // What was entered in this tab comes back once it's known who's signed in,
   // like after a reload, or after going to another page and coming back. On
@@ -483,6 +492,7 @@ export function useGearUp() {
         time: draft.time,
         durationDays: draft.durationDays,
         lastOuting: draft.lastOuting,
+        tripDay: draft.tripDay ?? null,
       },
       // Back to save the outing: Save to trip opens after signing in, or
       // picks the trip whose kit is being updated.
@@ -610,6 +620,7 @@ export function useGearUp() {
       time: state.time,
       durationDays: state.durationDays,
       lastOuting: state.lastOuting,
+      tripDay: state.tripDay,
     });
   }, [
     restored,
@@ -624,6 +635,7 @@ export function useGearUp() {
     state.time,
     state.durationDays,
     state.lastOuting,
+    state.tripDay,
   ]);
 
   // The browser's Back from the results shows the form, as Edit outing does,
@@ -712,5 +724,8 @@ export function useGearUp() {
     resetToInitialState,
     opensSave: !accountChanging && state.opensSave,
     saveTripId: accountChanging ? null : state.saveTripId,
+    tripDay: accountChanging ? null : state.tripDay,
+    planTripDay,
+    leaveTripDay,
   };
 }
