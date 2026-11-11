@@ -4,7 +4,9 @@
 // Unit conversion
 export const CLO_TO_M2KW = 0.155; // 1 clo = 0.155 m²K/W
 
-// Metabolic rates (W/m²)
+// Metabolic rates (W/m²). The MET labels use 58.2 W/m² per MET. A Compendium
+// MET (1 kcal/kg/h) is about 46.5 W/m² for the default body; running and XC
+// convert that way in bodyMetrics.ts. See docs/algorithm-review.md.
 export const METABOLIC_RATES = {
   resting: 58.2,              // 1 MET
   light_activity: 116.4,      // 2 MET
@@ -24,7 +26,9 @@ export const METABOLIC_RATES = {
 export const SKIN_TEMP_NEUTRAL = 33.7;
 export const SKIN_TEMP_MINIMUM = 30.0; // Below this = discomfort/risk
 
-// Regional weights for whole-body calculation (USARIEM Eq. 1)
+// Weights for SWTTR's whole-body clo: a linear mean of torso, arm and leg clo.
+// A convention, not T21-03's Eq. 1 (a parallel average over manikin zone areas).
+// By area the three are about 0.40 / 0.20 / 0.39. See docs/algorithm-review.md.
 export const REGIONAL_WEIGHTS = {
   torso: 0.50,
   arm: 0.25,
