@@ -577,6 +577,8 @@ describe("Touring equipment", () => {
     await renderPage();
     expect(await screen.findByText(/Add the touring equipment you're bringing/)).toBeInTheDocument();
     const open = screen.getByRole("button", { name: "Add touring equipment" });
+    // Its label wraps with enlarged text rather than run off a phone (#337).
+    expect(open).toHaveClass("whitespace-normal");
     await user.click(open);
     const dialog = await screen.findByRole("dialog", { name: "Touring equipment" });
     // The suggested additions start selected; optional items don't.

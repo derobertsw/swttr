@@ -94,6 +94,9 @@ function dayCount(start: string, end: string) {
  * one is its own page. The bar sticks below the safe area so a long day can
  * change section without scrolling back up; `data-trip-sections` gives the
  * page scroll padding (globals.css), so linked headings land below it.
+ * Four in a row need about 17.5rem; with enlarged text a phone has less than
+ * that, so they go two by two rather than run into each other (#337). The
+ * container query is in rem, so it follows the text size.
  */
 function TripSectionNav({ tripId, current, currentIsSectionPage, planPath }: {
   tripId: string;
@@ -103,8 +106,8 @@ function TripSectionNav({ tripId, current, currentIsSectionPage, planPath }: {
   planPath: string | null;
 }) {
   return (
-    <nav aria-label="Trip sections" data-trip-sections className="sticky top-[env(safe-area-inset-top)] z-20 bg-background">
-      <ul className="grid grid-cols-4 border-b border-border sm:flex sm:gap-2">
+    <nav aria-label="Trip sections" data-trip-sections className="@container sticky top-[env(safe-area-inset-top)] z-20 bg-background">
+      <ul className="grid grid-cols-2 border-b border-border @min-[17.5rem]:grid-cols-4 sm:flex sm:gap-2">
         {TRIP_SECTIONS.map((section) => {
           const active = section.id === current;
           // Plan, from elsewhere, goes back to the day it showed, or opens
