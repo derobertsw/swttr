@@ -15,11 +15,15 @@ const listed = (items: string[]) => items.length < 2 ? items.join("") : `${items
  * option for the compared nights. It's the same change, preview and save as
  * the Stays page's own: Change nights for a saved stay, and Add stay with
  * who's staying for an option, which becomes a stay with the option's id.
- * Bookings are never changed. See docs/trip-stays.md#use-for-these-nights.
+ * Bookings are never changed. An option is saved only as its preview showed it:
+ * `expected_candidate_revision` is checked with the save (use_trip_stay_candidate),
+ * or just before it until that function's migration is applied. See
+ * docs/trip-stays.md#use-for-these-nights.
  *
  * Body: `{option, first_night, checkout, member_ids?}`, and to save,
  * `{expected_revision, expected_people_key, mutation_id, replace_nights?}`
- * from the preview. Without `member_ids` it's everyone on the trip those
+ * from the preview, and `expected_candidate_revision` when it made a new stay
+ * from an option. Without `member_ids` it's everyone on the trip those
  * nights: the crew, and anyone else already planned for one of them.
  */
 export async function handleUseOption(request: Request, tripId: string, { preview }: { preview: boolean }) {
@@ -40,10 +44,24 @@ export async function handleUseOption(request: Request, tripId: string, { previe
     return jsonError("Couldn't load the stays. Try again.", 500);
   }
   if (!rows.per_member) return jsonError("Choosing a stay for these nights needs per-person nights. Plan the nights on Stays for now.", 503);
-  // An option already used is the stay it became.
-  const stay = rows.stays.find((saved) => saved.id === id);
-  const candidate = !stay && kind === "candidate" ? candidates.find((saved) => saved.id === id) : undefined;
+  // Saving an option as a new stay names the option's revision its preview showed.
+  const expectedOption = preview ? null : body.expected_candidate_revision ?? null;
+  if (expectedOption !== null && (kind !== "candidate" || !Number.isSafeInteger(expectedOption) || (expectedOption as number) < 1)) {
+    return jsonError("Reload the comparison and review the nights again before saving.", 400);
+  }
+  const saved = rows.stays.find((entry) => entry.id === id);
+  const option = kind === "candidate" ? candidates.find((entry) => entry.id === id) : undefined;
+  if (expectedOption !== null && option?.revision !== expectedOption) {
+    // Edited or removed since the preview, so it isn't the place that was reviewed. A
+    // retried save of an unchanged option rebuilds the same change and gets its first result.
+    return jsonError("This option changed since you reviewed it. Review it again.", 409);
+  }
+  // An option already used is the stay it became, except when saving it as previewed: a
+  // retry, after the stay was created, must send the same change again.
+  const stay = expectedOption === null ? saved : undefined;
+  const candidate = stay ? undefined : option;
   if (!stay && !candidate) return jsonError(kind === "stay" ? "Stay not found in this trip." : "Option not found in this trip.", 404);
+  if (!preview && candidate && expectedOption === null) return jsonError("Reload the comparison and review the nights again before saving.", 400);
 
   const lodging = buildLodging(auth.trip, rows.stays, rows.assignments, { members, attendance: rows.attendance, per_member: true });
   const nights = dates(window.first_night, window.checkout);
@@ -90,16 +108,10 @@ export async function handleUseOption(request: Request, tripId: string, { previe
     ...preview ? { expected_revision: lodging.revision, expected_people_key: lodging.people_key }
       : { expected_revision: body.expected_revision, expected_people_key: body.expected_people_key, mutation_id: body.mutation_id, replace_nights: body.replace_nights },
   }) });
-  const response = await handleLodging(forwarded, tripId, { action: change.action, preview });
-  if (!response.ok) return response;
-  if (!preview) {
-    // The option is a stay now; remove it from the options. If this fails it stays hidden behind the stay.
-    if (candidate) {
-      await Promise.resolve(auth.supabase.rpc("mutate_trip_stay_candidate", { p_trip_id: tripId, p_user_id: auth.userId, p_action: "remove",
-        p_payload: { id: candidate.id, expected_revision: candidate.revision } })).catch(() => undefined);
-    }
-    return response;
-  }
+  // The option is kept: it's listed with the stays from then on, and a retry rebuilds this change from it.
+  const response = await handleLodging(forwarded, tripId, { action: change.action, preview,
+    ...!preview && candidate ? { candidate: { id: candidate.id, revision: expectedOption as number } } : {} });
+  if (!response.ok || !preview) return response;
   const result = await response.json() as TripLodgingPreview;
   // The booked stays the chosen people leave those nights: they stay booked.
   const leaving = new Set(going.flatMap((person) => nights.flatMap((night) => {
@@ -107,7 +119,7 @@ export async function handleUseOption(request: Request, tripId: string, { previe
     return row?.stay_id && row.stay_id !== id ? [row.stay_id] : [];
   })));
   const usePreview: TripStayUsePreview = {
-    ...result, member_ids: going.map((person) => person.member_id), stay_name: name, new_stay: !stay,
+    ...result, member_ids: going.map((person) => person.member_id), stay_name: name, new_stay: !stay, candidate_revision: candidate?.revision ?? null,
     booked_kept: rows.stays.filter((saved) => leaving.has(saved.id) && saved.booking_status === "booked").map((saved) => saved.name),
   };
   return NextResponse.json(usePreview);

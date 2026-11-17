@@ -895,6 +895,8 @@ export interface TripStayUsePreview extends TripLodgingPreview {
   stay_name: string;
   /** An option, which becomes a saved stay for these nights, booking not confirmed. */
   new_stay: boolean;
+  /** The option's revision for a new stay; the save sends it back as `expected_candidate_revision`. */
+  candidate_revision: number | null;
   /** Booked stays the chosen people leave those nights. They stay booked. */
   booked_kept: string[];
 }

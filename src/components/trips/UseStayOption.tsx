@@ -66,7 +66,8 @@ export function UseStayOption({ tripId, option, window, people, onClose, onClose
     setBusy(true); setError(null);
     try {
       await timedTripRequest(url, "POST", { ...request, preview: false, member_ids: memberIds, expected_revision: preview.revision,
-        expected_people_key: preview.people_key, mutation_id: mutationId.current, replace_nights: replacement });
+        expected_people_key: preview.people_key, mutation_id: mutationId.current, replace_nights: replacement,
+        ...preview.candidate_revision === null ? {} : { expected_candidate_revision: preview.candidate_revision } });
       await onSaved(`${option.name} is now the stay for these nights. Bookings weren't changed.`);
       setOpen(false);
     } catch (err) {

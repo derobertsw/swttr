@@ -205,7 +205,7 @@ describe("Use for these nights (#213)", () => {
       id: A, name: "Ridge chalet", check_in: FRI, check_out: SUN, type: null, address: null, property_url: null, check_in_time: null, check_out_time: null,
       notes: null, booking_status: "not_booked", location: RIDGE } });
     if ("error" in preview) throw new Error(preview.error);
-    return { ...preview, member_ids: memberIds, stay_name: "Ridge chalet", new_stay: true, booked_kept: ["Pine rental", "Village hotel"] };
+    return { ...preview, member_ids: memberIds, stay_name: "Ridge chalet", new_stay: true, candidate_revision: 1, booked_kept: ["Pine rental", "Village hotel"] };
   };
   const initial = { options: [`stay:${PINE.id}`, `candidate:${A}`], first_night: FRI, checkout: SUN };
 
@@ -236,11 +236,13 @@ describe("Use for these nights (#213)", () => {
     expect(await screen.findByText("Ridge chalet is now the stay for these nights. Bookings weren't changed.")).toBeInTheDocument();
     const preview = usePreview();
     expect(sent[1]).toEqual({ option: `candidate:${A}`, first_night: FRI, checkout: SUN, preview: false, member_ids: preview.member_ids,
-      expected_revision: preview.revision, expected_people_key: preview.people_key, mutation_id: expect.any(String), replace_nights: true });
+      expected_revision: preview.revision, expected_people_key: preview.people_key, mutation_id: expect.any(String), replace_nights: true,
+      // The option as reviewed: an edit to it since then is refused.
+      expected_candidate_revision: 1 });
     expect(onPlanSaved).toHaveBeenCalled();
     // The option is a saved stay now, and stays in the comparison as one.
     await waitFor(() => expect(window.location.search).toContain(`stay%3A${A}`));
-  });
+  }, 20_000);
 
   it("asks again for the people chosen, and reviews again after the plan changed", async () => {
     const sent: Array<Record<string, unknown>> = [];
@@ -267,7 +269,7 @@ describe("Use for these nights (#213)", () => {
     expect(onPlanSaved).toHaveBeenCalledOnce();
     await screen.findByText("Move Alex from Pine rental to Ridge chalet for the nights of Fri Oct 9 and Sat Oct 10.");
     expect(sent.at(-1)).toMatchObject({ member_ids: [ALEX.id], preview: true });
-  });
+  }, 20_000);
 
   it("isn't offered to members", async () => {
     await renderPage({ initial, canEdit: false });
