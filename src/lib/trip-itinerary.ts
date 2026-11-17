@@ -1,6 +1,7 @@
 import "server-only";
 import { TOUR_ACTIVITY, tripActivityLabel } from "@/lib/trip-activities";
 import { dateLabel, isCalendarDate, isUuid } from "@/lib/trip-lodging";
+import { returningReviewsNote, type ConditionsRows } from "@/lib/trip-conditions";
 import { accessPointFor, sameLocation } from "@/lib/trip-location";
 import type { TripDay, TripFull, TripItineraryOption, TripItineraryPreview, TripItineraryRequest, TripMember, TripMemberDayKit, TripPlace, TripStop } from "@/types/trips";
 
@@ -462,9 +463,11 @@ const near = (a: number | null, b: number) => a !== null && Math.abs(a - b) <= 0
  * The options for a change, each with the days it changes and the payload to
  * save it. `full.stops` is in position order, as loadTripFull returns it.
  * `userId` is the signed-in user, whose kit a copy can bring and whose kits the
- * review calls "your".
+ * review calls "your". `conditions` holds every review recorded on the trip,
+ * for a copy that brings conditions sources (#211): a day the source was
+ * removed from keeps its reviews, and they show again once it's listed there.
  */
-export function previewItinerary(full: TripFull, request: TripItineraryRequest, userId?: string | null): TripItineraryPreview | { error: string; status: 400 | 403 | 404 } {
+export function previewItinerary(full: TripFull, request: TripItineraryRequest, userId?: string | null, conditions?: ConditionsRows): TripItineraryPreview | { error: string; status: 400 | 403 | 404 } {
   const { stops, days } = full;
   const base = stops[0];
   const stopFor = (day: Pick<TripDay, "stop_id">) => stops.find((stop) => stop.id === day.stop_id) ?? base;
@@ -636,19 +639,29 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest, 
       const parts = [sourceKit && `your ${what}`, tour && `its tour plan (${tour.objective})`, copiedSources.length > 0 && `its conditions sources (${sourceNames})`]
         .filter((part): part is string => !!part);
       // Sources are added to what each day lists, whichever is chosen: the day keeps its own.
-      const sourceNotes = (day: TripDay) => {
+      // Reviews recorded on the day before a source was removed from it show
+      // again, against the day's plan after the copy (and the tour plan, when it gets the copied one).
+      const sourceNotes = (day: TripDay, getsPlan: boolean) => {
         const there = new Set(sourcesOn(full, day).map((listing) => listing.id));
-        const names = (keep: boolean) => copiedSources.filter((listing) => there.has(listing.id) === keep).map((listing) => listing.name);
+        const copiedDay = { ...day, stop_id: source.stop_id, activity: source.activity };
+        const plans = getsPlan ? [...(full.tour_plans ?? []).filter((plan) => plan.trip_day_id !== day.id), { ...tour!, trip_day_id: day.id }] : full.tour_plans;
+        const returning = (listing: (typeof copiedSources)[number]) => conditions ? returningReviewsNote(conditions, { stops, tour_plans: plans }, copiedDay, listing) : null;
+        const adding = copiedSources.filter((listing) => !there.has(listing.id));
+        const fresh = adding.filter((listing) => !returning(listing)).map((listing) => listing.name);
         return [
-          names(false).length > 0 && `Lists ${listed(names(false))} too, with no review recorded for this day: reviews stay on ${from}.`,
-          names(true).length > 0 && `Already lists ${listed(names(true))}.`,
+          fresh.length > 0 && `Lists ${listed(fresh)} too, with no review recorded for this day: reviews stay on ${from}.`,
+          ...adding.flatMap((listing) => {
+            const note = returning(listing);
+            return note ? [`Lists ${listing.name} too. ${note}`] : [];
+          }),
+          adding.length < copiedSources.length && `Already lists ${listed(copiedSources.filter((listing) => there.has(listing.id)).map((listing) => listing.name))}.`,
         ].filter((note): note is string => !!note);
       };
       const copied = (replace: boolean) => new Map(targets.flatMap((day): Array<[string, Copied]> => {
         const kit = !!sourceKit && (replace || !myKit(day));
         const existing = tour && tourPlanFor(full, day);
         const getsPlan = !!tour && (replace || !existing);
-        const listings = sourceNotes(day);
+        const listings = sourceNotes(day, getsPlan);
         if (!kit && !getsPlan && listings.length === 0) return [];
         const notes = [
           kit && (myKit(day) ? `Your kit here is replaced with your ${what} from ${from}.` : `Gets your ${what} from ${from}.`),

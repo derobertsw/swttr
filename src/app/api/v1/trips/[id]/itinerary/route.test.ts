@@ -247,6 +247,23 @@ describe("Reviewing and saving itinerary changes", () => {
     expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary_reviewed", expect.not.objectContaining({ p_conditions: expect.anything() }));
   });
 
+  it("previews copying conditions sources with a target day's kept reviews, for the organizer", async () => {
+    const MWAC = "8a7b6c5d-4e3f-4a1b-9c8d-7e6f5a4b3c2d";
+    const supabase = { ...createFakeSupabase({ ...tables,
+      trip_conditions_sources: [{ id: MWAC, trip_id: TRIP.id, category: "avalanche", name: "MWAC", region: null, url: "https://example.org/", revision: 1, created_at: "2026-10-01T00:00:00Z" }],
+      // Listed on Saturday; Monday listed it once, and Sam's review there was kept when it was removed.
+      trip_day_conditions_sources: [{ trip_id: TRIP.id, trip_day_id: "day-10", source_id: MWAC, created_at: "2026-10-01T00:00:00Z" }],
+      trip_conditions_reviews: [{ id: "entry-1", entry_number: 1, trip_id: TRIP.id, trip_day_id: "day-12", source_id: MWAC, user_id: "user-2",
+        action: "reviewed", note: null, reviewed_at: "2026-10-09T12:00:00Z", created_at: "2026-10-09T12:00:00Z",
+        context: { date: "2026-10-12", stop: null, activity: null, access_point: null, route: null, source: { url: "https://example.org/", region: null } } }],
+    } as unknown as Parameters<typeof createFakeSupabase>[0]), rpc } as unknown as SupabaseClient;
+    vi.mocked(requireTripAccess).mockResolvedValue({ supabase, userId: TRIP.owner_user_id, trip: TRIP });
+    const preview = await previewOf({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: false, sources: true });
+    expect(preview.options[0].changes[0].notes).toEqual([
+      "Lists MWAC too. 1 review recorded here before it was removed shows again, marked Plan changed — review again.",
+    ]);
+  });
+
   it("previews copying conditions sources only for the organizer", async () => {
     const response = await post({ preview: true, action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: false, sources: true });
     expect([response.status, await response.json()]).toEqual([403, { error: "Only the organizer can copy conditions sources." }]);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError, readJson } from "@/lib/api";
 import { parseAccessPointsCheck, parseConditionsCheck, parseItineraryEdit, parseItineraryRequest, parseTourPlansCheck, previewItinerary, requestFor, type TourPlansCheck } from "@/lib/trip-itinerary";
+import { loadConditions } from "@/lib/trip-conditions";
 import { loadTripFull, requireTripAccess, tripFullFor } from "@/lib/trips";
 import type { TripItineraryRequest } from "@/types/trips";
 
@@ -19,8 +20,12 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
   const { supabase, userId } = auth;
 
   const preview = async (change: TripItineraryRequest) => {
-    const full = await loadTripFull(supabase, id);
-    return full ? previewItinerary(tripFullFor(full, userId), change, userId) : { error: "Not found", status: 404 as const };
+    // A copy that brings conditions sources (#211) says which of a day's kept reviews show again.
+    const [full, conditions] = await Promise.all([
+      loadTripFull(supabase, id),
+      change.action === "copy_day" && change.sources ? loadConditions(supabase, id) : undefined,
+    ]);
+    return full ? previewItinerary(tripFullFor(full, userId), change, userId, conditions) : { error: "Not found", status: 404 as const };
   };
 
   const body = await readJson<Record<string, unknown>>(request);

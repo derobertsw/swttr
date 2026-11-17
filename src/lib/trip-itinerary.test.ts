@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { conditionsContext, type ConditionsRows } from "@/lib/trip-conditions";
 import { parseItineraryEdit, previewItinerary, requestFor } from "@/lib/trip-itinerary";
 import { ORGANIZER, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
 import type { TripDay, TripDayConditionsSource, TripItineraryRequest, TripMember, TripMemberDayKit, TripTourPlanSummary } from "@/types/trips";
@@ -279,6 +280,34 @@ describe("Conditions sources in a copy (#211)", () => {
     expect(copy.changes.map((change) => [change.date, change.notes])).toEqual([
       ["2026-10-11", ["Lists MWAC and Mount Washington Observatory too, with no review recorded for this day: reviews stay on Sat Oct 10."]],
       ["2026-10-12", ["Lists MWAC too, with no review recorded for this day: reviews stay on Sat Oct 10.", "Already lists Mount Washington Observatory."]],
+    ]);
+  });
+
+  it("says when a day's own reviews from before a source was removed from it show again, against the plan after the copy", () => {
+    const sunday = trip.days[1];
+    const copiedSunday = { ...sunday, stop_id: STOWE_STOP.id, activity: null };
+    const review = (n: number, user: string, sourceId: string, context: object) => ({
+      id: `kept-${n}`, entry_number: n, trip_day_id: sunday.id, source_id: sourceId, user_id: user, action: "reviewed" as const, note: null,
+      reviewed_at: `2026-10-09T1${n}:00:00Z`, created_at: `2026-10-09T1${n}:00:00Z`, context,
+    });
+    const [mwac, obs] = trip.conditions;
+    const rows = (reviews: ConditionsRows["reviews"]): ConditionsRows => ({ sources: [mwac, obs], attachments: [], reviews });
+    // Sam's review of MWAC matches Sunday as the copy leaves it; Alex's of the Observatory was for Sunday's hike.
+    const [copy] = options(previewItinerary(trip, request, "user-1", rows([
+      review(1, "user-2", MWAC, conditionsContext(trip, copiedSunday, mwac)),
+      review(2, "user-3", OBS, conditionsContext(trip, sunday, obs)),
+    ])));
+    expect(copy.changes.find((change) => change.date === "2026-10-11")?.notes).toEqual([
+      "Lists MWAC too. 1 review recorded here before it was removed shows again.",
+      "Lists Mount Washington Observatory too. 1 review recorded here before it was removed shows again, marked Plan changed — review again.",
+    ]);
+    // A withdrawn review stays withdrawn, and other days' reviews never count.
+    const [withdrawn] = options(previewItinerary(trip, request, "user-1", rows([
+      { ...review(1, "user-2", MWAC, conditionsContext(trip, copiedSunday, mwac)), action: "withdrawn" },
+      { ...review(2, "user-2", OBS, conditionsContext(trip, copiedSunday, obs)), trip_day_id: "day-2026-10-12" },
+    ])));
+    expect(withdrawn.changes.find((change) => change.date === "2026-10-11")?.notes).toEqual([
+      "Lists MWAC and Mount Washington Observatory too, with no review recorded for this day: reviews stay on Sat Oct 10.",
     ]);
   });
 

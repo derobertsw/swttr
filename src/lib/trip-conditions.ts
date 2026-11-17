@@ -196,6 +196,28 @@ const reviewsCount = (count: number) => `${count} ${count === 1 ? "review" : "re
 type PreviewError = { error: string; status: 400 | 404 };
 
 /**
+ * The reviews recorded for a source on a day before it was removed from that
+ * day, which show again once it's listed there again, with how many say Plan
+ * changed against the day's plan as it will be (`full` and `day`). Null when
+ * there are none.
+ */
+export function returningReviewsNote(
+  rows: ConditionsRows,
+  full: Pick<TripFull, "stops" | "tour_plans">,
+  day: TripDay,
+  source: Pick<TripConditionsSource, "id" | "url" | "region">,
+): string | null {
+  const entries = rows.reviews.filter((row) => row.trip_day_id === day.id && row.source_id === source.id)
+    .sort((a, b) => b.entry_number - a.entry_number);
+  const earlier = reviewsFrom(entries, conditionsContext(full, day, source)).filter(isRecorded);
+  if (earlier.length === 0) return null;
+  const changed = earlier.filter((review) => review.stale_reasons.length > 0).length;
+  const marked = changed === 0 ? "" : changed === earlier.length ? (changed === 1 ? ", marked" : ", all marked") : `, ${changed} marked`;
+  return `${reviewsCount(earlier.length)} recorded here before it was removed ${earlier.length === 1 ? "shows" : "show"} again${
+    marked && `${marked} Plan changed — review again`}.`;
+}
+
+/**
  * What listing a source on `dates` does (#211): the days that don't list it
  * yet, and for each one any reviews recorded there before the source was
  * removed from it, which show again. Reviews never come from another day.
@@ -215,7 +237,6 @@ export function previewConditionsAttach(
   const already = days.filter((day): day is TripDay => !!day && listedOn.has(day.id));
   const labels = (list: TripDay[]) => listed(list.map((day) => dateLabel(day.date)));
   if (adding.length === 0) return { error: `${source.name} is already listed on ${labels(already)}.`, status: 400 };
-  const listings = entriesByListing(rows);
   return {
     source_id: source.id,
     revision: source.revision,
@@ -224,17 +245,10 @@ export function previewConditionsAttach(
       already.length > 0 && `${labels(already)} already ${already.length === 1 ? "lists" : "list"} it.`,
       "Reviews stay with the day they were recorded for, so none come from other days.",
     ].filter(Boolean).join(" "),
-    days: adding.map((day) => {
-      const earlier = reviewsFrom(listings.get(`${day.id}:${source.id}`) ?? [], conditionsContext(full, day, source)).filter(isRecorded);
-      const changed = earlier.filter((review) => review.stale_reasons.length > 0).length;
-      const marked = changed === 0 ? "" : changed === earlier.length ? (changed === 1 ? ", marked" : ", all marked") : `, ${changed} marked`;
-      return {
-        date: day.date, date_label: dateLabel(day.date),
-        note: earlier.length === 0 ? "No review recorded for this day."
-          : `${reviewsCount(earlier.length)} recorded here before it was removed ${earlier.length === 1 ? "shows" : "show"} again${
-            marked && `${marked} Plan changed — review again`}.`,
-      };
-    }),
+    days: adding.map((day) => ({
+      date: day.date, date_label: dateLabel(day.date),
+      note: returningReviewsNote(rows, full, day, source) ?? "No review recorded for this day.",
+    })),
     expected_days: adding.map((day) => ({ date: day.date, day_id: day.id })),
   };
 }

@@ -178,7 +178,7 @@ describe("Reusing conditions sources in Postgres", () => {
   describe("Copy day", () => {
     /** Reviews and saves a copy as the API does: the option's payload and the checks its review saw. */
     const copy = async (request: Extract<TripItineraryRequest, { action: "copy_day" }>, { user = "user-1", before = async () => {} } = {}) => {
-      const preview = previewItinerary(await h.loadFull(), request, user);
+      const preview = previewItinerary(await h.loadFull(), request, user, await h.conditionRows());
       if ("error" in preview) throw new Error(preview.error);
       const body: Record<string, unknown> = { action: "copy_day", ...preview.options[0].payload };
       const edit = parseItineraryEdit(body);
@@ -211,6 +211,34 @@ describe("Reusing conditions sources in Postgres", () => {
       expect([await h.revision(mwac), await h.revision(obs)]).toEqual([2, 1]);
       const copied = (await h.loadFull()).conditions!.filter((listing) => listing.date !== "2026-10-10");
       expect(copied.every((listing) => listing.reviews.length === 0)).toBe(true);
+    });
+
+    it("says a day's kept reviews show again, as the copy brings them back", async () => {
+      const mwac = await h.add("2026-10-10");
+      // Friday listed MWAC once; Sam reviewed it there, then it was removed from Friday.
+      const friday = await h.dayId("2026-10-09");
+      await h.attach(mwac, 1, [{ date: "2026-10-09", day_id: friday }]);
+      await h.review(mwac, "2026-10-09");
+      await db.query("SELECT public.mutate_trip_conditions_source($1, 'user-1', '2026-10-09', $2, $3, 2, $4, 'remove', '{}')", [tripId, friday, mwac, randomUUID()]);
+      const request = { action: "copy_day" as const, from: "2026-10-10", dates: ["2026-10-09"], kit: false, sources: true };
+      const preview = previewItinerary(await h.loadFull(), request, "user-1", await h.conditionRows());
+      expect(preview).toMatchObject({ options: [{ changes: [
+        { date: "2026-10-09", notes: ["Lists Mount Washington Avalanche Center too. 1 review recorded here before it was removed shows again."] },
+      ] }] });
+      await copy(request);
+      // Friday's plan is the same as when Sam reviewed it, so the review is current again.
+      expect((await h.loadFull()).conditions?.find((listing) => listing.date === "2026-10-09")?.reviews)
+        .toEqual([expect.objectContaining({ user_id: "user-2", stale_reasons: [] })]);
+      // Had Saturday been a hike, the review would come back marked Plan changed.
+      await db.query("DELETE FROM trip_day_conditions_sources WHERE trip_day_id = $1", [friday]);
+      await db.query("UPDATE trip_days SET activity = 'Hiking' WHERE trip_id = $1 AND date = '2026-10-10'", [tripId]);
+      const hike = previewItinerary(await h.loadFull(), request, "user-1", await h.conditionRows());
+      expect(hike).toMatchObject({ options: [{ changes: [{ date: "2026-10-09", notes: [
+        "Lists Mount Washington Avalanche Center too. 1 review recorded here before it was removed shows again, marked Plan changed — review again.",
+      ] }] }] });
+      await copy(request);
+      expect((await h.loadFull()).conditions?.find((listing) => listing.date === "2026-10-09")?.reviews)
+        .toEqual([expect.objectContaining({ user_id: "user-2", stale_reasons: ["Activity changed to Hiking"] })]);
     });
 
     it("refuses a copy whose review is from before a source was listed or removed anywhere on the trip", async () => {
