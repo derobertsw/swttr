@@ -491,6 +491,8 @@ The app uses a biophysics-based garment database with calibrated thermal propert
 
 The app is hosted at `swttr.vercel.app`.
 
+The outside services it depends on, their free-tier limits and what would need a paid plan are listed in [docs/third-party-services.md](docs/third-party-services.md).
+
 Deploy your own instance with Vercel:
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/swttr)
