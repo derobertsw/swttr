@@ -66,29 +66,42 @@ Prod runs on Clerk's **development** instance (its key is `pk_test_…`), so the
 
 ### End-to-end check (dev instance)
 
-Create a throwaway account. Give it preferences (including height and weight), Wardrobe items and a custom item, a trip of its own with someone else on the crew, and a place on someone else's trip. Delete the account from the account menu, then check in the SQL editor that nothing names it. The query reads every column `delete_user_data` deletes or anonymizes; no rows means the account is gone everywhere:
+1. Create a throwaway account. Copy its Clerk user ID (`user_…`) from the Clerk dashboard (**Users**) now: once it's deleted, it's no longer listed there.
+2. Give it preferences (including height and weight), Wardrobe items and a custom item, and a trip of its own with someone else on the crew.
+3. Put it on someone else's trip, and have that trip's organizer assign it a shared-gear item. Signed in as the throwaway account, **Accept** the item and **Mark packed**. Both put its ID in the item's history, which has to outlive the deletion with the ID replaced.
+4. Delete the account from the account menu.
+5. In the SQL editor, replace `user_…` in the last line of this query with the ID from step 1, then run it. It reads every column `delete_user_data` deletes or anonymizes, and no rows means the account is gone everywhere. Left as `user_…`, it matches nothing and always returns no rows, so it proves nothing:
 
-```sql
-SELECT t, count(*) FROM (
-  SELECT 'user_preferences' AS t, user_id AS id FROM user_preferences
-  UNION ALL SELECT 'user_wardrobe', user_id FROM user_wardrobe
-  UNION ALL SELECT 'user_item_mappings', user_id FROM user_item_mappings
-  UNION ALL SELECT 'user_custom_items', user_id FROM user_custom_items
-  UNION ALL SELECT 'trips', owner_user_id FROM trips
-  UNION ALL SELECT 'trip_members', user_id FROM trip_members
-  UNION ALL SELECT 'trip_kit_saves', user_id FROM trip_kit_saves
-  UNION ALL SELECT 'trip_conditions_reviews', user_id FROM trip_conditions_reviews
-  UNION ALL SELECT 'trip_group_gear', unnest(ARRAY[assigned_by, accepted_by, packed_by]) FROM trip_group_gear
-  UNION ALL SELECT 'trip_group_gear events', event->>'actor' FROM trip_group_gear, jsonb_array_elements(events) AS event
-  UNION ALL SELECT 'trip_day_checks', recorded_by FROM trip_day_checks
-  UNION ALL SELECT 'trip_day_conditions_sources', added_by FROM trip_day_conditions_sources
-  UNION ALL SELECT 'trip_day_tour_plans', unnest(ARRAY[created_by, updated_by]) FROM trip_day_tour_plans
-  UNION ALL SELECT 'trip_conditions_sources', unnest(ARRAY[created_by, updated_by]) FROM trip_conditions_sources
-  UNION ALL SELECT 'trip_drive_manual_estimates', entered_by FROM trip_drive_manual_estimates
-) ids WHERE id = 'user_…' GROUP BY t;
-```
+   ```sql
+   SELECT t, count(*) FROM (
+     SELECT 'user_preferences' AS t, user_id AS id FROM user_preferences
+     UNION ALL SELECT 'user_wardrobe', user_id FROM user_wardrobe
+     UNION ALL SELECT 'user_item_mappings', user_id FROM user_item_mappings
+     UNION ALL SELECT 'user_custom_items', user_id FROM user_custom_items
+     UNION ALL SELECT 'trips', owner_user_id FROM trips
+     UNION ALL SELECT 'trip_members', user_id FROM trip_members
+     UNION ALL SELECT 'trip_kit_saves', user_id FROM trip_kit_saves
+     UNION ALL SELECT 'trip_conditions_reviews', user_id FROM trip_conditions_reviews
+     UNION ALL SELECT 'trip_group_gear', unnest(ARRAY[assigned_by, accepted_by, packed_by]) FROM trip_group_gear
+     UNION ALL SELECT 'trip_group_gear events', event->>'actor' FROM trip_group_gear, jsonb_array_elements(events) AS event
+     UNION ALL SELECT 'trip_day_checks', recorded_by FROM trip_day_checks
+     UNION ALL SELECT 'trip_day_conditions_sources', added_by FROM trip_day_conditions_sources
+     UNION ALL SELECT 'trip_day_tour_plans', unnest(ARRAY[created_by, updated_by]) FROM trip_day_tour_plans
+     UNION ALL SELECT 'trip_conditions_sources', unnest(ARRAY[created_by, updated_by]) FROM trip_conditions_sources
+     UNION ALL SELECT 'trip_drive_manual_estimates', entered_by FROM trip_drive_manual_estimates
+   ) ids WHERE id = 'user_…' GROUP BY t;
+   ```
 
-If `SELECT to_regclass('public.trip_member_day_origins');` isn't null (migration `20261023233000` is applied), add `UNION ALL SELECT 'trip_member_day_origins', updated_by FROM trip_member_day_origins` inside the parentheses. Before that migration the table doesn't exist and the line fails.
+   If `SELECT to_regclass('public.trip_member_day_origins');` isn't null (migration `20261023233000` is applied), add `UNION ALL SELECT 'trip_member_day_origins', updated_by FROM trip_member_day_origins` inside the parentheses. Before that migration the table doesn't exist and the line fails.
+6. Check that the shared-gear item from step 3 stayed on the other trip, with the account replaced. Put that trip's ID in the query:
+
+   ```sql
+   SELECT g.description, event->>'action' AS action, event->>'actor' AS actor
+   FROM trip_group_gear g, jsonb_array_elements(g.events) AS event
+   WHERE g.trip_id = '<the other trip>' ORDER BY g.id;
+   ```
+
+   Its `accept` and `pack` events should show `deleted-account` as the actor, followed by a `member_removed` event by the organizer. The item should be back with the organizer to reassign.
 
 ### Orphan check
 
