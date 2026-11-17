@@ -268,6 +268,8 @@ The user approved every recommended option:
 
 Still open: the Capilene Midweight lab row, and the touring climb's hard-shell rule.
 
+Update 2026-11-16: #372 settles the touring climb's hard-shell rule. The climb wears a hard shell only for wind or wet; otherwise it goes in the pack. See [ski-touring-outfits.md](ski-touring-outfits.md).
+
 **The lower cycle target must ship together with the wind/motion correction.** PR A now retains the conservative baseline, so the original under-dressing regression cannot ship on its own. The original experiment illustrates why this dependency matters. At 5°F with 20 mph wind:
 - today's catalog outfit has a down jacket under a Gore-Tex Pro shell (Lyngen Down850);
 - PR A alone swaps it for a light synthetic insulator and a featherweight shell, at 2.95 clo against a 2.68–3.37 target;

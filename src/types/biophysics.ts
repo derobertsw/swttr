@@ -110,6 +110,11 @@ export interface EnsembleProperties {
 
 export interface PackItemGarment extends GarmentSemantics {
   rcl_torso?: number;
+  rcl_legs?: number;
+  /** Where the layer goes on at the transition. Absent on older responses: torso. */
+  covers_torso?: boolean;
+  covers_arms?: boolean;
+  covers_legs?: boolean;
   thermal_data_status?: 'known' | 'unknown';
   thermal_provenance?: ThermalProvenance;
   protection?: RecommendedGarment['protection'];

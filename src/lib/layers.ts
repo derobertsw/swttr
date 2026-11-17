@@ -160,7 +160,8 @@ export function buildRecommendedLayers(
 
 /**
  * Ski-touring descent layers: the climb garments plus pack items (added as
- * torso outer layers), with the descent gloves and headwear when provided.
+ * outer layers on each body part they cover; torso when the response doesn't
+ * say), with the descent gloves and headwear when provided.
  */
 export function buildDescentLayers(
   garments: RecommendedGarment[] | undefined,
@@ -173,14 +174,17 @@ export function buildDescentLayers(
   const torso = garments ? garmentsToLayerSet(garments, "torso") : createEmptyLayerSet();
   const legs = garments ? garmentsToLayerSet(garments, "legs") : createEmptyLayerSet();
 
-  const packLayerItems: LayerItem[] = packItems.map((item) => ({
+  const packLayer = (item: PackItemGarment, part: "torso" | "legs"): LayerItem => ({
     name: item.name,
-    rcl: item.rcl_torso ?? undefined,
+    rcl: (part === "legs" ? item.rcl_legs : item.rcl_torso) ?? undefined,
     ...garmentMetadata(item),
     sourceId: item.id,
     item_type: 'garment',
-  }));
-  torso.outer = [...torso.outer, ...packLayerItems];
+  });
+  const onLegs = (item: PackItemGarment) => item.covers_legs === true;
+  const onTorso = (item: PackItemGarment) => item.covers_torso !== false || !onLegs(item);
+  torso.outer = [...torso.outer, ...packItems.filter(onTorso).map((item) => packLayer(item, "torso"))];
+  legs.outer = [...legs.outer, ...packItems.filter(onLegs).map((item) => packLayer(item, "legs"))];
 
   const handwear = descentHandwear && descentHandwear.name !== climbHandwear?.name
     ? descentHandwear
