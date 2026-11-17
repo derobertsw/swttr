@@ -77,6 +77,8 @@ describe("GET /api/v1/trips/[id]/pack", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-08T12:00Z"));
+    // No real Open-Meteo calls (they time out on CI): a test that needs the forecast mocks fetch itself.
+    global.fetch = vi.fn().mockRejectedValue(new Error("Unexpected network call in test"));
     vi.mocked(fetchUserWardrobeItems).mockResolvedValue([]);
     // Keep the real plan and packing engines; inspect the days used to pack.
     vi.spyOn(packingList, "buildPackingListFromDays");
