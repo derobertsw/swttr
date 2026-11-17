@@ -132,6 +132,39 @@ describe("useGearUp with Run Warm/Run Cold (#251)", () => {
     expect(result.current.result).toMatchObject({ sensitivity: "cold" });
   });
 
+  it("asks again for a different setting after a failed update", async () => {
+    const { result, rerender } = await seeResult();
+    const previous = result.current.result;
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(Response.json({ error: "Unavailable" }, { status: 503 }));
+    prefs.sensitivity = "cold";
+    rerender();
+    await waitFor(() => expect(result.current.request.status).toBe("error"));
+    expect(result.current.result).toBe(previous);
+    prefs.sensitivity = "hot";
+    rerender();
+    await waitFor(() => expect(result.current.result).toMatchObject({ sensitivity: "hot" }));
+    expect(recommendationBodies(fetchMock).map(body => body.temperature_sensitivity)).toEqual(["cold", "hot"]);
+    expect(shownAdvice(result)).toEqual(["asked hot"]);
+  });
+
+  it("asks again for a failed setting chosen again after going back", async () => {
+    const { result, rerender } = await seeResult();
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(Response.json({ error: "Unavailable" }, { status: 503 }));
+    prefs.sensitivity = "cold";
+    rerender();
+    await waitFor(() => expect(result.current.request.status).toBe("error"));
+    prefs.sensitivity = "neutral";
+    rerender();
+    await act(async () => {});
+    expect(recommendationBodies(fetchMock)).toHaveLength(1);
+    prefs.sensitivity = "cold";
+    rerender();
+    await waitFor(() => expect(result.current.result).toMatchObject({ sensitivity: "cold" }));
+    expect(recommendationBodies(fetchMock).map(body => body.temperature_sensitivity)).toEqual(["cold", "cold"]);
+  });
+
   it("asks for a shown multi-day plan again with the new setting", async () => {
     const hook = renderHook(() => useGearUp());
     await waitFor(() => expect(hook.result.current.activityInitializing).toBe(false));

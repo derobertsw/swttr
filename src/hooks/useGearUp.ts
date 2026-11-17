@@ -414,18 +414,27 @@ export function useGearUp() {
    * setting (#251), once per result, keeping its outing and weather. A request
    * already running asks again itself when it finishes (see layersFor). If the
    * update fails, the result stays with the failed-update notice, as for any
-   * other update, and Try again uses the new setting.
+   * other update, and Try again uses the new setting. The attempt is keyed by
+   * result and setting, so a failed setting doesn't loop but choosing another
+   * one (or coming back to the failed one later) asks again.
    */
-  const refreshedForSetting = useRef<OutingResult | null>(null);
+  const refreshedForSetting = useRef<{ result: OutingResult; sensitivity: typeof sensitivity } | null>(null);
   useEffect(() => {
     const shown = state.result;
-    if (!shown?.sensitivity || shown.sensitivity === sensitivity || refreshedForSetting.current === shown) return;
+    if (!shown?.sensitivity) return;
+    if (shown.sensitivity === sensitivity) {
+      refreshedForSetting.current = null;
+      return;
+    }
+    const attempted = refreshedForSetting.current;
+    if (attempted?.result === shown && attempted.sensitivity === sensitivity) return;
     if (!state.restored || !readyToRequest || owner !== state.owner || state.request.status === "loading") return;
-    refreshedForSetting.current = shown;
+    const attempt = { result: shown, sensitivity };
+    refreshedForSetting.current = attempt;
     // Started from a callback after this commit, like any request a change of
     // setting starts, rather than as a render cascading from the effect.
     queueMicrotask(() => {
-      if (!mounted.current || refreshedForSetting.current !== shown) return;
+      if (!mounted.current || refreshedForSetting.current !== attempt) return;
       if (shown.kind === "layers") {
         void recommendForShownWeather({}, "Couldn't update layers for your temperature setting. Try again.");
       } else if (shown.outing.when.mode === "later") {
