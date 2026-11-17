@@ -170,6 +170,16 @@ All in map code, each with a test that fails without the fix.
 - **Participant study** (six travelers, the five-of-six target), and #172's analytics events, which don't exist yet.
 - Safari and Firefox; Android; tablets with a coarse pointer.
 
+## Screenshots
+
+Captured at 2× from the fixture trips and hosted on the `pr-assets` branch.
+
+- 320px Saturday map: [on `main`](https://raw.githubusercontent.com/derobertsw/swttr/314424cf2708dd765d5276ff517dfa5beb1fa569/pr-383/phone-320-day-map-main.png), where the destination is missing, and [with this PR](https://raw.githubusercontent.com/derobertsw/swttr/314424cf2708dd765d5276ff517dfa5beb1fa569/pr-383/phone-320-day-map.png)
+- [390px organizer view of two departures](https://raw.githubusercontent.com/derobertsw/swttr/314424cf2708dd765d5276ff517dfa5beb1fa569/pr-383/phone-390-departures-organizer.png) (#333)
+- [390px route line unavailable, with Retry](https://raw.githubusercontent.com/derobertsw/swttr/314424cf2708dd765d5276ff517dfa5beb1fa569/pr-383/phone-390-route-line-unavailable.png)
+- [Desktop Show drive](https://raw.githubusercontent.com/derobertsw/swttr/314424cf2708dd765d5276ff517dfa5beb1fa569/pr-383/desktop-day-show-drive.png), [WebGL unavailable](https://raw.githubusercontent.com/derobertsw/swttr/314424cf2708dd765d5276ff517dfa5beb1fa569/pr-383/desktop-map-unavailable.png) and [dark](https://raw.githubusercontent.com/derobertsw/swttr/314424cf2708dd765d5276ff517dfa5beb1fa569/pr-383/desktop-dark-day.png)
+- [400% zoom, 320 × 256 CSS px](https://raw.githubusercontent.com/derobertsw/swttr/314424cf2708dd765d5276ff517dfa5beb1fa569/pr-383/reflow-400.png)
+
 ## Re-running
 
 From the repository root, with the dependencies installed and `.env.local` present:
