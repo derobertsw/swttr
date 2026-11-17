@@ -12,6 +12,12 @@ import { join, resolve } from 'node:path';
 import { launch, sleep } from './cdp.mjs';
 import { loadFixtures } from './fixtures.mjs';
 
+/** A JS string literal for code evaluated in the page, safe inside any script context. */
+function literal(value) {
+  const unsafe = { '<': '\\u003C', '>': '\\u003E', '/': '\\u002F', '\\': '\\\\', '\b': '\\b', '\f': '\\f', '\n': '\\n', '\r': '\\r', '\t': '\\t', '\0': '\\0', '\u2028': '\\u2028', '\u2029': '\\u2029' };
+  return JSON.stringify(value).replace(/[<>\b\f\n\r\t\0\u2028\u2029]/g, (char) => unsafe[char]);
+}
+
 const args = process.argv.slice(2);
 const option = (name, fallback) => {
   const index = args.indexOf(name);
@@ -31,7 +37,7 @@ const SAT = '2027-01-09', SUN = '2027-01-10';
 
 // ---------- in-page helpers ----------
 const helpers = (viewer) => `
-try { localStorage.setItem('qa235User', ${JSON.stringify(viewer)}); } catch {}
+try { localStorage.setItem('qa235User', ${literal(viewer)}); } catch {}
 window.__qa = {
   norm: (text) => (text || '').replace(/\\s+/g, ' ').trim(),
   find(selector, text) { return [...document.querySelectorAll(selector)].find((el) => !text || __qa.norm(el.textContent).includes(text) || (el.getAttribute('aria-label') || '').includes(text)); },
@@ -164,7 +170,7 @@ async function handle(page, { requestId, request, responseStatusCode }, session)
     const answer = await rule(url, request);
     if (answer) return respond(page, session, requestId, answer);
   }
-  if (url.hostname.endsWith('openfreemap.org')) {
+  if (url.hostname === 'openfreemap.org' || url.hostname.endsWith('.openfreemap.org')) {
     const cached = await readFile(cacheFile(request.url), 'utf8').then(JSON.parse).catch(() => null);
     if (!cached) return page.send('Fetch.continueRequest', { requestId }, session);
     const type = url.pathname.endsWith('.pbf') ? 'application/x-protobuf' : url.pathname.endsWith('.png') ? 'image/png' : 'application/json';
@@ -238,7 +244,7 @@ await run('lazy', async () => {
   out.openedMap = { mapChunk: mapLoaded(page), css: mapCss(page), tiles: tileRequests(page).length, worker: page.requests.some((entry) => /maplibre-gl-worker/.test(entry.url)), api: page.api.map((entry) => entry.path) };
   const before = page.api.length;
   // Dates, selection, zoom and panning: none of them may route.
-  for (const date of ['2027-01-08', SAT, SUN, '2027-01-11', '']) { await page.eval(`__qa.select("map-date", ${JSON.stringify(date)})`); await sleep(400); }
+  for (const date of ['2027-01-08', SAT, SUN, '2027-01-11', '']) { await page.eval(`__qa.select("map-date", ${literal(date)})`); await sleep(400); }
   await page.eval('__qa.click(\'ul[aria-label="Itinerary places"] button\')'); await sleep(300);
   await page.eval('__qa.click(\'button[aria-label="Zoom in"]\')'); await page.eval('__qa.click(\'button[aria-label="Zoom out"]\')');
   const box = await page.eval('(() => { const r = document.querySelector(".maplibregl-canvas").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()');
@@ -546,7 +552,7 @@ await run('recovery', async () => {
     await page.goto(`${BASE}/trips/trip-drive/map?date=${SAT}`);
     await ready(page); await page.waitFor('__qa.canvasReady()', 30_000);
     await page.eval('__qa.click("button", "Show drive")');
-    const settled = await page.waitFor(`new RegExp(${JSON.stringify(wait)}).test(__qa.live().join(" "))`, name === 'hang' ? 25_000 : 10_000).then(() => true, () => false);
+    const settled = await page.waitFor(`new RegExp(${literal(wait)}).test(__qa.live().join(" "))`, name === 'hang' ? 25_000 : 10_000).then(() => true, () => false);
     const status = await page.eval('__qa.live().filter((t) => /route|line|Loading/i.test(t))');
     const buttons = await page.eval('[...document.querySelectorAll("main button")].map((b) => __qa.norm(b.textContent)).filter((t) => /route line/i.test(t))');
     const rows = await page.eval('__qa.rowText("Getting there")');
@@ -800,7 +806,7 @@ await run('shots', async () => {
     await ready(page);
     await before?.(page);
     await settle(page);
-    const clip = await page.eval(`(() => { const a = document.querySelector(${JSON.stringify(from)}).getBoundingClientRect(), b = document.querySelector(${JSON.stringify(to)}).getBoundingClientRect();
+    const clip = await page.eval(`(() => { const a = document.querySelector(${literal(from)}).getBoundingClientRect(), b = document.querySelector(${literal(to)}).getBoundingClientRect();
       return { x: 0, y: Math.max(0, Math.round(a.top) - 12), width: innerWidth, height: Math.round(b.bottom - a.top) + 24 }; })()`);
     await page.screenshot(shot(`pr-${name}`), { clip });
     taken.push(name);
