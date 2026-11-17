@@ -213,18 +213,21 @@ export function selectPhaseAccessories(
         .reduce<number>((total, value) => value == null ? total : total + value, 0) + hoodClo;
       return [{ head, neck, clo, count: Number(!!head) + Number(!!neck) }];
     }));
-  // A neck piece goes over a balaclava only when nothing else reaches the
-  // band's minimum, as in deep cold.
-  const separate = combine(false);
-  const combinations = separate.some(option => localThermalStatus(option.clo, min.head, maximum.head) !== 'under')
-    ? separate : [...separate, ...combine(true)];
-  const byItems = (a: typeof combinations[number], b: typeof combinations[number]) => a.count - b.count || a.clo - b.clo
-    || (a.head?.id ?? '').localeCompare(b.head?.id ?? '') || (a.neck?.id ?? '').localeCompare(b.neck?.id ?? '');
   // In deep cold, a head left short by the helmet and hood alone gets a hat:
   // a neck piece can't stand in for one, even within the band.
   const hatRequired = deepCold(knownHeads) && localThermalStatus(baseClo, min.head, maximum.head) === 'under';
-  const withHat = combinations.filter(option => option.head);
-  const headOptions = hatRequired && withHat.length > 0 ? withHat : combinations;
+  const allowed = <T extends { head: HeadwearRow | null }>(options: T[]) => {
+    const withHat = options.filter(option => option.head);
+    return hatRequired && withHat.length > 0 ? withHat : options;
+  };
+  // A neck piece goes over a balaclava only when nothing else allowed reaches
+  // the band's minimum, as in deep cold.
+  const separate = combine(false);
+  const combinations = allowed(separate).some(option => localThermalStatus(option.clo, min.head, maximum.head) !== 'under')
+    ? separate : [...separate, ...combine(true)];
+  const byItems = (a: typeof combinations[number], b: typeof combinations[number]) => a.count - b.count || a.clo - b.clo
+    || (a.head?.id ?? '').localeCompare(b.head?.id ?? '') || (a.neck?.id ?? '').localeCompare(b.neck?.id ?? '');
+  const headOptions = allowed(combinations);
   const headInRange = headOptions.filter(option => localThermalStatus(option.clo, min.head, maximum.head) === 'in_range');
   const headReaching = deepCold(knownHeads)
     ? headOptions.filter(option => localThermalStatus(option.clo, min.head, maximum.head) !== 'under') : [];
@@ -260,9 +263,11 @@ export function selectPhaseAccessories(
     const grip = part === 'hands' && poleGrip;
     const purpose = thermalNeeded ? grip ? 'thermal_and_pole_grip' : 'thermal' : grip ? 'pole_grip' : 'none';
     const keptGloves = part === 'hands' && !policy.bareHands;
+    const missingItem = !functionalMissing ? 'thermal accessory' : grip ? 'pole-grip gloves' : 'gloves';
     const message = state === 'unknown' ? `${part}: suitable accessory data is unknown; check warmth and protection before use.`
       : state === 'missing' && items.length > 0 && !functionalMissing ? `${part}: the closest available option still falls short of the local warmth range; check warmth before use.`
-      : state === 'missing' ? `${part}: no suitable ${functionalMissing ? 'pole-grip gloves' : 'thermal accessory'} available; check warmth and protection before use.`
+      : state === 'missing' && keptGloves && functionalMissing ? 'hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.'
+      : state === 'missing' ? `${part}: no suitable ${missingItem} available; check warmth and protection before use.`
       : thermal_status === 'over' && items.length > 0 && keptGloves ? 'hands: gloves stay on for this activity, and the lightest available pair is warmer than the local warmth range.'
       : thermal_status === 'over' && items.length > 0 ? `${part}: the lightest available option is warmer than the local warmth range; going without would leave you colder.`
       : thermal_status === 'over' ? `${part}: existing hood insulation exceeds the local warmth range; vent the hood or choose a lighter layer.`
@@ -273,8 +278,10 @@ export function selectPhaseAccessories(
     return { state, purpose, thermal_status, selected_ids: items.map(item => item.id), clo, min: min[part], max: maximum[part], message };
   }
   const assessments: AccessoryAssessments = {
+    // Pole-grip gloves, and gloves a phase keeps on, are protection even with
+    // no thermal demand; running's bare hands stay a valid choice.
     hands: assessment('hands', handwear ? [handwear] : [], pool.handwear, handwear?.rcl_clo ?? 0,
-      poleGrip && (!handwear || !supportsPoleGrip(handwear))),
+      (poleGrip && (!handwear || !supportsPoleGrip(handwear))) || (!policy.bareHands && !handwear)),
     head: assessment('head', [headwear.headWarmth, headwear.neckWarmth].filter((item): item is HeadwearRow => !!item),
       [...heads, ...(baseClo > 0 || heads.length > 0 ? necks : [])], headChoice?.clo ?? baseClo,
       false, helmet != null && !knownInsulation(helmet)),

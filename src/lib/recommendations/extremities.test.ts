@@ -208,6 +208,18 @@ describe('gloves stay on outside running and XC', () => {
     expect(selection.warnings).toContain(selection.assessments.hands.message);
   });
 
+  it.each(ALL_PHASES)('%s: with no gloves at all, they are reported missing even when the band asks for no hand warmth', phase => {
+    const base = targetsFor(phase, { tempF: 75, windMph: 4 });
+    // These phases keep some hand demand in warm air; the rule holds at zero too.
+    const targets: PhaseTargets = { ...base, extremity: { ...base.extremity, min: { ...base.extremity.min, hands: 0 } } };
+    const selection = selectPhaseAccessories(PHASES[phase], targets, { handwear: [], headwear: [] }, f2c(75));
+    expect(selection.handwear).toBeNull();
+    // A protection gap, not a thermal one.
+    expect(selection.assessments.hands).toMatchObject({ state: 'missing', thermal_status: 'in_range', clo: 0 });
+    expect(selection.assessments.hands.message).toContain('no gloves available, and gloves stay on');
+    expect(selection.warnings).toContain(selection.assessments.hands.message);
+  });
+
   it('the descent keeps the climb pair when it fits the descent band', () => {
     const conditions = { tempF: 56, windMph: 8 };
     const descent = targetsFor('descent', conditions).extremity;
@@ -261,6 +273,21 @@ describe('required helmets', () => {
     // 32°F: the balaclava alone overshoots less than layering, so no mask goes over it.
     const freezing = select('descent', { tempF: 32, windMph: 5 }, pool);
     expect(freezing.headwear.neckWarmth?.id === 'mask' && freezing.headwear.headWarmth?.id === 'balaclava').toBe(false);
+  });
+
+  it('in deep cold, a required hat can take a neck piece over a balaclava when the helmet plus neck piece alone would reach the band', () => {
+    const conditions = { tempF: -4, windMph: 10 };
+    const base = targetsFor('descent', conditions);
+    const band = (head: number) => ({ ...base.extremity.neutral, head });
+    const targets: PhaseTargets = { ...base, extremity: { ...base.extremity, min: band(1.5), neutral: band(1.9), max: band(2.3) } };
+    const balaclava = hat('balaclava', 0.5, { headwear_type: 'balaclava_light', covers_neck: true, min_temp_static: -30 });
+    const neck = hat('neck', 0.9, { headwear_type: 'buff_heavy', min_temp_static: -30 });
+    // A lighter hat that isn't rated for −20°C makes this deep cold, so the head needs a hat.
+    const lightHat = hat('light-hat', 0.3, { headwear_type: 'liner_beanie', min_temp_static: 10 });
+    const selection = selectPhaseAccessories('ski_touring_downhill', targets,
+      { handwear: [], headwear: [helmet, balaclava, neck, lightHat] }, f2c(conditions.tempF));
+    expect(selection.headwear).toEqual({ helmet, headWarmth: balaclava, neckWarmth: neck });
+    expect(selection.assessments.head).toMatchObject({ clo: 2.25, thermal_status: 'in_range' });
   });
 
   it.each(['cycling', 'climb'] as const)('%s never selects a helmet from the thermal budget', phase => {

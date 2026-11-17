@@ -2220,7 +2220,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in with an empt
         "hands": {
           "clo": 0,
           "max": 2.85,
-          "message": "hands: no suitable thermal accessory available; check warmth and protection before use.",
+          "message": "hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
           "min": 2.57,
           "purpose": "thermal",
           "selected_ids": [],
@@ -2484,7 +2484,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in with an empt
     },
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
-      "hands: no suitable thermal accessory available; check warmth and protection before use.",
+      "hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
       "head: no suitable thermal accessory available; check warmth and protection before use.",
     ],
   },
@@ -6719,7 +6719,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in with an empt
       "Selected for torso: Patagonia Capilene Cool Lightweight, Patagonia Houdini Jacket, Patagonia R1 Air Full-Zip Hoody.",
       "Selected for legs: Helly Hansen Lifa Active Pant, Outdoor Research Ferrosi Joggers, Patagonia R1 Fleece Pants.",
       "The worn hood contributes to head warmth; helmet compatibility is included.",
-      "hands: no suitable thermal accessory available; check warmth and protection before use.",
+      "hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
       "head: no additional thermal coverage needed.",
     ],
     "ireq": {
@@ -6770,7 +6770,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in with an empt
         "hands": {
           "clo": 0,
           "max": 1.02,
-          "message": "hands: no suitable thermal accessory available; check warmth and protection before use.",
+          "message": "hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
           "min": 0.9,
           "purpose": "thermal",
           "selected_ids": [],
@@ -7036,7 +7036,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in with an empt
     },
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
-      "hands: no suitable thermal accessory available; check warmth and protection before use.",
+      "hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
     ],
   },
   "status": 200,
@@ -17874,7 +17874,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
         "hands": {
           "clo": 0,
           "max": 0.93,
-          "message": "hands: no suitable thermal accessory available; check warmth and protection before use.",
+          "message": "hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
           "min": 0.81,
           "purpose": "thermal",
           "selected_ids": [],
@@ -18127,9 +18127,9 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
     "warnings": [
       "Climb: Significant insulation shortfall: improve coverage of the areas below target.",
       "Climb: Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
-      "Climb: hands: no suitable thermal accessory available; check warmth and protection before use.",
+      "Climb: hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
       "Descent: Significant insulation shortfall: improve coverage of the areas below target.",
-      "Descent: hands: no suitable thermal accessory available; check warmth and protection before use.",
+      "Descent: hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
       "Descent: head: no suitable thermal accessory available; check warmth and protection before use.",
     ],
   },
