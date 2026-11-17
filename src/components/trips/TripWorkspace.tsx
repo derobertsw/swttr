@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Settings } from "lucide-react";
@@ -105,8 +105,22 @@ function TripSectionNav({ tripId, current, currentIsSectionPage, planPath }: {
   currentIsSectionPage: boolean;
   planPath: string | null;
 }) {
+  // The bar is one row or two (enlarged text), so the page's scroll padding
+  // (globals.css) follows its actual height and linked headings clear it.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(() => root.style.setProperty("--trip-sections-height", `${nav.offsetHeight}px`));
+    observer.observe(nav);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--trip-sections-height");
+    };
+  }, []);
   return (
-    <nav aria-label="Trip sections" data-trip-sections className="@container sticky top-[env(safe-area-inset-top)] z-20 bg-background">
+    <nav ref={navRef} aria-label="Trip sections" data-trip-sections className="@container sticky top-[env(safe-area-inset-top)] z-20 bg-background">
       <ul className="grid grid-cols-2 border-b border-border @min-[17.5rem]:grid-cols-4 sm:flex sm:gap-2">
         {TRIP_SECTIONS.map((section) => {
           const active = section.id === current;

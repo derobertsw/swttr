@@ -65,6 +65,24 @@ describe("Trip workspace (#330)", () => {
     expect(within(nav).getByRole("list")).not.toHaveClass("grid-cols-4");
   });
 
+  it("gives the page's scroll padding the bar's actual height, one row or two (#337)", async () => {
+    let resized = () => {};
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: () => void) { resized = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    const view = await open("/trips/trip-1/days/2026-10-10");
+    const nav = screen.getByRole("navigation", { name: "Trip sections" });
+    const root = document.documentElement;
+    vi.spyOn(nav, "offsetHeight", "get").mockReturnValue(88);
+    act(() => resized());
+    expect(root.style.getPropertyValue("--trip-sections-height")).toBe("88px");
+    view.unmount();
+    expect(root.style.getPropertyValue("--trip-sections-height")).toBe("");
+    vi.unstubAllGlobals();
+  });
+
   it.each([
     ["/trips/trip-1", "Plan", "page"],
     ["/trips/trip-1/days/2026-10-10", "Plan", "true"],
