@@ -105,6 +105,7 @@ The standing decision is to stay on free tiers until launch and product-market f
   - Commercial use: a subscription, ads, or the paid agent API taking real money.
   - Sustained traffic near 10,000 calls a day, or rate-limit errors from Vercel's shared IPs.
 - **Paid:** Standard, 1M calls a month, $29 a month. Professional, 5M calls a month, $99 a month. Both include geocoding. The amounts come from Open-Meteo's [June 12, 2023 announcement](https://openmeteo.substack.com/p/api-subscriptions-for-commercial); the pricing page we fetched listed call volumes but no prices.
+  - **Buying a plan alone changes nothing.** Paid plans are served from the customer endpoint `customer-api.open-meteo.com`, with the plan's API key on each request. All four forecast files above call the free `api.open-meteo.com` with no key, and `src/app/api/geocode/route.ts` calls the free `geocoding-api.open-meteo.com`. Each needs its host changed and a server-side key added (an env var, never sent to the browser) before the plan's terms and limits apply. Check Open-Meteo's docs for the customer host for geocoding.
 - **Alternatives considered:** weather search was deliberately kept on Open-Meteo when trip search moved to Geoapify (#208). No other forecast provider has been evaluated.
 
 ## Geoapify
