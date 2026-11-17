@@ -33,7 +33,9 @@ export interface ExtremityIreqData {
 export interface ExtremityIreqRange {
   min: ExtremityIreqData;
   neutral: ExtremityIreqData;
-  /** Running/XC upper comfort limits; hands may allow thin pole-grip gloves. */
+  /** Upper local limits the accessories were chosen and are judged against:
+   * hands may allow thin kept or pole-grip gloves, and the head a required
+   * helmet or the lightest item rated for deep cold. */
   max?: ExtremityIreqData;
 }
 

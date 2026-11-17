@@ -57,6 +57,8 @@ describe('canonical recommendation and edit assessments', () => {
           minTargets: { torso: d!.regional_ireq.min.torso, legs: d!.regional_ireq.min.legs,
             hands: d!.extremity_ireq.min.hands, headNeck: d!.extremity_ireq.min.head },
           arms: { clo: 99, target: d!.regional_ireq.neutral.arms, minTarget: d!.regional_ireq.min.arms },
+          // The descent's own accessory limits, not the climb's.
+          extremityMaxTargets: d!.extremity_ireq.max ? { hands: d!.extremity_ireq.max.hands, headNeck: d!.extremity_ireq.max.head } : undefined,
           targetRange: body.ireq.downhill_target_range,
           breathabilityTarget: body.descent_evaluation.breathabilityTarget,
         });

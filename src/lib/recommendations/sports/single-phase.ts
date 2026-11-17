@@ -99,7 +99,7 @@ export function createSinglePhaseSport(
         recommendations: {
           target_clo_range: targets.targetRange,
           min_evap_potential: config.minEvapPotential,
-          ...(accessories.assessments ? { accessories: accessories.assessments } : {}),
+          accessories: accessories.assessments,
           guidance: [...(config.activity === 'xc_skiing' ? config.guidance(request, targets.basicIreq, [], targets) : config.guidance(request, targets.basicIreq)), ...(targets.policy?.assumptions ?? [])],
         },
       };
@@ -118,11 +118,11 @@ export function createSinglePhaseSport(
         }
         : undefined;
       const ensemble = functional && !config.completeOutfit ? filterUnsuitableEnsemble(builtEnsemble, targets.regional, functional) : builtEnsemble;
-      const accessories = selectPhaseAccessories(config.activity, targets, pool, request.tempC, ensemble);
+      const accessories = selectPhaseAccessories(config.activity, targets, pool, request.tempC, ensemble, { precipitation: request.precipitation });
       const { handwear, headwear } = accessories;
       // Scoring, the echoed targets and manual edits share the upper limits
       // the accessories were chosen against.
-      const judged = accessories.extremityMax ? { ...targets, extremity: { ...targets.extremity, max: accessories.extremityMax } } : targets;
+      const judged = { ...targets, extremity: { ...targets.extremity, max: accessories.extremityMax } };
 
       const { recommendation, warnings } = buildScoredRecommendation(
         {
@@ -154,7 +154,7 @@ export function createSinglePhaseSport(
         handwear,
         headwear
       );
-      if (accessories.assessments) recommendation.accessories = accessories.assessments;
+      recommendation.accessories = accessories.assessments;
 
       const requirements = config.requirementFirst
         ? buildClothingRequirements(config.activity, targets, {
@@ -181,7 +181,7 @@ export function createSinglePhaseSport(
         recommendation,
         warnings: [...warnings, ...(protectedOutfit?.warnings ?? []), ...accessories.warnings],
         guidance: [...new Set([...config.guidance(request, targets.basicIreq, ensemble, targets), ...(recommendation.evaluation?.decision?.reasons ?? []), ...missingGuidance,
-          ...Object.values(accessories.assessments ?? {}).map(assessment => assessment.message),
+          ...Object.values(accessories.assessments).map(assessment => assessment.message),
           ...(targets.policy?.assumptions ?? [])])],
       };
     },
