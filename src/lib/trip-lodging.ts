@@ -17,7 +17,7 @@ export const isUuid = (value: unknown): value is string => typeof value === "str
 export const shiftDate = (date: string, days: number) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 export const dateLabel = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).replace(",", "");
 /** Consecutive nights as a stay's dates read: "Fri Oct 9 → Sun Oct 11 · 2 nights", ending on the check-out morning. */
-const nightsLabel = (first: string, count: number) => `${dateLabel(first)} → ${dateLabel(shiftDate(first, count))} · ${count} ${count === 1 ? "night" : "nights"}`;
+export const nightsLabel = (first: string, count: number) => `${dateLabel(first)} → ${dateLabel(shiftDate(first, count))} · ${count} ${count === 1 ? "night" : "nights"}`;
 /** Each date from `start` up to, not including, `end`. */
 export function dates(start: string | null, end: string | null): string[] {
   if (!start || !end) return [];
