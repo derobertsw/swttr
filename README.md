@@ -59,7 +59,8 @@ graph TD
     P -->|No usable garments| T[Targets-only response]
     P --> G[Ensemble Building]
     G --> R[Running/XC only: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
-    R --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
+    R --> PROT[Alpine, cycling, touring descent: helmet requirement<br/>whatever the thermal demand<br/>owned match, catalog suggestion, or missing with a warning]
+    PROT --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
     XCCARRY --> I[Canonical server phase assessment:<br/>actual worn regional and extremity basic clo<br/>local shortfalls and excess, moisture and clothing gaps]
     I --> H[Ensemble thermal scoring and API/UI reasons<br/>consume the same phase assessment]
 
@@ -271,7 +272,7 @@ graph TD
 
 ### 6. Extremity Selection
 
-Running/XC evaluate optional thermal coverage against the phase's local min/max bands. The absence of insulation competes with known suitable gear. When nothing fits, going without is weighed against the nearest item, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings check the heuristic bands in deep cold: items rated for these conditions win, and the lightest rated choice sets the upper limit that scoring and manual checks use. Functional XC gloves have a separate pole-grip purpose. Cycling, alpine and touring explicitly retain the earlier selection rules pending calibration; required alpine/descent helmets remain outside the optional path.
+Running/XC evaluate optional thermal coverage against the phase's local min/max bands. The absence of insulation competes with known suitable gear. When nothing fits, going without is weighed against the nearest item, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings check the heuristic bands in deep cold: items rated for these conditions win, and the lightest rated choice sets the upper limit that scoring and manual checks use. Functional XC gloves have a separate pole-grip purpose. Cycling, alpine and touring explicitly retain the earlier selection rules pending calibration. Helmets are required protection, kept apart from optional warmth: alpine and the touring descent need a ski helmet and cycling a bike helmet, whatever the thermal demand. Each response reports the helmet as a requirement: an owned match, a catalog suggestion that is never presented as owned, or missing, with a warning and a generic suggestion.
 
 ```mermaid
 graph TD
@@ -291,9 +292,13 @@ graph TD
     MODE -->|No: compatibility policy| LEGACY[Temperature and target selection retained]
     LEGACY --> LHAND[Biking: active glove thresholds<br/>Alpine and touring: static glove thresholds]
     LEGACY --> LHEAD[Head warmth by temperature<br/>Neck layer below freezing]
-    LHEAD --> HELMET{Alpine or touring descent?}
-    HELMET -->|Yes| REQUIRED[Required helmet selected separately<br/>Only compatible hoods contribute]
-    HELMET -->|No| NOHELMET[No helmet from thermal selection]
+    LHEAD --> HELMET{Sport or phase requires a helmet?<br/>Alpine and touring descent: ski helmet<br/>Cycling: bike helmet}
+    HELMET -->|Yes| REQUIRED[Required helmet of that type, whatever the thermal demand<br/>Temperature only picks among helmets<br/>Only helmet-compatible hoods contribute warmth]
+    HELMET -->|No: running, XC, touring climb| NOHELMET[No helmet]
+    REQUIRED --> HREQ{Helmet of that type available?}
+    HREQ -->|In the wardrobe| HOWNED[Requirement: owned match]
+    HREQ -->|In the catalog| HCAT[Requirement: catalog suggestion, not owned]
+    HREQ -->|None| HMISS[Requirement missing with a generic suggestion<br/>and a warning; never dropped or claimed as owned]
 ```
 
 ### 7. Thermal Targets and Comfort

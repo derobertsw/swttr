@@ -9,7 +9,15 @@ import { localThermalStatus, THERMAL_DISPLAY_CLO_EPSILON, type ExtremityCloValue
 import type { PhaseTargets } from './thermal-targets';
 
 // Headwear type categories
-const HELMET_TYPES = ['ski_helmet'];
+/** Helmets each sport or phase requires: protection, chosen whatever the
+ * thermal demand. A ski helmet doesn't stand in for a bike helmet, or the reverse. */
+export const REQUIRED_HELMET_TYPES: Partial<Record<ActivityType, readonly string[]>> = {
+  alpine_skiing: ['ski_helmet'],
+  ski_touring_downhill: ['ski_helmet'],
+  biking: ['bike_helmet'],
+};
+/** Every helmet type; none of them counts as head warmth. */
+export const HELMET_TYPES: readonly string[] = ['ski_helmet', 'bike_helmet'];
 export const HEAD_WARMTH_TYPES = ['liner_beanie', 'midweight_beanie', 'heavy_beanie', 'balaclava_light', 'balaclava_heavy', 'headband'];
 const NECK_WARMTH_TYPES = ['buff_thin', 'buff_heavy', 'facemask'];
 
@@ -92,7 +100,7 @@ export function selectPhaseAccessories(
     return {
       handwear: selectHandwear(pool.handwear, tempC, activeHands, targets.extremity.neutral.hands),
       headwear: selectHeadwearByCategory(pool.headwear, tempC, activeHands || activity === 'ski_touring_uphill', {
-        includeHelmet: activity === 'alpine_skiing' || activity === 'ski_touring_downhill',
+        helmetTypes: REQUIRED_HELMET_TYPES[activity],
       }),
       warnings: [],
     };
@@ -284,12 +292,12 @@ export function selectHeadwearByCategory(
   headwear: HeadwearRow[],
   tempC: number,
   isActive: boolean,
-  options?: { includeHelmet?: boolean }
+  options?: { helmetTypes?: readonly string[] }
 ): HeadwearRecommendations {
-  const includeHelmet = options?.includeHelmet ?? false;
-  const helmets = includeHelmet
-    ? headwear.filter((h) => HELMET_TYPES.includes(h.headwear_type))
-    : [];
+  // Only the helmet types the sport requires; temperature picks among them
+  // but never leaves a required helmet out.
+  const helmetTypes = options?.helmetTypes ?? [];
+  const helmets = headwear.filter((h) => helmetTypes.includes(h.headwear_type));
   const headWarmthItems = headwear.filter((h) => HEAD_WARMTH_TYPES.includes(h.headwear_type));
   const neckWarmthItems = headwear.filter((h) => NECK_WARMTH_TYPES.includes(h.headwear_type));
 
