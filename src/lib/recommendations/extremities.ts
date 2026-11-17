@@ -298,11 +298,13 @@ export function selectHeadwearByCategory(
   // but never leaves a required helmet out.
   const helmetTypes = options?.helmetTypes ?? [];
   const helmets = headwear.filter((h) => helmetTypes.includes(h.headwear_type));
-  const headWarmthItems = headwear.filter((h) => HEAD_WARMTH_TYPES.includes(h.headwear_type));
   const neckWarmthItems = headwear.filter((h) => NECK_WARMTH_TYPES.includes(h.headwear_type));
 
   // Select best helmet (prefer warmer for cold, but helmets have similar warmth)
   const helmet = selectBestFromCategory(helmets, tempC, isActive);
+  // Under a helmet, only head warmth marked helmet-compatible fits; a thick beanie doesn't.
+  const headWarmthItems = headwear.filter((h) => HEAD_WARMTH_TYPES.includes(h.headwear_type)
+    && (!helmet || h.helmet_compatible !== false));
 
   // Select best head warmth layer based on temperature
   const headWarmth = selectBestFromCategory(headWarmthItems, tempC, isActive);

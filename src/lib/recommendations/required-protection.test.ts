@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BODY_METRICS } from '@/lib/biophysics/bodyMetrics';
 import type { ActivityType } from '@/lib/biophysics/constants';
-import { selectPhaseAccessories } from './extremities';
+import { selectHeadwearByCategory, selectPhaseAccessories } from './extremities';
 import { buildHelmetRequirement } from './requirements';
 import { metabolicRateFor, phaseIreq, phaseTargets } from './thermal-targets';
 import type { HeadwearRow } from './types';
@@ -40,6 +40,20 @@ describe('required helmets', () => {
     const result = selectPhaseAccessories(activity, targets(activity, -5), { handwear: [], headwear: [SKI, BIKE, BEANIE] }, -5);
     expect(result.headwear.helmet).toBeNull();
     expect(buildHelmetRequirement(activity, null, { usingWardrobe: true, headwearOwned: true })).toBeUndefined();
+  });
+
+  it('wears only helmet-compatible head warmth under a helmet', () => {
+    const cabinHat = { ...headwear('cabin-hat', 'heavy_beanie', 1.1), helmet_compatible: false };
+    const liner = { ...headwear('liner', 'liner_beanie', 0.4), helmet_compatible: true };
+    for (const helmet of [SKI, BIKE]) {
+      const helmetTypes = [helmet.headwear_type];
+      expect(selectHeadwearByCategory([cabinHat, liner, helmet], -20, true, { helmetTypes }).headWarmth?.id).toBe('liner');
+      // No head warmth rather than a hat that doesn't fit under the helmet.
+      expect(selectHeadwearByCategory([cabinHat, helmet], -20, true, { helmetTypes }))
+        .toMatchObject({ helmet: { id: helmet.id }, headWarmth: null });
+    }
+    // Without a helmet, including one owned but not required, the warmest hat is still chosen.
+    expect(selectHeadwearByCategory([cabinHat, liner, SKI], -20, true).headWarmth?.id).toBe('cabin-hat');
   });
 
   it('matches an owned helmet as owned and a catalog helmet as a suggestion, never as owned', () => {

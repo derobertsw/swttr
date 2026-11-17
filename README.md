@@ -272,7 +272,7 @@ graph TD
 
 ### 6. Extremity Selection
 
-Running/XC evaluate optional thermal coverage against the phase's local min/max bands. The absence of insulation competes with known suitable gear. When nothing fits, going without is weighed against the nearest item, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings check the heuristic bands in deep cold: items rated for these conditions win, and the lightest rated choice sets the upper limit that scoring and manual checks use. Functional XC gloves have a separate pole-grip purpose. Cycling, alpine and touring explicitly retain the earlier selection rules pending calibration. Helmets are required protection, kept apart from optional warmth: alpine and the touring descent need a ski helmet and cycling a bike helmet, whatever the thermal demand. Each response reports the helmet as a requirement: an owned match, a catalog suggestion that is never presented as owned, or missing, with a warning and a generic suggestion.
+Running/XC evaluate optional thermal coverage against the phase's local min/max bands. The absence of insulation competes with known suitable gear. When nothing fits, going without is weighed against the nearest item, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings check the heuristic bands in deep cold: items rated for these conditions win, and the lightest rated choice sets the upper limit that scoring and manual checks use. Functional XC gloves have a separate pole-grip purpose. Cycling, alpine and touring explicitly retain the earlier selection rules pending calibration. Helmets are required protection, kept apart from optional warmth: alpine and the touring descent need a ski helmet and cycling a bike helmet, whatever the thermal demand. Each gear recommendation reports the helmet as a requirement: an owned match, a catalog suggestion that is never presented as owned, or missing, with a warning and a generic suggestion. A targets-only response, returned when no usable garments are available, has no helmet requirement. Under a helmet, only head warmth and hoods marked helmet-compatible are worn.
 
 ```mermaid
 graph TD
@@ -293,7 +293,7 @@ graph TD
     LEGACY --> LHAND[Biking: active glove thresholds<br/>Alpine and touring: static glove thresholds]
     LEGACY --> LHEAD[Head warmth by temperature<br/>Neck layer below freezing]
     LHEAD --> HELMET{Sport or phase requires a helmet?<br/>Alpine and touring descent: ski helmet<br/>Cycling: bike helmet}
-    HELMET -->|Yes| REQUIRED[Required helmet of that type, whatever the thermal demand<br/>Temperature only picks among helmets<br/>Only helmet-compatible hoods contribute warmth]
+    HELMET -->|Yes| REQUIRED[Required helmet of that type, whatever the thermal demand<br/>Temperature only picks among helmets<br/>Only helmet-compatible head warmth and hoods are worn under it]
     HELMET -->|No: running, XC, touring climb| NOHELMET[No helmet]
     REQUIRED --> HREQ{Helmet of that type available?}
     HREQ -->|In the wardrobe| HOWNED[Requirement: owned match]
