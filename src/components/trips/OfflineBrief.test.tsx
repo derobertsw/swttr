@@ -54,8 +54,9 @@ describe("Save for offline on the trip (#214)", () => {
     expect(await screen.findByText(/^Saved on this device .* · Sat Feb 13$/)).toBeInTheDocument();
     expect(fetchMock).toHaveBeenLastCalledWith(`/api/v1/trips/trip-1/brief?dates=${SAT}`, expect.anything());
     expect((await readSavedBrief("trip-1", "user_1"))?.brief.covered.dates).toEqual([SAT]);
-    // jsdom has no service workers, so it says the copy can't open offline here.
-    expect(screen.getByRole("status")).toHaveTextContent("This browser can't open saved trips without a connection");
+    // jsdom has no service workers: the copy is kept, but it can't open offline here, and that's an alert, not a success.
+    expect(screen.getByRole("status")).not.toHaveTextContent("with or without a connection");
+    expect(screen.getByRole("alert")).toHaveTextContent("This browser can't open saved trips without a connection");
     expect(screen.getByRole("link", { name: "Open saved brief" })).toHaveAttribute("href", "/trips/saved?trip=trip-1");
   });
 

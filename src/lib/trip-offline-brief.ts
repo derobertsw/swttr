@@ -88,6 +88,13 @@ function coveredLabel(dates: string[]): string {
   return consecutive ? `${dateLabel(dates[0])} – ${dateLabel(dates[dates.length - 1])}` : dates.map(dateLabel).join(", ");
 }
 
+/**
+ * Drives whose `detail` only says when a calculated estimate was made and on
+ * what assumptions. It changes on every recalculation, so it's left out of
+ * the revision; the organizer's own estimate's note isn't.
+ */
+const calculatedDetail = new WeakSet<OfflineBriefDrive>();
+
 /** The drive this member takes: their own departure, or the crew's, as the day page shows it. */
 function driveFor(day: TripDriveDay | undefined, memberId: string | null): OfflineBriefDrive | null {
   if (!day) return null;
@@ -114,7 +121,7 @@ function driveFor(day: TripDriveDay | undefined, memberId: string | null): Offli
     case "approximate_origin": summary = "Drive time not available: the starting stay has no exact location"; break;
     default: summary = "Drive time not available: the access point has no exact location";
   }
-  return {
+  const drive: OfflineBriefDrive = {
     from: route.origin?.label ?? null,
     to: route.destination?.label ?? null,
     summary,
@@ -126,6 +133,8 @@ function driveFor(day: TripDriveDay | undefined, memberId: string | null): Offli
       { label: "Directions in Google Maps", url: route.directions.google },
     ] : [],
   };
+  if (calculated) calculatedDetail.add(drive);
+  return drive;
 }
 
 function stayOf(stay: TripStaySummary | undefined): OfflineBriefStay | null {
@@ -362,8 +371,11 @@ export function buildOfflineBrief({ full, userId, dates, drive, equipment, now }
     contents: { included, absent, omitted: OMITTED },
   };
   // A recalculated drive time changes only its "Calculated …" detail; that
-  // alone isn't the trip changing.
-  const basis = { ...content, days: days.map((day) => ({ ...day, getting_there: day.getting_there && { ...day.getting_there, detail: null } })) };
+  // alone isn't the trip changing. The organizer's note on their own estimate is.
+  const basis = { ...content, days: days.map((day) => ({
+    ...day,
+    getting_there: day.getting_there && calculatedDetail.has(day.getting_there) ? { ...day.getting_there, detail: null } : day.getting_there,
+  })) };
   return {
     ...content,
     saved_at: new Date(now).toISOString(),

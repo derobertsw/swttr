@@ -10,9 +10,15 @@ import type {
 
 const SAT = "2027-02-13", SUN = "2027-02-14", MON = "2027-02-15";
 const NOW = Date.parse("2027-02-10T12:00:00Z");
+// The labels are on the destination's clock, from the IANA rules Node ships.
+// Rogers Pass is in British Columbia, which tzdata 2026b moved to permanent
+// UTC-7, so America/Vancouver's February offset depends on the Node release
+// (PST in 2026a, -07 from 2026b). A zone whose winter rules aren't changing
+// keeps the expected labels the same everywhere.
+const ZONE = "America/Los_Angeles";
 const lot: TripLocation = {
   label: "Rogers Pass lot", address: "Trans-Canada Hwy, Glacier National Park", latitude: 51.301234, longitude: -117.52, precision: "exact",
-  time_zone: "America/Vancouver", source: "search", provider: "geoapify", provider_id: "p-1", attribution: "© OpenStreetMap contributors",
+  time_zone: ZONE, source: "search", provider: "geoapify", provider_id: "p-1", attribution: "© OpenStreetMap contributors",
 };
 const trip = { id: "trip-1", owner_user_id: "user-org", name: "Rogers Pass", start_date: SAT, end_date: MON, status: "planning",
   created_at: "2027-01-01T00:00:00Z", updated_at: "2027-01-01T00:00:00Z" } as TripFull["trip"];
@@ -36,7 +42,7 @@ const plan = {
   id: "plan-1", trip_id: trip.id, trip_day_id: "day-sat", date: SAT, objective: "Asulkan Valley", route_url: "https://example.com/asulkan",
   distance: 12, distance_unit: "km", ascent: 1100, ascent_unit: "m", duration_minutes: 390, metrics_source: null, metrics_source_url: null,
   approach_notes: "Skin the old road", access_notes: null, access_url: null, backup_plan: "Glacier Crest trees", return_time: "15:00:00",
-  return_day_offset: 0, checkin_notes: "Text Sam by 4", pickup_notes: null, time_zone: "America/Vancouver", revision: 3,
+  return_day_offset: 0, checkin_notes: "Text Sam by 4", pickup_notes: null, time_zone: ZONE, revision: 3,
   created_by: "user-org", updated_by: "user-org", created_at: "", updated_at: "2027-02-08T00:00:00Z",
   return_label: "3:00 PM PST · Sat Feb 13", metrics_label: "12 km · 1,100 m ascent · 6 h 30 min", metrics_source_label: "Crew estimate",
   time_zone_label: "Rogers Pass time (PST)", updated_label: "Last changed Mon Feb 8 by the organizer",
@@ -226,6 +232,22 @@ describe("A member's offline trip brief (#214)", () => {
     expect(briefFor("user-org", undefined, { tour_plans: [{ ...plan, backup_plan: "Bald Mountain" }] }).revision).not.toBe(first.revision);
     // Each member's brief is their own.
     expect(briefFor("user-ana").revision).not.toBe(first.revision);
+  });
+
+  it("changes revision when the organizer changes only the note on their own drive estimate", () => {
+    const manual = (note: string) => {
+      const estimates = drive();
+      const mine = estimates.days[0].departures[1];
+      Object.assign(mine, { state: "manual", manual: {
+        pair_key: "pair", duration_label: "50 min", duration_seconds: 3000, note, entered_at: "2027-02-09T08:00:00Z",
+        origin_label: "Golden motel", destination_label: "Rogers Pass lot", current: true, use_calculated: false, dates: [SAT],
+      } });
+      return buildOfflineBrief({ full: tripFullFor(fullTrip(), "user-org"), userId: "user-org", dates: [SAT], drive: estimates, equipment, now: NOW });
+    };
+    const before = manual("Chains required past Golden");
+    expect(before.days[0].getting_there).toMatchObject({ summary: "50 min · the organizer's estimate", detail: "Chains required past Golden · Entered Tue Feb 9" });
+    expect(manual("Road open, no chains").revision).not.toBe(before.revision);
+    expect(manual("Chains required past Golden").revision).toBe(before.revision);
   });
 
   it("says when drive times or equipment couldn't be read rather than leaving them out silently", () => {

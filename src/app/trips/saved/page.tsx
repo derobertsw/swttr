@@ -192,7 +192,8 @@ function SavedBriefDetail({ saved, canCheck, onChanged, onRemoved }: {
       const { brief } = await fetchOfflineBrief(saved.trip_id, saved.brief.covered.dates);
       await storeSavedBrief(saved.account_id, brief);
       const opening = await prepareOfflineOpening();
-      setMessage(`Updated.${opening.ready ? "" : ` ${opening.reason}`}`);
+      setMessage("Updated.");
+      if (!opening.ready) setError(opening.reason);
       await onChanged();
     } catch (err) {
       setError(`Couldn't update the saved copy: ${errorMessage(err)} The copy saved ${absoluteTime(saved.brief.saved_at)} is still on this device.`);

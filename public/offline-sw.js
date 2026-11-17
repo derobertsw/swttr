@@ -11,6 +11,8 @@
 
 const SHELL_PATH = "/trips/saved";
 const CACHE_PREFIX = "swttr-saved-shell-";
+// A copy being downloaded: never read, and dropped whether or not it completes.
+const STAGING_PREFIX = "swttr-saved-staging-";
 // Online, wait this long for the live page before showing the kept one.
 const NETWORK_TIMEOUT_MS = 4000;
 // Icons and images the page links to by URL, outside the build's static files.
@@ -20,17 +22,23 @@ const OFFLINE_PAGE = `<!doctype html><html lang="en"><meta charset="utf-8"><meta
 <title>Saved on this device | SWTTR</title><body style="font-family:system-ui,sans-serif;margin:2rem;line-height:1.5">
 <h1 style="font-size:1.25rem">You're offline</h1><p>This device hasn't kept the saved trips page yet. Connect, open Trips, then Saved on this device.</p></body></html>`;
 
-/** Build files the page's script, style and preload tags name. */
+/**
+ * Build files the page's script, style and preload tags name. The page can't
+ * run or look right without them, so keeping it needs every one.
+ */
 function taggedFiles(html) {
   return [...new Set([...html.matchAll(/(?:src|href)="(\/_next\/static\/[^"?#]+)/g)].map((match) => match[1]))];
 }
 
-/** Build files and icons the page names: its tags, and the chunk list in its page data. */
-function filesIn(html) {
-  const found = new Set(taggedFiles(html));
+/**
+ * Other files the page may load, kept when they download: chunk paths picked
+ * out of its page data (some aren't files) and its icons.
+ */
+function extraFiles(html, tagged) {
+  const found = new Set();
   for (const match of html.matchAll(/(?:\/_next\/|\\?")(static\/(?:chunks|css|media)\/[^"\\?#\s]+)/g)) found.add(`/_next/${match[1]}`);
   for (const match of html.matchAll(/href="(\/(?!_next\/)[^"#]+\.(?:png|svg|ico|webp)(?:\?[^"#]*)?)"/g)) found.add(match[1].replace(/&amp;/g, "&"));
-  return [...found];
+  return [...found].filter((path) => !tagged.includes(path));
 }
 
 /** Fonts and images a stylesheet loads, resolved against it. */
@@ -60,47 +68,65 @@ async function keptPage() {
 }
 
 async function removeCachesExcept(keep) {
-  const names = (await caches.keys()).filter((name) => name.startsWith(CACHE_PREFIX) && name !== keep);
+  const names = (await caches.keys()).filter((name) => (name.startsWith(CACHE_PREFIX) || name.startsWith(STAGING_PREFIX)) && name !== keep);
   await Promise.all(names.map((name) => caches.delete(name)));
 }
 
 const isPage = (response) => response.ok && response.type === "basic" && (response.headers.get("content-type") || "").includes("text/html");
 
 /**
- * Keeps the current page and every file it needs in a new cache, then drops
- * the old one. A failure part way drops the new cache instead, so the copy
- * that opens offline is always one whole page.
+ * Downloads the current page and the files it needs into a staging cache.
+ * Only once every required file arrived does it become the kept copy and the
+ * previous one go. Any failure, including a required file answering with an
+ * error, rejects and leaves the previous copy as it was, so the save that
+ * asked for it reports the failure rather than a copy that can't open.
  */
 let priming = null;
 function prime() {
   priming = priming || (async () => {
-    const name = `${CACHE_PREFIX}${Date.now()}`;
-    const cache = await caches.open(name);
+    const stamp = Date.now();
+    const stagingName = `${STAGING_PREFIX}${stamp}`;
+    const keptName = `${CACHE_PREFIX}${stamp}`;
+    const staging = await caches.open(stagingName);
     try {
       // No cookies: the page is the same for everyone, and must never be anyone's own.
       const page = await fetch(SHELL_PATH, { credentials: "omit", cache: "no-store", redirect: "manual" });
       if (!isPage(page)) throw new Error("the saved trips page didn't load");
       const html = await page.clone().text();
-      const files = filesIn(html);
-      const keep = async (path) => {
+      const required = taggedFiles(html);
+      const extra = extraFiles(html, required);
+      const keep = async (path, needed) => {
         const response = await fetch(path, { credentials: "omit", cache: "no-cache" });
-        // A path picked out of page data that isn't a file is skipped; a dropped connection isn't.
-        if (!response.ok) return null;
-        await cache.put(path, response.clone());
+        if (!response.ok) {
+          if (needed) throw new Error(`a file the page needs didn't download (${response.status})`);
+          return null;
+        }
+        await staging.put(path, response.clone());
         return response;
       };
       const styles = [];
-      await Promise.all(files.map(async (path) => {
-        const response = await keep(path);
-        if (response && path.endsWith(".css")) styles.push([path, await response.text()]);
-      }));
-      const fonts = styles.flatMap(([path, css]) => filesInCss(css, path)).filter((path) => !files.includes(path));
-      await Promise.all([...new Set(fonts)].map(keep));
-      await cache.put(SHELL_PATH, page);
-      await removeCachesExcept(name);
+      await Promise.all([
+        ...required.map(async (path) => {
+          const response = await keep(path, true);
+          if (path.endsWith(".css")) styles.push([path, await response.text()]);
+        }),
+        ...extra.map((path) => keep(path, false)),
+      ]);
+      // Fonts and images the stylesheets load: the page still reads without one.
+      const listed = new Set([...required, ...extra]);
+      const fromStyles = [...new Set(styles.flatMap(([path, css]) => filesInCss(css, path)))].filter((path) => !listed.has(path));
+      await Promise.all(fromStyles.map((path) => keep(path, false)));
+
+      // Everything required is here: the staged files become the kept copy, its page last.
+      const kept = await caches.open(keptName);
+      for (const request of await staging.keys()) await kept.put(request, await staging.match(request));
+      await kept.put(SHELL_PATH, page);
+      await removeCachesExcept(keptName);
     } catch (error) {
-      await caches.delete(name);
+      await caches.delete(keptName);
       throw error;
+    } finally {
+      await caches.delete(stagingName);
     }
   })().finally(() => { priming = null; });
   return priming;

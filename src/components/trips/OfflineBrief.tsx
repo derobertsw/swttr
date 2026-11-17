@@ -341,9 +341,7 @@ export function OfflineBriefView({ brief, status, actions }: { brief: TripOfflin
 }
 
 type Opening = Awaited<ReturnType<typeof prepareOfflineOpening>>;
-const openingNote = (opening: Opening) => opening.ready
-  ? "Open it from Trips, then Saved on this device, with or without a connection."
-  : opening.reason;
+const OPENS_OFFLINE = "Open it from Trips, then Saved on this device, with or without a connection.";
 
 /**
  * Save for offline on the trip's Plan page (#214): choose days, review what's
@@ -381,7 +379,9 @@ export function TripOfflineSave({ tripId }: { tripId: string }) {
       const stored = await storeSavedBrief(userId, brief);
       const opening = await prepareOfflineOpening();
       setSaved(stored);
-      setStatus(`Updated. ${savedLine(stored.brief)}. ${openingNote(opening)}`);
+      setStatus(`Updated. ${savedLine(stored.brief)}.${opening.ready ? ` ${OPENS_OFFLINE}` : ""}`);
+      // The brief is kept, but the page that opens it offline isn't: that's a failure to say so.
+      if (!opening.ready) setError(opening.reason);
     } catch (err) {
       setError(`Couldn't update the saved copy: ${errorMessage(err)} The copy saved ${absoluteTime(saved.brief.saved_at)} is still on this device.`);
       recheck();
@@ -452,7 +452,8 @@ export function TripOfflineSave({ tripId }: { tripId: string }) {
           onSaved={(stored, opening) => {
             setSaved(stored);
             setChoosing(false);
-            setStatus(`${savedLine(stored.brief)}. ${openingNote(opening)}`);
+            setStatus(`${savedLine(stored.brief)}.${opening.ready ? ` ${OPENS_OFFLINE}` : ""}`);
+            if (!opening.ready) setError(opening.reason);
           }}
         />
       )}
