@@ -240,8 +240,8 @@ const LayerDisplay = ({
   // Thermal evaluation of the worn layers (including edits) runs on the server.
   const climbInput: PhaseEvaluationInput = {
     items: evaluationItemsByBodyPart(climb.layers),
-    requireStandalone: Boolean(ireq?.policy),
-    protectionNeeds: ireq?.policy?.protection,
+    requireStandalone: Boolean(ireq?.policy) || ireq?.outfit_checks?.require_standalone === true,
+    protectionNeeds: ireq?.policy?.protection ?? ireq?.outfit_checks?.protection,
     breathabilityTarget: biophysicsData?.recommendation.evaluation?.breathabilityTarget,
     targets: bodyPartTargets(ireq?.regional, ireq?.extremity),
     minTargets: bodyPartTargets(ireq?.regional, ireq?.extremity, "min"),

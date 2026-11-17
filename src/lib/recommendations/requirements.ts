@@ -1,5 +1,5 @@
 /**
- * Requirement-first matching for running/XC: derive what the activity needs
+ * Requirement-first matching for running, cycling and XC: derive what the activity needs
  * from the thermal targets, then match owned garments against it. An owned
  * garment that is unsuitable (underlayer-only worn alone, too warm for a
  * light requirement, unknown thermal data) is never presented as a match;
@@ -12,6 +12,7 @@ import { HEAD_WARMTH_TYPES } from './extremities';
 import type { PhaseTargets } from './thermal-targets';
 import { xcBasic, xcRegionMatches, xcRequirementLabel } from './sports/xc-outfit';
 import { runningBasic, runningRegionMatches, runningRegionIssues, runningRequirementLabel } from './sports/running-outfit';
+import { cyclingRequirementLabel } from './sports/cycling-outfit';
 
 const CLO_MARGIN = 0.15;
 const EXTREMITY_NEEDED_CLO = 0.05;
@@ -22,6 +23,12 @@ const LABELS: Record<string, Record<string, { light: string; standard: string }>
     legs: { light: 'Running shorts', standard: 'Running tights or pants' },
     hands: { light: 'Lightweight running gloves', standard: 'Running gloves' },
     head: { light: 'Lightweight running hat', standard: 'Running beanie or hat' },
+  },
+  biking: {
+    torso: { light: 'Short-sleeve cycling jersey', standard: 'Breathable cycling top' },
+    legs: { light: 'Cycling shorts', standard: 'Cycling tights or pants' },
+    hands: { light: 'Lightweight cycling gloves', standard: 'Cycling gloves' },
+    head: { light: 'Thin cycling cap or headband', standard: 'Under-helmet cap or balaclava' },
   },
   xc_skiing: {
     torso: { light: 'Breathable Nordic top', standard: 'Breathable Nordic top and wind layer' },
@@ -137,10 +144,13 @@ export function buildClothingRequirements(
       continue;
     }
 
-    if (activity === 'running' && (pool.selectedGarments || pool.garments.length === 0)) {
+    // Cycling selects with running's search and its own protection needs.
+    if ((activity === 'running' || activity === 'biking') && (pool.selectedGarments || pool.garments.length === 0)) {
       const selected = pool.selectedGarments ?? [];
-      const matched = runningRegionMatches(selected, targets, region) ? runningBasic(selected, region) : undefined;
-      const result = requirement(activity, region, runningRequirementLabel(targets, region), neutral, matched, pool.ownership.garments);
+      const needs = pool.functional?.protection ?? targets.policy?.protection;
+      const matched = runningRegionMatches(selected, targets, region, needs) ? runningBasic(selected, region) : undefined;
+      const label = activity === 'biking' ? cyclingRequirementLabel(targets, region, needs) : runningRequirementLabel(targets, region);
+      const result = requirement(activity, region, label, neutral, matched, pool.ownership.garments);
       const names = selected.filter(g => g[`covers_${region}`]).map(g => `${g.brand} ${g.model_name}`).join(' + ');
       if (matched) {
         result.matched_garment_name = names;
@@ -149,7 +159,7 @@ export function buildClothingRequirements(
         // Missing refers to the ideal requirement, not to ownership of the
         // best available clothing that is actually selected and evaluated.
         const source = pool.ownership.garments ? 'in your wardrobe' : 'from the catalog (not owned)';
-        result.message = `${result.label} — best available ${source}: ${names}; ${runningRegionIssues(selected, targets, region).join('; ')}. Additional or alternative clothing is needed to meet this requirement.`;
+        result.message = `${result.label} — best available ${source}: ${names}; ${runningRegionIssues(selected, targets, region, needs).join('; ')}. Additional or alternative clothing is needed to meet this requirement.`;
       }
       requirements.push(result);
       continue;
