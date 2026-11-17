@@ -287,6 +287,41 @@ export function previewConditionsEdit(
   };
 }
 
+/**
+ * A day's conditions as a date change that removes it checks them
+ * (change_trip_dates, migration 20261116210000): the sources listed on it and
+ * every review entry recorded there, for any source, including ones no longer
+ * listed on it, whose reviews go with the day too. Undefined when it has
+ * neither, as the function then lists the day without them.
+ */
+export function removedDayConditions(rows: ConditionsRows, dayId: string): { source_ids: string[]; entries: number } | undefined {
+  const sourceIds = rows.attachments.filter((attachment) => attachment.trip_day_id === dayId).map((attachment) => attachment.source_id).sort();
+  const entries = rows.reviews.filter((row) => row.trip_day_id === dayId).length;
+  return sourceIds.length > 0 || entries > 0 ? { source_ids: sourceIds, entries } : undefined;
+}
+
+/**
+ * The reviews still recorded on a day for sources no longer listed on it,
+ * which go with the day when it's removed: each source's name and how many
+ * people's current review it has, by type and name. Sources whose reviews were
+ * all withdrawn are left out.
+ */
+export function keptReviewsOn(rows: ConditionsRows, dayId: string): Array<{ name: string; reviews: number }> {
+  const listed = new Set(rows.attachments.filter((attachment) => attachment.trip_day_id === dayId).map((attachment) => attachment.source_id));
+  return rows.sources
+    .filter((source) => !listed.has(source.id))
+    .sort((a, b) => CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category) || a.name.localeCompare(b.name))
+    .flatMap((source) => {
+      const latest = new Map<string, ReviewRow>();
+      for (const row of rows.reviews) {
+        if (row.trip_day_id !== dayId || row.source_id !== source.id) continue;
+        if ((latest.get(row.user_id)?.entry_number ?? -Infinity) < row.entry_number) latest.set(row.user_id, row);
+      }
+      const reviews = [...latest.values()].filter((row) => row.action !== "withdrawn").length;
+      return reviews > 0 ? [{ name: source.name, reviews }] : [];
+    });
+}
+
 /** Whether the days a source is listed on are the ones a review showed, as `{date, day_id}` in any order. */
 export function sameDays(a: Array<{ date: string; day_id: string }>, b: Array<{ date: string; day_id: string }>): boolean {
   const key = (list: Array<{ date: string; day_id: string }>) => list.map((day) => `${day.date}:${day.day_id.toLowerCase()}`).sort().join(",");

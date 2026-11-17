@@ -284,8 +284,50 @@ describe("Reusing conditions sources in Postgres", () => {
     const shorten = (removed: unknown, database = db) => database.query(
       "SELECT public.change_trip_dates($1, 'user-1', '2026-10-09', '2026-10-11', '2026-10-09', '2026-10-10', 'keep', 'planning', NULL, NULL, $2) AS result",
       [tripId, JSON.stringify(removed)]);
-    const removedFor = async () => previewDateChange(await h.loadFull(), "2026-10-09", "2026-10-10").plans.keep;
+    const removedFor = async () => previewDateChange(await h.loadFull(), "2026-10-09", "2026-10-10", await h.conditionRows()).plans.keep;
     const withoutSources = (removed: TripRemovedDayCheck[]) => removed.map((day) => without(day, "conditions"));
+    /** Removes a source from a day, keeping its reviews there. */
+    const detach = async (sourceId: string, date: string, revision: number) => db.query(
+      "SELECT public.mutate_trip_conditions_source($1, 'user-1', $2, $3, $4, $5, $6, 'remove', '{}')", [tripId, date, await h.dayId(date), sourceId, revision, randomUUID()]);
+
+    it("lists the reviews kept for a source removed from the day, and refuses a review that left them out", async () => {
+      const mwac = await h.add("2026-10-11");
+      await h.add("2026-10-11", OBS);
+      await h.review(mwac, "2026-10-11");
+      await detach(mwac, "2026-10-11", 1);
+      const plan = await removedFor();
+      expect(plan.removed.map((day) => day.conditions)).toEqual([
+        "Conditions: Mount Washington Observatory · 1 review of Mount Washington Avalanche Center (no longer listed) removed with the day",
+      ]);
+      expect(plan.expected_removed).toEqual([expect.objectContaining({ conditions: { source_ids: [expect.any(String)], entries: 1 } })]);
+      // A review that left them out, as the API's retry without conditions does, is refused.
+      await expect(shorten(withoutSources(plan.expected_removed))).rejects.toMatchObject({ code: "PT409" });
+      await shorten(plan.expected_removed);
+      expect(await h.entriesOn()).toEqual([]);
+    });
+
+    it("lists a day whose only conditions are kept reviews, and refuses a review from before they were recorded", async () => {
+      const mwac = await h.add("2026-10-11");
+      const unseen = (await removedFor()).expected_removed;
+      await h.review(mwac, "2026-10-11");
+      await detach(mwac, "2026-10-11", 1);
+      for (const stale of [unseen, withoutSources(unseen)]) await expect(shorten(stale)).rejects.toMatchObject({ code: "PT409" });
+      const seen = (await removedFor()).expected_removed;
+      expect(seen).toEqual([expect.objectContaining({ conditions: { source_ids: [], entries: 1 } })]);
+      expect(await h.entriesOn()).toHaveLength(1);
+      await shorten(seen);
+      expect(await h.entriesOn()).toEqual([]);
+    });
+
+    it("refuses a review from before a source was removed from the day, with or without the API's retry", async () => {
+      const mwac = await h.add("2026-10-11");
+      await h.review(mwac, "2026-10-11");
+      const seen = (await removedFor()).expected_removed;
+      await detach(mwac, "2026-10-11", 1);
+      await expect(shorten(seen)).rejects.toMatchObject({ code: "PT409" });
+      await expect(shorten(withoutSources(seen))).rejects.toMatchObject({ code: "PT409" });
+      expect(await h.entriesOn()).toHaveLength(1);
+    });
 
     it("lists its sources and reviews in the review, and removes them with the day", async () => {
       const mwac = await h.add("2026-10-11");
@@ -361,6 +403,22 @@ describe("Reusing conditions sources across migration orders", () => {
     await expect(shorten(removed)).rejects.toMatchObject({ code: "PT409" });
     await shorten(removed.map((day) => without(day, "conditions")));
     expect(await h.rows("SELECT count(*)::int AS days FROM trip_days WHERE trip_id = $1")).toEqual([{ days: 2 }]);
+
+    // Before it, the function checks no conditions, so the API compares the
+    // review's with the trip's now first: a source removed from the day since
+    // the review, or the reviews it keeps there, read differently.
+    await seed(before);
+    const mwac = await h.add("2026-10-11");
+    await h.review(mwac, "2026-10-11");
+    const now = async () => previewDateChange(await h.loadFull(), "2026-10-09", "2026-10-10", await h.conditionRows()).plans.keep.expected_removed;
+    const seen = await now();
+    await before.query("SELECT public.mutate_trip_conditions_source($1, 'user-1', '2026-10-11', $2, $3, 1, $4, 'remove', '{}')", [tripId, await h.dayId("2026-10-11"), mwac, randomUUID()]);
+    const after = await now();
+    expect([seen[0].conditions, after[0].conditions]).toEqual([{ source_ids: [mwac], entries: 1 }, { source_ids: [], entries: 1 }]);
+    // A review that saw the kept review passes through the API's retry, as every removal did before this change.
+    await expect(shorten(after)).rejects.toMatchObject({ code: "PT409" });
+    await shorten(after.map((day) => without(day, "conditions")));
+    expect(await h.entriesOn()).toEqual([]);
     await before.close();
 
     // This migration first, then day notes: both checks are there.

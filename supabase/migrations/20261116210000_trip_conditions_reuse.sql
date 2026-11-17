@@ -167,22 +167,26 @@ $$;
 REVOKE ALL ON FUNCTION public.edit_trip_itinerary_reviewed(uuid, text, text, jsonb, jsonb, jsonb, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.edit_trip_itinerary_reviewed(uuid, text, text, jsonb, jsonb, jsonb, jsonb) TO service_role;
 
--- A date change that removes a day checks the sources listed on it and the
--- review entries recorded for them against the review that listed them, as it
+-- A date change that removes a day checks the sources listed on it and every
+-- review entry recorded there against the review that listed them, as it
 -- checks the day's tour plan and notes, so sources listed or reviews recorded
 -- after the review aren't deleted unseen (409, and the API sends the current
--- review). A day without sources is listed as before. Only that list changes
+-- review). That's the entries of any source, including one removed from the
+-- day since, whose reviews are kept with the day and go with it. A day with
+-- neither sources nor reviews is listed as before. Only that list changes
 -- in change_trip_dates (026, as 20261021201500 and 20261028130000 leave it);
 -- it follows the tour plan, so 20261028130000's notes can come before or after.
 DO $migration$
 DECLARE
   target oid;
   legacy constant text := 'FROM public.trip_day_tour_plans t WHERE t.trip_day_id = d.id), ''{}''::jsonb)';
-  replaced constant text := legacy || ' || coalesce((SELECT jsonb_build_object(''conditions'', jsonb_build_object('
-    || '''source_ids'', jsonb_agg(a.source_id ORDER BY a.source_id), '
-    || '''entries'', (SELECT count(*) FROM public.trip_conditions_reviews r JOIN public.trip_day_conditions_sources ra'
-    || ' ON ra.trip_day_id = r.trip_day_id AND ra.source_id = r.source_id WHERE r.trip_day_id = d.id)))'
-    || ' FROM public.trip_day_conditions_sources a WHERE a.trip_day_id = d.id HAVING count(*) > 0), ''{}''::jsonb)';
+  replaced constant text := legacy
+    || ' || CASE WHEN EXISTS (SELECT 1 FROM public.trip_day_conditions_sources a WHERE a.trip_day_id = d.id)'
+    || ' OR EXISTS (SELECT 1 FROM public.trip_conditions_reviews r WHERE r.trip_day_id = d.id)'
+    || ' THEN jsonb_build_object(''conditions'', jsonb_build_object(''source_ids'', coalesce((SELECT jsonb_agg(a.source_id ORDER BY a.source_id)'
+    || ' FROM public.trip_day_conditions_sources a WHERE a.trip_day_id = d.id), ''[]''::jsonb),'
+    || ' ''entries'', (SELECT count(*) FROM public.trip_conditions_reviews r WHERE r.trip_day_id = d.id)))'
+    || ' ELSE ''{}''::jsonb END';
   updated integer := 0;
 BEGIN
   FOR target IN

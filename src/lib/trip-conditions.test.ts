@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   conditionsContext,
   contextKey,
+  keptReviewsOn,
   parseConditionsSource,
   parseReviewNote,
   previewConditionsAttach,
+  removedDayConditions,
   previewConditionsEdit,
   sameDays,
   staleReasons,
@@ -230,6 +232,21 @@ describe("reusing a source across days", () => {
     it("refuses a source that isn't on the trip", () => {
       expect(previewConditionsEdit(trip(), "source-9", source)).toMatchObject({ status: 404 });
     });
+  });
+
+  it("finds every review entry on a day for a date change's check, and the reviews kept for sources no longer listed", () => {
+    const kept = rows(["day-1"], [
+      entry(1, "day-1", "user-2", now), entry(2, "day-2", "user-2", now),
+      { ...entry(3, "day-1", "user-2", now), source_id: "source-2" }, { ...entry(4, "day-1", "user-3", now), source_id: "source-2" },
+      { ...entry(5, "day-1", "user-3", now), source_id: "source-2", action: "withdrawn" as const },
+      { ...entry(6, "day-1", "user-2", now), source_id: "source-3", action: "withdrawn" as const },
+    ]);
+    expect(removedDayConditions(kept, "day-1")).toEqual({ source_ids: ["source-1"], entries: 5 });
+    expect(removedDayConditions(kept, "day-2")).toEqual({ source_ids: [], entries: 1 });
+    expect(removedDayConditions(kept, "day-0")).toBeUndefined();
+    // MWAC is listed; MWOBS keeps Sam's review (Alex withdrew); Avalanche Canada's only review was withdrawn.
+    expect(keptReviewsOn(kept, "day-1")).toEqual([{ name: "MWOBS", reviews: 1 }]);
+    expect(keptReviewsOn(kept, "day-2")).toEqual([{ name: "MWAC", reviews: 1 }]);
   });
 
   it("compares a review's days in any order", () => {
