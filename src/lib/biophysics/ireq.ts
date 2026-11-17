@@ -1,5 +1,6 @@
 // IREQ (Required Insulation) Calculator
-// Based on ISO 11079 standard
+// A simplified ISO 11079 heat balance: fixed skin temperatures and no skin
+// evaporation term. docs/algorithm-review.md compares it with the standard.
 
 import {
   CLO_TO_M2KW,
@@ -139,7 +140,7 @@ function estimateExposureLimitHoursHeuristic(
 }
 
 /**
- * Calculate required clothing insulation using ISO 11079 method.
+ * Calculate required clothing insulation with a simplified ISO 11079 heat balance.
  */
 export function calculateIreq(input: IreqInput): IreqResult {
   const {
