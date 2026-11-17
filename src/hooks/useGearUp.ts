@@ -13,6 +13,7 @@ import { useActivitySelection } from "@/hooks/useActivitySelection";
 import { fetchWeatherAt } from "@/hooks/useCurrentWeather";
 import { isYourLocation, useDeviceLocation, yourLocation } from "@/hooks/useDeviceLocation";
 import { useResultsHistoryEntry } from "@/hooks/useResultsHistoryEntry";
+import { useOutingViewFocus } from "@/hooks/useOutingViewFocus";
 import {
   buildLayersResult,
   createInitialState,
@@ -104,6 +105,8 @@ export function useGearUp() {
   const biophysics = useBiophysicsRecommendation();
   const { isOnResultsEntry, navigationRef, leaveResultsEntry, forgetResultsEntry } =
     useResultsHistoryEntry(state.result !== null);
+  // Focus follows the person to the results they asked for, and back to the form (#284).
+  const expectView = useOutingViewFocus(state.result !== null ? "results" : "form");
 
   const setDate = useCallback((d: Date | undefined) => dispatch({ type: "SET_DATE", date: d }), []);
   const setTime = useCallback((t: string) => dispatch({ type: "SET_TIME", time: t }), []);
@@ -172,10 +175,12 @@ export function useGearUp() {
     const request = latestRequest.current;
     const controller = new AbortController();
     activeRequest.current = { controller, source, pending: true };
+    // A browser agent's outing never takes focus from where the person is.
+    expectView(source === "human" ? "results" : null);
     dispatch({ type: "SUBMIT_START", outing });
     setPlanTab("days");
     return Object.assign(() => latestRequest.current === request && !controller.signal.aborted, { signal: controller.signal });
-  }, [retireRequest]);
+  }, [retireRequest, expectView]);
 
   /** Results and their edit form/draft share the same submitted inputs. */
   const applyOutingInputs = useCallback((outing: Outing) => {
@@ -423,8 +428,9 @@ export function useGearUp() {
   const showForm = useCallback((mode: InputMode, retire = formShowing !== mode) => {
     if (retire) retireRequest();
     if (state.result) applyOutingInputs(state.result.outing);
+    expectView("form");
     dispatch({ type: "SHOW_FORM", mode, keepLoading: !retire });
-  }, [formShowing, state.result, applyOutingInputs, retireRequest]);
+  }, [formShowing, state.result, applyOutingInputs, retireRequest, expectView]);
   /**
    * Back to the form from the page itself, which also steps back over the
    * results' history entry, so the browser's next Back leaves Gear up.
