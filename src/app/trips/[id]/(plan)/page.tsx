@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StopDot, TripError } from "@/components/trips/trip-primitives";
 import { useTrip } from "@/hooks/useTrip";
 import { TripPlacesSummary } from "@/components/trips/TripPlacesSummary";
+import { TripOfflineSave } from "@/components/trips/OfflineBrief";
 
 /**
  * Plan's own page (#330): the trip's places and destinations, beside or
@@ -61,6 +62,8 @@ export default function TripPlanPage({ params }: { params: Promise<{ id: string 
               Add or edit destinations
             </Link>
           </section>
+          {/* A dated brief of chosen days, kept on this device for no connection (#214). */}
+          {data.days.length > 0 && <TripOfflineSave tripId={id} />}
           <div className="h-24" />
         </>
       )}

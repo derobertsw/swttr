@@ -29,6 +29,8 @@ vi.mock("@clerk/nextjs", () => ({
     Link: () => null,
     Action: () => null,
   }),
+  useAuth: () => ({ isLoaded: true, userId: "user_1" }),
+  useClerk: () => ({ signOut: vi.fn() }),
 }));
 
 vi.mock("@/hooks/useMigrateUser", () => ({ useMigrateUser: () => {} }));

@@ -14,11 +14,14 @@ export const fakeClerkState = {
   signedIn: true,
   /** False when focus stays put as the menu closes, e.g. while the tab is hidden. */
   returnFocus: true,
+  /** What useClerk().signOut does; a test can replace it with a spy. */
+  signOut: async () => { fakeClerkState.signedIn = false; },
 };
 
 export function resetFakeClerk() {
   fakeClerkState.signedIn = true;
   fakeClerkState.returnFocus = true;
+  fakeClerkState.signOut = async () => { fakeClerkState.signedIn = false; };
 }
 
 interface MenuItemProps {
@@ -91,4 +94,5 @@ export const fakeClerkModule = {
   SignedOut: ({ children }: { children: ReactNode }) => (fakeClerkState.signedIn ? null : <>{children}</>),
   UserButton: Object.assign(FakeUserButton, { MenuItems, Action: MenuItem, Link: MenuItem }),
   useAuth: () => ({ isLoaded: true, userId: fakeClerkState.signedIn ? "user_1" : null }),
+  useClerk: () => ({ signOut: () => fakeClerkState.signOut() }),
 };

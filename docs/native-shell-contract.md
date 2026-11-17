@@ -54,6 +54,12 @@ No calculation or advice generation moves into the native shell.
 - `/?mode=planAhead`: load the Plan Ahead form.
 - `swttr-last-activity` in localStorage: the selected activity value, read by
   the iOS shell's activity script when a page starts. It contains no advice.
+- `/trips/saved`: Saved on this device, the trip briefs saved for offline use
+  (#214). It's public, never redirects to sign-in, and reads only the web
+  view's IndexedDB. Its service worker (scope `/trips/saved`) opens it with no
+  connection once the shell allows service workers through App-Bound Domains;
+  #146's offline view is meant to link here. See
+  [trip-offline-brief.md](trip-offline-brief.md#iphone-app-146).
 
 Native navigation follows `/`, `/trips` and its nested routes, and `/wardrobe`,
 as defined in `src/components/AppNavigation.tsx`. Other pages clear the native

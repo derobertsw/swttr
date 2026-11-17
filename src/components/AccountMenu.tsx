@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
-import { UserButton } from "@clerk/nextjs";
-import { HelpCircle, Settings, Share2 } from "lucide-react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { UserButton, useAuth, useClerk } from "@clerk/nextjs";
+import { HelpCircle, LogOut, Settings, Share2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { clearSavedBriefs, countSavedBriefs, savedBriefsAccountHint } from "@/lib/offline-briefs";
 
 // Clerk's menu hands focus back to the avatar in a microtask once it closes.
 // Focus doesn't move if the avatar already had it, so don't wait for long.
@@ -35,29 +38,53 @@ export interface AccountMenuHandle {
 
 /**
  * The signed-in avatar and its menu: SWTTR Settings first, then Clerk's
- * account management, FAQ, Share and, last, Sign out.
+ * account management, FAQ, Share and, last, Sign out. Signing out removes
+ * the trip briefs saved on this device (#214), and asks first when there are some.
  */
 export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) {
   const rootRef = useRef<HTMLSpanElement>(null);
   const pendingSettings = useRef<AbortController | null>(null);
+  const { signOut } = useClerk();
+  const { userId } = useAuth();
+  // How many saved trip briefs signing out would remove, while that's being confirmed.
+  const [confirming, setConfirming] = useState<number | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => () => pendingSettings.current?.abort(), []);
 
-  // Clerk calls this and then closes its menu, whose focus trap returns focus
-  // to the avatar. Opening Settings before that would leave two overlays
-  // fighting over focus, so wait until the avatar has it back.
-  const openSettings = () => {
+  // Clerk calls a menu action and then closes its menu, whose focus trap
+  // returns focus to the avatar. Opening an overlay before that would leave
+  // two overlays fighting over focus, so wait until the avatar has it back.
+  const afterMenuCloses = (run: () => void) => {
     pendingSettings.current?.abort();
     const pending = new AbortController();
     pendingSettings.current = pending;
     const open = () => {
       pending.abort();
-      onOpenSettings();
+      run();
     };
     rootRef.current?.addEventListener("focusin", open, { signal: pending.signal });
     const timer = window.setTimeout(open, MENU_CLOSE_TIMEOUT_MS);
     pending.signal.addEventListener("abort", () => window.clearTimeout(timer));
   };
+  const openSettings = () => afterMenuCloses(onOpenSettings);
+
+  const finishSignOut = async () => {
+    setSigningOut(true);
+    // A brief that couldn't be removed now goes once the next page sees nobody signed in.
+    if (savedBriefsAccountHint() !== null) await clearSavedBriefs().catch(() => undefined);
+    try {
+      await signOut();
+    } catch {
+      setSigningOut(false);
+    }
+  };
+  const requestSignOut = () => afterMenuCloses(() => {
+    void (userId ? countSavedBriefs(userId) : Promise.resolve(0)).then((count) => {
+      if (count > 0) setConfirming(count);
+      else void finishSignOut();
+    });
+  });
 
   useImperativeHandle(ref, () => ({
     openSettings: () => {
@@ -81,9 +108,32 @@ export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) 
           <UserButton.Action label="manageAccount" />
           <UserButton.Link label="FAQ" labelIcon={<HelpCircle size={16} />} href="/faq" />
           <UserButton.Action label="Share" labelIcon={<Share2 size={16} />} onClick={onShare} />
-          <UserButton.Action label="signOut" />
+          <UserButton.Action label="Sign out" labelIcon={<LogOut size={16} />} onClick={requestSignOut} />
         </UserButton.MenuItems>
       </UserButton>
+      <Dialog open={confirming !== null} onOpenChange={(open) => { if (!open && !signingOut) setConfirming(null); }}>
+        <DialogContent
+          showCloseButton={!signingOut}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            rootRef.current?.querySelector<HTMLButtonElement>("button[aria-expanded]")?.focus();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Sign out and remove saved trips?</DialogTitle>
+            <DialogDescription>
+              Signing out removes the {confirming === 1 ? "trip brief" : `${confirming} trip briefs`} saved on this device for offline use.
+              Your trips stay in your account, and you can save them again after you sign in.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirming(null)} disabled={signingOut}>Cancel</Button>
+            <Button type="button" onClick={() => void finishSignOut()} aria-busy={signingOut || undefined} disabled={signingOut}>
+              {signingOut ? "Signing out…" : "Sign out and remove"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </span>
   );
 }

@@ -16,6 +16,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - **What to pack** lists what each person's saved outfits call for, once per item with its days, flags changes since they last looked, and keeps their own items and quantities ([packing rules](docs/trip-packing.md))
 - **Crew stays** save optional lodging, assign nights and show each day's morning origin and tonight's stay ([stay planning and deployment](docs/trip-stays.md))
 - **Touring equipment** adds a transceiver, probe, shovel and other touring items to each person's packing list for Backcountry days, from a template they choose from, and the organizer can add shared touring items like a first aid kit and group shelter to shared gear ([touring preparation](docs/trip-touring-prep.md))
+- **Save for offline** keeps a dated, read-only brief of chosen trip days on the device: the meet, where you start and sleep, tour plans, conditions sources with dated reviews and your own kit, to open from Saved on this device with no connection ([offline brief](docs/trip-offline-brief.md))
 - **Paid agent API** for machine callers, metered per request over HTTP 402 ([docs](docs/paid-agent-api-mpp.md))
 - **Mobile-first UX**, also shipped as an iOS app via Capacitor
 

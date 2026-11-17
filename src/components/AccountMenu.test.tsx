@@ -3,13 +3,18 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AccountMenu } from "./AccountMenu";
 import { fakeClerkState, resetFakeClerk } from "@/test/fakeClerk";
+import { readSavedBriefs, storeSavedBrief } from "@/lib/offline-briefs";
+import { offlineBrief, resetDeviceStorage } from "@/test/offlineBrief";
 
 vi.mock("@clerk/nextjs", async () => (await import("@/test/fakeClerk")).fakeClerkModule);
 
 const avatar = () => screen.getByRole("button", { name: "Open user menu" });
 
 describe("AccountMenu", () => {
-  beforeEach(resetFakeClerk);
+  beforeEach(() => {
+    resetFakeClerk();
+    resetDeviceStorage();
+  });
 
   it("puts Settings first and Sign out last", async () => {
     const user = userEvent.setup();
@@ -81,5 +86,41 @@ describe("AccountMenu", () => {
     await user.click(screen.getByRole("menuitem", { name: "Share" }));
 
     expect(onShare).toHaveBeenCalledTimes(1);
+  });
+
+  it("signs out at once when no trips are saved on this device", async () => {
+    const signOut = vi.fn(async () => {});
+    fakeClerkState.signOut = signOut;
+    const user = userEvent.setup();
+    render(<AccountMenu onOpenSettings={vi.fn()} onShare={vi.fn()} />);
+
+    await user.click(avatar());
+    await user.click(screen.getByRole("menuitem", { name: "Sign out" }));
+
+    await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("warns that signing out removes the trips saved on this device, and removes them (#214)", async () => {
+    await storeSavedBrief("user_1", offlineBrief());
+    const signOut = vi.fn(async () => {});
+    fakeClerkState.signOut = signOut;
+    const user = userEvent.setup();
+    render(<AccountMenu onOpenSettings={vi.fn()} onShare={vi.fn()} />);
+
+    await user.click(avatar());
+    await user.click(screen.getByRole("menuitem", { name: "Sign out" }));
+    const dialog = await screen.findByRole("dialog", { name: "Sign out and remove saved trips?" });
+    expect(dialog).toHaveTextContent("Signing out removes the trip brief saved on this device for offline use.");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(signOut).not.toHaveBeenCalled();
+    expect((await readSavedBriefs()).briefs).toHaveLength(1);
+
+    await user.click(avatar());
+    await user.click(screen.getByRole("menuitem", { name: "Sign out" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Sign out and remove" }));
+    await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
+    expect((await readSavedBriefs()).briefs).toEqual([]);
   });
 });
