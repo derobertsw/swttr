@@ -10,14 +10,17 @@
 --   against the review that listed them.
 --
 -- Needs 031, 030 and the change_trip_dates from 026. Order with
--- 20261028130000 (day notes) doesn't matter. Deploy the API that uses it
--- first, then apply it on its own:
--- - The API from this change, without this migration, says listing a source
---   on more days and copying sources aren't available yet (503), and retries
---   a date change without the sources check, as before.
+-- 20261028130000 (day notes) doesn't matter. Apply it on its own FIRST, then
+-- deploy the API that uses it:
 -- - An API from before this change never calls the new functions, but sends
 --   no sources with a removed day, so this change_trip_dates refuses (409) its
---   date changes that remove a day with sources until the new API is out.
+--   date changes that remove a day with sources or reviews until the new API
+--   is out. Nothing is deleted unchecked.
+-- - Fallback only: the API from this change, without this migration, says
+--   listing a source on more days and copying sources aren't available yet
+--   (503), and checks a removed day's conditions itself before retrying the
+--   date change without them. That check isn't atomic with the date change,
+--   so apply this migration first.
 
 -- Listing a source on more days, here or with Copy day, adds to its revision,
 -- so an edit reviewed for the days it was on can't then be saved over days its
