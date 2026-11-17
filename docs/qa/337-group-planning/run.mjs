@@ -10,7 +10,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { api, BASE, emulate, key, newPage, openBrowser, signIn, sleep, tab, visit } from './cdp.mjs';
+import { api, BASE, emulate, key, literal, newPage, openBrowser, signIn, sleep, tab, visit } from './cdp.mjs';
 
 const root = process.cwd();
 const OUT = resolve(process.env.OUT ?? join(tmpdir(), 'qa337'));
@@ -531,7 +531,7 @@ async function focusChecks(page) {
     const triggers = await page.eval(`[...document.querySelectorAll('#main-content button')].filter((b) => b.getBoundingClientRect().height > 0).map((b) => b.getAttribute('aria-label') || b.innerText.trim()).filter(Boolean)`);
     for (const label of triggers.filter((name) => /^(Add stay|Change|Edit|Move|Who)/.test(name)).slice(0, 3)) {
       await visit(page, PAGES.stays(trip));
-      await page.eval(`(() => { const b = [...document.querySelectorAll('#main-content button')].find((el) => (el.getAttribute('aria-label') || el.innerText.trim()) === ${JSON.stringify(label)} && el.getBoundingClientRect().height > 0); b.scrollIntoView({block:'center'}); b.focus(); })()`);
+      await page.eval(`(() => { const b = [...document.querySelectorAll('#main-content button')].find((el) => (el.getAttribute('aria-label') || el.innerText.trim()) === ${literal(label)} && el.getBoundingClientRect().height > 0); b.scrollIntoView({block:'center'}); b.focus(); })()`);
       await key(page, 'Enter', 'Enter', 13);
       await page.waitFor(`document.querySelector('[role=dialog]')`, 5000);
       const opened = await page.eval(`(() => { const d = document.querySelector('[role=dialog]'); return d ? { title: d.querySelector('h2, [data-slot$=title]')?.innerText, focusInside: d.contains(document.activeElement) } : null })()`);

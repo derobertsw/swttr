@@ -71,7 +71,7 @@ globalThis.fetch = async (input) => {
     return url.searchParams.has('hourly') ? forecast(latitude, longitude) : Response.json({ latitude, longitude, timezone: ZONE });
   }
   // The routing provider is down for the whole run.
-  if (url.host.endsWith('geoapify.com')) throw new TypeError('fetch failed');
+  if (url.hostname === 'geoapify.com' || url.hostname.endsWith('.geoapify.com')) throw new TypeError('fetch failed');
   throw new Error(`QA fixture: blocked a request to ${url.host}`);
 };
 

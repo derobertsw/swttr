@@ -44,6 +44,12 @@ export class Cdp {
 
 export const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
+/** A JS literal for code evaluated in the page, safe inside any script context. */
+export function literal(value) {
+  const unsafe = { '<': '\\u003C', '>': '\\u003E', '/': '\\u002F', '\\': '\\\\', '\b': '\\b', '\f': '\\f', '\n': '\\n', '\r': '\\r', '\t': '\\t', '\0': '\\0', '\u2028': '\\u2028', '\u2029': '\\u2029' };
+  return JSON.stringify(value).replace(/[<>\b\f\n\r\t\0\u2028\u2029]/g, (char) => unsafe[char]);
+}
+
 export class Page {
   constructor(cdp, sessionId) { this.cdp = cdp; this.sessionId = sessionId; }
   send(method, params) { return this.cdp.send(method, params, this.sessionId); }
@@ -52,7 +58,7 @@ export class Page {
     if (result.exceptionDetails) throw new Error(`${result.exceptionDetails.text} ${result.exceptionDetails.exception?.description ?? ''}`);
     return result.result.value;
   }
-  async run(fn, ...args) { return this.eval(`(${fn.toString()})(...${JSON.stringify(args)})`); }
+  async run(fn, ...args) { return this.eval(`(${fn.toString()})(...${literal(args)})`); }
   async waitFor(expression, timeout = 20_000) {
     if (process.env.DEBUG) process.stdout.write(`  wait ${expression.slice(0, 90)}\n`);
     const start = Date.now();
