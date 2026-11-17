@@ -123,9 +123,15 @@ Optional:
 - `height_inches`, `weight_lbs` — body metrics for metabolic adjustment
   (clamped; defaults 69 in / 170 lbs)
 - `prioritize_light_pack` (bool, ski-touring only)
+- `temperature_sensitivity`: `hot` | `neutral` | `cold` (default `neutral`).
+  Running and XC narrow their warmth targets for `hot` (Run Warm) or `cold`
+  (Run Cold); other sports report it as not supported. The response's
+  `preference` says what changed. See
+  [Running and XC foundations](running-xc-foundations.md#warmcold-preference-251).
 
-Rejected with 400: `use_wardrobe_only: true` — wardrobes require a signed-in user,
-which the stateless agent API never has.
+Rejected with 400 (before charging): `use_wardrobe_only: true` — wardrobes
+require a signed-in user, which the stateless agent API never has — and any
+other `temperature_sensitivity` value.
 
 Because agent calls are anonymous, garment ensembles and extremity picks
 (handwear/headwear) are selected from the full public catalog rather than a

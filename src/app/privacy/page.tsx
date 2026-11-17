@@ -34,8 +34,8 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>Preferences and body measurements.</strong> We store your temperature sensitivity
-              and default activity. Height and weight are optional and are used to personalize thermal
-              recommendations. Signed-in preferences are saved to your account; preferences can also
+              and default activity. Height and weight are optional. Temperature sensitivity, height and
+              weight are used to personalize thermal recommendations. Signed-in preferences are saved to your account; preferences can also
               be kept on your device. Temperature units are saved on the device.
             </li>
             <li>

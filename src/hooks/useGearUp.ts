@@ -28,7 +28,7 @@ import { isSingleDayOuting } from "@/lib/outingAction";
 import type { CurrentOutingSnapshot, DisplayedLayers, OutingActionOutcome, ReadbackOuting, ReadbackPlace } from "@/types/outingAction";
 import { logWarn } from "@/lib/logger";
 import { RESUME_PARAM, resumeView, TRIP_PARAM, type ResumeView } from "@/lib/outingReturn";
-import type { LaterTime, LayersResult, Outing, OutingTime } from "@/types/outing";
+import type { LaterTime, LayersResult, Outing, OutingResult, OutingTime } from "@/types/outing";
 import type { GearUpTripDay } from "@/types/trip-day-outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
@@ -120,13 +120,26 @@ export function useGearUp() {
     }
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Layers for an outing in the given weather. */
+  // Run Warm/Run Cold as last rendered. A request reads it when it starts and
+  // again when it finishes: when the setting changed meanwhile it asks again,
+  // so a late answer can't bring back the old setting's advice (#251).
+  const sensitivityRef = useRef(sensitivity);
+  useLayoutEffect(() => {
+    sensitivityRef.current = sensitivity;
+  }, [sensitivity]);
+
+  /** Layers for an outing in the given weather, for the current Run Warm/Run Cold setting. */
   const layersFor = useCallback(
-    (outing: Outing, weather: WeatherData, signal?: AbortSignal) =>
-      buildLayersResult(outing, weather, sensitivity, (o, w) =>
-        biophysics.fetch(o.activity, w, o.exertion, bodyMetrics, signal, o.activity === "xc_skiing" ? o : undefined)
-      ),
-    [sensitivity, biophysics, bodyMetrics]
+    async (outing: Outing, weather: WeatherData, signal?: AbortSignal) => {
+      for (;;) {
+        const asked = sensitivityRef.current;
+        const result = await buildLayersResult(outing, weather, asked, (o, w) =>
+          biophysics.fetch(o.activity, w, o.exertion, bodyMetrics, signal, o.activity === "xc_skiing" ? o : undefined, asked)
+        );
+        if (signal?.aborted || sensitivityRef.current === asked) return result;
+      }
+    },
+    [biophysics, bodyMetrics]
   );
 
   // Only the latest request's answer is used. Going to the form from the
@@ -258,7 +271,11 @@ export function useGearUp() {
    */
   const planFor = useCallback(async (isCurrent: CurrentRequest, outing: Outing & { when: LaterTime }) => {
     try {
-      const result = await fetchPlanAhead(outing, sensitivity);
+      let result = await fetchPlanAhead(outing, sensitivityRef.current);
+      // Asked again when Run Warm/Run Cold changed while it loaded, as layersFor does.
+      while (isCurrent() && result.sensitivity !== sensitivityRef.current) {
+        result = await fetchPlanAhead(outing, sensitivityRef.current);
+      }
       if (!isCurrent()) return false;
       commitRequest({ type: "SUBMIT_SUCCESS", result });
       return true;
@@ -275,7 +292,7 @@ export function useGearUp() {
       }
       return false;
     }
-  }, [sensitivity, commitRequest]);
+  }, [commitRequest]);
 
   /** Shows an outing's layers, or its plan when it's several days. */
   const showOuting = useCallback((isCurrent: CurrentRequest, outing: Outing) =>
@@ -391,6 +408,32 @@ export function useGearUp() {
     applyOutingInputs(outing);
     return true;
   }, [state.request, startRequest, showOuting, applyOutingInputs]);
+
+  /**
+   * Changing Run Warm/Run Cold asks for the shown result again with the new
+   * setting (#251), once per result, keeping its outing and weather. A request
+   * already running asks again itself when it finishes (see layersFor). If the
+   * update fails, the result stays with the failed-update notice, as for any
+   * other update, and Try again uses the new setting.
+   */
+  const refreshedForSetting = useRef<OutingResult | null>(null);
+  useEffect(() => {
+    const shown = state.result;
+    if (!shown?.sensitivity || shown.sensitivity === sensitivity || refreshedForSetting.current === shown) return;
+    if (!state.restored || !readyToRequest || owner !== state.owner || state.request.status === "loading") return;
+    refreshedForSetting.current = shown;
+    // Started from a callback after this commit, like any request a change of
+    // setting starts, rather than as a render cascading from the effect.
+    queueMicrotask(() => {
+      if (!mounted.current || refreshedForSetting.current !== shown) return;
+      if (shown.kind === "layers") {
+        void recommendForShownWeather({}, "Couldn't update layers for your temperature setting. Try again.");
+      } else if (shown.outing.when.mode === "later") {
+        void planFor(startRequest(shown.outing), { ...shown.outing, when: shown.outing.when });
+      }
+    });
+  }, [sensitivity, state.result, state.request.status, state.owner, state.restored, readyToRequest, owner,
+    recommendForShownWeather, planFor, startRequest]);
 
   /**
    * Set when an outing should be asked for again once a request can be made:

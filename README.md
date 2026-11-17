@@ -41,7 +41,7 @@ The biophysics-supported activities share a common recommendation pipeline built
 
 Golden tests in `src/app/api/v1/recommendations/golden.test.ts` pin every sport's full response against a snapshot of the real gear catalog; an intended output change shows up as a snapshot diff to review and update with `npx vitest run -u`.
 
-Running/XC garment and sustained-effort policy contracts, calibration evidence, generic catalog estimates, migration order and validation limits are documented in [Running and XC foundations](docs/running-xc-foundations.md). These foundations precede the remaining selector and presentation changes in #243.
+Running/XC garment and sustained-effort policy contracts, calibration evidence, generic catalog estimates, the Run Warm/Run Cold adjustment, migration order and validation limits are documented in [Running and XC foundations](docs/running-xc-foundations.md). These foundations precede the remaining selector and presentation changes in #243.
 
 ### 1. Recommendation Pipeline
 
@@ -55,10 +55,12 @@ graph TD
     C --> D[Activity Target Range<br/>Running/XC: retain heat-balance minimum<br/>Taper only added activity allowance]
     D --> E[CoWEDA-inspired heuristic buffer<br/>Running/XC: taper with cold, wind and wet exposure]
     E --> F[Regional & Extremity Targets<br/>Whole-body and regional bands converted to basic clo<br/>ISO 11079 wind and motion correction<br/>Inferred movement capped at 0.7 m/s<br/>Hands and head keep resultant IREQ]
-    F --> P[Load Gear Pool:<br/>wardrobe, or catalog filtered by activity score]
+    F --> PREF[Running/XC Run Warm or Run Cold:<br/>request value, else signed-in user's saved one, else neutral<br/>narrow each band by a quarter from one side<br/>Warm lowers upper limits, Cold raises minimums<br/>Weather, IREQ, buffers and protection unchanged]
+    PREF --> P[Load Gear Pool:<br/>wardrobe, or catalog filtered by activity score]
     P -->|No usable garments| T[Targets-only response]
     P --> G[Ensemble Building]
-    G --> R[Running/XC only: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
+    G --> GUARD[Run Warm or Run Cold: also select with standard targets<br/>keep the standard layers if the narrowed choice adds<br/>a reported shortfall for Warm, or excess for Cold<br/>Response explains only real changes<br/>Other sports: not supported]
+    GUARD --> R[Running/XC only: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
     R --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
     XCCARRY --> I[Canonical server phase assessment:<br/>actual worn regional and extremity basic clo<br/>local shortfalls and excess, moisture and clothing gaps]
     I --> H[Ensemble thermal scoring and API/UI reasons<br/>consume the same phase assessment]
@@ -69,6 +71,7 @@ graph TD
         D
         E
         F
+        PREF
     end
 
     subgraph "Shared Pipeline — handler.ts, gear-pool.ts"
@@ -78,6 +81,7 @@ graph TD
 
     subgraph "Sport-Specific — sports/*.ts"
         G
+        GUARD
     end
 
     subgraph "Shared Evaluation — layer-evaluation.ts and response-builder.ts"
@@ -314,9 +318,10 @@ graph TD
     SPLIT --> REG[Convert whole-body and regional bands to basic clo<br/>Phase-specific wind, motion and outer permeability<br/>Shared clothing area factor<br/>Never below resultant heat balance]
     PIREQ[Whole-body IREQ of the phase the hands and head follow<br/>alpine: skiing phase] --> EXT[Hand and head targets:<br/>activity multiplier × wind factor<br/>× temperature factor from 0.8 to 1<br/>+ CoWEDA-inspired extremity buffer<br/>Running/XC: taper both bands and buffer<br/>Allow zero thermal coverage in mild dry exercise]
 
-    RANGE --> DEC{Comfort decision}
-    REG --> DEC
-    EXT --> DEC
+    RANGE --> PREFBAND[Running/XC Run Warm or Run Cold:<br/>each band narrowed by a quarter from one side<br/>never below a minimum or above an upper limit<br/>XC keeps the pole-grip glove allowance]
+    REG --> PREFBAND
+    EXT --> PREFBAND
+    PREFBAND --> DEC{Comfort decision}
     EDIT[Manual outfit edits:<br/>UUID references or explicit source-free estimates<br/>Ownership and names do not trigger checks] --> LOOKUP[Server resolves catalog regional data<br/>Public rows reused for up to 30 seconds<br/>Custom items always read for signed-in owner]
     LOOKUP --> PICKER[Picker and packed garments use the same<br/>server status, regional clo and provenance]
     LOOKUP --> KNOWN{All worn items have usable thermal data?}
@@ -336,7 +341,7 @@ graph TD
     LOOKUP --> ACTUAL[Recompute worn arms and hood from current catalog items<br/>Carried clothing contributes only when worn in that phase]
     ACTUAL --> DEC
     DEC --> GAP[Missing standalone clothing or functional protection:<br/>explicit incomplete status, separate from unknown data]
-    DEC --> UI[API, edited outfit status, body-area pills and explanations<br/>use this phase assessment]
+    DEC --> UI[API, edited outfit status, body-area pills and explanations<br/>use this phase assessment<br/>Narrowed targets add a reason naming Run Warm or Run Cold]
     UI --> STALE[Pending or failed edit: retain outfit and labeled previous verdict<br/>Hide current score, body statuses and reasons until evaluated]
 
 ```

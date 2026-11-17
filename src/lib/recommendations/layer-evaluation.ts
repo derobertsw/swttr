@@ -151,6 +151,11 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
         decision.reasons?.push(`No thermal ${part === 'hands' ? 'handwear' : 'headwear'} is needed by this phase's policy.`);
       }
     }
+    if (input.sensitivity === 'hot') {
+      decision.reasons?.push('Targets follow Run Warm: they leave out the warmest part of the suitable range, without lowering minimum warmth or required protection.');
+    } else if (input.sensitivity === 'cold') {
+      decision.reasons?.push('Targets follow Run Cold: they leave out the coolest part of the suitable range, without changing required protection.');
+    }
     if (!input.breathability) decision.reasons?.push('Breathability is not assessed without usable evaporative resistance data.');
     if (input.hoodClo && input.hoodClo > 0) decision.reasons?.push('The worn hood contributes to head warmth; helmet compatibility is included.');
     if (input.items && [...input.items.torso, ...input.items.legs].some(item =>

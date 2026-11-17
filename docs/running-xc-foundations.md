@@ -1,6 +1,6 @@
 # Running and XC foundations (#244 / #245)
 
-These changes establish garment and target contracts for #243. Optional accessories (#246) and complete running outfits (#247) now consume those contracts, as described below. XC outfit selection (#248), shared wardrobe requirements (#249), comfort presentation (#250), and preference wiring (#251) have separate integration work.
+These changes establish garment and target contracts for #243. Optional accessories (#246) and complete running outfits (#247) now consume those contracts, as described below. XC outfit selection (#248), shared wardrobe requirements (#249), comfort presentation (#250), and the warm/cold preference (#251, below) have separate integration work.
 
 ## Evidence and metabolic conversion
 
@@ -169,6 +169,32 @@ Moving targets continue to use the chosen moving effort. Frequent stops do not i
 This design is consistent with [Salomon's XC clothing guidance](https://www.salomon.com/en-gb/sg/a/how-to-dress-for-cross-country-skiing), which describes commonly wearing one bottom layer, one or two upper layers, thin gloves/headwear for intense outings, and keeping warmth ready for afterward. That practical guidance does not validate the numerical thresholds above. Field checks remain necessary across body sizes, snow moisture, exposure and stop patterns.
 
 Behavioral coverage includes spring skiing, sustained hard effort below freezing, cold wind/long descents, wet snow/rain, frequent stops, sparse wardrobes, unknown thermal/protection data, standalone pants competing with base-plus-shell combinations, independent arm/leg fit and duplicate identities. Route tests verify request validation, legacy effort aliases, explicit unknown assumptions, pole-grip purpose, and identical moving outfit/scores when only the stop pattern changes. Alpine retains its catalog/wardrobe/sparse-wardrobe parity matrix. Only XC snapshots are updated for this slice; non-XC golden responses must remain unchanged from main.
+
+## Warm/cold preference (#251)
+
+Settings' **Run Warm** (`hot`) and **Run Cold** (`cold`) now reach personalized running and XC advice. Neutral is the standard calculation: its responses are byte-for-byte unchanged, including every golden snapshot.
+
+**Which setting a request uses.** The recommendation routes accept an optional `temperature_sensitivity` of `hot`, `neutral` or `cold`. Gear up always sends the account's current choice, so a change that is still saving can't be overtaken by the older saved value. When a request has none, the server reads the saved `user_preferences.temperature_sensitivity` of the authenticated Clerk user only; no ID in the body selects whose setting is read. Signed-out and agent callers, and a missing or unreadable saved value, use neutral. Any other value, including `null`, is rejected with 400; the paid agent API rejects it before charging. Guests keep general guidance, whose static brackets already shift for the setting.
+
+**The adjustment.** `running_xc_v1` carries `preference: { sensitivity, bandShare: 0.25, targetsChanged }`. `phaseTargets` narrows each final band from one side by a quarter of its width: the whole-body range, each region's minimum–neutral band, and the hand and head bands. Run Warm lowers the upper end and Run Cold raises the lower end (`preferenceBand` in `sport-policy.ts`). Hand and head upper limits follow the narrowed neutral, but XC keeps its 0.55 clo pole-grip allowance. Reported weather, raw IREQ, metabolic rate, the exposure taper, CoWEDA-inspired buffers, protection needs and garment data are untouched. Regional bands still average back to the whole-body band.
+
+Why this form and size (an **unvalidated engineering choice**, not a measured dose-response):
+
+- The setting is a self-report with no calibration data; learning from outings is #8. The adjustment therefore stays inside the band the model already calls suitable. Run Warm can't lower any minimum, so it is never treated as evidence that colder exposure is safe. Run Cold can't raise any upper limit.
+- The band itself spans the model's range from its heat-balance minimum to its upper comfort allowance, which is where individual variation is represented. The FAQ already advised aiming for the lower or upper end of the target range; this applies that advice by giving up only the outermost quarter.
+- A share of the width scales with conditions. At 56°F in 4 mph wind, the moderate-effort running band is 0.17 clo wide, so a limit moves about 0.04 clo, within the evaluator's 0.05 clo tolerance. At −5°F in 12 mph wind (a 0.65 clo band) it moves about 0.16 clo, roughly one light midlayer. It is not a temperature offset, which #243 rules out.
+
+**Selection guard.** The running and XC selectors rank warmth beyond the upper band (plus their matching allowance) ahead of filling a shortfall. Lowering an upper limit could therefore make a lighter outfit win even though it falls short of the unchanged minimum. The recommender also selects with the standard targets, and keeps the standard layers when the narrowed band's choice adds a mismatch the evaluator would report (beyond 0.05 clo, and more than 0.01 clo worse than the standard choice) on the side the setting must not trade away. For Run Warm that is a shortfall below the minimum. For Run Cold it is warmth above the upper limit, including worn hood insulation against the head limit. Accessories are then chosen against the narrowed band. This wraps the selectors; their ranking is unchanged.
+
+In a catalog check of 36 conditions per sport (56°F to −5°F, 4 and 12 mph, three efforts; 72 running and XC cases per setting), Run Warm gave 41 unchanged outfits, 5 lighter ones and 26 where lighter layers would have fallen short. Run Cold gave 43 warmer outfits, 17 unchanged ones and 12 where warmer layers would have gone past the upper limit. No change went in the wrong direction. The standard choice is often already the lightest suitable outfit, so Run Warm changes clothing less often than Run Cold.
+
+**Scoring, explanations and manual edits.** Score, status and warnings use the narrowed bands, so the same outfit can read "Warmer than recommended" for Run Warm. Some significant-mismatch warnings depend on band width, so they can appear at slightly smaller gaps; for any given outfit, the setting never removes a warning the standard bands give. Responses carry `preference` with `effect`: `changed_layers`, `same_layers`, `standard_layers_kept`, `no_change` (no band to narrow), `targets_only` (no gear) or `not_supported`. Its message, also added to `guidance`, names only items that actually differ, and calls them lighter or warmer from the predicted whole-body clo, then hand and head clo. `standard_target_range` shows the band before narrowing. Gear up forwards the setting with manual evaluations of narrowed targets; `/api/v1/ensembles/evaluate` adds a reason saying the targets follow it, and never changes the targets it is sent.
+
+**Changing the setting.** Each Gear up result records the setting it was asked with. Changing it asks again for the shown outing at the same weather (plans included). A request that finishes after a change asks again before anything is shown, so a late answer can't bring back the previous setting's advice. A failed update keeps the shown result with the usual failed-update notice; Try again uses the new setting. Manual edits survive only when the recommended layers stay the same, and are then judged against the new targets.
+
+**Other sports.** Cycling, alpine and touring return `not_supported` with their standard targets: every phase, including alpine's chairlift and touring's climb, descent and transition, is unchanged. Their builders are being reviewed separately (#116), and each needs its own calibrated policy before the setting can apply. The setting is one per account; nothing learned from one outing changes it.
+
+Field validation is still needed: whether runners who choose Run Warm or Run Cold are more comfortable in the adjusted outfits, and whether a quarter of the band is the right size.
 
 ## Validation and limits
 
