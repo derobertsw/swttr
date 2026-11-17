@@ -171,6 +171,7 @@ function DayList({ title, days, describe = (day) => day.date_label, warning = fa
             {day.kits.length > 0 && <p className="text-muted-foreground">{day.kits.length === 1 ? "Kit" : "Kits"}: {day.kits.join(", ")}</p>}
             {day.tour_plan && <p className="text-muted-foreground">Tour plan: {day.tour_plan}</p>}
             {day.notes && <p className="whitespace-pre-wrap text-muted-foreground">Notes: {day.notes}</p>}
+            {day.conditions && <p className="text-muted-foreground">{day.conditions}</p>}
           </li>
         ))}
       </ul>

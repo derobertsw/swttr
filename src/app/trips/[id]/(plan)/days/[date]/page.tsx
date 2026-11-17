@@ -343,6 +343,7 @@ export default function DayDetailPage({
             days={data.days}
             kit={myKit?.outfit ? "outfit" : myKit && myKit.items.length > 0 ? "checklist" : null}
             tourPlan={isOrganizer && activity === TOUR_ACTIVITY ? tourPlan?.objective ?? null : null}
+            sources={isOrganizer ? data.conditions?.filter((listing) => listing.date === date).map((listing) => listing.name) ?? null : null}
             onSaved={() => void refresh()}
           />
 

@@ -132,6 +132,23 @@ describe("Changing a trip's name and dates", () => {
     });
   });
 
+  it("retries once without a removed day's conditions sources, which only a function from before migration 20261116210000 accepts", async () => {
+    const sources = { source_ids: ["8a7b6c5d-4e3f-4a1b-9c8d-7e6f5a4b3c2d"], entries: 2 };
+    const expected = [{ date: "2026-10-12", stop_id: null, activity: null, kit_ids: ["kit-sam"], conditions: sources }];
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "PT409", message: "Days to remove changed." } });
+    expect((await save({ end_date: "2026-10-11", mode: "keep", expected_removed: expected })).status).toBe(200);
+    expect(rpc.mock.calls.map(([, args]) => args.p_expected_removed)).toEqual([expected, [{ date: "2026-10-12", stop_id: null, activity: null, kit_ids: ["kit-sam"] }]]);
+    // When that fails too, it's the review that's out of date.
+    rpc.mockClear();
+    rpc.mockResolvedValue({ data: null, error: { code: "PT409", message: "Days to remove changed." } });
+    expect((await save({ end_date: "2026-10-11", mode: "keep", expected_removed: expected })).status).toBe(409);
+    expect(rpc).toHaveBeenCalledTimes(2);
+    // A review without sources isn't retried.
+    rpc.mockClear();
+    expect((await save({ end_date: "2026-10-11", mode: "keep", expected_removed: [] })).status).toBe(409);
+    expect(rpc).toHaveBeenCalledOnce();
+  });
+
   it("reports a trip the user can no longer reach as not found, and a failed save as unchanged", async () => {
     rpc.mockResolvedValueOnce({ data: null, error: { code: "42501", message: "Not found" } });
     expect((await save({ end_date: "2026-10-13" })).status).toBe(404);

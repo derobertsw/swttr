@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError, readJson } from "@/lib/api";
-import { parseAccessPointsCheck, parseItineraryEdit, parseItineraryRequest, parseTourPlansCheck, previewItinerary, requestFor, type TourPlansCheck } from "@/lib/trip-itinerary";
+import { parseAccessPointsCheck, parseConditionsCheck, parseItineraryEdit, parseItineraryRequest, parseTourPlansCheck, previewItinerary, requestFor, type TourPlansCheck } from "@/lib/trip-itinerary";
 import { loadTripFull, requireTripAccess, tripFullFor } from "@/lib/trips";
 import type { TripItineraryRequest } from "@/types/trips";
 
@@ -39,8 +39,10 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
   if ("error" in edit) return jsonError(edit.error, 400);
   const accessPoints = parseAccessPointsCheck(body);
   const tourPlans = parseTourPlansCheck(body);
-  if (accessPoints === null || tourPlans === null) return jsonError("Reload the trip and try again.", 400);
+  const conditions = parseConditionsCheck(body);
+  if (accessPoints === null || tourPlans === null || conditions === null) return jsonError("Reload the trip and try again.", 400);
   const copiesPlan = edit.action === "copy_day" && edit.payload.plan !== "none";
+  const copiesSources = edit.action === "copy_day" && edit.payload.sources === "add";
   // Copying a day can bring the user's kit, so it has its own function.
   const unchecked = () => edit.action === "copy_day"
     ? supabase.rpc("copy_trip_day", { p_trip_id: id, p_user_id: userId, p_payload: edit.payload })
@@ -59,12 +61,16 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
   // day's access point, so it sends none. Before migration 027 there are no
   // access points, and no function to check them.
   if (!accessPoints && edit.action !== "reorder_stops") return reviewAgain();
-  // A copy of a tour plan (#210) needs a review that saw the trip's tour plans.
-  if (copiesPlan && !tourPlans) return reviewAgain();
+  // A copy of a tour plan (#210) needs a review that saw the trip's tour plans,
+  // and a copy of conditions sources (#211) one that saw where they're listed.
+  if ((copiesPlan || copiesSources) && !tourPlans) return reviewAgain();
+  if (copiesSources && !conditions) return reviewAgain();
   const missing = (code: string | undefined) => code === "PGRST202" || code === "42883";
   const reviewed = (plans?: TourPlansCheck) => supabase.rpc("edit_trip_itinerary_reviewed", {
     p_trip_id: id, p_user_id: userId, p_action: edit.action, p_payload: edit.payload, p_access_points: accessPoints,
     ...(plans ? { p_tour_plans: plans } : {}),
+    // From migration 20261116210000 on, a copy brings the day's sources only through the function that checks them.
+    ...(plans && copiesSources ? { p_conditions: conditions } : {}),
   });
   // The review noted tour plans too (#210), so they're checked from migration
   // 030 on. Before it, a copy can't bring a tour plan; anything else falls
@@ -73,12 +79,13 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     if (!accessPoints) return unchecked();
     if (tourPlans) {
       const result = await reviewed(tourPlans);
-      if (!missing(result.error?.code) || copiesPlan) return result;
+      if (!missing(result.error?.code) || copiesPlan || copiesSources) return result;
     }
     const result = await reviewed();
     return missing(result.error?.code) ? unchecked() : result;
   };
   const { error } = await save();
+  if (copiesSources && missing(error?.code)) return jsonError("Copying conditions sources isn't available yet. Nothing was changed.", 503);
   if (copiesPlan && missing(error?.code)) return jsonError("Copying a tour plan isn't available yet. Nothing was changed.", 503);
   if (error?.code === "40001" || error?.code === "PT409") return reviewAgain();
   if (error?.code === "42501") return jsonError("Not found", 404);

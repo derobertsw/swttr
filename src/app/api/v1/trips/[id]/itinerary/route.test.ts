@@ -217,6 +217,42 @@ describe("Reviewing and saving itinerary changes", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it("copies a day's conditions sources only through the function that checks where sources are listed (#211)", async () => {
+    const MWAC = "8a7b6c5d-4e3f-4a1b-9c8d-7e6f5a4b3c2d";
+    const copy = {
+      action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: "none", plan: "none", sources: "add",
+      access_points: { stops: {}, days: {} }, tour_plans: {}, conditions: { "2026-10-10": [MWAC] },
+      expected: { from: { stop_id: null, activity: "Ski touring", stop: null, kit: null }, days: [{ date: "2026-10-12", stop_id: STOWE.id, activity: null, stop: null, kit: null }] },
+    };
+    expect((await post(copy)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary_reviewed", expect.objectContaining({
+      p_tour_plans: {}, p_conditions: { "2026-10-10": [MWAC] }, p_payload: expect.objectContaining({ sources: "add" }),
+    }));
+    // Before migration 20261116210000 there's no such function, and nothing falls back to one that would drop the sources.
+    rpc.mockClear();
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "missing" } });
+    const refused = await post(copy);
+    expect([refused.status, await refused.json()]).toEqual([503, { error: "Copying conditions sources isn't available yet. Nothing was changed." }]);
+    expect(rpc).toHaveBeenCalledOnce();
+    // A review that didn't see where sources are listed is reviewed again, and a malformed one refused.
+    rpc.mockClear();
+    expect((await post({ ...copy, conditions: undefined })).status).toBe(409);
+    for (const conditions of [[], { "2026-10-10": [] }, { "2026-10-10": ["source-1"] }, { "Oct 10": [MWAC] }]) {
+      expect((await post({ ...copy, conditions })).status).toBe(400);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+    // A copy without sources goes on as before.
+    const plain = Object.fromEntries(Object.entries(copy).filter(([key]) => key !== "sources" && key !== "conditions"));
+    expect((await post(plain)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("edit_trip_itinerary_reviewed", expect.not.objectContaining({ p_conditions: expect.anything() }));
+  });
+
+  it("previews copying conditions sources only for the organizer", async () => {
+    const response = await post({ preview: true, action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: false, sources: true });
+    expect([response.status, await response.json()]).toEqual([403, { error: "Only the organizer can copy conditions sources." }]);
+    expect((await post({ preview: true, action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: false, sources: "yes" })).status).toBe(400);
+  });
+
   it("previews copying the tour plan only for the organizer", async () => {
     const response = await post({ preview: true, action: "copy_day", from: "2026-10-10", dates: ["2026-10-12"], kit: false, plan: true });
     expect([response.status, await response.json()]).toEqual([403, { error: "Only the organizer can copy the tour plan." }]);

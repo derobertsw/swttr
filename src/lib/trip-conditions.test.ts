@@ -4,8 +4,12 @@ import {
   contextKey,
   parseConditionsSource,
   parseReviewNote,
+  previewConditionsAttach,
+  previewConditionsEdit,
+  sameDays,
   staleReasons,
   summarizeConditions,
+  summarizeConditionsSources,
   type ConditionsRows,
 } from "@/lib/trip-conditions";
 import type { TripConditionsSource, TripDay, TripLocation, TripStop, TripTourPlanSummary } from "@/types/trips";
@@ -133,5 +137,104 @@ describe("summarizeConditions", () => {
   it("leaves out sources removed from a day and days no longer on the trip", () => {
     expect(summarizeConditions(rows([entry(1, "user-2", "reviewed")], { attachments: [] }), full)).toEqual([]);
     expect(summarizeConditions(rows([]), { ...full, days: [] })).toEqual([]);
+  });
+});
+
+describe("reusing a source across days", () => {
+  const days: TripDay[] = [{ ...day, id: "day-0", date: "2026-10-09" }, day, { ...day, id: "day-2", date: "2026-10-11" }];
+  const weekend = { ...full, days };
+  const entry = (n: number, dayId: string, user: string, context: object, action: "reviewed" | "withdrawn" = "reviewed") => ({
+    id: `entry-${n}`, entry_number: n, trip_day_id: dayId, source_id: "source-1", user_id: user, action, note: null,
+    reviewed_at: `2026-10-09T1${n}:00:00Z`, created_at: `2026-10-09T1${n}:00:00Z`, context,
+  });
+  const rows = (attachedTo: string[], reviews: ConditionsRows["reviews"] = []): ConditionsRows => ({
+    sources: [source, { ...source, id: "source-2", category: "weather", name: "MWOBS" }, { ...source, id: "source-3", name: "Avalanche Canada" }],
+    attachments: attachedTo.map((dayId) => ({ trip_day_id: dayId, source_id: "source-1", created_at: "2026-10-01T00:00:00Z" })),
+    reviews,
+  });
+
+  it("lists every source on the trip by type and name, with the dates it's listed on", () => {
+    expect(summarizeConditionsSources(rows(["day-2", "day-0"]), weekend).map((use) => [use.name, use.dates])).toEqual([
+      ["Avalanche Canada", []], ["MWAC", ["2026-10-09", "2026-10-11"]], ["MWOBS", []],
+    ]);
+  });
+
+  describe("previewConditionsAttach", () => {
+    it("lists the days that don't have it yet, says which already do, and that reviews don't come from other days", () => {
+      const preview = previewConditionsAttach(rows(["day-1"], [entry(1, "day-1", "user-2", conditionsContext(full, day, source))]), weekend, "source-1",
+        ["2026-10-11", "2026-10-10", "2026-10-09", "2026-10-11"]);
+      expect(preview).toEqual({
+        source_id: "source-1", revision: 1,
+        summary: "Lists MWAC on Fri Oct 9 and Sun Oct 11. Sat Oct 10 already lists it. Reviews stay with the day they were recorded for, so none come from other days.",
+        days: [
+          { date: "2026-10-09", date_label: "Fri Oct 9", note: "No review recorded for this day." },
+          { date: "2026-10-11", date_label: "Sun Oct 11", note: "No review recorded for this day." },
+        ],
+        expected_days: [{ date: "2026-10-09", day_id: "day-0" }, { date: "2026-10-11", day_id: "day-2" }],
+      });
+    });
+
+    it("says a day's own earlier reviews show again, and which of them the plan changed since", () => {
+      const sunday = days[2];
+      const fresh = conditionsContext(weekend, sunday, source);
+      const preview = previewConditionsAttach(rows([], [
+        entry(1, "day-2", "user-2", fresh), entry(2, "day-2", "user-3", { ...fresh, activity: "Hiking" }), entry(3, "day-2", "user-4", fresh, "withdrawn"),
+        entry(4, "day-0", "user-2", { ...fresh, date: "2026-10-09", source: { url: "https://example.org/old", region: "Presidential Range" } }),
+      ]), weekend, "source-1", ["2026-10-09", "2026-10-11"]);
+      expect("error" in preview ? [] : preview.days.map((entry) => entry.note)).toEqual([
+        "1 review recorded here before it was removed shows again, marked Plan changed — review again.",
+        "2 reviews recorded here before it was removed show again, 1 marked Plan changed — review again.",
+      ]);
+    });
+
+    it("refuses a source or day that isn't on the trip, and days that all list it", () => {
+      expect(previewConditionsAttach(rows([]), weekend, "source-9", ["2026-10-09"])).toMatchObject({ status: 404 });
+      expect(previewConditionsAttach(rows([]), weekend, "source-1", ["2026-10-12"])).toMatchObject({ status: 404 });
+      expect(previewConditionsAttach(rows(["day-1"]), weekend, "source-1", ["2026-10-10"])).toEqual({ error: "MWAC is already listed on Sat Oct 10.", status: 400 });
+    });
+  });
+
+  describe("previewConditionsEdit", () => {
+    const listing = (date: string, dayId: string, reviews = [] as ReturnType<typeof summarizeConditions>[number]["reviews"]) =>
+      ({ ...source, date, trip_day_id: dayId, context_key: "key", reviews });
+    const trip = (reviews: ReturnType<typeof summarizeConditions>[number]["reviews"] = []) => ({
+      conditions: [listing("2026-10-11", "day-2"), listing("2026-10-10", "day-1", reviews)],
+      conditions_sources: [{ ...source, dates: ["2026-10-10", "2026-10-11"] }],
+    });
+    const recorded = (user: string, stale: string[] = [], action: "reviewed" | "withdrawn" = "reviewed") => ({
+      user_id: user, stale_reasons: stale, history: [],
+      current: { id: `entry-${user}`, action, note: null, reviewed_at: "2026-10-09T12:00:00Z", created_at: "2026-10-09T12:00:00Z" },
+    });
+
+    it("lists every day it's on, and the reviews a new link or area makes to record again", () => {
+      const preview = previewConditionsEdit(trip([recorded("user-2"), recorded("user-3", ["Route changed"]), recorded("user-4", [], "withdrawn")]), "source-1",
+        { category: "avalanche", name: "MWAC", region: "Presidential Range", url: "https://example.org/new" });
+      expect(preview).toEqual({
+        source_id: "source-1", revision: 1,
+        summary: "Your change to MWAC applies to both days it's listed on: Sat Oct 10 and Sun Oct 11. A new link or area changes what was reviewed, so reviews recorded for these days need recording again.",
+        days: [{ date: "2026-10-10", date_label: "Sat Oct 10", note: "1 review to record again" }, { date: "2026-10-11", date_label: "Sun Oct 11", note: null }],
+        expected_days: [{ date: "2026-10-10", day_id: "day-1" }, { date: "2026-10-11", day_id: "day-2" }],
+      });
+      expect(previewConditionsEdit(trip([recorded("user-2")]), "source-1", { category: "avalanche", name: "MWAC", region: null, url: source.url }))
+        .toMatchObject({ days: [{ note: "1 review to record again" }, { note: null }] });
+    });
+
+    it("says a new name or type keeps reviews as recorded", () => {
+      const preview = previewConditionsEdit(trip([recorded("user-2")]), "source-1", { ...source, category: "weather", name: "Mount Washington Avalanche Center" });
+      expect(preview).toMatchObject({
+        summary: "Your change to MWAC applies to both days it's listed on: Sat Oct 10 and Sun Oct 11. The link and area stay the same, so reviews stay as recorded.",
+        days: [{ note: null }, { note: null }],
+      });
+    });
+
+    it("refuses a source that isn't on the trip", () => {
+      expect(previewConditionsEdit(trip(), "source-9", source)).toMatchObject({ status: 404 });
+    });
+  });
+
+  it("compares a review's days in any order", () => {
+    expect(sameDays([{ date: "2026-10-10", day_id: "A" }, { date: "2026-10-11", day_id: "b" }], [{ date: "2026-10-11", day_id: "B" }, { date: "2026-10-10", day_id: "a" }])).toBe(true);
+    expect(sameDays([{ date: "2026-10-10", day_id: "a" }], [{ date: "2026-10-10", day_id: "a" }, { date: "2026-10-11", day_id: "b" }])).toBe(false);
+    expect(sameDays([{ date: "2026-10-10", day_id: "a" }], [{ date: "2026-10-10", day_id: "b" }])).toBe(false);
   });
 });

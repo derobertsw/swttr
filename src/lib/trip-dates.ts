@@ -67,6 +67,17 @@ function planFor(full: TripFull, start: string, end: string, mode: TripDateChang
   const memberNames = new Map(full.members.map((member) => [member.id, member.display_name]));
   const kitsOn = (day: TripDay) => full.kits.filter((kit) => kit.trip_day_id === day.id);
   const tourPlanOn = (day: TripDay) => full.tour_plans?.find((plan) => plan.trip_day_id === day.id);
+  const sourcesOn = (day: TripDay) => (full.conditions ?? []).filter((listing) => listing.trip_day_id === day.id);
+  // A day's conditions sources (#211) and the reviews recorded there: removed
+  // with the day, or moved with it and so to record again.
+  const conditions = (day: TripDay, moved: boolean) => {
+    const listings = sourcesOn(day);
+    if (listings.length === 0) return null;
+    const reviews = listings.reduce((count, listing) => count + listing.reviews.filter((review) => review.current.action !== "withdrawn").length, 0);
+    const names = new Intl.ListFormat("en", { type: "conjunction" }).format(listings.map((listing) => listing.name));
+    return `Conditions: ${names}${reviews === 0 ? ""
+      : ` · ${reviews} ${reviews === 1 ? "review" : "reviews"} ${moved ? "to record again" : "removed with the day"}`}`;
+  };
   const destination = (stopId: string | null) => stopId ? stopNames.get(stopId) ?? "No destination" : base ? `${base} (base)` : "No destination";
   const describe = (day: TripDay, date: string, from: string | null): TripDateChangeDay => ({
     date, date_label: dateLabel(date), from_date_label: from ? dateLabel(from) : null,
@@ -74,6 +85,7 @@ function planFor(full: TripFull, start: string, end: string, mode: TripDateChang
     kits: kitsOn(day).map((kit) => memberNames.get(kit.trip_member_id) ?? "Crew member"),
     tour_plan: tourPlanOn(day)?.objective ?? null,
     notes: day.notes ?? null,
+    conditions: conditions(day, !!from),
   });
 
   const days = [...full.days].sort((a, b) => a.date.localeCompare(b.date));
@@ -97,13 +109,19 @@ function planFor(full: TripFull, start: string, end: string, mode: TripDateChang
     })),
     removed: removed.map((day) => describe(day, day.date, null)),
     kept: shift === 0 ? staying.length : 0,
-    // A day's tour plan and notes are listed only when it has them, as
-    // change_trip_dates (026, 20261028130000) lists them.
+    // A day's tour plan, notes and conditions sources are listed only when it
+    // has them, as change_trip_dates (026, 20261028130000, 20261116210000)
+    // lists them. Sources come with every review entry recorded for them there.
     expected_removed: removed.map((day) => {
       const plan = tourPlanOn(day);
+      const listings = sourcesOn(day);
       return { date: day.date, stop_id: day.stop_id, activity: day.activity, kit_ids: kitsOn(day).map((kit) => kit.id),
         ...(plan ? { tour_plan_id: plan.id, tour_plan_revision: plan.revision } : {}),
-        ...(day.notes ? { notes: day.notes } : {}) };
+        ...(day.notes ? { notes: day.notes } : {}),
+        ...(listings.length > 0 ? { conditions: {
+          source_ids: listings.map((listing) => listing.id).sort(),
+          entries: listings.reduce((count, listing) => count + listing.reviews.reduce((sum, review) => sum + 1 + review.history.length, 0), 0),
+        } } : {}) };
     }),
   };
 }

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DayConditions } from "./DayConditions";
 import { fakeTripApi, ORGANIZER, ORGANIZER_TO_CREW, reply, sentBodies, TRIP, tripFull } from "@/test/tripApi";
-import type { TripConditionsReview, TripDayConditionsSource, TripFull, TripMember } from "@/types/trips";
+import type { TripConditionsReview, TripConditionsSourcePreview, TripConditionsSourceUse, TripDay, TripDayConditionsSource, TripFull, TripMember } from "@/types/trips";
 
 const DATE = "2026-10-10";
 const sourcesRoute = `/api/v1/trips/${TRIP.id}/days/${DATE}/conditions`;
@@ -60,7 +60,7 @@ describe("Day conditions", () => {
     expect(screen.getByRole("link", { name: "Open forecast (new tab)" })).toHaveAttribute("target", "_blank");
     expect(screen.getByRole("link", { name: "Open access information (new tab)" })).toHaveAttribute("href", "https://example.org/roads");
     expect(screen.getAllByText("Validity not available in SWTTR — check the source.")).toHaveLength(2);
-    expect(screen.getAllByText("No review recorded")).toHaveLength(2);
+    expect(screen.getAllByText("No review recorded for this day")).toHaveLength(2);
     expect(screen.getByText("Your reviews: 0 of 2 recorded for Saturday")).toBeInTheDocument();
   });
 
@@ -168,7 +168,7 @@ describe("Day conditions", () => {
       review("user-3", { history: [{ id: "old", action: "reviewed", note: null, reviewed_at: "2026-10-09T12:00:00Z", created_at: "2026-10-09T12:00:00Z" }] },
         { action: "withdrawn", created_at: "2026-10-09T23:00:00Z" }),
     ] })] });
-    expect(screen.getByText("No review recorded")).toBeInTheDocument();
+    expect(screen.getByText("No review recorded for this day")).toBeInTheDocument();
     expect(screen.getByText("Your reviews: 0 of 1 recorded for Saturday")).toBeInTheDocument();
     expect(screen.getByText(/Organizer recorded a review/)).not.toBeVisible();
     await user.click(screen.getByText("Crew reviews (2)"));
@@ -239,6 +239,144 @@ describe("Day conditions", () => {
     await user.click(screen.getByRole("button", { name: "Save review" }));
     expect(await screen.findByText("Review recorded.")).toBeInTheDocument();
     expect(sentBodies(api, `POST ${reviewsRoute}`).map((body) => (body as { context_key: string }).context_key)).toEqual(["key-1", "key-2"]);
+  });
+
+  describe("reusing sources across days", () => {
+    const WEEKEND: TripDay[] = [
+      { id: "day-0", trip_id: TRIP.id, stop_id: null, date: "2026-10-09", activity: "Backcountry" },
+      DAYS[0],
+      { id: "day-2", trip_id: TRIP.id, stop_id: null, date: "2026-10-11", activity: "Backcountry" },
+    ];
+    const use = (dates: string[], extra: Partial<TripConditionsSourceUse> = {}): TripConditionsSourceUse => {
+      const listing = Object.entries(source()).filter(([key]) => !["date", "trip_day_id", "context_key", "reviews"].includes(key));
+      return { ...Object.fromEntries(listing) as Omit<TripDayConditionsSource, "date" | "trip_day_id" | "context_key" | "reviews">, dates, ...extra };
+    };
+    const weekend = (conditions: TripDayConditionsSource[], saved: TripConditionsSourceUse[]) =>
+      tripFull({ days: WEEKEND, members: [ORGANIZER, SAM, ALEX], conditions, conditions_sources: saved });
+    const renderWeekend = (conditions: TripDayConditionsSource[], saved: TripConditionsSourceUse[]) =>
+      render(<DayConditions data={weekend(conditions, saved)} date={DATE} dateLabel="Sat Oct 10" activity="Backcountry" userId="user-1" onSaved={onSaved} />);
+    const attachReview: TripConditionsSourcePreview = {
+      source_id: "source-1", revision: 2,
+      summary: "Lists Mount Washington Avalanche Center on Sun Oct 11. Reviews stay with the day they were recorded for, so none come from other days.",
+      days: [{ date: "2026-10-11", date_label: "Sun Oct 11", note: "No review recorded for this day." }],
+      expected_days: [{ date: "2026-10-11", day_id: "day-2" }],
+    };
+
+    it("lists a source on other days after the server's review, never with reviews", async () => {
+      const api = fakeTripApi({ [`POST ${sourcesRoute}`]: (body) => (body as { preview?: boolean }).preview
+        ? reply(200, attachReview) : reply(200, { source_id: "source-1", revision: 3 }) });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      renderWeekend([source({ reviews: [review("user-2")] })], [use([DATE])]);
+      await user.click(screen.getByRole("button", { name: "Use Mount Washington Avalanche Center on other days" }));
+      const sheet = within(screen.getByRole("dialog"));
+      expect(sheet.getByText("Already listed on 1 day.")).toBeInTheDocument();
+      // Saturday lists it already, so only Friday and Sunday are offered.
+      expect(sheet.queryByRole("checkbox", { name: /Sat, Oct 10/ })).not.toBeInTheDocument();
+      expect(sheet.getByRole("button", { name: "Review" })).toBeDisabled();
+      await user.click(sheet.getByRole("checkbox", { name: /Sun, Oct 11/ }));
+      await user.click(sheet.getByRole("button", { name: "Review 1 day" }));
+      expect(await sheet.findByText(attachReview.summary)).toBeInTheDocument();
+      expect(sheet.getByText("No review recorded for this day.")).toBeInTheDocument();
+      expect(api).toHaveBeenCalledOnce();
+      await user.click(sheet.getByRole("button", { name: "List on 1 day" }));
+      expect(await screen.findByText("Mount Washington Avalanche Center added to 1 day.")).toBeInTheDocument();
+      expect(onSaved).toHaveBeenCalledOnce();
+      expect(sentBodies(api, `POST ${sourcesRoute}`)).toEqual([
+        { action: "attach", preview: true, source_id: "source-1", dates: ["2026-10-11"] },
+        { action: "attach", source_id: "source-1", expected_revision: 2, days: [{ date: "2026-10-11", day_id: "day-2" }], mutation_id: expect.any(String) },
+      ]);
+    });
+
+    it("adds a saved source this day doesn't list, starting with this day", async () => {
+      const api = fakeTripApi({ [`POST ${sourcesRoute}`]: reply(200, { ...attachReview, days: [{ date: DATE, date_label: "Sat Oct 10", note: "1 review recorded here before it was removed shows again." }], expected_days: [{ date: DATE, day_id: "day-1" }] }) });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      renderWeekend([], [use(["2026-10-11"]), use([], { id: "source-2", category: "weather", name: "Mount Washington Observatory", region: null })]);
+      await user.click(screen.getByRole("button", { name: "Add a saved source" }));
+      const sheet = within(screen.getByRole("dialog"));
+      expect(sheet.getByText("Avalanche forecast · Presidential Range · On 1 day")).toBeInTheDocument();
+      expect(sheet.getByText("Mountain weather · Not on any day")).toBeInTheDocument();
+      await user.click(sheet.getByRole("radio", { name: /Mount Washington Avalanche Center/ }));
+      expect(sheet.getByRole("checkbox", { name: /Sat, Oct 10/ })).toBeChecked();
+      await user.click(sheet.getByRole("button", { name: "Review 1 day" }));
+      expect(await sheet.findByText("1 review recorded here before it was removed shows again.")).toBeInTheDocument();
+      expect(sentBodies(api, `POST ${sourcesRoute}`)).toEqual([{ action: "attach", preview: true, source_id: "source-1", dates: [DATE] }]);
+    });
+
+    it("shows the review as it is now when the trip changed, with a new save identity", async () => {
+      const now = { ...attachReview, revision: 3 };
+      const api = fakeTripApi({ [`POST ${sourcesRoute}`]: (body) => (body as { preview?: boolean }).preview ? reply(200, attachReview)
+        : (body as { expected_revision: number }).expected_revision === 2 ? reply(409, { error: "The trip changed since you reviewed this. Review it again.", ...now })
+        : reply(200, { source_id: "source-1", revision: 4 }) });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      renderWeekend([source()], [use([DATE])]);
+      await user.click(screen.getByRole("button", { name: "Use Mount Washington Avalanche Center on other days" }));
+      await user.click(screen.getByRole("checkbox", { name: /Sun, Oct 11/ }));
+      await user.click(screen.getByRole("button", { name: "Review 1 day" }));
+      await user.click(await screen.findByRole("button", { name: "List on 1 day" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("The trip changed since you reviewed this.");
+      expect(onSaved).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "List on 1 day" }));
+      expect(await screen.findByText(/added to 1 day/)).toBeInTheDocument();
+      const saves = sentBodies(api, `POST ${sourcesRoute}`).slice(1) as Array<{ expected_revision: number; mutation_id: string }>;
+      expect(saves.map((body) => body.expected_revision)).toEqual([2, 3]);
+      expect(saves[0].mutation_id).not.toBe(saves[1].mutation_id);
+    });
+
+    it("doesn't offer a source that every day lists, or reuse to members", () => {
+      const { unmount } = renderWeekend([source()], [use(WEEKEND.map((day) => day.date))]);
+      expect(screen.queryByRole("button", { name: /on other days/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add a saved source" })).not.toBeInTheDocument();
+      unmount();
+      render(<DayConditions data={{ ...weekend([source()], [use([DATE]), use([], { id: "source-2" })]), members: [ORGANIZER_TO_CREW, SAM] }}
+        date={DATE} dateLabel="Sat Oct 10" activity="Backcountry" userId="user-2" onSaved={onSaved} />);
+      expect(screen.queryByRole("button", { name: /on other days/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add a saved source" })).not.toBeInTheDocument();
+    });
+
+    it("reviews an edit to a source listed on several days, then saves it for the days the review listed", async () => {
+      const editReview: TripConditionsSourcePreview = {
+        source_id: "source-1", revision: 2,
+        summary: "Your change to Mount Washington Avalanche Center applies to both days it's listed on: Sat Oct 10 and Sun Oct 11. A new link or area changes what was reviewed, so reviews recorded for these days need recording again.",
+        days: [{ date: DATE, date_label: "Sat Oct 10", note: "1 review to record again" }, { date: "2026-10-11", date_label: "Sun Oct 11", note: null }],
+        expected_days: [{ date: DATE, day_id: "day-1" }, { date: "2026-10-11", day_id: "day-2" }],
+      };
+      const api = fakeTripApi({ [`POST ${sourcesRoute}`]: (body) => (body as { preview?: boolean }).preview
+        ? reply(200, editReview) : reply(200, { source_id: "source-1", revision: 3 }) });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      renderWeekend([source({ reviews: [review("user-2")] }), source({ date: "2026-10-11", trip_day_id: "day-2" })], [use([DATE, "2026-10-11"])]);
+      await user.click(screen.getByRole("button", { name: "Edit source Mount Washington Avalanche Center" }));
+      await user.clear(screen.getByLabelText("Link"));
+      await user.type(screen.getByLabelText("Link"), "https://www.mountwashingtonavalanchecenter.org/forecasts/");
+      await user.click(screen.getByRole("button", { name: "Save source" }));
+      expect(await screen.findByText(editReview.summary)).toBeInTheDocument();
+      expect(screen.getByText("1 review to record again")).toBeInTheDocument();
+      // Back to editing keeps the change.
+      await user.click(screen.getByRole("button", { name: "Back to editing" }));
+      expect(screen.getByLabelText("Link")).toHaveValue("https://www.mountwashingtonavalanchecenter.org/forecasts/");
+      await user.click(screen.getByRole("button", { name: "Save source" }));
+      await user.click(await screen.findByRole("button", { name: "Save on 2 days" }));
+      expect(await screen.findByText("Source saved on 2 days.")).toBeInTheDocument();
+      const bodies = sentBodies(api, `POST ${sourcesRoute}`);
+      expect(bodies[0]).toEqual({ action: "save", preview: true, source_id: "source-1",
+        source: { category: "avalanche", name: "Mount Washington Avalanche Center", region: "Presidential Range", url: "https://www.mountwashingtonavalanchecenter.org/forecasts/" } });
+      expect(bodies[2]).toMatchObject({ action: "save", source_id: "source-1", expected_revision: 2, expected_days: editReview.expected_days });
+    });
+
+    it("saves an edit to a source on one day without a review, for that day only", async () => {
+      const api = fakeTripApi({ [`POST ${sourcesRoute}`]: reply(200, { source_id: "source-1", revision: 3 }) });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      renderWeekend([source()], [use([DATE])]);
+      await user.click(screen.getByRole("button", { name: "Edit source Mount Washington Avalanche Center" }));
+      await user.type(screen.getByLabelText("Source name"), " (MWAC)");
+      await user.click(screen.getByRole("button", { name: "Save source" }));
+      expect(await screen.findByText("Source saved.")).toBeInTheDocument();
+      expect(sentBodies(api, `POST ${sourcesRoute}`)).toEqual([expect.objectContaining({ action: "save", expected_days: [{ date: DATE, day_id: "day-1" }] })]);
+    });
   });
 
   it("asks before discarding a note", async () => {

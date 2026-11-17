@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseItineraryEdit, previewItinerary, requestFor } from "@/lib/trip-itinerary";
 import { ORGANIZER, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
-import type { TripDay, TripItineraryRequest, TripMember, TripMemberDayKit, TripTourPlanSummary } from "@/types/trips";
+import type { TripDay, TripDayConditionsSource, TripItineraryRequest, TripMember, TripMemberDayKit, TripTourPlanSummary } from "@/types/trips";
 
 const JAY = { ...STOWE_STOP, id: "stop-jay", position: 1, name: "Jay Peak, Vermont", latitude: 44.9379, longitude: -72.5045 };
 const day = (date: string, stop_id: string | null, activity: string | null = null): TripDay => ({ id: `day-${date}`, trip_id: TRIP.id, date, stop_id, activity });
@@ -254,6 +254,66 @@ describe("Tour plans in itinerary reviews (#210)", () => {
     ]);
     const both = options(previewItinerary({ ...touring, kits: [kit("2026-10-10"), kit("2026-10-12")] }, request, "user-1"));
     expect(both.map((option) => option.label)).toEqual(["Replace your kit and the tour plan on Mon Oct 12", "Keep your kit and the tour plan on Mon Oct 12"]);
+  });
+});
+
+describe("Conditions sources in a copy (#211)", () => {
+  const MWAC = "33333333-3333-4333-8333-333333333333";
+  const OBS = "44444444-4444-4444-8444-444444444444";
+  const listing = (id: string, name: string, date: string): TripDayConditionsSource => ({
+    id, trip_id: TRIP.id, category: "avalanche", name, region: null, url: "https://example.org/", revision: 1, created_by: "user-1", updated_by: "user-1",
+    created_at: "2026-10-01T00:00:00Z", updated_at: "2026-10-01T00:00:00Z", date, trip_day_id: `day-${date}`, context_key: "key",
+    reviews: [{ user_id: "user-2", stale_reasons: [], history: [], current: { id: "entry-1", action: "reviewed", note: null, reviewed_at: "2026-10-09T12:00:00Z", created_at: "2026-10-09T12:00:00Z" } }],
+  });
+  // Saturday lists MWAC and the Observatory; Monday already lists the Observatory.
+  const trip = { ...full, conditions: [listing(MWAC, "MWAC", "2026-10-10"), listing(OBS, "Mount Washington Observatory", "2026-10-10"), listing(OBS, "Mount Washington Observatory", "2026-10-12")] };
+  const request: TripItineraryRequest = { action: "copy_day", from: "2026-10-10", dates: ["2026-10-11", "2026-10-12"], kit: false, sources: true };
+
+  it("lists the day's sources on each day, saying which are there already and that no review comes along", () => {
+    const [copy] = options(previewItinerary(trip, request, "user-1"));
+    expect(copy).toMatchObject({
+      key: "copy", label: "Copy Sat Oct 10 and its conditions sources to 2 days",
+      detail: "Stowe, Vermont · No activity, and its conditions sources (MWAC and Mount Washington Observatory).",
+      payload: { sources: "add", conditions: { "2026-10-10": [MWAC, OBS], "2026-10-12": [OBS] } },
+    });
+    expect(copy.changes.map((change) => [change.date, change.notes])).toEqual([
+      ["2026-10-11", ["Lists MWAC and Mount Washington Observatory too, with no review recorded for this day: reviews stay on Sat Oct 10."]],
+      ["2026-10-12", ["Lists MWAC too, with no review recorded for this day: reviews stay on Sat Oct 10.", "Already lists Mount Washington Observatory."]],
+    ]);
+  });
+
+  it("adds sources whichever way a kit is copied", () => {
+    const kit = (date: string): TripMemberDayKit => ({
+      id: `kit-${date}`, trip_day_id: `day-${date}`, trip_member_id: ORGANIZER.id, effort: "steady", items: ["shell"], note: null, state: "ok",
+      updated_at: `${date}T08:00:00.000000+00:00`, outfit: null, outfit_saved_at: null,
+    });
+    const [replace, keep] = options(previewItinerary({ ...trip, kits: [kit("2026-10-10"), kit("2026-10-11")] }, { ...request, kit: true }, "user-1"));
+    expect(keep.detail).toBe("That day gets Stowe, Vermont · No activity and its conditions sources only. The other day also gets your checklist.");
+    for (const option of [replace, keep]) {
+      expect(option.payload).toMatchObject({ sources: "add" });
+      expect(option.changes.find((change) => change.date === "2026-10-11")?.notes).toContain(
+        "Lists MWAC and Mount Washington Observatory too, with no review recorded for this day: reviews stay on Sat Oct 10.");
+    }
+  });
+
+  it("copies sources only for the organizer, from a day that has some", () => {
+    expect(previewItinerary(trip, request, "user-2")).toEqual({ error: "Only the organizer can copy conditions sources.", status: 403 });
+    expect(previewItinerary(trip, { ...request, from: "2026-10-11", dates: ["2026-10-10"] }, "user-1"))
+      .toEqual({ error: "There are no conditions sources on Sun Oct 11 to copy.", status: 400 });
+    // Without asking, nothing about sources is sent.
+    const [plain] = options(previewItinerary(trip, { ...request, sources: undefined }, "user-1"));
+    expect(plain.payload).not.toHaveProperty("sources");
+    expect(plain.payload).not.toHaveProperty("conditions");
+  });
+
+  it("saves the copy with its sources and maps it back to the preview request", () => {
+    const expected = { from: { stop_id: null, activity: null, stop: null, kit: null }, days: [{ date: "2026-10-11", stop_id: null, activity: null, stop: null, kit: null }] };
+    const body = { action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: "none", plan: "none", sources: "add", conditions: { "2026-10-10": [MWAC] }, expected };
+    const edit = parseItineraryEdit(body);
+    expect(edit).toEqual({ action: "copy_day", payload: { from: "2026-10-10", dates: ["2026-10-11"], kit: "none", plan: "none", sources: "add", expected } });
+    expect("error" in edit ? null : requestFor(edit)).toEqual({ action: "copy_day", from: "2026-10-10", dates: ["2026-10-11"], kit: false, plan: false, sources: true });
+    expect(parseItineraryEdit({ ...body, sources: "replace" })).toHaveProperty("error");
+    expect(parseItineraryEdit({ ...body, sources: true })).toHaveProperty("error");
   });
 });
 

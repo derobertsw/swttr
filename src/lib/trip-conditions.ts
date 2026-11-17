@@ -9,6 +9,8 @@ import type {
   TripConditionsReviewEntry,
   TripConditionsSource,
   TripConditionsSourceInput,
+  TripConditionsSourcePreview,
+  TripConditionsSourceUse,
   TripDay,
   TripDayConditionsSource,
   TripFull,
@@ -126,6 +128,37 @@ export async function loadConditions(supabase: SupabaseClient, tripId: string): 
 const entry = (row: ReviewRow): TripConditionsReviewEntry =>
   ({ id: row.id, action: row.action, note: row.note, reviewed_at: row.reviewed_at, created_at: row.created_at });
 
+/** Each person's entries for a source on a day, newest first, keyed by `<day id>:<source id>`. */
+function entriesByListing(rows: ConditionsRows): Map<string, ReviewRow[]> {
+  const listings = new Map<string, ReviewRow[]>();
+  for (const row of [...rows.reviews].sort((a, b) => b.entry_number - a.entry_number)) {
+    const key = `${row.trip_day_id}:${row.source_id}`;
+    let list = listings.get(key);
+    if (!list) listings.set(key, list = []);
+    list.push(row);
+  }
+  return listings;
+}
+
+/** Everyone's review from their entries (newest first), with what changed since against the plan now. */
+function reviewsFrom(entries: ReviewRow[], context: TripConditionsContext): TripConditionsReview[] {
+  const byUser = new Map<string, ReviewRow[]>();
+  for (const row of entries) {
+    if (!byUser.has(row.user_id)) byUser.set(row.user_id, []);
+    byUser.get(row.user_id)!.push(row);
+  }
+  return [...byUser.values()]
+    .map(([latest, ...earlier]) => ({
+      user_id: latest.user_id,
+      current: entry(latest),
+      stale_reasons: latest.action === "withdrawn" ? [] : staleReasons(latest.context, context),
+      history: earlier.map(entry),
+    }))
+    .sort((a, b) => a.current.reviewed_at.localeCompare(b.current.reviewed_at));
+}
+
+const isRecorded = (review: TripConditionsReview) => review.current.action !== "withdrawn";
+
 /**
  * Each day's sources, in date and category order, with everyone's current
  * review, its history and whether the plan changed since it was recorded.
@@ -133,34 +166,115 @@ const entry = (row: ReviewRow): TripConditionsReviewEntry =>
 export function summarizeConditions(rows: ConditionsRows, full: Pick<TripFull, "stops" | "days" | "tour_plans">): TripDayConditionsSource[] {
   const days = new Map(full.days.map((day) => [day.id, day]));
   const sources = new Map(rows.sources.map((source) => [source.id, source]));
-  // Each person's entries for a source on a day, newest first.
-  const people = new Map<string, ReviewRow[]>();
-  for (const row of [...rows.reviews].sort((a, b) => b.entry_number - a.entry_number)) {
-    const key = `${row.trip_day_id}:${row.source_id}`;
-    let list = people.get(key);
-    if (!list) people.set(key, list = []);
-    list.push(row);
-  }
+  const listings = entriesByListing(rows);
   return rows.attachments
     .filter((attachment) => days.has(attachment.trip_day_id) && sources.has(attachment.source_id))
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
     .map((attachment) => {
       const day = days.get(attachment.trip_day_id)!, source = sources.get(attachment.source_id)!;
       const context = conditionsContext(full, day, source);
-      const byUser = new Map<string, ReviewRow[]>();
-      for (const row of people.get(`${day.id}:${source.id}`) ?? []) {
-        if (!byUser.has(row.user_id)) byUser.set(row.user_id, []);
-        byUser.get(row.user_id)!.push(row);
-      }
-      const reviews: TripConditionsReview[] = [...byUser.values()]
-        .map(([latest, ...earlier]) => ({
-          user_id: latest.user_id,
-          current: entry(latest),
-          stale_reasons: latest.action === "withdrawn" ? [] : staleReasons(latest.context, context),
-          history: earlier.map(entry),
-        }))
-        .sort((a, b) => a.current.reviewed_at.localeCompare(b.current.reviewed_at));
+      const reviews = reviewsFrom(listings.get(`${day.id}:${source.id}`) ?? [], context);
       return { ...source, date: day.date, trip_day_id: day.id, context_key: contextKey(context), reviews };
     })
     .sort((a, b) => a.date.localeCompare(b.date) || CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category));
+}
+
+/** Every source on the trip, by type and name, with the dates it's listed on. */
+export function summarizeConditionsSources(rows: ConditionsRows, full: Pick<TripFull, "days">): TripConditionsSourceUse[] {
+  const dates = new Map(full.days.map((day) => [day.id, day.date]));
+  return rows.sources
+    .map((source) => ({
+      ...source,
+      dates: rows.attachments.flatMap((attachment) => attachment.source_id === source.id && dates.has(attachment.trip_day_id)
+        ? [dates.get(attachment.trip_day_id)!] : []).sort(),
+    }))
+    .sort((a, b) => CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category) || a.name.localeCompare(b.name) || a.created_at.localeCompare(b.created_at));
+}
+
+const listed = (items: string[]) => new Intl.ListFormat("en", { type: "conjunction" }).format(items);
+const reviewsCount = (count: number) => `${count} ${count === 1 ? "review" : "reviews"}`;
+type PreviewError = { error: string; status: 400 | 404 };
+
+/**
+ * What listing a source on `dates` does (#211): the days that don't list it
+ * yet, and for each one any reviews recorded there before the source was
+ * removed from it, which show again. Reviews never come from another day.
+ */
+export function previewConditionsAttach(
+  rows: ConditionsRows,
+  full: Pick<TripFull, "stops" | "days" | "tour_plans">,
+  sourceId: string,
+  dates: string[],
+): TripConditionsSourcePreview | PreviewError {
+  const source = rows.sources.find((candidate) => candidate.id === sourceId);
+  if (!source) return { error: "This source isn't on the trip any more. Reload the trip.", status: 404 };
+  const days = [...new Set(dates)].sort().map((date) => full.days.find((day) => day.date === date));
+  if (days.some((day) => !day)) return { error: "Some of these days aren't on the trip any more. Reload the trip.", status: 404 };
+  const listedOn = new Set(rows.attachments.filter((attachment) => attachment.source_id === source.id).map((attachment) => attachment.trip_day_id));
+  const adding = days.filter((day): day is TripDay => !!day && !listedOn.has(day.id));
+  const already = days.filter((day): day is TripDay => !!day && listedOn.has(day.id));
+  const labels = (list: TripDay[]) => listed(list.map((day) => dateLabel(day.date)));
+  if (adding.length === 0) return { error: `${source.name} is already listed on ${labels(already)}.`, status: 400 };
+  const listings = entriesByListing(rows);
+  return {
+    source_id: source.id,
+    revision: source.revision,
+    summary: [
+      `Lists ${source.name} on ${labels(adding)}.`,
+      already.length > 0 && `${labels(already)} already ${already.length === 1 ? "lists" : "list"} it.`,
+      "Reviews stay with the day they were recorded for, so none come from other days.",
+    ].filter(Boolean).join(" "),
+    days: adding.map((day) => {
+      const earlier = reviewsFrom(listings.get(`${day.id}:${source.id}`) ?? [], conditionsContext(full, day, source)).filter(isRecorded);
+      const changed = earlier.filter((review) => review.stale_reasons.length > 0).length;
+      const marked = changed === 0 ? "" : changed === earlier.length ? (changed === 1 ? ", marked" : ", all marked") : `, ${changed} marked`;
+      return {
+        date: day.date, date_label: dateLabel(day.date),
+        note: earlier.length === 0 ? "No review recorded for this day."
+          : `${reviewsCount(earlier.length)} recorded here before it was removed ${earlier.length === 1 ? "shows" : "show"} again${
+            marked && `${marked} Plan changed — review again`}.`,
+      };
+    }),
+    expected_days: adding.map((day) => ({ date: day.date, day_id: day.id })),
+  };
+}
+
+/**
+ * Which days an edit to a source changes (#211): every day it's listed on. A
+ * new link or area changes what each review was recorded against, so those
+ * reviews say "Plan changed — review again"; a new name or type doesn't.
+ */
+export function previewConditionsEdit(
+  full: Pick<TripFull, "conditions" | "conditions_sources">,
+  sourceId: string,
+  input: TripConditionsSourceInput,
+): TripConditionsSourcePreview | PreviewError {
+  const source = full.conditions_sources?.find((candidate) => candidate.id === sourceId);
+  if (!source) return { error: "This source isn't on the trip any more. Reload the trip.", status: 404 };
+  const listings = (full.conditions ?? []).filter((listing) => listing.id === source.id).sort((a, b) => a.date.localeCompare(b.date));
+  const restales = input.url !== source.url || input.region !== source.region;
+  const labels = listed(listings.map((listing) => dateLabel(listing.date)));
+  return {
+    source_id: source.id,
+    revision: source.revision,
+    summary: listings.length === 0 ? `${source.name} isn't listed on any day, so your change shows wherever it's listed next.`
+      : [
+        `Your change to ${source.name} applies to ${listings.length === 1 ? labels
+          : `${listings.length === 2 ? "both" : `all ${listings.length}`} days it's listed on: ${labels}`}.`,
+        restales ? "A new link or area changes what was reviewed, so reviews recorded for these days need recording again."
+          : "The link and area stay the same, so reviews stay as recorded.",
+      ].join(" "),
+    days: listings.map((listing) => {
+      // Reviews already marked Plan changed stay that way; the others change now.
+      const current = listing.reviews.filter((review) => isRecorded(review) && review.stale_reasons.length === 0).length;
+      return { date: listing.date, date_label: dateLabel(listing.date), note: restales && current > 0 ? `${reviewsCount(current)} to record again` : null };
+    }),
+    expected_days: listings.map((listing) => ({ date: listing.date, day_id: listing.trip_day_id })),
+  };
+}
+
+/** Whether the days a source is listed on are the ones a review showed, as `{date, day_id}` in any order. */
+export function sameDays(a: Array<{ date: string; day_id: string }>, b: Array<{ date: string; day_id: string }>): boolean {
+  const key = (list: Array<{ date: string; day_id: string }>) => list.map((day) => `${day.date}:${day.day_id.toLowerCase()}`).sort().join(",");
+  return key(a) === key(b);
 }

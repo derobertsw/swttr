@@ -78,16 +78,26 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     return jsonError("Reload the trip before changing its dates.", 400);
   }
 
-  const { data, error } = await supabase.rpc("change_trip_dates", {
+  const change = (removedDays: unknown[]) => supabase.rpc("change_trip_dates", {
     p_trip_id: id, p_user_id: userId,
     p_from_start: from.start_date, p_from_end: from.end_date,
     p_start: start, p_end: end, p_mode: mode,
     p_status: classifyTripStatus(start, end),
     p_name: name ?? null,
     p_lodging_revision: body.lodging_revision ?? null,
-    p_expected_removed: expectedRemoved,
+    p_expected_removed: removedDays,
   });
-  if (error?.code === "40001" || error?.code === "PT409") {
+  const conflict = (code: string | undefined) => code === "40001" || code === "PT409";
+  let { data, error } = await change(expectedRemoved);
+  // Before migration 20261116210000, change_trip_dates doesn't list a removed
+  // day's conditions sources (#211), so a review that lists them never
+  // matches. It's tried once more without them, which only that older
+  // function can accept: from the migration on, a day with sources is listed
+  // with them, and a review without them doesn't match.
+  if (conflict(error?.code) && expectedRemoved.some((day: object) => "conditions" in day)) {
+    ({ data, error } = await change(expectedRemoved.map((day: object) => Object.fromEntries(Object.entries(day).filter(([key]) => key !== "conditions")))));
+  }
+  if (conflict(error?.code)) {
     // Something changed since the review. Show the change as it would be now.
     const current = await preview().catch(() => null);
     return NextResponse.json({ error: "The trip changed since you reviewed it. Review the changes again.", ...(current ?? {}) }, { status: 409 });
