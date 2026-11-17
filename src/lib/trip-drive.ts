@@ -210,11 +210,18 @@ export function departurePlans(full: TripFull): DeparturePlan[][] {
  */
 export function dayStarts(full: TripFull, departures: DeparturePlan[][] = departurePlans(full)): TripDayStart[] {
   return departures.map((day) => {
-    const leaving = day.filter((departure) => departure.origin && departure.member_ids.length > 0);
+    // No drive planned splits a departure but not where people start, so the
+    // crew's count joins them by place.
+    const places = new Map<string, [string, number]>();
+    for (const departure of day) {
+      if (!departure.origin || !departure.member_ids.length) continue;
+      const place = departure.key.replace(/:no_drive$/, "");
+      const [label, count] = places.get(place) ?? [departure.label, 0];
+      places.set(place, [label, count + departure.member_ids.length]);
+    }
     return {
       date: day[0].date,
-      starting_from: leaving.length ? groupLabel(leaving.map((departure) => [departure.label, departure.member_ids.length]))
-        : day[0].origin?.label ?? null,
+      starting_from: places.size ? groupLabel([...places.values()]) : day[0].origin?.label ?? null,
       people: day.flatMap((departure) => departure.member_ids.map((member_id) => ({
         member_id, starting_from: departure.label, own: departure.own_member_ids.includes(member_id) || !!departure.origin?.own,
       }))),

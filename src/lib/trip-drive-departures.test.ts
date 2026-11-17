@@ -252,6 +252,8 @@ describe("A person's own starting point (#333)", () => {
     expect(person(own, SAT, ELI.id)).toEqual({ member_id: ELI.id, starting_from: "Ridge cabin", own: true });
     expect(person(own, SAT, FRAN.id)).toEqual({ member_id: FRAN.id, starting_from: "Village hotel", own: false });
     expect(startsOn(own, SAT).starting_from).toBe("Pine rental (3) · Village hotel (1) · Ridge cabin (1)");
+    // No drive planned for Eli alone still counts him at the hotel with Fran.
+    expect(startsOn(withOwn({ member_id: ELI.id, no_drive: true }), SAT).starting_from).toBe("Pine rental (3) · Village hotel (2)");
     // Given the rental: Eli's own choice, though the rental is where the others slept.
     expect(person(withOwn({ member_id: ELI.id, origin: { ...PINE_PLACE, label: "Pine rental" }, origin_stay_id: PINE.id }), SAT, ELI.id))
       .toEqual({ member_id: ELI.id, starting_from: "Pine rental", own: true });
