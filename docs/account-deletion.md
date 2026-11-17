@@ -66,18 +66,33 @@ Prod runs on Clerk's **development** instance (its key is `pk_test_…`), so the
 
 ### End-to-end check (dev instance)
 
-Create a throwaway account. Give it preferences (including height and weight), Wardrobe items and a custom item, a trip of its own with someone else on the crew, and a place on someone else's trip. Delete the account from the account menu, then check in the SQL editor that nothing names it:
+Create a throwaway account. Give it preferences (including height and weight), Wardrobe items and a custom item, a trip of its own with someone else on the crew, and a place on someone else's trip. Delete the account from the account menu, then check in the SQL editor that nothing names it. The query reads every column `delete_user_data` deletes or anonymizes; no rows means the account is gone everywhere:
 
 ```sql
-SELECT 'user_preferences' AS t, count(*) FROM user_preferences WHERE user_id = 'user_…'
-UNION ALL SELECT 'user_wardrobe', count(*) FROM user_wardrobe WHERE user_id = 'user_…'
-UNION ALL SELECT 'trips', count(*) FROM trips WHERE owner_user_id = 'user_…'
-UNION ALL SELECT 'trip_members', count(*) FROM trip_members WHERE user_id = 'user_…';
+SELECT t, count(*) FROM (
+  SELECT 'user_preferences' AS t, user_id AS id FROM user_preferences
+  UNION ALL SELECT 'user_wardrobe', user_id FROM user_wardrobe
+  UNION ALL SELECT 'user_item_mappings', user_id FROM user_item_mappings
+  UNION ALL SELECT 'user_custom_items', user_id FROM user_custom_items
+  UNION ALL SELECT 'trips', owner_user_id FROM trips
+  UNION ALL SELECT 'trip_members', user_id FROM trip_members
+  UNION ALL SELECT 'trip_kit_saves', user_id FROM trip_kit_saves
+  UNION ALL SELECT 'trip_conditions_reviews', user_id FROM trip_conditions_reviews
+  UNION ALL SELECT 'trip_group_gear', unnest(ARRAY[assigned_by, accepted_by, packed_by]) FROM trip_group_gear
+  UNION ALL SELECT 'trip_group_gear events', event->>'actor' FROM trip_group_gear, jsonb_array_elements(events) AS event
+  UNION ALL SELECT 'trip_day_checks', recorded_by FROM trip_day_checks
+  UNION ALL SELECT 'trip_day_conditions_sources', added_by FROM trip_day_conditions_sources
+  UNION ALL SELECT 'trip_day_tour_plans', unnest(ARRAY[created_by, updated_by]) FROM trip_day_tour_plans
+  UNION ALL SELECT 'trip_conditions_sources', unnest(ARRAY[created_by, updated_by]) FROM trip_conditions_sources
+  UNION ALL SELECT 'trip_drive_manual_estimates', entered_by FROM trip_drive_manual_estimates
+) ids WHERE id = 'user_…' GROUP BY t;
 ```
+
+If `SELECT to_regclass('public.trip_member_day_origins');` isn't null (migration `20261023233000` is applied), add `UNION ALL SELECT 'trip_member_day_origins', updated_by FROM trip_member_day_origins` inside the parentheses. Before that migration the table doesn't exist and the line fails.
 
 ### Orphan check
 
-Accounts deleted before the webhook was set up still have data. This read-only query lists every Clerk user ID the database holds:
+Accounts deleted before the webhook was set up still have data. This read-only query lists every Clerk user ID the database holds. Once migration `20261023233000` is applied (`SELECT to_regclass('public.trip_member_day_origins');` isn't null), add `UNION SELECT updated_by FROM trip_member_day_origins` inside the parentheses too; before that the table doesn't exist and the line fails:
 
 ```sql
 SELECT DISTINCT id FROM (
