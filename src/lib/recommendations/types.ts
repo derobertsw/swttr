@@ -31,6 +31,23 @@ export interface GarmentActivityRatingProps {
   alpine_skiing_score?: number;
 }
 
+/**
+ * Catalog `garment_ventilation` row. `ventilation_factor` is an estimated
+ * multiplier on the garment's evaporative resistance (Recl) with its vents
+ * open; it never changes dry insulation (clo).
+ */
+export interface GarmentVentilationProps {
+  has_pit_zips?: boolean | null;
+  pit_zip_length_cm?: number | null;
+  has_side_vents?: boolean | null;
+  has_back_vent?: boolean | null;
+  has_thigh_vents?: boolean | null;
+  main_zip_two_way?: boolean | null;
+  mesh_lined_pockets?: boolean | null;
+  /** PostgREST returns numeric columns as numbers; tolerate strings too. */
+  ventilation_factor?: number | string | null;
+}
+
 export interface GarmentRow extends GarmentSemantics {
   id: string;
   brand: string;
@@ -44,6 +61,8 @@ export interface GarmentRow extends GarmentSemantics {
   garment_thermal_properties?: GarmentThermalProps;
   garment_protection?: GarmentProtectionProps;
   garment_activity_ratings?: GarmentActivityRatingProps;
+  /** Missing (null) means the garment's vents are unknown, not that it has none. */
+  garment_ventilation?: GarmentVentilationProps | GarmentVentilationProps[] | null;
 }
 
 export interface CategorizedGarments {

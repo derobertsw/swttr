@@ -24,6 +24,7 @@ import {
 } from '../thermal-targets';
 import { sortByBreathability } from '../sorting';
 import { selectPhaseAccessories } from '../extremities';
+import { ventilationAdvice, withVentTransitionStep } from '../ventilation';
 import {
   ensembleToThermalGarments,
   formatConditions,
@@ -246,6 +247,15 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     const uphillResult = scorePhase(uphillEnsemble, uphill, true);
     const downhillResult = scorePhase(downhillEnsemble, downhill, false);
 
+    // Vent settings for the selected garments: the climb, then the
+    // transition and descent (climb layers stay on, pack layers go on).
+    const ventilation = ventilationAdvice({
+      windMs,
+      precipitation: request.precipitation,
+      active: { phase: 'climb', ensemble: uphillEnsemble, metabolicRate: targets.uphillRate, evaluation: uphillResult.recommendation.evaluation },
+      rest: [{ phase: 'transition', ensemble: uphillEnsemble }, { phase: 'descent', ensemble: downhillEnsemble }],
+    });
+
     return {
       conditions: {
         ...formatConditions(request.weather),
@@ -290,13 +300,14 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         }),
         total_weight_g: totalPackWeightGrams,
       },
-      transition_protocol: transitionProtocol,
+      transition_protocol: withVentTransitionStep(transitionProtocol, ventilation),
       warnings: [...uphillResult.warnings.map(w => `Climb: ${w}`), ...downhillResult.warnings.map(w => `Descent: ${w}`)],
       guidance: [
         ...(uphillResult.recommendation.evaluation?.decision?.reasons ?? []).map(r => `Climb: ${r}`),
         ...(downhillResult.recommendation.evaluation?.decision?.reasons ?? []).map(r => `Descent: ${r}`),
         ...generateTouringGuidance(tempC, targets.uphillIreq, targets.downhillIreq),
       ],
+      ...(ventilation && { ventilation }),
     };
   },
 };

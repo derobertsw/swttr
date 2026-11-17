@@ -436,3 +436,91 @@ describe("POST /api/v1/recommendations/ski-touring (golden, pack options)", () =
     ).toMatchSnapshot();
   });
 });
+
+describe("vent advice (#290)", () => {
+  const withoutVentilation = () => catalog.garments.map(({ garment_ventilation: _, ...garment }) => ({ ...garment, garment_ventilation: null }));
+
+  function useCatalog(garments: Row[], mode: (typeof MODES)[number]) {
+    state.userId = mode.userId;
+    state.client = createFakeSupabase({ garments, handwear: catalog.handwear, headwear: catalog.headwear, user_wardrobe: mode.wardrobe });
+  }
+
+  /** The response minus vent advice and the transition step it adds. */
+  function baseline(body: BiophysicsRecommendation) {
+    const { ventilation: _, ...rest } = body;
+    return rest.transition_protocol
+      ? { ...rest, transition_protocol: { ...rest.transition_protocol, steps: rest.transition_protocol.steps.filter(step => !step.startsWith('Close the vents')) } }
+      : rest;
+  }
+
+  it.each(ROUTES.flatMap(route => MODES.flatMap(mode => CONDITIONS.map(condition => ({ ...route, mode, condition })))))(
+    "leaves outfit, warmth and warnings unchanged: $sport, $mode.name, $condition.name",
+    async ({ sport, POST, mode, condition }) => {
+      useCatalog(withoutVentilation(), mode);
+      const unknown = await callRoute(POST, { ...condition.body, ...mode.extraBody });
+      useCatalog(catalog.garments, mode);
+      const known = await callRoute(POST, { ...condition.body, ...mode.extraBody });
+
+      // Missing vent records keep every garment and give no advice.
+      expect(unknown.body.ventilation).toBeUndefined();
+      expect(baseline(known.body)).toEqual(unknown.body);
+      if (!["alpine", "ski-touring"].includes(sport)) expect(known.body.ventilation).toBeUndefined();
+    }
+  );
+
+  it.each(MODES)("names vents only of selected garments with listed vents: $name", async (mode) => {
+    for (const POST of [alpine, skiTouring]) {
+      useCatalog(catalog.garments, mode);
+      const { body } = await callRoute(POST, { ...CONDITIONS[0].body, ...mode.extraBody });
+      const worn = new Map<string, Row>([...body.recommendation.garments, ...(body.pack_items?.garments ?? [])]
+        .map((g: RecommendedGarment) => [g.id, catalog.garments.find(row => row.id === g.id) as Row]));
+      for (const advice of (body as BiophysicsRecommendation).ventilation?.advice ?? []) {
+        const vents = worn.get(advice.garment_id)?.garment_ventilation as Record<string, unknown> | undefined;
+        expect(vents).toBeDefined();
+        const listed = { pit_zips: vents!.has_pit_zips, side_vents: vents!.has_side_vents, thigh_vents: vents!.has_thigh_vents, two_way_zip: vents!.main_zip_two_way }[advice.vent];
+        expect(listed).toBe(true);
+      }
+    }
+  });
+
+  it("opens alpine vents for skiing in dry, calm weather and closes them for the chairlift", async () => {
+    useDatabase(null, []);
+    const { body } = await callRoute(alpine, CONDITIONS[0].body);
+    const { advice, estimates } = (body as BiophysicsRecommendation).ventilation!;
+
+    expect(advice.filter(a => a.phase === "skiing").every(a => a.setting === "open")).toBe(true);
+    expect(advice.filter(a => a.phase === "chairlift").map(a => a.message)).toEqual(
+      advice.filter(a => a.phase === "skiing").map(a => a.message.replace(/^Open (.*) while skiing$/, "Close $1 before the chairlift")),
+    );
+    // The open-state estimate is separate: every reported warmth and breathability value is the closed outfit.
+    expect(estimates[0].closed_evap_potential).toBe(body.recommendation.ensemble_properties.evap_potential);
+    expect(estimates[0].open_evap_potential).toBeGreaterThan(estimates[0].closed_evap_potential);
+  });
+
+  it("keeps vents closed in snow and adds no transition step", async () => {
+    useDatabase(null, []);
+    for (const POST of [alpine, skiTouring]) {
+      const { body } = await callRoute(POST, CONDITIONS[2].body);
+      const ventilation = (body as BiophysicsRecommendation).ventilation!;
+      expect(ventilation.advice.every(a => a.setting === "closed")).toBe(true);
+      expect(ventilation.estimates).toEqual([]);
+      expect(body.transition_protocol?.steps ?? []).not.toEqual(expect.arrayContaining([expect.stringContaining("Close the vents")]));
+    }
+  });
+
+  it("closes vents opened for the touring climb at the transition", async () => {
+    useDatabase(null, []);
+    const { body } = await callRoute(skiTouring, CONDITIONS[0].body);
+    const { advice } = (body as BiophysicsRecommendation).ventilation!;
+    const opened = advice.filter(a => a.phase === "climb" && a.setting === "open");
+
+    expect(opened.length).toBeGreaterThan(0);
+    for (const climb of opened) {
+      expect(advice).toEqual(expect.arrayContaining([
+        expect.objectContaining({ garment_id: climb.garment_id, vent: climb.vent, phase: "transition", setting: "closed", message: expect.stringMatching(/^Close .* at the transition$/) }),
+        expect.objectContaining({ garment_id: climb.garment_id, vent: climb.vent, phase: "descent", setting: "closed" }),
+      ]));
+    }
+    expect(body.transition_protocol.steps.at(-1)).toMatch(/^Close the vents you opened for the climb: /);
+  });
+});

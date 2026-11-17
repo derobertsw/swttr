@@ -380,6 +380,13 @@ const LayerDisplay = ({
     setPickerTarget(null);
   };
 
+  // Vent advice for this phase's garments (#290). Outfit-based settings are
+  // for the recommended outfit, so they're hidden once this phase's layers
+  // change; the server hasn't assessed vents for the edited outfit.
+  const ventAdviceFor = (phase: Phase) => (biophysicsData?.ventilation?.advice ?? []).filter((advice) =>
+    (showDescent && phase === "descent" ? advice.phase === "descent" : advice.phase !== "transition" && advice.phase !== "descent")
+    && !(advice.basis === "outfit" && phaseLayers(phase).edited));
+
   // --- Body part sections ---
   const renderSection = (bodyPart: BodyPart, phase: Phase) => {
     const layers = biophysicsActive
@@ -394,6 +401,7 @@ const LayerDisplay = ({
         bodyPart={bodyPart}
         layers={layers}
         readOnly={!biophysicsActive}
+        ventAdvice={biophysicsActive ? ventAdviceFor(phase) : undefined}
         currentClo={bodyPartEvaluation?.clo}
         targetClo={bodyPartEvaluation?.target}
         status={bodyPartEvaluation?.status}
