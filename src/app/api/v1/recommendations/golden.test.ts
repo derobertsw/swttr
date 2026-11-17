@@ -438,16 +438,17 @@ describe("POST /api/v1/recommendations/ski-touring (golden, pack options)", () =
 });
 
 describe("vent advice (#290)", () => {
-  const withoutVentilation = () => catalog.garments.map(({ garment_ventilation: _, ...garment }) => ({ ...garment, garment_ventilation: null }));
+  const withoutVentilation = () => catalog.garments.map(garment => ({ ...garment, garment_ventilation: null }));
 
-  function useCatalog(garments: Row[], mode: (typeof MODES)[number]) {
+  function loadCatalog(garments: Row[], mode: (typeof MODES)[number]) {
     state.userId = mode.userId;
     state.client = createFakeSupabase({ garments, handwear: catalog.handwear, headwear: catalog.headwear, user_wardrobe: mode.wardrobe });
   }
 
   /** The response minus vent advice and the transition step it adds. */
   function baseline(body: BiophysicsRecommendation) {
-    const { ventilation: _, ...rest } = body;
+    const rest: BiophysicsRecommendation = { ...body };
+    delete rest.ventilation;
     return rest.transition_protocol
       ? { ...rest, transition_protocol: { ...rest.transition_protocol, steps: rest.transition_protocol.steps.filter(step => !step.startsWith('Close the vents')) } }
       : rest;
@@ -456,9 +457,9 @@ describe("vent advice (#290)", () => {
   it.each(ROUTES.flatMap(route => MODES.flatMap(mode => CONDITIONS.map(condition => ({ ...route, mode, condition })))))(
     "leaves outfit, warmth and warnings unchanged: $sport, $mode.name, $condition.name",
     async ({ sport, POST, mode, condition }) => {
-      useCatalog(withoutVentilation(), mode);
+      loadCatalog(withoutVentilation(), mode);
       const unknown = await callRoute(POST, { ...condition.body, ...mode.extraBody });
-      useCatalog(catalog.garments, mode);
+      loadCatalog(catalog.garments, mode);
       const known = await callRoute(POST, { ...condition.body, ...mode.extraBody });
 
       // Missing vent records keep every garment and give no advice.
@@ -470,7 +471,7 @@ describe("vent advice (#290)", () => {
 
   it.each(MODES)("names vents only of selected garments with listed vents: $name", async (mode) => {
     for (const POST of [alpine, skiTouring]) {
-      useCatalog(catalog.garments, mode);
+      loadCatalog(catalog.garments, mode);
       const { body } = await callRoute(POST, { ...CONDITIONS[0].body, ...mode.extraBody });
       const worn = new Map<string, Row>([...body.recommendation.garments, ...(body.pack_items?.garments ?? [])]
         .map((g: RecommendedGarment) => [g.id, catalog.garments.find(row => row.id === g.id) as Row]));
