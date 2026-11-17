@@ -428,7 +428,9 @@ export function useGearUp() {
   const showForm = useCallback((mode: InputMode, retire = formShowing !== mode) => {
     if (retire) retireRequest();
     if (state.result) applyOutingInputs(state.result.outing);
-    expectView("form");
+    // A request kept running was made from this form, which is already
+    // showing: focus still follows it to its results.
+    if (retire) expectView("form");
     dispatch({ type: "SHOW_FORM", mode, keepLoading: !retire });
   }, [formShowing, state.result, applyOutingInputs, retireRequest, expectView]);
   /**

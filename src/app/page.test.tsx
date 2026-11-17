@@ -1957,6 +1957,34 @@ describe("Home Page", () => {
       expect(screen.getByRole("heading", { level: 1, name: "What should I wear?" })).toHaveFocus();
     });
 
+    it("still moves focus to the plan when the Plan tab is tapped again while it's being built (#284)", async () => {
+      let finishPlan: (() => void) | undefined;
+      mockPlanAheadApis({
+        planAhead: () => new Promise((resolve) => {
+          finishPlan = () => resolve(respond(200, {
+            plan: PLAN,
+            baseline: { recommendation: null, effectiveTemperature: 28, maxWindSpeed: 12 },
+          }));
+        }),
+      });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await chooseSeveralDays(user);
+      act(() => screen.getByRole("button", { name: "Build my plan" }).focus());
+      await user.keyboard("{Enter}");
+      expect(screen.getByText("Building your plan…", { selector: "[role='status']" })).toBeInTheDocument();
+      // The iOS shell's Plan tab, tapped again on this page: the plan keeps building.
+      act(() => { window.dispatchEvent(new CustomEvent("navigatePlanAhead")); });
+      expect(screen.getByText("Building your plan…", { selector: "[role='status']" })).toBeInTheDocument();
+      await answer(finishPlan!);
+
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Gear up" })).toHaveFocus();
+    });
+
     it("builds a multi-day plan for a signed-out visitor", async () => {
       // /api/plan-ahead is public (see src/proxy.test.ts), so a guest gets the same plan.
       mockUseAuth.mockReturnValue({ userId: null, isLoaded: true, isSignedIn: false });
