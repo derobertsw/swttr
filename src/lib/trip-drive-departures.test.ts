@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
-import { departurePlans, drivePlans, stayDepartures, type StoredDriveEstimate } from "@/lib/trip-drive";
+import { dayStarts, departurePlans, drivePlans, stayDepartures, type StoredDriveEstimate } from "@/lib/trip-drive";
 import { loadMemberDayOrigins, tripDriveEstimates, type DriveEstimateStore, type ManualEstimateRow } from "@/lib/trip-drive-estimates";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createFakeSupabase } from "@/test/fakeSupabase";
@@ -239,6 +239,30 @@ describe("A person's own starting point (#333)", () => {
     const arriving = splitDriveTrip({ rows });
     arriving.member_origins = [{ trip_id: arriving.trip.id, trip_day_id: `day-${SAT}`, member_id: CASEY.id, origin: cabin, origin_stay_id: null, no_drive: false }];
     expect(departuresOn(arriving, SAT).map((plan) => plan.label)).toEqual(["Pine rental", "Village hotel", "Ridge cabin"]);
+  });
+  it("is where the day brief says each person starts, and the crew's by where people actually start", () => {
+    const startsOn = (full: TripFull, date: string) => dayStarts(full).find((day) => day.date === date)!;
+    const person = (full: TripFull, date: string, memberId: string) => startsOn(full, date).people.find((entry) => entry.member_id === memberId);
+    // As the stays have it while nobody has a starting point of their own.
+    const plain = splitDriveTrip();
+    expect(startsOn(plain, SAT).starting_from).toBe("Pine rental (3) · Village hotel (2)");
+    expect(person(plain, SAT, ELI.id)).toEqual({ member_id: ELI.id, starting_from: "Village hotel", own: false });
+    // Eli from the cabin: his own, and the crew's counts him there, not at the hotel.
+    const own = withOwn({ member_id: ELI.id, origin: cabin });
+    expect(person(own, SAT, ELI.id)).toEqual({ member_id: ELI.id, starting_from: "Ridge cabin", own: true });
+    expect(person(own, SAT, FRAN.id)).toEqual({ member_id: FRAN.id, starting_from: "Village hotel", own: false });
+    expect(startsOn(own, SAT).starting_from).toBe("Pine rental (3) · Village hotel (1) · Ridge cabin (1)");
+    // Given the rental: Eli's own choice, though the rental is where the others slept.
+    expect(person(withOwn({ member_id: ELI.id, origin: { ...PINE_PLACE, label: "Pine rental" }, origin_stay_id: PINE.id }), SAT, ELI.id))
+      .toEqual({ member_id: ELI.id, starting_from: "Pine rental", own: true });
+    // The day's own starting point is everyone's.
+    const day = splitDriveTrip({ days: plain.days.map((entry) => entry.date === SAT ? { ...entry, origin: cabin } : entry) });
+    expect(startsOn(day, SAT)).toMatchObject({ starting_from: "Ridge cabin" });
+    expect(person(day, SAT, ALEX.id)).toEqual({ member_id: ALEX.id, starting_from: "Ridge cabin", own: true });
+    // Someone not taking part has no start here; nobody without a starting point is counted in the crew's.
+    expect(person(plain, SAT, CASEY.id)).toBeUndefined();
+    expect(startsOn(plain, FRI)).toMatchObject({ starting_from: null });
+    expect(person(plain, FRI, ALEX.id)).toEqual({ member_id: ALEX.id, starting_from: "Not set", own: false });
   });
   it("gives each departure its own estimate of yours, and shows one for a gone drive only on the crew's", async () => {
     const full = splitDriveTrip();
