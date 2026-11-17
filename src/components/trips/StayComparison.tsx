@@ -6,6 +6,7 @@ import { fieldClassName } from "@/components/ui/input";
 import { BackLink } from "@/components/trips/trip-primitives";
 import { RoutingAttribution } from "@/components/trips/DriveEstimate";
 import { StayOptionEditor } from "@/components/trips/StayOptionEditor";
+import { UseStayOption } from "@/components/trips/UseStayOption";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { errorMessage, timedTripRequest, tripRequest, TripRequestError } from "@/lib/trip-requests";
@@ -67,7 +68,11 @@ const optionKey = (kind: "stay" | "candidate", id: string) => `${kind}:${id}`;
  * kept in the page's address, so a reload or a property page opened in a new
  * tab leaves them as they were. See docs/trip-stays.md#comparing-stays-213.
  */
-export function StayComparison({ data, canEdit, initial }: { data: TripFull; canEdit: boolean; initial: ComparisonSelection }) {
+export function StayComparison({ data, canEdit, initial, onPlanSaved }: {
+  data: TripFull; canEdit: boolean; initial: ComparisonSelection;
+  /** Loads the trip again after Use for these nights changes it. */
+  onPlanSaved: () => Promise<void>;
+}) {
   const tripId = data.trip.id;
   const options = useStayOptions(tripId);
   const [selected, setSelected] = useState<string[]>(initial.options.slice(0, MAX_OPTIONS));
@@ -75,6 +80,7 @@ export function StayComparison({ data, canEdit, initial }: { data: TripFull; can
     initial.first_night && initial.checkout ? { first_night: initial.first_night, checkout: initial.checkout } : null);
   const [editor, setEditor] = useState<{ candidate: TripStayCandidate | null } | null>(null);
   const [removing, setRemoving] = useState<TripStayCandidate | null>(null);
+  const [using, setUsing] = useState<{ option: TripStayComparisonOption; window: TripStayComparison["window"] } | null>(null);
   const [status, setStatus] = useState("");
   const focus = useReturnFocus();
 
@@ -173,7 +179,7 @@ export function StayComparison({ data, canEdit, initial }: { data: TripFull; can
     </section>}
 
     <section aria-labelledby="comparison-heading" className="mt-8 min-w-0">
-      <h2 id="comparison-heading" className="text-lg font-semibold text-foreground">Comparison</h2>
+      <h2 id="comparison-heading" tabIndex={-1} className="text-lg font-semibold text-foreground">Comparison</h2>
       {choices && chosen.length < 2 && <div className="max-w-3xl">
         <p className="text-base text-foreground">{chosen.length ? "Choose one more stay to compare." : "Choose two or three stays to compare."}</p>
         <p className="text-base text-muted-foreground">A comparison puts each stay&apos;s drives to the same planned days side by side. Each needs a location for its drive times.</p>
@@ -185,7 +191,12 @@ export function StayComparison({ data, canEdit, initial }: { data: TripFull; can
       {result.error && <div role="alert" className="flex flex-wrap items-center gap-2 text-base text-destructive">
         <p>{result.error}</p><Button type="button" variant="outline" onClick={result.retry}>Try again</Button>
       </div>}
-      {result.comparison && <ComparisonView comparison={result.comparison} />}
+      {result.comparison && <ComparisonView comparison={result.comparison}
+        onUse={canEdit && data.lodging?.per_member ? (option) => {
+          focus.remember(() => document.getElementById("comparison-heading"));
+          setUsing({ option, window: result.comparison!.window });
+        } : undefined} />}
+      {result.comparison && canEdit && !data.lodging?.per_member && <p className="mt-3 max-w-3xl text-base text-muted-foreground">To use one of these for the nights, plan them on Stays: choosing from here needs per-person nights.</p>}
     </section>
 
     {editor && <StayOptionEditor key={editor.candidate?.id ?? "new"} tripId={tripId} candidate={editor.candidate}
@@ -196,6 +207,17 @@ export function StayComparison({ data, canEdit, initial }: { data: TripFull; can
           setSelected((prev) => [...prev, optionKey("candidate", saved.id)]);
           setStatus(`${saved.name} saved and added to the comparison.`);
         } else setStatus(`${saved.name} saved.`);
+      }} />}
+    {using && <UseStayOption tripId={tripId} option={using.option} window={using.window}
+      people={(data.lodging?.people ?? []).filter((person) => person.membership !== "left")}
+      onClose={() => setUsing(null)} onCloseAutoFocus={focus.restore} onPlanChanged={onPlanSaved}
+      onSaved={async (message) => {
+        // An option is a saved stay now, with the same id: once the trip has it, it's chosen as that stay.
+        const { option } = using;
+        await onPlanSaved();
+        if (option.kind === "candidate") setSelected((prev) => prev.map((key) => key === option.key ? optionKey("stay", option.id) : key));
+        setStatus(message);
+        options.reload();
       }} />}
     {removing && <RemoveOption tripId={tripId} candidate={removing} onClose={() => setRemoving(null)} onCloseAutoFocus={focus.restore}
       onRemoved={(message) => {
@@ -256,7 +278,7 @@ type Group = { key: string; title: string; caption: string; rows: Row[] };
 const tag = (text: string) => <span className="block text-sm font-medium text-foreground">{text}</span>;
 
 /** The server's comparison laid out: per-day drives and totals first, then cost and details. */
-function ComparisonView({ comparison }: { comparison: TripStayComparison }) {
+function ComparisonView({ comparison, onUse }: { comparison: TripStayComparison; onUse?: (option: TripStayComparisonOption) => void }) {
   const { options, window: compared } = comparison;
   const drives: Group = {
     key: "drives", title: "Drive each morning", caption: "One-way drive from each stay to each morning's destination", rows: comparison.days.map((day) => ({
@@ -288,6 +310,10 @@ function ComparisonView({ comparison }: { comparison: TripStayComparison }) {
         detail: option.address,
       })) },
       { key: "notes", heading: "Notes", cells: options.map((option) => ({ main: option.notes ? <span className="whitespace-pre-wrap">{option.notes}</span> : "None" })) },
+      // The one action, last: it previews who and which nights change before anything is saved.
+      ...onUse ? [{ key: "use", heading: "Use for these nights", sub: "Shows who and which nights change before anything is saved. Bookings don't change.",
+        cells: options.map((option) => ({ main: <Button type="button" variant="outline" className="mt-1 h-auto min-h-11 whitespace-normal text-left" onClick={() => onUse(option)}
+          aria-label={`Use ${option.name} for these nights`}>Use for these nights</Button> })) }] : [],
     ],
   };
   return <div className="mt-2 min-w-0 space-y-6">

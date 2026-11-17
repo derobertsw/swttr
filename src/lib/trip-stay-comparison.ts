@@ -57,10 +57,15 @@ export function parseComparisonRequest(params: URLSearchParams, trip: Pick<Trip,
   if (new Set(keys).size !== keys.length) return { error: "Choose each stay once.", field: "options" };
   const first = params.get("first_night"), checkout = params.get("checkout");
   if (!first && !checkout) return { options: options as OptionRef[], ...stayWindowChoices(trip).default_window };
-  const preTrip = shiftDate(trip.start_date, -1);
-  if (!isCalendarDate(first) || first < preTrip || first > trip.end_date) return { error: "Choose a first night from the night before the trip through the last night.", field: "first_night" };
+  const window = parseStayWindow(first, checkout, trip);
+  return "error" in window ? window : { options: options as OptionRef[], ...window };
+}
+
+/** Nights within the trip's, from the pre-trip night, ending on a check-out morning up to the one after the last night. */
+export function parseStayWindow(first: unknown, checkout: unknown, trip: Pick<Trip, "start_date" | "end_date">): { first_night: string; checkout: string } | { error: string; field: string } {
+  if (!isCalendarDate(first) || first < shiftDate(trip.start_date, -1) || first > trip.end_date) return { error: "Choose a first night from the night before the trip through the last night.", field: "first_night" };
   if (!isCalendarDate(checkout) || checkout <= first || checkout > shiftDate(trip.end_date, 1)) return { error: "Choose a check-out morning after the first night.", field: "checkout" };
-  return { options: options as OptionRef[], first_night: first, checkout };
+  return { first_night: first, checkout };
 }
 
 /** An option as compared: a saved stay, or a stay the organizer is considering. */
