@@ -533,7 +533,7 @@ describe("Trip day page", () => {
       expect(document.querySelector("canvas")).toBeNull();
     });
 
-    it("scrolls a cold link from the trip map to the editor it names, once the day renders", async () => {
+    it("scrolls a cold link from the trip map to the editor it names, once the day renders, and focuses it (#235)", async () => {
       const scroll = vi.fn();
       const original = Element.prototype.scrollIntoView;
       Element.prototype.scrollIntoView = scroll;
@@ -543,6 +543,8 @@ describe("Trip day page", () => {
         await renderPage();
         await waitFor(() => expect(scroll).toHaveBeenCalledOnce());
         expect(scroll.mock.contexts[0]).toHaveAttribute("id", "getting-there-2026-10-10");
+        // Back to day from the map lands here: keyboard and screen reader users continue from Getting there.
+        expect(screen.getByRole("heading", { name: "Getting there" })).toHaveFocus();
       } finally {
         Element.prototype.scrollIntoView = original;
         window.history.replaceState(null, "", window.location.pathname);

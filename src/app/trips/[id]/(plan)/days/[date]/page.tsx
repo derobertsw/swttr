@@ -128,10 +128,12 @@ export default function DayDetailPage({
     };
   }, [weatherKey, id, date]);
 
-  // Links from the trip map open an editor here, like #getting-there-<date>.
-  // Cold links resolve before the async day plan renders. Those ids are plain
-  // ASCII, so the fragment is matched as is: decoding a malformed one like #%
-  // would throw.
+  // Links from the trip map open an editor here, like #getting-there-<date>,
+  // and Back to day returns there. Focus follows, so keyboard and screen
+  // reader users continue from that heading, not the top of the page (#235);
+  // a target that can't take focus ignores it. Cold links resolve before the
+  // async day plan renders. Those ids are plain ASCII, so the fragment is
+  // matched as is: decoding a malformed one like #% would throw.
   const restoredHash = useRef(false);
   useEffect(() => {
     if (restoredHash.current || !day || !window.location.hash) return;
@@ -139,6 +141,7 @@ export default function DayDetailPage({
     if (!target) return;
     restoredHash.current = true;
     target.scrollIntoView({ block: "start", behavior: "instant" });
+    target.focus({ preventScroll: true });
   }, [day]);
 
   const dateObj = new Date(`${date}T00:00:00`);

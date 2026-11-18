@@ -25,9 +25,9 @@ async function open(search: string) {
 }
 
 describe("Trip map back link (#234)", () => {
-  it("returns to the day it was opened from", async () => {
+  it("returns to the day it was opened from, at Getting there where View day map was (#235)", async () => {
     await open("?date=2026-10-10&from=day");
-    expect(screen.getByRole("link", { name: "Back to day" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-10");
+    expect(screen.getByRole("link", { name: "Back to day" })).toHaveAttribute("href", "/trips/trip-1/days/2026-10-10#getting-there-2026-10-10");
   });
 
   it("returns to Plan when that day is no longer on the trip", async () => {

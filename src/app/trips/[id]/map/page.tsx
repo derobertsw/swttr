@@ -31,12 +31,13 @@ export default function TripMapPage({ params }: { params: Promise<{ id: string }
 
 /**
  * Opened from a day's Getting there: back to the selected day while the trip
- * still has it. A saved link that outlived its day goes back to Plan.
+ * still has it, at Getting there, which the day page scrolls to and focuses
+ * (#235). A saved link that outlived its day goes back to Plan.
  */
 function MapBackLink({ tripId, days }: { tripId: string; days: TripDay[] | undefined }) {
   const params = useSearchParams();
   const date = params.get("date");
   return params.get("from") === "day" && days?.some((day) => day.date === date)
-    ? <BackLink href={`/trips/${tripId}/days/${date}`}>Back to day</BackLink>
+    ? <BackLink href={`/trips/${tripId}/days/${date}#getting-there-${date}`}>Back to day</BackLink>
     : <BackLink href={`/trips/${tripId}`}>Back to Plan</BackLink>;
 }
