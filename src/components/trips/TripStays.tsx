@@ -288,8 +288,10 @@ const lodgingRow = (term: string, value: string) =>
  * The start of a day's brief (#334): the meet, the day's time (#333) at its
  * access point, where the crew meets (#210), and the organizer's notes for
  * the day, then where you start. A person on the trip sees their own start
- * first, then the crew's where it differs (#333). The drive follows in Getting
- * there, and tonight's stay after it.
+ * first, then the crew's where it differs (#333). Both are where the day's
+ * departures start, as the server works them out (`starts`), so a starting
+ * point of your own, or the day's own, reads as it does in the drive below.
+ * The drive follows in Getting there, and tonight's stay after it.
  */
 export function DayStart({ data, date, meet, meetingPoint = null, notes = null, memberId = null, children }: {
   data: TripFull; date: string; meet?: TripDayMeet | null; meetingPoint?: string | null;
@@ -302,6 +304,11 @@ export function DayStart({ data, date, meet, meetingPoint = null, notes = null, 
 }) {
   const { context, mine } = dayLodging(data, date, memberId);
   if (!context && !meet && !notes && !children) return null;
+  // Someone without a departure, such as a person not taking part, keeps the lodging's reason.
+  const start = data.starts?.find((entry) => entry.date === date);
+  const myStart = start?.people.find((person) => person.member_id === memberId);
+  const crewFrom = start?.starting_from ?? context?.starting_from ?? "Not set";
+  const myFrom = myStart?.starting_from ?? mine?.starting_from;
   return <section aria-labelledby={`day-start-${date}`} className="min-w-0">
     <h2 id={`day-start-${date}`} className={sectionLabelClassName}>{meet ? "Meet and start" : "Start of the day"}</h2>
     <dl className="mt-2 space-y-2 text-base">
@@ -310,8 +317,8 @@ export function DayStart({ data, date, meet, meetingPoint = null, notes = null, 
         <span className="block text-sm text-muted-foreground">{meet.time_zone_label}</span>
       </dd></div>}
       {notes && <div><dt className="text-muted-foreground">Notes</dt><dd className="whitespace-pre-wrap break-words text-foreground">{notes}</dd></div>}
-      {context && lodgingRow("Starting from", mine?.starting_from ?? context.starting_from)}
-      {context && mine && mine.starting_from !== context.starting_from && lodgingRow("Crew starting from", context.starting_from)}
+      {context && lodgingRow("Starting from", myFrom ? `${myFrom}${myStart?.own ? " · only this day" : ""}` : crewFrom)}
+      {context && myFrom && myFrom !== crewFrom && lodgingRow("Crew starting from", crewFrom)}
     </dl>
     {children}
   </section>;
