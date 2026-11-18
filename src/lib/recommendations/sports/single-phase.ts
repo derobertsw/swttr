@@ -25,6 +25,7 @@ import { selectPhaseAccessories } from '../extremities';
 import { buildScoredRecommendation } from '../response-builder';
 import { formatConditions, formatSinglePhaseIreq } from '../formatting';
 import { buildClothingRequirements, buildHelmetRequirement, filterUnsuitableEnsemble } from '../requirements';
+import { describePreference, preferenceOverreach, warmOrCold } from '../preference';
 
 interface SinglePhaseTargets extends PhaseTargets {
   metabolicRate: number;
@@ -85,7 +86,7 @@ interface SinglePhaseSportConfig {
 export function createSinglePhaseSport(
   config: SinglePhaseSportConfig
 ): SportRecommender<SinglePhaseTargets> {
-  return {
+  const sport: SportRecommender<SinglePhaseTargets> = {
     catalog: { ...config.catalog, activity: config.activity },
 
     /** Derive moving targets with the same exposure and precipitation policy used for scoring. */
@@ -102,7 +103,8 @@ export function createSinglePhaseSport(
         ireq,
         basicIreq: basicIreq(ireq, exposure),
         ...(config.protection ? { protection: config.protection(request) } : {}),
-        ...phaseTargets(config.activity, ireq, metabolicRate, conditions, windMs, ireq, request.exertion, exposure),
+        ...phaseTargets(config.activity, ireq, metabolicRate, conditions, windMs, ireq, request.exertion, exposure,
+          request.preference?.sensitivity),
       };
     },
 
@@ -110,8 +112,13 @@ export function createSinglePhaseSport(
     emptyResponse(request, targets) {
       // The no-garment fast path has not inspected accessory availability.
       const accessories = selectPhaseAccessories(config.activity, targets, { handwear: [], headwear: [], availability: 'unknown' }, request.tempC);
+      const setting = warmOrCold(request.preference);
+      const preference = setting && targets.policy
+        ? describePreference(setting, targets, { targets: sport.computeTargets({ ...request, preference: undefined }) })
+        : undefined;
       const needs = outfitNeeds(targets);
       return {
+        ...(preference ? { preference } : {}),
         ...(config.carry ? { carry_items: config.carry(request, targets) } : {}),
         ireq: targets.policy ? formatSinglePhaseIreq(targets.ireq, targets) : { min: targets.ireq.ireqMin, neutral: targets.ireq.ireqNeutral },
         ...(config.requirementFirst ? {
@@ -122,16 +129,14 @@ export function createSinglePhaseSport(
           target_clo_range: targets.targetRange,
           min_evap_potential: config.minEvapPotential,
           accessories: accessories.assessments,
-          guidance: [...(config.activity === 'xc_skiing' ? config.guidance(request, targets.basicIreq, [], targets) : config.guidance(request, targets.basicIreq)), ...(targets.policy?.assumptions ?? [])],
+          guidance: [...(config.activity === 'xc_skiing' ? config.guidance(request, targets.basicIreq, [], targets) : config.guidance(request, targets.basicIreq)), ...(targets.policy?.assumptions ?? []),
+            ...(preference ? [preference.message] : [])],
         },
       };
     },
 
     /** Select and score worn clothing, then report requirements, protection gaps, and carry advice. */
     recommend(request, targets, pool) {
-      const built = config.buildEnsemble(pool.categorized, targets, request);
-      const protectedOutfit = config.protect?.(built, pool.categorized, targets);
-      const builtEnsemble = protectedOutfit?.ensemble ?? built;
       const needs = outfitNeeds(targets);
       const functional = config.requirementFirst
         ? {
@@ -140,9 +145,42 @@ export function createSinglePhaseSport(
           protection: needs,
         }
         : undefined;
-      const ensemble = functional && !config.completeOutfit ? filterUnsuitableEnsemble(builtEnsemble, targets.regional, functional) : builtEnsemble;
+      /** Worn clothing for one set of targets, and the protection it still lacks. */
+      const select = (phase: SinglePhaseTargets) => {
+        const built = config.buildEnsemble(pool.categorized, phase, request);
+        const protectedOutfit = config.protect?.(built, pool.categorized, phase);
+        const builtEnsemble = protectedOutfit?.ensemble ?? built;
+        return {
+          ensemble: functional && !config.completeOutfit ? filterUnsuitableEnsemble(builtEnsemble, phase.regional, functional) : builtEnsemble,
+          protectionWarnings: protectedOutfit?.warnings ?? [],
+        };
+      };
+      let { ensemble, protectionWarnings } = select(targets);
+
+      // Run Warm/Run Cold (#251): the standard targets' choice, to keep when
+      // the narrowed band's choice would overreach, and to explain the change.
+      const setting = warmOrCold(request.preference);
+      const standardTargets = setting && targets.policy ? sport.computeTargets({ ...request, preference: undefined }) : undefined;
+      let usual: { ensemble: GarmentRow[]; kept: 'minimum' | 'upper_limit' | null } | undefined;
+      if (setting && standardTargets && targets.policy?.preference?.targetsChanged) {
+        const standardChoice = select(standardTargets);
+        const kept = preferenceOverreach(setting.sensitivity, ensemble, standardChoice.ensemble, standardTargets);
+        if (kept) ({ ensemble, protectionWarnings } = standardChoice);
+        usual = { ensemble: standardChoice.ensemble, kept };
+      }
+
       const accessories = selectPhaseAccessories(config.activity, targets, pool, request.tempC, ensemble, { precipitation: request.precipitation });
       const { handwear, headwear } = accessories;
+      const usualAccessories = usual && standardTargets
+        && selectPhaseAccessories(config.activity, standardTargets, pool, request.tempC, usual.ensemble, { precipitation: request.precipitation });
+      const preference = setting && standardTargets ? describePreference(setting, targets, {
+        targets: standardTargets,
+        ...(usual && usualAccessories ? { selections: {
+          chosen: { ensemble, handwear, headwear },
+          usual: { ensemble: usual.ensemble, handwear: usualAccessories.handwear, headwear: usualAccessories.headwear },
+          kept: usual.kept,
+        } } : {}),
+      }) : undefined;
       // Scoring, the echoed targets and manual edits share the upper limits
       // the accessories were chosen against.
       const judged = { ...targets, extremity: { ...targets.extremity, max: accessories.extremityMax } };
@@ -164,6 +202,7 @@ export function createSinglePhaseSport(
           },
           activityKey: config.activity,
           comfortContext: {
+            sensitivity: targets.policy?.preference?.targetsChanged ? targets.policy.preference.sensitivity : undefined,
             requireStandalone: config.requirementFirst,
             protectionNeeds: needs,
             targetRange: targets.targetRange,
@@ -195,6 +234,7 @@ export function createSinglePhaseSport(
       const helmet = buildHelmetRequirement(config.activity, headwear.helmet, pool);
 
       return {
+        ...(preference ? { preference } : {}),
         ...(config.carry ? { carry_items: config.carry(request, targets) } : {}),
         conditions: {
           ...formatConditions(request.weather),
@@ -204,11 +244,12 @@ export function createSinglePhaseSport(
         ireq: { ...formatSinglePhaseIreq(targets.ireq, judged), ...outfitChecks(targets, config.requirementFirst) },
         ...(requirements || helmet ? { requirements: [...(requirements ?? []), ...(helmet ? [helmet.requirement] : [])] } : {}),
         recommendation,
-        warnings: [...warnings, ...(protectedOutfit?.warnings ?? []), ...accessories.warnings, ...(helmet?.warnings ?? [])],
+        warnings: [...warnings, ...protectionWarnings, ...accessories.warnings, ...(helmet?.warnings ?? [])],
         guidance: [...new Set([...config.guidance(request, targets.basicIreq, ensemble, targets), ...(recommendation.evaluation?.decision?.reasons ?? []), ...missingGuidance,
           ...Object.values(accessories.assessments).map(assessment => assessment.message),
-          ...(targets.policy?.assumptions ?? [])])],
+          ...(targets.policy?.assumptions ?? []), ...(preference ? [preference.message] : [])])],
       };
     },
   };
+  return sport;
 }

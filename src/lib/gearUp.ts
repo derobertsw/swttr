@@ -241,8 +241,9 @@ export function outingTimeAt(localDateTime?: string): OutingTime {
 }
 
 /**
- * Layers for an outing in one weather reading, tied to that outing and
- * weather: personalized when the API has them, otherwise general layers or
+ * Layers for an outing in one weather reading, tied to that outing, weather
+ * and the Run Warm/Run Cold setting: personalized when the API has them
+ * (`fetchBiophysics` sends the same setting), otherwise general layers or
  * none, with the reason.
  */
 export async function buildLayersResult(
@@ -254,13 +255,13 @@ export async function buildLayersResult(
   const biophysics = await fetchBiophysics(outing, weather);
   if (biophysics.status === "ok") {
     const recommendation = normalizeBiophysicsForActivity(outing.activity, biophysics.data);
-    return { kind: "layers", outing, weather, advice: { kind: "personalized", recommendation } };
+    return { kind: "layers", outing, weather, advice: { kind: "personalized", recommendation }, sensitivity };
   }
   const layers = getStaticRecommendation(weather.temperature, outing.activity, sensitivity);
   const advice: Advice = layers
     ? { kind: "general", layers, reason: biophysics.status }
     : { kind: "none", reason: biophysics.status };
-  return { kind: "layers", outing, weather, advice };
+  return { kind: "layers", outing, weather, advice, sensitivity };
 }
 
 /** LayerDisplay's props for a result's advice, until it takes the advice itself (#127). */
@@ -326,5 +327,5 @@ export async function fetchPlanAhead(
     throw new PlanAheadError(fixableError, data?.field === "startDate" ? "startDate" : undefined);
   }
 
-  return { kind: "plan", outing, plan: { ...data.plan, provenance: readWeatherProvenance(data.plan.provenance) } };
+  return { kind: "plan", outing, plan: { ...data.plan, provenance: readWeatherProvenance(data.plan.provenance) }, sensitivity };
 }

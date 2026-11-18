@@ -1,4 +1,5 @@
 /** Server-owned policy for sustained running/XC. See docs/running-xc-foundations.md. */
+import type { TemperatureSensitivity } from '@/types/preferences';
 import type { ActivityType } from './constants';
 import type { ExertionLevel } from './exertion';
 import { needsXCWindProtection, type XCPhaseContext } from './xc-policy';
@@ -12,6 +13,19 @@ export const SUSTAINED_ACTIVITY_METS = {
  * Uses existing liner estimates; see docs/running-xc-foundations.md. */
 export const POLE_GRIP_MAX_CLO = 0.55;
 
+/** Share of each warmth band that Run Warm or Run Cold leaves out (#251).
+ * Run Warm drops the warmest share and Run Cold the coolest; no limit moves
+ * outward. An unvalidated engineering choice; see docs/running-xc-foundations.md. */
+export const PREFERENCE_BAND_SHARE = 0.25;
+
+/** A warm or cold preference as the policy applies it. Neutral has none. */
+export interface PolicyPreference {
+  sensitivity: Exclude<TemperatureSensitivity, 'neutral'>;
+  bandShare: number;
+  /** Whether narrowing changed any band in these conditions (set by phaseTargets). */
+  targetsChanged: boolean;
+}
+
 export interface SustainedSportPolicy {
   version: 'running_xc_v1';
   activity: 'running' | 'xc_skiing';
@@ -24,6 +38,8 @@ export interface SustainedSportPolicy {
   protection: { wind: boolean; wet: boolean; poleGrip: boolean };
   assumptions: string[];
   xc?: XCPhaseContext;
+  /** Run Warm/Run Cold only. Narrows bands from one side and never widens them. */
+  preference?: PolicyPreference;
 }
 
 /** Narrow to the activities governed by the sustained running/XC policy. */
@@ -38,6 +54,7 @@ export function sustainedSportPolicy(
   metabolicRateWm2: number,
   conditions: { tempC: number; precipitation?: boolean; xc?: XCPhaseContext },
   windMs: number,
+  sensitivity: TemperatureSensitivity = 'neutral',
 ): SustainedSportPolicy {
   // Continuous taper: full cold margins at freezing, none at 10°C in dry
   // moderate wind. Wind and wet conditions retain exposure allowances.
@@ -56,9 +73,23 @@ export function sustainedSportPolicy(
       poleGrip: activity === 'xc_skiing',
     },
     ...(conditions.xc ? { xc: conditions.xc } : {}),
+    ...(sensitivity !== 'neutral' ? { preference: { sensitivity, bandShare: PREFERENCE_BAND_SHARE, targetsChanged: false } } : {}),
     assumptions: [
       'These targets assume continuous movement. Bring extra layers for breaks and frequent stops.',
       'These are clothing estimates; adjust layers for your comfort and changing conditions.',
     ],
   };
+}
+
+/**
+ * One warmth band `[low, high]` narrowed for a preference: Run Warm lowers
+ * `high` and Run Cold raises `low`, each by the policy's share of the width.
+ * The other limit never moves, so Run Warm cannot lower a minimum and Run Cold
+ * cannot raise an upper limit. Without a preference the band is unchanged.
+ */
+export function preferenceBand(low: number, high: number, preference?: Pick<PolicyPreference, 'sensitivity' | 'bandShare'>): [number, number] {
+  if (!preference || !(high > low)) return [low, high];
+  const shift = (high - low) * preference.bandShare;
+  const round2 = (value: number) => Math.round(value * 100) / 100;
+  return preference.sensitivity === 'hot' ? [low, round2(high - shift)] : [round2(low + shift), high];
 }

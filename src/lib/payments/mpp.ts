@@ -54,6 +54,7 @@ function getMppx() {
  *   `parseRecommendationRequest`)
  * - `use_wardrobe_only: true` — wardrobes require a signed-in user, which the
  *   stateless agent API never has
+ * - a `temperature_sensitivity` other than `hot`, `neutral` or `cold`
  */
 export function paidRecommendationRoute(
   amount: string,
@@ -94,6 +95,13 @@ export function paidRecommendationRoute(
           error:
             'use_wardrobe_only is not supported on the agent API — wardrobes require a signed-in user. Omit the flag to get catalog recommendations.',
         },
+        { status: 400 },
+      );
+    }
+
+    if (body.temperature_sensitivity !== undefined && !['hot', 'neutral', 'cold'].includes(body.temperature_sensitivity as string)) {
+      return NextResponse.json(
+        { error: 'temperature_sensitivity must be one of: hot, neutral, cold' },
         { status: 400 },
       );
     }

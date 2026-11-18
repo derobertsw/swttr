@@ -207,6 +207,12 @@ describe("buildLayersResult", () => {
     expect(result).toMatchObject({ kind: "layers", outing: ALPINE_OUTING, weather: WEATHER });
   });
 
+  it("records the Run Warm/Run Cold setting it was asked with (#251)", async () => {
+    expect(await buildLayersResult(ALPINE_OUTING, WEATHER, "cold", async () => SIGN_IN_REQUIRED)).toMatchObject({ sensitivity: "cold" });
+    const ok = { status: "ok" as const, data: { recommendation: {} } as unknown as BiophysicsRecommendation };
+    expect(await buildLayersResult(ALPINE_OUTING, WEATHER, "hot", async () => ok)).toMatchObject({ sensitivity: "hot" });
+  });
+
   it("gives general layers, with the reason they aren't personalized, when the activity has a static table", async () => {
     const { advice } = await buildLayersResult(ALPINE_OUTING, WEATHER, "neutral", async () => SIGN_IN_REQUIRED);
     expect(advice).toMatchObject({ kind: "general", reason: "auth_required" });
@@ -272,7 +278,7 @@ describe("fetchPlanAhead", () => {
     const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => Response.json({ plan }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(requestPlan()).resolves.toEqual({ kind: "plan", outing: PLAN_OUTING, plan });
+    await expect(requestPlan()).resolves.toEqual({ kind: "plan", outing: PLAN_OUTING, plan, sensitivity: "neutral" });
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
       activity: "running",
       sensitivity: "neutral",
