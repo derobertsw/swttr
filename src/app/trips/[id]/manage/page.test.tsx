@@ -285,6 +285,8 @@ describe("Invitation controls", () => {
     vi.stubGlobal("fetch", fetchMock);
     await renderPage();
     expect(await screen.findByText("1 joined · 1 pending invitation · 1 managed guest")).toBeInTheDocument();
+    // A long name wraps rather than being cut off (#337).
+    expect(screen.getByText("Sam")).toHaveClass("break-words");
     expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
     expect(screen.getByText(/No message is sent/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Revoke link" }));

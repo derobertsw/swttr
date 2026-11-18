@@ -264,6 +264,13 @@ const LayerDisplay = ({
     minTargets: descentBreakdown
       ? bodyPartTargets(descentBreakdown.regional_ireq, descentBreakdown.extremity_ireq, "min")
       : climbInput.minTargets,
+    // The descent's own accessory limits, as its server evaluation used.
+    extremityMaxTargets: descentBreakdown
+      ? descentBreakdown.extremity_ireq.max && {
+          hands: descentBreakdown.extremity_ireq.max.hands,
+          headNeck: descentBreakdown.extremity_ireq.max.head,
+        }
+      : climbInput.extremityMaxTargets,
     arms: regionalClo
       ? {
           clo: descentBreakdown?.regional_clo?.arms ?? regionalClo.arms,

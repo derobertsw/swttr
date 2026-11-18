@@ -1,7 +1,7 @@
 /**
  * Recommender for sports modelled as one continuous activity phase (running,
  * biking, XC skiing): a single IREQ and target range, active-use extremity
- * gear, and no helmet.
+ * gear, and the helmet the sport requires (biking).
  */
 import { xcPhaseContext } from '@/lib/biophysics/xc-policy';
 import type { BiophysicsRecommendation } from '@/types/biophysics';
@@ -24,7 +24,7 @@ import {
 import { selectPhaseAccessories } from '../extremities';
 import { buildScoredRecommendation } from '../response-builder';
 import { formatConditions, formatSinglePhaseIreq } from '../formatting';
-import { buildClothingRequirements, filterUnsuitableEnsemble } from '../requirements';
+import { buildClothingRequirements, buildHelmetRequirement, filterUnsuitableEnsemble } from '../requirements';
 
 interface SinglePhaseTargets extends PhaseTargets {
   metabolicRate: number;
@@ -121,7 +121,7 @@ export function createSinglePhaseSport(
         recommendations: {
           target_clo_range: targets.targetRange,
           min_evap_potential: config.minEvapPotential,
-          ...(accessories.assessments ? { accessories: accessories.assessments } : {}),
+          accessories: accessories.assessments,
           guidance: [...(config.activity === 'xc_skiing' ? config.guidance(request, targets.basicIreq, [], targets) : config.guidance(request, targets.basicIreq)), ...(targets.policy?.assumptions ?? [])],
         },
       };
@@ -141,11 +141,11 @@ export function createSinglePhaseSport(
         }
         : undefined;
       const ensemble = functional && !config.completeOutfit ? filterUnsuitableEnsemble(builtEnsemble, targets.regional, functional) : builtEnsemble;
-      const accessories = selectPhaseAccessories(config.activity, targets, pool, request.tempC, ensemble);
+      const accessories = selectPhaseAccessories(config.activity, targets, pool, request.tempC, ensemble, { precipitation: request.precipitation });
       const { handwear, headwear } = accessories;
       // Scoring, the echoed targets and manual edits share the upper limits
       // the accessories were chosen against.
-      const judged = accessories.extremityMax ? { ...targets, extremity: { ...targets.extremity, max: accessories.extremityMax } } : targets;
+      const judged = { ...targets, extremity: { ...targets.extremity, max: accessories.extremityMax } };
 
       const { recommendation, warnings } = buildScoredRecommendation(
         {
@@ -177,7 +177,7 @@ export function createSinglePhaseSport(
         handwear,
         headwear
       );
-      if (accessories.assessments) recommendation.accessories = accessories.assessments;
+      recommendation.accessories = accessories.assessments;
 
       const requirements = config.requirementFirst
         ? buildClothingRequirements(config.activity, targets, {
@@ -191,6 +191,8 @@ export function createSinglePhaseSport(
         })
         : undefined;
       const missingGuidance = requirements?.filter((r) => r.status === 'missing').map((r) => r.message) ?? [];
+      // Required protection is reported whatever the thermal demand.
+      const helmet = buildHelmetRequirement(config.activity, headwear.helmet, pool);
 
       return {
         ...(config.carry ? { carry_items: config.carry(request, targets) } : {}),
@@ -200,11 +202,11 @@ export function createSinglePhaseSport(
           ...config.conditions(request),
         },
         ireq: { ...formatSinglePhaseIreq(targets.ireq, judged), ...outfitChecks(targets, config.requirementFirst) },
-        ...(requirements ? { requirements } : {}),
+        ...(requirements || helmet ? { requirements: [...(requirements ?? []), ...(helmet ? [helmet.requirement] : [])] } : {}),
         recommendation,
-        warnings: [...warnings, ...(protectedOutfit?.warnings ?? []), ...accessories.warnings],
+        warnings: [...warnings, ...(protectedOutfit?.warnings ?? []), ...accessories.warnings, ...(helmet?.warnings ?? [])],
         guidance: [...new Set([...config.guidance(request, targets.basicIreq, ensemble, targets), ...(recommendation.evaluation?.decision?.reasons ?? []), ...missingGuidance,
-          ...Object.values(accessories.assessments ?? {}).map(assessment => assessment.message),
+          ...Object.values(accessories.assessments).map(assessment => assessment.message),
           ...(targets.policy?.assumptions ?? [])])],
       };
     },

@@ -4,11 +4,14 @@
  * garment that is unsuitable (underlayer-only worn alone, too warm for a
  * light requirement, unknown thermal data) is never presented as a match;
  * the requirement survives as `missing` with a generic suggestion.
+ * Required protection (a helmet) follows the same contract for every sport
+ * that needs it, independent of thermal demand.
  */
 import type { AccessoryAssessments, ClothingRequirement } from '@/types/biophysics';
+import type { ActivityType } from '@/lib/biophysics/constants';
 import type { GarmentRow, HandwearRow, HeadwearRow } from './types';
 import { garmentCapabilities, hasUsableThermalData } from './garment-semantics';
-import { HEAD_WARMTH_TYPES } from './extremities';
+import { HEAD_WARMTH_TYPES, REQUIRED_HELMET_TYPES } from './extremities';
 import type { PhaseTargets } from './thermal-targets';
 import { xcBasic, xcRegionMatches, xcRequirementLabel } from './sports/xc-outfit';
 import { runningBasic, runningRegionMatches, runningRegionIssues, runningRequirementLabel } from './sports/running-outfit';
@@ -214,6 +217,47 @@ export function buildClothingRequirements(
       matched ? { id: matched.id, name: `${matched.brand} ${matched.model_name}` } : undefined, owned));
   }
   return requirements;
+}
+
+const HELMET_LABELS: Record<string, string> = { ski_helmet: 'Ski helmet', bike_helmet: 'Bike helmet' };
+
+/**
+ * The helmet a sport or phase requires, reported apart from insulation.
+ * Thermal demand never removes it; a missing helmet is reported with a
+ * warning and a generic suggestion, and a catalog helmet is never presented
+ * as owned. Undefined when the activity requires no helmet.
+ */
+export function buildHelmetRequirement(
+  activity: ActivityType,
+  helmet: HeadwearRow | null,
+  pool: { usingWardrobe: boolean; headwearOwned?: boolean },
+): { requirement: ClothingRequirement; warnings: string[] } | undefined {
+  const types = REQUIRED_HELMET_TYPES[activity];
+  if (!types?.length) return undefined;
+  const label = HELMET_LABELS[types[0]] ?? 'Helmet';
+  const base = { id: `${activity}:helmet`, region: 'head' as const, kind: 'protection' as const, label };
+  // Signed-in headwear comes from the wardrobe alone; otherwise from the catalog.
+  const owned = pool.headwearOwned ?? false;
+  if (helmet && types.includes(helmet.headwear_type)) {
+    const name = `${helmet.brand} ${helmet.model_name}`;
+    return {
+      requirement: {
+        ...base, status: owned ? 'owned_match' : 'generic_suggestion',
+        matched_garment_id: helmet.id, matched_garment_name: name, matched_is_owned: owned,
+        message: owned ? `${label} — matched to ${name} in your wardrobe` : `${label} — suggested: ${name} (not in your wardrobe)`,
+      },
+      warnings: [],
+    };
+  }
+  const where = pool.usingWardrobe || owned ? 'in your wardrobe' : 'available to suggest';
+  return {
+    requirement: {
+      ...base, status: 'missing',
+      generic_suggestion: { label, generic_estimate: true, owned: false },
+      message: `${label} — required protection in any weather; none ${where}`,
+    },
+    warnings: [`No ${label.toLowerCase()} ${where}. Wear one in any weather: it's required protection, not optional warmth.`],
+  };
 }
 
 function requirement(

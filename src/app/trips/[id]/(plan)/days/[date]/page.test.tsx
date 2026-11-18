@@ -22,7 +22,7 @@ import { buildTouringEquipment } from "@/lib/touring-equipment";
 import { dayChecksFor, summarizeDayChecks } from "@/lib/trip-day-checks";
 import { tripDayOutingFor } from "@/lib/trip-day-outing";
 import type { TripDay, TripFull, TripItineraryRequest, TripLocation, TripMember, TripMemberDayKit, TripTourPlan } from "@/types/trips";
-import { savedOutfit, savedPlan } from "@/test/savedKit";
+import { savedOutfit, savedPlan, WEAR } from "@/test/savedKit";
 import DayDetailPage from "./page";
 import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
 import { STORAGE_KEYS } from "@/lib/storage";
@@ -785,6 +785,23 @@ describe("Trip day page", () => {
       expect(screen.getByText("Needs help")).toBeInTheDocument();
     });
 
+    // The organizer edits their own kit and each guest's, so the same layer and
+    // effort buttons repeat; each set is named for whose kit it is (#337).
+    it("names each editable kit's controls for whose kit they change", async () => {
+      vi.stubGlobal("fetch", crewTrip([kit(SAM, { items: ["shell"] })]));
+      await renderPage();
+      const mine = await screen.findByRole("group", { name: "Your kit" });
+      const sams = screen.getByRole("group", { name: "Sam's kit" });
+      expect(within(mine).getByRole("button", { name: "Shirt" })).toHaveAttribute("aria-pressed", "false");
+      expect(within(sams).getByRole("button", { name: "Shell" })).toHaveAttribute("aria-pressed", "true");
+      expect(within(sams).getByRole("button", { name: "Flag needs help" })).toBeInTheDocument();
+      expect(within(sams).getByRole("group", { name: "Effort for Sam" })).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Ana's kit" })).not.toBeInTheDocument();
+      // A long name wraps rather than being cut off, editable or not.
+      expect(within(sams).getByText("Sam")).toHaveClass("break-words");
+      expect(screen.getByText("Ana")).not.toHaveClass("truncate");
+    });
+
     it("shows a member only their own kit to change, and the organizer's under their name for the crew", async () => {
       mockAuth.userId = "user-2";
       vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit() })], [ORGANIZER_TO_CREW, ANA, SAM]));
@@ -940,6 +957,33 @@ describe("Trip day page", () => {
       });
     });
 
+    it("lets the organizer list the day's conditions sources on the copies too, never their reviews (#211)", async () => {
+      const listing = { id: "source-1", trip_id: TRIP.id, category: "avalanche" as const, name: "Mount Washington Avalanche Center", region: null,
+        url: "https://www.mountwashingtonavalanchecenter.org/", revision: 1, created_by: "user-1", updated_by: "user-1",
+        created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z", date: days[0].date, trip_day_id: days[0].id, context_key: "key-1", reviews: [] };
+      const fetchMock = copyTrip(tripFull({ stops: [STOWE_STOP, JAY], days, conditions: [listing] }), () => reply(200, { ok: true }));
+      const user = userEvent.setup();
+      await renderPage();
+      await user.click(await screen.findByRole("button", { name: "Copy to other days" }));
+      await user.click(screen.getByRole("checkbox", { name: /Mon, Oct 12/ }));
+      await user.click(screen.getByRole("checkbox", { name: /Also list its conditions sources.*Mount Washington Avalanche Center. Reviews stay on this day/ }));
+      await user.click(screen.getByRole("button", { name: "Review copy to 1 day" }));
+      expect(sentBodies(fetchMock, ITINERARY)[0]).toMatchObject({ preview: true, action: "copy_day", sources: true });
+    });
+
+    it("doesn't offer a member the day's conditions sources", async () => {
+      mockAuth.userId = "user-2";
+      const member: TripMember = { ...ORGANIZER, id: "member-sam", user_id: "user-2", display_name: "Sam", role: "member" };
+      const listing = { id: "source-1", trip_id: TRIP.id, category: "avalanche" as const, name: "MWAC", region: null, url: "https://example.org/", revision: 1,
+        created_by: "user-1", updated_by: "user-1", created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z", date: days[0].date,
+        trip_day_id: days[0].id, context_key: "key-1", reviews: [] };
+      copyTrip(tripFull({ stops: [STOWE_STOP, JAY], days, members: [ORGANIZER, member], conditions: [listing] }), () => reply(200, { ok: true }));
+      const user = userEvent.setup();
+      await renderPage();
+      await user.click(await screen.findByRole("button", { name: "Copy to other days" }));
+      expect(screen.queryByRole("checkbox", { name: /Also list its conditions sources/ })).not.toBeInTheDocument();
+    });
+
     it("isn't offered on a one-day trip", async () => {
       copyTrip(tripFull({ stops: [STOWE_STOP], days: [DAY] }), () => reply(200, { ok: true }));
       await renderPage();
@@ -989,6 +1033,47 @@ describe("Trip day page", () => {
         & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
+    it("switches a saved tour between Climb and Descent without saving anything or changing what's packed (#212, #335)", async () => {
+      // The climb carries the shell the descent wears.
+      const climb = { ...WEAR, torso: { ...WEAR.torso, outer: [] } };
+      const tour = savedOutfit({
+        outing: { ...savedOutfit().outing, activity: "backcountry_skiing" },
+        phases: [
+          { id: "climb", wear: climb, carry: ["Ski shell"], decision: null },
+          { id: "descent", wear: WEAR, carry: ["Skins"], decision: null },
+        ],
+      });
+      const full = tripFull({
+        stops: [STOWE_STOP], days: [tourDay], members: [ORGANIZER],
+        kits: [{ id: "kit-tour", trip_day_id: DAY.id, trip_member_id: ORGANIZER.id, effort: "steady", items: [], note: null, state: "ok",
+          updated_at: "2026-10-06T20:01:02Z", outfit: tour, outfit_saved_at: "2026-10-06T20:01:02Z" }],
+      });
+      const api = fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, full),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        "GET /api/v1/trips/trip-1/days/2026-10-10/outing": reply(200, tripDayOutingFor(full, "user-1", DAY.date, "America/New_York", Date.parse("2026-10-07T12:00:00Z"))),
+        [EQUIPMENT]: reply(200, {
+          equipment: equipment({ transceiver: { status: "added", quantity: 1 } }),
+          checks: { "equipment:transceiver": { packed: true, quantity: 1, version } },
+        }),
+      });
+      vi.stubGlobal("fetch", api);
+      await renderPage();
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      const phases = within(myKit).getByRole("group", { name: "Phase" });
+      expect(within(phases).getByRole("button", { name: "Climb" })).toHaveAttribute("aria-pressed", "true");
+      const carry = () => within(myKit).getByRole("heading", { name: "Carry" }).closest("section")!;
+      expect(carry()).toHaveTextContent("Ski shell");
+      await userEvent.click(within(phases).getByRole("button", { name: "Descent" }));
+      expect(within(phases).getByRole("button", { name: "Descent" })).toHaveAttribute("aria-pressed", "true");
+      expect(carry()).toHaveTextContent("Skins");
+      expect(carry()).not.toHaveTextContent("Ski shell");
+      // Only reads: the view is the page's, not the kit's or the packing list's.
+      expect(api.mock.calls.map(([, init]) => (init as RequestInit | undefined)?.method ?? "GET").every((method) => method === "GET")).toBe(true);
+      const equipmentRows = await within(screen.getByRole("heading", { name: "My equipment" }).closest("section")!).findAllByRole("listitem");
+      expect(equipmentRows[0]).toHaveTextContent("Avalanche transceiverPacked");
+    });
+
     it("adds touring equipment from the day", async () => {
       const api = fakeTripApi({
         "GET /api/v1/trips/trip-1": trip(tourDay),
@@ -1003,6 +1088,8 @@ describe("Trip day page", () => {
       const user = userEvent.setup();
       await renderPage();
       expect(await screen.findByText("No touring equipment in your packing list yet.")).toBeInTheDocument();
+      // Its label wraps with enlarged text rather than run off a phone (#337).
+      expect(screen.getByRole("button", { name: "Add touring equipment" })).toHaveClass("whitespace-normal");
       await user.click(screen.getByRole("button", { name: "Add touring equipment" }));
       const dialog = await screen.findByRole("dialog", { name: "Touring equipment" });
       await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));
@@ -1253,7 +1340,7 @@ describe("Trip day page", () => {
       const conditions = await screen.findByRole("heading", { name: "Conditions" });
       expect(screen.getByRole("heading", { name: "Tour plan" }).compareDocumentPosition(conditions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       // The organizer's review is theirs, not the member's.
-      expect(screen.getByText("No review recorded")).toBeInTheDocument();
+      expect(screen.getByText("No review recorded for this day")).toBeInTheDocument();
       expect(screen.getByText("Crew reviews (1)")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Record my review of Mount Washington Avalanche Center" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add source" })).not.toBeInTheDocument();

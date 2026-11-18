@@ -288,7 +288,9 @@ export function DayEquipment({ tripId, gear, memberId }: {
           )}
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
             {data.equipment.editable && (
-              <Button type="button" variant="outline" onClick={() => { focus.remember(() => heading.current); setStatus(""); setAdding(true); }}>
+              // The label wraps rather than run past a phone's edge with enlarged text (#337).
+              <Button type="button" variant="outline" className="h-auto min-h-11 max-w-full whitespace-normal py-2"
+                onClick={() => { focus.remember(() => heading.current); setStatus(""); setAdding(true); }}>
                 <Plus aria-hidden="true" />
                 {items.length > 0 ? "Add more touring equipment" : "Add touring equipment"}
               </Button>
@@ -395,7 +397,7 @@ export function SharedTouringItems({ tripId, onAdded }: {
           Group items for the Backcountry days: {touring.dates.map(packingDay).join(", ")}.
         </p>
       )}
-      <Button ref={button} type="button" variant="outline" className="mt-3" loading={opening} onClick={() => void openPreview()}>
+      <Button ref={button} type="button" variant="outline" className="mt-3 h-auto min-h-11 max-w-full whitespace-normal py-2" loading={opening} onClick={() => void openPreview()}>
         {!opening && <Plus aria-hidden="true" />}
         Add shared touring items
       </Button>

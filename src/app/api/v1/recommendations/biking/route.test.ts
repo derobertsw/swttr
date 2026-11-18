@@ -65,7 +65,8 @@ describe('POST /api/v1/recommendations/biking (complete outfits, #371)', () => {
     expect(garments.some(g => g.category === 'hard_shell')).toBe(false);
     expect(body.ireq.outfit_checks).toEqual({ require_standalone: true, protection: { wind: false, wet: false, poleGrip: false } });
     expect(body.guidance.join(' ')).toMatch(/while riding/);
-    expect(body.requirements?.map(r => r.id)).toEqual(['biking:torso', 'biking:legs', 'biking:hands', 'biking:head']);
+    // The helmet is required protection (#373); the golden catalog has no bike helmets yet.
+    expect(body.requirements?.map(r => r.id)).toEqual(['biking:torso', 'biking:legs', 'biking:hands', 'biking:head', 'biking:helmet']);
   });
 
   it('shows no over-warm clothing at 65°F when the catalog has nothing light enough, and reports the gaps', async () => {

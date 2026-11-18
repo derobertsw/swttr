@@ -33,7 +33,9 @@ export interface ExtremityIreqData {
 export interface ExtremityIreqRange {
   min: ExtremityIreqData;
   neutral: ExtremityIreqData;
-  /** Running/XC upper comfort limits; hands may allow thin pole-grip gloves. */
+  /** Upper local limits the accessories were chosen and are judged against:
+   * hands may allow thin kept or pole-grip gloves, and the head a required
+   * helmet or the lightest item rated for deep cold. */
   max?: ExtremityIreqData;
 }
 
@@ -181,10 +183,14 @@ export interface RecommendedHeadwear {
 export type ClothingRequirementStatus = 'owned_match' | 'generic_suggestion' | 'missing' | 'not_needed' | 'unknown';
 
 /** A suitable-clothing requirement, separate from any wardrobe item. Stable
- * `id` (`<activity>:<region>`) associates edits/explanations across calls. */
+ * `id` (`<activity>:<region>`, or `<activity>:helmet` for a required helmet)
+ * associates edits/explanations across calls. */
 export interface ClothingRequirement {
   id: string;
   region: 'torso' | 'legs' | 'hands' | 'head';
+  /** Nonthermal protection (a helmet): required whatever the thermal demand,
+   * so it has no clo target and is never `not_needed`. */
+  kind?: 'protection';
   label: string;
   status: ClothingRequirementStatus;
   /** Ideal regional clo; a missing requirement is never scored as 0 clo worn. */
@@ -197,8 +203,9 @@ export interface ClothingRequirement {
 }
 
 export interface BiophysicsRecommendation {
-  /** Requirement-first flow (running/XC only): what the activity needs,
-   * before wardrobe matching. Absent for other sports. */
+  /** What the activity needs, before wardrobe matching: running/XC clothing
+   * (requirement-first flow), and the helmet alpine, cycling and the touring
+   * descent require. Absent when a sport has neither. */
   requirements?: ClothingRequirement[];
   /** The request's conditions, echoed as sent (°F, mph). */
   conditions: {

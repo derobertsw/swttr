@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, render, within } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { tripMapFixture } from "@/test/tripMap";
 import TripMapCanvas from "./TripMapCanvas";
@@ -41,6 +41,19 @@ describe("Lazy map canvas", () => {
     expect(sdk.map.layers.some((layer) => layer.type === "line")).toBe(false);
     expect(sdk.worker).toHaveBeenCalledWith(expect.stringContaining("maplibre-gl-worker.mjs"));
     view.unmount(); expect(sdk.map.remove).toHaveBeenCalled();
+  });
+  it("names its zoom controls as a group and has a shape for another group's start (#235)", async () => {
+    const view = render(<TripMapCanvas {...props()} />); await loaded();
+    const zoom = within(view.getByRole("group", { name: "Map controls" })).getAllByRole("button");
+    expect(zoom.map((button) => button.getAttribute("aria-label"))).toEqual(["Zoom in", "Zoom out"]);
+    // A square 44px target, not a one-character default button.
+    for (const button of zoom) expect(button).toHaveClass("size-11");
+    expect(sdk.map.addImage.mock.calls.map(([role]) => role)).toContain("departure");
+  });
+  it("keeps every marker when labels collide, dropping only the label (#235)", async () => {
+    render(<TripMapCanvas {...props()} />); await loaded();
+    const points = sdk.map.layers.find((layer) => layer.id === "points") as { layout?: Record<string, unknown> };
+    expect(points.layout).toMatchObject({ "icon-allow-overlap": true, "text-optional": true });
   });
   it("preserves user pan on background updates and selection; refits on scope or explicit extent", async () => {
     const input = props(); const view = render(<TripMapCanvas {...input} />); await loaded();

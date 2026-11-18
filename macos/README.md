@@ -70,8 +70,6 @@ is `SWTTRNativeMac/1`; it never grants API access or bypasses Clerk.
 
 ## Remaining work
 
-- #145: adopt this shared package in iOS, migrate its pulse tracker/tests and fix
-  clean-checkout iOS build plumbing. This Mac phase does not certify #145.
 - #147/#138: native location/share scripts and bridges. Until those land,
   location falls back to manual entry and sharing uses the web clipboard fallback.
 - #141: signing team, app icons, completed privacy/data audit and TestFlight.

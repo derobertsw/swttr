@@ -74,6 +74,9 @@ describe("Trip loading", () => {
     // So do conditions sources and reviews (#211).
     expect(requests.filter((r) => r.table.includes("conditions")).map((r) => r.started)).toEqual([started, started, started]);
     expect(full).toMatchObject({ trip: TRIP, days: [day], kits: [kit], members: [ORGANIZER], stops: [STOWE_STOP], lodging: { stays: [], assignments: [] }, tour_plans: [], conditions: [] });
+    // Where each day starts (#333), worked out from what was read, with nothing more to fetch.
+    expect(full!.starts!.map((entry) => entry.date)).toEqual(full!.lodging!.days.map((entry) => entry.date));
+    expect(full!.starts![0]).toEqual({ date: day.date, starting_from: null, people: [{ member_id: ORGANIZER.id, starting_from: "Not set", own: false }] });
   });
 
   it("does not turn failed shared gear reads into an empty confirmed list", async () => {
