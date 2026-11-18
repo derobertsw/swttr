@@ -216,6 +216,17 @@ describe("The saved trips page's service worker (#214)", () => {
     expect(sw.kept()).toHaveLength(1);
   });
 
+  it("still keeps a page whose required files all arrived when only an optional file stalls", async () => {
+    // A font a stylesheet loads hangs: the deadline cancels it, and the page works without it.
+    net.set("/_next/static/media/font.woff2", { status: 200, body: "", hang: true });
+    const sw = worker(net);
+    expect(await sw.prime()).toEqual({ ok: true });
+    const [[, files]] = sw.kept();
+    const kept = [...files.keys()].map((url) => new URL(url).pathname);
+    expect(kept).toEqual(expect.arrayContaining(["/trips/saved", "/_next/static/chunks/app.css", "/_next/static/chunks/v1.js"]));
+    expect(kept).not.toContain("/_next/static/media/font.woff2");
+  });
+
   it("gives up on a download that stalls, keeps the previous copy, and starts afresh next time", async () => {
     const sw = worker(net);
     expect(await sw.prime()).toEqual({ ok: true });

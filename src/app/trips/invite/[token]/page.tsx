@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { errorMessage, tripRequest, TripRequestError } from "@/lib/trip-requests";
+import { clearSavedBriefs, noteSignedInAccount, savedBriefsAccountHint } from "@/lib/offline-briefs";
 
 interface InvitePreview {
   state: "available" | "joined";
@@ -33,6 +34,7 @@ export default function InviteLandingPage({ params }: { params: Promise<{ token:
 function Invitation({ token, account }: { token: string; account: string | null }) {
   const router = useRouter();
   const { signOut } = useClerk();
+  const { user } = useUser();
   const [result, setResult] = useState<InviteState>({ state: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [accepting, setAccepting] = useState(false);
@@ -74,8 +76,22 @@ function Invitation({ token, account }: { token: string; account: string | null 
   const switchAccount = async () => {
     setSwitching(true);
     setActionError(null);
+    // As the account menu's Sign out does (#214): trip briefs saved on this
+    // device go, and a save still downloading in any tab can't land after.
+    noteSignedInAccount(null);
+    try {
+      await clearSavedBriefs();
+    } catch {
+      // Storage this browser won't open holds none; otherwise stay signed in.
+      if (savedBriefsAccountHint() !== null) {
+        noteSignedInAccount(user?.id ?? null);
+        setActionError("Couldn't remove the trips saved on this device, so you're still signed in. Try again.");
+        setSwitching(false);
+        return;
+      }
+    }
     try { await signOut({ redirectUrl: returnUrl }); }
-    catch { setActionError("Couldn't switch accounts. Try again."); setSwitching(false); }
+    catch { noteSignedInAccount(user?.id ?? null); setActionError("Couldn't switch accounts. Try again."); setSwitching(false); }
   };
   const preview = result.state === "available" || result.state === "joined" ? result : null;
 

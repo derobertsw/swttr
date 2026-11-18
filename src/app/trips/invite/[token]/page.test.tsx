@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readSavedBriefs, saveTicket, storeSavedBrief, noteSignedInAccount } from "@/lib/offline-briefs";
+import { offlineBrief, resetDeviceStorage } from "@/test/offlineBrief";
 import { fakeTripApi, reply, TRIP } from "@/test/tripApi";
 import InviteLandingPage from "./page";
 
@@ -33,7 +35,29 @@ describe("Invitation states and account recovery", () => {
     expect(screen.getByText("Alex added you as “Sam”.")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Accept invitation" })).toBeEnabled();
     await userEvent.click(screen.getByRole("button", { name: "Switch account" }));
-    expect(auth.signOut).toHaveBeenCalledWith({ redirectUrl: "/trips/invite/invite-sam" });
+    // Saved trip briefs are cleared first (#214), so signing out follows a moment later.
+    await waitFor(() => expect(auth.signOut).toHaveBeenCalledWith({ redirectUrl: "/trips/invite/invite-sam" }));
+  });
+
+  it("switching accounts stops a trip brief still downloading in another tab from landing afterwards (#214)", async () => {
+    resetDeviceStorage();
+    // Another tab started saving Sam's first brief: nothing is saved yet, so there's no account hint.
+    const ticket = await saveTicket();
+    vi.stubGlobal("fetch", fakeTripApi({ [`GET ${endpoint}`]: reply(200, preview) }));
+    await renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Switch account" }));
+    await waitFor(() => expect(auth.signOut).toHaveBeenCalledTimes(1));
+
+    // The next account saves a brief here…
+    noteSignedInAccount("user_2");
+    await storeSavedBrief("user_2", offlineBrief({ viewer: { user_id: "user_2", member_id: "m-2" } }), await saveTicket());
+    // …then the other tab, not yet told of the sign-out, finishes Sam's.
+    noteSignedInAccount("synthetic-sam");
+    await expect(storeSavedBrief("synthetic-sam", offlineBrief({ viewer: { user_id: "synthetic-sam", member_id: "m-sam" } }), ticket))
+      .rejects.toThrow("nothing was saved");
+    const device = await readSavedBriefs();
+    expect(device.account).toBe("user_2");
+    expect(device.briefs).toHaveLength(1);
   });
 
   it("says the organizer added the invitee when the invitation doesn't name them", async () => {
