@@ -102,6 +102,18 @@ The results have their own browser history entry, at the same URL. [`src/hooks/u
 
 Results aren't stored, so anything shown after a reload or Forward is a new request for whoever is signed in.
 
+### Focus and announcements
+
+While the form's request runs, a status on the form says "Getting your layers…" or "Building your plan…", as the submit button does. That includes the request asked for again after a reload or Forward.
+
+When the page switches between the form and the results, focus goes with it (#284), through [`src/hooks/useOutingViewFocus.ts`](../src/hooks/useOutingViewFocus.ts):
+
+- Results for an outing the person asked for (See my layers, Build my plan, a reload, Forward, coming back from sign-in or Wardrobe, a trip day's Plan my layers) focus the results' `sr-only` "Gear up" heading.
+- Back, Edit outing and the iOS Plan tab focus the form's "What should I wear?" heading.
+- Focus moves only when it would otherwise be lost, because it's on `<body>` as the view switches: the control that had it went with the old view, or nothing had it. When the person moved it to something still on the page while the request ran, like the header or the sidebar, it stays there.
+- Updates that keep the results on screen never move it: changing the activity, place or time, a re-evaluation of edited layers, or Try again. Try update again moves it to the results' heading itself.
+- An outing a browser agent submits through the [Gear up tools](webmcp.md) never moves focus, even from `<body>`, since the person didn't ask for it from the page.
+
 Known gap: following a link to `/` while on the results, like Gear up in the sidebar, keeps the results on screen. Next.js then replaces the entry's state, so a reload afterwards shows the form instead of the results. Back still works.
 
 ### What's kept for the tab

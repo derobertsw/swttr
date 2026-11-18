@@ -396,21 +396,20 @@ describe("POST /api/v1/recommendations/alpine (golden, comfort)", () => {
     expect(body.recommendation.thermal_comfort_score).toBeGreaterThanOrEqual(85);
   });
 
-  it("reports local accessory excess even when whole-body insulation is in range at 25°F", async () => {
+  it("keeps the helmet, hood and head warmth within the head band at 25°F (#370)", async () => {
     useDatabase(null, []);
     const { body } = await callRoute(alpine, CONDITIONS[1].body);
-    const { ensemble_properties: properties, thermal_comfort_score: score } = body.recommendation;
+    const { ensemble_properties: properties, thermal_comfort_score: score, evaluation, headwear, accessories } = body.recommendation;
 
     expect(properties.total_clo).toBeGreaterThanOrEqual(body.ireq.target_range[0]);
     expect(properties.total_clo).toBeLessThanOrEqual(body.ireq.target_range[1]);
-    expect(score).toBeLessThan(85);
-    expect(body.recommendation.evaluation.bodyParts.headNeck.status).toBe('over');
-    expect(body.recommendation.evaluation.decision).toMatchObject({
-      status: 'warmer', summary: 'Warmer than recommended',
-    });
-    expect(body.recommendation.evaluation.decision.reasons).toContain(
-      'Head and neck has more insulation than its estimated upper target.',
-    );
+    // Before #370: helmet, hood, balaclava and neck piece, 3.75 clo against 2.29.
+    expect(headwear.helmet).not.toBeNull();
+    expect(evaluation.bodyParts.headNeck.status).toBe('in_range');
+    expect(evaluation.bodyParts.headNeck.clo).toBeLessThanOrEqual(body.ireq.extremity.max.head + 0.05);
+    expect(accessories.head).toMatchObject({ state: 'selected', thermal_status: 'in_range' });
+    expect(evaluation.decision).toMatchObject({ status: 'near_target', summary: 'Likely comfortable' });
+    expect(score).toBeGreaterThanOrEqual(85);
     expect(body.warnings).not.toEqual(expect.arrayContaining([
       expect.stringMatching(/^Insufficient (torso|arms|legs) insulation:/),
     ]));
@@ -435,4 +434,144 @@ describe("POST /api/v1/recommendations/ski-touring (golden, pack options)", () =
       await callRoute(skiTouring, { ...CONDITIONS[2].body, prioritize_light_pack: true })
     ).toMatchSnapshot();
   });
+});
+
+describe("vent advice (#290)", () => {
+  const withoutVentilation = () => catalog.garments.map(garment => ({ ...garment, garment_ventilation: null }));
+
+  function loadCatalog(garments: Row[], mode: (typeof MODES)[number]) {
+    state.userId = mode.userId;
+    state.client = createFakeSupabase({ garments, handwear: catalog.handwear, headwear: catalog.headwear, user_wardrobe: mode.wardrobe });
+  }
+
+  /** The response minus vent advice and the transition step it adds. */
+  function baseline(body: BiophysicsRecommendation) {
+    const rest: BiophysicsRecommendation = { ...body };
+    delete rest.ventilation;
+    return rest.transition_protocol
+      ? { ...rest, transition_protocol: { ...rest.transition_protocol, steps: rest.transition_protocol.steps.filter(step => !step.startsWith('Close the vents')) } }
+      : rest;
+  }
+
+  it.each(ROUTES.flatMap(route => MODES.flatMap(mode => CONDITIONS.map(condition => ({ ...route, mode, condition })))))(
+    "leaves outfit, warmth and warnings unchanged: $sport, $mode.name, $condition.name",
+    async ({ sport, POST, mode, condition }) => {
+      loadCatalog(withoutVentilation(), mode);
+      const unknown = await callRoute(POST, { ...condition.body, ...mode.extraBody });
+      loadCatalog(catalog.garments, mode);
+      const known = await callRoute(POST, { ...condition.body, ...mode.extraBody });
+
+      // Missing vent records keep every garment and give no advice.
+      expect(unknown.body.ventilation).toBeUndefined();
+      expect(baseline(known.body)).toEqual(unknown.body);
+      if (!["alpine", "ski-touring"].includes(sport)) expect(known.body.ventilation).toBeUndefined();
+    }
+  );
+
+  it.each(MODES)("names vents only of selected garments with listed vents: $name", async (mode) => {
+    for (const POST of [alpine, skiTouring]) {
+      loadCatalog(catalog.garments, mode);
+      const { body } = await callRoute(POST, { ...CONDITIONS[0].body, ...mode.extraBody });
+      const worn = new Map<string, Row>([...body.recommendation.garments, ...(body.pack_items?.garments ?? [])]
+        .map((g: RecommendedGarment) => [g.id, catalog.garments.find(row => row.id === g.id) as Row]));
+      for (const advice of (body as BiophysicsRecommendation).ventilation?.advice ?? []) {
+        const vents = worn.get(advice.garment_id)?.garment_ventilation as Record<string, unknown> | undefined;
+        expect(vents).toBeDefined();
+        const listed = { pit_zips: vents!.has_pit_zips, side_vents: vents!.has_side_vents, thigh_vents: vents!.has_thigh_vents, two_way_zip: vents!.main_zip_two_way }[advice.vent];
+        expect(listed).toBe(true);
+      }
+    }
+  });
+
+  it("opens alpine vents for skiing in dry, calm weather and closes them for the chairlift", async () => {
+    useDatabase(null, []);
+    const { body } = await callRoute(alpine, CONDITIONS[0].body);
+    const { advice, estimates } = (body as BiophysicsRecommendation).ventilation!;
+
+    expect(advice.filter(a => a.phase === "skiing").every(a => a.setting === "open")).toBe(true);
+    expect(advice.filter(a => a.phase === "chairlift").map(a => a.message)).toEqual(
+      advice.filter(a => a.phase === "skiing").map(a => a.message.replace(/^Open (.*) while skiing$/, "Close $1 before the chairlift")),
+    );
+    // The open-state estimate is separate: every reported warmth and breathability value is the closed outfit.
+    expect(estimates[0].closed_evap_potential).toBe(body.recommendation.ensemble_properties.evap_potential);
+    expect(estimates[0].open_evap_potential).toBeGreaterThan(estimates[0].closed_evap_potential);
+  });
+
+  it("keeps vents closed in snow and adds no transition step", async () => {
+    useDatabase(null, []);
+    for (const POST of [alpine, skiTouring]) {
+      const { body } = await callRoute(POST, CONDITIONS[2].body);
+      const ventilation = (body as BiophysicsRecommendation).ventilation!;
+      expect(ventilation.advice.every(a => a.setting === "closed")).toBe(true);
+      expect(ventilation.estimates).toEqual([]);
+      expect(body.transition_protocol?.steps ?? []).not.toEqual(expect.arrayContaining([expect.stringContaining("Close the vents")]));
+    }
+  });
+
+  it("closes vents opened for the touring climb at the transition", async () => {
+    useDatabase(null, []);
+    // #372's climb wears a vented shell only for wind or wet, so a vented climb outfit is the deep-cold one.
+    const { body } = await callRoute(skiTouring, CONDITIONS[3].body);
+    const { advice } = (body as BiophysicsRecommendation).ventilation!;
+    const opened = advice.filter(a => a.phase === "climb" && a.setting === "open");
+
+    expect(opened.length).toBeGreaterThan(0);
+    for (const climb of opened) {
+      expect(advice).toEqual(expect.arrayContaining([
+        expect.objectContaining({ garment_id: climb.garment_id, vent: climb.vent, phase: "transition", setting: "closed", message: expect.stringMatching(/^Close .* at the transition$/) }),
+        expect.objectContaining({ garment_id: climb.garment_id, vent: climb.vent, phase: "descent", setting: "closed" }),
+      ]));
+    }
+    expect(body.transition_protocol.steps.at(-1)).toMatch(/^Close the vents you opened for the climb: /);
+  });
+});
+
+describe("accessories against local bands (#370)", () => {
+  it("cycling at 32°F wears no balaclava against a ~0.55 clo head target", async () => {
+    useDatabase(null, []);
+    const { body } = await callRoute(biking, { weather: { temperature: 32, wind_speed: 5 }, exertion: "moderate" });
+    const { evaluation, headwear, handwear, accessories } = body.recommendation;
+    expect(body.ireq.extremity.neutral.head).toBeLessThan(0.6);
+    expect(headwear.head_warmth?.type ?? "").not.toMatch(/^balaclava/);
+    expect(evaluation.bodyParts.headNeck.status).not.toBe("over");
+    expect(handwear).not.toBeNull();
+    expect(accessories.hands.thermal_status).toBe("in_range");
+  });
+
+  it.each(MODES)("the touring climb at 25°F stays within its head band, and the descent keeps the helmet: $name", async mode => {
+    useDatabase(mode.userId, mode.wardrobe);
+    const { body } = await callRoute(skiTouring, { ...CONDITIONS[1].body, ...mode.extraBody });
+    // Before #370 the climb wore a balaclava, a neck piece and two hoods: 3.2 clo against 0.85.
+    // #372's climb outfit has no hoods, so at most one light head layer fills the band.
+    expect(body.recommendation.headwear).toMatchObject({ helmet: null, neck_warmth: null });
+    expect(body.recommendation.evaluation.bodyParts.headNeck.status).toBe("in_range");
+    expect(body.descent_headwear.helmet).not.toBeNull();
+    expect(body.descent_evaluation.bodyParts.headNeck.status).toBe("in_range");
+    expect(body.recommendation.handwear).not.toBeNull();
+  });
+
+  it("the touring descent at −15°F wears the warmest rated mitten and reports what is still short", async () => {
+    useDatabase(null, []);
+    const { body } = await callRoute(skiTouring, CONDITIONS[3].body);
+    const { descent_breakdown: descent, descent_evaluation: evaluation } = body as BiophysicsRecommendation;
+    expect(descent!.extremity_ireq.min.hands).toBeGreaterThan(5);
+    expect(body.descent_handwear.rcl).toBe(Math.max(...catalog.handwear.map(h => h.rcl_clo)));
+    expect(evaluation!.bodyParts.hands.status).toBe("under");
+    expect(evaluation!.decision!.reasons).toContain("Hands needs more insulation; extra warmth elsewhere does not cover this gap.");
+    expect(body.warnings).toContain("Descent: hands: the closest available option still falls short of the local warmth range; check warmth before use.");
+    // The descent's limits are reported for manual checks, and the shortfall isn't hidden by them.
+    expect(descent!.extremity_ireq.max!.hands).toBe(descent!.extremity_ireq.neutral.hands);
+  });
+
+  it.each([["alpine", alpine], ["biking", biking], ["ski-touring", skiTouring]] as const)(
+    "%s reports the accessory limits it was judged against", async (_, POST) => {
+      useDatabase(USER_ID, FULL_WARDROBE);
+      for (const conditions of CONDITIONS.slice(0, 4)) {
+        const { body } = await callRoute(POST, { ...conditions.body, use_wardrobe_only: true });
+        const { ireq, recommendation } = body as BiophysicsRecommendation;
+        expect(ireq.extremity!.max).toEqual({ hands: recommendation.accessories!.hands.max, head: recommendation.accessories!.head.max });
+        expect(recommendation.evaluation!.bodyParts.hands.status).toBe(recommendation.accessories!.hands.thermal_status);
+        expect(recommendation.evaluation!.bodyParts.headNeck.status).toBe(recommendation.accessories!.head.thermal_status);
+      }
+    });
 });

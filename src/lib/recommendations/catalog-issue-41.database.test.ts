@@ -140,7 +140,9 @@ describe('#41 catalog migration and API integration', () => {
     state.client = createFakeSupabase({ garments: candidates, handwear: catalog.handwear, headwear: catalog.headwear, user_wardrobe: [] });
     const request = () => new NextRequest('http://localhost/api/v1/recommendations/ski-touring', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ weather: { temperature: 5, wind_speed: 20 }, exertion: 'moderate' }),
+      // Calm enough on the climb that no shell is needed (#372), so the
+      // wind-resistant Senja is the climb's warmth layer.
+      body: JSON.stringify({ weather: { temperature: 5, wind_speed: 10 }, exertion: 'moderate' }),
     });
     const parsed = await parseRecommendationRequest(request());
     if (parsed instanceof Response) throw new Error('Unexpected invalid recommendation request');

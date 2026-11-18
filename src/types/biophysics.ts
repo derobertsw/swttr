@@ -33,7 +33,9 @@ export interface ExtremityIreqData {
 export interface ExtremityIreqRange {
   min: ExtremityIreqData;
   neutral: ExtremityIreqData;
-  /** Running/XC upper comfort limits; hands may allow thin pole-grip gloves. */
+  /** Upper local limits the accessories were chosen and are judged against:
+   * hands may allow thin kept or pole-grip gloves, and the head a required
+   * helmet or the lightest item rated for deep cold. */
   max?: ExtremityIreqData;
 }
 
@@ -59,6 +61,11 @@ export interface AccessoryAssessments {
  */
 export interface IreqRange {
   policy?: SustainedSportPolicy;
+  /** Outfit checks manual edits repeat for a sport without a sustained policy (cycling). */
+  outfit_checks?: {
+    require_standalone: boolean;
+    protection: SustainedSportPolicy['protection'];
+  };
   min?: number;
   neutral?: number;
   skiing?: IreqData;
@@ -110,6 +117,11 @@ export interface EnsembleProperties {
 
 export interface PackItemGarment extends GarmentSemantics {
   rcl_torso?: number;
+  rcl_legs?: number;
+  /** Where the layer goes on at the transition. Absent on older responses: torso. */
+  covers_torso?: boolean;
+  covers_arms?: boolean;
+  covers_legs?: boolean;
   thermal_data_status?: 'known' | 'unknown';
   thermal_provenance?: ThermalProvenance;
   protection?: RecommendedGarment['protection'];
@@ -176,10 +188,14 @@ export interface RecommendedHeadwear {
 export type ClothingRequirementStatus = 'owned_match' | 'generic_suggestion' | 'missing' | 'not_needed' | 'unknown';
 
 /** A suitable-clothing requirement, separate from any wardrobe item. Stable
- * `id` (`<activity>:<region>`) associates edits/explanations across calls. */
+ * `id` (`<activity>:<region>`, or `<activity>:helmet` for a required helmet)
+ * associates edits/explanations across calls. */
 export interface ClothingRequirement {
   id: string;
   region: 'torso' | 'legs' | 'hands' | 'head';
+  /** Nonthermal protection (a helmet): required whatever the thermal demand,
+   * so it has no clo target and is never `not_needed`. */
+  kind?: 'protection';
   label: string;
   status: ClothingRequirementStatus;
   /** Ideal regional clo; a missing requirement is never scored as 0 clo worn. */
@@ -189,6 +205,54 @@ export interface ClothingRequirement {
   matched_is_owned?: boolean;
   generic_suggestion?: { label: string; estimated_clo?: number; generic_estimate: true; owned: false };
   message: string;
+}
+
+/** Adjustable vents a catalog garment can list. Back vents and mesh pockets
+ * aren't treated as adjustable without supporting metadata. */
+export type VentType = 'pit_zips' | 'side_vents' | 'thigh_vents' | 'two_way_zip';
+
+/** Alpine: skiing and chairlift. Ski touring: climb, transition and descent. */
+export type VentPhase = 'skiing' | 'chairlift' | 'climb' | 'transition' | 'descent';
+
+/** A suggested vent setting for one vent of a selected garment in one phase. */
+export interface VentAdvice {
+  garment_id: string;
+  garment_name: string;
+  vent: VentType;
+  /** Body region the vent opens, so it sits beside the garment there. */
+  region: 'torso' | 'legs';
+  phase: VentPhase;
+  setting: 'open' | 'closed';
+  /**
+   * What the setting follows: the phase alone (rest and descent), the weather
+   * (wind or precipitation), or the modeled outfit (its breathability and
+   * thermal decision). Outfit-based advice is for the recommended outfit only.
+   */
+  basis: 'phase' | 'weather' | 'outfit';
+  /** Short instruction, e.g. "Open pit zips while skiing". */
+  message: string;
+  reason: string;
+  /** True only when an open-state breathability estimate includes this vent's garment. */
+  effect_estimated: boolean;
+}
+
+/**
+ * Estimated breathability with the advised vents open. Every warmth metric,
+ * the comfort decision and `ensemble_properties` stay on the closed outfit.
+ */
+export interface VentOpenEstimate {
+  phase: 'skiing' | 'climb';
+  /** Garments whose ventilation_factor was applied, once, to their Recl in the vented regions. */
+  garment_ids: string[];
+  closed_evap_potential: number;
+  open_evap_potential: number;
+  breathability_target: number;
+  basis: 'estimate';
+}
+
+export interface VentilationAdvice {
+  advice: VentAdvice[];
+  estimates: VentOpenEstimate[];
 }
 
 /**
@@ -220,8 +284,9 @@ export interface RecommendationPreference {
 export interface BiophysicsRecommendation {
   /** Run Warm/Run Cold and its effect; absent for neutral. */
   preference?: RecommendationPreference;
-  /** Requirement-first flow (running/XC only): what the activity needs,
-   * before wardrobe matching. Absent for other sports. */
+  /** What the activity needs, before wardrobe matching: running/XC clothing
+   * (requirement-first flow), and the helmet alpine, cycling and the touring
+   * descent require. Absent when a sport has neither. */
   requirements?: ClothingRequirement[];
   /** The request's conditions, echoed as sent (°F, mph). */
   conditions: {
@@ -262,6 +327,8 @@ export interface BiophysicsRecommendation {
   /** Generic carry advice, excluded from moving insulation and ownership. */
   carry_items?: Array<{ label: string; reason: string }>;
   transition_protocol?: TransitionProtocol;
+  /** Alpine and ski touring: vent settings for selected garments with known vents. */
+  ventilation?: VentilationAdvice;
 }
 
 // ============================================

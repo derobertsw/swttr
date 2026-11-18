@@ -5,8 +5,9 @@ import { jsonError, requireUser, type AuthedContext } from "@/lib/api";
 import { buildLodging, loadLodgingRows } from "@/lib/trip-lodging";
 import { loadTourPlans, summarizeTourPlans } from "@/lib/trip-tour-plans";
 import { buildDayMeets } from "@/lib/trip-meets";
-import { loadConditions, summarizeConditions } from "@/lib/trip-conditions";
+import { loadConditions, summarizeConditions, summarizeConditionsSources } from "@/lib/trip-conditions";
 import { loadMemberDayOrigins } from "@/lib/trip-drive-estimates";
+import { dayStarts } from "@/lib/trip-drive";
 import { dayChecksFor, loadDayChecks, preparationFor, summarizeDayChecks } from "@/lib/trip-day-checks";
 import { tripFocusFor } from "@/lib/trip-focus";
 import type {
@@ -206,6 +207,8 @@ export async function loadTripFull(
   const members = (membersRes.data ?? []) as TripMember[];
   const lodging = buildLodging(trip, lodgingRows.stays, lodgingRows.assignments,
     { members, attendance: lodgingRows.attendance, per_member: lodgingRows.per_member });
+  // Where each day starts, own starting points included (#333): the day brief's Starting from.
+  const starts = dayStarts({ trip, stops, members, days, kits: [], gear: [], lodging, member_origins: memberOrigins });
   return {
     trip: { ...trip, status: classifyTripStatus(trip.start_date, trip.end_date) },
     stops,
@@ -220,7 +223,9 @@ export async function loadTripFull(
     tour_plans,
     meets: buildDayMeets(days, tourPlans),
     conditions: summarizeConditions(conditions, { stops, days, tour_plans }),
+    conditions_sources: summarizeConditionsSources(conditions, { days }),
     member_origins: memberOrigins,
+    starts,
     // Before the day checks migration there are none to show or record.
     ...(dayChecks ? { day_checks: summarizeDayChecks(dayChecks, { trip, stops, days, members, tour_plans, lodging }) } : {}),
   };

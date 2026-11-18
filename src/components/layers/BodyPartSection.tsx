@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Wind } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +14,7 @@ import {
   type LayerType,
 } from "@/lib/layers";
 import { LayerItems } from "./LayerItems";
-import type { BodyPartEvaluation } from "@/types/biophysics";
+import type { BodyPartEvaluation, VentAdvice } from "@/types/biophysics";
 
 const LAYER_TYPES: LayerType[] = ["base", "mid", "outer"];
 
@@ -29,6 +29,8 @@ interface BodyPartSectionProps {
   itemMappings?: Map<string, string>;
   /** General guidance: nothing evaluates edits, so there's no Change. */
   readOnly?: boolean;
+  /** Server vent advice for the shown phase, placed beside the garment it names. */
+  ventAdvice?: VentAdvice[];
   otherPhaseLayers?: LayerSet;
   syncLabel?: string;
   onItemTap: (layerType: LayerType, index: number) => void;
@@ -50,6 +52,7 @@ export function BodyPartSection({
   status,
   itemMappings,
   readOnly,
+  ventAdvice,
   otherPhaseLayers,
   syncLabel,
   onItemTap,
@@ -128,19 +131,38 @@ export function BodyPartSection({
         </div>
       ) : hasAnyLayers(layers) ? (
         <ul className="mt-2 flex flex-col gap-2">
-          {wornItems.map(({ item, layerType, key }) => (
-            <li key={key} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="w-12 shrink-0 text-sm text-muted-foreground">{LAYER_LABELS[layerType]}</span>
-              <span className="min-w-0 flex-1 basis-40 text-base font-medium text-foreground [overflow-wrap:anywhere]">
-                {item.name}
-                {item.isRecommended && (
-                  <Badge size="sm" variant="outline" className="ml-2 align-middle font-medium">
-                    Not in your wardrobe
-                  </Badge>
+          {wornItems.map(({ item, layerType, key }) => {
+            // Advice follows the garment, so a removed or replaced one takes it along.
+            const vents = item.sourceId
+              ? ventAdvice?.filter((advice) => advice.garment_id === item.sourceId && advice.region === bodyPart) ?? []
+              : [];
+            return (
+              <li key={key} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="w-12 shrink-0 text-sm text-muted-foreground">{LAYER_LABELS[layerType]}</span>
+                <span className="min-w-0 flex-1 basis-40 text-base font-medium text-foreground [overflow-wrap:anywhere]">
+                  {item.name}
+                  {item.isRecommended && (
+                    <Badge size="sm" variant="outline" className="ml-2 align-middle font-medium">
+                      Not in your wardrobe
+                    </Badge>
+                  )}
+                </span>
+                {vents.length > 0 && (
+                  <ul className="flex basis-full flex-col gap-1 pl-15 text-sm">
+                    {vents.map((advice) => (
+                      <li key={`${advice.phase}:${advice.vent}`} className="flex gap-1.5">
+                        <Wind className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        <span className="min-w-0 [overflow-wrap:anywhere]">
+                          <span className="font-medium text-foreground">{advice.message}.</span>{" "}
+                          <span className="text-muted-foreground">{advice.reason}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
-              </span>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className="mt-1 text-sm text-muted-foreground">

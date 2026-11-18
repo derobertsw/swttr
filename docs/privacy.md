@@ -46,8 +46,8 @@ Use app functionality for these features and confirm whether Apple's product-per
 ## Release dependencies and owner review
 
 - Review the rendered policy before deployment. Confirm the actual Vercel retention/drain configuration and that the service list matches the deployed feature set.
-- **#139 is not implemented in this checkout:** there is no Clerk `user.deleted` webhook. The policy accurately distinguishes deleting a Clerk account from requesting removal of SWTTR records via support. Do not change that to promise automatic deletion until #139 is deployed, configured and verified end to end.
-- Extend #139's original table list to cover later user-linked data. In particular, `trip_kit_saves` retains a user ID and request receipt after a trip is removed (`019_trip_kit_save_tombstones.sql`); later conditions/tour/lodging records also need review. Deleting owned trips removes their shared data for the whole crew. #140 does not perform cleanup or delete any accounts.
+- **#139 adds the Clerk `user.deleted` webhook, but it does nothing until it's set up in Clerk and Vercel** ([account deletion](account-deletion.md)). Until then the policy accurately distinguishes deleting a Clerk account from requesting removal of SWTTR records via support. Do not change that to promise automatic deletion until the webhook is deployed, configured and verified end to end; [account deletion](account-deletion.md#privacy-policy) lists what the paragraph should say then.
+- The webhook covers every table holding a user ID as of #139, including `trip_kit_saves` receipts that outlive their trip (`019_trip_kit_save_tombstones.sql`) and the conditions, tour plan, day check and shared gear records on other people's trips, which it anonymizes. Deleting owned trips removes their shared data for the whole crew. #140 does not perform cleanup or delete any accounts.
 - After review and deployment, set Clerk's privacy policy URL to `https://swttr.vercel.app/privacy`. Use that as the App Store privacy URL and `https://swttr.vercel.app/faq#contact` as the Support URL. Dashboard changes and publication are not performed by this code change.
 
 ## Verification

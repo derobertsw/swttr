@@ -5,7 +5,7 @@ import { EVALUATED_BODY_PARTS } from './layer-evaluation';
 import { itemThermalMetadata, knownClo } from './item-thermal-metadata';
 import { cacheCatalogRows, cachedCatalogRow } from './evaluation-catalog-cache';
 import { garmentMetadata } from '@/lib/garment-metadata';
-import { hoodInsulation } from './extremities';
+import { HELMET_TYPES, hoodInsulation } from './extremities';
 import type { GarmentRow } from './types';
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { ensembleToThermalGarments } from './formatting';
@@ -105,7 +105,7 @@ export async function resolveEvaluationItems(
       } : {}),
       hoodClo: hoodInsulation(wornGarments,
           items.headNeck.some(item => item.item_type === 'headwear' && item.sourceId
-            && rows.get('headwear')?.get(item.sourceId)?.headwear_type === 'ski_helmet'),
+            && HELMET_TYPES.includes(String(rows.get('headwear')?.get(item.sourceId)?.headwear_type))),
         ),
       itemClo: Object.fromEntries(EVALUATED_BODY_PARTS.map(part => [part,
         items[part].map(item => item.rcl ?? null),

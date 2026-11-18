@@ -8,7 +8,7 @@ import { driveTrip, place } from "@/test/driveTrip";
 import { storedDrive, tripMapFixture } from "@/test/tripMap";
 import type { TripMap } from "@/types/trip-map";
 import type { TripTourPlan } from "@/types/trips";
-import { TripMapDaySummary } from "./TripMapDay";
+import { TripMapDaySummary, WRAPPING_BUTTON } from "./TripMapDay";
 import { dayRoles } from "./trip-map-presentation";
 
 const FRI = "2027-01-08", SAT = "2027-01-09", SUN = "2027-01-10", MON = "2027-01-11";
@@ -52,6 +52,8 @@ describe("Selected day logistics on the trip map", () => {
     expect(url.searchParams.get("destination")).toBe(coordinates(map, day.access_place_id));
     expect(url.searchParams.get("travelmode")).toBe("driving");
     expect(directions).toHaveAttribute("target", "_blank");
+    // The Button is one line by default; a long access point name overflowed a phone at 200% text (#235).
+    expect(directions.parentElement).toHaveClass(...WRAPPING_BUTTON.split(" "));
     expect(within(card).getByRole("link", { name: "View day" })).toHaveAttribute("href", `/trips/trip-drive/days/${SUN}`);
   });
 

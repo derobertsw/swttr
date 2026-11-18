@@ -155,8 +155,12 @@ export interface TripFull {
   meets?: TripDayMeet[];
   /** Each day's conditions sources with the crew's reviews (#211); optional like `lodging`. */
   conditions?: TripDayConditionsSource[];
+  /** Every conditions source on the trip with the days it's listed on (#211), to list it on more; optional like `lodging`. */
+  conditions_sources?: TripConditionsSourceUse[];
   /** People's own starting points (#333); missing or empty before its migration. */
   member_origins?: TripMemberDayOrigin[];
+  /** Where each day starts for the people taking part (#333), own starting points included; optional like `lodging`. */
+  starts?: TripDayStart[];
   /** Backcountry days' day checks (#212); optional like `lodging`. */
   day_checks?: TripDayChecks[];
   /** Tour preparation the signed-in person can act on, for Plan's own page (#212); optional like `lodging`. */
@@ -176,6 +180,25 @@ export interface TripFocus {
   reason: "today" | "unfinished" | "first_day" | null;
   /** The first thing still to do from today on, or null when nothing is. */
   next_step: { kind: "add_destination" | "choose_activity" | "plan_kit"; date: string | null } | null;
+}
+
+/**
+ * Where a day starts (#333), as its departures work it out: a person's own
+ * starting point, then the day's own, then the stay they slept in. The day
+ * brief reads it, so its Starting from matches the drive below it.
+ */
+export interface TripDayStart {
+  date: string;
+  /** Where the people taking part start, e.g. "Pine rental (3) · Ridge cabin (1)"; null when nobody has a starting point. */
+  starting_from: string | null;
+  /** Each person with a departure that day: everyone taking part, and a pending invitation once it has a starting point. */
+  people: Array<{
+    member_id: string;
+    /** The stay's or place's name, "Not set" or "Arrives this day". */
+    starting_from: string;
+    /** Their own or the day's own starting point, not the stay they slept in. */
+    own: boolean;
+  }>;
 }
 
 /**
@@ -310,6 +333,36 @@ export interface TripDayConditionsSource extends TripConditionsSource {
   /** The day's plan and this source as the server reads them now; recording a review sends it back. */
   context_key: string;
   reviews: TripConditionsReview[];
+}
+
+/** A source on the trip with the days it's listed on (#211). */
+export interface TripConditionsSourceUse extends TripConditionsSource {
+  /** In order; empty when it was removed from every day. */
+  dates: string[];
+}
+
+/** A day a change to a source applies to. */
+export interface TripConditionsSourceDay {
+  date: string;
+  date_label: string;
+  /** What happens to the reviews recorded there, e.g. "2 reviews to record again". */
+  note: string | null;
+}
+
+/**
+ * What listing a source on more days, or editing one listed on several,
+ * does before it's saved (#211). Saving sends `revision` and
+ * `expected_days` back, and is refused (409) when they no longer match.
+ */
+export interface TripConditionsSourcePreview {
+  source_id: string;
+  revision: number;
+  /** e.g. "Lists Mount Washington Avalanche Center on Sat Oct 10 and Sun Oct 11." */
+  summary: string;
+  /** The days it changes, in order. */
+  days: TripConditionsSourceDay[];
+  /** Listing it: the days it's added to. Editing it: the days it's on. */
+  expected_days: Array<{ date: string; day_id: string }>;
 }
 
 /** A day check on a Backcountry day (#212): see docs/trip-touring-prep.md. */
@@ -623,6 +676,8 @@ export interface TripDateChangeDay {
   tour_plan?: string | null;
   /** The day's notes (#334), if it has some. */
   notes?: string | null;
+  /** The day's conditions sources and their reviews (#211), e.g. "Conditions: MWAC · 2 reviews removed with the day". */
+  conditions?: string | null;
 }
 
 /** A removed day as the server last saw it; sent back to confirm the removal. */
@@ -636,6 +691,8 @@ export interface TripRemovedDayCheck {
   tour_plan_revision?: number;
   /** Present only when the day has notes: the notes the review showed. */
   notes?: string;
+  /** Present only when the day lists conditions sources (#211): theirs and how many review entries were recorded for them there. */
+  conditions?: { source_ids: string[]; entries: number };
 }
 
 export interface TripDateChangePlan {
@@ -830,6 +887,173 @@ export interface TripDriveEstimates {
   stays: TripStayDepartures[];
 }
 
+/**
+ * A stay the organizer is considering (#213): separate from the trip's stays
+ * and nights, so saving one never plans a night or records a booking. See
+ * docs/trip-stays.md#comparing-stays-213.
+ */
+export interface TripStayCandidateInput {
+  id: string;
+  name: string;
+  /** The nights it's considered for, which its cost covers; both or neither. */
+  check_in: string | null;
+  check_out: string | null;
+  address: string | null;
+  property_url: string | null;
+  notes: string | null;
+  location: TripLocation | null;
+  /** The organizer's estimate of the total for its nights, never a live price; with `cost_currency`. */
+  cost_amount: number | null;
+  /** ISO 4217, e.g. "USD". */
+  cost_currency: string | null;
+}
+
+export interface TripStayCandidate extends TripStayCandidateInput {
+  trip_id: string;
+  /** Sent back as `expected_revision`, so a change meanwhile is reviewed first. */
+  revision: number;
+  created_at: string;
+  updated_at: string;
+  /** "Fri Oct 9 → Sun Oct 11 · 2 nights", or "Nights not set". */
+  date_label: string;
+  /** "About $840 total for Fri Oct 9 → Sun Oct 11 · 2 nights", or null without a cost. */
+  cost_label: string | null;
+  /** Its nights the trip's no longer include, kept for review. */
+  review_dates: string[];
+}
+
+/** A night or check-out morning the comparison can start or end on. */
+export interface TripStayWindowChoice {
+  date: string;
+  label: string;
+}
+
+/** GET /api/v1/trips/:id/stay-candidates. */
+export interface TripStayCandidates {
+  /** False before the candidates migration: no option can be saved, and saved stays can still be compared. */
+  available: boolean;
+  candidates: TripStayCandidate[];
+  /** First nights to compare from: the pre-trip night through the last night. */
+  first_nights: TripStayWindowChoice[];
+  /** Check-out mornings: the morning after each night. */
+  checkouts: TripStayWindowChoice[];
+  /** The trip's nights, from the first day's to the last day's morning. */
+  default_window: { first_night: string; checkout: string };
+}
+
+/**
+ * POST /api/v1/trips/:id/stay-candidates/use with `preview: true` (#213):
+ * the lodging preview of putting the chosen people in a compared stay or
+ * option for the compared nights.
+ */
+export interface TripStayUsePreview extends TripLodgingPreview {
+  /** Who it's for: as chosen, or everyone on the trip those nights. */
+  member_ids: string[];
+  stay_name: string;
+  /** An option, which becomes a saved stay for these nights, booking not confirmed. */
+  new_stay: boolean;
+  /** The option's revision for a new stay; the save sends it back as `expected_candidate_revision`. */
+  candidate_revision: number | null;
+  /** Booked stays the chosen people leave those nights. They stay booked. */
+  booked_kept: string[];
+}
+
+/** One option's drive on one morning of a comparison. */
+export interface TripStayComparisonDrive {
+  /** "stay:<id>" or "candidate:<id>". */
+  option_key: string;
+  /** As a day's drive (#209), or the option's own place missing or only approximate. */
+  state: TripDriveState | "location_needed" | "approximate_location";
+  /** "12 min · 5.6 mi", "No road route", "Drive estimate unavailable", "Location needed". */
+  label: string;
+  /** "Calculated 2 days ago", "Not updated: …", "Organizer's estimate", or null. */
+  detail: string | null;
+  /** A current one-way figure, counted in the option's totals. Stale, missing and approximate ones aren't. */
+  known: boolean;
+  /** The option's longest known drive. */
+  longest: boolean;
+  /** Shorter than another option's that morning, when every option's is known. */
+  shortest: boolean;
+}
+
+export interface TripStayComparisonDay {
+  /** The morning: the drive leaves after the night before. */
+  date: string;
+  date_label: string;
+  activity_label: string | null;
+  /** The destination, and where the crew parks or meets there. */
+  stop_label: string | null;
+  destination_label: string | null;
+  /** The window's check-out morning. */
+  checkout: boolean;
+  /** The same for every option, such as "No drive planned"; the day then has no drives. */
+  shared: string | null;
+  /** E.g. "Same access point as Sat Oct 10. Each day's drive counts." */
+  notes: string[];
+  /** One per option, in the options' order. */
+  drives: TripStayComparisonDrive[];
+}
+
+export interface TripStayComparisonOption {
+  key: string;
+  kind: "stay" | "candidate";
+  id: string;
+  name: string;
+  /** Its own nights: "Saved for Fri Oct 9 → Sun Oct 11 · 2 nights", "Considered for …" or "Nights not set". */
+  date_label: string;
+  /** When its saved nights don't include every night compared. */
+  dates_note: string | null;
+  /** For these nights: "Chosen for these nights · 3 people", "Saved stay · Nobody is staying here these nights", "Option you're considering". */
+  status_label: string;
+  /** "Booked", "Booking not confirmed", or "No booking recorded" for an option. */
+  booking_label: string;
+  /** Why it has no drive times: "Location needed for drive times", or the place is only approximate. */
+  location_note: string | null;
+  address: string | null;
+  property_url: string | null;
+  notes: string | null;
+  /** The organizer's cost estimate, with a note when it's for other nights. */
+  cost: { label: string; note: string | null } | null;
+  drives_needed: number;
+  drives_known: number;
+  /** "All 3 drives known", "2 of 3 drives known", "No drives to compare". */
+  coverage_label: string;
+  /** "45 min · Sun Oct 11 to Tram lot", or null with no known drive. */
+  longest_label: string | null;
+  /** The sum of planned outbound drives when every one is known, otherwise why it isn't totaled. */
+  sum_label: string;
+  sum_complete: boolean;
+}
+
+/**
+ * GET /api/v1/trips/:id/stay-candidates/compare (#213): two or three stays or
+ * options over the same nights, by the drives on the mornings after them.
+ * Never a score: figures are compared only when every drive is known.
+ */
+export interface TripStayComparison {
+  window: {
+    first_night: string;
+    checkout: string;
+    /** "Fri Oct 9 → Sun Oct 11 · 2 nights". */
+    label: string;
+    /** "Mornings compared: Sat Oct 10 and Sun Oct 11 (check-out)". */
+    mornings_label: string;
+    /** Each night with the trip's plan for it now, and its booked stays. */
+    nights: Array<{ date: string; date_label: string; current: string; booked: string[] }>;
+  };
+  options: TripStayComparisonOption[];
+  days: TripStayComparisonDay[];
+  /** The sums side by side when every drive is known, otherwise why they aren't compared. */
+  summary: string;
+  comparable: boolean;
+  /** E.g. "Costs are in different currencies, so they aren't compared." */
+  cost_note: string | null;
+  /** Winter closures the drives avoid. */
+  closures: string[];
+  /** Calculated drives are shown, so the routing and map data credits are. */
+  credit: boolean;
+}
+
 /** A searched place: its display name and coordinates. */
 export interface TripPlace {
   name: string;
@@ -846,9 +1070,11 @@ export type TripItineraryRequest =
   | { action: "set_day_place"; date: string; place: TripPlace }
   /**
    * Gives `dates` the destination and activity of `from`, with `kit` the
-   * signed-in member's kit too, and with `plan` its tour plan (#210, organizer only).
+   * signed-in member's kit too, with `plan` its tour plan (#210), and with
+   * `sources` its conditions sources (#211), never their reviews. Only the
+   * organizer copies a tour plan or sources.
    */
-  | { action: "copy_day"; from: string; dates: string[]; kit: boolean; plan?: boolean };
+  | { action: "copy_day"; from: string; dates: string[]; kit: boolean; plan?: boolean; sources?: boolean };
 
 /** Sets or removes a day's access point (#208); the review asks whether it's for the day or every day at its stop. */
 export interface TripAccessPointRequest {

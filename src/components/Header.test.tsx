@@ -249,3 +249,29 @@ describe("Header settings entry points", () => {
     expect(within(drawer).getByRole("radio", { name: "Celsius (°C)" })).toBeChecked();
   });
 });
+
+describe("Header wordmark (#337)", () => {
+  beforeEach(() => {
+    resetFakeClerk();
+    navigation.pathname = "/";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // In rem, the wordmark doubled with 200% text and pushed the menu button
+  // past a phone's edge (docs/qa/337-group-planning). jsdom doesn't lay out,
+  // so this pins the pixel sizes.
+  it.each([["compact", "text-[32px]"], ["default", "text-[40px]"]] as const)("keeps the %s wordmark its own size when text is enlarged", (variant, size) => {
+    render(
+      <TemperatureUnitProvider>
+        <SidebarProvider>
+          <Header variant={variant} />
+        </SidebarProvider>
+      </TemperatureUnitProvider>
+    );
+    expect(screen.getByText("SWTTR")).toHaveClass(size);
+  });
+});

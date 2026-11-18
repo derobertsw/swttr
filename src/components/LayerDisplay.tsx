@@ -242,8 +242,8 @@ const LayerDisplay = ({
     // Run Warm/Run Cold narrowed these targets: the check explains that (#251).
     ...(ireq?.policy?.preference?.targetsChanged ? { sensitivity: ireq.policy.preference.sensitivity } : {}),
     items: evaluationItemsByBodyPart(climb.layers),
-    requireStandalone: Boolean(ireq?.policy),
-    protectionNeeds: ireq?.policy?.protection,
+    requireStandalone: Boolean(ireq?.policy) || ireq?.outfit_checks?.require_standalone === true,
+    protectionNeeds: ireq?.policy?.protection ?? ireq?.outfit_checks?.protection,
     breathabilityTarget: biophysicsData?.recommendation.evaluation?.breathabilityTarget,
     targets: bodyPartTargets(ireq?.regional, ireq?.extremity),
     minTargets: bodyPartTargets(ireq?.regional, ireq?.extremity, "min"),
@@ -266,6 +266,13 @@ const LayerDisplay = ({
     minTargets: descentBreakdown
       ? bodyPartTargets(descentBreakdown.regional_ireq, descentBreakdown.extremity_ireq, "min")
       : climbInput.minTargets,
+    // The descent's own accessory limits, as its server evaluation used.
+    extremityMaxTargets: descentBreakdown
+      ? descentBreakdown.extremity_ireq.max && {
+          hands: descentBreakdown.extremity_ireq.max.hands,
+          headNeck: descentBreakdown.extremity_ireq.max.head,
+        }
+      : climbInput.extremityMaxTargets,
     arms: regionalClo
       ? {
           clo: descentBreakdown?.regional_clo?.arms ?? regionalClo.arms,
@@ -382,6 +389,13 @@ const LayerDisplay = ({
     setPickerTarget(null);
   };
 
+  // Vent advice for this phase's garments (#290). Outfit-based settings are
+  // for the recommended outfit, so they're hidden once this phase's layers
+  // change; the server hasn't assessed vents for the edited outfit.
+  const ventAdviceFor = (phase: Phase) => (biophysicsData?.ventilation?.advice ?? []).filter((advice) =>
+    (showDescent && phase === "descent" ? advice.phase === "descent" : advice.phase !== "transition" && advice.phase !== "descent")
+    && !(advice.basis === "outfit" && phaseLayers(phase).edited));
+
   // --- Body part sections ---
   const renderSection = (bodyPart: BodyPart, phase: Phase) => {
     const layers = biophysicsActive
@@ -396,6 +410,7 @@ const LayerDisplay = ({
         bodyPart={bodyPart}
         layers={layers}
         readOnly={!biophysicsActive}
+        ventAdvice={biophysicsActive ? ventAdviceFor(phase) : undefined}
         currentClo={bodyPartEvaluation?.clo}
         targetClo={bodyPartEvaluation?.target}
         status={bodyPartEvaluation?.status}

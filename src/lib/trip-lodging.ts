@@ -17,7 +17,7 @@ export const isUuid = (value: unknown): value is string => typeof value === "str
 export const shiftDate = (date: string, days: number) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 export const dateLabel = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).replace(",", "");
 /** Consecutive nights as a stay's dates read: "Fri Oct 9 → Sun Oct 11 · 2 nights", ending on the check-out morning. */
-const nightsLabel = (first: string, count: number) => `${dateLabel(first)} → ${dateLabel(shiftDate(first, count))} · ${count} ${count === 1 ? "night" : "nights"}`;
+export const nightsLabel = (first: string, count: number) => `${dateLabel(first)} → ${dateLabel(shiftDate(first, count))} · ${count} ${count === 1 ? "night" : "nights"}`;
 /** Each date from `start` up to, not including, `end`. */
 export function dates(start: string | null, end: string | null): string[] {
   if (!start || !end) return [];
@@ -99,7 +99,8 @@ export function attendanceWindow(trip: Pick<Trip, "start_date" | "end_date">, at
 const PERSON_LABELS: Record<Exclude<TripLodgingState, "assigned">, string> = { no_stay: "No accommodation needed", unplanned: "Not planned", not_on_trip: "Not on trip" };
 const PARTICIPATION_LABELS = { participating: "Taking part", skipping: "Not taking part", not_on_trip: "Not on trip" } as const;
 export const participationLabel = (participation: keyof typeof PARTICIPATION_LABELS) => PARTICIPATION_LABELS[participation];
-const groupLabel = (groups: Array<[string, number]>) => groups.length === 1 ? groups[0][0] : groups.map(([label, count]) => `${label} (${count})`).join(" · ");
+/** One group's name, or each group with its size: "Pine rental (3) · Village hotel (2)". */
+export const groupLabel = (groups: Array<[string, number]>) => groups.length === 1 ? groups[0][0] : groups.map(([label, count]) => `${label} (${count})`).join(" · ");
 
 function attendanceLabel(attendance: TripMemberAttendance | undefined): string {
   const parts = [
