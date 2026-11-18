@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { CircleDashed, Eye, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, fieldClassName } from "@/components/ui/input";
+import { AttachSourceSheet, isSourcePreview, SourceDaysReview, useFocusReview } from "@/components/trips/ConditionsSourceDays";
 import { OfficialCenterPicker } from "@/components/trips/OfficialCenterPicker";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
@@ -16,6 +17,7 @@ import type {
   TripConditionsCategory,
   TripConditionsReview,
   TripConditionsReviewEntry,
+  TripConditionsSourcePreview,
   TripDayConditionsSource,
   TripFull,
 } from "@/types/trips";
@@ -92,27 +94,40 @@ export function DayConditions({ data, date, dateLabel, activity, userId, onSaved
   // The source being edited, null to add one.
   const [editing, setEditing] = useState<{ source: TripDayConditionsSource | null } | null>(null);
   const [reviewing, setReviewing] = useState<{ sourceId: string; mode: ReviewMode } | null>(null);
+  // Listing a saved source on more days (#211): the source, or null to choose one.
+  const [attaching, setAttaching] = useState<{ sourceId: string | null } | null>(null);
   const [status, setStatus] = useState("");
   const focus = useReturnFocus();
   // An open editor, or the result it announced, keeps the section on the page:
   // removing another activity's last source would otherwise unmount the sheet
   // before it can close, return focus and say what happened.
-  if (activity !== TOUR_ACTIVITY && sources.length === 0 && !editing && !reviewing && !status) return null;
+  if (activity !== TOUR_ACTIVITY && sources.length === 0 && !editing && !reviewing && !attaching && !status) return null;
 
   const weekday = new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { weekday: "long" });
   const mine = (source: TripDayConditionsSource) => source.reviews.find((review) => review.user_id === userId);
   const recorded = sources.filter((source) => isCurrent(mine(source)) && mine(source)!.stale_reasons.length === 0).length;
-  const saved = async (message: string) => { setStatus(message); await onSaved(); };
+  const announce = async (message: string) => { setStatus(message); await onSaved(); };
   const heading = () => document.getElementById("conditions-heading");
   const openEditor = (source: TripDayConditionsSource | null) => { focus.remember(heading); setStatus(""); setEditing({ source }); };
   const openReview = (sourceId: string, mode: ReviewMode) => { focus.remember(heading); setStatus(""); setReviewing({ sourceId, mode }); };
   const reviewSource = reviewing && sources.find((source) => source.id === reviewing.sourceId);
+  const saved = data.conditions_sources ?? [];
+  const datesOf = (sourceId: string) => saved.find((source) => source.id === sourceId)?.dates ?? [date];
+  // Sources the trip has that this day doesn't list, and whether a listed one is missing from some day.
+  const notHere = saved.filter((source) => !source.dates.includes(date));
+  const onOtherDays = (sourceId: string) => datesOf(sourceId).length < data.days.length;
+  const openAttach = (sourceId: string | null) => { focus.remember(heading); setStatus(""); setAttaching({ sourceId }); };
 
   return (
     <section aria-labelledby="conditions-heading">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="conditions-heading" tabIndex={-1} className="text-title font-semibold text-foreground">Conditions</h2>
-        {canEdit && <Button type="button" variant="outline" onClick={() => openEditor(null)}>Add source</Button>}
+        {canEdit && (
+          <div className="flex flex-wrap gap-2">
+            {notHere.length > 0 && <Button type="button" variant="ghost" onClick={() => openAttach(null)}>Add a saved source</Button>}
+            <Button type="button" variant="outline" onClick={() => openEditor(null)}>Add source</Button>
+          </div>
+        )}
       </div>
       {!canEdit && <p className="mt-1 text-base text-muted-foreground">Sources are managed by the organizer. You record your own reviews.</p>}
       <p aria-live="polite" className="text-sm text-success">{status}</p>
@@ -128,7 +143,8 @@ export function DayConditions({ data, date, dateLabel, activity, userId, onSaved
           <ul className="mt-3 space-y-4">
             {sources.map((source) => (
               <SourceRow key={source.id} data={data} source={source} userId={userId} canEdit={canEdit}
-                onEdit={() => openEditor(source)} onReview={(mode) => openReview(source.id, mode)} />
+                onEdit={() => openEditor(source)} onReview={(mode) => openReview(source.id, mode)}
+                onAttach={onOtherDays(source.id) ? () => openAttach(source.id) : undefined} />
             ))}
           </ul>
         </>
@@ -137,21 +153,30 @@ export function DayConditions({ data, date, dateLabel, activity, userId, onSaved
         A recorded review notes who looked at a source and when. It doesn&apos;t mean the forecast is current or the plan is safe.
       </p>
       {editing && <SourceEditor key={editing.source?.id ?? "new"} tripId={data.trip.id} date={date} dateLabel={dateLabel} dayId={dayId}
-        source={editing.source} onSaved={saved} onClose={() => setEditing(null)} onCloseAutoFocus={focus.restore} />}
+        source={editing.source} dates={editing.source ? datesOf(editing.source.id) : []}
+        onSaved={announce} onClose={() => setEditing(null)} onCloseAutoFocus={focus.restore} />}
       {reviewing && <ReviewEditor key={`${reviewing.sourceId}:${reviewing.mode}`} tripId={data.trip.id} date={date} dateLabel={dateLabel}
         dayId={dayId} source={reviewSource || undefined} review={reviewSource ? mine(reviewSource) : undefined} mode={reviewing.mode}
-        onSaved={saved} onReload={onSaved} onClose={() => setReviewing(null)} onCloseAutoFocus={focus.restore} />}
+        onSaved={announce} onReload={onSaved} onClose={() => setReviewing(null)} onCloseAutoFocus={focus.restore} />}
+      {attaching && <AttachSourceSheet tripId={data.trip.id} date={date} stops={data.stops} days={data.days}
+        title={attaching.sourceId ? `Use ${saved.find((source) => source.id === attaching.sourceId)?.name ?? "the source"} on other days` : "Add a saved source"}
+        choose={!attaching.sourceId}
+        sources={attaching.sourceId ? saved.filter((source) => source.id === attaching.sourceId) : notHere}
+        initialDates={attaching.sourceId ? [] : [date]}
+        onSaved={announce} onClose={() => setAttaching(null)} onCloseAutoFocus={focus.restore} />}
     </section>
   );
 }
 
-function SourceRow({ data, source, userId, canEdit, onEdit, onReview }: {
+function SourceRow({ data, source, userId, canEdit, onEdit, onReview, onAttach }: {
   data: TripFull;
   source: TripDayConditionsSource;
   userId: string | null;
   canEdit: boolean;
   onEdit: () => void;
   onReview: (mode: ReviewMode) => void;
+  /** Lists it on more days; missing when every day lists it. */
+  onAttach?: () => void;
 }) {
   const review = userId ? source.reviews.find((entry) => entry.user_id === userId) : undefined;
   const crew = source.reviews.filter((entry) => entry.user_id !== userId);
@@ -172,7 +197,7 @@ function SourceRow({ data, source, userId, canEdit, onEdit, onReview }: {
         <div className="mt-2 text-base text-foreground">
           {!current ? (
             <p className="flex gap-2"><CircleDashed className={cn(iconClassName, "text-muted-foreground")} aria-hidden />
-              <span>No review recorded{review ? ` · You withdrew your review ${when(review.current.created_at)}` : ""}</span></p>
+              <span>No review recorded for this day{review ? ` · You withdrew your review ${when(review.current.created_at)}` : ""}</span></p>
           ) : stale ? (
             <div className="flex gap-2">
               <TriangleAlert className={cn(iconClassName, "text-warning")} aria-hidden />
@@ -207,7 +232,12 @@ function SourceRow({ data, source, userId, canEdit, onEdit, onReview }: {
           </ul>
         </details>
       )}
-      {canEdit && <Button type="button" variant="ghost" className="mt-1" onClick={onEdit} aria-label={`Edit source ${source.name}`}>Edit source</Button>}
+      {canEdit && (
+        <div className="mt-1 flex flex-wrap gap-2">
+          <Button type="button" variant="ghost" onClick={onEdit} aria-label={`Edit source ${source.name}`}>Edit source</Button>
+          {onAttach && <Button type="button" variant="ghost" onClick={onAttach} aria-label={`Use ${source.name} on other days`}>Use on other days</Button>}
+        </div>
+      )}
     </li>
   );
 }
@@ -293,7 +323,7 @@ function useFieldErrors(form: RefObject<HTMLFormElement | null>, busy: boolean) 
 
 type SourceDraft = { category: TripConditionsCategory; name: string; region: string; url: string };
 
-function SourceEditor({ tripId, date, dateLabel, dayId, source, onSaved, onClose, onCloseAutoFocus }: {
+function SourceEditor({ tripId, date, dateLabel, dayId, source, dates, onSaved, onClose, onCloseAutoFocus }: {
   tripId: string;
   date: string;
   dateLabel: string;
@@ -301,6 +331,8 @@ function SourceEditor({ tripId, date, dateLabel, dayId, source, onSaved, onClose
   dayId: string | undefined;
   /** The source to change, or null to add one. */
   source: TripDayConditionsSource | null;
+  /** The dates the source is listed on; an edit to one on several is reviewed first (#211). */
+  dates: string[];
   onSaved: (message: string) => Promise<void>;
   onClose: () => void;
   onCloseAutoFocus: (event: Event) => void;
@@ -310,15 +342,21 @@ function SourceEditor({ tripId, date, dateLabel, dayId, source, onSaved, onClose
   }));
   const [original] = useState(() => JSON.stringify(draft));
   // What the save applies to; Check the latest moves it to what's saved now.
-  const [target, setTarget] = useState({ sourceId: source?.id ?? null, revision: source?.revision ?? 0, dayId });
+  const [target, setTarget] = useState({ sourceId: source?.id ?? null, revision: source?.revision ?? 0, dayId, dates });
   const [notice, setNotice] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
+  // The server's review of which days an edit changes, for a source on several.
+  const [review, setReview] = useState<TripConditionsSourcePreview | null>(null);
+  const needsReview = !!target.sourceId && target.dates.length > 1;
+  useFocusReview(review);
   const [busy, setBusy] = useState(false);
   // One identity per input, so a retry of an uncertain save replays rather than saving twice.
   const mutationId = useRef<string | null>(null);
   const form = useRef<HTMLFormElement>(null);
   const errors = useFieldErrors(form, busy);
-  const sheet = useEditorClose(JSON.stringify(draft) !== original, busy, removing, () => setRemoving(false));
+  const sheet = useEditorClose(JSON.stringify(draft) !== original, busy, removing || !!review, () => { setRemoving(false); setReview(null); });
+  const url = `/api/v1/trips/${tripId}/days/${date}/conditions`;
+  const input = () => ({ ...draft, region: draft.region.trim() || null });
 
   const change = (field: keyof SourceDraft, value: string) => {
     setDraft((prev) => ({ ...prev, [field]: value }));
@@ -330,19 +368,33 @@ function SourceEditor({ tripId, date, dateLabel, dayId, source, onSaved, onClose
     mutationId.current ??= crypto.randomUUID();
     setBusy(true); errors.clear();
     try {
-      await timedTripRequest(`/api/v1/trips/${tripId}/days/${date}/conditions`, "POST", {
+      await timedTripRequest(url, "POST", {
         action, day_id: target.dayId, mutation_id: mutationId.current,
         ...(action === "add" ? {} : { source_id: target.sourceId, expected_revision: target.revision }),
-        ...(action === "remove" ? {} : { source: { ...draft, region: draft.region.trim() || null } }),
+        ...(action === "remove" ? {} : { source: input() }),
+        // The days the edit's review listed, or just this one: it isn't saved over days it didn't list.
+        ...(action === "save" ? { expected_days: review?.expected_days ?? (target.dayId ? [{ date, day_id: target.dayId }] : []) } : {}),
       });
       await onSaved(message);
       sheet.close();
     } catch (err) { errors.show(err); }
     finally { setBusy(false); }
   };
+  const loadReview = async () => {
+    if (busy) return;
+    setBusy(true); errors.clear();
+    try {
+      const preview = await timedTripRequest<unknown>(url, "POST", { action: "save", preview: true, source_id: target.sourceId, source: input() });
+      if (!isSourcePreview(preview)) throw new Error("The review didn't load. Try again.");
+      setReview(preview);
+    } catch (err) { errors.show(err); }
+    finally { setBusy(false); }
+  };
   const save = (event?: FormEvent) => {
     event?.preventDefault();
-    void send(target.sourceId ? "save" : "add", target.sourceId ? "Source saved." : "Source added.");
+    if (needsReview && !review) return void loadReview();
+    void send(target.sourceId ? "save" : "add", !target.sourceId ? "Source added."
+      : review ? `Source saved on ${review.days.length === 1 ? "1 day" : `${review.days.length} days`}.` : "Source saved.");
   };
   const remove = () => {
     if (!removing) { mutationId.current = null; setRemoving(true); return; }
@@ -353,7 +405,9 @@ function SourceEditor({ tripId, date, dateLabel, dayId, source, onSaved, onClose
     try {
       const current = await timedTripRequest<TripFull>(`/api/v1/trips/${tripId}`, "GET");
       const saved = target.sourceId ? current.conditions?.find((entry) => entry.id === target.sourceId && entry.date === date) : undefined;
-      setTarget({ sourceId: saved?.id ?? null, revision: saved?.revision ?? 0, dayId: current.days.find((entry) => entry.date === date)?.id });
+      setTarget({ sourceId: saved?.id ?? null, revision: saved?.revision ?? 0, dayId: current.days.find((entry) => entry.date === date)?.id,
+        dates: (saved && current.conditions_sources?.find((entry) => entry.id === saved.id)?.dates) || (saved ? [date] : []) });
+      setReview(null);
       setNotice(saved
         ? `Saved now: ${saved.name} · ${saved.url}. Your changes are still in the form; save to replace it.`
         : target.sourceId ? `This source isn't on ${dateLabel} any more. Save to add yours as a new source.`
@@ -365,7 +419,8 @@ function SourceEditor({ tripId, date, dateLabel, dayId, source, onSaved, onClose
   };
 
   const describedBy = (key: string, hint?: boolean) => errors.field === key ? "conditions-source-error" : hint ? `${key}-hint` : undefined;
-  const title = sheet.discarding ? "Discard changes?" : removing ? "Remove source?" : target.sourceId ? "Edit source" : "Add source";
+  const title = sheet.discarding ? "Discard changes?" : removing ? "Remove source?" : review ? "Save on every day it's listed?"
+    : target.sourceId ? "Edit source" : "Add source";
   return (
     <TripSheet open={!sheet.closed} busy={busy} onClose={sheet.requestClose} className="sm:max-w-xl"
       onCloseAutoFocus={(event) => { onCloseAutoFocus(event); onClose(); }}
@@ -382,6 +437,9 @@ function SourceEditor({ tripId, date, dateLabel, dayId, source, onSaved, onClose
       </> : removing ? <>
         <Button type="button" variant="destructive" loading={busy} onClick={remove}>Remove source</Button>
         <Button type="button" variant="outline" disabled={busy} onClick={() => setRemoving(false)}>Keep source</Button>
+      </> : review ? <>
+        <Button type="button" loading={busy} onClick={() => save()}>Save on {review.days.length === 1 ? "1 day" : `${review.days.length} days`}</Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => setReview(null)}>Back to editing</Button>
       </> : <>
         <Button type="submit" form="conditions-source-form" loading={busy}>Save source</Button>
         <Button type="button" variant="outline" disabled={busy} onClick={sheet.requestClose}>Cancel</Button>
@@ -395,6 +453,8 @@ function SourceEditor({ tripId, date, dateLabel, dayId, source, onSaved, onClose
           <p className="break-words text-base text-foreground">
             {source?.name} will no longer be listed for {dateLabel}. Reviews already recorded for it are kept.
           </p>
+        ) : review ? (
+          <div className="text-base text-foreground"><SourceDaysReview heading="Days it changes" preview={review} /></div>
         ) : (
           <form id="conditions-source-form" ref={form} onSubmit={save} className="space-y-4" aria-busy={busy}>
             <fieldset disabled={busy} className="min-w-0 space-y-4">
@@ -426,7 +486,7 @@ function SourceEditor({ tripId, date, dateLabel, dayId, source, onSaved, onClose
           </form>
         )}
         {busy && <p role="status" className="text-base text-muted-foreground">
-          {errors.conflict ? "Loading the saved sources…" : removing ? "Removing source…" : "Saving source…"}
+          {errors.conflict ? "Loading the saved sources…" : removing ? "Removing source…" : needsReview && !review ? "Loading the review…" : "Saving source…"}
         </p>}
       </div>}
     </TripSheet>

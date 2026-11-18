@@ -95,8 +95,12 @@ export const alpine: SportRecommender<AlpineTargets> = {
       targets.regional,
       request.precipitation
     );
-    const { handwear, headwear } = selectPhaseAccessories('alpine_skiing', targets, pool, tempC, ensemble);
+    const accessories = selectPhaseAccessories('alpine_skiing', targets, pool, tempC, ensemble, { precipitation: request.precipitation });
+    const { handwear, headwear } = accessories;
     const helmet = buildHelmetRequirement('alpine_skiing', headwear.helmet, pool);
+    // Scoring, the echoed targets and manual edits share the upper limits
+    // the accessories were chosen against.
+    const extremity = { ...targets.extremity, max: accessories.extremityMax };
 
     const { recommendation, warnings } = buildScoredRecommendation(
       {
@@ -122,11 +126,14 @@ export const alpine: SportRecommender<AlpineTargets> = {
           regionalTarget: targets.regional.neutral,
           extremityMinTarget: targets.extremity.min,
           extremityTarget: targets.extremity.neutral,
+          extremityMaxTarget: extremity.max,
         },
       },
       handwear,
       headwear
     );
+    recommendation.accessories = accessories.assessments;
+    warnings.push(...accessories.warnings);
 
     // Regional minima split the whole-body band derived from the 60/40
     // skiing/chairlift cycle. Warn only about a shortfall the
@@ -161,7 +168,7 @@ export const alpine: SportRecommender<AlpineTargets> = {
         dle_method: DLE_ESTIMATION_METHOD,
         target_range: targets.targetRange,
         regional: targets.regional,
-        extremity: targets.extremity,
+        extremity,
         validation_buffer_clo: formatValidationBuffer(targets.validationBuffer),
         validation_source: COWEDA_VALIDATION_SOURCE,
       },

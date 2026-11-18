@@ -21,6 +21,10 @@ const call = async (route: typeof evaluate, body: unknown) => {
   return response.json();
 };
 
+/** Body-part results with clo and delta rounded to 10 decimals; statuses stay exact. */
+const roundClo = (parts: unknown) => JSON.parse(JSON.stringify(parts), (key, value) =>
+  (key === 'clo' || key === 'delta') && typeof value === 'number' ? Math.round(value * 1e10) / 1e10 : value);
+
 function phase(body: BiophysicsRecommendation): PhaseEvaluationInput {
   const { ireq, recommendation: rec } = body;
   return {
@@ -57,6 +61,8 @@ describe('canonical recommendation and edit assessments', () => {
           minTargets: { torso: d!.regional_ireq.min.torso, legs: d!.regional_ireq.min.legs,
             hands: d!.extremity_ireq.min.hands, headNeck: d!.extremity_ireq.min.head },
           arms: { clo: 99, target: d!.regional_ireq.neutral.arms, minTarget: d!.regional_ireq.min.arms },
+          // The descent's own accessory limits, not the climb's.
+          extremityMaxTargets: d!.extremity_ireq.max ? { hands: d!.extremity_ireq.max.hands, headNeck: d!.extremity_ireq.max.head } : undefined,
           targetRange: body.ireq.downhill_target_range,
           breathabilityTarget: body.descent_evaluation.breathabilityTarget,
         });
@@ -68,7 +74,9 @@ describe('canonical recommendation and edit assessments', () => {
         expect(edited.totalClo).toBeCloseTo(initial.totalClo!, 10);
         expect(edited.comfortScore).toBe(initial.comfortScore);
         expect(edited.decision).toEqual(initial.decision);
-        expect(edited.bodyParts).toEqual(initial.bodyParts);
+        // Manual edits sum worn items in display order (helmet last), so sums can
+        // differ in the last floating-point bit, as totalClo can above.
+        expect(roundClo(edited.bodyParts)).toEqual(roundClo(initial.bodyParts));
       }
     });
   }

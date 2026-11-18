@@ -132,6 +132,59 @@ describe("Changing a trip's name and dates", () => {
     });
   });
 
+  describe("a removed day's conditions sources and reviews (#211)", () => {
+    const LISTED = "8a7b6c5d-4e3f-4a1b-9c8d-7e6f5a4b3c2d";
+    const REMOVED = "9b8c7d6e-5f4a-4b3c-8d2e-1f0a9b8c7d6e";
+    const source = (id: string, name: string) => ({ id, trip_id: TRIP.id, category: "avalanche", name, region: null, url: "https://example.org/", revision: 1, created_at: "2026-10-01T00:00:00Z" });
+    const entry = (n: number, sourceId: string) => ({ id: `entry-${n}`, entry_number: n, trip_id: TRIP.id, trip_day_id: "day-12", source_id: sourceId, user_id: "user-2",
+      action: "reviewed", note: null, reviewed_at: "2026-10-09T12:00:00Z", created_at: "2026-10-09T12:00:00Z",
+      context: { date: "2026-10-12", stop: null, activity: null, access_point: null, route: null, source: { url: "https://example.org/", region: null } } });
+    // Monday lists MWAC, reviewed by Sam, and keeps Sam's review of NWS, removed from it since.
+    const withConditions = (reviews = [entry(1, LISTED), entry(2, REMOVED)]) => {
+      tables = { ...tablesWith(false), trip_conditions_sources: [source(LISTED, "MWAC"), source(REMOVED, "NWS")],
+        trip_day_conditions_sources: [{ trip_id: TRIP.id, trip_day_id: "day-12", source_id: LISTED, created_at: "2026-10-01T00:00:00Z" }],
+        trip_conditions_reviews: reviews } as typeof tables;
+      const supabase = { ...createFakeSupabase(tables as unknown as Parameters<typeof createFakeSupabase>[0]), rpc } as unknown as SupabaseClient;
+      vi.mocked(requireTripAccess).mockResolvedValue({ supabase, userId: "user-1", trip: { ...TRIP, lodging_revision: 2 } });
+    };
+    const day = { date: "2026-10-12", stop_id: null, activity: null, kit_ids: ["kit-sam"] };
+    const reviewed = { ...day, conditions: { source_ids: [LISTED], entries: 2 } };
+
+    it("lists every review that goes with the day, of sources no longer listed there too", async () => {
+      withConditions();
+      const preview = await (await save({ end_date: "2026-10-11", preview: true })).json();
+      expect(preview.plans.keep.removed[0].conditions).toBe("Conditions: MWAC · 1 review removed with the day · 1 review of NWS (no longer listed) removed with the day");
+      expect(preview.plans.keep.expected_removed).toEqual([reviewed]);
+    });
+
+    it("refuses a review whose conditions differ from the trip's now, before the transaction", async () => {
+      withConditions();
+      for (const stale of [[day], [{ ...day, conditions: { source_ids: [LISTED], entries: 1 } }], [{ ...day, conditions: { source_ids: [], entries: 2 } }]]) {
+        const response = await save({ end_date: "2026-10-11", mode: "keep", expected_removed: stale });
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({ plans: { keep: { expected_removed: [reviewed] } } });
+      }
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
+    it("retries once without them, which only a function from before migration 20261116210000 accepts", async () => {
+      withConditions();
+      rpc.mockResolvedValueOnce({ data: null, error: { code: "PT409", message: "Days to remove changed." } });
+      expect((await save({ end_date: "2026-10-11", mode: "keep", expected_removed: [reviewed] })).status).toBe(200);
+      expect(rpc.mock.calls.map(([, args]) => args.p_expected_removed)).toEqual([[reviewed], [day]]);
+      // When that fails too, it's the review that's out of date.
+      rpc.mockClear();
+      rpc.mockResolvedValue({ data: null, error: { code: "PT409", message: "Days to remove changed." } });
+      expect((await save({ end_date: "2026-10-11", mode: "keep", expected_removed: [reviewed] })).status).toBe(409);
+      expect(rpc).toHaveBeenCalledTimes(2);
+      // A day with no conditions isn't retried.
+      useTables();
+      rpc.mockClear();
+      expect((await save({ end_date: "2026-10-11", mode: "keep", expected_removed: [day] })).status).toBe(409);
+      expect(rpc).toHaveBeenCalledOnce();
+    });
+  });
+
   it("reports a trip the user can no longer reach as not found, and a failed save as unchanged", async () => {
     rpc.mockResolvedValueOnce({ data: null, error: { code: "42501", message: "Not found" } });
     expect((await save({ end_date: "2026-10-13" })).status).toBe(404);

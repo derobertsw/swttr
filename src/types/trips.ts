@@ -155,6 +155,8 @@ export interface TripFull {
   meets?: TripDayMeet[];
   /** Each day's conditions sources with the crew's reviews (#211); optional like `lodging`. */
   conditions?: TripDayConditionsSource[];
+  /** Every conditions source on the trip with the days it's listed on (#211), to list it on more; optional like `lodging`. */
+  conditions_sources?: TripConditionsSourceUse[];
   /** People's own starting points (#333); missing or empty before its migration. */
   member_origins?: TripMemberDayOrigin[];
   /** Where each day starts for the people taking part (#333), own starting points included; optional like `lodging`. */
@@ -331,6 +333,36 @@ export interface TripDayConditionsSource extends TripConditionsSource {
   /** The day's plan and this source as the server reads them now; recording a review sends it back. */
   context_key: string;
   reviews: TripConditionsReview[];
+}
+
+/** A source on the trip with the days it's listed on (#211). */
+export interface TripConditionsSourceUse extends TripConditionsSource {
+  /** In order; empty when it was removed from every day. */
+  dates: string[];
+}
+
+/** A day a change to a source applies to. */
+export interface TripConditionsSourceDay {
+  date: string;
+  date_label: string;
+  /** What happens to the reviews recorded there, e.g. "2 reviews to record again". */
+  note: string | null;
+}
+
+/**
+ * What listing a source on more days, or editing one listed on several,
+ * does before it's saved (#211). Saving sends `revision` and
+ * `expected_days` back, and is refused (409) when they no longer match.
+ */
+export interface TripConditionsSourcePreview {
+  source_id: string;
+  revision: number;
+  /** e.g. "Lists Mount Washington Avalanche Center on Sat Oct 10 and Sun Oct 11." */
+  summary: string;
+  /** The days it changes, in order. */
+  days: TripConditionsSourceDay[];
+  /** Listing it: the days it's added to. Editing it: the days it's on. */
+  expected_days: Array<{ date: string; day_id: string }>;
 }
 
 /** A day check on a Backcountry day (#212): see docs/trip-touring-prep.md. */
@@ -644,6 +676,8 @@ export interface TripDateChangeDay {
   tour_plan?: string | null;
   /** The day's notes (#334), if it has some. */
   notes?: string | null;
+  /** The day's conditions sources and their reviews (#211), e.g. "Conditions: MWAC · 2 reviews removed with the day". */
+  conditions?: string | null;
 }
 
 /** A removed day as the server last saw it; sent back to confirm the removal. */
@@ -657,6 +691,8 @@ export interface TripRemovedDayCheck {
   tour_plan_revision?: number;
   /** Present only when the day has notes: the notes the review showed. */
   notes?: string;
+  /** Present only when the day lists conditions sources (#211): theirs and how many review entries were recorded for them there. */
+  conditions?: { source_ids: string[]; entries: number };
 }
 
 export interface TripDateChangePlan {
@@ -1034,9 +1070,11 @@ export type TripItineraryRequest =
   | { action: "set_day_place"; date: string; place: TripPlace }
   /**
    * Gives `dates` the destination and activity of `from`, with `kit` the
-   * signed-in member's kit too, and with `plan` its tour plan (#210, organizer only).
+   * signed-in member's kit too, with `plan` its tour plan (#210), and with
+   * `sources` its conditions sources (#211), never their reviews. Only the
+   * organizer copies a tour plan or sources.
    */
-  | { action: "copy_day"; from: string; dates: string[]; kit: boolean; plan?: boolean };
+  | { action: "copy_day"; from: string; dates: string[]; kit: boolean; plan?: boolean; sources?: boolean };
 
 /** Sets or removes a day's access point (#208); the review asks whether it's for the day or every day at its stop. */
 export interface TripAccessPointRequest {

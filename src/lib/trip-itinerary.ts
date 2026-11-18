@@ -1,6 +1,7 @@
 import "server-only";
 import { TOUR_ACTIVITY, tripActivityLabel } from "@/lib/trip-activities";
 import { dateLabel, isCalendarDate, isUuid } from "@/lib/trip-lodging";
+import { returningReviewsNote, type ConditionsRows } from "@/lib/trip-conditions";
 import { accessPointFor, sameLocation } from "@/lib/trip-location";
 import type { TripDay, TripFull, TripItineraryOption, TripItineraryPreview, TripItineraryRequest, TripMember, TripMemberDayKit, TripPlace, TripStop } from "@/types/trips";
 
@@ -8,8 +9,9 @@ import type { TripDay, TripFull, TripItineraryOption, TripItineraryPreview, Trip
  * Itinerary edits (#176): remove and reorder stops, assign several days,
  * change one day's place, and copy a day. previewItinerary builds the review
  * with the same rules as edit_trip_itinerary (migration 022) and copy_trip_day
- * (023, and 030 for tour plans), which save the chosen option and refuse it if
- * the trip no longer matches what the review showed.
+ * (023, 030 for tour plans and 20261116210000 for conditions sources), which
+ * save the chosen option and refuse it if the trip no longer matches what the
+ * review showed.
  */
 
 type DayCheck = { date: string; stop_id: string | null; activity: string | null };
@@ -34,7 +36,7 @@ type ItineraryEdit =
   | { action: "reorder_stops"; payload: { order: string[]; expected: string[] } }
   | { action: "assign_days"; payload: { dates: string[]; stop_id?: string; activity?: string | null; expected: DayCheck[] } }
   | { action: "set_day_place"; payload: { date: string; place: TripPlace; scope: "day" | "stop"; expected: { stop_id: string | null; stop: StopCheck | null; dates: string[] } } }
-  | { action: "copy_day"; payload: { from: string; dates: string[]; kit: CopyMode; plan: CopyMode; expected: { from: Omit<CopyCheck, "date">; days: CopyCheck[] } } };
+  | { action: "copy_day"; payload: { from: string; dates: string[]; kit: CopyMode; plan: CopyMode; sources?: "add"; expected: { from: Omit<CopyCheck, "date">; days: CopyCheck[] } } };
 
 type Invalid = { error: string };
 type Itinerary = {
@@ -109,9 +111,10 @@ export function parseItineraryRequest(body: unknown): TripItineraryRequest | Inv
     }
     case "copy_day": {
       const days = dates(body.dates);
-      if (!isCalendarDate(body.from) || typeof body.kit !== "boolean" || !(body.plan === undefined || typeof body.plan === "boolean")) return INVALID;
+      const optional = (value: unknown) => value === undefined || typeof value === "boolean";
+      if (!isCalendarDate(body.from) || typeof body.kit !== "boolean" || !optional(body.plan) || !optional(body.sources)) return INVALID;
       if (!days?.length) return { error: "Choose days to copy to." };
-      return { action: "copy_day", from: body.from, dates: uniqueSorted(days), kit: body.kit, plan: body.plan === true };
+      return { action: "copy_day", from: body.from, dates: uniqueSorted(days), kit: body.kit, plan: body.plan === true, ...(body.sources === true ? { sources: true } : {}) };
     }
     default:
       return INVALID;
@@ -198,10 +201,15 @@ export function parseItineraryEdit(body: unknown): ItineraryEdit | Invalid {
         return check && isObject(entry) && isCalendarDate(entry.date) ? { date: entry.date, ...check } : undefined;
       });
       const kit = body.kit;
-      // A review from before tour plans could be copied (#210) doesn't say.
+      // A review from before tour plans (#210) or sources (#211) could be copied doesn't say.
       const plan = body.plan ?? "none";
-      if (!isCalendarDate(body.from) || !days?.length || !from || !checks || !COPY_MODES.includes(kit) || !COPY_MODES.includes(plan)) return INVALID;
-      return { action: "copy_day", payload: { from: body.from, dates: uniqueSorted(days), kit: kit as CopyMode, plan: plan as CopyMode, expected: { from, days: checks } } };
+      const sources = body.sources ?? "none";
+      if (!isCalendarDate(body.from) || !days?.length || !from || !checks || !COPY_MODES.includes(kit) || !COPY_MODES.includes(plan)
+        || (sources !== "none" && sources !== "add")) return INVALID;
+      return { action: "copy_day", payload: {
+        from: body.from, dates: uniqueSorted(days), kit: kit as CopyMode, plan: plan as CopyMode,
+        ...(sources === "add" ? { sources } : {}), expected: { from, days: checks },
+      } };
     }
     default:
       return INVALID;
@@ -218,7 +226,10 @@ export function requestFor(edit: ItineraryEdit): TripItineraryRequest {
       return { action: "assign_days", dates, ...("stop_id" in edit.payload ? { stop_id } : {}), ...("activity" in edit.payload ? { activity } : {}) };
     }
     case "set_day_place": return { action: "set_day_place", date: edit.payload.date, place: edit.payload.place };
-    case "copy_day": return { action: "copy_day", from: edit.payload.from, dates: edit.payload.dates, kit: edit.payload.kit !== "none", plan: edit.payload.plan !== "none" };
+    case "copy_day": return {
+      action: "copy_day", from: edit.payload.from, dates: edit.payload.dates, kit: edit.payload.kit !== "none", plan: edit.payload.plan !== "none",
+      ...(edit.payload.sources ? { sources: true } : {}),
+    };
   }
 }
 
@@ -322,6 +333,34 @@ export function parseTourPlansCheck(body: unknown): TourPlansCheck | null | unde
 
 const tourPlanFor = (full: TripFull, day: Pick<TripDay, "id">) => full.tour_plans?.find((plan) => plan.trip_day_id === day.id);
 
+/**
+ * Where the trip's conditions sources are listed (#211) as a copy's review saw
+ * it, as trip_conditions_snapshot() in migration 20261116210000 builds it:
+ * each date that lists any, with their ids in order. A copy that brings the
+ * day's sources is refused when a source was listed on or removed from any
+ * day since, so the review's list of what each day gets stays true.
+ */
+type ConditionsCheck = Record<string, string[]>;
+function conditionsCheck(full: TripFull): ConditionsCheck {
+  const byDate = new Map<string, Set<string>>();
+  for (const listing of full.conditions ?? []) {
+    if (!byDate.has(listing.date)) byDate.set(listing.date, new Set());
+    byDate.get(listing.date)!.add(listing.id);
+  }
+  return Object.fromEntries([...byDate].map(([date, ids]) => [date, [...ids].sort()]));
+}
+
+/** The sources a save says its review saw: undefined when it sends none, null when they're malformed. */
+export function parseConditionsCheck(body: unknown): ConditionsCheck | null | undefined {
+  if (!isObject(body) || !("conditions" in body)) return undefined;
+  const check = body.conditions;
+  if (!isObject(check) || Object.keys(check).length > MAX_DAYS) return null;
+  const valid = Object.entries(check).every(([date, ids]) => isCalendarDate(date) && Array.isArray(ids) && ids.length > 0 && ids.every(isUuid));
+  return valid ? check as ConditionsCheck : null;
+}
+
+const sourcesOn = (full: TripFull, day: Pick<TripDay, "id">) => (full.conditions ?? []).filter((listing) => listing.trip_day_id === day.id);
+
 /** The activity a day shows: its own, or its stop's first, as the day page shows it. */
 const shownActivity = (day: Pick<TripDay, "activity">, stop: Place | undefined) => day.activity ?? stop?.activities?.[0] ?? null;
 
@@ -424,9 +463,11 @@ const near = (a: number | null, b: number) => a !== null && Math.abs(a - b) <= 0
  * The options for a change, each with the days it changes and the payload to
  * save it. `full.stops` is in position order, as loadTripFull returns it.
  * `userId` is the signed-in user, whose kit a copy can bring and whose kits the
- * review calls "your".
+ * review calls "your". `conditions` holds every review recorded on the trip,
+ * for a copy that brings conditions sources (#211): a day the source was
+ * removed from keeps its reviews, and they show again once it's listed there.
  */
-export function previewItinerary(full: TripFull, request: TripItineraryRequest, userId?: string | null): TripItineraryPreview | { error: string; status: 400 | 403 | 404 } {
+export function previewItinerary(full: TripFull, request: TripItineraryRequest, userId?: string | null, conditions?: ConditionsRows): TripItineraryPreview | { error: string; status: 400 | 403 | 404 } {
   const { stops, days } = full;
   const base = stops[0];
   const stopFor = (day: Pick<TripDay, "stop_id">) => stops.find((stop) => stop.id === day.stop_id) ?? base;
@@ -563,6 +604,10 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest, 
       if (request.plan && (!userId || full.trip.owner_user_id !== userId)) return { error: "Only the organizer can copy the tour plan.", status: 403 };
       const tour = request.plan ? tourPlanFor(full, source) : undefined;
       if (request.plan && !tour) return { error: `There's no tour plan on ${from} to copy.`, status: 400 };
+      // So do its conditions sources (#211), which the organizer manages too. Never their reviews.
+      if (request.sources && (!userId || full.trip.owner_user_id !== userId)) return { error: "Only the organizer can copy conditions sources.", status: 403 };
+      const copiedSources = request.sources ? sourcesOn(full, source) : [];
+      if (request.sources && copiedSources.length === 0) return { error: `There are no conditions sources on ${from} to copy.`, status: 400 };
 
       const after = { stops, days: days.map((day) => request.dates.includes(day.date) ? { ...day, stop_id: source.stop_id, activity: source.activity } : day) };
       const plan = dayLabels(full).get(source.date)!;
@@ -571,9 +616,10 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest, 
         const stop = stopFor(day);
         return stop ? { id: stop.id, name: stop.name, latitude: stop.latitude, longitude: stop.longitude } : null;
       };
-      // Tour plans aren't in `expected`: the save checks every plan on the trip against the review.
+      // Tour plans and sources aren't in `expected`: the save checks every one on the trip against the review.
       const payload = (mode: Exclude<CopyMode, "none">) => ({
         from: source.date, dates: targets.map((day) => day.date), kit: sourceKit ? mode : "none", plan: tour ? mode : "none",
+        ...(copiedSources.length > 0 ? { sources: "add", conditions: conditionsCheck(full) } : {}),
         expected: {
           from: { stop_id: source.stop_id, activity: source.activity, stop: placeOf(source), kit: sourceKit?.updated_at ?? null },
           days: targets.map((day) => ({
@@ -581,7 +627,7 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest, 
           })),
         },
       });
-      if (!sourceKit && !tour) {
+      if (!sourceKit && !tour && copiedSources.length === 0) {
         return { options: [review(after, {
           key: "copy", label: `Copy ${from} to ${plural(targets.length)}`, detail: `${plan}. Kits stay on their own days.`, payload: payload("replace"),
         })] };
@@ -589,15 +635,38 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest, 
 
       // The user's kit can come too: an outfit still shows the forecast it was planned for.
       const what = sourceKit?.outfit ? "outfit" : "checklist";
-      const parts = [sourceKit && `your ${what}`, tour && `its tour plan (${tour.objective})`].filter((part): part is string => !!part);
+      const sourceNames = listed(copiedSources.map((listing) => listing.name));
+      const parts = [sourceKit && `your ${what}`, tour && `its tour plan (${tour.objective})`, copiedSources.length > 0 && `its conditions sources (${sourceNames})`]
+        .filter((part): part is string => !!part);
+      // Sources are added to what each day lists, whichever is chosen: the day keeps its own.
+      // Reviews recorded on the day before a source was removed from it show
+      // again, against the day's plan after the copy (and the tour plan, when it gets the copied one).
+      const sourceNotes = (day: TripDay, getsPlan: boolean) => {
+        const there = new Set(sourcesOn(full, day).map((listing) => listing.id));
+        const copiedDay = { ...day, stop_id: source.stop_id, activity: source.activity };
+        const plans = getsPlan ? [...(full.tour_plans ?? []).filter((plan) => plan.trip_day_id !== day.id), { ...tour!, trip_day_id: day.id }] : full.tour_plans;
+        const returning = (listing: (typeof copiedSources)[number]) => conditions ? returningReviewsNote(conditions, { stops, tour_plans: plans }, copiedDay, listing) : null;
+        const adding = copiedSources.filter((listing) => !there.has(listing.id));
+        const fresh = adding.filter((listing) => !returning(listing)).map((listing) => listing.name);
+        return [
+          fresh.length > 0 && `Lists ${listed(fresh)} too, with no review recorded for this day: reviews stay on ${from}.`,
+          ...adding.flatMap((listing) => {
+            const note = returning(listing);
+            return note ? [`Lists ${listing.name} too. ${note}`] : [];
+          }),
+          adding.length < copiedSources.length && `Already lists ${listed(copiedSources.filter((listing) => there.has(listing.id)).map((listing) => listing.name))}.`,
+        ].filter((note): note is string => !!note);
+      };
       const copied = (replace: boolean) => new Map(targets.flatMap((day): Array<[string, Copied]> => {
         const kit = !!sourceKit && (replace || !myKit(day));
         const existing = tour && tourPlanFor(full, day);
         const getsPlan = !!tour && (replace || !existing);
-        if (!kit && !getsPlan) return [];
+        const listings = sourceNotes(day, getsPlan);
+        if (!kit && !getsPlan && listings.length === 0) return [];
         const notes = [
           kit && (myKit(day) ? `Your kit here is replaced with your ${what} from ${from}.` : `Gets your ${what} from ${from}.`),
           getsPlan && (existing ? `Its tour plan, ${existing.objective}, is replaced with ${tour!.objective} from ${from}.` : `Gets the tour plan from ${from}: ${tour!.objective}.`),
+          ...listings,
         ].filter((note): note is string => !!note);
         return [[day.date, { notes, kit, plan: getsPlan }]];
       }));
@@ -608,7 +677,8 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest, 
       const planned = tour ? targets.filter((day) => tourPlanFor(full, day)) : [];
       if (mine.length === 0 && planned.length === 0) {
         return { options: [review(after, {
-          key: "copy", label: `Copy ${listed([from, ...[sourceKit && "your kit", tour && "its tour plan"].filter((part): part is string => !!part)])} to ${plural(targets.length)}`,
+          key: "copy", label: `Copy ${listed([from, ...[sourceKit && "your kit", tour && "its tour plan", copiedSources.length > 0 && "its conditions sources"]
+            .filter((part): part is string => !!part)])} to ${plural(targets.length)}`,
           detail: `${plan}, and ${listed(parts)}.${forecast(copied(true))}`, payload: payload("replace"),
         }, copied(true))] };
       }
@@ -616,9 +686,10 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest, 
       const there = mine.length > 0 && planned.length > 0 && on(mine) === on(planned)
         ? `your kit and the tour plan on ${on(mine)}`
         : listed([mine.length > 0 && `your kit on ${on(mine)}`, planned.length > 0 && `the tour plan on ${on(planned)}`].filter((part): part is string => !!part));
+      const withSources = copiedSources.length > 0 ? " and its conditions sources" : "";
       const keepDetail = tour
-        ? `Every day gets ${plan}. What's already there stays (${there}), and the rest comes from ${from}.${forecast(copied(false))}`
-        : `${mine.length === 1 ? "That day gets" : "Those days get"} ${plan} only.${mine.length < targets.length
+        ? `Every day gets ${plan}${withSources}. What's already there stays (${there}), and the rest comes from ${from}.${forecast(copied(false))}`
+        : `${mine.length === 1 ? "That day gets" : "Those days get"} ${plan}${withSources} only.${mine.length < targets.length
           ? ` ${targets.length - mine.length === 1 ? "The other day also gets" : "The others also get"} your ${what}.${forecast(copied(false))}` : ""}`;
       return { options: [
         review(after, {

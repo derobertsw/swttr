@@ -126,4 +126,92 @@ describe("Conditions sources API", () => {
       reviews: [expect.objectContaining({ user_id: "member-user", stale_reasons: ["Date changed from Fri Oct 9"] })],
     })]);
   });
+
+  describe("reusing a source across days (#211, PR 2)", () => {
+    const sundayId = "7a1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e5f";
+    const sunday = { id: sundayId, trip_id: TRIP.id, date: "2026-10-11", stop_id: null, activity: "Backcountry" };
+    const saturday = { id: dayId, trip_id: TRIP.id, date: "2026-10-10", stop_id: null, activity: "Backcountry" };
+    const listedOn = (...days: string[]) => ({
+      trip_days: [saturday, sunday],
+      trip_conditions_sources: [{ id: sourceId, trip_id: TRIP.id, category: "avalanche", name: "MWAC", region: null, url: "https://example.org/", revision: 2,
+        created_at: "2026-10-01T00:00:00Z", updated_at: "2026-10-01T00:00:00Z" }],
+      trip_day_conditions_sources: days.map((id) => ({ trip_id: TRIP.id, trip_day_id: id, source_id: sourceId, created_at: "2026-10-01T00:00:00Z" })),
+      trip_conditions_reviews: [],
+    });
+    const edit = { action: "save", source: { ...source, url: "https://example.org/new" }, source_id: sourceId, expected_revision: 2, day_id: dayId, mutation_id: mutationId };
+
+    it("reviews an edit for every day the source is listed on, without saving", async () => {
+      identity("user-1", { tables: listedOn(dayId, sundayId) });
+      const response = await POST(request({ action: "save", preview: true, source_id: sourceId, source: edit.source }), context());
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        source_id: sourceId, revision: 2,
+        days: [{ date: "2026-10-10", date_label: "Sat Oct 10" }, { date: "2026-10-11", date_label: "Sun Oct 11" }],
+        expected_days: [{ date: "2026-10-10", day_id: dayId }, { date: "2026-10-11", day_id: sundayId }],
+      });
+      expect(rpc).not.toHaveBeenCalled();
+      // With the field to fix when the change itself is invalid.
+      const invalid = await POST(request({ action: "save", preview: true, source_id: sourceId, source: { ...source, url: "ftp://x" } }), context());
+      expect([invalid.status, await invalid.json()]).toEqual([400, expect.objectContaining({ field: "url" })]);
+    });
+
+    it("saves an edit only while the source is on the days its review listed", async () => {
+      identity("user-1", { tables: listedOn(dayId, sundayId) });
+      const stale = await POST(request({ ...edit, expected_days: [{ date: "2026-10-10", day_id: dayId }] }), context());
+      expect(stale.status).toBe(409);
+      expect(rpc).not.toHaveBeenCalled();
+      const reviewed = [{ date: "2026-10-11", day_id: sundayId.toUpperCase() }, { date: "2026-10-10", day_id: dayId }];
+      expect((await POST(request({ ...edit, expected_days: reviewed }), context())).status).toBe(200);
+      expect(rpc).toHaveBeenCalledWith("mutate_trip_conditions_source", expect.objectContaining({ p_action: "save", p_expected_revision: 2 }));
+      expect((await POST(request({ ...edit, expected_days: [{ date: "Oct 10", day_id: dayId }] }), context())).status).toBe(400);
+    });
+
+    it("reviews and saves listing a source on more days, at the revision the review read", async () => {
+      identity("user-1", { tables: listedOn(dayId) });
+      const preview = await POST(request({ action: "attach", preview: true, source_id: sourceId, dates: ["2026-10-11", "2026-10-10"] }), context());
+      expect(preview.status).toBe(200);
+      const review = await preview.json();
+      expect(review).toMatchObject({ revision: 2, expected_days: [{ date: "2026-10-11", day_id: sundayId }], days: [{ note: "No review recorded for this day." }] });
+      expect(rpc).not.toHaveBeenCalled();
+      rpc.mockResolvedValue({ data: { source_id: sourceId, revision: 3 }, error: null });
+      const saved = await POST(request({ action: "attach", source_id: sourceId, expected_revision: 2, days: review.expected_days, mutation_id: mutationId }), context());
+      expect([saved.status, await saved.json()]).toEqual([200, { source_id: sourceId, revision: 3 }]);
+      expect(rpc).toHaveBeenCalledExactlyOnceWith("attach_trip_conditions_source", {
+        p_trip_id: TRIP.id, p_user_id: "user-1", p_source_id: sourceId, p_expected_revision: 2, p_request_id: mutationId,
+        p_days: [{ date: "2026-10-11", day_id: sundayId }],
+      });
+    });
+
+    it("returns the review as it is now when the trip changed, and says when listing isn't available yet", async () => {
+      identity("user-1", { tables: listedOn(dayId) });
+      const body = { action: "attach", source_id: sourceId, expected_revision: 1, days: [{ date: "2026-10-11", day_id: sundayId }], mutation_id: mutationId };
+      rpc.mockResolvedValue({ data: null, error: { code: "PT409", message: "Source changed." } });
+      const conflict = await POST(request(body), context());
+      expect([conflict.status, await conflict.json()]).toEqual([409, expect.objectContaining({
+        error: "The trip changed since you reviewed this. Review it again.", revision: 2, expected_days: [{ date: "2026-10-11", day_id: sundayId }],
+      })]);
+      for (const [code, status] of [["PGRST202", 503], ["42883", 503], ["42501", 404], ["22023", 409], ["22000", 400], ["XX000", 500]] as const) {
+        rpc.mockResolvedValue({ data: null, error: { code, message: "Internal database details" } });
+        const response = await POST(request(body), context());
+        expect(response.status).toBe(status);
+        expect(JSON.stringify(await response.json())).not.toContain("Internal database details");
+      }
+    });
+
+    it("rejects a malformed listing before the transaction, and lets only the organizer list", async () => {
+      identity("user-1", { tables: listedOn(dayId) });
+      const body = { action: "attach", source_id: sourceId, expected_revision: 2, days: [{ date: "2026-10-11", day_id: sundayId }], mutation_id: mutationId };
+      for (const bad of [{ source_id: "source-1" }, { expected_revision: 0 }, { days: [] }, { days: [{ date: "2026-10-11" }] }, { mutation_id: "x" }]) {
+        expect((await POST(request({ ...body, ...bad }), context())).status).toBe(400);
+      }
+      for (const dates of [[], ["Oct 11"], undefined]) {
+        expect((await POST(request({ action: "attach", preview: true, source_id: sourceId, dates }), context())).status).toBe(400);
+      }
+      expect((await POST(request({ action: "attach", preview: true, source_id: sourceId, dates: ["2026-10-10"] }), context())).status).toBe(400);
+      expect((await POST(request({ action: "attach", preview: true, source_id: sourceId, dates: ["2026-10-12"] }), context())).status).toBe(404);
+      identity("member-user", { tables: listedOn(dayId) });
+      expect((await POST(request(body), context())).status).toBe(403);
+      expect(rpc).not.toHaveBeenCalled();
+    });
+  });
 });
