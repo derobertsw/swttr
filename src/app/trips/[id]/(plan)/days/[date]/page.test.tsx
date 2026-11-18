@@ -957,6 +957,33 @@ describe("Trip day page", () => {
       });
     });
 
+    it("lets the organizer list the day's conditions sources on the copies too, never their reviews (#211)", async () => {
+      const listing = { id: "source-1", trip_id: TRIP.id, category: "avalanche" as const, name: "Mount Washington Avalanche Center", region: null,
+        url: "https://www.mountwashingtonavalanchecenter.org/", revision: 1, created_by: "user-1", updated_by: "user-1",
+        created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z", date: days[0].date, trip_day_id: days[0].id, context_key: "key-1", reviews: [] };
+      const fetchMock = copyTrip(tripFull({ stops: [STOWE_STOP, JAY], days, conditions: [listing] }), () => reply(200, { ok: true }));
+      const user = userEvent.setup();
+      await renderPage();
+      await user.click(await screen.findByRole("button", { name: "Copy to other days" }));
+      await user.click(screen.getByRole("checkbox", { name: /Mon, Oct 12/ }));
+      await user.click(screen.getByRole("checkbox", { name: /Also list its conditions sources.*Mount Washington Avalanche Center. Reviews stay on this day/ }));
+      await user.click(screen.getByRole("button", { name: "Review copy to 1 day" }));
+      expect(sentBodies(fetchMock, ITINERARY)[0]).toMatchObject({ preview: true, action: "copy_day", sources: true });
+    });
+
+    it("doesn't offer a member the day's conditions sources", async () => {
+      mockAuth.userId = "user-2";
+      const member: TripMember = { ...ORGANIZER, id: "member-sam", user_id: "user-2", display_name: "Sam", role: "member" };
+      const listing = { id: "source-1", trip_id: TRIP.id, category: "avalanche" as const, name: "MWAC", region: null, url: "https://example.org/", revision: 1,
+        created_by: "user-1", updated_by: "user-1", created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z", date: days[0].date,
+        trip_day_id: days[0].id, context_key: "key-1", reviews: [] };
+      copyTrip(tripFull({ stops: [STOWE_STOP, JAY], days, members: [ORGANIZER, member], conditions: [listing] }), () => reply(200, { ok: true }));
+      const user = userEvent.setup();
+      await renderPage();
+      await user.click(await screen.findByRole("button", { name: "Copy to other days" }));
+      expect(screen.queryByRole("checkbox", { name: /Also list its conditions sources/ })).not.toBeInTheDocument();
+    });
+
     it("isn't offered on a one-day trip", async () => {
       copyTrip(tripFull({ stops: [STOWE_STOP], days: [DAY] }), () => reply(200, { ok: true }));
       await renderPage();
@@ -1313,7 +1340,7 @@ describe("Trip day page", () => {
       const conditions = await screen.findByRole("heading", { name: "Conditions" });
       expect(screen.getByRole("heading", { name: "Tour plan" }).compareDocumentPosition(conditions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       // The organizer's review is theirs, not the member's.
-      expect(screen.getByText("No review recorded")).toBeInTheDocument();
+      expect(screen.getByText("No review recorded for this day")).toBeInTheDocument();
       expect(screen.getByText("Crew reviews (1)")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Record my review of Mount Washington Avalanche Center" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add source" })).not.toBeInTheDocument();

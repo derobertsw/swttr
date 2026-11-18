@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError, readJson } from "@/lib/api";
+import { loadConditions } from "@/lib/trip-conditions";
 import { parseTripSettings, previewDateChange } from "@/lib/trip-dates";
 import { isCalendarDate } from "@/lib/trip-lodging";
 import { requireTripAccess, classifyTripStatus, loadTripFull, tripFullFor } from "@/lib/trips";
@@ -54,8 +55,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
   }
 
   const preview = async () => {
-    const full = await loadTripFull(supabase, id);
-    return full && previewDateChange(tripFullFor(full, userId), start, end);
+    // Every conditions review on the trip (#211): a removed day takes its reviews with it, of sources no longer listed there too.
+    const [full, conditions] = await Promise.all([loadTripFull(supabase, id), loadConditions(supabase, id)]);
+    return full && previewDateChange(tripFullFor(full, userId), start, end, conditions);
   };
   let reviewed: TripDateChangePreview | null;
   try {
@@ -78,20 +80,44 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     return jsonError("Reload the trip before changing its dates.", 400);
   }
 
-  const { data, error } = await supabase.rpc("change_trip_dates", {
+  const change = (removedDays: unknown[]) => supabase.rpc("change_trip_dates", {
     p_trip_id: id, p_user_id: userId,
     p_from_start: from.start_date, p_from_end: from.end_date,
     p_start: start, p_end: end, p_mode: mode,
     p_status: classifyTripStatus(start, end),
     p_name: name ?? null,
     p_lodging_revision: body.lodging_revision ?? null,
-    p_expected_removed: expectedRemoved,
+    p_expected_removed: removedDays,
   });
-  if (error?.code === "40001" || error?.code === "PT409") {
+  const conflict = (code: string | undefined) => code === "40001" || code === "PT409";
+  const reviewAgain = async () => {
     // Something changed since the review. Show the change as it would be now.
     const current = await preview().catch(() => null);
     return NextResponse.json({ error: "The trip changed since you reviewed it. Review the changes again.", ...(current ?? {}) }, { status: 409 });
+  };
+  // A removed day's conditions sources and reviews (#211) must be the ones the
+  // review listed, as they are now. change_trip_dates checks them again under
+  // the trip lock from migration 20261116210000 on; before it, this is the
+  // only check.
+  // Each date's conditions, in a comparable form; the function checks the dates themselves.
+  const conditionsOf = (days: object[]) => new Map(days.flatMap((day) => {
+    const { date, conditions } = day as { date?: unknown; conditions?: { source_ids?: unknown; entries?: unknown } };
+    if (!conditions) return [];
+    const ids = Array.isArray(conditions.source_ids) ? [...conditions.source_ids].map(String).sort() : null;
+    return [[String(date), JSON.stringify({ source_ids: ids, entries: conditions.entries ?? null })]];
+  }));
+  const [seen, now] = [conditionsOf(expectedRemoved), conditionsOf(reviewed.plans[mode]?.expected_removed ?? [])];
+  if (seen.size !== now.size || [...now].some(([date, conditions]) => seen.get(date) !== conditions)) return reviewAgain();
+  let { data, error } = await change(expectedRemoved);
+  // Before migration 20261116210000, change_trip_dates doesn't list a removed
+  // day's conditions, so a review that lists them never matches there. It's
+  // tried once more without them, which only that older function can accept:
+  // from the migration on, a day with any source or review is listed with
+  // them, and a review without them doesn't match.
+  if (conflict(error?.code) && expectedRemoved.some((day: object) => "conditions" in day)) {
+    ({ data, error } = await change(expectedRemoved.map((day: object) => Object.fromEntries(Object.entries(day).filter(([key]) => key !== "conditions")))));
   }
+  if (conflict(error?.code)) return reviewAgain();
   if (error?.code === "42501") return jsonError("Not found", 404);
   if (error?.code === "22023") return jsonError("Choose valid dates for this trip.", 400);
   if (error) return jsonError("Couldn't change the dates. Nothing was changed; try again.", 500);
