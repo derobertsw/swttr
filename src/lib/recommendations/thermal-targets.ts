@@ -13,7 +13,14 @@ import {
 import { calculateActivityTargetRange, calculateRegionalTargets } from '@/lib/biophysics/targets';
 import { getMetabolicRateForActivity, type ExertionLevel } from '@/lib/biophysics/exertion';
 import { applyBodySizeMetabolicAdjustment, metabolicHeatFluxFromMet } from '@/lib/biophysics/bodyMetrics';
-import { isCalibratedActivity, POLE_GRIP_MAX_CLO, SUSTAINED_ACTIVITY_METS, sustainedSportPolicy } from '@/lib/biophysics/sport-policy';
+import {
+  isCalibratedActivity,
+  POLE_GRIP_MAX_CLO,
+  preferenceBand,
+  SUSTAINED_ACTIVITY_METS,
+  sustainedSportPolicy,
+  type PolicyPreference,
+} from '@/lib/biophysics/sport-policy';
 import {
   applyCowedaBufferToExtremityTargets,
   applyCowedaBufferToTargetRange,
@@ -21,7 +28,7 @@ import {
 } from '@/lib/biophysics/coweda';
 import type { ActivityType } from '@/lib/biophysics/constants';
 import type { IreqResult } from '@/types/garments';
-import type { UserBodyMetrics } from '@/types/preferences';
+import type { TemperatureSensitivity, UserBodyMetrics } from '@/types/preferences';
 import type { XCPhaseContext } from '@/lib/biophysics/xc-policy';
 
 interface Conditions {
@@ -72,6 +79,19 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Each part's [min, neutral] band narrowed for a preference (see `preferenceBand`). */
+function preferenceBands<Part extends string>(
+  bands: { min: Record<Part, number>; neutral: Record<Part, number> },
+  preference: PolicyPreference | undefined,
+): { min: Record<Part, number>; neutral: Record<Part, number> } {
+  const min = { ...bands.min };
+  const neutral = { ...bands.neutral };
+  for (const part of Object.keys(bands.min) as Part[]) {
+    [min[part], neutral[part]] = preferenceBand(bands.min[part], bands.neutral[part], preference);
+  }
+  return { min, neutral };
+}
+
 /** IREQ for one activity phase at its effective wind speed. */
 export function phaseIreq(conditions: Conditions, windMs: number, metabolicRate: number): IreqResult {
   return calculateIreq({
@@ -92,6 +112,11 @@ export function phaseIreq(conditions: Conditions, windMs: number, metabolicRate:
  * bands are converted to basic clo (`requiredBasicInsulation`); without it
  * they stay resultant, like IREQ. Hand and head targets stay resultant either
  * way: their heuristic multipliers already include a wind factor.
+ *
+ * `sensitivity` (Run Warm/Run Cold, #251) applies only through the sustained
+ * running/XC policy: it narrows every final band from one side by the
+ * policy's share (`preferenceBand`). Raw IREQ, weather, buffers and
+ * protection needs stay as calculated; other sports ignore it.
  */
 export function phaseTargets(
   activity: ActivityType,
@@ -102,9 +127,10 @@ export function phaseTargets(
   extremityBaseline: IreqResult = baseline,
   exertion: ExertionLevel = 'moderate',
   dynamicExposure?: DynamicExposure,
+  sensitivity: TemperatureSensitivity = 'neutral',
 ) {
   const policy = isCalibratedActivity(activity)
-    ? sustainedSportPolicy(activity, exertion, metabolicRate, conditions, windMs)
+    ? sustainedSportPolicy(activity, exertion, metabolicRate, conditions, windMs, sensitivity)
     : undefined;
   const exposure = policy?.coldExposureFactor ?? 1;
   const range = calculateActivityTargetRange({
@@ -145,13 +171,13 @@ export function phaseTargets(
   const toBasic = (clo: number, fclReference = clo) => (dynamicExposure
     ? round2(requiredBasicInsulation(clo, dynamicExposure, fclReference))
     : clo);
-  const targetRange: [number, number] = [toBasic(resultantRange[0]), toBasic(resultantRange[1])];
+  const standardRange: [number, number] = [toBasic(resultantRange[0]), toBasic(resultantRange[1])];
   const convertRegions = (values: typeof resultantRegional.min, reference: number) => ({
     torso: toBasic(values.torso, reference),
     arms: toBasic(values.arms, reference),
     legs: toBasic(values.legs, reference),
   });
-  const regional = {
+  const standardRegional = {
     min: convertRegions(resultantRegional.min, resultantRange[0]),
     neutral: convertRegions(resultantRegional.neutral, resultantRange[1]),
   };
@@ -160,10 +186,27 @@ export function phaseTargets(
     min: { hands: round2(rawExtremity.min.hands * exposure), head: round2(rawExtremity.min.head * exposure) },
     neutral: { hands: round2(rawExtremity.neutral.hands * exposure), head: round2(rawExtremity.neutral.head * exposure) },
   } : rawExtremity;
-  const extremity = applyCowedaBufferToExtremityTargets(
+  const standardExtremity = applyCowedaBufferToExtremityTargets(
     taperedExtremity,
     validationBuffer
   );
+
+  // Run Warm/Run Cold narrows each final band from one side; with no
+  // preference these are the standard bands unchanged. Hand and head upper
+  // limits follow the narrowed neutral, but never drop below the functional
+  // pole-grip glove allowance.
+  const preference = policy?.preference;
+  const targetRange = preferenceBand(standardRange[0], standardRange[1], preference);
+  const regional = preferenceBands(standardRegional, preference);
+  const extremity = preferenceBands(standardExtremity, preference);
+  const finalPolicy = preference ? {
+    ...policy,
+    preference: {
+      ...preference,
+      targetsChanged: JSON.stringify([targetRange, regional, extremity])
+        !== JSON.stringify([standardRange, standardRegional, standardExtremity]),
+    },
+  } : policy;
 
   return {
     targetRange, validationBuffer, regional,
@@ -174,7 +217,7 @@ export function phaseTargets(
         head: extremity.neutral.head,
       } } : {}),
     },
-    ...(policy ? { policy } : {}),
+    ...(finalPolicy ? { policy: finalPolicy } : {}),
   };
 }
 

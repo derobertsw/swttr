@@ -11,6 +11,7 @@ import { readJson } from '@/lib/api';
 import type { UserBodyMetrics } from '@/types/preferences';
 import type { PrecipitationType } from '@/types/weather';
 import { isXCContext, type XCContext } from '@/types/xc';
+import { resolvePreference, type ResolvedPreference } from './preference';
 
 export interface WeatherInput {
   temperature: number;
@@ -32,6 +33,8 @@ type RecommendationBody = {
   weight_lbs?: unknown;
   outing_pattern?: unknown;
   xc_exposure?: unknown;
+  /** Run Warm/Run Cold: `hot`, `neutral` or `cold`. */
+  temperature_sensitivity?: unknown;
 };
 
 export interface RecommendationRequest extends XCContext {
@@ -48,6 +51,9 @@ export interface RecommendationRequest extends XCContext {
   bodyMetrics: UserBodyMetrics;
   useWardrobeOnly: boolean;
   prioritizeLightPack: boolean;
+  /** Run Warm/Run Cold, from the request or the caller's saved setting (#251).
+   * Always set by parsing; direct callers may omit it for neutral. */
+  preference?: ResolvedPreference;
 }
 
 /**
@@ -87,6 +93,10 @@ export async function parseRecommendationRequest(
   if (!isXCContext(xcContext)) {
     return NextResponse.json({ error: 'Invalid outing_pattern or xc_exposure' }, { status: 400 });
   }
+  const preference = await resolvePreference(body.temperature_sensitivity, supabase, userId);
+  if (!preference) {
+    return NextResponse.json({ error: 'temperature_sensitivity must be one of: hot, neutral, cold' }, { status: 400 });
+  }
   return {
     supabase,
     userId,
@@ -99,6 +109,7 @@ export async function parseRecommendationRequest(
     bodyMetrics: parseBodyMetricsFromRequestBody(body),
     useWardrobeOnly: body.use_wardrobe_only === true,
     prioritizeLightPack: Boolean(body.prioritize_light_pack),
+    preference,
     ...xcContext,
   };
 }

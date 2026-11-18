@@ -44,6 +44,16 @@ describe("paidRecommendationRoute", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it("rejects an invalid temperature sensitivity before charging, and charges for a valid one", async () => {
+    const route = await loadRoute("test-secret-key-for-unit-tests-only");
+    const weather = { temperature: 30, wind_speed: 5 };
+    for (const temperature_sensitivity of ["warm", null, 1]) {
+      expect((await route(post(JSON.stringify({ weather, temperature_sensitivity })))).status).toBe(400);
+    }
+    expect((await route(post(JSON.stringify({ weather, temperature_sensitivity: "hot" })))).status).toBe(402);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it("returns 503 instead of throwing when MPP is not configured", async () => {
     const route = await loadRoute();
     const response = await route(post(VALID_BODY));
