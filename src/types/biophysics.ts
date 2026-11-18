@@ -61,6 +61,11 @@ export interface AccessoryAssessments {
  */
 export interface IreqRange {
   policy?: SustainedSportPolicy;
+  /** Outfit checks manual edits repeat for a sport without a sustained policy (cycling). */
+  outfit_checks?: {
+    require_standalone: boolean;
+    protection: SustainedSportPolicy['protection'];
+  };
   min?: number;
   neutral?: number;
   skiing?: IreqData;

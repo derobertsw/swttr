@@ -37,7 +37,8 @@ function phase(body: BiophysicsRecommendation): PhaseEvaluationInput {
     extremityMaxTargets: ireq.extremity?.max ? { hands: ireq.extremity.max.hands, headNeck: ireq.extremity.max.head } : undefined,
     targetRange: ireq.target_range,
     breathabilityTarget: rec.evaluation?.breathabilityTarget,
-    requireStandalone: Boolean(ireq.policy), protectionNeeds: ireq.policy?.protection,
+    requireStandalone: Boolean(ireq.policy) || ireq.outfit_checks?.require_standalone === true,
+    protectionNeeds: ireq.policy?.protection ?? ireq.outfit_checks?.protection,
   };
 }
 
