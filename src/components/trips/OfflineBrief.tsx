@@ -471,33 +471,71 @@ function SaveOfflineSheet({ tripId, userId, saved, onClose, onCloseAutoFocus, on
   onSaved: (stored: SavedBrief, opening: Opening) => void;
 }) {
   const [choices, setChoices] = useState<Omit<TripOfflineBriefResponse, "brief"> | null>(null);
-  // Null until the server's default days arrive, or the days already saved.
-  const [selected, setSelected] = useState<string[] | null>(saved?.brief.covered.dates ?? null);
+  // Null until the trip's days arrive: then the saved copy's days that are still on the trip, or the default days.
+  const [selected, setSelected] = useState<string[] | null>(null);
+  // Days chosen before that the trip no longer has, said in words.
+  const [notice, setNotice] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ key: string; brief: TripOfflineBrief } | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Reloads the trip's days, after its dates changed under the sheet.
+  const [reload, setReload] = useState(0);
   const previewKey = useRef<string | null>(null);
+  const chosen = useRef<string[] | null>(null);
   const key = selected?.join(",") ?? "";
+  useEffect(() => { chosen.current = selected; }, [selected]);
 
+  // The trip's days as they are now, always from the default brief, so days
+  // the trip no longer has can't stop the sheet from offering the ones it does.
   useEffect(() => {
-    if (selected?.length === 0 || previewKey.current === key) return;
+    const controller = new AbortController();
+    fetchOfflineBrief(tripId, undefined, controller.signal).then((response) => {
+      const onTrip = new Set(response.trip_days.map((day) => day.date));
+      const wanted = chosen.current ?? saved?.brief.covered.dates ?? null;
+      const kept = wanted?.filter((date) => onTrip.has(date)) ?? [];
+      const gone = wanted?.filter((date) => !onTrip.has(date)) ?? [];
+      const next = kept.length > 0 ? kept : response.brief.covered.dates;
+      // The server's labels for the gone days: the saved copy's, or the days this sheet listed.
+      const label = (date: string) => saved?.brief.days.find((day) => day.date === date)?.date_label
+        ?? choices?.trip_days.find((day) => day.date === date)?.date_label ?? date;
+      const names = gone.map(label).join(", ");
+      setNotice(gone.length === 0 ? null : kept.length > 0
+        ? `${names} ${gone.length === 1 ? "is" : "are"} no longer a day of this trip, so ${gone.length === 1 ? "it's" : "they're"} left out.`
+        : `None of the saved days (${names}) are on the trip any more, so the trip's days ahead are chosen instead.`);
+      setChoices({ trip_days: response.trip_days, default_dates: response.default_dates });
+      setSelected(next);
+      setPreviewError(null);
+      if (next.join(",") === response.brief.covered.dates.join(",")) {
+        previewKey.current = next.join(",");
+        setPreview({ key: next.join(","), brief: response.brief });
+      }
+    }, (err) => {
+      if (!controller.signal.aborted) setPreviewError(errorMessage(err));
+    });
+    return () => controller.abort();
+    // `choices` only names gone days on a reload; reading it mustn't start one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripId, saved, reload]);
+
+  // What the chosen days include, once they're known and whenever they change.
+  useEffect(() => {
+    if (!choices || !selected?.length || previewKey.current === key) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      fetchOfflineBrief(tripId, selected ?? undefined, controller.signal).then((response) => {
-        // The default days are known once they arrive; chosen days keep their own key.
-        const shown = selected ? key : response.brief.covered.dates.join(",");
-        previewKey.current = shown;
-        setChoices({ trip_days: response.trip_days, default_dates: response.default_dates });
-        setPreview({ key: shown, brief: response.brief });
+      fetchOfflineBrief(tripId, selected, controller.signal).then((response) => {
+        previewKey.current = key;
+        setPreview({ key, brief: response.brief });
         setPreviewError(null);
-        if (!selected) setSelected(response.brief.covered.dates);
       }, (err) => {
-        if (!controller.signal.aborted) setPreviewError(errorMessage(err));
+        if (controller.signal.aborted) return;
+        // The trip's dates changed since the sheet opened: list its days again.
+        if (err instanceof TripRequestError && err.status === 409) setReload((n) => n + 1);
+        else setPreviewError(errorMessage(err));
       });
-    }, selected ? 300 : 0);
+    }, 300);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [tripId, key, selected]);
+  }, [tripId, key, selected, choices]);
 
   const toggle = (date: string) => setSelected((current) => {
     const next = new Set(current ?? []);
@@ -513,7 +551,9 @@ function SaveOfflineSheet({ tripId, userId, saved, onClose, onCloseAutoFocus, on
       const stored = await storeSavedBrief(userId, brief);
       onSaved(stored, await prepareOfflineOpening());
     } catch (err) {
-      setSaveError(`Couldn't save on this device: ${errorMessage(err)} ${saved ? `The copy saved ${absoluteTime(saved.brief.saved_at)} is still on this device.` : "Nothing was saved."}`);
+      const changed = err instanceof TripRequestError && err.status === 409;
+      if (changed) setReload((n) => n + 1);
+      setSaveError(`Couldn't save on this device: ${changed ? "The trip's days changed. Check the days and save again." : errorMessage(err)} ${saved ? `The copy saved ${absoluteTime(saved.brief.saved_at)} is still on this device.` : "Nothing was saved."}`);
     } finally {
       setSaving(false);
     }
@@ -557,6 +597,7 @@ function SaveOfflineSheet({ tripId, userId, saved, onClose, onCloseAutoFocus, on
               ))}
             </ul>
           )}
+          {notice && <p role="status" className="mt-2 text-base text-foreground">{notice}</p>}
           {selected?.length === 0 && <p className="mt-1 text-base text-foreground">Choose at least one day.</p>}
         </fieldset>
         <div role="status" aria-live="polite">

@@ -112,6 +112,73 @@ describe("Save for offline on the trip (#214)", () => {
     expect(screen.getByRole("button", { name: "Save for offline" })).toBeInTheDocument();
   });
 
+  describe("after the trip's dates changed", () => {
+    const FEB_20 = "2027-02-20";
+    /** The brief API for a trip whose days are now Saturday and Sunday: other days are left out, or refused when none remain. */
+    const rescheduledApi = () => vi.fn(async (url: string) => {
+      const asked = new URL(url, "http://localhost").searchParams.get("dates")?.split(",");
+      const days = asked ? asked.filter((date) => date === SAT || date === "2027-02-14") : [SAT, "2027-02-14"];
+      if (days.length === 0) {
+        return { ok: false, status: 409, json: async () => ({ error: "None of these days are on the trip any more. Choose the days to save again." }) } as Response;
+      }
+      const brief = days.length === 1 ? saturdayOnly() : offlineBrief({ revision: "rev-2" });
+      return { ok: true, status: 200, json: async () => briefResponse(brief) } as Response;
+    });
+    /** A copy saved for days with their own labels, as the trip had them then. */
+    const savedFor = (days: Array<[string, string]>) => {
+      const template = offlineBrief().days[0];
+      return offlineBrief({
+        covered: { dates: days.map(([date]) => date), label: days.map(([, label]) => label).join(", ") },
+        days: days.map(([date, label]) => ({ ...template, date, date_label: label })),
+      });
+    };
+
+    it("offers the trip's current days when none of the saved days remain, and keeps the old copy until the new one saves", async () => {
+      await storeSavedBrief("user_1", savedFor([["2027-01-09", "Sat Jan 9"], ["2027-01-10", "Sun Jan 10"]]));
+      const fetchMock = rescheduledApi();
+      vi.stubGlobal("fetch", fetchMock);
+      const user = userEvent.setup();
+      render(<TripOfflineSave tripId="trip-1" />);
+
+      // The section's own check finds the saved days gone.
+      expect(await screen.findByText("Trip changed — update saved copy")).toBeInTheDocument();
+      const opened = fetchMock.mock.calls.length;
+      await user.click(screen.getByRole("button", { name: "Change saved days" }));
+      const dialog = await screen.findByRole("dialog", { name: "Save for offline" });
+      expect(await within(dialog).findByText("None of the saved days (Sat Jan 9, Sun Jan 10) are on the trip any more, so the trip's days ahead are chosen instead.")).toBeInTheDocument();
+      expect(within(dialog).getByRole("checkbox", { name: /Sat Feb 13/ })).toBeChecked();
+      expect(within(dialog).getByRole("checkbox", { name: /Sun Feb 14/ })).toBeChecked();
+      expect(await within(dialog).findByRole("heading", { name: "Included" })).toBeInTheDocument();
+      expect((await readSavedBrief("trip-1", "user_1"))?.brief.covered.dates).toEqual(["2027-01-09", "2027-01-10"]);
+
+      await user.click(within(dialog).getByRole("button", { name: "Save for offline" }));
+      expect(await screen.findByText(/^Saved on this device .* · Sat Feb 13 – Sun Feb 14$/)).toBeInTheDocument();
+      expect((await readSavedBrief("trip-1", "user_1"))?.brief.covered.dates).toEqual([SAT, "2027-02-14"]);
+      // The sheet never asked for the days the trip no longer has.
+      expect(fetchMock.mock.calls.slice(opened).map(([url]) => url).filter((url) => String(url).includes("2027-01"))).toEqual([]);
+    });
+
+    it("drops the saved days the trip no longer has, says so, and keeps the rest", async () => {
+      await storeSavedBrief("user_1", savedFor([[SAT, "Sat Feb 13"], [FEB_20, "Sat Feb 20"]]));
+      const fetchMock = rescheduledApi();
+      vi.stubGlobal("fetch", fetchMock);
+      const user = userEvent.setup();
+      render(<TripOfflineSave tripId="trip-1" />);
+
+      await user.click(await screen.findByRole("button", { name: "Change saved days" }));
+      const dialog = await screen.findByRole("dialog", { name: "Save for offline" });
+      expect(await within(dialog).findByText("Sat Feb 20 is no longer a day of this trip, so it's left out.")).toBeInTheDocument();
+      expect(within(dialog).getByRole("checkbox", { name: /Sat Feb 13/ })).toBeChecked();
+      expect(within(dialog).getByRole("checkbox", { name: /Sun Feb 14/ })).not.toBeChecked();
+      expect(await within(dialog).findByRole("heading", { name: "Included" })).toBeInTheDocument();
+
+      await user.click(within(dialog).getByRole("button", { name: "Save for offline" }));
+      expect(await screen.findByText(/^Saved on this device .* · Sat Feb 13$/)).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenLastCalledWith(`/api/v1/trips/trip-1/brief?dates=${SAT}`, expect.anything());
+      expect((await readSavedBrief("trip-1", "user_1"))?.brief.covered.dates).toEqual([SAT]);
+    });
+  });
+
   it("isn't offered to someone signed out", () => {
     fakeClerkState.signedIn = false;
     vi.stubGlobal("fetch", briefApi());
