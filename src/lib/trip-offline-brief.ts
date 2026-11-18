@@ -90,10 +90,11 @@ function coveredLabel(dates: string[]): string {
 
 /**
  * Drives whose `detail` only says when a calculated estimate was made and on
- * what assumptions. It changes on every recalculation, so it's left out of
- * the revision; the organizer's own estimate's note isn't.
+ * what assumptions, and whether it's stale. The date changes on every
+ * recalculation, so it's left out of the revision, but staleness isn't; nor
+ * is the organizer's own estimate's note.
  */
-const calculatedDetail = new WeakSet<OfflineBriefDrive>();
+const calculatedDetail = new WeakMap<OfflineBriefDrive, { stale: boolean }>();
 
 /** The drive this member takes: their own departure, or the crew's, as the day page shows it. */
 function driveFor(day: TripDriveDay | undefined, memberId: string | null): OfflineBriefDrive | null {
@@ -133,7 +134,7 @@ function driveFor(day: TripDriveDay | undefined, memberId: string | null): Offli
       { label: "Directions in Google Maps", url: route.directions.google },
     ] : [],
   };
-  if (calculated) calculatedDetail.add(drive);
+  if (calculated) calculatedDetail.set(drive, { stale: route.state === "stale" });
   return drive;
 }
 
@@ -160,8 +161,18 @@ const wearOf = (wear: Recommendation) => BODY_PARTS.flatMap((part) => {
 
 function kitParts(outfit: SavedKit): OfflineBriefKitPart[] {
   if (outfit.kind === "plan_day") {
-    const wear = outfit.day?.baseline?.recommendation;
-    return wear ? [{ label: "Day", wear: wearOf(wear), carry: outfit.day.carryItems ?? [] }] : [];
+    // The day's layers, then each part of the day that wears something else.
+    const [day, ...dayparts] = kitWear(outfit);
+    if (!day) return [];
+    const baseline = wearOf(day.wear);
+    const same = JSON.stringify(baseline);
+    return [
+      { label: "Day", wear: baseline, carry: outfit.day.carryItems ?? [] },
+      ...dayparts.flatMap((part) => {
+        const wear = wearOf(part.wear);
+        return JSON.stringify(wear) === same ? [] : [{ label: PHASE_LABEL[part.id], wear, carry: [] }];
+      }),
+    ];
   }
   return kitWear(outfit).map((part) => ({
     label: PHASE_LABEL[part.id],
@@ -386,7 +397,9 @@ export function buildOfflineBrief({ full, userId, dates, drive, equipment, now }
   // alone isn't the trip changing. The organizer's note on their own estimate is.
   const basis = { ...content, days: days.map((day) => ({
     ...day,
-    getting_there: day.getting_there && calculatedDetail.has(day.getting_there) ? { ...day.getting_there, detail: null } : day.getting_there,
+    // Without the date, but still saying whether it's stale.
+    getting_there: day.getting_there && calculatedDetail.has(day.getting_there)
+      ? { ...day.getting_there, detail: calculatedDetail.get(day.getting_there)!.stale ? "stale" : null } : day.getting_there,
   })) };
   return {
     ...content,

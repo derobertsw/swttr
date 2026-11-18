@@ -323,6 +323,8 @@ export async function reconcileSavedBriefs(userId: string | null, account: strin
   if (userId === null) {
     const response = await fetch("/api/v1/trips", { cache: "no-store", signal: AbortSignal.timeout(8000) }).catch(() => null);
     if (response?.status !== 401) return false;
+    // Someone signed in while the server answered: that 401 is out of date.
+    if (signedIn !== undefined && signedIn !== null) return false;
   }
   return clearSavedBriefs(account);
 }

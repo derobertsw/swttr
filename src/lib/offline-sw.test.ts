@@ -26,7 +26,14 @@ const PAGE = (chunk: string) => `<!doctype html><html><head>
 </head><body><script src="/_next/static/chunks/${chunk}" async></script>
 <script>self.__next_f.push([1,"\\"static/chunks/maybe-not-a-file.js\\""])</script></body></html>`;
 
-function worker(network: Map<string, Reply>) {
+function worker(network: Map<string, Reply>, { timeScale = 1 / 1000 }: { timeScale?: number } = {}) {
+  // A held navigation waits until the test fails it, as a slow or dropped connection would.
+  let heldNavigation: Promise<Response> | null = null;
+  let dropNavigation: () => void = () => undefined;
+  const holdNavigation = () => {
+    heldNavigation = new Promise<Response>((_, reject) => { dropNavigation = () => reject(new TypeError("Failed to fetch")); });
+    return () => dropNavigation();
+  };
   const stores = new Map<string, Map<string, Response>>();
   const key = (request: RequestInfo | URL) => new URL(typeof request === "string" ? request : request instanceof URL ? request.href : request.url, ORIGIN);
   // Holds cache lookups after the next `skip` until released, to order them against the browser reading a response.
@@ -71,6 +78,7 @@ function worker(network: Map<string, Reply>) {
     clients: { claim: async () => undefined },
   };
   const fetch = async (request: RequestInfo | URL, init: RequestInit = {}) => {
+    if (heldNavigation && typeof request === "object" && "mode" in request && request.mode === "navigate") return heldNavigation;
     const url = key(request);
     const reply = network.get(url.pathname);
     if (!reply) throw new TypeError("Failed to fetch");
@@ -81,7 +89,7 @@ function worker(network: Map<string, Reply>) {
     return asResponse(reply);
   };
   // The worker's timers run a thousand times faster, so its deadlines pass within a test.
-  const fastTimeout = (run: () => void, ms = 0) => setTimeout(run, ms / 1000);
+  const fastTimeout = (run: () => void, ms = 0) => setTimeout(run, ms * timeScale);
   new Function("self", "caches", "fetch", "setTimeout", "clearTimeout", source)(self, caches, fetch, fastTimeout, clearTimeout);
 
   /** Sends the page's "keep the latest page" message and resolves with the worker's reply. */
@@ -103,7 +111,19 @@ function worker(network: Map<string, Reply>) {
     });
     return answer!;
   };
-  const kept = () => [...stores].filter(([name]) => name.startsWith("swttr-saved-shell-"));
+  /** The kept copies, newest first. */
+  const kept = () => [...stores].filter(([name]) => name.startsWith("swttr-saved-shell-")).sort(([a], [b]) => b.localeCompare(a));
+  /** What the worker answers for a build file the page asks for, with the network gone. */
+  const staticOffline = async (path: string) => {
+    network.clear();
+    let answer: Promise<Response> | undefined;
+    listeners.get("fetch")!({
+      request: new Request(`${ORIGIN}${path}`),
+      respondWith: (response: Promise<Response>) => { answer = response; },
+      waitUntil: () => undefined,
+    });
+    return answer!.then((response) => response.status, () => "failed");
+  };
   /** A navigation to /trips/saved with the network up: the response, and the work it left running. */
   const openOnline = () => {
     let answer: Promise<Response> | undefined;
@@ -115,7 +135,7 @@ function worker(network: Map<string, Reply>) {
     });
     return { answer: answer!, settled: async () => { await answer; await Promise.all(pending); } };
   };
-  return { prime, openOffline, openOnline, hold, kept, stores };
+  return { prime, openOffline, openOnline, staticOffline, hold, holdNavigation, kept, stores };
 }
 
 const network = (chunk: string, overrides: Record<string, Reply> = {}) => new Map<string, Reply>(Object.entries({
@@ -212,6 +232,25 @@ describe("The saved trips page's service worker (#214)", () => {
     expect(await sw.prime()).toEqual({ ok: true });
     const [[, files]] = sw.kept();
     expect([...files.keys()].map((url) => new URL(url).pathname)).toContain("/_next/static/chunks/v2.js");
+  });
+
+  it("serves the newest kept page when the connection drops after a newer one was kept, and keeps the one before's files", async () => {
+    // Slower timers: the navigation's 4 second wait is 400 ms, time enough to keep the new page first.
+    const sw = worker(net, { timeScale: 1 / 10 });
+    expect(await sw.prime()).toEqual({ ok: true });
+    net.set("/trips/saved", { status: 200, body: PAGE("v2.js"), type: "text/html" });
+    net.set("/_next/static/chunks/v2.js", { status: 200, body: "console.log(2)", type: "application/javascript" });
+    await new Promise((resolve) => setTimeout(resolve, 2));
+
+    // A navigation starts while the old page is kept; meanwhile a save keeps the new one; then the connection drops.
+    const drop = sw.holdNavigation();
+    const { answer } = sw.openOnline();
+    expect(await sw.prime()).toEqual({ ok: true });
+    drop();
+    expect(await (await answer).text()).toContain("/_next/static/chunks/v2.js");
+    // Both copies' files open offline: the new page's, and the old page's for one already open.
+    expect(await sw.staticOffline("/_next/static/chunks/v2.js")).toBe(200);
+    expect(await sw.staticOffline("/_next/static/chunks/v1.js")).toBe(200);
   });
 
   it("reports a failure when the connection drops part way", async () => {

@@ -69,8 +69,20 @@ async function keptPage() {
   return cache ? cache.match(SHELL_PATH) : undefined;
 }
 
-async function removeCachesExcept(keep) {
-  const names = (await caches.keys()).filter((name) => (name.startsWith(CACHE_PREFIX) || name.startsWith(STAGING_PREFIX)) && name !== keep);
+/** Every kept copy's cache, newest first. */
+async function keptCaches() {
+  return (await caches.keys()).filter((name) => name.startsWith(CACHE_PREFIX)).sort().reverse();
+}
+
+/**
+ * Drops all but the new kept copy and the one before it, and any staging
+ * left over. A page served from the copy before, as a navigation that
+ * started before the new one was kept can be, still finds its files.
+ */
+async function removeOlderCaches(keep) {
+  const kept = await keptCaches();
+  const previous = kept.find((name) => name < keep);
+  const names = (await caches.keys()).filter((name) => (name.startsWith(CACHE_PREFIX) || name.startsWith(STAGING_PREFIX)) && name !== keep && name !== previous);
   await Promise.all(names.map((name) => caches.delete(name)));
 }
 
@@ -134,7 +146,7 @@ function prime() {
       const kept = await caches.open(keptName);
       for (const request of await staging.keys()) await kept.put(request, await staging.match(request));
       await kept.put(SHELL_PATH, page);
-      await removeCachesExcept(keptName);
+      await removeOlderCaches(keptName);
     } catch (error) {
       await caches.delete(keptName);
       throw signal.aborted ? new Error("the offline page took too long to download") : error;
@@ -155,10 +167,13 @@ function withTimeout(promise, ms) {
 
 /** Online, the live page (and keep it when its build changed); offline or slow, the kept one. */
 async function openPage(event) {
-  const kept = await keptPage();
+  // Whether there's a kept copy decides how long to wait for the live page.
+  // The copy served is read again when it's needed, since a newer one may
+  // have been kept meanwhile, along with its own files.
+  const hasKept = !!(await keptPage());
   try {
-    const live = await withTimeout(fetch(event.request), kept ? NETWORK_TIMEOUT_MS : 30000);
-    if (!isPage(live)) return kept || live;
+    const live = await withTimeout(fetch(event.request), hasKept ? NETWORK_TIMEOUT_MS : 30000);
+    if (!isPage(live)) return (await keptPage()) || live;
     // The browser starts reading `live` as soon as it's returned, so the check
     // reads its own copy, taken before anything else waits.
     const copy = live.clone();
@@ -170,15 +185,21 @@ async function openPage(event) {
     })());
     return live;
   } catch {
-    return kept || new Response(OFFLINE_PAGE, { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } });
+    return (await keptPage()) || new Response(OFFLINE_PAGE, { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } });
   }
 }
 
-/** Build files never change under one name, so the kept one serves; new ones join the kept page's cache. */
+/**
+ * Build files never change under one name, so a kept one serves: from the
+ * newest copy, or the one before for a page served from it. New ones join
+ * the newest copy's cache.
+ */
 async function staticFile(request, ignoreSearch) {
+  for (const name of await keptCaches()) {
+    const hit = await (await caches.open(name)).match(request, { ignoreSearch });
+    if (hit) return hit;
+  }
   const cache = await currentCache();
-  const hit = cache && await cache.match(request, { ignoreSearch });
-  if (hit) return hit;
   const response = await fetch(request);
   if (response.ok && response.type === "basic" && cache) await cache.put(request, response.clone()).catch(() => undefined);
   return response;

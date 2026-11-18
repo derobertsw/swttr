@@ -164,6 +164,18 @@ describe("Trip briefs saved on this device (#214)", () => {
       expect(savedBriefsAccountHint()).toBe("user_2");
     });
 
+    it("doesn't clear them when the account signs back in while the server answers", async () => {
+      await storeSavedBrief("user_1", offlineBrief());
+      noteSignedInAccount(null);
+      let answer!: (response: Response) => void;
+      vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { answer = resolve; })));
+      const pending = reconcileSavedBriefs(null, "user_1");
+      noteSignedInAccount("user_1");
+      answer({ status: 401 } as Response);
+      expect(await pending).toBe(false);
+      expect((await readSavedBriefs()).briefs).toHaveLength(1);
+    });
+
     it("leaves the signed-in account's own copies alone", async () => {
       await storeSavedBrief("user_1", offlineBrief());
       expect(await reconcileSavedBriefs("user_1", "user_1")).toBe(false);

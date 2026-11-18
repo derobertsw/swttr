@@ -3,7 +3,7 @@ import { buildOfflineBrief, defaultBriefDates, parseBriefDates } from "@/lib/tri
 import { buildLodging } from "@/lib/trip-lodging";
 import { dayStarts } from "@/lib/trip-drive";
 import { tripFullFor } from "@/lib/trips";
-import { savedOutfit } from "@/test/savedKit";
+import { planDay, savedOutfit, savedPlan, WEAR } from "@/test/savedKit";
 import type {
   TripDay, TripDayConditionsSource, TripDriveDay, TripDriveEstimates, TripFull, TripLocation, TripMember, TripStay,
   TripTourPlanSummary,
@@ -274,6 +274,36 @@ describe("A member's offline trip brief (#214)", () => {
     expect(before.days[0].getting_there).toMatchObject({ summary: "50 min · the organizer's estimate", detail: "Chains required past Golden · Entered Tue Feb 9" });
     expect(manual("Road open, no chains").revision).not.toBe(before.revision);
     expect(manual("Chains required past Golden").revision).toBe(before.revision);
+  });
+
+  it("changes revision when a calculated drive time goes stale", () => {
+    const withState = (state: "available" | "stale") => {
+      const estimates = drive();
+      Object.assign(estimates.days[0].departures[1], { state });
+      return buildOfflineBrief({ full: tripFullFor(fullTrip(), "user-org"), userId: "user-org", dates: [SAT], drive: estimates, equipment, now: NOW });
+    };
+    const fresh = withState("available");
+    const stale = withState("stale");
+    expect(stale.days[0].getting_there?.detail).toBe("Calculated Tue Feb 9 · typical traffic, not live · not updated since");
+    expect(stale.revision).not.toBe(fresh.revision);
+  });
+
+  it("keeps a plan day's layers, and each part of the day that wears something else", () => {
+    const shell = { name: "Wind shell", rcl: 0.2, sourceId: "g-9" };
+    const evening = { ...WEAR, torso: { ...WEAR.torso, outer: [...WEAR.torso.outer, shell] } };
+    const day = planDay(SAT, {
+      dayparts: planDay(SAT).dayparts.map((part) => part.id === "evening" ? { ...part, recommendation: evening } : part),
+    });
+    const plan = savedPlan();
+    const kit = { version: 1 as const, kind: "plan_day" as const, outing: plan.outing, startHour: 6, endHour: 21, day };
+    const trip = fullTrip();
+    trip.kits = [{ id: "kit-org", trip_day_id: "day-sat", trip_member_id: "m-org", effort: "steady", items: [], note: null, state: "ok", updated_at: "", outfit: kit }];
+    const [sat] = buildOfflineBrief({ full: tripFullFor(trip, "user-org"), userId: "user-org", dates: [SAT], drive: drive(), equipment, now: NOW }).days;
+    // The morning wears the day's layers, so only the evening is listed with them.
+    expect(sat.kit?.kind === "outfit" && sat.kit.parts.map((part) => [part.label, part.wear[0].items])).toEqual([
+      ["Day", ["Merino crew", "Fleece", "Ski shell"]],
+      ["Evening", ["Merino crew", "Fleece", "Ski shell", "Wind shell"]],
+    ]);
   });
 
   it("says when drive times or equipment couldn't be read rather than leaving them out silently", () => {

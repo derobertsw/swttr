@@ -26,7 +26,7 @@ This page covers the web app. The iPhone app's offline path is the last section;
 - **Authorization:** `requireTripAccess`, as for every trip read: 401 signed out, 404 not on the trip, 503 when the trip or membership couldn't be read (`TripAccessUnavailable`), so a database blip never reads as access removed. The brief is the trip as this person sees it (`tripFullFor`), built from the same server reads as the trip pages: `loadTripFull`, lodging and attendance (#331), meets (#333), tour plans (#210), conditions (#211), day checks (#212), the person's packing list for touring equipment (#212), and drive estimates (#209) read with `refresh: false`, so building a brief never calls a routing provider.
 - **Errors:** 400 for unreadable dates (`?dates=` must be up to 62 valid calendar dates), 409 when none of the asked dates are trip days any more, 429 past 30 a minute per person, 500 when it can't be built. Every response, errors included, is `Cache-Control: private, no-store` with `Vary: Cookie, Authorization`.
 - **Format:** `version: 1`, `kind: "swttr.trip-offline-brief"`. Every label is the server's (`src/lib/trip-offline-brief.ts`); the client only lays them out and formats the saved time on the device's clock. A reader refuses any other version or a brief whose days don't match its covered dates (`readOfflineBrief`).
-- **`revision`:** a hash of everything in the brief except `saved_at`. Comparing it with a fresh brief for the same days says whether anything the copy shows changed. A recalculated drive time alone changes only its "Calculated …" detail and doesn't count; a change to the note on the organizer's own drive estimate does. Each person's brief has its own revision.
+- **`revision`:** a hash of everything in the brief except `saved_at`. Comparing it with a fresh brief for the same days says whether anything the copy shows changed. A recalculated drive time alone changes only its "Calculated …" detail and doesn't count; a change to the note on the organizer's own drive estimate does, and so does a calculated estimate going stale. Each person's brief has its own revision.
 - **`viewer.user_id`:** the account it was built for. The device stores it only for that account.
 
 What a day holds:
@@ -41,7 +41,7 @@ What a day holds:
 | Tonight | Lodging person day | The stay's name, dates, booked or not, check-in/out times and location; a move between stays |
 | Tour plan | Backcountry days with a plan | Objective, figures, approach, access, backup, return, check-in, pickup, links, last change and revision |
 | Conditions | Sources on the day | Category, name, region, link, and the crew's current reviews: who, when on the destination's clock, note, and "Reviewed before the plan changed: …" |
-| My kit | The person's own kit | Saved outfit by body area (and climb/descent), a plan day's layers, or the older checklist; "No kit saved" otherwise |
+| My kit | The person's own kit | Saved outfit by body area (and climb/descent), a plan day's layers with each part of the day that wears something else, or the older checklist; "No kit saved" otherwise |
 | My equipment | The person's touring equipment (#212) | "Packed" or "Not packed yet" as of saving |
 | Day checks | The person's own checks | Recorded, not recorded or out of date, with the server's time label |
 | `missing` | | What the day doesn't have yet: activity, meet time, access point, tour plan, conditions sources, kit |
