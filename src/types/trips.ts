@@ -941,6 +941,23 @@ export interface TripStayCandidates {
   default_window: { first_night: string; checkout: string };
 }
 
+/**
+ * POST /api/v1/trips/:id/stay-candidates/use with `preview: true` (#213):
+ * the lodging preview of putting the chosen people in a compared stay or
+ * option for the compared nights.
+ */
+export interface TripStayUsePreview extends TripLodgingPreview {
+  /** Who it's for: as chosen, or everyone on the trip those nights. */
+  member_ids: string[];
+  stay_name: string;
+  /** An option, which becomes a saved stay for these nights, booking not confirmed. */
+  new_stay: boolean;
+  /** The option's revision for a new stay; the save sends it back as `expected_candidate_revision`. */
+  candidate_revision: number | null;
+  /** Booked stays the chosen people leave those nights. They stay booked. */
+  booked_kept: string[];
+}
+
 /** One option's drive on one morning of a comparison. */
 export interface TripStayComparisonDrive {
   /** "stay:<id>" or "candidate:<id>". */

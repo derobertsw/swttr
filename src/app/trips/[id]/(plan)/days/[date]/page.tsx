@@ -29,6 +29,7 @@ import { CopyDayCard } from "@/components/trips/CopyDayCard";
 import { canEditMemberKit } from "@/lib/trip-permissions";
 import { kitAdvice, kitWear } from "@/lib/trip-saved-kits";
 import { DayStart, DayTonight } from "@/components/trips/TripStays";
+import { possessive } from "@/components/trips/LodgingEditor";
 import { DayMeetControls } from "@/components/trips/DayMeet";
 import { DayNotesControls } from "@/components/trips/DayNotes";
 import { DayAccessPoint } from "@/components/trips/DayAccessPoint";
@@ -693,7 +694,7 @@ function MemberKitSummary({ member, kit, fit, away }: { member: TripMember; kit:
       <div className="flex flex-wrap items-center gap-3">
         <MemberAvatar name={member.display_name} size={28} state={member.role === "organizer" ? "self" : "default"} />
         <div className="min-w-32 flex-1">
-          <p className="truncate text-sm font-medium text-foreground">{member.display_name}</p>
+          <p className="break-words text-sm font-medium text-foreground">{member.display_name}</p>
           {away && <p className="text-sm text-muted-foreground">{away}</p>}
           <p className="text-sm text-muted-foreground">
             {outfit
@@ -777,8 +778,9 @@ function EditableMemberKitRow({
   };
 
   return (
-    // The Day checklist links here (#336).
-    <div id={`kit-${member.id}`} className="py-3">
+    // The Day checklist links here (#336). The organizer edits their own kit
+    // and each guest's, so each set of controls is named for whose it is (#337).
+    <div id={`kit-${member.id}`} role="group" aria-label={`${possessive(member.display_name)} kit`} className="py-3">
       <div className="flex flex-wrap items-center gap-3">
         <MemberAvatar
           name={member.display_name}
@@ -786,7 +788,7 @@ function EditableMemberKitRow({
           state={member.role === "organizer" ? "self" : "default"}
         />
         <div className="min-w-32 flex-1">
-          <p className="truncate text-sm font-medium text-foreground">{member.display_name}</p>
+          <p className="break-words text-sm font-medium text-foreground">{member.display_name}</p>
           {away && <p className="text-sm text-muted-foreground">{away}</p>}
           <p className="text-sm text-muted-foreground">
             {state === "warn"

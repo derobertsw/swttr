@@ -163,7 +163,8 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
                     }
                   />
                   <div className="min-w-32 flex-1">
-                    <p className="truncate text-sm font-semibold text-foreground">
+                    {/* Names wrap: a cut-off name can't be read anywhere else on the page (#337). */}
+                    <p className="break-words text-sm font-semibold text-foreground">
                       {m.display_name}
                     </p>
                     <p className="text-xs text-muted-foreground">

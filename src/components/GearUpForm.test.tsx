@@ -150,6 +150,26 @@ describe("GearUpForm", () => {
 
     expect(screen.getByRole("button", { name: "Building your plan…" })).toHaveAttribute("aria-busy", "true");
   });
+
+  it.each([
+    { length: "one day", durationDays: 1, running: "Getting your layers…" },
+    { length: "several days", durationDays: 3, running: "Building your plan…" },
+  ])("announces the request for $length while it runs, from a status that's there before it starts (#284)", ({ durationDays, running }) => {
+    const props = baseProps({ inputMode: "later", durationDays });
+    const { rerender } = render(<GearUpForm {...props} />);
+    const form = screen.getByRole("form", { name: "Outing" });
+    const statuses = within(form).getAllByRole("status");
+    const announced = () => within(form).queryByText(running, { selector: "[role='status']" });
+    expect(announced()).not.toBeInTheDocument();
+
+    rerender(<GearUpForm {...props} loading />);
+    expect(announced()).toBeInTheDocument();
+    // Screen readers announce a change to a status already on the page, not a new one.
+    expect(statuses).toContain(announced());
+
+    rerender(<GearUpForm {...props} />);
+    expect(announced()).not.toBeInTheDocument();
+  });
 });
 
 describe("GearUpForm's start date calendar", () => {

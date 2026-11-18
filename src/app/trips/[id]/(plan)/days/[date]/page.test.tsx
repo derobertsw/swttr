@@ -785,6 +785,23 @@ describe("Trip day page", () => {
       expect(screen.getByText("Needs help")).toBeInTheDocument();
     });
 
+    // The organizer edits their own kit and each guest's, so the same layer and
+    // effort buttons repeat; each set is named for whose kit it is (#337).
+    it("names each editable kit's controls for whose kit they change", async () => {
+      vi.stubGlobal("fetch", crewTrip([kit(SAM, { items: ["shell"] })]));
+      await renderPage();
+      const mine = await screen.findByRole("group", { name: "Your kit" });
+      const sams = screen.getByRole("group", { name: "Sam's kit" });
+      expect(within(mine).getByRole("button", { name: "Shirt" })).toHaveAttribute("aria-pressed", "false");
+      expect(within(sams).getByRole("button", { name: "Shell" })).toHaveAttribute("aria-pressed", "true");
+      expect(within(sams).getByRole("button", { name: "Flag needs help" })).toBeInTheDocument();
+      expect(within(sams).getByRole("group", { name: "Effort for Sam" })).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Ana's kit" })).not.toBeInTheDocument();
+      // A long name wraps rather than being cut off, editable or not.
+      expect(within(sams).getByText("Sam")).toHaveClass("break-words");
+      expect(screen.getByText("Ana")).not.toHaveClass("truncate");
+    });
+
     it("shows a member only their own kit to change, and the organizer's under their name for the crew", async () => {
       mockAuth.userId = "user-2";
       vi.stubGlobal("fetch", crewTrip([kit(ORGANIZER, { outfit: savedOutfit() })], [ORGANIZER_TO_CREW, ANA, SAM]));
@@ -1071,6 +1088,8 @@ describe("Trip day page", () => {
       const user = userEvent.setup();
       await renderPage();
       expect(await screen.findByText("No touring equipment in your packing list yet.")).toBeInTheDocument();
+      // Its label wraps with enlarged text rather than run off a phone (#337).
+      expect(screen.getByRole("button", { name: "Add touring equipment" })).toHaveClass("whitespace-normal");
       await user.click(screen.getByRole("button", { name: "Add touring equipment" }));
       const dialog = await screen.findByRole("dialog", { name: "Touring equipment" });
       await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));

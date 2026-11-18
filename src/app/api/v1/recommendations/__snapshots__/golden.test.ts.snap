@@ -340,6 +340,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 69.8,
       "thermal_comfort_score": 53.1,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
@@ -674,6 +687,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 69.3,
       "thermal_comfort_score": 51.4,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [],
   },
   "status": 200,
@@ -1012,6 +1038,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 68.9,
       "thermal_comfort_score": 41.2,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
@@ -1349,6 +1388,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 68.1,
       "thermal_comfort_score": 56.7,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [
       "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
     ],
@@ -1664,6 +1716,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 90.9,
       "thermal_comfort_score": 76.3,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Atomic Backland CTD in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [],
   },
   "status": 200,
@@ -1978,6 +2043,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 90.4,
       "thermal_comfort_score": 76.3,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Atomic Backland CTD in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [],
   },
   "status": 200,
@@ -2296,8 +2374,24 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in with an empt
       "score": 59.4,
       "thermal_comfort_score": 13.8,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Ski helmet",
+          "owned": false,
+        },
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "message": "Ski helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
+      "No ski helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -2656,6 +2750,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 57.5,
       "thermal_comfort_score": 39.2,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [
       "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
     ],
@@ -3005,6 +3112,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 82.5,
       "thermal_comfort_score": 29.8,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
     ],
@@ -3366,6 +3486,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 73.2,
       "thermal_comfort_score": 51.2,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "Insufficient torso insulation: 5.1 clo vs 5.7 clo required for alpine conditions",
@@ -3719,6 +3852,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 79.7,
       "thermal_comfort_score": 33.2,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
       "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
@@ -4015,6 +4161,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 93.8,
       "thermal_comfort_score": 96,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Atomic Backland CTD (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [],
   },
   "status": 200,
@@ -4327,6 +4486,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 83.2,
       "thermal_comfort_score": 74.5,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Atomic Backland CTD (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [],
   },
   "status": 200,
@@ -4691,9 +4863,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 63.5,
       "thermal_comfort_score": 34.5,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -5009,8 +5197,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 63.3,
       "thermal_comfort_score": 26.5,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -5330,9 +5534,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 69.4,
       "thermal_comfort_score": 38.7,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -5652,8 +5872,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 63,
       "thermal_comfort_score": 26,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -5944,8 +6180,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 87.1,
       "thermal_comfort_score": 57,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -6258,8 +6510,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 81.5,
       "thermal_comfort_score": 50.8,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -6571,8 +6839,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in with an empt
       "score": 64.1,
       "thermal_comfort_score": 30.4,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -6907,8 +7191,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 56.2,
       "thermal_comfort_score": 22.2,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -7244,8 +7544,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 74.4,
       "thermal_comfort_score": 18.6,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -7585,9 +7901,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 63.1,
       "thermal_comfort_score": 28.4,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -7925,8 +8257,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 74.4,
       "thermal_comfort_score": 18.3,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -8237,8 +8585,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 87.9,
       "thermal_comfort_score": 59.5,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -8549,8 +8913,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 81.5,
       "thermal_comfort_score": 50.8,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -14313,6 +14693,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 64.4,
       "thermal_comfort_score": 31.3,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -14840,6 +15233,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 61.9,
       "thermal_comfort_score": 26.3,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -15377,6 +15783,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 62.2,
       "thermal_comfort_score": 27,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -15902,6 +16321,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 72.9,
       "thermal_comfort_score": 26.2,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -16423,6 +16855,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 78.9,
       "thermal_comfort_score": 43.2,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Atomic Backland CTD in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "quick",
       "steps": [
@@ -16942,6 +17387,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 78.6,
       "thermal_comfort_score": 42.5,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Atomic Backland CTD in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "quick",
       "steps": [
@@ -17406,6 +17864,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
       "score": 66.2,
       "thermal_comfort_score": 32.4,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Ski helmet",
+          "owned": false,
+        },
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "message": "Ski helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -17423,6 +17896,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
       "Climb: Significant insulation shortfall: improve coverage of the areas below target.",
       "Climb: Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
       "Descent: Significant insulation shortfall: improve coverage of the areas below target.",
+      "Descent: No ski helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -17953,6 +18427,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 61.4,
       "thermal_comfort_score": 20.8,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -18470,6 +18957,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 71.5,
       "thermal_comfort_score": 18.5,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -19002,6 +19502,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 63.5,
       "thermal_comfort_score": 27,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -19520,6 +20033,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 71.4,
       "thermal_comfort_score": 18.4,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -20031,6 +20557,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 80.1,
       "thermal_comfort_score": 43.2,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Atomic Backland CTD (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "quick",
       "steps": [
@@ -20542,6 +21081,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 79.9,
       "thermal_comfort_score": 42.5,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Atomic Backland CTD (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "quick",
       "steps": [
@@ -26387,6 +26939,19 @@ exports[`POST /api/v1/recommendations/ski-touring (golden, pack options) > prior
       "score": 61.4,
       "thermal_comfort_score": 20.8,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
