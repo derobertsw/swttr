@@ -43,12 +43,15 @@ export async function fetchGarmentsWithDetails(
 
   // `!inner` is required for the .gte() below to drop garments under the score
   // threshold — without it PostgREST only nulls the embed and returns every row.
+  // Ventilation stays a left join: a garment without a record is kept, with
+  // `garment_ventilation: null` (vents unknown).
   let query = supabase
     .from('garments')
     .select(`
       *,
       garment_thermal_properties (*),
       garment_protection (*),
+      garment_ventilation (*),
       ${useActivityFilter ? 'garment_activity_ratings!inner (*)' : 'garment_activity_ratings (*)'}
     `);
 

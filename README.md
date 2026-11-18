@@ -65,6 +65,7 @@ graph TD
     PROT --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
     XCCARRY --> I[Canonical server phase assessment:<br/>actual worn regional and extremity basic clo<br/>local shortfalls and excess, moisture and clothing gaps]
     I --> H[Ensemble thermal scoring and API/UI reasons<br/>consume the same phase assessment]
+    H --> V[Alpine and ski touring: vent advice per selected garment and phase<br/>Only vents the catalog lists, a missing record means unknown<br/>Closed in precipitation, wind of 8 m/s or more, or a cold outfit or region<br/>Open when breathability is below target or the outfit is too warm<br/>Open-state breathability is a separate estimate: factor × Recl once<br/>Clo, targets, selection and the decision stay on the closed outfit]
 
     subgraph "Shared Biophysics Core — thermal-targets.ts"
         B
@@ -86,6 +87,10 @@ graph TD
     subgraph "Shared Evaluation — layer-evaluation.ts and response-builder.ts"
         H
         I
+    end
+
+    subgraph "Shared Vent Advice — ventilation.ts"
+        V
     end
 ```
 
@@ -197,6 +202,7 @@ graph TD
         A2 --> A3[Insulated outerwear occupies outer slot<br/>Puffies pair only with hard shells or no outer]
         A3 --> A4[Budget all layers by regional clo<br/>Balance shortfalls against excess warmth]
         A4 --> A5[60/40 ski-and-lift cycle IREQ<br/>at time-weighted metabolism and relative wind<br/>Convert cycle target to basic clo<br/>Chairlift DLE retained]
+        A5 --> A6[Vent advice: skiing follows the shared rules<br/>Close vents for the chairlift]
     end
 
     subgraph "XC Skiing — regional builder shared with alpine"
@@ -214,6 +220,7 @@ graph TD
         T3a --> T4a[Descent = climb clothing + pack:<br/>hard shell if the climb wore none<br/>a fleece or puffy and over-pants only where a region<br/>falls short of its descent minimum]
         T4a --> T6a[Pack layers that reach the minimum first<br/>then share of the region's gap closed, a shortfall counting double an excess,<br/>traded against weight; a light pack weighs weight more and may stop short]
         T6a --> T5a[Transition protocol:<br/>urgent / quick / normal<br/>names the insulation and leg layer to add]
+        T5a --> T7a[Vent advice: the climb follows the shared rules<br/>Close vents at the transition, a protocol step<br/>Keep them closed for the descent]
     end
 ```
 

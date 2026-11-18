@@ -22,6 +22,7 @@ import {
   type PhaseTargets,
 } from '../thermal-targets';
 import { selectPhaseAccessories } from '../extremities';
+import { ventilationAdvice, withVentTransitionStep } from '../ventilation';
 import { xcProtection } from './xc-outfit';
 import {
   buildTouringClimbEnsemble,
@@ -250,6 +251,15 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     const downhillResult = scorePhase(downhillEnsemble, downhill, descentExtremity, false);
     uphillResult.recommendation.accessories = climbAccessories.assessments;
 
+    // Vent settings for the selected garments: the climb, then the
+    // transition and descent (climb layers stay on, pack layers go on).
+    const ventilation = ventilationAdvice({
+      windMs,
+      precipitation: request.precipitation,
+      active: { phase: 'climb', ensemble: uphillEnsemble, metabolicRate: targets.uphillRate, evaluation: uphillResult.recommendation.evaluation },
+      rest: [{ phase: 'transition', ensemble: uphillEnsemble }, { phase: 'descent', ensemble: downhillEnsemble }],
+    });
+
     return {
       ...(descentHelmet ? { requirements: [descentHelmet.requirement] } : {}),
       conditions: {
@@ -300,7 +310,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         }),
         total_weight_g: totalPackWeightGrams,
       },
-      transition_protocol: transitionProtocol,
+      transition_protocol: withVentTransitionStep(transitionProtocol, ventilation),
       warnings: [
         ...[...uphillResult.warnings, ...climbAccessories.warnings].map(w => `Climb: ${w}`),
         ...climbProtectionWarnings(uphillEnsemble, targets.climbProtection),
@@ -313,6 +323,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         ...(pack.legs ? [`Descent: put ${pack.legs.brand} ${pack.legs.model_name} on over your climbing layers. Pants with full side zips go on over ski boots.`] : []),
         ...generateTouringGuidance(tempC, targets.uphillIreq, targets.downhillIreq),
       ],
+      ...(ventilation && { ventilation }),
     };
   },
 };
