@@ -38,6 +38,69 @@ PR 2 lets the organizer use one source on several days. Every rule above still h
 - **Copy day can bring the day's sources.** The organizer's Copy day has "Also list its conditions sources" when the day has some ([trip-editing.md](trip-editing.md)). The review says what each copied day gets: "Lists MWAC too, with no review recorded for this day: reviews stay on Sat Oct 10." or "Already lists Mount Washington Observatory." Sources are added to what a day already lists, whichever of Replace or Keep is chosen for a kit or tour plan. Reviews never come along, so a copied day shows "No review recorded for this day". A day the source was removed from keeps the reviews recorded there, and they show again: the copy's review says so, checked against the day's plan after the copy ("Lists MWAC too. 1 review recorded here before it was removed shows again, marked Plan changed — review again."). The save is refused (409, with the current review) when any source on the trip was listed on or removed from a day since the review.
 - **A date change lists them.** The date-change review lists a removed day's sources and its reviews ("Conditions: Mount Washington Avalanche Center · 1 review removed with the day"), and a moved day's reviews to record again ("· 1 review to record again"). Removing a day also removes the reviews kept there for sources no longer listed on it, so the review lists those too ("1 review of NWS (no longer listed) removed with the day"). A removed day's sources and every review entry recorded there, for any source, must be the ones the review saw, or the change is refused (409) with the current review. The API compares them with the trip as it is now before saving, and from migration 20261116210000 on `change_trip_dates` checks them again under the trip lock. The sources themselves stay on the trip, listed on no day.
 
+## Official forecast centers
+
+The third PR adds a verified list of official avalanche forecast centers to the source editor. When the type is Avalanche forecast, the organizer can press **Choose an official center**. That loads the list, and suggestions for the day from Avalanche Canada's published forecast areas. Choosing a center, from the list or with **Use …** on a suggestion, only fills in the source's name and link. The area or region stays as the organizer typed it, and nothing is saved until they press Save source. The result is an ordinary source: it can be edited, it goes stale like any other, and it still says "Validity not available in SWTTR — check the source."
+
+### The list (verified November 16, 2026)
+
+The U.S. centers come from avalanche.org's [U.S. Avalanche Centers](https://avalanche.org/us-avalanche-centers/) page. Coastal Alaska comes from its [National Danger Map](https://avalanche.org/). Haines and Valdez are listed there under the Alaska Avalanche Information Center. "Listed under" is the state the list gives, which is where the center is based. It isn't the center's forecast boundary, so the editor says to check that the center's map covers the route.
+
+| Center | Listed under | Official link |
+|---|---|---|
+| Chugach National Forest Avalanche Center | Alaska | https://www.cnfaic.org/forecast/ |
+| Coastal Alaska Avalanche Center | Alaska | https://www.coastalakavalanche.org/forecast/ |
+| Haines Avalanche Center | Alaska | https://alaskasnow.org/haines-forecast/ |
+| Hatcher Pass Avalanche Center | Alaska | https://hpavalanche.org/forecast/ |
+| Valdez Avalanche Center | Alaska | https://alaskasnow.org/valdez-forecast/ |
+| Kachina Peaks Avalanche Center | Arizona | https://kachinapeaks.org/Forecast/ |
+| Bridgeport Avalanche Center | California | https://bridgeportavalanchecenter.org/avalanche-forecast/ |
+| Eastern Sierra Avalanche Center | California | https://www.esavalanche.org/forecasts/ |
+| Mount Shasta Avalanche Center | California | https://www.shastaavalanche.org/forecasts/avalanche/mount-shasta |
+| Sierra Avalanche Center | California | https://www.sierraavalanchecenter.org/forecasts/avalanche/central-sierra-nevada |
+| Colorado Avalanche Information Center | Colorado | https://avalanche.state.co.us/ |
+| Crested Butte Avalanche Center | Colorado | https://cbavalanchecenter.org/forecasts/ |
+| Idaho Panhandle Avalanche Center | Idaho | https://www.idahopanhandleavalanche.org/forecasts/ |
+| Payette Avalanche Center | Idaho | https://payetteavalanche.org/forecasts/avalanche |
+| Sawtooth Avalanche Center | Idaho | https://www.sawtoothavalanche.com/forecasts/avalanche |
+| Flathead Avalanche Center | Montana | https://www.flatheadavalanche.org/avalanche-forecast/ |
+| Gallatin National Forest Avalanche Center | Montana | https://www.mtavalanche.com/avalanche-forecast |
+| West Central Montana Avalanche Center | Montana | https://missoulaavalanche.org/forecasts/ |
+| Mount Washington Avalanche Center | New Hampshire | https://www.mountwashingtonavalanchecenter.org/forecasts/ |
+| Taos Avalanche Center | New Mexico | https://taosavalanchecenter.org/forecasts/ |
+| Central Oregon Avalanche Center | Oregon | https://coavalanche.org/pages/forecasts/ |
+| Utah Avalanche Center | Utah | https://utahavalanchecenter.org/ |
+| Northwest Avalanche Center | Washington | https://nwac.us/forecasts/avalanche |
+| Bridger-Teton Avalanche Center | Wyoming | https://bridgertetonavalanchecenter.org/forecasts/ |
+| Avalanche Canada | Forecast areas on avalanche.ca's map | https://avalanche.ca/map |
+| Parks Canada avalanche forecast | Banff, Yoho, Kootenay, Jasper, Glacier and Waterton Lakes national parks | https://avalanche.ca/map |
+| Avalanche Québec | Chic-Chocs, Québec | https://avalanchequebec.ca/en/avalanche-bulletin/ |
+
+Canada's centers come from the forecasters on [avalanche.ca's map](https://avalanche.ca/map), as its metadata lists them: Avalanche Canada, Parks Canada (the four mountain-park forecasts), Kananaskis and Avalanche Québec. Parks Canada's [avalanche information](https://parks.canada.ca/pn-np/mtn/securiteenmontagne-mountainsafety/avalanche) page links its avalanche bulletin to avalanche.ca's map, so that's its link. Avalanche Québec links to its own bulletin page for the Chic-Chocs. Kananaskis's forecast is on avalanche.ca's map, so a suggestion for it uses the Avalanche Canada entry. Avalanche Canada's forecast pages change address with each bulletin, and its areas are merged and split during the season, so every Canadian forecast on avalanche.ca uses the map's address, which doesn't change.
+
+**How each link was checked (November 16, 2026).**
+- `curl -sIL` on every link except Utah's returned HTTP 200 with no redirect. Where the listed link redirected, the list keeps where it ended up: NWAC, Mount Washington, Sierra and Eastern Sierra. Payette's and Sawtooth's `/forecasts/` return 404, so the list uses `/forecasts/avalanche`.
+- Each page then loaded in headless Chrome and showed its forecast: issued forecasts or "General avalanche information", the forecast area and the center's name. Utah's site answers `curl` with a Cloudflare 403 but loads normally in a browser. Utah's `/forecasts` is a 404, so its link is the home page and its current danger ratings. avalanche.ca's map needs WebGL, so headless Chrome only shows its WebGL notice. Its HTTP 200 and Parks Canada's link to it confirm it.
+
+**Left out, and why.** Organizers can still add these as their own sources.
+- Wallowa Avalanche Center: its site answers every automated request with a bot-verification page, so its link couldn't be checked.
+- Cordova and Eastern Alaska Range: their pages show observations and weather, with no forecast.
+- Eastern Wyoming and Southern Oregon information exchanges: observations and weather, not forecasts.
+- New York DEC's Adirondack page: it's on the national map out of season, but the page has no avalanche forecast, and it's behind a Cloudflare check.
+- The National Avalanche Center and the Alaska Avalanche Information Center: they don't issue forecasts themselves.
+
+To change an entry, check every link again the same way, and update `VERIFIED_ON` and this table (`src/lib/avalanche-centers.ts`).
+
+### Suggestions
+
+- **Only from Avalanche Canada's published areas.** Avalanche Canada documents its [public forecast API](https://avalanche.ca/api-docs), and its [data sharing policy](https://avalanche.ca/data-sharing-policy) points public users to it. SWTTR's server reads two endpoints: today's forecast areas (`/forecasts/en/areas`) and their names and forecasters (`/forecasts/en/metadata`). It keeps only the boundaries, area names and forecasters, never ratings or bulletin text. It reads them again after 30 minutes. The whole list is downloaded and matched on SWTTR's server, so the trip's place is never sent to Avalanche Canada.
+- **No U.S. suggestions.** avalanche.org's API (`api.avalanche.org`) says to contact avalanche.org and the American Avalanche Association for permission. Without its zone boundaries, SWTTR has no data to suggest a U.S. center, and the editor says so. A U.S. suggestion needs that permission first.
+- **Inside an area, or nothing.** The place is the day's access point, or else its destination's weather location, the same as a review records. A suggestion names the area that contains the place today and its forecaster: "Avalanche Canada's forecast areas put this day's access point in “Glacier” today, forecast by Parks Canada." A place outside every area gets no suggestion, however close an area is. SWTTR never picks the nearest center. Merged areas with names longer than 60 characters are called "a combined forecast area."
+- **Confirmed by the organizer, never stored.** A suggestion is shown with the time it was checked, and says that forecast areas change through the season. It becomes a source only when the organizer uses it and saves. The source doesn't keep the area, since Avalanche Canada's areas change during the season, so the organizer types the area or region.
+- **Validity stays unknown.** Avalanche Canada's bulletins carry issue and expiry times, but a saved source links to the map, not to one bulletin. So the row keeps "Validity not available in SWTTR — check the source."
+
+`GET /api/v1/trips/:id/days/:date/conditions/centers` returns `{verified_on, centers, suggestions: {status, point, checked_at, items}}`. `status` is `found`, `none`, `no_location` (no coordinates) or `unavailable` (Avalanche Canada couldn't be read; the list still loads). The route is organizer only, like adding a source: `403` for members, `404` for anyone not on the trip or a date outside it. It changes nothing. Unit tests cover the list (each entry saves as a valid source), matching inside areas and holes, places just outside an area, combined areas, each forecaster, U.S. places, failures and the 30-minute reuse. Route tests cover the place checked and access. Component tests cover loading on request, using a suggestion without saving it, choosing from the list, each status without a suggestion and a failed load that keeps the typed source.
+
 ## API
 
 `GET /api/v1/trips/:id` includes `conditions`: each source on each day, with its `date`, `trip_day_id`, `context_key` (the day's plan and the source as read now) and `reviews`: each person's `current` entry, `history` (newest first) and `stale_reasons`. It also includes `conditions_sources`: every source on the trip, by type and name, with the `dates` it's listed on (empty for one removed from every day).

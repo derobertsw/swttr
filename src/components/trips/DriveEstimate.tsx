@@ -112,7 +112,7 @@ export function Directions({ day, label }: { day: TripDriveRoute; label?: string
 }
 
 /** Visible provider and map-data credits for the routing results shown. */
-function RoutingAttribution() {
+export function RoutingAttribution() {
   return <p className="text-sm text-muted-foreground">
     <a href={GEOAPIFY_CREDIT.url} target="_blank" rel="noopener noreferrer" className={linkClass}>{GEOAPIFY_CREDIT.label}</a>
     {" · "}

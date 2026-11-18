@@ -4,7 +4,7 @@ import { projectTripMap } from "@/lib/trip-map";
 import { tripDriveEstimates } from "@/lib/trip-drive-estimates";
 import { driveTrip } from "@/test/driveTrip";
 import type { TripMapDay, TripMapRoadGeometry as TripMapGeometry } from "@/types/trip-map";
-import { useTripMapGeometry } from "./useTripMapGeometry";
+import { GEOMETRY_TIMEOUT_MS, useTripMapGeometry } from "./useTripMapGeometry";
 
 const full = driveTrip();
 const map = projectTripMap(full, await tripDriveEstimates(full, { read: async () => [], write: async () => {} }, { refresh: false }));
@@ -14,7 +14,41 @@ const answer = (selected: TripMapDay, tripId = map.trip.id): TripMapGeometry => 
   geometry: { type: "MultiLineString", coordinates: [[[-72, 44], [-73, 45]]] }, provider: "geoapify", calculated_at: "2027-01-07T12:00:00Z", attribution: [] });
 
 describe("On-demand trip geometry loading", () => {
-  afterEach(() => { vi.unstubAllGlobals(); });
+  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+  it("gives up on a stalled request with a retryable error instead of loading forever (#235)", async () => {
+    vi.useFakeTimers();
+    // A connection that never answers, but honors abort like fetch.
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useTripMapGeometry(map.trip.id, day));
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.load(); });
+    expect(result.current.loading).toBe(true);
+    await act(async () => { vi.advanceTimersByTime(GEOMETRY_TIMEOUT_MS - 1); });
+    expect(result.current.loading).toBe(true);
+    await act(async () => { vi.advanceTimersByTime(1); await pending; });
+    expect(result.current).toMatchObject({ loading: false, data: null });
+    expect(result.current.error?.message).toBe("The route line took too long. Try again.");
+    // Retry asks again, and its answer draws the line.
+    fetchMock.mockImplementationOnce(async () => Response.json(answer(day)));
+    await act(async () => { await result.current.load(); });
+    expect(result.current).toMatchObject({ loading: false, error: null, data: answer(day) });
+  });
+
+  it("doesn't report a timeout for a request a changed day already abandoned", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+    })));
+    const { result, rerender } = renderHook(({ selected }) => useTripMapGeometry(map.trip.id, selected), { initialProps: { selected: day } });
+    act(() => { void result.current.load(); });
+    rerender({ selected: other });
+    await act(async () => { vi.advanceTimersByTime(GEOMETRY_TIMEOUT_MS * 2); });
+    expect(result.current).toMatchObject({ loading: false, data: null, error: null });
+  });
 
   it("does not fetch on mount, selection or repeated camera renders; fetches only on load", async () => {
     const fetchMock = vi.fn(async () => Response.json(answer(other)));

@@ -22,7 +22,7 @@ import { buildTouringEquipment } from "@/lib/touring-equipment";
 import { dayChecksFor, summarizeDayChecks } from "@/lib/trip-day-checks";
 import { tripDayOutingFor } from "@/lib/trip-day-outing";
 import type { TripDay, TripFull, TripItineraryRequest, TripLocation, TripMember, TripMemberDayKit, TripTourPlan } from "@/types/trips";
-import { savedOutfit, savedPlan } from "@/test/savedKit";
+import { savedOutfit, savedPlan, WEAR } from "@/test/savedKit";
 import DayDetailPage from "./page";
 import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
 import { STORAGE_KEYS } from "@/lib/storage";
@@ -1014,6 +1014,47 @@ describe("Trip day page", () => {
       // The tour comes before what to bring for it (#334).
       expect(screen.getByRole("heading", { name: "Tour plan" }).compareDocumentPosition(screen.getByRole("heading", { name: "My equipment" }))
         & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("switches a saved tour between Climb and Descent without saving anything or changing what's packed (#212, #335)", async () => {
+      // The climb carries the shell the descent wears.
+      const climb = { ...WEAR, torso: { ...WEAR.torso, outer: [] } };
+      const tour = savedOutfit({
+        outing: { ...savedOutfit().outing, activity: "backcountry_skiing" },
+        phases: [
+          { id: "climb", wear: climb, carry: ["Ski shell"], decision: null },
+          { id: "descent", wear: WEAR, carry: ["Skins"], decision: null },
+        ],
+      });
+      const full = tripFull({
+        stops: [STOWE_STOP], days: [tourDay], members: [ORGANIZER],
+        kits: [{ id: "kit-tour", trip_day_id: DAY.id, trip_member_id: ORGANIZER.id, effort: "steady", items: [], note: null, state: "ok",
+          updated_at: "2026-10-06T20:01:02Z", outfit: tour, outfit_saved_at: "2026-10-06T20:01:02Z" }],
+      });
+      const api = fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, full),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+        "GET /api/v1/trips/trip-1/days/2026-10-10/outing": reply(200, tripDayOutingFor(full, "user-1", DAY.date, "America/New_York", Date.parse("2026-10-07T12:00:00Z"))),
+        [EQUIPMENT]: reply(200, {
+          equipment: equipment({ transceiver: { status: "added", quantity: 1 } }),
+          checks: { "equipment:transceiver": { packed: true, quantity: 1, version } },
+        }),
+      });
+      vi.stubGlobal("fetch", api);
+      await renderPage();
+      const myKit = await screen.findByRole("region", { name: "My kit" });
+      const phases = within(myKit).getByRole("group", { name: "Phase" });
+      expect(within(phases).getByRole("button", { name: "Climb" })).toHaveAttribute("aria-pressed", "true");
+      const carry = () => within(myKit).getByRole("heading", { name: "Carry" }).closest("section")!;
+      expect(carry()).toHaveTextContent("Ski shell");
+      await userEvent.click(within(phases).getByRole("button", { name: "Descent" }));
+      expect(within(phases).getByRole("button", { name: "Descent" })).toHaveAttribute("aria-pressed", "true");
+      expect(carry()).toHaveTextContent("Skins");
+      expect(carry()).not.toHaveTextContent("Ski shell");
+      // Only reads: the view is the page's, not the kit's or the packing list's.
+      expect(api.mock.calls.map(([, init]) => (init as RequestInit | undefined)?.method ?? "GET").every((method) => method === "GET")).toBe(true);
+      const equipmentRows = await within(screen.getByRole("heading", { name: "My equipment" }).closest("section")!).findAllByRole("listitem");
+      expect(equipmentRows[0]).toHaveTextContent("Avalanche transceiverPacked");
     });
 
     it("adds touring equipment from the day", async () => {
