@@ -9,7 +9,7 @@ Every earlier URL still works and belongs to the section that now holds it (`src
 | Section | Its page | Pages inside it |
 |---|---|---|
 | Plan | `/trips/:id` | `/days`, `/days/:date`, `/map`, `/stops`, `/settings` |
-| Stays | `/trips/:id/stays` | |
+| Stays | `/trips/:id/stays` | `/stays/compare` ([Comparing stays](trip-stays.md#comparing-stays-213)) |
 | Crew | `/trips/:id/manage` | `/rollcall` (the Day checklist, [trip-crew-checklist.md](trip-crew-checklist.md)) |
 | Packing | `/trips/:id/pack` | `/gear` (shared gear) |
 
