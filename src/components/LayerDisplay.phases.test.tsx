@@ -157,3 +157,95 @@ describe("backcountry phase editing with the real picker", () => {
     expect(vi.mocked(fetch).mock.calls.some(([url, init]) => init?.method === "POST" && String(url) === "/api/wardrobe/gear")).toBe(false);
   });
 });
+
+describe("vent advice beside the selected garments (#290)", () => {
+  const SHELL = "5b0f6a59-3a3e-4d2a-9f39-2f5b1c3f8a11";
+  const PANTS = "0c5f1f0e-7a36-4c43-8a3c-1b1d0a2e6c22";
+  const vent = (phase: "skiing" | "chairlift" | "climb" | "transition" | "descent", garment_id: string, message: string, basis: "phase" | "weather" | "outfit") => ({
+    garment_id, garment_name: garment_id === SHELL ? "Shell" : "Pants", vent: garment_id === SHELL ? "pit_zips" as const : "thigh_vents" as const,
+    region: garment_id === SHELL ? "torso" as const : "legs" as const, phase, setting: message.startsWith("Open") ? "open" as const : "closed" as const,
+    basis, message, reason: `${phase} reason.`, effect_estimated: false,
+  });
+  const garments = [
+    ...touring.recommendation.garments,
+    { id: SHELL, name: "Shell", category: "hard_shell", rcl: 0.2, rcl_torso: 0.2, covers_torso: true },
+    { id: PANTS, name: "Pants", category: "hard_shell", rcl: 0.2, rcl_legs: 0.3, covers_legs: true },
+  ];
+
+  it("shows climb advice on Climb and transition advice on Descent, and drops a removed garment's", async () => {
+    const data: BiophysicsRecommendation = {
+      ...touring,
+      recommendation: { ...touring.recommendation, garments },
+      ventilation: {
+        advice: [
+          vent("climb", SHELL, "Open pit zips while climbing", "outfit"),
+          vent("transition", SHELL, "Close pit zips at the transition", "phase"),
+          vent("descent", SHELL, "Close pit zips at the transition and keep them closed for the descent", "phase"),
+        ],
+        estimates: [],
+      },
+    };
+    render(<LayerDisplay activity="backcountry_skiing" recommendation={null} temperature={25} windspeed={10} biophysicsData={data} />);
+    const user = userEvent.setup();
+    const upperBody = screen.getByRole("region", { name: "Upper body" });
+
+    expect(within(upperBody).getByText("Open pit zips while climbing.")).toBeInTheDocument();
+    expect(within(upperBody).getByText("climb reason.")).toBeInTheDocument();
+    expect(upperBody).not.toHaveTextContent("for the descent");
+
+    await user.click(screen.getByRole("button", { name: /^Descent/ }));
+    expect(within(upperBody).getByText("Close pit zips at the transition and keep them closed for the descent.")).toBeInTheDocument();
+    expect(upperBody).not.toHaveTextContent("while climbing");
+
+    // Removing the shell on the descent removes its descent advice; the climb keeps its own.
+    await user.click(within(upperBody).getByRole("button", { name: "Change upper body" }));
+    await user.click(within(upperBody).getByRole("button", { name: /^Shell/ }));
+    const picker = await screen.findByRole("dialog");
+    await user.click(within(picker).getByRole("button", { name: "Remove current item" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await user.click(within(upperBody).getByRole("button", { name: "Done changing upper body" }));
+    expect(upperBody).not.toHaveTextContent("pit zips");
+    await user.click(screen.getByRole("button", { name: /^Climb/ }));
+    expect(within(upperBody).getByText("Open pit zips while climbing.")).toBeInTheDocument();
+  });
+
+  it("shows alpine skiing and chairlift advice by body area, hiding outfit-based advice once the outfit changes", async () => {
+    const data: BiophysicsRecommendation = {
+      ...touring,
+      descent_handwear: undefined,
+      descent_breakdown: undefined,
+      recommendation: { ...touring.recommendation, garments },
+      ventilation: {
+        advice: [
+          vent("skiing", SHELL, "Open pit zips while skiing", "outfit"),
+          vent("skiing", PANTS, "Keep thigh vents closed while skiing", "weather"),
+          vent("chairlift", SHELL, "Close pit zips before the chairlift", "phase"),
+          vent("chairlift", PANTS, "Keep thigh vents closed on the chairlift", "phase"),
+        ],
+        estimates: [],
+      },
+    };
+    render(<LayerDisplay activity="alpine_skiing" recommendation={null} temperature={25} windspeed={10} biophysicsData={data} />);
+    const user = userEvent.setup();
+    const upperBody = screen.getByRole("region", { name: "Upper body" });
+    const legs = screen.getByRole("region", { name: "Legs" });
+
+    expect(within(upperBody).getAllByRole("listitem").map((item) => item.textContent)).toEqual(expect.arrayContaining([
+      "Open pit zips while skiing. skiing reason.",
+      "Close pit zips before the chairlift. chairlift reason.",
+    ]));
+    expect(upperBody).not.toHaveTextContent("thigh vents");
+    expect(legs).toHaveTextContent("Keep thigh vents closed while skiing.");
+
+    // Any change to the outfit hides advice that depends on the outfit.
+    const hands = screen.getByRole("region", { name: "Hands" });
+    await user.click(within(hands).getByRole("button", { name: "Change hands" }));
+    await user.click(within(hands).getByRole("button", { name: /Climb gloves/ }));
+    const picker = await screen.findByRole("dialog");
+    await user.click(within(picker).getByRole("button", { name: "Remove current item" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(upperBody).not.toHaveTextContent("Open pit zips while skiing");
+    expect(upperBody).toHaveTextContent("Close pit zips before the chairlift.");
+    expect(legs).toHaveTextContent("Keep thigh vents closed while skiing.");
+  });
+});

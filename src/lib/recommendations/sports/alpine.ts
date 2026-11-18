@@ -14,6 +14,7 @@ import { buildAlpineEnsemble, alpineRegionalCapacity } from './alpine-ensemble';
 import { selectPhaseAccessories } from '../extremities';
 import { buildHelmetRequirement } from '../requirements';
 import { buildScoredRecommendation } from '../response-builder';
+import { ventilationAdvice } from '../ventilation';
 import {
   formatConditions,
   formatIreqPhase,
@@ -154,6 +155,14 @@ export const alpine: SportRecommender<AlpineTargets> = {
     }
     if (helmet) warnings.push(...helmet.warnings);
 
+    // Vent settings for the selected garments: skiing, then the lift ride.
+    const ventilation = ventilationAdvice({
+      windMs,
+      precipitation: request.precipitation,
+      active: { phase: 'skiing', ensemble, metabolicRate: targets.skiingRate, evaluation: recommendation.evaluation },
+      rest: [{ phase: 'chairlift', ensemble }],
+    });
+
     return {
       ...(helmet ? { requirements: [helmet.requirement] } : {}),
       conditions: {
@@ -175,6 +184,7 @@ export const alpine: SportRecommender<AlpineTargets> = {
       recommendation,
       warnings,
       guidance: [...(recommendation.evaluation?.decision?.reasons ?? []), ...getAlpineGuidance(tempC, weather.precipitation)],
+      ...(ventilation && { ventilation }),
     };
   },
 };

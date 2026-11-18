@@ -110,4 +110,17 @@ describe('fetchGarmentsWithDetails', () => {
     expect(selects.garments).toContain('garment_activity_ratings (*)');
     expect(selects.garments).not.toContain('!inner');
   });
+
+  it('left-joins vent records, so garments without one are kept', async () => {
+    const { supabase, selects } = createStubSupabase({
+      garments: { data: [], error: null },
+    });
+
+    await fetchGarmentsWithDetails(supabase, {
+      activityFilter: { field: 'alpine_skiing_score', minScore: 5 },
+    });
+
+    expect(selects.garments).toContain('garment_ventilation (*)');
+    expect(selects.garments).not.toContain('garment_ventilation!inner');
+  });
 });

@@ -207,6 +207,54 @@ export interface ClothingRequirement {
   message: string;
 }
 
+/** Adjustable vents a catalog garment can list. Back vents and mesh pockets
+ * aren't treated as adjustable without supporting metadata. */
+export type VentType = 'pit_zips' | 'side_vents' | 'thigh_vents' | 'two_way_zip';
+
+/** Alpine: skiing and chairlift. Ski touring: climb, transition and descent. */
+export type VentPhase = 'skiing' | 'chairlift' | 'climb' | 'transition' | 'descent';
+
+/** A suggested vent setting for one vent of a selected garment in one phase. */
+export interface VentAdvice {
+  garment_id: string;
+  garment_name: string;
+  vent: VentType;
+  /** Body region the vent opens, so it sits beside the garment there. */
+  region: 'torso' | 'legs';
+  phase: VentPhase;
+  setting: 'open' | 'closed';
+  /**
+   * What the setting follows: the phase alone (rest and descent), the weather
+   * (wind or precipitation), or the modeled outfit (its breathability and
+   * thermal decision). Outfit-based advice is for the recommended outfit only.
+   */
+  basis: 'phase' | 'weather' | 'outfit';
+  /** Short instruction, e.g. "Open pit zips while skiing". */
+  message: string;
+  reason: string;
+  /** True only when an open-state breathability estimate includes this vent's garment. */
+  effect_estimated: boolean;
+}
+
+/**
+ * Estimated breathability with the advised vents open. Every warmth metric,
+ * the comfort decision and `ensemble_properties` stay on the closed outfit.
+ */
+export interface VentOpenEstimate {
+  phase: 'skiing' | 'climb';
+  /** Garments whose ventilation_factor was applied, once, to their Recl in the vented regions. */
+  garment_ids: string[];
+  closed_evap_potential: number;
+  open_evap_potential: number;
+  breathability_target: number;
+  basis: 'estimate';
+}
+
+export interface VentilationAdvice {
+  advice: VentAdvice[];
+  estimates: VentOpenEstimate[];
+}
+
 export interface BiophysicsRecommendation {
   /** What the activity needs, before wardrobe matching: running/XC clothing
    * (requirement-first flow), and the helmet alpine, cycling and the touring
@@ -251,6 +299,8 @@ export interface BiophysicsRecommendation {
   /** Generic carry advice, excluded from moving insulation and ownership. */
   carry_items?: Array<{ label: string; reason: string }>;
   transition_protocol?: TransitionProtocol;
+  /** Alpine and ski touring: vent settings for selected garments with known vents. */
+  ventilation?: VentilationAdvice;
 }
 
 // ============================================
