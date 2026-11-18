@@ -40,8 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Capacitor
-/capacitor-web
+# Capacitor (capacitor-web/ is committed: a placeholder that lets `cap sync` run)
 ios/App/App.xcworkspace/xcuserdata/
 
 # clerk configuration (can include secrets)

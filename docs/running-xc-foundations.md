@@ -1,6 +1,6 @@
 # Running and XC foundations (#244 / #245)
 
-These changes establish garment and target contracts for #243. Optional accessories (#246) and complete running outfits (#247) now consume those contracts, as described below. XC outfit selection (#248), shared wardrobe requirements (#249), comfort presentation (#250), and preference wiring (#251) have separate integration work.
+These changes establish garment and target contracts for #243. Optional accessories (#246), complete running outfits (#247) and XC outfits (#248) consume those contracts, as described below. Shared wardrobe requirements (#249) and the shared comfort check (#250) have also shipped; preference wiring (#251) is still open. Alpine, cycling and touring have not been moved onto these contracts: see the [algorithm review](algorithm-review.md).
 
 ## Evidence and metabolic conversion
 

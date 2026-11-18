@@ -22,7 +22,7 @@ export interface DriveEstimateStore {
 }
 
 /** Your estimates by their day's current date. */
-async function manualEstimates(full: TripFull, store: DriveEstimateStore): Promise<StoredManualEstimate[]> {
+export async function manualEstimates(full: TripFull, store: Pick<DriveEstimateStore, "manual">): Promise<StoredManualEstimate[]> {
   const rows = await (store.manual?.() ?? Promise.resolve([])).catch(() => []);
   return rows.flatMap(({ trip_day_id: dayId, ...row }) => {
     const day = full.days.find((candidate) => candidate.id === dayId);
@@ -30,7 +30,7 @@ async function manualEstimates(full: TripFull, store: DriveEstimateStore): Promi
   });
 }
 
-type ReadyPlan = Extract<DrivePlan, { state: "ready" }>;
+export type ReadyPlan = Extract<DrivePlan, { state: "ready" }>;
 type Matrix = typeof driveMatrix;
 
 const pointKey = (location: TripLocation) => `${location.latitude},${location.longitude}`;
@@ -69,8 +69,50 @@ function sharedMatrix(matrix: Matrix, ...args: Parameters<Matrix>): ReturnType<M
   return pending;
 }
 
-const routeOf = (plan: DrivePlan | StoredDriveEstimate) => `${plan.date}|${plan.route_key}`;
-const newer = (a: StoredDriveEstimate | undefined, b: StoredDriveEstimate) => !a || Date.parse(b.calculated_at) > Date.parse(a.calculated_at) ? b : a;
+/** A drive on a day: the key `calculateDrives` reports it by. */
+export const routeOf = (plan: DrivePlan | StoredDriveEstimate) => `${plan.date}|${plan.route_key}`;
+/** The more recently calculated of two estimates. */
+export const newer = (a: StoredDriveEstimate | undefined, b: StoredDriveEstimate) => !a || Date.parse(b.calculated_at) > Date.parse(a.calculated_at) ? b : a;
+
+/**
+ * Calculates `due` drives, one provider call per set of winter closures (more
+ * when a call would pass the provider's cell limit), each asking only for its
+ * own days' starting points and access points. Identical calls at the same
+ * time share one request. A failed call's drives are in `failed`, by routeOf.
+ */
+export async function calculateDrives(due: ReadyPlan[], matrix: Matrix, now: number) {
+  const calculated = new Map<string, StoredDriveEstimate>();
+  const failed = new Set<string>();
+  const calculatedAt = new Date(now).toISOString();
+  const groups = new Map<string, ReadyPlan[]>();
+  for (const plan of due) {
+    const closures = closureKey(plan.closures);
+    groups.set(closures, [...groups.get(closures) ?? [], plan]);
+  }
+  await Promise.all([...groups.values()].flatMap(batches).map(async (group) => {
+    const origins = [...new Map(group.map((plan) => [pointKey(plan.origin!.location!), plan.origin!.location!])).values()];
+    const targets = [...new Map(group.map((plan) => [pointKey(plan.destination!.location), plan.destination!.location])).values()];
+    const avoid = group[0].closures.flatMap((closure) => closure.points);
+    let legs: Awaited<ReturnType<Matrix>>;
+    try {
+      legs = await sharedMatrix(matrix, origins, targets, avoid);
+    } catch {
+      group.forEach((plan) => failed.add(routeOf(plan)));
+      return;
+    }
+    for (const plan of group) {
+      const leg = legs[origins.findIndex((point) => pointKey(point) === pointKey(plan.origin!.location!))]
+        ?.[targets.findIndex((point) => pointKey(point) === pointKey(plan.destination!.location))];
+      calculated.set(routeOf(plan), {
+        date: plan.date, route_key: plan.route_key,
+        origin_label: plan.origin!.label, destination_label: plan.destination!.label,
+        status: leg ? "ok" : "no_route", duration_seconds: leg?.seconds ?? null, distance_meters: leg?.meters ?? null,
+        calculated_at: calculatedAt,
+      });
+    }
+  }));
+  return { calculated, failed };
+}
 
 /**
  * Every trip day's drive estimates and each stay's departures (#209): the
@@ -103,37 +145,9 @@ export async function tripDriveEstimates(full: TripFull, store: DriveEstimateSto
     return !row || now - Date.parse(row.calculated_at) > DRIVE_ESTIMATE_MAX_AGE_MS;
   });
 
-  const calculated = new Map<string, StoredDriveEstimate>();
+  const { calculated, failed } = await calculateDrives(due, matrix, now);
   // Read-only map views label expired estimates stale without spending routing credits.
-  const failed = new Set<string>(options.refresh === false ? ready.map(routeOf) : []);
-  const calculatedAt = new Date(now).toISOString();
-  const groups = new Map<string, ReadyPlan[]>();
-  for (const plan of due) {
-    const closures = closureKey(plan.closures);
-    groups.set(closures, [...groups.get(closures) ?? [], plan]);
-  }
-  await Promise.all([...groups.values()].flatMap(batches).map(async (group) => {
-    const origins = [...new Map(group.map((plan) => [pointKey(plan.origin!.location!), plan.origin!.location!])).values()];
-    const targets = [...new Map(group.map((plan) => [pointKey(plan.destination!.location), plan.destination!.location])).values()];
-    const avoid = group[0].closures.flatMap((closure) => closure.points);
-    let legs: Awaited<ReturnType<Matrix>>;
-    try {
-      legs = await sharedMatrix(matrix, origins, targets, avoid);
-    } catch {
-      group.forEach((plan) => failed.add(routeOf(plan)));
-      return;
-    }
-    for (const plan of group) {
-      const leg = legs[origins.findIndex((point) => pointKey(point) === pointKey(plan.origin!.location!))]
-        ?.[targets.findIndex((point) => pointKey(point) === pointKey(plan.destination!.location))];
-      calculated.set(routeOf(plan), {
-        date: plan.date, route_key: plan.route_key,
-        origin_label: plan.origin!.label, destination_label: plan.destination!.label,
-        status: leg ? "ok" : "no_route", duration_seconds: leg?.seconds ?? null, distance_meters: leg?.meters ?? null,
-        calculated_at: calculatedAt,
-      });
-    }
-  }));
+  if (options.refresh === false) ready.forEach((plan) => failed.add(routeOf(plan)));
 
   const rowFor = (plan: DeparturePlan) => calculated.get(routeOf(plan)) ?? reuse(plan) ?? earlier(plan);
   /**

@@ -1,11 +1,15 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "tags": ["-lintignore"],
-  "ignore": ["apple/**", "macos/**"],
+  // ios/App/App/public is copied from capacitor-web by `npx cap sync ios`.
+  "ignore": ["apple/**", "macos/**", "ios/App/App/public/**"],
   // Benchmarks run separately from Vitest's test.include patterns; skill
   // scripts are run directly with node.
-  "entry": ["src/**/*.bench.ts", ".claude/skills/*/scripts/*.mjs", "docs/qa/179-shared-gear/lock-order.mjs", "docs/qa/233-overview-map/preview.mjs", "docs/qa/233-overview-map/preview/*.tsx", "docs/qa/234-day-map/preview.mjs", "docs/qa/234-day-map/preview/*.tsx", "docs/qa/337-group-planning/*.mjs", "docs/qa/337-group-planning/fixtures.ts", "docs/qa/337-group-planning/server/*.ts"],
+  "entry": ["src/**/*.bench.ts", ".claude/skills/*/scripts/*.mjs", "docs/qa/179-shared-gear/lock-order.mjs", "docs/qa/233-overview-map/preview.mjs", "docs/qa/233-overview-map/preview/*.tsx", "docs/qa/234-day-map/preview.mjs", "docs/qa/234-day-map/preview/*.tsx", "docs/qa/235-trip-maps/*.mjs", "docs/qa/235-trip-maps/fixtures.ts", "docs/qa/337-group-planning/*.mjs", "docs/qa/337-group-planning/fixtures.ts", "docs/qa/337-group-planning/server/*.ts"],
   "ignoreDependencies": [
+    // Required by `npx cap sync ios`, which pins capacitor-swift-pm to its
+    // version in ios/App/CapApp-SPM/Package.swift; never imported from JS.
+    "@capacitor/ios",
     // Linked natively by ios/App/CapApp-SPM/Package.swift; never imported from JS.
     "@capacitor/splash-screen",
     // Loaded through postcss.config.mjs by Next's bundled PostCSS.
