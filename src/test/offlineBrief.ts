@@ -1,10 +1,12 @@
 import { IDBFactory } from "fake-indexeddb";
+import { noteSignedInAccount } from "@/lib/offline-briefs";
 import type { OfflineBriefDay, TripOfflineBrief, TripOfflineBriefResponse } from "@/types/trip-offline-brief";
 
 /** A fresh, empty IndexedDB for each test. */
 export function resetDeviceStorage() {
   globalThis.indexedDB = new IDBFactory();
   window.localStorage.clear();
+  noteSignedInAccount(undefined);
 }
 
 const day = (date: string, label: string, extra: Partial<OfflineBriefDay> = {}): OfflineBriefDay => ({

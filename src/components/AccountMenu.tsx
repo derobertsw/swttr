@@ -5,7 +5,7 @@ import { UserButton, useAuth, useClerk } from "@clerk/nextjs";
 import { HelpCircle, LogOut, Settings, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { clearSavedBriefs, countSavedBriefs, savedBriefsAccountHint } from "@/lib/offline-briefs";
+import { clearSavedBriefs, countSavedBriefs, noteSignedInAccount, savedBriefsAccountHint } from "@/lib/offline-briefs";
 
 // Clerk's menu hands focus back to the avatar in a microtask once it closes.
 // Focus doesn't move if the avatar already had it, so don't wait for long.
@@ -55,6 +55,7 @@ export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) 
   // How many saved trip briefs signing out would remove, while that's being confirmed.
   const [confirming, setConfirming] = useState<number | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   useEffect(() => () => pendingSettings.current?.abort(), []);
 
@@ -77,11 +78,25 @@ export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) 
 
   const finishSignOut = async () => {
     setSigningOut(true);
-    // A brief that couldn't be removed now goes once the next page sees nobody signed in.
-    if (savedBriefsAccountHint() !== null) await clearSavedBriefs().catch(() => undefined);
+    setSignOutError(null);
+    // A save still downloading for this account mustn't land after the clear.
+    noteSignedInAccount(null);
+    if (savedBriefsAccountHint() !== null) {
+      try {
+        await clearSavedBriefs();
+      } catch {
+        // Saved trips stay on this device, so the account stays signed in, and says why.
+        noteSignedInAccount(userId ?? null);
+        setSignOutError("Couldn't remove the trips saved on this device, so you're still signed in. Try again, or remove them from Trips, then Saved on this device.");
+        setConfirming((count) => count ?? 0);
+        setSigningOut(false);
+        return;
+      }
+    }
     try {
       await signOut();
     } catch {
+      noteSignedInAccount(userId ?? null);
       setSigningOut(false);
     }
   };
@@ -117,7 +132,7 @@ export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) 
           <UserButton.Action label="Sign out" labelIcon={<LogOut size={16} />} onClick={requestSignOut} />
         </UserButton.MenuItems>
       </UserButton>
-      <Dialog open={confirming !== null} onOpenChange={(open) => { if (!open && !signingOut) setConfirming(null); }}>
+      <Dialog open={confirming !== null} onOpenChange={(open) => { if (!open && !signingOut) { setConfirming(null); setSignOutError(null); } }}>
         <DialogContent
           showCloseButton={!signingOut}
           onCloseAutoFocus={(event) => {
@@ -128,12 +143,13 @@ export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) 
           <DialogHeader>
             <DialogTitle>Sign out and remove saved trips?</DialogTitle>
             <DialogDescription>
-              Signing out removes the {confirming === 1 ? "trip brief" : `${confirming} trip briefs`} saved on this device for offline use.
+              Signing out removes the {confirming === 1 ? "trip brief" : confirming ? `${confirming} trip briefs` : "trip briefs"} saved on this device for offline use.
               Your trips stay in your account, and you can save them again after you sign in.
             </DialogDescription>
           </DialogHeader>
+          {signOutError && <p role="alert" className="text-base font-medium text-destructive">{signOutError}</p>}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setConfirming(null)} disabled={signingOut}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => { setConfirming(null); setSignOutError(null); }} disabled={signingOut}>Cancel</Button>
             <Button type="button" onClick={() => void finishSignOut()} aria-busy={signingOut || undefined} disabled={signingOut}>
               {signingOut ? "Signing out…" : "Sign out and remove"}
             </Button>

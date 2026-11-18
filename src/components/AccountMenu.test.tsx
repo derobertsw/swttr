@@ -3,10 +3,14 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AccountMenu } from "./AccountMenu";
 import { fakeClerkState, resetFakeClerk } from "@/test/fakeClerk";
-import { readSavedBriefs, storeSavedBrief } from "@/lib/offline-briefs";
+import { clearSavedBriefs, readSavedBriefs, storeSavedBrief } from "@/lib/offline-briefs";
 import { offlineBrief, resetDeviceStorage } from "@/test/offlineBrief";
 
 vi.mock("@clerk/nextjs", async () => (await import("@/test/fakeClerk")).fakeClerkModule);
+vi.mock("@/lib/offline-briefs", async (original) => {
+  const actual = await original<typeof import("@/lib/offline-briefs")>();
+  return { ...actual, clearSavedBriefs: vi.fn(actual.clearSavedBriefs) };
+});
 
 const avatar = () => screen.getByRole("button", { name: "Open user menu" });
 
@@ -140,6 +144,28 @@ describe("AccountMenu", () => {
     await user.click(avatar());
     await user.click(screen.getByRole("menuitem", { name: "Sign out" }));
     await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Sign out and remove" }));
+    await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
+    expect((await readSavedBriefs()).briefs).toEqual([]);
+  });
+
+  it("stays signed in, and says why, when the saved trips can't be removed (#214)", async () => {
+    await storeSavedBrief("user_1", offlineBrief());
+    vi.mocked(clearSavedBriefs).mockRejectedValueOnce(new Error("blocked"));
+    const signOut = vi.fn(async () => {});
+    fakeClerkState.signOut = signOut;
+    const user = userEvent.setup();
+    render(<AccountMenu onOpenSettings={vi.fn()} onShare={vi.fn()} />);
+
+    await user.click(avatar());
+    await user.click(screen.getByRole("menuitem", { name: "Sign out" }));
+    const dialog = await screen.findByRole("dialog", { name: "Sign out and remove saved trips?" });
+    await user.click(within(dialog).getByRole("button", { name: "Sign out and remove" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Couldn't remove the trips saved on this device, so you're still signed in.");
+    expect(signOut).not.toHaveBeenCalled();
+    expect((await readSavedBriefs()).briefs).toHaveLength(1);
+    // Trying again works once the device lets it.
+    await user.click(within(dialog).getByRole("button", { name: "Sign out and remove" }));
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
     expect((await readSavedBriefs()).briefs).toEqual([]);
   });

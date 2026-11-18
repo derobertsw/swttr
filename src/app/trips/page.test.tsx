@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { fakeTripApi, reply, TRIP } from "@/test/tripApi";
 import { storeSavedBrief } from "@/lib/offline-briefs";
 import { offlineBrief, resetDeviceStorage } from "@/test/offlineBrief";
+import { fakeClerkState, resetFakeClerk } from "@/test/fakeClerk";
 import type { TripSummary } from "@/types/trips";
 import TripsHomePage from "./page";
 
@@ -27,8 +28,14 @@ describe("Saved on this device (#214)", () => {
     unmount();
 
     await storeSavedBrief("user_1", offlineBrief());
-    render(<TripsHomePage />);
+    const { rerender } = render(<TripsHomePage />);
     expect(await screen.findByRole("link", { name: "Saved on this device · 1 trip" })).toHaveAttribute("href", "/trips/saved");
+
+    // Signed out, the count was the account's, so it goes.
+    fakeClerkState.signedIn = false;
+    rerender(<TripsHomePage />);
+    expect(screen.queryByRole("link", { name: /Saved on this device/ })).not.toBeInTheDocument();
+    resetFakeClerk();
   });
 });
 

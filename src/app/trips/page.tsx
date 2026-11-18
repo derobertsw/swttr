@@ -32,14 +32,16 @@ export default function TripsHomePage() {
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const userId = useUserId();
-  // Trip briefs this account saved on this device (#214), for Saved on this device.
-  const [saved, setSaved] = useState(0);
+  // Trip briefs this account saved on this device (#214), for Saved on this device,
+  // with the account they were counted for: another account never sees the count.
+  const [counted, setCounted] = useState<{ account: string; count: number } | null>(null);
   useEffect(() => {
     if (!userId) return;
     let current = true;
-    void countSavedBriefs(userId).then((count) => { if (current) setSaved(count); });
+    void countSavedBriefs(userId).then((count) => { if (current) setCounted({ account: userId, count }); });
     return () => { current = false; };
   }, [userId]);
+  const saved = counted && counted.account === userId ? counted.count : 0;
 
   useEffect(() => {
     let pending: AbortController | null = null;

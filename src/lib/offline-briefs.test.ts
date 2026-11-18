@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  clearSavedBriefs, countSavedBriefs, fetchOfflineBrief, readOfflineBrief, readSavedBrief, readSavedBriefs,
+  clearSavedBriefs, countSavedBriefs, fetchOfflineBrief, noteSignedInAccount, readOfflineBrief, readSavedBrief, readSavedBriefs,
   reconcileSavedBriefs, removeSavedBrief, savedBriefsAccountHint, storeSavedBrief,
 } from "@/lib/offline-briefs";
 import { fakeTripApi, reply } from "@/test/tripApi";
@@ -43,20 +43,44 @@ describe("Trip briefs saved on this device (#214)", () => {
     expect(device.briefs.map((saved) => saved.trip_id)).toEqual(["trip-2"]);
   });
 
+  it("doesn't write a brief that finishes downloading after its account signed out or switched", async () => {
+    noteSignedInAccount("user_1");
+    await storeSavedBrief("user_1", offlineBrief());
+    noteSignedInAccount(null);
+    await expect(storeSavedBrief("user_1", offlineBrief({ revision: "rev-late" }))).rejects.toThrow("You signed out or switched accounts while it downloaded, so nothing was saved.");
+    noteSignedInAccount("user_2");
+    await expect(storeSavedBrief("user_1", offlineBrief({ revision: "rev-late" }))).rejects.toThrow("nothing was saved");
+    expect((await readSavedBriefs()).briefs[0].brief.revision).toBe("rev-1");
+  });
+
+  it("refuses a brief missing a field its page reads, before it's stored", async () => {
+    const trip = { ...offlineBrief().trip, start_date: undefined };
+    expect(readOfflineBrief({ ...offlineBrief(), trip })).toBeNull();
+    const checklist = { ...offlineBrief().days[0], kit: { kind: "checklist", summary: "Checklist" } };
+    expect(readOfflineBrief({ ...offlineBrief(), days: [checklist, offlineBrief().days[1]] })).toBeNull();
+    const noLink = { ...offlineBrief().days[0], conditions: [{ category_label: "Avalanche forecast", name: "Avalanche Canada", region: null, your_review: null, reviews: [] }] };
+    expect(readOfflineBrief({ ...offlineBrief(), days: [noLink, offlineBrief().days[1]] })).toBeNull();
+    await expect(storeSavedBrief("user_1", { ...offlineBrief(), trip } as never)).rejects.toThrow("Nothing was saved");
+    expect(readOfflineBrief(offlineBrief())).not.toBeNull();
+  });
+
   it("lists a stored copy that no longer reads as a brief as damaged instead of showing it", async () => {
     await storeSavedBrief("user_1", offlineBrief());
     await new Promise<void>((resolve, reject) => {
       const open = indexedDB.open("swttr-offline", 1);
       open.onsuccess = () => {
         const tx = open.result.transaction("briefs", "readwrite");
+        const trip = { ...offlineBrief().trip, start_date: undefined };
         tx.objectStore("briefs").put({ trip_id: "trip-9", account_id: "user_1", stored_at: "x", brief: { version: 2 } });
+        // An older copy without its trip's start date: listing the others mustn't trip over it.
+        tx.objectStore("briefs").put({ trip_id: "trip-8", account_id: "user_1", stored_at: "x", brief: { ...offlineBrief(), trip: { ...trip, id: "trip-8" } } });
         tx.oncomplete = () => { open.result.close(); resolve(); };
         tx.onerror = () => reject(tx.error);
       };
     });
     const device = await readSavedBriefs();
     expect(device.briefs.map((saved) => saved.trip_id)).toEqual(["trip-1"]);
-    expect(device.damaged).toEqual(["trip-9"]);
+    expect(device.damaged.sort()).toEqual(["trip-8", "trip-9"]);
   });
 
   it("removes one trip's copy, and forgets the account once none are left", async () => {
@@ -94,6 +118,19 @@ describe("Trip briefs saved on this device (#214)", () => {
       vi.stubGlobal("fetch", fakeTripApi({ "GET /api/v1/trips": reply(401, { error: "Authentication required" }) }));
       expect(await reconcileSavedBriefs(null, "user_1")).toBe(true);
       expect((await readSavedBriefs()).briefs).toEqual([]);
+    });
+
+    it("doesn't clear a newer account's save that finished while it waited for the server", async () => {
+      await storeSavedBrief("user_1", offlineBrief());
+      let answer!: (response: Response) => void;
+      vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { answer = resolve; })));
+      const pending = reconcileSavedBriefs(null, "user_1");
+      // Meanwhile someone else signs in and saves.
+      await storeSavedBrief("user_2", forOther("trip-2"));
+      answer({ status: 401 } as Response);
+      expect(await pending).toBe(false);
+      expect((await readSavedBriefs()).briefs.map((saved) => saved.trip_id)).toEqual(["trip-2"]);
+      expect(savedBriefsAccountHint()).toBe("user_2");
     });
 
     it("leaves the signed-in account's own copies alone", async () => {

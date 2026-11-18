@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TripOfflineSave } from "./OfflineBrief";
-import { readSavedBrief, storeSavedBrief } from "@/lib/offline-briefs";
+import { readSavedBrief, readSavedBriefs, storeSavedBrief } from "@/lib/offline-briefs";
+import { OfflineBriefAccountGuard } from "@/components/OfflineBriefAccountGuard";
 import { fakeClerkState, resetFakeClerk } from "@/test/fakeClerk";
 import { briefResponse, offlineBrief, resetDeviceStorage } from "@/test/offlineBrief";
 import type { TripOfflineBrief } from "@/types/trip-offline-brief";
@@ -110,6 +111,47 @@ describe("Save for offline on the trip (#214)", () => {
     expect(await screen.findByText("Removed from this device. The trip online hasn't changed.")).toBeInTheDocument();
     expect(await readSavedBrief("trip-1", "user_1")).toBeNull();
     expect(screen.getByRole("button", { name: "Save for offline" })).toBeInTheDocument();
+  });
+
+  it("removes the copy once the server says the member can't open the trip any more, and keeps it on other failures", async () => {
+    await storeSavedBrief("user_1", offlineBrief());
+    vi.stubGlobal("fetch", briefApi({ fail: 500 }));
+    const { unmount } = render(<TripOfflineSave tripId="trip-1" />);
+    expect(await screen.findByText(/^Couldn't check for changes/)).toBeInTheDocument();
+    expect(await readSavedBrief("trip-1", "user_1")).not.toBeNull();
+    unmount();
+
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: "Not found" }) }) as Response));
+    render(<TripOfflineSave tripId="trip-1" />);
+    expect(await screen.findByText("Removed from this device: you're no longer on this trip, or it was deleted.")).toBeInTheDocument();
+    expect(await readSavedBrief("trip-1", "user_1")).toBeNull();
+    expect(screen.getByRole("button", { name: "Save for offline" })).toBeInTheDocument();
+  });
+
+  it("doesn't keep a brief that finishes downloading after the account signed out", async () => {
+    const user = userEvent.setup();
+    const preview = briefApi();
+    let finish!: () => void;
+    // The preview answers at once; the save's download waits until released.
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (!saving) return preview(url);
+      await new Promise<void>((resolve) => { finish = resolve; });
+      return preview(url);
+    }));
+    let saving = false;
+    const view = () => <><OfflineBriefAccountGuard /><TripOfflineSave tripId="trip-1" /></>;
+    const { rerender } = render(view());
+    await user.click(await screen.findByRole("button", { name: "Save for offline" }));
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByRole("heading", { name: "Included" });
+    saving = true;
+    await user.click(within(dialog).getByRole("button", { name: "Save for offline" }));
+
+    fakeClerkState.signedIn = false;
+    rerender(view());
+    finish();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect((await readSavedBriefs()).briefs).toEqual([]);
   });
 
   describe("after the trip's dates changed", () => {

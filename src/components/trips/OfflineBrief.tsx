@@ -369,6 +369,20 @@ export function TripOfflineSave({ tripId }: { tripId: string }) {
     return () => { current = false; };
   }, [tripId, userId]);
 
+  // The server says this person can't open the trip any more: the copy goes
+  // from the device once that's done. Any other failed check keeps it.
+  const gone = check?.state === "gone" && saved ? saved : null;
+  useEffect(() => {
+    if (!gone) return;
+    let current = true;
+    removeSavedBrief(gone.trip_id).then(() => {
+      if (!current) return;
+      setSaved(null);
+      setStatus("Removed from this device: you're no longer on this trip, or it was deleted.");
+    }, (err) => { if (current) setError(`Couldn't remove the saved copy: ${errorMessage(err)}`); });
+    return () => { current = false; };
+  }, [gone]);
+
   if (!userId) return null;
 
   const update = async () => {
