@@ -13,7 +13,8 @@ import type { TripDay } from "@/types/trips";
 export default function TripMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const trip = useTrip(id);
-  const map = useTripMap(trip.data ? id : null, trip.data);
+  // Both reads start together; a newer trip, after an edit, refreshes the places.
+  const map = useTripMap(id, trip.data);
   const userId = useUserId();
   // The workspace header names the trip, and Plan is the current section.
   return (

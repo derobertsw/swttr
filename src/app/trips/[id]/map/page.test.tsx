@@ -20,9 +20,28 @@ async function open(search: string) {
   vi.stubGlobal("fetch", fetchMock);
   await act(async () => { render(<TripMapPage params={params} />); });
   expect(screen.getByRole("heading", { name: "Trip map" })).toBeInTheDocument();
-  // Places are requested once the trip, and its days, have loaded.
   await waitFor(() => expect(sentBodies(fetchMock, "GET /api/v1/trips/trip-1/map")).toHaveLength(1));
 }
+
+describe("Trip map loading (#235)", () => {
+  it("asks for the places alongside the trip, not after it, and only once when the trip arrives", async () => {
+    window.history.replaceState(null, "", "/trips/trip-1/map");
+    let finishTrip!: () => void;
+    const fetchMock = fakeTripApi({
+      "GET /api/v1/trips/trip-1": () => new Promise((resolve) => { finishTrip = () => resolve(reply(200, tripFull({ stops: [STOWE_STOP], days: [day] }))); }),
+      "GET /api/v1/trips/trip-1/map": () => new Promise(() => {}),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await act(async () => { render(<TripMapPage params={params} />); });
+    // On slow connections the list waited for two round trips in a row.
+    await waitFor(() => expect(sentBodies(fetchMock, "GET /api/v1/trips/trip-1/map")).toHaveLength(1));
+    expect(screen.getByRole("status")).toHaveTextContent("Loading trip places…");
+    await act(async () => finishTrip());
+    await waitFor(() => expect(screen.getByRole("link", { name: "Back to Plan" })).toBeInTheDocument());
+    // The trip's first arrival isn't a change to refresh for.
+    expect(sentBodies(fetchMock, "GET /api/v1/trips/trip-1/map")).toHaveLength(1);
+  });
+});
 
 describe("Trip map back link (#234)", () => {
   it("returns to the day it was opened from, at Getting there where View day map was (#235)", async () => {
