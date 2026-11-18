@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { ACTIVITIES } from "@/data/activities";
 import { Button } from "@/components/ui/button";
 import { formatLocationName } from "@/hooks/useLocationSearch";
+import { OUTING_VIEW_HEADING_IDS } from "@/hooks/useOutingViewFocus";
 import { EXERTION_LABELS } from "@/lib/biophysics/exertion";
 import { toPickerDate } from "@/lib/timeZones";
 import type { Outing, OutingRequestState } from "@/types/outing";
@@ -47,7 +48,7 @@ export function OutingRequestNotice({ request, shownOuting, onRetry }: {
             const shown = await onRetry();
             // A successful update removes this notice. Keep keyboard focus in the result.
             if (shown && (document.activeElement === button || document.activeElement === document.body)) {
-              document.getElementById("outing-result-heading")?.focus({ preventScroll: true });
+              document.getElementById(OUTING_VIEW_HEADING_IDS.results)?.focus({ preventScroll: true });
             }
           }}
         >

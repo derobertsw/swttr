@@ -128,7 +128,7 @@ describe("selectHeadwearByCategory", () => {
       [helmet, beanie],
       -5,
       true,
-      { includeHelmet: false }
+      { helmetTypes: [] }
     );
 
     expect(result.helmet).toBeNull();
