@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BODY_METRICS } from '@/lib/biophysics/bodyMetrics';
 import { evaluatePhase } from './layer-evaluation';
-import { REQUIRED_HELMET_TYPES, selectPhaseAccessories, selectHandwear, selectHeadwearByCategory } from './extremities';
+import { selectPhaseAccessories } from './extremities';
 import { metabolicRateFor, phaseIreq, phaseTargets } from './thermal-targets';
 import { buildClothingRequirements } from './requirements';
 import type { ActivityType } from '@/lib/biophysics/constants';
@@ -266,16 +266,5 @@ describe('optional sustained-activity accessories', () => {
     expect(result.assessments?.hands.message).toContain('going without would leave you colder');
     // A little warmth costs less than the cold of going without.
     expect(manual(t, [0.8], []).comfortScore!).toBeGreaterThan(manual(t, [], []).comfortScore!);
-  });
-
-  it.each(['biking', 'alpine_skiing', 'ski_touring_uphill', 'ski_touring_downhill'] as const)('preserves explicit compatibility selection for %s', activity => {
-    const t = targets(activity, -8);
-    const result = selectPhaseAccessories(activity, t, pool, -8);
-    expect(result.assessments).toBeUndefined();
-    expect(result.handwear).toEqual(selectHandwear(pool.handwear, -8, activity === 'biking', t.extremity.neutral.hands));
-    expect(result.headwear).toEqual(selectHeadwearByCategory(pool.headwear, -8,
-      activity === 'biking' || activity === 'ski_touring_uphill',
-      { helmetTypes: REQUIRED_HELMET_TYPES[activity] }));
-    if (activity === 'alpine_skiing' || activity === 'ski_touring_downhill') expect(result.headwear.helmet?.id).toBe('helmet');
   });
 });

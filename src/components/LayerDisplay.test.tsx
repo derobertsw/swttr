@@ -1167,6 +1167,38 @@ describe("LayerDisplay", () => {
       expect(within(screen.getByRole("region", { name: "Carry" })).getByText("Nothing extra to carry.")).toBeInTheDocument();
     });
 
+    it("checks the descent against its own accessory limits, not the climb's", async () => {
+      const extremity = (hands: number, head: number) => ({
+        min: { hands: hands - 0.2, head: head - 0.2 }, neutral: { hands, head }, max: { hands, head },
+      });
+      const touringData = {
+        ...mockBiophysicsData,
+        ireq: {
+          ...mockBiophysicsData.ireq,
+          extremity: { ...extremity(0.6, 0.5), max: { hands: 0.65, head: 0.5 } },
+          downhill: { min: 1.0, neutral: 1.6 },
+          downhill_target_range: [1.0, 1.6] as [number, number],
+        },
+        descent_breakdown: {
+          total_clo: 1.2,
+          regional_clo: { torso: 1.2, arms: 1.0, legs: 1.0 },
+          regional_ireq: mockBiophysicsData.ireq.regional,
+          extremity_ireq: { ...extremity(2.2, 1.8), max: { hands: 2.2, head: 1.95 } },
+        },
+        pack_items: { garments: [], total_weight_g: 0 },
+      };
+
+      render(
+        <LayerDisplay activity="backcountry_skiing" recommendation={null} temperature={15} windspeed={10} biophysicsData={touringData} />
+      );
+
+      await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
+      const sent = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+      expect(sent.phases).toHaveLength(2);
+      expect(sent.phases[0].extremityMaxTargets).toEqual({ hands: 0.65, headNeck: 0.5 });
+      expect(sent.phases[1].extremityMaxTargets).toEqual({ hands: 2.2, headNeck: 1.95 });
+    });
+
     it("should show descent overheating risk card when descent clo exceeds target", async () => {
       const overheatedDescentData = {
         ...mockBiophysicsData,

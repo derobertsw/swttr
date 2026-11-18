@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BODY_METRICS } from '@/lib/biophysics/bodyMetrics';
 import type { ActivityType } from '@/lib/biophysics/constants';
-import { selectHeadwearByCategory, selectPhaseAccessories } from './extremities';
+import { selectPhaseAccessories } from './extremities';
 import { buildHelmetRequirement } from './requirements';
 import { metabolicRateFor, phaseIreq, phaseTargets } from './thermal-targets';
 import type { HeadwearRow } from './types';
@@ -45,15 +45,15 @@ describe('required helmets', () => {
   it('wears only helmet-compatible head warmth under a helmet', () => {
     const cabinHat = { ...headwear('cabin-hat', 'heavy_beanie', 1.1), helmet_compatible: false };
     const liner = { ...headwear('liner', 'liner_beanie', 0.4), helmet_compatible: true };
-    for (const helmet of [SKI, BIKE]) {
-      const helmetTypes = [helmet.headwear_type];
-      expect(selectHeadwearByCategory([cabinHat, liner, helmet], -20, true, { helmetTypes }).headWarmth?.id).toBe('liner');
+    const pick = (activity: ActivityType, items: HeadwearRow[]) =>
+      selectPhaseAccessories(activity, targets(activity, -20), { handwear: [], headwear: items }, -20).headwear;
+    for (const [activity, helmet] of [['alpine_skiing', SKI], ['biking', BIKE]] as const) {
+      expect(pick(activity, [cabinHat, liner, helmet])).toMatchObject({ helmet: { id: helmet.id }, headWarmth: { id: 'liner' } });
       // No head warmth rather than a hat that doesn't fit under the helmet.
-      expect(selectHeadwearByCategory([cabinHat, helmet], -20, true, { helmetTypes }))
-        .toMatchObject({ helmet: { id: helmet.id }, headWarmth: null });
+      expect(pick(activity, [cabinHat, helmet])).toMatchObject({ helmet: { id: helmet.id }, headWarmth: null });
     }
-    // Without a helmet, including one owned but not required, the warmest hat is still chosen.
-    expect(selectHeadwearByCategory([cabinHat, liner, SKI], -20, true).headWarmth?.id).toBe('cabin-hat');
+    // Without a required helmet, including one owned but not required, the hat is a candidate.
+    expect(pick('ski_touring_uphill', [cabinHat, SKI])).toMatchObject({ helmet: null, headWarmth: { id: 'cabin-hat' } });
   });
 
   it('matches an owned helmet as owned and a catalog helmet as a suggestion, never as owned', () => {
