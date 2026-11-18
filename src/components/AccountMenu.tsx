@@ -23,6 +23,12 @@ const APPEARANCE = {
       borderRadius: "9999px",
       "&:focus-visible": { outline: "2px solid var(--ring)", outlineOffset: "2px", boxShadow: "none" },
     },
+    // Clerk keeps its own Sign out in the menu whatever MenuItems lists, and
+    // its label can't take an onClick. Signing out must go through ours,
+    // which warns about the trip briefs saved on this device (#214), so its
+    // own sign-out actions are hidden ("&&" outranks Clerk's variant rules).
+    userButtonPopoverActionButton__signOut: { display: "none", "&&": { display: "none" } },
+    userButtonPopoverActionButton__signOutAll: { display: "none", "&&": { display: "none" } },
   },
 };
 

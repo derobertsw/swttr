@@ -88,6 +88,26 @@ describe("AccountMenu", () => {
     expect(onShare).toHaveBeenCalledTimes(1);
   });
 
+  it("offers one Sign out, its own, which warns before removing saved trips; Clerk's is hidden (#214)", async () => {
+    await storeSavedBrief("user_1", offlineBrief());
+    const signOut = vi.fn(async () => {});
+    fakeClerkState.signOut = signOut;
+    const user = userEvent.setup();
+    render(<AccountMenu onOpenSettings={vi.fn()} onShare={vi.fn()} />);
+
+    await user.click(avatar());
+    const menu = screen.getByRole("menu", { name: "User menu" });
+    expect(within(menu).getAllByRole("menuitem", { name: "Sign out" })).toHaveLength(1);
+    // Clerk keeps its own, hidden, so nothing can sign out without the warning.
+    const both = within(menu).getAllByText("Sign out");
+    expect(both).toHaveLength(2);
+    expect(both.filter((item) => item.style.display === "none")).toHaveLength(1);
+    await user.click(within(menu).getByRole("menuitem", { name: "Sign out" }));
+    expect(await screen.findByRole("dialog", { name: "Sign out and remove saved trips?" })).toBeInTheDocument();
+    expect(signOut).not.toHaveBeenCalled();
+    expect((await readSavedBriefs()).briefs).toHaveLength(1);
+  });
+
   it("signs out at once when no trips are saved on this device", async () => {
     const signOut = vi.fn(async () => {});
     fakeClerkState.signOut = signOut;

@@ -62,7 +62,7 @@ Writes are atomic. A save downloads the whole brief, checks it (`readOfflineBrie
 
 ## Signing out and account changes
 
-- **Sign out** in the account menu is SWTTR's own action now, not Clerk's built-in one. With briefs on the device it first asks "Sign out and remove saved trips?", naming how many, and then removes them before signing out. Without briefs it signs out at once.
+- **Sign out** in the account menu is SWTTR's own action now, not Clerk's built-in one. Clerk keeps its own Sign out in the menu whatever the menu lists, and that item can't take an onClick, so the menu's `appearance` hides it (`userButtonPopoverActionButton__signOut`, and `__signOutAll` for multiple sessions). With briefs on the device it first asks "Sign out and remove saved trips?", naming how many, and then removes them before signing out. Without briefs it signs out at once.
 - **Any page** runs `OfflineBriefAccountGuard` (root layout). Once Clerk knows who's signed in, briefs saved by another account are removed. When Clerk says nobody is signed in, they're removed only once the server agrees (`GET /api/v1/trips` answers 401), so a session that hasn't loaded, or a flaky connection, never wipes them. Saved on this device applies the same rule before showing anything, and hides another account's briefs while they're removed.
 - The invite page's "not you? sign out" path uses Clerk directly; its briefs go once the next page sees nobody signed in.
 - Offline, Clerk can't load, so nothing is checked and the device's briefs show. Online, the page waits up to 3 seconds for Clerk before showing them.
