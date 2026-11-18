@@ -15,6 +15,8 @@ const CACHE_PREFIX = "swttr-saved-shell-";
 const STAGING_PREFIX = "swttr-saved-staging-";
 // Online, wait this long for the live page before showing the kept one.
 const NETWORK_TIMEOUT_MS = 4000;
+// Keeping the page gives up after this long, within the 30 seconds a save waits for it.
+const PRIME_TIMEOUT_MS = 25000;
 // Icons and images the page links to by URL, outside the build's static files.
 const PUBLIC_FILE = /^\/(?!api\/)[^?#]*\.(?:png|svg|ico|webp|jpe?g)$/;
 
@@ -88,15 +90,26 @@ function prime() {
     const stagingName = `${STAGING_PREFIX}${stamp}`;
     const keptName = `${CACHE_PREFIX}${stamp}`;
     const staging = await caches.open(stagingName);
+    // Downloads that stall are cancelled, so this attempt ends and the next starts afresh.
+    const deadline = new AbortController();
+    const timer = setTimeout(() => deadline.abort(), PRIME_TIMEOUT_MS);
+    const { signal } = deadline;
     try {
       // No cookies: the page is the same for everyone, and must never be anyone's own.
-      const page = await fetch(SHELL_PATH, { credentials: "omit", cache: "no-store", redirect: "manual" });
+      const page = await fetch(SHELL_PATH, { credentials: "omit", cache: "no-store", redirect: "manual", signal });
       if (!isPage(page)) throw new Error("the saved trips page didn't load");
       const html = await page.clone().text();
       const required = taggedFiles(html);
       const extra = extraFiles(html, required);
       const keep = async (path, needed) => {
-        const response = await fetch(path, { credentials: "omit", cache: "no-cache" });
+        let response;
+        try {
+          response = await fetch(path, { credentials: "omit", cache: "no-cache", signal });
+        } catch (error) {
+          // An optional file that didn't arrive: the page reads without it. A required one fails the attempt.
+          if (needed) throw error;
+          return null;
+        }
         if (!response.ok) {
           if (needed) throw new Error(`a file the page needs didn't download (${response.status})`);
           return null;
@@ -124,8 +137,9 @@ function prime() {
       await removeCachesExcept(keptName);
     } catch (error) {
       await caches.delete(keptName);
-      throw error;
+      throw signal.aborted ? new Error("the offline page took too long to download") : error;
     } finally {
+      clearTimeout(timer);
       await caches.delete(stagingName);
     }
   })().finally(() => { priming = null; });

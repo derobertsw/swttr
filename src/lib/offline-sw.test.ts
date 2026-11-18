@@ -11,7 +11,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 const ORIGIN = "http://localhost";
 const source = readFileSync(path.resolve(__dirname, "../../public/offline-sw.js"), "utf8");
 
-type Reply = { status: number; body: string; type?: string };
+/** A server's answer; `hang` never answers, until the request is aborted. */
+type Reply = { status: number; body: string; type?: string; hang?: boolean };
 const asResponse = ({ status, body, type = "text/plain" }: Reply) => {
   const response = new Response(body, { status, headers: { "Content-Type": type } });
   // Same-origin responses a worker fetches are "basic"; Node's are "default".
@@ -69,13 +70,19 @@ function worker(network: Map<string, Reply>) {
     skipWaiting: async () => undefined,
     clients: { claim: async () => undefined },
   };
-  const fetch = async (request: RequestInfo | URL) => {
+  const fetch = async (request: RequestInfo | URL, init: RequestInit = {}) => {
     const url = key(request);
     const reply = network.get(url.pathname);
     if (!reply) throw new TypeError("Failed to fetch");
+    if (reply.hang) {
+      return new Promise<Response>((_, reject) =>
+        init.signal?.addEventListener("abort", () => reject(new DOMException("This operation was aborted", "AbortError"))));
+    }
     return asResponse(reply);
   };
-  new Function("self", "caches", "fetch", source)(self, caches, fetch);
+  // The worker's timers run a thousand times faster, so its deadlines pass within a test.
+  const fastTimeout = (run: () => void, ms = 0) => setTimeout(run, ms / 1000);
+  new Function("self", "caches", "fetch", "setTimeout", "clearTimeout", source)(self, caches, fetch, fastTimeout, clearTimeout);
 
   /** Sends the page's "keep the latest page" message and resolves with the worker's reply. */
   const prime = async () => {
@@ -177,6 +184,32 @@ describe("The saved trips page's service worker (#214)", () => {
     await settled();
 
     // Its check still ran on its own copy, saw the new chunk missing, and kept the new page.
+    const [[, files]] = sw.kept();
+    expect([...files.keys()].map((url) => new URL(url).pathname)).toContain("/_next/static/chunks/v2.js");
+  });
+
+  it("keeps the page when an optional file's download fails outright", async () => {
+    net.delete("/_next/static/media/font.woff2");
+    net.delete("/_next/static/chunks/maybe-not-a-file.js");
+    const sw = worker(net);
+    expect(await sw.prime()).toEqual({ ok: true });
+    expect(sw.kept()).toHaveLength(1);
+  });
+
+  it("gives up on a download that stalls, keeps the previous copy, and starts afresh next time", async () => {
+    const sw = worker(net);
+    expect(await sw.prime()).toEqual({ ok: true });
+    const [[previous]] = sw.kept();
+
+    net.set("/trips/saved", { status: 200, body: PAGE("v2.js"), type: "text/html" });
+    net.set("/_next/static/chunks/v2.js", { status: 200, body: "", hang: true });
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    expect(await sw.prime()).toEqual({ ok: false, error: "the offline page took too long to download" });
+    expect(sw.kept().map(([name]) => name)).toEqual([previous]);
+
+    // The stalled attempt is over: the next one downloads again rather than waiting on it.
+    net.set("/_next/static/chunks/v2.js", { status: 200, body: "console.log(2)", type: "application/javascript" });
+    expect(await sw.prime()).toEqual({ ok: true });
     const [[, files]] = sw.kept();
     expect([...files.keys()].map((url) => new URL(url).pathname)).toContain("/_next/static/chunks/v2.js");
   });
