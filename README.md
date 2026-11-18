@@ -61,7 +61,8 @@ graph TD
     P -->|No usable garments| T[Targets-only response]
     P --> G[Ensemble Building]
     G --> R[Running/XC only: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
-    R --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
+    R --> PROT[Alpine, cycling, touring descent: helmet requirement<br/>whatever the thermal demand<br/>owned match, catalog suggestion, or missing with a warning]
+    PROT --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
     XCCARRY --> I[Canonical server phase assessment:<br/>actual worn regional and extremity basic clo<br/>local shortfalls and excess, moisture and clothing gaps]
     I --> H[Ensemble thermal scoring and API/UI reasons<br/>consume the same phase assessment]
 
@@ -275,7 +276,7 @@ graph TD
 
 ### 6. Extremity Selection
 
-Running/XC evaluate optional thermal coverage against the phase's local min/max bands. The absence of insulation competes with known suitable gear. When nothing fits, going without is weighed against the nearest item, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings check the heuristic bands in deep cold: items rated for these conditions win, and the lightest rated choice sets the upper limit that scoring and manual checks use. Functional XC gloves have a separate pole-grip purpose. Cycling, alpine and touring explicitly retain the earlier selection rules pending calibration; required alpine/descent helmets remain outside the optional path. Those rules choose among head layers rated for the temperature or unrated (any head layer when none qualifies), switch from the lightest to the warmest of them at 0°C, and do not count the helmet or a worn hood, so the shared comfort check often judges head and neck too warm. A helmet that is not owned is left out without a warning, and cycling has no helmet in the model ([algorithm review](docs/algorithm-review.md), findings 2 and 4).
+Running/XC evaluate optional thermal coverage against the phase's local min/max bands. The absence of insulation competes with known suitable gear. When nothing fits, going without is weighed against the nearest item, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings check the heuristic bands in deep cold: items rated for these conditions win, and the lightest rated choice sets the upper limit that scoring and manual checks use. Functional XC gloves have a separate pole-grip purpose. Cycling, alpine and touring explicitly retain the earlier selection rules pending calibration. Those rules choose among head layers rated for the temperature or unrated (any head layer when none qualifies), switch from the lightest to the warmest of them at 0°C, and do not count the helmet or a worn hood, so the shared comfort check often judges head and neck too warm ([algorithm review](docs/algorithm-review.md), finding 2). Helmets are required protection, kept apart from optional warmth: alpine and the touring descent need a ski helmet and cycling a bike helmet, whatever the thermal demand. Each gear recommendation reports the helmet as a requirement: an owned match, a catalog suggestion that is never presented as owned, or missing, with a warning and a generic suggestion. A targets-only response, returned when no usable garments are available, has no helmet requirement. Under a helmet, only head warmth and hoods marked helmet-compatible are worn.
 
 ```mermaid
 graph TD
@@ -295,9 +296,13 @@ graph TD
     MODE -->|No: compatibility policy| LEGACY[Temperature and target selection retained]
     LEGACY --> LHAND[Glove nearest the hand target, excess counts double<br/>Penalty below its rating: active rating for biking,<br/>static rating for alpine and touring]
     LEGACY --> LHEAD[Head: from items rated for the temperature or unrated,<br/>or from all items when none qualifies:<br/>lightest above 0°C, warmest at 0°C and below<br/>Neck layer below freezing<br/>Helmet and hood are not counted]
-    LHEAD --> HELMET{Alpine or touring descent?}
-    HELMET -->|Yes| REQUIRED[Required helmet selected separately<br/>Only compatible hoods contribute<br/>No warning when none is owned]
-    HELMET -->|No| NOHELMET[No helmet from thermal selection]
+    LHEAD --> HELMET{Sport or phase requires a helmet?<br/>Alpine and touring descent: ski helmet<br/>Cycling: bike helmet}
+    HELMET -->|Yes| REQUIRED[Required helmet of that type, whatever the thermal demand<br/>Temperature only picks among helmets<br/>Only helmet-compatible head warmth and hoods are worn under it]
+    HELMET -->|No: running, XC, touring climb| NOHELMET[No helmet]
+    REQUIRED --> HREQ{Helmet of that type available?}
+    HREQ -->|In the wardrobe| HOWNED[Requirement: owned match]
+    HREQ -->|In the catalog| HCAT[Requirement: catalog suggestion, not owned]
+    HREQ -->|None| HMISS[Requirement missing with a generic suggestion<br/>and a warning; never dropped or claimed as owned]
 ```
 
 ### 7. Thermal Targets and Comfort

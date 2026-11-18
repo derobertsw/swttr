@@ -1,0 +1,7 @@
+{
+  "headwear": [
+    {"brand": "Giro", "covers_ears": false, "covers_face": false, "covers_neck": false, "headwear_type": "bike_helmet", "helmet_compatible": false, "id": "7f0c3a52-9d4e-4b1a-8e6f-2c5d9b373a01", "min_temp_active": null, "min_temp_static": null, "model_name": "Syntax MIPS", "msrp_usd": null, "rcl_clo": 0.2, "weight_grams": 296, "windproof": false, "year_released": null},
+    {"brand": "Smith", "covers_ears": false, "covers_face": false, "covers_neck": false, "headwear_type": "bike_helmet", "helmet_compatible": false, "id": "7f0c3a52-9d4e-4b1a-8e6f-2c5d9b373a02", "min_temp_active": null, "min_temp_static": null, "model_name": "Signal MIPS", "msrp_usd": null, "rcl_clo": 0.2, "weight_grams": 300, "windproof": false, "year_released": null},
+    {"brand": "Specialized", "covers_ears": false, "covers_face": false, "covers_neck": false, "headwear_type": "bike_helmet", "helmet_compatible": false, "id": "7f0c3a52-9d4e-4b1a-8e6f-2c5d9b373a03", "min_temp_active": null, "min_temp_static": null, "model_name": "Align II MIPS", "msrp_usd": null, "rcl_clo": 0.2, "weight_grams": 374, "windproof": false, "year_released": null}
+  ]
+}

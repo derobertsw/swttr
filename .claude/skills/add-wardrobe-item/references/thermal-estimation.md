@@ -196,6 +196,7 @@ The engine picks the item whose `rcl_clo` is closest to the extremity target and
   | Type | `rcl_clo` |
   | --- | --- |
   | `ski_helmet` | 0.5–0.85 (more venting and less liner → lower) |
+  | `bike_helmet` | about 0.2 (manikin: at most ~0.15 clo over a bare head; see `20261117031100_seed_bike_helmets.sql`); unrated for temperature |
   | `liner_beanie` | 0.45–0.5 |
   | `midweight_beanie` | 0.7–0.85 |
   | `heavy_beanie` | about 1.1 |

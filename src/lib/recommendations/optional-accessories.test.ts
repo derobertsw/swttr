@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BODY_METRICS } from '@/lib/biophysics/bodyMetrics';
 import { evaluatePhase } from './layer-evaluation';
-import { selectPhaseAccessories, selectHandwear, selectHeadwearByCategory } from './extremities';
+import { REQUIRED_HELMET_TYPES, selectPhaseAccessories, selectHandwear, selectHeadwearByCategory } from './extremities';
 import { metabolicRateFor, phaseIreq, phaseTargets } from './thermal-targets';
 import { buildClothingRequirements } from './requirements';
 import type { ActivityType } from '@/lib/biophysics/constants';
@@ -275,7 +275,7 @@ describe('optional sustained-activity accessories', () => {
     expect(result.handwear).toEqual(selectHandwear(pool.handwear, -8, activity === 'biking', t.extremity.neutral.hands));
     expect(result.headwear).toEqual(selectHeadwearByCategory(pool.headwear, -8,
       activity === 'biking' || activity === 'ski_touring_uphill',
-      { includeHelmet: activity === 'alpine_skiing' || activity === 'ski_touring_downhill' }));
+      { helmetTypes: REQUIRED_HELMET_TYPES[activity] }));
     if (activity === 'alpine_skiing' || activity === 'ski_touring_downhill') expect(result.headwear.helmet?.id).toBe('helmet');
   });
 });
