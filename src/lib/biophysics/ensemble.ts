@@ -63,7 +63,7 @@ export function predictEnsembleThermal(garments: ThermalGarment[]): EnsemblePred
     },
   };
 
-  // Calculate whole-body values using parallel weighted average
+  // Whole-body values: the weighted linear mean of the regions (REGIONAL_WEIGHTS)
   predicted.rcl.wholeBody = calculateWeightedAverage(predicted.rcl);
   predicted.recl.wholeBody = calculateWeightedAverage(predicted.recl);
 

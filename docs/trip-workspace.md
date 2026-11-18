@@ -9,7 +9,7 @@ Every earlier URL still works and belongs to the section that now holds it (`src
 | Section | Its page | Pages inside it |
 |---|---|---|
 | Plan | `/trips/:id` | `/days`, `/days/:date`, `/map`, `/stops`, `/settings` |
-| Stays | `/trips/:id/stays` | |
+| Stays | `/trips/:id/stays` | `/stays/compare` ([Comparing stays](trip-stays.md#comparing-stays-213)) |
 | Crew | `/trips/:id/manage` | `/rollcall` (the Day checklist, [trip-crew-checklist.md](trip-crew-checklist.md)) |
 | Packing | `/trips/:id/pack` | `/gear` (shared gear) |
 
@@ -47,7 +47,7 @@ A new trip still opens on Plan's own page, which confirms it's saved (#169), and
 A day reads in one order on every width ([#334](https://github.com/derobertsw/swttr/issues/334)), so a phone shows the essentials first and a wide screen keeps them beside the days:
 
 1. **What the day is.** The date, the activity and the destination, and on a Backcountry day the route. It says when you aren't taking part, or aren't on the trip that day, and offers **Choose an activity** when the day has none. A Backcountry day, or any day with official sources, adds one line for your conditions reviews (recorded, out of how many, and how many were recorded before the plan changed), linked to Conditions below.
-2. **Meet and start.** The day's meet time, for every sport, at its access point ([#333](trip-locations.md#meet-time), set here by the organizer), the day's [notes](#day-notes), then where you start, with the crew's where it differs.
+2. **Meet and start.** The day's meet time, for every sport, at its access point ([#333](trip-locations.md#meet-time), set here by the organizer), the day's [notes](#day-notes), then where you start, with the crew's where it differs. That's where your departure starts, so a starting point of your own, or the day's own, reads as it does in your drive below ([Departures](trip-locations.md#departures-333)).
 3. **Getting there.** The access point, your drive and everyone's departures, then the ski or walk approach, kept apart from the road.
 4. **Tonight.** Where you sleep, with the crew's where it differs. On a morning you move stays it names both, with their check-out and check-in times when they're saved.
 5. **The tour and its conditions** on a Backcountry day: the tour plan, then each source with your review. A review shows as an icon and text, never a badge or a box: not recorded, recorded by you at a time, or recorded before the plan changed and why.

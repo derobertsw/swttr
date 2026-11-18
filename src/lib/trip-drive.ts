@@ -1,9 +1,9 @@
 import "server-only";
 import { closuresFor, type WinterClosure } from "@/lib/locations/closures";
 import { accessPointFor } from "@/lib/trip-location";
-import { CREW_STATUSES, dateLabel, shiftDate } from "@/lib/trip-lodging";
+import { CREW_STATUSES, dateLabel, groupLabel, shiftDate } from "@/lib/trip-lodging";
 import { formatZonedTime, isTimeZone } from "@/lib/timeZones";
-import type { TripDay, TripDriveEstimate, TripDriveManualEstimate, TripDriveRoute, TripFull, TripLocation, TripStayDepartures } from "@/types/trips";
+import type { TripDay, TripDayStart, TripDriveEstimate, TripDriveManualEstimate, TripDriveRoute, TripFull, TripLocation, TripStayDepartures } from "@/types/trips";
 
 /**
  * Which drive each trip day has (#209): from the stay of the night before, or
@@ -198,6 +198,34 @@ export function departurePlans(full: TripFull): DeparturePlan[][] {
       const origin = group.find((entry) => !entry.own)?.origin ?? group[0].origin;
       return { ...planFor(full, date, origin, starting_stay_id, group[0].noDrive), key, label, member_ids, own_member_ids, crew: key === crew };
     });
+  });
+}
+
+/**
+ * Where each trip day starts, as the day brief reads it (#333): each person's
+ * departure, so their own starting point or the day's own comes before the
+ * stay they slept in, and the crew's, grouped by where people actually start.
+ * People with no starting point aren't counted in the crew's, as in the
+ * lodging's own view. Nothing is estimated.
+ */
+export function dayStarts(full: TripFull, departures: DeparturePlan[][] = departurePlans(full)): TripDayStart[] {
+  return departures.map((day) => {
+    // No drive planned splits a departure but not where people start, so the
+    // crew's count joins them by place.
+    const places = new Map<string, [string, number]>();
+    for (const departure of day) {
+      if (!departure.origin || !departure.member_ids.length) continue;
+      const place = departure.key.replace(/:no_drive$/, "");
+      const [label, count] = places.get(place) ?? [departure.label, 0];
+      places.set(place, [label, count + departure.member_ids.length]);
+    }
+    return {
+      date: day[0].date,
+      starting_from: places.size ? groupLabel([...places.values()]) : day[0].origin?.label ?? null,
+      people: day.flatMap((departure) => departure.member_ids.map((member_id) => ({
+        member_id, starting_from: departure.label, own: departure.own_member_ids.includes(member_id) || !!departure.origin?.own,
+      }))),
+    };
   });
 }
 

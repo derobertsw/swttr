@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { CircleDashed, Eye, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, fieldClassName } from "@/components/ui/input";
+import { OfficialCenterPicker } from "@/components/trips/OfficialCenterPicker";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { useTripEditorHistory } from "@/hooks/useTripEditorHistory";
@@ -404,6 +405,8 @@ function SourceEditor({ tripId, date, dateLabel, dayId, source, onSaved, onClose
                   {(Object.keys(CATEGORY) as TripConditionsCategory[]).map((key) => <option key={key} value={key}>{CATEGORY[key].label}</option>)}
                 </select>
               </label>
+              {draft.category === "avalanche" && <OfficialCenterPicker tripId={tripId} date={date}
+                onPick={(center) => { change("name", center.name); change("url", center.url); }} />}
               {([
                 ["name", "Source name", { required: true, maxLength: 200, hint: "e.g. Mount Washington Avalanche Center" }],
                 ["region", "Area or region (optional)", { maxLength: 200, hint: "The forecast zone or area it covers, e.g. Presidential Range." }],
