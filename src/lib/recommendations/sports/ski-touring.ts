@@ -29,6 +29,7 @@ import {
   selectDescentPack,
   type ClimbProtection,
 } from './ski-touring-outfit';
+import { buildHelmetRequirement } from '../requirements';
 import {
   ensembleToThermalGarments,
   formatConditions,
@@ -170,13 +171,6 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     const { categorized } = pool;
     const { uphill, downhill } = targets;
 
-    // Climb: no helmet (conditional), active warmth selection
-    const climbAccessories = selectPhaseAccessories('ski_touring_uphill', uphill, pool, tempC);
-    const climbHeadwear = climbAccessories.headwear;
-    // Descent: helmet mandatory, static warmth selection
-    const descentAccessories = selectPhaseAccessories('ski_touring_downhill', downhill, pool, tempC);
-    const descentHeadwear = descentAccessories.headwear;
-
     // Catalog callers draw from the catalog filter (uphill OR downhill >= 6),
     // so each phase only takes catalog garments that clear its own threshold.
     // Wardrobe garments stay unfiltered: they're the user's own kit and may
@@ -212,6 +206,18 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     const packItems = [pack.insulation, pack.shell, pack.legs].filter((g): g is GarmentRow => g !== null);
     const downhillEnsemble = [...uphillEnsemble, ...packItems];
 
+    // Accessories fit each phase's local bands, counting that phase's hoods.
+    // Climb: no helmet, gloves that grip poles. Descent: helmet required, and
+    // the climb's gloves carry over when they fit its band.
+    const climbAccessories = selectPhaseAccessories('ski_touring_uphill', uphill, pool, tempC, uphillEnsemble);
+    const climbHeadwear = climbAccessories.headwear;
+    const descentAccessories = selectPhaseAccessories('ski_touring_downhill', downhill, pool, tempC, downhillEnsemble,
+      { precipitation: request.precipitation, preferHandwearId: climbAccessories.handwear?.id });
+    const descentHeadwear = descentAccessories.headwear;
+    const descentHelmet = buildHelmetRequirement('ski_touring_downhill', descentHeadwear.helmet, pool);
+    const climbExtremity = { ...uphill.extremity, max: climbAccessories.extremityMax };
+    const descentExtremity = { ...downhill.extremity, max: descentAccessories.extremityMax };
+
     const downhillThermalGarments = ensembleToThermalGarments(downhillEnsemble);
     const downhillThermalProperties = predictEnsembleThermal(downhillThermalGarments);
 
@@ -230,23 +236,22 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     };
 
     const selectedHandwear = climbAccessories.handwear;
-    // Gloves carry over from the climb — only select warmer descent gloves if climb pair is insufficient
-    const descentHandwear = selectedHandwear && selectedHandwear.rcl_clo >= downhill.extremity.neutral.hands
-      ? selectedHandwear
-      : descentAccessories.handwear ?? selectedHandwear;
+    const descentHandwear = descentAccessories.handwear;
 
-    const scorePhase = (ensemble: GarmentRow[], phase: PhaseTargets, climb: boolean) => buildScoredRecommendation({
+    const scorePhase = (ensemble: GarmentRow[], phase: PhaseTargets, extremity: PhaseTargets['extremity'], climb: boolean) => buildScoredRecommendation({
       ensemble,
       weather: { temperature: tempC, windSpeed: climb ? targets.uphillWind : targets.downhillWind, humidity, precipitation: !climb && request.precipitation },
       activity: { name: climb ? 'Ski Touring Uphill' : 'Ski Touring Downhill', metabolicRate: climb ? targets.uphillRate : targets.downhillRate, hasStaticPeriods: false, windExposure: climb ? 'sheltered' : 'exposed' },
       activityKey: climb ? 'ski_touring_uphill' : 'ski_touring_downhill',
       comfortContext: { targetRange: phase.targetRange, regionalMinTarget: phase.regional.min, regionalTarget: phase.regional.neutral,
-        extremityMinTarget: phase.extremity.min, extremityTarget: phase.extremity.neutral, extremityMaxTarget: phase.extremity.max },
+        extremityMinTarget: extremity.min, extremityTarget: extremity.neutral, extremityMaxTarget: extremity.max },
     }, climb ? selectedHandwear : descentHandwear, climb ? climbHeadwear : descentHeadwear);
-    const uphillResult = scorePhase(uphillEnsemble, uphill, true);
-    const downhillResult = scorePhase(downhillEnsemble, downhill, false);
+    const uphillResult = scorePhase(uphillEnsemble, uphill, climbExtremity, true);
+    const downhillResult = scorePhase(downhillEnsemble, downhill, descentExtremity, false);
+    uphillResult.recommendation.accessories = climbAccessories.assessments;
 
     return {
+      ...(descentHelmet ? { requirements: [descentHelmet.requirement] } : {}),
       conditions: {
         ...formatConditions(request.weather),
         exertion: request.exertion,
@@ -260,7 +265,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         dle_method: DLE_ESTIMATION_METHOD,
         target_range: uphill.targetRange,
         regional: uphill.regional,
-        extremity: uphill.extremity,
+        extremity: climbExtremity,
         validation_buffer_clo: {
           uphill: formatValidationBuffer(uphill.validationBuffer),
           downhill: formatValidationBuffer(downhill.validationBuffer),
@@ -275,7 +280,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         total_clo: Math.round(downhillThermalProperties.rcl.wholeBody * 100) / 100,
         regional_clo: downhillRegionalClo,
         regional_ireq: downhill.regional,
-        extremity_ireq: downhill.extremity,
+        extremity_ireq: descentExtremity,
       },
       pack_items: {
         garments: packItems.map((g) => {
@@ -297,9 +302,9 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
       },
       transition_protocol: transitionProtocol,
       warnings: [
-        ...uphillResult.warnings.map(w => `Climb: ${w}`),
+        ...[...uphillResult.warnings, ...climbAccessories.warnings].map(w => `Climb: ${w}`),
         ...climbProtectionWarnings(uphillEnsemble, targets.climbProtection),
-        ...downhillResult.warnings.map(w => `Descent: ${w}`),
+        ...[...downhillResult.warnings, ...descentAccessories.warnings, ...(descentHelmet?.warnings ?? [])].map(w => `Descent: ${w}`),
       ],
       guidance: [
         ...(uphillResult.recommendation.evaluation?.decision?.reasons ?? []).map(r => `Climb: ${r}`),

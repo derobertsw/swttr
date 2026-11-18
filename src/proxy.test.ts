@@ -35,6 +35,11 @@ describe("proxy, signed out", () => {
     expect(auth.protect).not.toHaveBeenCalled();
   });
 
+  it("lets Clerk deliver webhooks, which the route verifies by signature", async () => {
+    expect(await visit("/api/webhooks/clerk", "POST", "Svix-Webhooks/1.0")).toBeUndefined();
+    expect(auth.protect).not.toHaveBeenCalled();
+  });
+
   it("asks visitors to sign in for their own gear and trips", async () => {
     await visit("/api/wardrobe/items");
     await visit("/trips");

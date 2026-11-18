@@ -262,9 +262,10 @@
   }
 }
 
-/* A linked heading or focused control clears a trip's sticky section tabs. */
+/* A linked heading or focused control clears a trip's sticky section tabs:
+   their measured height (one row, or two with enlarged text), else one row. */
 html:has([data-trip-sections]) {
-  scroll-padding-top: calc(3.5rem + env(safe-area-inset-top));
+  scroll-padding-top: calc(var(--trip-sections-height, 3.5rem) + env(safe-area-inset-top));
 }
 
 @supports (-webkit-touch-callout: none) {

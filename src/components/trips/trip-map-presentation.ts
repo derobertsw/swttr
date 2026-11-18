@@ -1,6 +1,7 @@
 import type { TripMapDay, TripMapPlace, TripMapRole } from "@/types/trip-map";
 
-export type MapDisplayRole = TripMapRole | "tonight" | "meeting";
+/** "departure" is where another group starts that day (#333), beside the one the view follows. */
+export type MapDisplayRole = TripMapRole | "tonight" | "meeting" | "departure";
 
 export function placeDates(place: TripMapPlace): string[] {
   return [...new Set(place.visits.map((visit) => visit.date))];
@@ -8,6 +9,7 @@ export function placeDates(place: TripMapPlace): string[] {
 
 export const roleLabels: Record<MapDisplayRole, string> = {
   stay: "Stay", destination: "Destination", origin: "Starting from", access: "Access", meeting: "Meeting point", tonight: "Staying tonight", pickup: "Pickup",
+  departure: "Other departure",
 };
 
 /**
@@ -21,6 +23,8 @@ export function dayRoles(place: TripMapPlace, day: TripMapDay): MapDisplayRole[]
   if (place.id === day.access_place_id) roles.push(place.id === day.meeting_place_id ? "meeting" : "access");
   if (place.id === day.destination_place_id) roles.push("destination");
   if (place.id === day.tonight_place_id) roles.push("tonight");
+  // Another group's start (#333): never a second "Starting from" beside the one the view follows.
+  if (!roles.length && day.departures?.some((departure) => departure.origin_place_id === place.id)) roles.push("departure");
   // Last night's crew stay while the day starts somewhere else.
   if (place.id === day.crew_stay_place_id && !roles.length) roles.push("stay");
   return roles;
@@ -45,7 +49,7 @@ export function placeStatus(place: TripMapPlace): string {
   return place.precision === "approximate" ? "Approximate location" : place.precision === "unknown" ? "Location precision unconfirmed" : "Confirmed location";
 }
 
-export const roleSymbols: Record<MapDisplayRole, string> = { stay: "⌂", destination: "▲", origin: "●", access: "◆", meeting: "◆", tonight: "⌂", pickup: "■" };
+export const roleSymbols: Record<MapDisplayRole, string> = { stay: "⌂", destination: "▲", origin: "●", access: "◆", meeting: "◆", tonight: "⌂", pickup: "■", departure: "○" };
 
 /**
  * The day as one departure or person sees it (#333). `key` is a departure

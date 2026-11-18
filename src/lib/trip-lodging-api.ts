@@ -7,7 +7,11 @@ import { buildLodging, isCalendarDate, isUuid, loadLodgingMembers, loadLodgingRo
 import { applyLodgingChange, lodgingPayload, parseAssignments, parseAttendance, parseOccupants, previewLodgingChange, type LodgingChange, type LodgingFailure } from "@/lib/trip-lodging-changes";
 import type { Trip, TripLodgingAction } from "@/types/trips";
 
-type Options = { action: TripLodgingAction; stayId?: string; date?: string; memberId?: string; preview?: boolean };
+type Options = {
+  action: TripLodgingAction; stayId?: string; date?: string; memberId?: string; preview?: boolean;
+  /** A stay saved from an option (#213): saved only while the option is at the revision its preview showed. */
+  candidate?: { id: string; revision: number };
+};
 type Body = Record<string, unknown>;
 
 const failure = ({ error, field, status }: LodgingFailure) => NextResponse.json({ error, ...(field ? { field } : {}) }, { status });
@@ -112,13 +116,21 @@ export async function handleLodging(request: Request, tripId: string, options: O
   }
   // Nothing else is checked against the saved plan here: a retried save must
   // reach the transaction to get its first result back.
-  const { data, error } = await auth.supabase.rpc("mutate_trip_lodging", {
+  const params = {
     p_trip_id: tripId, p_user_id: auth.userId, p_expected_revision: body.expected_revision,
     p_request_id: body.mutation_id, p_action: change.action,
     p_payload: { ...lodgingPayload(change), people_key: peopleKey },
     p_replace_nights: body.replace_nights === true,
-  });
+  };
+  let { data, error } = options.candidate && change.action === "save"
+    ? await auth.supabase.rpc("use_trip_stay_candidate", { p_trip_id: params.p_trip_id, p_user_id: params.p_user_id,
+      p_expected_revision: params.p_expected_revision, p_request_id: params.p_request_id, p_payload: params.p_payload,
+      p_replace_nights: params.p_replace_nights, p_candidate_id: options.candidate.id, p_candidate_revision: options.candidate.revision })
+    : await auth.supabase.rpc("mutate_trip_lodging", params);
+  // Before migration 20261117090000 the caller has checked the option's revision just before this.
+  if (options.candidate && error && ["PGRST202", "42883"].includes(error.code)) ({ data, error } = await auth.supabase.rpc("mutate_trip_lodging", params));
   if (error) {
+    if (error.code === "PT409" && error.hint === "option") return jsonError("This option changed since you reviewed it. Review it again.", 409);
     if (["40001", "PT409"].includes(error.code)) return changed();
     if (error.code === "23P01") return jsonError("These nights already have a plan. Review and explicitly replace those nights, or change dates.", 409);
     if (["42501", "P0002"].includes(error.code)) return jsonError(error.hint === "member" ? "Person not found in this trip." : "Stay not found in this trip.", 404);

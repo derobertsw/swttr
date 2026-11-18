@@ -1,0 +1,130 @@
+# #329 acceptance audit: #333, #334, #335 and #212
+
+Audited against `origin/main` at `b4e63d7` (November 16, 2026), after every implementation PR merged:
+
+- #333: #344, #346, #356
+- #334: #350, #365, #366
+- #335: #368
+- #212: #305, #357, #358
+
+Each acceptance box on the issues was checked against the code paths and their tests. The PR descriptions were read too, but they weren't taken as evidence. Every criterion has one of these statuses:
+
+- **Implemented:** the behavior is in the code and a test covers it.
+- **Manual check:** the behavior is in the code and covered by tests, but the box asks for something only a signed-in person, a real device or a reviewer can confirm. The check needed is named.
+- **Gap fixed:** a real gap, fixed in the PR that adds this audit.
+- **Gap left:** a real gap, not fixed here, with the option I'd recommend.
+
+Line numbers are for `main` at `b4e63d7`, plus this PR's changes where it says so. The day page is `src/app/trips/[id]/(plan)/days/[date]/page.tsx`, called "day page" below.
+
+## Summary
+
+| Issue | Implemented | Manual check | Gap fixed here | Gap left |
+|---|---|---|---|---|
+| #333 | 10 | 0 (one signed-in pass for the issue, below) | 1 (origin on the day brief) | 0 |
+| #334 | 8 | 2 | 0 (one row shares #333's fix) | 0 |
+| #335 | 7 | 2 | 1 (packing continuity test) | 0 |
+| #212 | 9 | 1 (plus member view and phone pass, below) | 0 (one test added) | 0 |
+
+**What this PR changes**
+
+1. **Your starting point on the day brief now matches your drive** (#333, #334). Meet and start's **Starting from** and **Crew starting from** read the stay each person slept in. They ignored a person's own starting point and the day's own starting point, while Getting there just below showed the real one. Example: Eli is given Ridge cabin for Saturday. The brief said "Starting from: Village hotel", and the drive said "Starting from Ridge cabin · only this day". The server now returns `starts` on `GET /api/v1/trips/:id`, built by `dayStarts` in `src/lib/trip-drive.ts` from `departurePlans`. `DayStart` reads it.
+2. **Packing continuity is now tested** (#335). A save from a trip day sends `save_trip_kits` exactly the snapshot a plain save sends, so #177's packing items and identities don't change. #368 said this was covered only by not changing the format.
+3. **Changing the phase view doesn't change packing** (#212, #335). A day page test switches a saved tour between Climb and Descent. It checks that only reads are sent and that the packed status stays as it was.
+
+**Left for people and devices.** These need a person: signed-in organizer and member journeys on a real trip, iPhone and VoiceOver, 200% text, and the practitioner review of the touring copy. #337 owns the cross-epic device record.
+
+## #333: meeting details and departures by personal origin
+
+| # | Criterion | Status | Evidence | Tests |
+|---|---|---|---|---|
+| 1 | Shared meet time/place per day in destination-local date and IANA zone, including the evening before | Implemented | Migration `20261024230000_trip_day_meet_times.sql`: `trip_days.meet_time`, `meet_day_offset` (`-1` is the evening before) and `meet_time_zone`, plus `set_trip_day_meet`. `PUT .../days/:date/meet` looks the zone up from the stop (`meet/route.ts:43`) and saves (`:46`). `buildDayMeets` (`src/lib/trip-meets.ts:53`) labels it. The place is the day's access point. `DayMeetControls` (`DayMeet.tsx:19`) is organizer only, on every sport (day page `:229-234`). | `trip-day-meets.database.test.ts` (set, the evening before, zone, stale `expected`, organizer only, moving with the dates); `trip-meets.test.ts`; `meet/route.test.ts`; `DayMeet.test.tsx`; day page "starts any sport's day with its meet time…" |
+| 2 | Migrate tour meet values with explicit precedence; one canonical meet; route, backup and return stay in the tour plan | Implemented | The same migration copies each tour plan's meet onto its day, and a day's own meet comes first. `mutate_trip_tour_plan` leaves the day's meet alone for this API, and puts an older API's meet on the day. The tour plan editor has no meet fields and reads the day's meet (`TourPlan.tsx:73-76`). | `trip-day-meets.database.test.ts:36` ("moves each meet time … whether the plan is in use or kept"), `:140`, `:150`; `TourPlan.test.tsx` |
+| 3 | Each member's morning origin comes from the night before (checkout morning included), with explicit overrides; first-day gaps stay explicit | **Gap fixed** (drive was right; the brief wasn't) | `departurePlans` (`trip-drive.ts:155`) applies precedence: own starting point → the day's own → the stay slept in, and "Not set" or "Arrives this day" otherwise. **Gap:** the brief's Starting from (`DayStart`, `TripStays.tsx`) read `lodging.people[].days[].starting_from`, which only knows where people slept, so it contradicted the drive below it. **Fix:** `dayStarts` (`trip-drive.ts:211`, this PR) is computed in `loadTripFull` as `TripFull.starts`, and `DayStart` reads it. | `trip-drive-departures.test.ts` (groups, Not set / Arrives this day, the day's own, a person's own, a late arrival); **new** `dayStarts` test; **new** `DayDepartures.test.tsx` "starts you from your own starting point…" and "…the day's own starting point…" (both fail on main) |
+| 4 | Members see their own origin, one-way estimate/directions and tonight's stay first; organizers can expand named departure groups | Implemented (with fix 3) | `DayDrive` shows your departure first and labels it "Your drive" when the crew is split (`DriveEstimate.tsx:241-249`, `:418`). `Departures` lists every group by name (`:155`). It's for everyone, per the October 22 decision. `DayStart`/`DayTonight` lead with yours, then the crew's where it differs. | `DayDepartures.test.tsx` "shows your own drive first…", "leads with your own start and stay…" |
+| 5 | Rental and hotel get different estimates to the same point; absent members are never grouped with the crew | Implemented | `departurePlans` only includes people taking part. A pending invitation needs a stay or an own start. Each departure gets its own pair in `tripDriveEstimates` (`trip-drive-estimates.ts:85`). | `trip-drive-departures.test.ts:50` (Casey, Blair unplanned), `:91` (rental and hotel, one matrix call) |
+| 6 | Organizer manages one person's day-only origin or No drive planned without changing others; shared defaults and overrides survive the migration | Implemented | `PeopleStartingPointEditor` (`DriveEstimate.tsx:581`) calls `PUT .../origin` with `member_ids`. That runs `set_trip_member_day_origins` (migration `20261023233000`), which is organizer only, checks `expected` per person and returns PT409. The migration keeps every manual estimate row. | `trip-member-starting-points.database.test.ts`; `origin/route.test.ts:71-`; `DayDepartures.test.tsx` "lets the organizer start the hotel's people from the rental, and nobody else" |
+| 7 | Derivation and routing stay API-side; route-pair caching; changing one origin recalculates only its drives; out-of-order responses can't restore obsolete routes | Implemented | Departures and estimates are built on the server. Stored estimates are reused by pair from any day. `useDriveEstimates` keeps an answer only for the plan it was fetched for and aborts older requests (`DriveEstimate.tsx:33-66`). The geometry route 409s on a stale revision (`geometry/route.ts:11`). | `trip-drive-departures.test.ts:107` ("calculates only the drive that's new when one person moves"), `:126`, `:159`; `map/geometry.integration.test.ts`; `DriveEstimate.test.tsx` |
+| 8 | Missing/approximate place, manual estimate, stale, unavailable, no road route and No drive planned keep their freshness and attribution | Implemented | `planFor`/`driveDay` states (`trip-drive.ts:109`, `:285`). `driveSummary`, `EstimateDetails` and `RoutingAttribution` in `DriveEstimate.tsx`. | `trip-drive.test.ts` (stale, no route, manual, recovery); `trip-drive-departures.test.ts:138` (per-departure failure) |
+| 9 | Road travel and the ski/walk approach are labelled separately; a hut isn't turned into an inferred road or ski ETA | Implemented | "Approach (ski or walk)" comes from the tour plan's notes, separate from the drive (day page `:238-241`; `TripMapDay.tsx:88`). No ski ETA is ever computed. A hut gives a provider "No road route", or the organizer picks No drive planned. | day page "keeps the ski or walk approach visible separately while the road estimate loads"; `trip-drive.test.ts:177`; `trip-drive-departures.test.ts:225` |
+| 10 | Map projection shows the selected person's origin and grouped departures, with no map-only editors and no eager route requests | Implemented | `projectTripMap` builds `departures` and `people` (`trip-map.ts:119-143`). `followDeparture` (`trip-map-presentation.ts:58`) uses the departure's label and origin. Geometry is fetched on demand by revision. The map links to the day's editors. | `DayDepartures.test.tsx` "Departures on the trip map"; `map/route.test.ts`; `TripMapView.test.tsx` |
+| 11 | Tests: evening arrival, two stays, moving day, pre-trip origin, override/reset, hut/no drive, time zones, provider failure, authorization | Implemented | | evening arrival and late arrival: `trip-drive-departures.test.ts:50`, `:233`; two stays and moving day: `:35`; pre-trip: Friday `Not set`; override/reset: `trip-member-starting-points.database.test.ts:83`; no drive: `:225`; zones: `trip-meets.test.ts:23`; provider failure: `:138`; authorization: the database tests' organizer-only and other-trip cases |
+
+**Manual check (#333).** With the migrations applied, sign in on a split trip as the organizer and as a member. Give one person their own starting point, then reset it. Confirm the brief's Starting from, Your drive, Departures and the map agree. Check with real routing credits. #344, #346 and #356 all list this as not verified.
+
+**Gap left (minor, not in #333's boxes).** In Stays, a run's details say "Sat Oct 10 morning: starts from Village hotel" (`RunDetails` in `TripStays.tsx`). That's the stay's checkout morning, and it doesn't reflect an own starting point. I left it alone because Stays is shared with the #213 work. I'd recommend reading `starts` there too in a small follow-up.
+
+## #334: sport-specific day briefs
+
+| # | Criterion | Status | Evidence | Tests |
+|---|---|---|---|---|
+| 1 | Mobile: compact date/sport/destination, meet, personal logistics and one next action on an unframed surface; All days without tiny arrows | Implemented; **manual check** on a phone | Day page header (`:204-227`) has the date, activity label, destination and the clothing step. `DateStrip` with **All days** (`PlanWorkspace.tsx:188-231`) replaced the arrows. Sections are unframed. | `PlanWorkspace.test.tsx` "marks the selected day in the list and in a date strip with All days"; day page order tests |
+| 2 | Desktop shows the itinerary beside the day; tablet/small desktop gets a focused view | Implemented; **manual check** at 768/1024/1440 | A container query at 56rem (`PlanWorkspace.tsx:31-46`) puts the sticky days list beside the day. Narrower widths get the date strip. | `PlanWorkspace.test.tsx`; #350/#365 checked by eye at 375/1440 |
+| 3 | Downhill: resort/base meet and optional ticket/rental/practical notes, with no touring fields | Implemented | Meet plus day **Notes** (`DayStart`; `DayNotesControls` at `DayNotes.tsx:17`; migration `20261028130000`). Touring sections render only when `activity === TOUR_ACTIVITY` (day page `:213`, `:238`, `:297-302`). | `DayNotes.test.tsx`; `trip-day-notes.database.test.ts`; `notes/route.test.ts`; day page "shows everyone the day's notes under the meet…" |
+| 4 | Backcountry puts objective, unresolved conditions tasks, backup and return before clothing/equipment, readable without an editor | Implemented | Header route and `ConditionsTask` (`:213`, `:220`), then `DayTourPlan` with `TourPlanSummary`, read-only, before Weather and My kit (`:250-263`). | day page "leads a backcountry day with its route and your conditions reviews, and puts the tour before clothing"; "puts the meet time at the start of the day, and the plan before clothing (#334)" |
+| 5 | Conditions tasks are inline icon and text; recorded review, date/actor, changed context and unavailable metadata are distinct | Implemented (#211 owns sources) | `ConditionsTask` (`DayConditions.tsx:46-67`) and the review rows (icon and text: not recorded, recorded by and when, plan changed since). | `DayConditions.test.tsx`; day page "lists conditions after the plan…" |
+| 6 | Road vs ski/walk approach, origin vs tonight's stay, and source review vs packed equipment stay explicit | Implemented (origin made consistent by #333 fix 3) | Approach is separate from the drive. `DayStart` (origin) and `DayTonight` (tonight) are separate sections. Conditions reviews and My equipment are separate sections with different wording. | `DayDepartures.test.tsx`; day page order tests; **new** `DayStart` own-origin tests |
+| 7 | Future trips open the member's first unresolved day; active trips open destination-local today; an explicit pick survives navigation | Implemented | `tripFocusFor` (`src/lib/trip-focus.ts`) on `TripFull.focus`; `/trips/:id/days` with `openTripPath` (`trip-sections.ts:123`) and the tab's picked day in sessionStorage. | `trip-focus.test.ts` (unfinished day, Denver evening vs UTC, trip over); `(plan)/days/page.test.tsx` (picked day wins, opened day isn't a pick, today beats a past pick) |
+| 8 | Downhill skiing / Backcountry skiing labels with `Alpine`/`Backcountry` storage kept; Travel/Rest/non-participation make no missing-clothing tasks | Implemented | `tripActivityLabel` / `tripActivityNeedsClothing` (`trip-activities.ts:30`, `:38`), used by the day page (`:171-176`), focus, checklist (`trip-checklist.ts:62`), the pack route (`:80`, `:126`) and the outing (`trip-day-outing.ts:84`). | day page "reads a stored Alpine day as Downhill skiing, and saves the activity as stored", "says who isn't taking part…"; `trip-focus.test.ts` "skips Travel and Rest days…"; `trip-checklist.test.ts`; pack route test |
+| 9 | Mixed-sport days, name-only tour drafts, no-forecast/manual states, activity change/restore and explicit copy-day scope; never copy reviews or packed completion | Implemented | `CopyDayCard` (`CopyDayCard.tsx:20`) and `copy_trip_day` (030) copy only the stop, activity, your kit by choice, and the tour plan by choice. Reviews (#211's tables), day checks and packing checks are keyed elsewhere and not copied. Restore tour plan is at `TourPlan.tsx:101-107`. | day page copy-day tests, "restores a plan kept from Backcountry…", "keeps an inactive plan readable…"; `trip-day-notes.database.test.ts` (copy leaves notes alone) |
+| 10 | Route/stay changes show factual review tasks without discarding outfits, bookings or review history | Implemented | `outfitMismatches` (`trip-kit-fit.ts:30`) notes on kits ("Outfit saved for another plan"). Stays keep `review_dates`. Conditions reviews keep history with `stale_reasons`. | day page "says when a saved outfit was planned for another date or activity…"; `trip-conditions.test.ts`; `trip-lodging.test.ts` (morning origins and review dates) |
+
+## #335: trip-day context through Gear up
+
+| # | Criterion | Status | Evidence | Tests |
+|---|---|---|---|---|
+| 1 | Day brief offers Plan my layers / Review saved layers from the day's saved date, activity, destination and member | Implemented | `GET .../days/:date/outing` (`outing/route.ts:14`) → `tripDayOutingFor` (`trip-day-outing.ts:72`). Header step at day page `:221-226`; `PlanMyKit` at `:660`. | `trip-day-outing.test.ts`; `outing/route.test.ts`; day page "offers Plan my layers for the day…", "starts the day's outing at its meet time…" |
+| 2 | Gear up receives explicit context and returns to the day after a confirmed save; the return survives sign-in (#168) | Implemented; **manual check** of a real expired session | The `tripDay` context lives in the account's own draft (`keepOutingForGearUp`, `gearUpDraft.ts:164`), and guest drafts drop it (`:141`). `SaveToTrip` pushes `tripDayHref` after the save (`SaveToTrip.tsx:266-270`). | `src/app/page.test.tsx` "planning a trip day (#335)": "asks for the day's layers right away, saves them to that day and goes back to it", "comes back to the day's save after signing in again, and never shows the day to another account" |
+| 3 | Can't silently save into the wrong trip/day; switching is explicit | Implemented | The kits route refuses another day's, activity's or place's layers, or a new trip's (422; `kits/route.ts:38-43`). The sheet is pinned to the day, and "Save to another trip instead" is explicit. | `kits/route.test.ts` "refuses %s layers as the trip day's"; `SaveToTrip.test.tsx`; page test "says when the outing was changed away from the day…" |
+| 4 | Saved outfits keep the #170 snapshot/refresh contract and #177/#171 packing identities | Implemented; **test added** | The route sends the same `p_days` either way (`kits/route.ts:63-84`). Update in Gear up re-plans the day (#368). | **new** `kits/route.test.ts` "saves the same snapshot as a save without the day, so the packing list keeps its items (#170, #177)"; `trip-packing.test.ts` |
+| 5 | Backcountry uses the engine's phase results and Wear/Carry; a phase view doesn't change packing; integrates with #212 | Implemented; **test added** | `SavedOutfitView` phase toggle is local state (`SavedKitView.tsx:73-111`), and `CarryCard` follows the phase. My equipment reads #171's checks read-only. | **new** day page "switches a saved tour between Climb and Descent without saving anything or changing what's packed (#212, #335)"; `LayerDisplay.phases.test.tsx` |
+| 6 | Outside the forecast, unsupported, no wardrobe, failed requests and manual planning have explicit recoverable states | Implemented | `tripDayOutingFor` gives a reason for each: `no_activity`, `no_clothing`, `not_taking_part`, `no_destination`, `unsupported`, `past`, `outside_forecast` with `opens_on`. Try again on a failed check; the checklist stays for manual planning (`PlanMyKit`). No wardrobe gets Gear up's general guide, saved as "General guide". | `trip-day-outing.test.ts`; day page "lets me try again when it can't tell…", "says when general guidance or another place was saved" |
+| 7 | A plan change during the flow is caught before saving; failed saves keep the result and offer retry | Implemented | 409 `day_changed` with `changes` (`kits/route.ts:54-59`), then Plan again or Save anyway. Retries reuse the `save_id`. | `kits/route.test.ts` "saves nothing and says what changed…", "replays a save that already went through…"; `SaveToTrip.test.tsx` (day changed, retry a failed save) |
+| 8 | Back/forward, reload/resume, account change, expired session and rapid requests can't attach stale results to another member/day | Implemented; **manual check** of account switching and expired sessions on a real account | Only the latest request lands (`useGearUp.ts:132-177`). Drafts are per account, and the trip day is dropped on account change (`:727`). Saves are for the signed-in member only (`save_trip_kits`), and the day is checked again on the server. | page tests "keeps the day through a reload…", "…never shows the day to another account"; `useGearUp.test.ts` |
+| 9 | Authorization and recommendations stay server-side; guest/standalone flows unchanged; no protected trip details in URLs or storage beyond the contract | Implemented | The URL is `/?resume=outing` only. The context is kept in the account's sessionStorage draft, as `docs/outing-contract.md` records. The kits and outing routes check membership (`assertCanAccessTrip`). | `outing/route.test.ts` (404 off the trip, 401 signed out); `kits/route.test.ts` "refuses a trip the person isn't on…"; existing guest page tests |
+| 10 | Integration tests: exact round-trip context, sign-in return, save failure, changed day and packing continuity | **Gap fixed** (packing continuity) | #368 said packing continuity was "covered by keeping #170's saved-kit format unchanged, not by a new test". | round trip, sign-in, save failure and changed day: see 2, 3 and 7; packing continuity: **new** test in 4 |
+
+**Manual check (#335).** With a real signed-in account, do Plan my layers → personalized layers → Save → back at My kit. Then let the session expire mid-flow and sign back in. Switch accounts in the tab and confirm the trip day doesn't follow. #368 checked a fixture only, and it showed general guidance.
+
+## #212: touring layers, personal equipment and crew preparation
+
+| # | Criterion | Status | Evidence | Tests |
+|---|---|---|---|---|
+| 1 | Phase-specific results through #127, saved through #170; no new engine | Implemented | `SavedKitView` phases (`SavedKitView.tsx:33`, `:73-134`); `save_trip_kits` (#170). | `LayerDisplay.phases.test.tsx`; **new** day page Climb/Descent test |
+| 2 | Manual, unsupported, no-forecast and no-wardrobe stay usable through #175; Gear-up checks and advice availability are separate | Implemented | The pack route's coverage states; day checks are separate from Plan my layers. | pack route tests ("Climb uses general hiking guidance"); `DayChecks.test.tsx` |
+| 3 | Personal equipment per member with stable identity and per-day use; one person's kit doesn't cover the crew; packed is separate from a day's functional check | Implemented (managed guests have no list, a #305 choice) | `equipment:<id>` keys in each person's packing row (migration 032); the days come from the itinerary (`trip-member-packing.ts:60`); the transceiver check is a separate day check. | `trip-packing.database.test.ts`; pack route and page tests; `trip-day-checks.database.test.ts` "the transceiver a check covers" |
+| 4 | Template preview (Already in your list / Suggested / Optional), Add selected items, idempotent, no second checkbox, per-item purpose | Implemented; **reviewer check** of the copy | `EquipmentTemplateSheet` (`TouringEquipment.tsx:66`); `buildTouringEquipment`. | pack page tests (groups, defaults, failed add, reapply); `touring-equipment` unit tests |
+| 5 | Shared items reuse assignment and #179's states; assignment alone isn't agreement | Implemented | `sharedGearStatus` (`shared-gear-status.ts:11`); `SharedTouringItems` (`TouringEquipment.tsx:331`, #358); `DayEquipment` labels. | day page "shows what's packed … and the shared items assigned to you" (Repair kit "Awaiting acceptance"); `gear/touring/route.test.ts`; `trip-shared-touring.test.ts` |
+| 6 | Before leaving vs At the trailhead; each check has actor, destination-local time and plan revision; plan review never fills #211 reviews; Not recorded isn't failure | Implemented | `DayChecks` (`DayChecks.tsx:51`); `record_trip_day_check` (migration `20261026120000`); `checkTimeLabel` (`trip-day-checks.ts:109`). | `DayChecks.test.tsx:58`; `trip-day-checks.database.test.ts:86`; `trip-day-checks.test.ts:120` |
+| 7 | Members update their own checks; the organizer records a managed guest's, attributed; no attesting for signed-in members | Implemented | `canRecordDayCheck` (`trip-day-checks.ts:210`); the database refuses others. | `trip-day-checks.database.test.ts:97`, `:103`; `DayChecks.test.tsx:157` |
+| 8 | Overview shows role-appropriate facts with direct actions, no readiness score; unrecorded trailhead checks aren't overdue days ahead; custom/removal/N/A choices are never counted as done | Implemented | `preparationFor` (`trip-day-checks.ts:240`) → `TourPreparation` on Plan's page (`DayChecks.tsx:317`). A removed item never counts as packed. | `trip-day-checks.test.ts:200` ("lists nothing unrecorded while planning days ahead…"), `:215`; `DayChecks.test.tsx:211` |
+| 9 | Packing checks keep #171 identity across tour days; day checks start unrecorded each day; route/backup changes and a replaced transceiver invalidate, cosmetic notes don't; history kept and correctable | Implemented | `dayCheckStaleReasons` (`trip-day-checks.ts:76`); the `added_at` trigger; withdraw/record history. | `trip-day-checks.database.test.ts` "what a plan review covers", "the transceiver a check covers", "history"; `trip-day-checks.test.ts:78-118` |
+| 10 | Tests: two members with different kits, several tour days, template reapply, guests, reassignment, gear removal, each invalidation rule, failed saves across reload | Implemented | | the files above plus `SharedGear.test.tsx` (reassignment, #179) |
+
+**Manual and reviewer checks (#212).**
+
+- **Member view.** On October 27 the production check covered only the organizer's view. A member's own checks and their Crew preparation still need checking.
+- **Phone and VoiceOver.** The checkbox names, and the announced save and error states.
+- **Copy review.** A qualified ski-touring practitioner needs to review the equipment template and day-check copy. The issue requires this before release.
+
+## #329 release acceptance (parent)
+
+None of these can be ticked from code alone. They're #337's evidence:
+
+- Both reference journeys, as organizer and as member
+- 320/390/768/1024/1440 widths
+- Light and dark mode
+- Enlarged text and reflow
+- Keyboard and screen reader
+- Phone keyboard and safe areas
+- The iPhone app
+
+The code-level parts are implemented and tested as above: split stays, departures, meet and origin on the brief, Backcountry order and deep links.
+
+## Boxes that could be ticked now
+
+- **#333:** 1, 2, 3 (after this PR), 4, 5, 6, 7, 8, 9, 10 and 11. The signed-in split-trip check above is the one thing left before closing.
+- **#334:** 3, 4, 5, 6, 7, 8, 9 and 10. Boxes 1 and 2 wait on phone and tablet/desktop checks (#337).
+- **#335:** 1, 3, 4, 5, 6, 7, 9 and 10 (after this PR). Boxes 2 and 8 wait on a real-account expired-session and account-switch check.
+- **#212:** 1, 2, 3, 5, 6, 7, 8, 9 and 10. Box 4 waits on the practitioner copy review. The member view and the phone/VoiceOver pass are also still open.
+
+Once those manual checks pass, #333, #334, #335 and #212 can close. #329 closes after #337.

@@ -5,6 +5,13 @@ import { tripRequest } from "@/lib/trip-requests";
 import type { TripMapDay, TripMapRoadGeometry as TripMapGeometry } from "@/types/trip-map";
 
 /**
+ * How long the browser waits for a route line. The server gives the provider
+ * eight seconds; a stalled connection must still end in Retry, not an endless
+ * "Loading", like the trip API's other 20-second client timeouts.
+ */
+export const GEOMETRY_TIMEOUT_MS = 20_000;
+
+/**
  * On demand only: selecting/panning does not calculate a route. A changed day
  * or revision hides the old line immediately, even before effect cleanup.
  */
@@ -25,6 +32,8 @@ export function useTripMapGeometry(tripId: string | null, day: TripMapDay | null
     if (!key || !tripId || !date || !dayId || !revision) return;
     const controller = new AbortController();
     pending.current = controller;
+    let timedOut = false;
+    const timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, GEOMETRY_TIMEOUT_MS);
     setState({ key, data: null, loading: true, error: null });
     try {
       const data = await tripRequest<TripMapGeometry>(`/api/v1/trips/${encodeURIComponent(tripId)}/days/${encodeURIComponent(date)}/geometry?revision=${encodeURIComponent(revision)}`, "GET", undefined, { signal: controller.signal });
@@ -32,7 +41,11 @@ export function useTripMapGeometry(tripId: string | null, day: TripMapDay | null
       if (data.trip_id !== tripId || data.day_id !== dayId || data.date !== date || data.revision !== revision) throw new Error("The day's places changed. Refresh the trip map.");
       setState({ key, data, loading: false, error: null });
     } catch (error) {
-      if (!controller.signal.aborted) setState({ key, data: null, loading: false, error: error instanceof Error ? error : new Error("Route line unavailable.") });
+      // Only our own timeout reports; a newer request or a changed day aborted the rest.
+      if (timedOut && pending.current === controller) setState({ key, data: null, loading: false, error: new Error("The route line took too long. Try again.") });
+      else if (!controller.signal.aborted) setState({ key, data: null, loading: false, error: error instanceof Error ? error : new Error("Route line unavailable.") });
+    } finally {
+      window.clearTimeout(timer);
     }
   }, [key, tripId, dayId, date, revision]);
 

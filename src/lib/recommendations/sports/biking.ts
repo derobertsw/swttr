@@ -1,54 +1,44 @@
 /**
- * Biking: breathability first like running, but always adds a wind shell
- * since riding speed makes the rider's wind exposure high.
+ * Cycling selects a complete moving outfit with running's search: reviewed
+ * standalone tops and shorts or tights, with optional underlayers, mids,
+ * insulation and outers, ranked against the shared regional bands. Wind and
+ * rain protection follow `cyclingProtection`.
  */
-import type { CategorizedGarments, GarmentRow } from '../types';
-import { createSinglePhaseSport } from './single-phase';
-import { buildBreathableEnsemble } from './breathable-ensemble';
 import { OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
+import { createSinglePhaseSport } from './single-phase';
+import { runningProtectionWarnings, runningRegionMatches } from './running-outfit';
+import { buildCyclingEnsemble, cyclingProtection } from './cycling-outfit';
 
 const MIN_EVAP_POTENTIAL = 0.25;
 
-/**
- * Build a garment ensemble for biking, prioritizing breathability.
- * Selects base layers, mid-layers, and shells for torso and legs
- * while respecting IREQ targets and preventing duplicate garments.
- */
-export function buildBikingEnsemble(
-  categorized: CategorizedGarments,
-  ireq: { ireqMin: number; ireqNeutral: number },
-  maxClo: number,
-  minEvapPotential: number
-): GarmentRow[] {
-  return buildBreathableEnsemble(categorized, ireq, maxClo, minEvapPotential, () => true);
-}
-
-function getBikingGuidance(tempC: number, ireq: { ireqMin: number; ireqNeutral: number }): string[] {
-  const guidance: string[] = [];
-
-  if (tempC > 0) {
-    guidance.push('Mild conditions - prioritize breathable layers');
-  } else if (tempC > -10) {
-    guidance.push('Cool conditions - add wind protection');
-  } else {
-    guidance.push('Cold conditions - add a midlayer and wind shell');
-  }
-
-  if (ireq.ireqNeutral < 1.1) {
-    guidance.push('Avoid heavy insulation to prevent overheating');
-  }
-
-  return guidance;
-}
-
 export const biking = createSinglePhaseSport({
+  requirementFirst: true,
+  completeOutfit: true,
   activity: 'biking',
   profile: { name: 'Biking', windExposure: 'exposed' },
   minEvapPotential: MIN_EVAP_POTENTIAL,
-  // Biking always adds a wind shell.
+  // Targets keep assuming a windproof outer, as before (#374 owns ride speed).
   outerAirPermeability: () => OUTER_AIR_PERMEABILITY.windproof,
+  protection: cyclingProtection,
+  protect: (ensemble, _categorized, targets) => ({ ensemble, warnings: runningProtectionWarnings(ensemble, targets, targets.protection) }),
   buildEnsemble: (categorized, targets) =>
-    buildBikingEnsemble(categorized, targets.basicIreq, targets.targetRange[1], MIN_EVAP_POTENTIAL),
-  conditions: () => ({}),
-  guidance: (request, ireq) => getBikingGuidance(request.tempC, ireq),
+    buildCyclingEnsemble(categorized, targets, MIN_EVAP_POTENTIAL, targets.protection!),
+  conditions: (request) => ({ precipitation: request.precipitation }),
+  guidance: (_request, _ireq, ensemble, targets) => {
+    if (!ensemble || !targets) return ['Choose a cycling top and shorts or tights to meet the riding targets.'];
+    const needs = targets.protection;
+    const incomplete = !runningRegionMatches(ensemble, targets, 'torso', needs) || !runningRegionMatches(ensemble, targets, 'legs', needs);
+    const names = ensemble.map(g => `${g.brand} ${g.model_name}`).join(', ');
+    const guidance = ensemble.length
+      ? [incomplete
+        ? `Best available clothing while riding: ${names}. This outfit still has clothing gaps; see the requirements for what remains needed.`
+        : `While riding, wear: ${names}.`]
+      : ['No available clothing forms a suitable riding outfit; fill the clothing gaps below.'];
+    if (ensemble.some(g => g.garment_type === 'shorts')) guidance.push('Shorts intentionally leave the lower legs exposed; their regional insulation includes that exposure.');
+    if (ensemble.some(g => g.garment_type === 'top_short_sleeve')) guidance.push('Short sleeves intentionally leave part of the arms exposed.');
+    if (needs?.wet) guidance.push('Wet conditions require rain protection as well as suitable insulation.');
+    else if (needs?.wind) guidance.push('Cold or windy conditions require wind protection as well as suitable insulation.');
+    guidance.push('These targets assume continuous riding. Bring an extra layer for stops and long descents.');
+    return guidance;
+  },
 });

@@ -396,21 +396,20 @@ describe("POST /api/v1/recommendations/alpine (golden, comfort)", () => {
     expect(body.recommendation.thermal_comfort_score).toBeGreaterThanOrEqual(85);
   });
 
-  it("reports local accessory excess even when whole-body insulation is in range at 25°F", async () => {
+  it("keeps the helmet, hood and head warmth within the head band at 25°F (#370)", async () => {
     useDatabase(null, []);
     const { body } = await callRoute(alpine, CONDITIONS[1].body);
-    const { ensemble_properties: properties, thermal_comfort_score: score } = body.recommendation;
+    const { ensemble_properties: properties, thermal_comfort_score: score, evaluation, headwear, accessories } = body.recommendation;
 
     expect(properties.total_clo).toBeGreaterThanOrEqual(body.ireq.target_range[0]);
     expect(properties.total_clo).toBeLessThanOrEqual(body.ireq.target_range[1]);
-    expect(score).toBeLessThan(85);
-    expect(body.recommendation.evaluation.bodyParts.headNeck.status).toBe('over');
-    expect(body.recommendation.evaluation.decision).toMatchObject({
-      status: 'warmer', summary: 'Warmer than recommended',
-    });
-    expect(body.recommendation.evaluation.decision.reasons).toContain(
-      'Head and neck has more insulation than its estimated upper target.',
-    );
+    // Before #370: helmet, hood, balaclava and neck piece, 3.75 clo against 2.29.
+    expect(headwear.helmet).not.toBeNull();
+    expect(evaluation.bodyParts.headNeck.status).toBe('in_range');
+    expect(evaluation.bodyParts.headNeck.clo).toBeLessThanOrEqual(body.ireq.extremity.max.head + 0.05);
+    expect(accessories.head).toMatchObject({ state: 'selected', thermal_status: 'in_range' });
+    expect(evaluation.decision).toMatchObject({ status: 'near_target', summary: 'Likely comfortable' });
+    expect(score).toBeGreaterThanOrEqual(85);
     expect(body.warnings).not.toEqual(expect.arrayContaining([
       expect.stringMatching(/^Insufficient (torso|arms|legs) insulation:/),
     ]));
@@ -435,4 +434,54 @@ describe("POST /api/v1/recommendations/ski-touring (golden, pack options)", () =
       await callRoute(skiTouring, { ...CONDITIONS[2].body, prioritize_light_pack: true })
     ).toMatchSnapshot();
   });
+});
+
+describe("accessories against local bands (#370)", () => {
+  it("cycling at 32°F wears no balaclava against a ~0.55 clo head target", async () => {
+    useDatabase(null, []);
+    const { body } = await callRoute(biking, { weather: { temperature: 32, wind_speed: 5 }, exertion: "moderate" });
+    const { evaluation, headwear, handwear, accessories } = body.recommendation;
+    expect(body.ireq.extremity.neutral.head).toBeLessThan(0.6);
+    expect(headwear.head_warmth?.type ?? "").not.toMatch(/^balaclava/);
+    expect(evaluation.bodyParts.headNeck.status).not.toBe("over");
+    expect(handwear).not.toBeNull();
+    expect(accessories.hands.thermal_status).toBe("in_range");
+  });
+
+  it.each(MODES)("the touring climb at 25°F stays within its head band, and the descent keeps the helmet: $name", async mode => {
+    useDatabase(mode.userId, mode.wardrobe);
+    const { body } = await callRoute(skiTouring, { ...CONDITIONS[1].body, ...mode.extraBody });
+    // Before #370 the climb wore a balaclava, a neck piece and two hoods: 3.2 clo against 0.85.
+    // #372's climb outfit has no hoods, so at most one light head layer fills the band.
+    expect(body.recommendation.headwear).toMatchObject({ helmet: null, neck_warmth: null });
+    expect(body.recommendation.evaluation.bodyParts.headNeck.status).toBe("in_range");
+    expect(body.descent_headwear.helmet).not.toBeNull();
+    expect(body.descent_evaluation.bodyParts.headNeck.status).toBe("in_range");
+    expect(body.recommendation.handwear).not.toBeNull();
+  });
+
+  it("the touring descent at −15°F wears the warmest rated mitten and reports what is still short", async () => {
+    useDatabase(null, []);
+    const { body } = await callRoute(skiTouring, CONDITIONS[3].body);
+    const { descent_breakdown: descent, descent_evaluation: evaluation } = body as BiophysicsRecommendation;
+    expect(descent!.extremity_ireq.min.hands).toBeGreaterThan(5);
+    expect(body.descent_handwear.rcl).toBe(Math.max(...catalog.handwear.map(h => h.rcl_clo)));
+    expect(evaluation!.bodyParts.hands.status).toBe("under");
+    expect(evaluation!.decision!.reasons).toContain("Hands needs more insulation; extra warmth elsewhere does not cover this gap.");
+    expect(body.warnings).toContain("Descent: hands: the closest available option still falls short of the local warmth range; check warmth before use.");
+    // The descent's limits are reported for manual checks, and the shortfall isn't hidden by them.
+    expect(descent!.extremity_ireq.max!.hands).toBe(descent!.extremity_ireq.neutral.hands);
+  });
+
+  it.each([["alpine", alpine], ["biking", biking], ["ski-touring", skiTouring]] as const)(
+    "%s reports the accessory limits it was judged against", async (_, POST) => {
+      useDatabase(USER_ID, FULL_WARDROBE);
+      for (const conditions of CONDITIONS.slice(0, 4)) {
+        const { body } = await callRoute(POST, { ...conditions.body, use_wardrobe_only: true });
+        const { ireq, recommendation } = body as BiophysicsRecommendation;
+        expect(ireq.extremity!.max).toEqual({ hands: recommendation.accessories!.hands.max, head: recommendation.accessories!.head.max });
+        expect(recommendation.evaluation!.bodyParts.hands.status).toBe(recommendation.accessories!.hands.thermal_status);
+        expect(recommendation.evaluation!.bodyParts.headNeck.status).toBe(recommendation.accessories!.head.thermal_status);
+      }
+    });
 });

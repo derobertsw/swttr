@@ -33,7 +33,7 @@ All inputs are bounded JSON objects with `additionalProperties: false`; runtime 
 |---|---|---|
 | `swttr_get_capabilities` | `{}` | Six canonical activity IDs, current session's engine support, one-day modes, efforts, canonical units, required fields and restrictions. No account ID. |
 | `swttr_search_locations` | `{ "query": "Stowe" }`, trimmed minimum 2 characters, maximum 200 before trimming | Up to five candidates from `/api/geocode`, with only the listed place fields; a place without a country gets `""`. A result that doesn't fit the place shape is left out, and `location_unavailable` returns only when none fit. Returns `selectionRequired: true`, even for an empty list. Never selects or changes the form. |
-| `swttr_recommend_outing` | A complete one-day `Outing`, below | Applies the explicit outing to the visible form and runs the same one-day request/result path as the person. Resolves after React commits the result/error and displayed-layer report. |
+| `swttr_recommend_outing` | A complete one-day `Outing`, below | Applies the explicit outing to the visible form and runs the same one-day request/result path as the person. Resolves after React commits the result/error and displayed-layer report. Unlike the person's own outing, its result never moves keyboard focus (see [Focus and announcements](outing-contract.md#focus-and-announcements)). |
 | `swttr_get_current_outing` | `{}` | Pending form inputs, request state, and the actual displayed advice under its own outing context. |
 
 ### Outing input
