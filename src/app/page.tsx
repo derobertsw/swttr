@@ -8,6 +8,7 @@ import MultiDayPlanDisplay from "@/components/MultiDayPlanDisplay";
 import { useItemMappings } from "@/hooks/useItemMappings";
 import { formatLocationName } from "@/hooks/useLocationSearch";
 import { useGearUp } from "@/hooks/useGearUp";
+import { OUTING_VIEW_HEADING_IDS } from "@/hooks/useOutingViewFocus";
 import { layerDisplayAdvice } from "@/lib/gearUp";
 import { useUserId } from "@/hooks/useUserId";
 import { gearUpTools } from "@/lib/webmcp/tools";
@@ -81,7 +82,7 @@ const HomeContent = () => {
         key={result ? "results" : "form"}
         className="flex w-full flex-col items-center gap-6 animate-in fade-in duration-300 sm:gap-7"
       >
-        {result && <h1 id="outing-result-heading" tabIndex={-1} className="sr-only">Gear up</h1>}
+        {result && <h1 id={OUTING_VIEW_HEADING_IDS.results} tabIndex={-1} className="sr-only">Gear up</h1>}
         {tripDay && (
           <TripDayBar tripDay={tripDay} shown={result?.outing ?? null} onPlanAgain={() => planTripDay(tripDay)} onLeave={leaveTripDay} />
         )}
@@ -91,7 +92,7 @@ const HomeContent = () => {
         {!result ? (
           <>
             <div className="flex w-full max-w-md flex-col gap-1">
-              <h1 className="text-title font-semibold text-foreground md:text-title-lg">What should I wear?</h1>
+              <h1 id={OUTING_VIEW_HEADING_IDS.form} tabIndex={-1} className="text-title font-semibold text-foreground md:text-title-lg">What should I wear?</h1>
               <p className="text-base text-muted-foreground">Layer advice for your activity and conditions.</p>
             </div>
             <GearUpForm

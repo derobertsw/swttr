@@ -220,6 +220,18 @@ describe("Home Page", () => {
       expect(screen.getByText(/9:15/)).toBeVisible();
       expect((await execute("get_current_outing")).snapshot.displayed).toMatchObject({ outing, advice: outcome.snapshot.displayed!.advice, layers: { phases: outcome.snapshot.displayed!.layers!.phases } });
     });
+    it("leaves focus where it is when an agent's outing replaces the form (#284)", async () => {
+      render(<Home />);
+      await waitFor(() => expect(registered.size).toBe(4));
+      await waitFor(() => expect(screen.getByRole("radio", { name: "Alpine Skiing" })).toBeEnabled());
+      // Where the person's own outing would take focus.
+      expect(document.activeElement).toBe(document.body);
+
+      expect(await execute("recommend_outing", outing)).toMatchObject({ status: "completed" });
+
+      expect(screen.getByRole("heading", { level: 1, name: "Gear up" })).not.toHaveFocus();
+      expect(document.activeElement).toBe(document.body);
+    });
     it("reports human layer removals and pending evaluation instead of the original recommendation", async () => {
       const user = userEvent.setup();
       render(<Home />);
@@ -889,6 +901,138 @@ describe("Home Page", () => {
         expect(within(activity()).getByRole("radio", { name: /alpine skiing/i })).toBeChecked();
         expect(placeField()).toHaveValue("");
         expect(weatherRequests).toHaveLength(1);
+      });
+    });
+
+    describe("focus and announcements (#284)", () => {
+      const resultHeading = () => screen.getByRole("heading", { level: 1, name: "Gear up" });
+      const formHeading = () => screen.getByRole("heading", { level: 1, name: "What should I wear?" });
+      /** The form's announcement of the request it's running. */
+      const announced = (text: string) => screen.queryByText(text, { selector: "[role='status']" });
+
+      /** Weather that arrives when `finish` is called. */
+      function holdWeather() {
+        const held: { finish?: () => void } = {};
+        const weatherRequests = mockOutingApis(() => new Promise((resolve) => {
+          held.finish = () => resolve(respond(200, { temperature: 30, windSpeed: 7 }));
+        }));
+        return { held, weatherRequests };
+      }
+
+      /** Picks Stowe, and presses See my layers from the keyboard. */
+      async function submitByKeyboard(user: ReturnType<typeof userEvent.setup>) {
+        await chooseStowe(user);
+        act(() => gearUpButton().focus());
+        await user.keyboard("{Enter}");
+      }
+
+      it("says the layers are coming, then moves focus to them", async () => {
+        const { held } = holdWeather();
+        const user = userEvent.setup();
+        render(<Home />);
+
+        await submitByKeyboard(user);
+        expect(announced("Getting your layers…")).toBeInTheDocument();
+        await answer(held.finish!);
+
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+        expect(resultHeading()).toHaveFocus();
+      });
+
+      it("leaves focus where the person moved it while the layers loaded", async () => {
+        const { held } = holdWeather();
+        const user = userEvent.setup();
+        render(<Home />);
+
+        await submitByKeyboard(user);
+        const logo = screen.getByRole("link", { name: "SWTTR" });
+        act(() => logo.focus());
+        await answer(held.finish!);
+
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+        expect(logo).toHaveFocus();
+      });
+
+      it("keeps focus where it is when the results change the activity", async () => {
+        mockOutingApis();
+        const outingApis = mockFetch.getMockImplementation()!;
+        mockFetch.mockImplementation((url: string, init?: RequestInit) =>
+          url.includes("/api/v1/recommendations/") ? Promise.resolve(respond(200, RUNNING_RECOMMENDATION)) : outingApis(url, init));
+        const user = userEvent.setup();
+        render(<Home />);
+        await submitByKeyboard(user);
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+
+        await user.click(screen.getByRole("button", { name: "Alpine Skiing, change activity" }));
+        await user.click(await screen.findByRole("button", { name: "Running" }));
+
+        expect(await screen.findByRole("button", { name: "Running, change activity" })).toBeEnabled();
+        expect(resultHeading()).not.toHaveFocus();
+      });
+
+      it("moves focus to the form's heading on Edit outing", async () => {
+        mockOutingApis();
+        const user = userEvent.setup();
+        render(<Home />);
+        await submitByKeyboard(user);
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+
+        act(() => screen.getByRole("button", { name: "Edit outing" }).focus());
+        await user.keyboard("{Enter}");
+
+        expect(formHeading()).toHaveFocus();
+      });
+
+      it("moves focus to the form on the browser's Back, and to the results again on Forward", async () => {
+        const { held, weatherRequests } = holdWeather();
+        const user = userEvent.setup();
+        // Next.js's popstate listener is added before the page's, and re-renders the page.
+        let rerenderPage = () => {};
+        const nextJsListener = () => act(() => rerenderPage());
+        window.addEventListener("popstate", nextJsListener);
+        /** Outside act, so effects run between the listeners, as in the browser. */
+        const traverse = async (delta: -1 | 1) => {
+          const arrived = new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true }));
+          window.history.go(delta);
+          await arrived;
+        };
+        try {
+          const { rerender } = render(<Home />);
+          rerenderPage = () => rerender(<Home />);
+          await submitByKeyboard(user);
+          await answer(held.finish!);
+          expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+
+          await traverse(-1);
+          await waitFor(() => expect(formHeading()).toHaveFocus());
+
+          await traverse(1);
+          await waitFor(() => expect(weatherRequests).toHaveLength(2));
+          expect(announced("Getting your layers…")).toBeInTheDocument();
+          await answer(held.finish!);
+
+          expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+          await waitFor(() => expect(resultHeading()).toHaveFocus());
+        } finally {
+          window.removeEventListener("popstate", nextJsListener);
+        }
+      });
+
+      it("says the layers are coming again after a reload on them, then moves focus to them", async () => {
+        mockOutingApis();
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+        await submitByKeyboard(user);
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+        unmount();
+        const { held } = holdWeather();
+        render(<Home />);
+
+        expect(await screen.findByText("Getting your layers…", { selector: "[role='status']" })).toBeInTheDocument();
+        await answer(held.finish!);
+
+        expect(await screen.findByText("Current conditions")).toBeInTheDocument();
+        expect(resultHeading()).toHaveFocus();
       });
     });
 
@@ -1781,6 +1925,64 @@ describe("Home Page", () => {
       ]);
       expect(requests.weather).toEqual([]);
       expect(getCurrentPosition).not.toHaveBeenCalled();
+    });
+
+    it("says the plan is being built, moves focus to it once it is, and back to the form on Edit outing (#284)", async () => {
+      let finishPlan: (() => void) | undefined;
+      mockPlanAheadApis({
+        planAhead: () => new Promise((resolve) => {
+          finishPlan = () => resolve(respond(200, {
+            plan: PLAN,
+            baseline: { recommendation: null, effectiveTemperature: 28, maxWindSpeed: 12 },
+          }));
+        }),
+      });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await chooseSeveralDays(user);
+      act(() => screen.getByRole("button", { name: "Build my plan" }).focus());
+      await user.keyboard("{Enter}");
+      expect(screen.getByText("Building your plan…", { selector: "[role='status']" })).toBeInTheDocument();
+      await answer(finishPlan!);
+
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Gear up" })).toHaveFocus();
+
+      act(() => screen.getByRole("button", { name: "Edit outing" }).focus());
+      await user.keyboard("{Enter}");
+
+      expect(screen.getByRole("heading", { level: 1, name: "What should I wear?" })).toHaveFocus();
+    });
+
+    it("still moves focus to the plan when the Plan tab is tapped again while it's being built (#284)", async () => {
+      let finishPlan: (() => void) | undefined;
+      mockPlanAheadApis({
+        planAhead: () => new Promise((resolve) => {
+          finishPlan = () => resolve(respond(200, {
+            plan: PLAN,
+            baseline: { recommendation: null, effectiveTemperature: 28, maxWindSpeed: 12 },
+          }));
+        }),
+      });
+      const user = userEvent.setup();
+      render(<Home />);
+
+      await chooseStowe(user);
+      await chooseStartDate(user);
+      await chooseSeveralDays(user);
+      act(() => screen.getByRole("button", { name: "Build my plan" }).focus());
+      await user.keyboard("{Enter}");
+      expect(screen.getByText("Building your plan…", { selector: "[role='status']" })).toBeInTheDocument();
+      // The iOS shell's Plan tab, tapped again on this page: the plan keeps building.
+      act(() => { window.dispatchEvent(new CustomEvent("navigatePlanAhead")); });
+      expect(screen.getByText("Building your plan…", { selector: "[role='status']" })).toBeInTheDocument();
+      await answer(finishPlan!);
+
+      expect(await screen.findByRole("heading", { name: "Multi-day layer plan" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Gear up" })).toHaveFocus();
     });
 
     it("builds a multi-day plan for a signed-out visitor", async () => {
