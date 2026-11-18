@@ -92,6 +92,8 @@ export default function TripMapCanvas(props: Props) {
   const latest = useRef(props);
   useEffect(() => { latest.current = props; });
   const [ready, setReady] = useState(false);
+  // MapLibre's load comes 1–3 s before the fitted extent's tiles paint; idle is when they have (#235).
+  const [painted, setPainted] = useState(false);
   const fitted = useRef("");
 
   useEffect(() => {
@@ -193,6 +195,15 @@ export default function TripMapCanvas(props: Props) {
     }
   }, [ready, props.places, props.scope, props.date, props.day, props.fitRequest, focus]);
 
+  // After the places and their extent above, so this idle is the one that has painted them.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    let current = true;
+    map.once("idle", () => { if (current) setPainted(true); });
+    return () => { current = false; };
+  }, [ready]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
@@ -215,7 +226,7 @@ export default function TripMapCanvas(props: Props) {
 
   return <div className="relative min-w-0">
     <div ref={container} className="h-[min(52dvh,420px)] min-h-64 w-full overflow-hidden rounded-card border border-border lg:h-[560px]" />
-    {!ready && <p role="status" className="absolute left-3 top-3 rounded-control bg-card p-3 text-sm">Loading map… The list is ready.</p>}
+    {!painted && <p role="status" className="absolute left-3 top-3 rounded-control bg-card p-3 text-sm">Loading map… The list is ready.</p>}
     <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Map controls">
       {/* icon: 44 × 44; a one-character default button was 42px wide (#235). */}
       <Button type="button" variant="outline" size="icon" disabled={!ready} onClick={() => mapRef.current?.zoomIn({ duration: 0 })} aria-label="Zoom in">+</Button>

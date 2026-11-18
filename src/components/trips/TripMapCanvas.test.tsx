@@ -14,6 +14,7 @@ class FakeMap {
   dragRotate = { disable: vi.fn() }; touchZoomRotate = { disableRotation: vi.fn() };
   fitBounds = vi.fn(); remove = vi.fn(); resize = vi.fn(); zoomIn = vi.fn(); zoomOut = vi.fn(); addImage = vi.fn();
   on(event: string, layer: string | Callback, cb?: Callback) { this.events[`${event}:${typeof layer === "string" ? layer : ""}`] = cb ?? layer as Callback; }
+  once(event: string, cb: Callback) { this.events[`once:${event}`] = cb; }
   /** The style's sprite, as MapLibre reports it once the style has loaded. */
   getSprite() { return [{ id: "default", url: SPRITE }]; }
   getCanvas() { return this.canvas; }
@@ -114,6 +115,16 @@ describe("Lazy map canvas", () => {
     act(() => sdk.map.events["error:"]({ error: Object.assign(new Error("Failed to fetch"), { url: "https://tiles.example/planet" }), sourceId: "openmaptiles" }));
     expect(input.onError).toHaveBeenCalledOnce();
   });
+  it("says the map is loading until its first idle, once the places and their extent are drawn (#235)", async () => {
+    const view = render(<TripMapCanvas {...props()} />); await loaded();
+    // load comes before the tiles for the fitted extent paint; the controls can work already.
+    expect(view.getByRole("status")).toHaveTextContent("Loading map… The list is ready.");
+    expect(view.getByRole("button", { name: "Zoom in" })).toBeEnabled();
+    expect(sdk.map.fitBounds).toHaveBeenCalledOnce();
+    await act(async () => { sdk.map.events["once:idle"](); });
+    expect(view.queryByRole("status")).not.toBeInTheDocument();
+  });
+
   it("labels a day's roles and fits the drive's two places only when asked", async () => {
     const day = data.days.find((entry) => entry.date === "2027-01-10")!;
     const places = data.places.filter((place) => place.visits.some((visit) => visit.date === day.date));
