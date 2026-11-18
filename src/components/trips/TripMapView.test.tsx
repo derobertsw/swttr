@@ -93,6 +93,21 @@ describe("Synchronized trip map and accessible list", () => {
     expect(screen.getByRole("list", { name: "Itinerary places" })).toBeVisible();
   });
 
+  it("treats a renderer chunk that fails to load like any map failure: no road line to show (#235)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {}); canvas.crash = true;
+    const fetchMock = fakeTripApi({});
+    vi.stubGlobal("fetch", fetchMock);
+    nativePush({}, "", `${path}?date=2027-01-09`); view();
+    expect(screen.getByRole("heading", { name: "Map unavailable" })).toBeVisible();
+    // Show drive would otherwise request a line and report it drawn on a map that isn't there.
+    expect(screen.getByRole("button", { name: "Show drive" })).toBeDisabled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    canvas.crash = false;
+    await userEvent.click(screen.getByRole("button", { name: "Retry map" }));
+    expect(screen.getByLabelText("Test canvas")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show drive" })).toBeEnabled();
+  });
+
   it("recovers offline and keeps list selection usable without requesting geolocation", async () => {
     Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
     view();
@@ -176,6 +191,28 @@ describe("Synchronized trip map and accessible list", () => {
     await new Promise((resolve) => requestAnimationFrame(resolve));
     expect(screen.getByRole("heading", { name: "Place list" })).toHaveFocus();
     expect(screen.queryByRole("link", { name: "Edit in trip plan" })).not.toBeInTheDocument();
+  });
+
+  it("moves focus to the list only once a phone shows it, however late the router commits ?view=list (#235)", async () => {
+    // Next applies a pushState to useSearchParams after a transition, often later than one frame.
+    vi.mocked(window.history.pushState).mockImplementation((state, unused, url) => {
+      nativePush(state, unused, url);
+      setTimeout(() => window.dispatchEvent(new PopStateEvent("popstate")), 50);
+    });
+    view();
+    const heading = screen.getByRole("heading", { name: "Place list", hidden: true });
+    const hiddenWhenFocused: boolean[] = [];
+    heading.addEventListener("focus", () => hiddenWhenFocused.push(heading.closest("section")!.classList.contains("hidden")));
+    const skip = screen.getByRole("button", { name: "Skip map" }); skip.focus();
+    await userEvent.keyboard("{Enter}");
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(window.location.search).toBe("?view=list");
+    expect(hiddenWhenFocused).toEqual([false]);
+    // Already in List, Skip map focuses it again without another history entry.
+    skip.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(heading).toHaveFocus();
+    expect(window.history.pushState).toHaveBeenCalledTimes(1);
   });
 });
 

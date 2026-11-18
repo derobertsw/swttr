@@ -15,9 +15,11 @@ import { TripMapDaySummary } from "./TripMapDay";
 
 const Canvas = dynamic(() => import("./TripMapCanvas"), { ssr: false, loading: () => <p role="status" className="min-h-64 p-4">Loading map… The list is ready.</p> });
 
-class CanvasBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+/** A renderer chunk that fails to load or render counts as a map failure, like a style or WebGL failure. */
+class CanvasBoundary extends Component<{ children: ReactNode; fallback: ReactNode; onError: () => void }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { this.props.onError(); }
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
@@ -26,7 +28,7 @@ function subscribeConnection(change: () => void) {
   return () => { window.removeEventListener("online", change); window.removeEventListener("offline", change); };
 }
 /** A day's list reads in the order of the day: where it starts, where the crew parks, then tonight. */
-const DAY_ORDER: MapDisplayRole[] = ["origin", "access", "meeting", "pickup", "destination", "tonight", "stay"];
+const DAY_ORDER: MapDisplayRole[] = ["origin", "access", "meeting", "pickup", "destination", "tonight", "departure", "stay"];
 const dayRank = (roles: MapDisplayRole[]) => roles.length ? DAY_ORDER.indexOf(roles[0]) : DAY_ORDER.length;
 /** Drive states with a saved origin → access pair to focus on (#209). */
 const DRIVE_PAIR_STATES = new Set<TripMapDay["drive"]["state"]>(["available", "stale", "manual", "unavailable", "no_route"]);
@@ -142,9 +144,19 @@ export function TripMapView({ data, canEdit, memberId = null }: { data: TripMap;
   }
   function showWholeDay() { setDriveDate(null); setFitRequest((value) => value + 1); }
 
+  // Skip map / Use list focus the list once it's shown. On phones it stays
+  // hidden until the router commits ?view=list, which can take longer than a
+  // frame, and a hidden heading silently refuses focus.
+  const focusList = useRef(false);
+  useEffect(() => {
+    if (!focusList.current || view !== "list") return;
+    focusList.current = false;
+    document.getElementById("map-place-list-heading")?.focus();
+  }, [view]);
   const showList = () => {
+    if (view === "list") { document.getElementById("map-place-list-heading")?.focus(); return; }
+    focusList.current = true;
     navigate({ view: "list" });
-    requestAnimationFrame(() => document.getElementById("map-place-list-heading")?.focus());
   };
   const failure = <Card className="space-y-3">
     <h2 className="font-semibold">Map unavailable</h2>
@@ -202,7 +214,7 @@ export function TripMapView({ data, canEdit, memberId = null }: { data: TripMap;
         {driveFocus && day && !offline && !failed && <RoadLineStatus day={day} geometry={geometry} road={!!road} />}
         {offline ? <Card><h2 className="font-semibold">Map needs a connection</h2><p className="mt-2 text-base">Use List for places already loaded. Offline maps and a saved offline brief are not available here.</p><Button variant="outline" className="mt-3" onClick={showList}>Use list</Button></Card>
           : !shown ? <Card><p className="text-base">No mapped places in this scope. The list includes places with missing or invalid locations.</p><Button variant="outline" className="mt-3" onClick={showList}>Use list</Button></Card>
-          : failed ? failure : (view === "map" || desktop) && <CanvasBoundary key={attempt} fallback={failure}>
+          : failed ? failure : (view === "map" || desktop) && <CanvasBoundary key={attempt} fallback={failure} onError={() => setFailed(true)}>
             <Canvas places={places} date={date} day={day} route={road?.geometry.coordinates ?? null} focusIds={driveFocus ? pair : null} provider={data.provider} scope={`${data.trip.id}:${date}`} selectedId={selectedId} fitRequest={fitRequest} onSelect={selectPlace} onGroup={(ids) => setGroup({ date, revision: data.revision, ids })} onError={() => setFailed(true)} />
           </CanvasBoundary>}
       </section>

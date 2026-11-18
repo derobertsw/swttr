@@ -24,6 +24,9 @@ const isPublicRoute = createRouteMatcher([
   "/api/v1(.*)",
   // Paid agent API — gated by MPP (HTTP 402), not Clerk auth.
   "/api/agent(.*)",
+  // Clerk's webhooks carry no session; each handler verifies the request's
+  // signature instead (src/app/api/webhooks/clerk/route.ts).
+  "/api/webhooks(.*)",
 ]);
 
 // Clerk-gated even though /api/v1 is otherwise public: anonymous callers would

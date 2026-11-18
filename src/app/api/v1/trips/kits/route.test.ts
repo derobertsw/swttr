@@ -6,6 +6,8 @@ import { assertCanAccessTrip, loadTripFull } from "@/lib/trips";
 import { planDay, savedOutfit, savedPlan, WEAR } from "@/test/savedKit";
 import { ORGANIZER, STOWE_STOP, TRIP, tripFull } from "@/test/tripApi";
 import { createFakeSupabase } from "@/test/fakeSupabase";
+import { packingFromOutfits } from "@/lib/trip-packing";
+import type { SavedKit } from "@/types/savedKit";
 import type { TripDay, TripMemberDayKit } from "@/types/trips";
 import { POST } from "./route";
 
@@ -200,6 +202,19 @@ describe("Save an outing's kit to a trip", () => {
       expect(response.status).toBe(200);
       expect(assertCanAccessTrip).toHaveBeenCalledWith(expect.anything(), TRIP_ID, "user-1");
       expect(rpc).toHaveBeenCalledWith("save_trip_kits", expect.objectContaining({ p_trip_id: TRIP_ID, p_days: [expect.objectContaining({ date: "2026-10-10" })] }));
+    });
+
+    it("saves the same snapshot as a save without the day, so the packing list keeps its items (#170, #177)", async () => {
+      expect((await save(fromDay())).status).toBe(200);
+      expect((await save(request())).status).toBe(200);
+      const [[, fromTheDay], [, plain]] = rpc.mock.calls as Array<[string, { p_days: Array<{ date: string; outfit: SavedKit }> }]>;
+      // The day it was planned from isn't kept in the kit: the outfit is #170's snapshot, as Gear up showed it.
+      expect(fromTheDay).toEqual(plain);
+      expect(fromTheDay.p_days[0].outfit).toEqual(savedOutfit());
+      // So the packing list derives the same items under the same identities, and their packed checks still apply.
+      const keys = (args: typeof plain) => packingFromOutfits(args.p_days.map(({ date, outfit }) => ({ date, outfit, savedAt: null }))).map((item) => item.key);
+      expect(keys(fromTheDay)).toEqual(keys(plain));
+      expect(keys(fromTheDay)).toContain("item:g-1");
     });
 
     it("saves nothing and says what changed when the day changed since", async () => {

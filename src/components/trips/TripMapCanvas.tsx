@@ -59,7 +59,10 @@ function roleImage(role: MapDisplayRole, primary: string, contrast: string) {
   } else if (role === "access" || role === "meeting") {
     ctx.moveTo(24, 4); ctx.lineTo(44, 24); ctx.lineTo(24, 44); ctx.lineTo(4, 24); ctx.closePath();
   } else if (role === "pickup") ctx.rect(7, 7, 34, 34);
-  else ctx.arc(24, 24, 18, 0, Math.PI * 2);
+  else if (role === "departure") {
+    // A ring: another group's start, unlike the filled "Starting from" circle.
+    ctx.arc(24, 24, 16, 0, Math.PI * 2); ctx.fillStyle = contrast; ctx.strokeStyle = primary; ctx.lineWidth = 8;
+  } else ctx.arc(24, 24, 18, 0, Math.PI * 2);
   ctx.fill(); ctx.stroke();
   return ctx.getImageData(0, 0, 48, 48);
 }
@@ -102,13 +105,15 @@ export default function TripMapCanvas(props: Props) {
         try {
           const primary = getComputedStyle(container.current!).getPropertyValue("--primary").trim() || "#743bea";
           const contrast = getComputedStyle(container.current!).getPropertyValue("--primary-foreground").trim() || "#ffffff";
-          for (const role of ["stay", "tonight", "destination", "origin", "access", "meeting", "pickup"] as const) map.addImage(role, roleImage(role, primary, contrast), { pixelRatio: 2 });
+          for (const role of ["stay", "tonight", "destination", "origin", "access", "meeting", "pickup", "departure"] as const) map.addImage(role, roleImage(role, primary, contrast), { pixelRatio: 2 });
           map.addSource("places", { type: "geojson", data: points(latest.current.places, latest.current.date), cluster: true, clusterRadius: 44, clusterMaxZoom: 18 });
           map.addLayer({ id: "groups", type: "circle", source: "places", filter: ["has", "point_count"], paint: { "circle-radius": 23, "circle-color": primary, "circle-stroke-color": contrast, "circle-stroke-width": 3 } });
           map.addLayer({ id: "counts", type: "symbol", source: "places", filter: ["has", "point_count"], layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 16, "text-font": ["Noto Sans Regular"] }, paint: { "text-color": contrast } });
           map.addLayer({ id: "point-targets", type: "circle", source: "places", filter: ["!", ["has", "point_count"]], paint: { "circle-radius": 22, "circle-opacity": 0 } });
           map.addLayer({ id: "points", type: "symbol", source: "places", filter: ["!", ["has", "point_count"]], layout: {
-            "icon-image": ["get", "role"], "icon-size": 1.2, "icon-allow-overlap": true,
+            // A label that collides is dropped, never its marker: without text-optional a nearby
+            // place's label hid the whole symbol, so a "shown" place was missing on phones (#235).
+            "icon-image": ["get", "role"], "icon-size": 1.2, "icon-allow-overlap": true, "text-optional": true,
             "text-field": ["concat", ["get", "label"], ["case", ["get", "approximate"], " · unconfirmed", ""]], "text-size": 12, "text-font": ["Noto Sans Regular"], "text-offset": [0, 2], "text-anchor": "top",
           }, paint: { "text-color": "#26351c", "text-halo-color": "#ffffff", "text-halo-width": 2, "icon-opacity": ["case", ["get", "approximate"], 0.65, 1] } });
           map.addSource("selection", { type: "geojson", data: points([], "") });
@@ -186,9 +191,10 @@ export default function TripMapCanvas(props: Props) {
   return <div className="relative min-w-0">
     <div ref={container} className="h-[min(52dvh,420px)] min-h-64 w-full overflow-hidden rounded-card border border-border lg:h-[560px]" />
     {!ready && <p role="status" className="absolute left-3 top-3 rounded-control bg-card p-3 text-sm">Loading map… The list is ready.</p>}
-    <div className="mt-2 flex flex-wrap gap-2" aria-label="Map controls">
-      <Button type="button" variant="outline" disabled={!ready} onClick={() => mapRef.current?.zoomIn({ duration: 0 })} aria-label="Zoom in">+</Button>
-      <Button type="button" variant="outline" disabled={!ready} onClick={() => mapRef.current?.zoomOut({ duration: 0 })} aria-label="Zoom out">−</Button>
+    <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Map controls">
+      {/* icon: 44 × 44; a one-character default button was 42px wide (#235). */}
+      <Button type="button" variant="outline" size="icon" disabled={!ready} onClick={() => mapRef.current?.zoomIn({ duration: 0 })} aria-label="Zoom in">+</Button>
+      <Button type="button" variant="outline" size="icon" disabled={!ready} onClick={() => mapRef.current?.zoomOut({ duration: 0 })} aria-label="Zoom out">−</Button>
     </div>
     <p className="mt-2 text-sm text-muted-foreground">Select a shape for details or a numbered group for its named places. Approximate and unconfirmed places have lighter markers.</p>
   </div>;

@@ -1,0 +1,55 @@
+name: iOS app
+
+on:
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'apple/**'
+      - 'capacitor-web/**'
+      - 'capacitor.config.ts'
+      - 'package-lock.json'
+      - '.github/workflows/ios-app.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - 'apple/**'
+      - 'capacitor-web/**'
+      - 'capacitor.config.ts'
+      - 'package-lock.json'
+      - '.github/workflows/ios-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Pinned rather than macos-latest so the image's default Xcode (26.x)
+    # only changes when this line does.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Install dependencies
+        run: npm ci
+      - name: Sync Capacitor project
+        run: npx cap sync ios
+      - name: Shared shell tests
+        run: swift test --package-path apple/SWTTRShellKit
+      - name: Build for the iOS Simulator (Debug and Release)
+        run: |
+          for configuration in Debug Release; do
+            xcodebuild build -project ios/App/App.xcodeproj -scheme App \
+              -configuration "$configuration" -destination 'generic/platform=iOS Simulator' \
+              -derivedDataPath /tmp/swttr-ios-build CODE_SIGNING_ALLOWED=NO
+          done
+      - name: List files changed by sync or the build
+        run: git status --short
