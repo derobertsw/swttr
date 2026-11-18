@@ -61,7 +61,7 @@ graph TD
     F --> P[Load Gear Pool:<br/>wardrobe, or catalog filtered by activity score]
     P -->|No usable garments| T[Targets-only response]
     P --> G[Ensemble Building]
-    G --> R[Running/XC only: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
+    G --> R[Running, cycling and XC: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
     R --> PROT[Alpine, cycling, touring descent: helmet requirement<br/>whatever the thermal demand<br/>owned match, catalog suggestion, or missing with a warning]
     PROT --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
     XCCARRY --> I[Canonical server phase assessment:<br/>actual worn regional and extremity basic clo<br/>local shortfalls and excess, moisture and clothing gaps]
@@ -138,17 +138,19 @@ graph TD
 
 ### 3. Ensemble Building Flow
 
-Running compares complete wearable moving outfits made from reviewed standalone tops, shorts or tights, optional underlayers/mids and protective outers. A thermal base is never mandatory. Shorts and short sleeves intentionally leave skin exposed; regional thermal data already includes that exposure. The running search caches shared-model regional contributions, fixes any garments spanning the upper body and legs (including arms without torso coverage), and prunes inferior regional priorities before pairing the surviving choices. Identical selection capabilities keep the first sorted ID; no candidate cap or thermal bins discard distinct outfits. It preserves actual wind/rain protection, prefers waterproof coverage in precipitation, rejects excessive warmth before filling a clothing gap, and balances whole-body/regional shortfalls and excess before using layer count and breathability as tie-breaks. Selection and final/manual evaluation use the same regional ensemble regression and calibrated targets, with the shared 0.05 clo cold tolerance. A light clothing need cannot be satisfied by overly warm full coverage; absent suitable basics remain missing requirements with generic suggestions. Requirements assess the selected combination, including outer warmth and protection, and reasons name the worn outfit. When the best available combination still misses a target, both requirements and guidance name that clothing and explain the remaining shortfall, excess warmth, or protection gap. Missing wind and rain protection are reported separately. Extra clothing for stops stays separate. Ski bibs and insulated outerwear without explicit running suitability are excluded from moving outfits. The small mismatch allowances are wardrobe heuristics, not measured physiological limits. Cycling and touring retain their earlier builders: a base top and bottom; then, if the bases' summed clo is under the IREQ minimum, up to one torso mid and one leg mid that each fit the clo cap; then shells. The minimum is checked once, so a leg mid can still be added after the torso mid has reached it. They have no regional search and report no clothing gaps, so their outfits often fail the shared comfort check ([algorithm review](docs/algorithm-review.md), finding 1).
+Running compares complete wearable moving outfits made from reviewed standalone tops, shorts or tights, optional underlayers/mids and protective outers. A thermal base is never mandatory. Shorts and short sleeves intentionally leave skin exposed; regional thermal data already includes that exposure. The running search caches shared-model regional contributions, fixes any garments spanning the upper body and legs (including arms without torso coverage), and prunes inferior regional priorities before pairing the surviving choices. Identical selection capabilities keep the first sorted ID; no candidate cap or thermal bins discard distinct outfits. It preserves actual wind/rain protection, prefers waterproof coverage in precipitation, rejects excessive warmth before filling a clothing gap, and balances whole-body/regional shortfalls and excess before using layer count and breathability as tie-breaks. Selection and final/manual evaluation use the same regional ensemble regression and calibrated targets, with the shared 0.05 clo cold tolerance. A light clothing need cannot be satisfied by overly warm full coverage; absent suitable basics remain missing requirements with generic suggestions. Requirements assess the selected combination, including outer warmth and protection, and reasons name the worn outfit. When the best available combination still misses a target, both requirements and guidance name that clothing and explain the remaining shortfall, excess warmth, or protection gap. Missing wind and rain protection are reported separately. Extra clothing for stops stays separate. Ski bibs and insulated outerwear without explicit running suitability are excluded from moving outfits. The small mismatch allowances are wardrobe heuristics, not measured physiological limits.
+
+Cycling (#371) uses the same complete-outfit search, regional checks and requirement matching with its own inputs. Its protection policy asks for wind protection at or below 0°C or in wind over 8 m/s, and rain protection in any precipitation, for torso and legs alike; like running's, it reads ambient wind only, and riding speed is left to #374. A wind- or rain-protective garment is chosen as part of the outfit, so its warmth counts in the regional fit instead of being added on top. Ski bibs need explicit cycling suitability, but insulated outerwear and puffies stay eligible, so deep cold can use them. Cycling's targets are unchanged and still assume a windproof outer. The response's `ireq.outfit_checks` carries the standalone and protection checks so manual edits repeat them. Touring retains its earlier builder: a base top and bottom; then, if the bases' summed clo is under the IREQ minimum, up to one torso mid and one leg mid that each fit the clo cap; then shells. The minimum is checked once, so a leg mid can still be added after the torso mid has reached it. It has no regional search and reports no clothing gaps, so its outfits often fail the shared comfort check ([algorithm review](docs/algorithm-review.md), finding 1).
 
 Alpine and XC compare complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. They allow at most one item in each slot per covered region, including items that span multiple regions, so insulated outerwear takes the outer slot and no shell goes over it. Alpine puts a puffy only under a hard shell; XC allows one under any shell, but not under insulated outerwear. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. XC uses the same regional enumeration with a separate assessment: reviewed standalone coverage, actual wind/wet protection, excessive warmth before filling clothing gaps, then regional thermal fit and breathability. It permits one suitable Nordic tight or pant without an extra base or outer. XC requirements assess the selected combination, including all its warmth and protection. XC never leaves a region in underwear alone. Weather-protection scoring counts windbreakers and insulated outerwear as shells. When targets cannot be met, alpine returns the best available wearable combination. Regional warnings require both a shortfall and an available wearable alternative that could reduce it by more than 0.12 clo while preserving coverage and rain protection. The thermal comfort score and overall cold warnings still report cold conditions when regional targets are unreachable.
 
 ```mermaid
 graph TD
-    START[Target Clo Range from Pipeline] --> RUNNING{Running?}
-    RUNNING -->|Yes| RUNOPT[Compare complete top and leg outfit combinations<br/>Standalone coverage without mandatory thermal bases<br/>Short sleeves and shorts allowed<br/>Exclude unreviewed ski bibs and insulated outers]
+    START[Target Clo Range from Pipeline] --> RUNNING{Running or cycling?}
+    RUNNING -->|Yes| RUNOPT[Compare complete top and leg outfit combinations<br/>Standalone coverage without mandatory thermal bases<br/>Short sleeves and shorts allowed<br/>Running: exclude unreviewed ski bibs and insulated outers<br/>Cycling: exclude unreviewed ski bibs; insulation allowed]
     RUNOPT --> RCACHE[Cache regional contributions and partial totals<br/>Fix torso/arms + leg garments; prune inferior regional choices]
     RCACHE --> RUNRANK[Actual wind/rain protection, then excess warmth<br/>Clothing coverage, thermal fit, layers, breathability]
-    RUNRANK --> RUNREQ[Evaluate with shared regional regression and targets<br/>Match selected combinations or report missing basics<br/>Distinguish best available clothing from absent basics]
+    RUNRANK --> RUNREQ[Evaluate with shared regional regression and targets<br/>Match selected combinations or report missing basics<br/>Distinguish best available clothing from absent basics<br/>Cycling forwards its checks to manual edits]
     RUNNING -->|No| SPORT{Alpine or XC?}
     SPORT -->|Yes| CACHE[Cache garment features once<br/>Reuse prefix and base/mid totals]
     CACHE --> COMB[Compare optional base, mid/puffy and outer<br/>for torso, then legs<br/>XC can use a standalone garment]
@@ -159,7 +161,7 @@ graph TD
     WARM --> WARN[Warn only when a regional shortfall<br/>can be reduced by more than 0.12 clo]
     RANK -->|XC| XREG[Actual full-region wind/wet protection<br/>Bound excess, require reviewed standalone coverage<br/>Fit regional bands, then breathable and fewer layers]
     XREG --> XREQ[Match selected combinations or report gaps<br/>Carry stop warmth separately]
-    SPORT -->|No| SORT[Sort Pool by Sport Strategy]
+    SPORT -->|No: touring climb| SORT[Sort Pool by Breathability]
     SORT --> BASE[Select Base Layer]
     BASE --> MID[Select Mid Layers<br/>If summed base clo is under the IREQ minimum:<br/>up to one torso mid and one leg mid that fit the cap]
     MID --> SHELL[Select Shell]
@@ -169,9 +171,9 @@ graph TD
 
     subgraph "Guards Applied at Each Step"
         G1{Garment already selected?}
-        G2{Mid layers within the clo budget?<br/>Biking shells bypass the cap<br/>Touring climb shells must fit it}
+        G2{Mid layers within the clo budget?<br/>Touring climb shells must fit it}
         G3{Covers required body region?}
-        G4{Meets breathability threshold?<br/>Bases prefer it, else the most breathable<br/>Touring mids must reach 80 percent of it<br/>Biking mids and all shells are not filtered}
+        G4{Meets breathability threshold?<br/>Bases prefer it, else the most breathable<br/>Touring mids must reach 80 percent of it<br/>Shells are not filtered}
     end
 
     G1 -->|Duplicate| SKIP[Skip Garment]
@@ -204,10 +206,11 @@ graph TD
         R4 --> R5[Reasons describe worn outfit<br/>Stop layers are separate]
     end
 
-    subgraph "Biking — shared breathable builder"
-        BIKE --> B1[Breathability-sorted]
-        B1 --> B2[Shells always processed]
-        B2 --> B3[Basic clo budget for mid layers<br/>Shells outside the clo cap<br/>Puffies and insulated outerwear never selected]
+    subgraph "Biking — running's complete outfit search"
+        BIKE --> B1[Standalone top and shorts or tights<br/>Optional base, mid or puffy and outer<br/>Insulated outerwear allowed, ski bibs excluded]
+        B1 --> B2[Cycling protection policy, ambient wind only:<br/>wind at or below 0°C or over 8 m/s<br/>rain in any precipitation]
+        B2 --> B3[Protective outer counted in the regional fit<br/>Same regional model and targets<br/>as final and manual evaluation]
+        B3 --> B4[Clothing requirements and gaps<br/>Targets still assume a windproof outer]
     end
 
     subgraph "Alpine Skiing"
@@ -254,7 +257,9 @@ graph TD
     ROPT --> RRANK
     RRANK --> RGAP[Warn and report clothing gaps<br/>when available protection is insufficient]
 
-    BIKE --> BADD[Always add the most breathable<br/>torso shell and leg shell]
+    BIKE --> BCHECK{Cycling policy: at or below 0°C,<br/>wind over 8 m/s, or precipitation?}
+    BCHECK -->|Yes| RPROTECT
+    BCHECK -->|No| ROPT
 
     ALP --> AOUT[Compare shell or insulated outer<br/>as part of each regional outfit]
     AOUT --> AWET{Precipitation?}

@@ -7,6 +7,7 @@ import { xcPhaseContext } from '@/lib/biophysics/xc-policy';
 import type { BiophysicsRecommendation } from '@/types/biophysics';
 import type { ActivityType } from '@/lib/biophysics/constants';
 import type { ActivityProfile } from '@/lib/biophysics/scorer';
+import type { SustainedSportPolicy } from '@/lib/biophysics/sport-policy';
 import type { IreqResult } from '@/types/garments';
 import type { SportRecommender } from '../handler';
 import type { CatalogFilter } from '../gear-pool';
@@ -31,6 +32,22 @@ interface SinglePhaseTargets extends PhaseTargets {
   ireq: IreqResult;
   /** The same IREQ in the basic clo garments are rated in. */
   basicIreq: IreqResult;
+  /** Protection required by a sport without a sustained policy (cycling). */
+  protection?: SustainedSportPolicy['protection'];
+}
+
+type Protection = SustainedSportPolicy['protection'];
+
+/** Protection the worn outfit must establish: the sustained policy's or the sport's own. */
+function outfitNeeds(targets: SinglePhaseTargets): Protection | undefined {
+  return targets.policy?.protection ?? targets.protection;
+}
+
+/** Manual edits repeat these checks. A sustained policy already carries them. */
+function outfitChecks(targets: SinglePhaseTargets, requirementFirst = false) {
+  return !targets.policy && targets.protection
+    ? { outfit_checks: { require_standalone: requirementFirst, protection: targets.protection } }
+    : {};
 }
 
 interface SinglePhaseSportConfig {
@@ -60,6 +77,8 @@ interface SinglePhaseSportConfig {
   completeOutfit?: boolean;
   /** Whether the torso requirement includes a wind layer for this request. */
   windTorsoRequirement?(request: RecommendationRequest): boolean;
+  /** Wind and rain protection for a sport without a sustained policy. */
+  protection?(request: RecommendationRequest): Protection;
 }
 
 /** Compose one-phase targets, outfit/protection selection, and response evaluation for a sport. */
@@ -82,6 +101,7 @@ export function createSinglePhaseSport(
         metabolicRate,
         ireq,
         basicIreq: basicIreq(ireq, exposure),
+        ...(config.protection ? { protection: config.protection(request) } : {}),
         ...phaseTargets(config.activity, ireq, metabolicRate, conditions, windMs, ireq, request.exertion, exposure),
       };
     },
@@ -90,11 +110,13 @@ export function createSinglePhaseSport(
     emptyResponse(request, targets) {
       // The no-garment fast path has not inspected accessory availability.
       const accessories = selectPhaseAccessories(config.activity, targets, { handwear: [], headwear: [], availability: 'unknown' }, request.tempC);
+      const needs = outfitNeeds(targets);
       return {
         ...(config.carry ? { carry_items: config.carry(request, targets) } : {}),
         ireq: targets.policy ? formatSinglePhaseIreq(targets.ireq, targets) : { min: targets.ireq.ireqMin, neutral: targets.ireq.ireqNeutral },
         ...(config.requirementFirst ? {
-          requirements: buildClothingRequirements(config.activity, targets, { garments: [], handwear: [], headwear: [], ownership: { garments: false, handwear: false, headwear: false }, accessories: accessories.assessments }),
+          requirements: buildClothingRequirements(config.activity, targets, { garments: [], handwear: [], headwear: [], ownership: { garments: false, handwear: false, headwear: false },
+            ...(needs ? { functional: { protection: needs } } : {}), accessories: accessories.assessments }),
         } : {}),
         recommendations: {
           target_clo_range: targets.targetRange,
@@ -110,11 +132,12 @@ export function createSinglePhaseSport(
       const built = config.buildEnsemble(pool.categorized, targets, request);
       const protectedOutfit = config.protect?.(built, pool.categorized, targets);
       const builtEnsemble = protectedOutfit?.ensemble ?? built;
+      const needs = outfitNeeds(targets);
       const functional = config.requirementFirst
         ? {
           minEvapPotential: config.minEvapPotential,
           torsoWind: config.windTorsoRequirement?.(request) ?? false,
-          protection: targets.policy?.protection,
+          protection: needs,
         }
         : undefined;
       const ensemble = functional && !config.completeOutfit ? filterUnsuitableEnsemble(builtEnsemble, targets.regional, functional) : builtEnsemble;
@@ -142,7 +165,7 @@ export function createSinglePhaseSport(
           activityKey: config.activity,
           comfortContext: {
             requireStandalone: config.requirementFirst,
-            protectionNeeds: targets.policy?.protection,
+            protectionNeeds: needs,
             targetRange: targets.targetRange,
             regionalMinTarget: targets.regional.min,
             regionalTarget: targets.regional.neutral,
@@ -178,7 +201,7 @@ export function createSinglePhaseSport(
           exertion: request.exertion,
           ...config.conditions(request),
         },
-        ireq: formatSinglePhaseIreq(targets.ireq, judged),
+        ireq: { ...formatSinglePhaseIreq(targets.ireq, judged), ...outfitChecks(targets, config.requirementFirst) },
         ...(requirements || helmet ? { requirements: [...(requirements ?? []), ...(helmet ? [helmet.requirement] : [])] } : {}),
         recommendation,
         warnings: [...warnings, ...(protectedOutfit?.warnings ?? []), ...accessories.warnings, ...(helmet?.warnings ?? [])],
