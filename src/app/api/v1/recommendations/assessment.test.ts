@@ -21,6 +21,10 @@ const call = async (route: typeof evaluate, body: unknown) => {
   return response.json();
 };
 
+/** Body-part results with clo and delta rounded to 10 decimals; statuses stay exact. */
+const roundClo = (parts: unknown) => JSON.parse(JSON.stringify(parts), (key, value) =>
+  (key === 'clo' || key === 'delta') && typeof value === 'number' ? Math.round(value * 1e10) / 1e10 : value);
+
 function phase(body: BiophysicsRecommendation): PhaseEvaluationInput {
   const { ireq, recommendation: rec } = body;
   return {
@@ -70,7 +74,9 @@ describe('canonical recommendation and edit assessments', () => {
         expect(edited.totalClo).toBeCloseTo(initial.totalClo!, 10);
         expect(edited.comfortScore).toBe(initial.comfortScore);
         expect(edited.decision).toEqual(initial.decision);
-        expect(edited.bodyParts).toEqual(initial.bodyParts);
+        // Manual edits sum worn items in display order (helmet last), so sums can
+        // differ in the last floating-point bit, as totalClo can above.
+        expect(roundClo(edited.bodyParts)).toEqual(roundClo(initial.bodyParts));
       }
     });
   }
