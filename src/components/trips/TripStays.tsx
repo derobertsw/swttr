@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { sectionLabelClassName } from "@/components/trips/trip-primitives";
@@ -78,7 +79,11 @@ export function TripStays({ data, canEdit, onSaved, viewerMemberId = null }: {
       <div>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 id="trip-stays-heading" tabIndex={-1} className="text-title font-semibold text-foreground md:text-title-lg">Stays</h1>
-          {canEdit && <Button type="button" variant="outline" onClick={() => open({ action: "save" })}>Add stay</Button>}
+          <div className="flex flex-wrap gap-2">
+            {/* Options to compare are kept apart from these stays (#213). */}
+            <Button asChild variant="outline"><Link href={`/trips/${data.trip.id}/stays/compare`}>Compare stays</Link></Button>
+            {canEdit && <Button type="button" variant="outline" onClick={() => open({ action: "save" })}>Add stay</Button>}
+          </div>
         </div>
         <p className="mt-1 text-base text-muted-foreground">{perMember ? "Who's staying where, night by night" : "Crew stay · One shared place each night"}</p>
         {!canEdit && <p className="mt-1 text-base text-muted-foreground">Managed by the organizer</p>}
