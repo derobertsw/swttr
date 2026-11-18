@@ -36,7 +36,7 @@ What a day holds:
 | Meet | `TripFull.meets` | Label and whose clock |
 | Meeting point | `accessPointFor` (#208) | User-confirmed label, address, coordinates, precision, saved attribution |
 | Notes | `trip_days.notes` (#334) | |
-| Starting from | Lodging person day, else the crew's | The crew's too when it differs |
+| Starting from | `TripFull.starts` (the day's departures, #333), as the live day brief reads it | Their own or the day's own starting point ("· only this day"), else the stay they slept in; someone without a departure keeps the lodging's reason. The crew's too when it differs |
 | Getting there | The person's own departure, else the crew's (#333) | Duration and distance with "Calculated [date] · typical traffic, not live", Geoapify and OSM credit, closures, and Apple/Google directions links |
 | Tonight | Lodging person day | The stay's name, dates, booked or not, check-in/out times and location; a move between stays |
 | Tour plan | Backcountry days with a plan | Objective, figures, approach, access, backup, return, check-in, pickup, links, last change and revision |

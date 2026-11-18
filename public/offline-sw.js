@@ -145,9 +145,12 @@ async function openPage(event) {
   try {
     const live = await withTimeout(fetch(event.request), kept ? NETWORK_TIMEOUT_MS : 30000);
     if (!isPage(live)) return kept || live;
+    // The browser starts reading `live` as soon as it's returned, so the check
+    // reads its own copy, taken before anything else waits.
+    const copy = live.clone();
     event.waitUntil((async () => {
+      const files = taggedFiles(await copy.text());
       const cache = await currentCache();
-      const files = taggedFiles(await live.clone().text());
       const missing = !cache || (await Promise.all(files.map((path) => cache.match(path, { ignoreSearch: true })))).some((hit) => !hit);
       if (missing) await prime().catch(() => undefined);
     })());

@@ -28,8 +28,22 @@ const PAGE = (chunk: string) => `<!doctype html><html><head>
 function worker(network: Map<string, Reply>) {
   const stores = new Map<string, Map<string, Response>>();
   const key = (request: RequestInfo | URL) => new URL(typeof request === "string" ? request : request instanceof URL ? request.href : request.url, ORIGIN);
+  // Holds cache lookups after the next `skip` until released, to order them against the browser reading a response.
+  let gate: Promise<void> = Promise.resolve();
+  let free = Infinity;
+  const hold = (skip: number) => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    free = skip;
+    gate = held;
+    return () => { free = Infinity; gate = Promise.resolve(); release(); };
+  };
   const caches = {
-    keys: async () => [...stores.keys()],
+    keys: async () => {
+      if (free > 0) free -= 1;
+      else await gate;
+      return [...stores.keys()];
+    },
     delete: async (name: string) => stores.delete(name),
     open: async (name: string) => {
       if (!stores.has(name)) stores.set(name, new Map());
@@ -83,7 +97,18 @@ function worker(network: Map<string, Reply>) {
     return answer!;
   };
   const kept = () => [...stores].filter(([name]) => name.startsWith("swttr-saved-shell-"));
-  return { prime, openOffline, kept, stores };
+  /** A navigation to /trips/saved with the network up: the response, and the work it left running. */
+  const openOnline = () => {
+    let answer: Promise<Response> | undefined;
+    const pending: Promise<unknown>[] = [];
+    listeners.get("fetch")!({
+      request: { method: "GET", mode: "navigate", url: `${ORIGIN}/trips/saved` },
+      respondWith: (response: Promise<Response>) => { answer = response; },
+      waitUntil: (work: Promise<unknown>) => pending.push(work),
+    });
+    return { answer: answer!, settled: async () => { await answer; await Promise.all(pending); } };
+  };
+  return { prime, openOffline, openOnline, hold, kept, stores };
 }
 
 const network = (chunk: string, overrides: Record<string, Reply> = {}) => new Map<string, Reply>(Object.entries({
@@ -134,6 +159,26 @@ describe("The saved trips page's service worker (#214)", () => {
     expect(sw.kept().map(([name]) => name)).toEqual([previous]);
     expect([...sw.stores.keys()].filter((name) => name.includes("staging"))).toEqual([]);
     expect(await (await sw.openOffline()).text()).toContain("/_next/static/chunks/v1.js");
+  });
+
+  it("keeps a new deploy's page found online even when the browser reads the page first", async () => {
+    const sw = worker(net);
+    expect(await sw.prime()).toEqual({ ok: true });
+    net.set("/trips/saved", { status: 200, body: PAGE("v2.js"), type: "text/html" });
+    net.set("/_next/static/chunks/v2.js", { status: 200, body: "console.log(2)", type: "application/javascript" });
+    await new Promise((resolve) => setTimeout(resolve, 2));
+
+    // Past the lookup for the kept page, the worker's cache lookups wait; meanwhile the browser reads the whole page it was given.
+    const release = sw.hold(1);
+    const { answer, settled } = sw.openOnline();
+    const page = await answer;
+    expect(await page.text()).toContain("/_next/static/chunks/v2.js");
+    release();
+    await settled();
+
+    // Its check still ran on its own copy, saw the new chunk missing, and kept the new page.
+    const [[, files]] = sw.kept();
+    expect([...files.keys()].map((url) => new URL(url).pathname)).toContain("/_next/static/chunks/v2.js");
   });
 
   it("reports a failure when the connection drops part way", async () => {

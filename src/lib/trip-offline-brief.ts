@@ -273,7 +273,15 @@ export function buildOfflineBrief({ full, userId, dates, drive, equipment, now }
       needsKit && !kit?.outfit && !kit?.items.length && "No kit saved",
     ].filter((entry): entry is string => !!entry);
 
-    const yoursFrom = mine?.starting_from ?? context?.starting_from ?? null;
+    // Where the day starts, as its departures work it out (`starts`, #333):
+    // a starting point of the member's own, or the day's own, before the stay
+    // they slept in. Someone without a departure, such as a person not taking
+    // part, keeps the lodging's reason. The live day brief (DayStart) reads it
+    // the same way, so both match the drive under them.
+    const start = full.starts?.find((entry) => entry.date === date);
+    const myStart = start?.people.find((entry) => entry.member_id === memberId);
+    const crewFrom = start?.starting_from ?? context?.starting_from ?? "Not set";
+    const myFrom = myStart?.starting_from ?? mine?.starting_from;
     const yoursTonight = mine?.staying_tonight ?? context?.staying_tonight ?? null;
     const leaving = move ? stayById(person?.nights[person.nights.findIndex((night) => night.date === date) - 1]?.stay_id) : undefined;
     const arriving = move ? stayById(mine?.tonight_stay_id) : undefined;
@@ -293,7 +301,10 @@ export function buildOfflineBrief({ full, userId, dates, drive, equipment, now }
       meet: meet ? { label: meet.meet_label, time_zone_label: meet.time_zone_label } : null,
       meeting_point: access ? place(access.location) : null,
       notes: day.notes ?? null,
-      starting_from: context ? { yours: yoursFrom, crew: mine && mine.starting_from !== context.starting_from ? context.starting_from : null } : null,
+      starting_from: context ? {
+        yours: myFrom ? `${myFrom}${myStart?.own ? " · only this day" : ""}` : crewFrom,
+        crew: myFrom && myFrom !== crewFrom ? crewFrom : null,
+      } : null,
       getting_there: drive ? driveFor(drive.days.find((entry) => entry.date === date), memberId) : null,
       tonight: yoursTonight ? {
         yours: yoursTonight,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildOfflineBrief, defaultBriefDates, parseBriefDates } from "@/lib/trip-offline-brief";
 import { buildLodging } from "@/lib/trip-lodging";
+import { dayStarts } from "@/lib/trip-drive";
 import { tripFullFor } from "@/lib/trips";
 import { savedOutfit } from "@/test/savedKit";
 import type {
@@ -147,6 +148,23 @@ describe("A member's offline trip brief (#214)", () => {
       yours: "Glacier Park Lodge",
       stay: { name: "Glacier Park Lodge", booking_label: "Booked", times_label: "Check-in from 16:00 · Check-out by 10:00 · property local time" },
     });
+  });
+
+  it("says where the member starts as the day's departures do: their own starting point, or the day's own", () => {
+    const golden: TripLocation = { ...lot, label: "Golden motel", latitude: 51.29, longitude: -116.96 };
+    const cabin: TripLocation = { ...lot, label: "Ridge cabin", latitude: 51.31, longitude: -117.5 };
+    const trip = fullTrip();
+    trip.days = trip.days.map((entry) => entry.date === SUN ? { ...entry, origin: cabin, origin_stay_id: null } : entry);
+    trip.member_origins = [{ trip_id: trip.trip.id, trip_day_id: "day-sat", member_id: "m-org", origin: golden, origin_stay_id: null, no_drive: false }];
+    trip.starts = dayStarts(trip);
+    const brief = (userId: string) => buildOfflineBrief({ full: tripFullFor(trip, userId), userId, dates: [SAT, SUN], drive: drive(), equipment, now: NOW });
+
+    // Saturday: the organizer starts from a place of their own; Ana from the lodge, where she slept.
+    const [orgSat, orgSun] = brief("user-org").days;
+    expect(orgSat.starting_from).toEqual({ yours: "Golden motel · only this day", crew: "Glacier Park Lodge (1) · Golden motel (1)" });
+    expect(brief("user-ana").days[0].starting_from).toEqual({ yours: "Glacier Park Lodge", crew: "Glacier Park Lodge (1) · Golden motel (1)" });
+    // Sunday: the day's own starting point, for everyone.
+    expect(orgSun.starting_from).toEqual({ yours: "Ridge cabin · only this day", crew: null });
   });
 
   it("keeps the tour plan, conditions sources with dated reviews, and the member's day checks", () => {
