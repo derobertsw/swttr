@@ -448,11 +448,12 @@ describe("accessories against local bands (#370)", () => {
     expect(accessories.hands.thermal_status).toBe("in_range");
   });
 
-  it.each(MODES)("the touring climb at 25°F adds nothing over its hoods, and the descent keeps the helmet: $name", async mode => {
+  it.each(MODES)("the touring climb at 25°F stays within its head band, and the descent keeps the helmet: $name", async mode => {
     useDatabase(mode.userId, mode.wardrobe);
     const { body } = await callRoute(skiTouring, { ...CONDITIONS[1].body, ...mode.extraBody });
     // Before #370 the climb wore a balaclava, a neck piece and two hoods: 3.2 clo against 0.85.
-    expect(body.recommendation.headwear).toEqual({ helmet: null, head_warmth: null, neck_warmth: null });
+    // #372's climb outfit has no hoods, so at most one light head layer fills the band.
+    expect(body.recommendation.headwear).toMatchObject({ helmet: null, neck_warmth: null });
     expect(body.recommendation.evaluation.bodyParts.headNeck.status).toBe("in_range");
     expect(body.descent_headwear.helmet).not.toBeNull();
     expect(body.descent_evaluation.bodyParts.headNeck.status).toBe("in_range");
