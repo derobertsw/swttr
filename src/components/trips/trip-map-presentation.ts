@@ -1,10 +1,19 @@
-import type { TripMapDay, TripMapPlace, TripMapRole } from "@/types/trip-map";
+import type { TripMap, TripMapDay, TripMapPlace, TripMapRole } from "@/types/trip-map";
 
 /** "departure" is where another group starts that day (#333), beside the one the view follows. */
 export type MapDisplayRole = TripMapRole | "tonight" | "meeting" | "departure";
 
 export function placeDates(place: TripMapPlace): string[] {
   return [...new Set(place.visits.map((visit) => visit.date))];
+}
+
+/**
+ * A trip date as the date picker names it, "Sat Jan 9", from the server's own
+ * labels (#235). A date outside the trip's days, such as a checkout morning
+ * after it, keeps its ISO form rather than a label made up here.
+ */
+export function dateLabelIn(dates: TripMap["dates"], date: string): string {
+  return dates.find((entry) => entry.date === date)?.label ?? date;
 }
 
 export const roleLabels: Record<MapDisplayRole, string> = {

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useTripMapGeometry } from "@/hooks/useTripMapGeometry";
-import { dayRoles, followDeparture, placeDates, type MapDisplayRole } from "./trip-map-presentation";
+import { dateLabelIn, dayRoles, followDeparture, placeDates, type MapDisplayRole } from "./trip-map-presentation";
 import type { TripMap, TripMapDay } from "@/types/trip-map";
 import { TripMapAttribution, TripMapPlaceDetail, TripMapPlaceList, PlaceLabel } from "./TripMapPlaces";
 import { TripMapDaySummary } from "./TripMapDay";
@@ -171,7 +171,7 @@ export function TripMapView({ data, canEdit, memberId = null }: { data: TripMap;
     {day && crewDay && <TripMapDaySummary tripId={data.trip.id} day={day} places={places} canEdit={canEdit} memberId={memberId}
       following={chosenKey ?? day.people?.find((person) => person.member_id === memberId)?.departure_key ?? crewDay.departures?.find((departure) => departure.crew)?.key ?? null}
       onFollow={(key) => { setChosen({ date: crewDay.date, key }); setDriveDate(null); }} />}
-    {selected ? <TripMapPlaceDetail tripId={data.trip.id} place={selected} date={date} day={day} canEdit={canEdit} /> : <p className="text-base text-muted-foreground">Select a place to read its details.</p>}
+    {selected ? <TripMapPlaceDetail tripId={data.trip.id} place={selected} dates={data.dates} date={date} day={day} canEdit={canEdit} /> : <p className="text-base text-muted-foreground">Select a place to read its details.</p>}
     {!!groupPlaces.length && <section className="rounded-card border border-border p-3" aria-label="Places in selected group">
       <h2 id="map-group-heading" tabIndex={-1} className="font-semibold focus-visible:outline-2 focus-visible:outline-ring">{groupPlaces.length} places in this group</h2>
       <p className="mt-1 text-sm text-muted-foreground">Choose an individual place. All itinerary rows remain below.</p>
@@ -179,7 +179,7 @@ export function TripMapView({ data, canEdit, memberId = null }: { data: TripMap;
     </section>}
     <section className={cn(view !== "list" && "hidden lg:block")}>
       <h2 id="map-place-list-heading" tabIndex={-1} className="mb-3 text-lg font-semibold focus-visible:outline-2 focus-visible:outline-ring">Place list</h2>
-      <TripMapPlaceList places={places} date={date} day={day} selectedId={selectedId} onSelect={selectPlace} />
+      <TripMapPlaceList places={places} dates={data.dates} date={date} day={day} selectedId={selectedId} onSelect={selectPlace} />
     </section>
   </div>;
 
@@ -225,7 +225,7 @@ export function TripMapView({ data, canEdit, memberId = null }: { data: TripMap;
       <div className="order-2 min-w-0 lg:order-3 lg:col-span-2"><TripMapAttribution provider={data.provider} places={places} /></div>
       {!desktop && listPane}
     </div>
-    <p role="status" aria-live="polite" className="sr-only">{selected ? `Selected ${selected.name}. ${placeAnnouncement(selected.id, places)}` : groupPlaces.length ? `${groupPlaces.length} named places in selected group.` : "No place selected."}</p>
+    <p role="status" aria-live="polite" className="sr-only">{selected ? `Selected ${selected.name}. ${placeAnnouncement(selected.id, places, data.dates)}` : groupPlaces.length ? `${groupPlaces.length} named places in selected group.` : "No place selected."}</p>
   </div>;
 }
 
@@ -235,9 +235,9 @@ function focusSelectedPlace() {
   heading?.scrollIntoView({ block: "nearest", behavior: "instant" });
 }
 
-function placeAnnouncement(id: string, places: TripMap["places"]) {
+function placeAnnouncement(id: string, places: TripMap["places"], dates: TripMap["dates"]) {
   const place = places.find((item) => item.id === id);
-  return place ? `Dates: ${placeDates(place).join(", ") || "not assigned"}.` : "";
+  return place ? `Dates: ${placeDates(place).map((visit) => dateLabelIn(dates, visit)).join(", ") || "not assigned"}.` : "";
 }
 
 /**

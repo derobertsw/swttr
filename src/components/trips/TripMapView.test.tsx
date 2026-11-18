@@ -44,10 +44,13 @@ describe("Synchronized trip map and accessible list", () => {
     await user.click(screen.getByRole("button", { name: "List" }));
     const row = screen.getByRole("button", { name: /Destination · Stowe, Vermont/ });
     expect(row).toHaveAttribute("aria-pressed", "true");
-    expect(row).toHaveTextContent("2027-01-08 · 2027-01-09");
+    // Days read as the date picker names them, from the server's labels (#235).
+    expect(row).toHaveTextContent("Fri Jan 8 · Sat Jan 9");
     await user.click(screen.getByRole("button", { name: /Village Inn/ }));
     expect(screen.getByRole("link", { name: "View stay" })).toHaveAttribute("href", "/trips/trip-drive/stays#stay-stay-inn");
-    expect(screen.getByRole("link", { name: "View day · 2027-01-10" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "View day · Sun Jan 10" })).toBeVisible();
+    expect(screen.getByRole("region", { name: /Village Inn/ })).not.toHaveTextContent(/\d{4}-\d{2}-\d{2}/);
+    expect(screen.getByText(/^Selected Village Inn\./)).toHaveTextContent("Selected Village Inn. Dates: Sun Jan 10, Mon Jan 11.");
   });
 
   it("retains missing and approximate places and every date, including an unmapped day", async () => {
