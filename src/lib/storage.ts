@@ -24,4 +24,6 @@ export const STORAGE_KEYS = {
   GEAR_UP_DRAFT: "swttr-gear-up",
   /** In sessionStorage: the latest Save to trip in this tab, so a retry after a reload repeats it rather than saving twice (src/lib/tripKitSave.ts). */
   TRIP_KIT_SAVE: "swttr-trip-kit-save",
+  /** The account whose trip briefs this device keeps in IndexedDB (src/lib/offline-briefs.ts); a hint, so the account check needn't open the database. */
+  OFFLINE_BRIEFS_ACCOUNT: "swttr-offline-briefs-account",
 } as const;

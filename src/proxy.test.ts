@@ -56,6 +56,21 @@ describe("proxy, signed out", () => {
     expect(authenticateRequest).not.toHaveBeenCalled();
   });
 
+  it.each(["Mozilla/5.0", "SWTTRNativeTabs"])("opens trip briefs saved on this device without a sign-in redirect in %s (#214)", async (userAgent) => {
+    for (const path of ["/trips/saved", "/trips/saved?trip=trip-1"]) {
+      const response = await visit(path, "GET", userAgent);
+      expect(response?.status).toBe(200);
+      expect(response?.headers.get("location")).toBeNull();
+    }
+    expect(auth.protect).not.toHaveBeenCalled();
+    expect(authenticateRequest).not.toHaveBeenCalled();
+  });
+
+  it("keeps trip pages and their APIs behind sign-in next to the saved briefs page", async () => {
+    for (const path of ["/trips/saved-x", "/trips/saved/other", "/trips/trip-1"]) await visit(path);
+    expect(auth.protect).toHaveBeenCalledTimes(3);
+  });
+
   it("does not skip authentication for paths that only start with an information route", async () => {
     for (const path of ["/privacy-settings", "/faq/private", "/feedback/admin"]) {
       await visit(path);

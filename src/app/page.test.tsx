@@ -37,6 +37,7 @@ vi.mock("@clerk/nextjs", () => ({
   UserButton: () => <div data-testid="user-button">UserButton</div>,
   ClerkProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useAuth: () => mockUseAuth(),
+  useClerk: () => ({ signOut: vi.fn() }),
 }));
 
 // Mock fetch globally

@@ -4,10 +4,15 @@ import { detectNativeShell } from "@/lib/native-shell";
 import { safeReturnPath, signInHref } from "@/lib/outingReturn";
 
 const PUBLIC_INFORMATION_ROUTES = ["/privacy", "/faq", "/feedback"];
+// Trip briefs saved on this device (#214). The page reads only the browser's
+// own storage, so it renders the same for everyone, and its service worker can
+// keep it to open with no connection, never through a sign-in redirect.
+const SAVED_BRIEFS_ROUTE = "/trips/saved";
 
 const isPublicRoute = createRouteMatcher([
   "/",
   ...PUBLIC_INFORMATION_ROUTES,
+  SAVED_BRIEFS_ROUTE,
   // Design reference; 404s outside dev and Vercel previews (see src/app/design/page.tsx).
   "/design",
   "/sign-in(.*)",
@@ -73,7 +78,7 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
   // Clerk can redirect even public HTML requests through its development
   // handshake. App Review and fresh browsers must reach these pages directly.
   // They use client-side account UI and do not need server authentication.
-  if (PUBLIC_INFORMATION_ROUTES.includes(request.nextUrl.pathname)) {
+  if (PUBLIC_INFORMATION_ROUTES.includes(request.nextUrl.pathname) || request.nextUrl.pathname === SAVED_BRIEFS_ROUTE) {
     return NextResponse.next();
   }
   return authenticate(request, event);

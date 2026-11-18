@@ -16,6 +16,9 @@ import {
   daysBetween,
 } from "@/components/trips/trip-primitives";
 import { tripOpenHref } from "@/lib/trip-sections";
+import { useUserId } from "@/hooks/useUserId";
+import { countSavedBriefs } from "@/lib/offline-briefs";
+import { SAVED_BRIEFS_PATH } from "@/lib/offline-shell";
 import type { TripSummary } from "@/types/trips";
 
 const STATUS_LABEL: Record<TripSummary["status"], string> = {
@@ -28,6 +31,17 @@ const STATUS_LABEL: Record<TripSummary["status"], string> = {
 export default function TripsHomePage() {
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const userId = useUserId();
+  // Trip briefs this account saved on this device (#214), for Saved on this device,
+  // with the account they were counted for: another account never sees the count.
+  const [counted, setCounted] = useState<{ account: string; count: number } | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let current = true;
+    void countSavedBriefs(userId).then((count) => { if (current) setCounted({ account: userId, count }); });
+    return () => { current = false; };
+  }, [userId]);
+  const saved = counted && counted.account === userId ? counted.count : 0;
 
   useEffect(() => {
     let pending: AbortController | null = null;
@@ -83,6 +97,12 @@ export default function TripsHomePage() {
             New trip
           </Link>
         </Button>
+
+        {saved > 0 && (
+          <Link href={SAVED_BRIEFS_PATH} className="inline-flex min-h-11 w-fit items-center text-base font-semibold text-primary underline-offset-2 hover:underline">
+            Saved on this device · {saved} {saved === 1 ? "trip" : "trips"}
+          </Link>
+        )}
 
         {error && <TripError>{error}</TripError>}
 

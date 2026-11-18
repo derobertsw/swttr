@@ -6,6 +6,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
 import { headers } from "next/headers";
 import { NativeShellProvider } from "@/components/NativeShellProvider";
+import { OfflineBriefAccountGuard } from "@/components/OfflineBriefAccountGuard";
 import { detectNativeShell, NATIVE_SHELL_AUTH_APPEARANCE } from "@/lib/native-shell";
 
 import React from "react";
@@ -66,6 +67,7 @@ const RootLayout = async ({ children }: { children: React.ReactNode }) => {
           <NativeShellProvider shell={shell}>
             <TemperatureUnitProvider>{children}</TemperatureUnitProvider>
             <Toaster />
+            <OfflineBriefAccountGuard />
           </NativeShellProvider>
         </body>
       </html>

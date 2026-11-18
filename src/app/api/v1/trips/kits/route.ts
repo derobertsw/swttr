@@ -3,7 +3,7 @@ import { jsonError, requireUser } from "@/lib/api";
 import { tripActivityFromRecommendationKey } from "@/lib/trip-activities";
 import { destinationToday, kitChanges, kitsToSave, parseSaveKitRequest, tripDestination, tripEffort } from "@/lib/trip-saved-kits";
 import { isTripDayOuting, tripDayChanges, tripDayPlannedFor } from "@/lib/trip-day-outing";
-import { assertCanAccessTrip, classifyTripStatus, loadTripFull } from "@/lib/trips";
+import { assertCanAccessTrip, classifyTripStatus, loadTripFull, TripAccessUnavailable } from "@/lib/trips";
 import type { SaveKitConflict, SaveKitResponse } from "@/types/savedKit";
 
 /** Generous for a seven-day plan or one outfit with two phases; anything bigger isn't one. */
@@ -46,7 +46,12 @@ export async function POST(request: NextRequest) {
     const { data: receipt } = await supabase.from("trip_kit_saves").select("save_id")
       .eq("save_id", input.saveId).eq("user_id", userId).maybeSingle();
     if (!receipt) {
-      const trip = await assertCanAccessTrip(supabase, input.tripId, userId);
+      let trip;
+      try { trip = await assertCanAccessTrip(supabase, input.tripId, userId); }
+      catch (error) {
+        if (error instanceof TripAccessUnavailable) return jsonError("Couldn't check the trip. Retry with the same save.", 503);
+        throw error;
+      }
       if (!trip) return jsonError("Trip not found. It may have been deleted, or you're no longer on it.", 404);
       let full;
       try { full = await loadTripFull(supabase, trip); }

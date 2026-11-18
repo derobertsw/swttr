@@ -11,7 +11,7 @@ vi.mock("@/assets/styles/globals.css", () => ({}));
 vi.mock("next/font/google", () => ({ Geist: () => ({ variable: "geist" }), Geist_Mono: () => ({ variable: "mono" }) }));
 vi.mock("@/components/TemperatureUnitProvider", () => ({ TemperatureUnitProvider: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/components/ui/sonner", () => ({ Toaster: () => null }));
-vi.mock("@clerk/nextjs", () => ({ ClerkProvider: vi.fn(({ children }) => children) }));
+vi.mock("@clerk/nextjs", () => ({ ClerkProvider: vi.fn(({ children }) => children), useAuth: () => ({ isLoaded: false, userId: null }) }));
 
 function ShellProbe() {
   return <span data-shell={useNativeShell() ?? "browser"} />;

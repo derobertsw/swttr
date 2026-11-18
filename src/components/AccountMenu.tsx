@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
-import { UserButton } from "@clerk/nextjs";
-import { HelpCircle, Settings, Share2 } from "lucide-react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { UserButton, useAuth, useClerk } from "@clerk/nextjs";
+import { HelpCircle, LogOut, Settings, Share2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { clearSavedBriefs, countSavedBriefs, noteSignedInAccount, savedBriefsAccountHint } from "@/lib/offline-briefs";
 
 // Clerk's menu hands focus back to the avatar in a microtask once it closes.
 // Focus doesn't move if the avatar already had it, so don't wait for long.
@@ -20,6 +23,12 @@ const APPEARANCE = {
       borderRadius: "9999px",
       "&:focus-visible": { outline: "2px solid var(--ring)", outlineOffset: "2px", boxShadow: "none" },
     },
+    // Clerk keeps its own Sign out in the menu whatever MenuItems lists, and
+    // its label can't take an onClick. Signing out must go through ours,
+    // which warns about the trip briefs saved on this device (#214), so its
+    // own sign-out actions are hidden ("&&" outranks Clerk's variant rules).
+    userButtonPopoverActionButton__signOut: { display: "none", "&&": { display: "none" } },
+    userButtonPopoverActionButton__signOutAll: { display: "none", "&&": { display: "none" } },
   },
 };
 
@@ -35,29 +44,71 @@ export interface AccountMenuHandle {
 
 /**
  * The signed-in avatar and its menu: SWTTR Settings first, then Clerk's
- * account management, FAQ, Share and, last, Sign out.
+ * account management, FAQ, Share and, last, Sign out. Signing out removes
+ * the trip briefs saved on this device (#214), and asks first when there are some.
  */
 export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) {
   const rootRef = useRef<HTMLSpanElement>(null);
   const pendingSettings = useRef<AbortController | null>(null);
+  const { signOut } = useClerk();
+  const { userId } = useAuth();
+  // How many saved trip briefs signing out would remove, while that's being confirmed.
+  const [confirming, setConfirming] = useState<number | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   useEffect(() => () => pendingSettings.current?.abort(), []);
 
-  // Clerk calls this and then closes its menu, whose focus trap returns focus
-  // to the avatar. Opening Settings before that would leave two overlays
-  // fighting over focus, so wait until the avatar has it back.
-  const openSettings = () => {
+  // Clerk calls a menu action and then closes its menu, whose focus trap
+  // returns focus to the avatar. Opening an overlay before that would leave
+  // two overlays fighting over focus, so wait until the avatar has it back.
+  const afterMenuCloses = (run: () => void) => {
     pendingSettings.current?.abort();
     const pending = new AbortController();
     pendingSettings.current = pending;
     const open = () => {
       pending.abort();
-      onOpenSettings();
+      run();
     };
     rootRef.current?.addEventListener("focusin", open, { signal: pending.signal });
     const timer = window.setTimeout(open, MENU_CLOSE_TIMEOUT_MS);
     pending.signal.addEventListener("abort", () => window.clearTimeout(timer));
   };
+  const openSettings = () => afterMenuCloses(onOpenSettings);
+
+  const finishSignOut = async () => {
+    setSigningOut(true);
+    setSignOutError(null);
+    // A save still downloading for this account mustn't land after the clear.
+    noteSignedInAccount(null);
+    // Always cleared, even with nothing saved here, so a save still
+    // downloading in another tab is refused too.
+    try {
+      await clearSavedBriefs();
+    } catch {
+      // Storage this browser won't open can't hold any; otherwise saved trips
+      // stay on this device, so the account stays signed in, and says why.
+      if (savedBriefsAccountHint() !== null) {
+        noteSignedInAccount(userId ?? null);
+        setSignOutError("Couldn't remove the trips saved on this device, so you're still signed in. Try again, or remove them from Trips, then Saved on this device.");
+        setConfirming((count) => count ?? 0);
+        setSigningOut(false);
+        return;
+      }
+    }
+    try {
+      await signOut();
+    } catch {
+      noteSignedInAccount(userId ?? null);
+      setSigningOut(false);
+    }
+  };
+  const requestSignOut = () => afterMenuCloses(() => {
+    void (userId ? countSavedBriefs(userId) : Promise.resolve(0)).then((count) => {
+      if (count > 0) setConfirming(count);
+      else void finishSignOut();
+    });
+  });
 
   useImperativeHandle(ref, () => ({
     openSettings: () => {
@@ -81,9 +132,33 @@ export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) 
           <UserButton.Action label="manageAccount" />
           <UserButton.Link label="FAQ" labelIcon={<HelpCircle size={16} />} href="/faq" />
           <UserButton.Action label="Share" labelIcon={<Share2 size={16} />} onClick={onShare} />
-          <UserButton.Action label="signOut" />
+          <UserButton.Action label="Sign out" labelIcon={<LogOut size={16} />} onClick={requestSignOut} />
         </UserButton.MenuItems>
       </UserButton>
+      <Dialog open={confirming !== null} onOpenChange={(open) => { if (!open && !signingOut) { setConfirming(null); setSignOutError(null); } }}>
+        <DialogContent
+          showCloseButton={!signingOut}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            rootRef.current?.querySelector<HTMLButtonElement>("button[aria-expanded]")?.focus();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Sign out and remove saved trips?</DialogTitle>
+            <DialogDescription>
+              Signing out removes the {confirming === 1 ? "trip brief" : confirming ? `${confirming} trip briefs` : "trip briefs"} saved on this device for offline use.
+              Your trips stay in your account, and you can save them again after you sign in.
+            </DialogDescription>
+          </DialogHeader>
+          {signOutError && <p role="alert" className="text-base font-medium text-destructive">{signOutError}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setConfirming(null); setSignOutError(null); }} disabled={signingOut}>Cancel</Button>
+            <Button type="button" onClick={() => void finishSignOut()} aria-busy={signingOut || undefined} disabled={signingOut}>
+              {signingOut ? "Signing out…" : "Sign out and remove"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </span>
   );
 }
