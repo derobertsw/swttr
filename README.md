@@ -61,7 +61,8 @@ graph TD
     P -->|No usable garments| T[Targets-only response]
     P --> G[Ensemble Building]
     G --> R[Running/XC only: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
-    R --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
+    R --> PROT[Alpine, cycling, touring descent: helmet requirement<br/>whatever the thermal demand<br/>owned match, catalog suggestion, or missing with a warning]
+    PROT --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
     XCCARRY --> I[Canonical server phase assessment:<br/>actual worn regional and extremity basic clo<br/>local shortfalls and excess, moisture and clothing gaps]
     I --> H[Ensemble thermal scoring and API/UI reasons<br/>consume the same phase assessment]
 
@@ -275,16 +276,20 @@ graph TD
 
 ### 6. Extremity Selection
 
-Every sport and phase chooses hand, head and neck warmth against its local min/max bands with one selector (`selectPhaseAccessories` in `src/lib/recommendations/extremities.ts`), under that phase's own policy. Running/XC take theirs from the sustained-activity policy: going without competes with known suitable gear, and functional XC gloves have a separate pole-grip purpose. Cycling, alpine and the ski-touring climb and descent (#370) keep gloves on whatever the thermal budget, so thin gloves up to XC's 0.55 clo liner allowance aren't judged as overheating. With no gloves available, the gloves are reported missing even when the hands need no warmth. Alpine and the descent wear a required helmet whatever the thermal budget (which helmet is the existing temperature rule, #373); the helmet and any helmet-compatible hood count in the head budget, and a helmet that alone exceeds the band sets the head's upper limit. When nothing fits, the nearest option wins, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings (active for running, XC, cycling and the climb; static for alpine and the descent) check the heuristic bands in deep cold: items rated for these conditions win, the lightest rated item that reaches the band's minimum is preferred to a closer one that falls short, and the lightest rated choice sets the upper limit that scoring and manual checks use. Where no rated item reaches the band (descent and chairlift hands and head in deep cold), the warmest rated choice bounds the selection and the shortfall stays in the assessment, the warnings and the comfort verdict. The recommendation, the descent evaluation and manual edits are judged against the same reported limits (`ireq.extremity.max`, `descent_breakdown.extremity_ireq.max`). A helmet that is not owned is left out without a warning, and cycling has no helmet in the model ([algorithm review](docs/algorithm-review.md), finding 4).
+Every sport and phase chooses hand, head and neck warmth against its local min/max bands with one selector (`selectPhaseAccessories` in `src/lib/recommendations/extremities.ts`), under that phase's own policy. Running/XC take theirs from the sustained-activity policy: going without competes with known suitable gear, and functional XC gloves have a separate pole-grip purpose. Cycling, alpine and the ski-touring climb and descent (#370) keep gloves on whatever the thermal budget, so thin gloves up to XC's 0.55 clo liner allowance aren't judged as overheating. With no gloves available, the gloves are reported missing even when the hands need no warmth. Alpine and the touring descent wear a ski helmet and cycling a bike helmet, whatever the thermal budget; the helmet and any helmet-compatible hood count in the head budget, only head warmth marked helmet-compatible is worn under it, and a helmet that alone exceeds the band sets the head's upper limit. When nothing fits, the nearest option wins, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings (active for running, XC, cycling and the climb; static for alpine and the descent) check the heuristic bands in deep cold: items rated for these conditions win, the lightest rated item that reaches the band's minimum is preferred to a closer one that falls short, and the lightest rated choice sets the upper limit that scoring and manual checks use. Where no rated item reaches the band (descent and chairlift hands and head in deep cold), the warmest rated choice bounds the selection and the shortfall stays in the assessment, the warnings and the comfort verdict. The recommendation, the descent evaluation and manual edits are judged against the same reported limits (`ireq.extremity.max`, `descent_breakdown.extremity_ireq.max`). Helmets are required protection, kept apart from optional warmth: each gear recommendation reports the helmet as a requirement, either an owned match, a catalog suggestion that is never presented as owned, or missing, with a warning and a generic suggestion. A targets-only response, returned when no usable garments are available, has no helmet requirement.
 
 ```mermaid
 graph TD
     EXT[Server sport and phase policy<br/>Local minimum, neutral and upper limits] --> MODE{Sustained running or XC?}
     MODE -->|Yes| SUSTAINED[Bare hands and no thermal headwear compete<br/>XC: dexterous pole-grip gloves when any exist<br/>Wind and wet glove warnings]
     MODE -->|No: cycling, alpine, touring climb and descent| PHASE[Gloves stay on: thin gloves up to 0.55 clo<br/>are within the hand limit<br/>Prefer waterproof gloves in precipitation<br/>and windproof ones in exposed phases<br/>No gloves available: reported missing]
-    PHASE --> HELMET{Alpine or touring descent?}
-    HELMET -->|Yes| REQUIRED[Required helmet worn whatever the budget<br/>Counts in the head budget<br/>Only helmet-compatible hoods count under it<br/>Helmet alone above the band sets the head limit]
-    HELMET -->|No| NOHELMET[No helmet from thermal selection<br/>Every worn hood counts]
+    PHASE --> HELMET{Sport or phase requires a helmet?<br/>Alpine and touring descent: ski helmet<br/>Cycling: bike helmet}
+    HELMET -->|Yes| REQUIRED[Required helmet worn whatever the budget<br/>Counts in the head budget<br/>Only helmet-compatible head warmth and hoods under it<br/>Helmet alone above the band sets the head limit]
+    REQUIRED --> HREQ{Helmet of that type available?}
+    HREQ -->|In the wardrobe| HOWNED[Requirement: owned match]
+    HREQ -->|In the catalog| HCAT[Requirement: catalog suggestion, not owned]
+    HREQ -->|None| HMISS[Requirement missing with a generic suggestion<br/>and a warning; never dropped or claimed as owned]
+    HELMET -->|No: touring climb| NOHELMET[No helmet from thermal selection<br/>Every worn hood counts]
     SUSTAINED --> RATED
     REQUIRED --> RATED
     NOHELMET --> RATED[Prefer items rated for the conditions:<br/>minimum rating at most air temperature + 10°C<br/>active for running, XC, cycling and the climb<br/>static for alpine and the descent<br/>Neck pieces must be rated]
@@ -368,6 +373,9 @@ Create a `.env.local` file:
 # Clerk authentication
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
 CLERK_SECRET_KEY=sk_...
+# Signing secret of the Clerk webhook endpoint that deletes an account's data
+# (optional; /api/webhooks/clerk returns 503 without it). See docs/account-deletion.md.
+CLERK_WEBHOOK_SIGNING_SECRET=whsec_...
 
 # Supabase: persistent wardrobe, preferences, trips, and calibrated gear data.
 # The service-role key is server-only (never prefix it with NEXT_PUBLIC_).
@@ -450,6 +458,7 @@ src/
       plan-ahead/             # Multi-day forecast plan
       packing-list/           # Packing list for a plan
       media/                  # Brand logos and item images
+      webhooks/clerk/         # Clerk webhooks: deletes a deleted account's data
     trips/                    # Trips pages
     wardrobe/                 # My Gear page
     faq/                      # FAQ page
@@ -491,11 +500,15 @@ The app uses a biophysics-based garment database with calibrated thermal propert
 
 **Access model:** the browser never talks to Supabase. API routes use the service-role key (`src/lib/supabase.ts`, guarded by `server-only`) and enforce per-user access in code, for example with `requireUser()` in `src/lib/api.ts` and `requireTripAccess()` in `src/lib/trips.ts`. Migration `014_restrict_to_service_role.sql` revokes all table access from the public `anon`/`authenticated` roles, so the anon key grants nothing.
 
+**Deleted accounts:** Clerk's `user.deleted` webhook deletes the account's data, and its trips for their whole crew, through `delete_user_data`. A new column that holds a user ID needs adding there; see `docs/account-deletion.md`.
+
 **Applying migrations:** production's migration history doesn't match the numbered files here (some migrations were applied by hand), so don't `supabase db push` the whole folder. Apply new migrations individually, for example in the SQL editor or with the Supabase MCP `apply_migration`.
 
 ## Deployment
 
 The app is hosted at `swttr.vercel.app`.
+
+The outside services it depends on, their free-tier limits and what would need a paid plan are listed in [docs/third-party-services.md](docs/third-party-services.md).
 
 Deploy your own instance with Vercel:
 

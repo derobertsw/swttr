@@ -1,156 +1,18 @@
+import SWTTRShellKit
 import UIKit
 import WebKit
 
-// MARK: - Testable policy types
-
-struct SWTTRNavigationPolicy {
-    let allowedHosts: Set<String>
-
-    func isAllowedHost(_ host: String) -> Bool {
-        for allowed in allowedHosts where !allowed.isEmpty {
-            if host == allowed || host.hasSuffix(".\(allowed)") {
-                return true
-            }
-        }
-        return false
-    }
-
-    func isClerkHost(_ host: String) -> Bool {
-        let lower = host.lowercased()
-        return lower == "clerk.com"
-            || lower.hasSuffix(".clerk.com")
-            || lower == "clerk.dev"
-            || lower.hasSuffix(".clerk.dev")
-            || lower.hasSuffix(".clerk.accounts.dev")
-    }
-
-    func isAuthFlowURL(_ url: URL) -> Bool {
-        let host = (url.host ?? "").lowercased()
-
-        // Always allow Clerk-owned hosts
-        if isClerkHost(host) {
-            return true
-        }
-
-        // Only allow auth-like paths/queries on trusted hosts
-        guard isAllowedHost(host) else {
-            return false
-        }
-
-        let path = url.path.lowercased()
-        let query = (url.query ?? "").lowercased()
-
-        if path.contains("/sign-in")
-            || path.contains("/sign-up")
-            || path.contains("/sso-callback")
-            || path.contains("/oauth")
-            || path.contains("/authenticate") {
-            return true
-        }
-        if query.contains("__clerk")
-            || query.contains("clerk")
-            || query.contains("sso")
-            || query.contains("oauth")
-            || query.contains("redirect_url") {
-            return true
-        }
-        return false
-    }
-
-    enum NavigationDecision {
-        case allow
-        case openExternal
-    }
-
-    func decide(targetURL: URL, isMainFrame: Bool) -> NavigationDecision {
-        guard let host = targetURL.host else { return .allow }
-
-        if isAllowedHost(host) || isClerkHost(host) || isAuthFlowURL(targetURL) {
-            return .allow
-        }
-
-        return isMainFrame ? .openExternal : .allow
-    }
-}
-
-struct SWTTRPulseTracker {
-    private(set) var lastPulsedActivityValue: String?
-    private(set) var lastPulsedEventID: String?
-    private(set) var lastPulseTimestamp: CFTimeInterval = 0
-
-    mutating func shouldPulse(
-        activityValue: String,
-        source: String,
-        eventID: String?,
-        userInitiated: Bool,
-        now: CFTimeInterval = CACurrentMediaTime()
-    ) -> Bool {
-        guard source == "activityChange" else { return false }
-        guard userInitiated else { return false }
-
-        let normalizedEventID: String? = {
-            guard let eventID, !eventID.isEmpty else { return nil }
-            return eventID
-        }()
-
-        if let normalizedEventID, normalizedEventID == lastPulsedEventID {
-            return false
-        }
-
-        if activityValue == lastPulsedActivityValue, now - lastPulseTimestamp < 1.1 {
-            return false
-        }
-
-        lastPulsedActivityValue = activityValue
-        lastPulsedEventID = normalizedEventID
-        lastPulseTimestamp = now
-        return true
-    }
-}
-
 // MARK: - Shell config
 
-private struct SWTTRShellConfig {
-    let remoteURL: URL
-    let appURL: URL
-    let allowedHosts: Set<String>
-
-    static func resolve() -> SWTTRShellConfig {
-        let defaultRemoteURL = URL(string: "https://swttr.vercel.app")!
-        let localDevURL = URL(string: "http://localhost:3000")!
-
-        let remoteURL: URL
-        if let plistValue = Bundle.main.object(forInfoDictionaryKey: "SWTTRWebURL") as? String,
-           let parsed = URL(string: plistValue),
-           !plistValue.isEmpty {
-            remoteURL = parsed
-        } else {
-            remoteURL = defaultRemoteURL
-        }
-
-        let appURL: URL
-        #if DEBUG
-        if let debugValue = Bundle.main.object(forInfoDictionaryKey: "SWTTRWebURLDebug") as? String,
-           let parsed = URL(string: debugValue),
-           !debugValue.isEmpty {
-            appURL = parsed
-        } else {
-            appURL = localDevURL
-        }
-        #else
-        appURL = remoteURL
-        #endif
-
-        var hosts = Set<String>()
-        if let host = appURL.host, !host.isEmpty {
-            hosts.insert(host)
-        }
-        if let host = remoteURL.host, !host.isEmpty {
-            hosts.insert(host)
-        }
-
-        return SWTTRShellConfig(remoteURL: remoteURL, appURL: appURL, allowedHosts: hosts)
-    }
+/// Navigation policy, pulse tracking and config resolution live in
+/// apple/SWTTRShellKit, where they are tested and shared with the Mac app.
+private func resolveShellConfig() -> SWTTRShellConfig {
+    #if DEBUG
+    let isDebug = true
+    #else
+    let isDebug = false
+    #endif
+    return SWTTRShellConfig.resolve(info: Bundle.main.infoDictionary ?? [:], isDebug: isDebug)
 }
 
 fileprivate protocol SWTTRWebTabEventDelegate: AnyObject {
@@ -566,6 +428,8 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
         case .openExternal:
             UIApplication.shared.open(url)
             decisionHandler(.cancel)
+        case .cancel:
+            decisionHandler(.cancel)
         }
     }
 
@@ -589,7 +453,7 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
 }
 
 class SWTTRViewController: UITabBarController, UITabBarControllerDelegate, SWTTRWebTabEventDelegate {
-    private let shell = SWTTRShellConfig.resolve()
+    private let shell = resolveShellConfig()
     private lazy var planController = SWTTRWebTabViewController(shell: shell, initialPath: "/?mode=planAhead")
     private lazy var wardrobeController = SWTTRWebTabViewController(shell: shell, initialPath: "/wardrobe")
     private lazy var gearActionController = UIViewController()

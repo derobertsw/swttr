@@ -363,6 +363,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 69.8,
       "thermal_comfort_score": 53.1,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
@@ -720,6 +733,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 71.1,
       "thermal_comfort_score": 55.3,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [
       "hands: gloves stay on for this activity, and the lightest available pair is warmer than the local warmth range.",
     ],
@@ -1083,6 +1109,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 68.9,
       "thermal_comfort_score": 41.2,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
@@ -1444,6 +1483,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 70.3,
       "thermal_comfort_score": 61.6,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [
       "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
       "hands: gloves stay on for this activity, and the lightest available pair is warmer than the local warmth range.",
@@ -1790,6 +1842,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 90.9,
       "thermal_comfort_score": 76.3,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Atomic Backland CTD in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [
       "head: the lightest available option is warmer than the local warmth range; going without would leave you colder.",
     ],
@@ -2136,6 +2201,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "score": 90.4,
       "thermal_comfort_score": 76.3,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Atomic Backland CTD in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "warnings": [
       "head: the lightest available option is warmer than the local warmth range; going without would leave you colder.",
     ],
@@ -2482,10 +2560,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in with an empt
       "score": 59.4,
       "thermal_comfort_score": 13.8,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Ski helmet",
+          "owned": false,
+        },
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "message": "Ski helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
       "head: no suitable thermal accessory available; check warmth and protection before use.",
+      "No ski helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -2509,7 +2603,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "Selected for torso: Icebreaker Merino 260 Tech Long Sleeve Half-Zip, Norrøna Lyngen Down850 Hood Jacket, Patagonia Snowdrifter Jacket.",
       "Selected for legs: Icebreaker Merino 260 Tech Leggings, Patagonia Insulated Powder Bowl Pants - Regular, Patagonia R1 Fleece Pants.",
       "Selected for hands: Outdoor Research Alti Mitt.",
-      "Selected for head and neck: Giro Range MIPS, Smartwool Cozy Cabin Hat.",
+      "Selected for head and neck: BlackStrap Expedition Hood Balaclava, Giro Range MIPS.",
       "The worn hood contributes to head warmth; helmet compatibility is included.",
       "Cold conditions - prioritize warmth",
       "Heavy base + substantial insulation + shell",
@@ -2527,7 +2621,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "extremity": {
         "max": {
           "hands": 4,
-          "head": 3.14,
+          "head": 3.25,
         },
         "min": {
           "hands": 3.62,
@@ -2582,13 +2676,13 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
           "thermal_status": "in_range",
         },
         "head": {
-          "clo": 2.95,
-          "max": 3.14,
-          "message": "head: selected for the local warmth range.",
+          "clo": 3.25,
+          "max": 3.25,
+          "message": "head: selected the lightest option rated for this cold; lighter hats aren't rated for it.",
           "min": 2.9,
           "purpose": "thermal",
           "selected_ids": [
-            "7ab217ca-ee6c-460f-83db-4d782df1a92c",
+            "32c28954-6218-44ee-a907-aaac1d204f59",
           ],
           "state": "selected",
           "thermal_status": "in_range",
@@ -2620,8 +2714,8 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
             "target": 3.91,
           },
           "headNeck": {
-            "clo": 2.95,
-            "delta": 0.18999999999999995,
+            "clo": 3.25,
+            "delta": -0.10999999999999988,
             "status": "in_range",
             "target": 3.14,
           },
@@ -2673,7 +2767,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
             "Selected for torso: Icebreaker Merino 260 Tech Long Sleeve Half-Zip, Norrøna Lyngen Down850 Hood Jacket, Patagonia Snowdrifter Jacket.",
             "Selected for legs: Icebreaker Merino 260 Tech Leggings, Patagonia Insulated Powder Bowl Pants - Regular, Patagonia R1 Fleece Pants.",
             "Selected for hands: Outdoor Research Alti Mitt.",
-            "Selected for head and neck: Giro Range MIPS, Smartwool Cozy Cabin Hat.",
+            "Selected for head and neck: BlackStrap Expedition Hood Balaclava, Giro Range MIPS.",
             "The worn hood contributes to head warmth; helmet compatibility is included.",
           ],
           "riskType": "cold",
@@ -2844,11 +2938,11 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "headwear": {
         "head_warmth": {
           "covers_ears": true,
-          "covers_neck": false,
-          "id": "7ab217ca-ee6c-460f-83db-4d782df1a92c",
-          "name": "Smartwool Cozy Cabin Hat",
-          "rcl": 1.1,
-          "type": "heavy_beanie",
+          "covers_neck": true,
+          "id": "32c28954-6218-44ee-a907-aaac1d204f59",
+          "name": "BlackStrap Expedition Hood Balaclava",
+          "rcl": 1.4,
+          "type": "balaclava_heavy",
         },
         "helmet": {
           "covers_ears": true,
@@ -2863,6 +2957,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 73,
       "thermal_comfort_score": 65.9,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [
       "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
     ],
@@ -3233,6 +3340,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 89.6,
       "thermal_comfort_score": 94.2,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [],
   },
   "status": 200,
@@ -3615,6 +3735,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 73.2,
       "thermal_comfort_score": 51.2,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "hands: the closest available option still falls short of the local warmth range; check warmth before use.",
@@ -3992,6 +4125,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 86.3,
       "thermal_comfort_score": 95.6,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [
       "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
     ],
@@ -4317,6 +4463,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 93.8,
       "thermal_comfort_score": 96,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Atomic Backland CTD (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [],
   },
   "status": 200,
@@ -4659,6 +4818,19 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "score": 92.1,
       "thermal_comfort_score": 93,
     },
+    "requirements": [
+      {
+        "id": "alpine_skiing:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Atomic Backland CTD (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "warnings": [],
   },
   "status": 200,
@@ -5047,9 +5219,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 70.9,
       "thermal_comfort_score": 49.3,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "head: the lightest available option is warmer than the local warmth range; going without would leave you colder.",
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -5375,7 +5563,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 80.9,
       "thermal_comfort_score": 61.8,
     },
-    "warnings": [],
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
+    "warnings": [
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
+    ],
   },
   "status": 200,
 }
@@ -5714,8 +5919,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 87.7,
       "thermal_comfort_score": 38.7,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -6047,8 +6268,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 77.8,
       "thermal_comfort_score": 55.5,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -6356,8 +6593,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 90.8,
       "thermal_comfort_score": 69.3,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "hands: gloves stay on for this activity, and the lightest available pair is warmer than the local warmth range.",
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -6691,10 +6944,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "score": 71.7,
       "thermal_comfort_score": 50.8,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none in your wardrobe",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
       "hands: gloves stay on for this activity, and the lightest available pair is warmer than the local warmth range.",
       "head: no suitable thermal accessory available; check warmth and protection before use.",
+      "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -7034,9 +7303,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in with an empt
       "score": 64.1,
       "thermal_comfort_score": 30.4,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -7392,7 +7677,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 90,
       "thermal_comfort_score": 74.5,
     },
-    "warnings": [],
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
+    "warnings": [
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
+    ],
   },
   "status": 200,
 }
@@ -7737,7 +8039,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 87.4,
       "thermal_comfort_score": 61.8,
     },
-    "warnings": [],
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
+    "warnings": [
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
+    ],
   },
   "status": 200,
 }
@@ -8096,8 +8415,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 90.6,
       "thermal_comfort_score": 58.5,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant insulation shortfall: improve coverage of the areas below target.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -8447,8 +8782,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 85.5,
       "thermal_comfort_score": 55.5,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -8778,8 +9129,24 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 87.9,
       "thermal_comfort_score": 59.5,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -9111,9 +9478,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "score": 71.7,
       "thermal_comfort_score": 50.8,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Bike helmet",
+          "owned": false,
+        },
+        "id": "biking:helmet",
+        "kind": "protection",
+        "label": "Bike helmet",
+        "message": "Bike helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "warnings": [
       "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
       "head: no suitable thermal accessory available; check warmth and protection before use.",
+      "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -14905,6 +15288,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 81,
       "thermal_comfort_score": 64.6,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -15440,6 +15836,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 75.4,
       "thermal_comfort_score": 53.4,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -15993,6 +16402,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 90.6,
       "thermal_comfort_score": 45.5,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -16529,6 +16951,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 82,
       "thermal_comfort_score": 52.3,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "0841ee66-d4d9-4057-84f6-4397c3adaa57",
+        "matched_garment_name": "Sweet Protection Igniter 2Vi MIPS",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Sweet Protection Igniter 2Vi MIPS in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -16605,8 +17040,8 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "target": 2.2,
         },
         "headNeck": {
-          "clo": 1.6,
-          "delta": 0.15999999999999992,
+          "clo": 1.5,
+          "delta": 0.26,
           "status": "in_range",
           "target": 1.76,
         },
@@ -16658,7 +17093,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "Selected for torso: Columbia Powder Lite Vest, Patagonia Capilene Cool Lightweight, Patagonia Houdini Jacket, Patagonia R1 Air Full-Zip Hoody.",
           "Selected for legs: Helly Hansen Lifa Active Pant, Outdoor Research Carbide Bibs.",
           "Selected for hands: Hestra Fall Line.",
-          "Selected for head and neck: Atomic Backland CTD, Smartwool Cozy Cabin Hat.",
+          "Selected for head and neck: Arc'teryx Rho LTW Beanie, Atomic Backland CTD, Buff Original.",
         ],
         "riskType": "overheat",
         "severity": "high",
@@ -16671,7 +17106,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       },
       "hasExtremityGap": false,
       "hasRegionalGap": true,
-      "maxExtremityDeficit": 0,
+      "maxExtremityDeficit": 0.010000000000000009,
       "maxRegionalDeficit": 1.21705,
       "thermal_data_status": "known",
       "totalClo": 2.12945,
@@ -16687,10 +17122,10 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "head_warmth": {
         "covers_ears": true,
         "covers_neck": false,
-        "id": "7ab217ca-ee6c-460f-83db-4d782df1a92c",
-        "name": "Smartwool Cozy Cabin Hat",
-        "rcl": 1.1,
-        "type": "heavy_beanie",
+        "id": "00ac2b6f-69f9-47a3-874d-39068f48d3d8",
+        "name": "Arc'teryx Rho LTW Beanie",
+        "rcl": 0.7,
+        "type": "midweight_beanie",
       },
       "helmet": {
         "covers_ears": true,
@@ -16700,7 +17135,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         "rcl": 0.5,
         "type": "ski_helmet",
       },
-      "neck_warmth": null,
+      "neck_warmth": {
+        "covers_ears": false,
+        "covers_neck": true,
+        "id": "26375233-3ac3-4d8a-8de3-0c09df415ec7",
+        "name": "Buff Original",
+        "rcl": 0.3,
+        "type": "buff_thin",
+      },
     },
     "guidance": [
       "Climb: Whole-body insulation is above the estimated target band.",
@@ -16720,7 +17162,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Descent: Selected for torso: Columbia Powder Lite Vest, Patagonia Capilene Cool Lightweight, Patagonia Houdini Jacket, Patagonia R1 Air Full-Zip Hoody.",
       "Descent: Selected for legs: Helly Hansen Lifa Active Pant, Outdoor Research Carbide Bibs.",
       "Descent: Selected for hands: Hestra Fall Line.",
-      "Descent: Selected for head and neck: Atomic Backland CTD, Smartwool Cozy Cabin Hat.",
+      "Descent: Selected for head and neck: Arc'teryx Rho LTW Beanie, Atomic Backland CTD, Buff Original.",
       "Uphill target: 0.4-0.6 clo",
       "Downhill target: 1.3-1.5 clo",
       "Pack insulation adding ~0.9 clo for transitions/descent",
@@ -17073,6 +17515,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 78.9,
       "thermal_comfort_score": 43.2,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Atomic Backland CTD in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "quick",
       "steps": [
@@ -17148,8 +17603,8 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "target": 2.2,
         },
         "headNeck": {
-          "clo": 1.6,
-          "delta": 0.15999999999999992,
+          "clo": 1.5,
+          "delta": 0.26,
           "status": "in_range",
           "target": 1.76,
         },
@@ -17201,7 +17656,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "Selected for torso: Columbia Powder Lite Vest, Patagonia Capilene Cool Lightweight, Patagonia Houdini Jacket, Patagonia R1 Air Full-Zip Hoody.",
           "Selected for legs: Helly Hansen Lifa Active Pant, Outdoor Research Carbide Bibs.",
           "Selected for hands: Hestra Fall Line.",
-          "Selected for head and neck: Atomic Backland CTD, Smartwool Cozy Cabin Hat.",
+          "Selected for head and neck: Arc'teryx Rho LTW Beanie, Atomic Backland CTD, Buff Original.",
         ],
         "riskType": "overheat",
         "severity": "moderate",
@@ -17213,7 +17668,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       },
       "hasExtremityGap": false,
       "hasRegionalGap": true,
-      "maxExtremityDeficit": 0,
+      "maxExtremityDeficit": 0.030000000000000027,
       "maxRegionalDeficit": 1.2270500000000002,
       "thermal_data_status": "known",
       "totalClo": 2.12945,
@@ -17229,10 +17684,10 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "head_warmth": {
         "covers_ears": true,
         "covers_neck": false,
-        "id": "7ab217ca-ee6c-460f-83db-4d782df1a92c",
-        "name": "Smartwool Cozy Cabin Hat",
-        "rcl": 1.1,
-        "type": "heavy_beanie",
+        "id": "00ac2b6f-69f9-47a3-874d-39068f48d3d8",
+        "name": "Arc'teryx Rho LTW Beanie",
+        "rcl": 0.7,
+        "type": "midweight_beanie",
       },
       "helmet": {
         "covers_ears": true,
@@ -17242,7 +17697,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         "rcl": 0.5,
         "type": "ski_helmet",
       },
-      "neck_warmth": null,
+      "neck_warmth": {
+        "covers_ears": false,
+        "covers_neck": true,
+        "id": "26375233-3ac3-4d8a-8de3-0c09df415ec7",
+        "name": "Buff Original",
+        "rcl": 0.3,
+        "type": "buff_thin",
+      },
     },
     "guidance": [
       "Climb: Whole-body insulation is above the estimated target band.",
@@ -17262,7 +17724,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Descent: Selected for torso: Columbia Powder Lite Vest, Patagonia Capilene Cool Lightweight, Patagonia Houdini Jacket, Patagonia R1 Air Full-Zip Hoody.",
       "Descent: Selected for legs: Helly Hansen Lifa Active Pant, Outdoor Research Carbide Bibs.",
       "Descent: Selected for hands: Hestra Fall Line.",
-      "Descent: Selected for head and neck: Atomic Backland CTD, Smartwool Cozy Cabin Hat.",
+      "Descent: Selected for head and neck: Arc'teryx Rho LTW Beanie, Atomic Backland CTD, Buff Original.",
       "Uphill target: 0.5-0.6 clo",
       "Downhill target: 1.3-1.5 clo",
       "Pack insulation adding ~0.9 clo for transitions/descent",
@@ -17615,6 +18077,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "score": 78.6,
       "thermal_comfort_score": 42.5,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": true,
+        "message": "Ski helmet — matched to Atomic Backland CTD in your wardrobe",
+        "region": "head",
+        "status": "owned_match",
+      },
+    ],
     "transition_protocol": {
       "priority": "quick",
       "steps": [
@@ -18111,6 +18586,21 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
       "score": 66.2,
       "thermal_comfort_score": 32.4,
     },
+    "requirements": [
+      {
+        "generic_suggestion": {
+          "generic_estimate": true,
+          "label": "Ski helmet",
+          "owned": false,
+        },
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "message": "Ski helmet — required protection in any weather; none available to suggest",
+        "region": "head",
+        "status": "missing",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -18131,6 +18621,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
       "Descent: Significant insulation shortfall: improve coverage of the areas below target.",
       "Descent: hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
       "Descent: head: no suitable thermal accessory available; check warmth and protection before use.",
+      "Descent: No ski helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
     ],
   },
   "status": 200,
@@ -18684,6 +19175,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 73.1,
       "thermal_comfort_score": 54.3,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -19206,6 +19710,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 83.7,
       "thermal_comfort_score": 53.4,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -19753,6 +20270,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 92.3,
       "thermal_comfort_score": 48.6,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -20277,6 +20807,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 83.3,
       "thermal_comfort_score": 52.3,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [
@@ -20351,8 +20894,8 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "target": 2.2,
         },
         "headNeck": {
-          "clo": 1.6,
-          "delta": 0.15999999999999992,
+          "clo": 1.5,
+          "delta": 0.26,
           "status": "in_range",
           "target": 1.76,
         },
@@ -20404,7 +20947,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "Selected for torso: Patagonia Capilene Cool Lightweight, Patagonia Houdini Jacket, Patagonia Nano-Air Light Vest, Patagonia R1 Air Full-Zip Hoody.",
           "Selected for legs: Helly Hansen Lifa Active Pant, Patagonia R1 Fleece Pants.",
           "Selected for hands: Hestra Fall Line.",
-          "Selected for head and neck: Atomic Backland CTD, Smartwool Cozy Cabin Hat.",
+          "Selected for head and neck: Arc'teryx Rho LTW Beanie, Atomic Backland CTD, Buff Original.",
         ],
         "riskType": "overheat",
         "severity": "moderate",
@@ -20416,7 +20959,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       },
       "hasExtremityGap": false,
       "hasRegionalGap": true,
-      "maxExtremityDeficit": 0,
+      "maxExtremityDeficit": 0.010000000000000009,
       "maxRegionalDeficit": 1.12095,
       "thermal_data_status": "known",
       "totalClo": 2.111675,
@@ -20432,10 +20975,10 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "head_warmth": {
         "covers_ears": true,
         "covers_neck": false,
-        "id": "7ab217ca-ee6c-460f-83db-4d782df1a92c",
-        "name": "Smartwool Cozy Cabin Hat",
-        "rcl": 1.1,
-        "type": "heavy_beanie",
+        "id": "00ac2b6f-69f9-47a3-874d-39068f48d3d8",
+        "name": "Arc'teryx Rho LTW Beanie",
+        "rcl": 0.7,
+        "type": "midweight_beanie",
       },
       "helmet": {
         "covers_ears": true,
@@ -20445,7 +20988,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         "rcl": 0.5,
         "type": "ski_helmet",
       },
-      "neck_warmth": null,
+      "neck_warmth": {
+        "covers_ears": false,
+        "covers_neck": true,
+        "id": "26375233-3ac3-4d8a-8de3-0c09df415ec7",
+        "name": "Buff Original",
+        "rcl": 0.3,
+        "type": "buff_thin",
+      },
     },
     "guidance": [
       "Climb: Whole-body insulation is above the estimated target band.",
@@ -20464,7 +21014,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Descent: Selected for torso: Patagonia Capilene Cool Lightweight, Patagonia Houdini Jacket, Patagonia Nano-Air Light Vest, Patagonia R1 Air Full-Zip Hoody.",
       "Descent: Selected for legs: Helly Hansen Lifa Active Pant, Patagonia R1 Fleece Pants.",
       "Descent: Selected for hands: Hestra Fall Line.",
-      "Descent: Selected for head and neck: Atomic Backland CTD, Smartwool Cozy Cabin Hat.",
+      "Descent: Selected for head and neck: Arc'teryx Rho LTW Beanie, Atomic Backland CTD, Buff Original.",
       "Uphill target: 0.4-0.6 clo",
       "Downhill target: 1.3-1.5 clo",
       "Pack insulation adding ~0.9 clo for transitions/descent",
@@ -20809,6 +21359,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 80.1,
       "thermal_comfort_score": 43.2,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Atomic Backland CTD (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "quick",
       "steps": [
@@ -20882,8 +21445,8 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "target": 2.2,
         },
         "headNeck": {
-          "clo": 1.6,
-          "delta": 0.15999999999999992,
+          "clo": 1.5,
+          "delta": 0.26,
           "status": "in_range",
           "target": 1.76,
         },
@@ -20935,7 +21498,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "Selected for torso: Patagonia Capilene Cool Lightweight, Patagonia Houdini Jacket, Patagonia Nano-Air Light Vest, Patagonia R1 Air Full-Zip Hoody.",
           "Selected for legs: Helly Hansen Lifa Active Pant, Patagonia R1 Fleece Pants.",
           "Selected for hands: Hestra Fall Line.",
-          "Selected for head and neck: Atomic Backland CTD, Smartwool Cozy Cabin Hat.",
+          "Selected for head and neck: Arc'teryx Rho LTW Beanie, Atomic Backland CTD, Buff Original.",
         ],
         "riskType": "overheat",
         "severity": "moderate",
@@ -20947,7 +21510,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       },
       "hasExtremityGap": false,
       "hasRegionalGap": true,
-      "maxExtremityDeficit": 0,
+      "maxExtremityDeficit": 0.030000000000000027,
       "maxRegionalDeficit": 1.1309500000000001,
       "thermal_data_status": "known",
       "totalClo": 2.111675,
@@ -20963,10 +21526,10 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "head_warmth": {
         "covers_ears": true,
         "covers_neck": false,
-        "id": "7ab217ca-ee6c-460f-83db-4d782df1a92c",
-        "name": "Smartwool Cozy Cabin Hat",
-        "rcl": 1.1,
-        "type": "heavy_beanie",
+        "id": "00ac2b6f-69f9-47a3-874d-39068f48d3d8",
+        "name": "Arc'teryx Rho LTW Beanie",
+        "rcl": 0.7,
+        "type": "midweight_beanie",
       },
       "helmet": {
         "covers_ears": true,
@@ -20976,7 +21539,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         "rcl": 0.5,
         "type": "ski_helmet",
       },
-      "neck_warmth": null,
+      "neck_warmth": {
+        "covers_ears": false,
+        "covers_neck": true,
+        "id": "26375233-3ac3-4d8a-8de3-0c09df415ec7",
+        "name": "Buff Original",
+        "rcl": 0.3,
+        "type": "buff_thin",
+      },
     },
     "guidance": [
       "Climb: Whole-body insulation is above the estimated target band.",
@@ -20995,7 +21565,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Descent: Selected for torso: Patagonia Capilene Cool Lightweight, Patagonia Houdini Jacket, Patagonia Nano-Air Light Vest, Patagonia R1 Air Full-Zip Hoody.",
       "Descent: Selected for legs: Helly Hansen Lifa Active Pant, Patagonia R1 Fleece Pants.",
       "Descent: Selected for hands: Hestra Fall Line.",
-      "Descent: Selected for head and neck: Atomic Backland CTD, Smartwool Cozy Cabin Hat.",
+      "Descent: Selected for head and neck: Arc'teryx Rho LTW Beanie, Atomic Backland CTD, Buff Original.",
       "Uphill target: 0.5-0.6 clo",
       "Downhill target: 1.3-1.5 clo",
       "Pack insulation adding ~0.9 clo for transitions/descent",
@@ -21340,6 +21910,19 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "score": 79.9,
       "thermal_comfort_score": 42.5,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "785dfe49-f0a3-48d8-98cc-83c09c94c543",
+        "matched_garment_name": "Atomic Backland CTD",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Atomic Backland CTD (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "quick",
       "steps": [
@@ -27209,6 +27792,19 @@ exports[`POST /api/v1/recommendations/ski-touring (golden, pack options) > prior
       "score": 73.1,
       "thermal_comfort_score": 54.3,
     },
+    "requirements": [
+      {
+        "id": "ski_touring_downhill:helmet",
+        "kind": "protection",
+        "label": "Ski helmet",
+        "matched_garment_id": "ef5032e0-9187-4805-9321-b9d6f53daefd",
+        "matched_garment_name": "Giro Range MIPS",
+        "matched_is_owned": false,
+        "message": "Ski helmet — suggested: Giro Range MIPS (not in your wardrobe)",
+        "region": "head",
+        "status": "generic_suggestion",
+      },
+    ],
     "transition_protocol": {
       "priority": "urgent",
       "steps": [

@@ -24,6 +24,7 @@ import {
 } from '../thermal-targets';
 import { sortByBreathability } from '../sorting';
 import { selectPhaseAccessories } from '../extremities';
+import { buildHelmetRequirement } from '../requirements';
 import {
   ensembleToThermalGarments,
   formatConditions,
@@ -208,6 +209,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     const descentAccessories = selectPhaseAccessories('ski_touring_downhill', downhill, pool, tempC, downhillEnsemble,
       { precipitation: request.precipitation, preferHandwearId: climbAccessories.handwear?.id });
     const descentHeadwear = descentAccessories.headwear;
+    const descentHelmet = buildHelmetRequirement('ski_touring_downhill', descentHeadwear.helmet, pool);
     const climbExtremity = { ...uphill.extremity, max: climbAccessories.extremityMax };
     const descentExtremity = { ...downhill.extremity, max: descentAccessories.extremityMax };
 
@@ -249,6 +251,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     uphillResult.recommendation.accessories = climbAccessories.assessments;
 
     return {
+      ...(descentHelmet ? { requirements: [descentHelmet.requirement] } : {}),
       conditions: {
         ...formatConditions(request.weather),
         exertion: request.exertion,
@@ -294,7 +297,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
       },
       transition_protocol: transitionProtocol,
       warnings: [...uphillResult.warnings, ...climbAccessories.warnings].map(w => `Climb: ${w}`)
-        .concat([...downhillResult.warnings, ...descentAccessories.warnings].map(w => `Descent: ${w}`)),
+        .concat([...downhillResult.warnings, ...descentAccessories.warnings, ...(descentHelmet?.warnings ?? [])].map(w => `Descent: ${w}`)),
       guidance: [
         ...(uphillResult.recommendation.evaluation?.decision?.reasons ?? []).map(r => `Climb: ${r}`),
         ...(downhillResult.recommendation.evaluation?.decision?.reasons ?? []).map(r => `Descent: ${r}`),

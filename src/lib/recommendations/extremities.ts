@@ -10,7 +10,15 @@ import { POLE_GRIP_MAX_CLO } from '@/lib/biophysics/sport-policy';
 import type { PhaseTargets } from './thermal-targets';
 
 // Headwear type categories
-const HELMET_TYPES = ['ski_helmet'];
+/** Helmets each sport or phase requires: protection, chosen whatever the
+ * thermal demand. A ski helmet doesn't stand in for a bike helmet, or the reverse. */
+export const REQUIRED_HELMET_TYPES: Partial<Record<ActivityType, readonly string[]>> = {
+  alpine_skiing: ['ski_helmet'],
+  ski_touring_downhill: ['ski_helmet'],
+  biking: ['bike_helmet'],
+};
+/** Every helmet type; none of them counts as head warmth. */
+export const HELMET_TYPES: readonly string[] = ['ski_helmet', 'bike_helmet'];
 export const HEAD_WARMTH_TYPES = ['liner_beanie', 'midweight_beanie', 'heavy_beanie', 'balaclava_light', 'balaclava_heavy', 'headband'];
 const NECK_WARMTH_TYPES = ['buff_thin', 'buff_heavy', 'facemask'];
 
@@ -65,10 +73,10 @@ interface AccessoryPolicy {
 const KEPT_GLOVE_MAX_CLO = POLE_GRIP_MAX_CLO;
 
 /** Each phase keeps its own policy (#370): gloves stay on; ratings follow the
- * phase's activity level; helmets are required for alpine and the descent;
+ * phase's activity level; helmets (REQUIRED_HELMET_TYPES) are required for alpine, the descent and cycling;
  * wind preference follows the phase's exposure. */
 const PHASE_POLICIES: Partial<Record<ActivityType, Omit<AccessoryPolicy, 'wet'>>> = {
-  biking: { bareHands: false, poleGrip: false, wind: true, rating: 'active', helmet: false, sustained: false },
+  biking: { bareHands: false, poleGrip: false, wind: true, rating: 'active', helmet: true, sustained: false },
   alpine_skiing: { bareHands: false, poleGrip: false, wind: true, rating: 'static', helmet: true, sustained: false },
   ski_touring_uphill: { bareHands: false, poleGrip: false, wind: false, rating: 'active', helmet: false, sustained: false },
   ski_touring_downhill: { bareHands: false, poleGrip: false, wind: true, rating: 'static', helmet: true, sustained: false },
@@ -193,14 +201,16 @@ export function selectPhaseAccessories(
   // any worn hood (only helmet-compatible hoods under a helmet). Neck-only
   // coverage cannot silently satisfy a bare head, and a neck piece must
   // itself be rated for the conditions.
-  const helmet = policy.helmet ? selectHelmet(pool.headwear, tempC) : null;
+  const helmet = policy.helmet ? selectHelmet(pool.headwear, tempC, REQUIRED_HELMET_TYPES[activity] ?? []) : null;
   const helmetClo = helmet && knownInsulation(helmet) ? helmet.rcl_clo : 0;
   const hoodClo = hoodInsulation(ensemble, helmet != null);
   const baseClo = hoodClo + helmetClo;
   // A required helmet is never judged as overheating: when it alone is
   // above the band, it sets the head's upper limit.
   if (localThermalStatus(helmetClo, min.head, maximum.head) === 'over') maximum.head = Math.round(helmetClo * 100) / 100;
-  const heads = pool.headwear.filter(item => HEAD_WARMTH_TYPES.includes(item.headwear_type));
+  // Under a helmet, only head warmth that fits under one (#373); a thick beanie doesn't.
+  const heads = pool.headwear.filter(item => HEAD_WARMTH_TYPES.includes(item.headwear_type)
+    && (!helmet || item.helmet_compatible !== false));
   const necks = pool.headwear.filter(item => NECK_WARMTH_TYPES.includes(item.headwear_type));
   const knownHeads = heads.filter(knownInsulation);
   const ratedNecks = necks.filter(item => knownInsulation(item) && rated(item));
@@ -300,9 +310,9 @@ export function selectPhaseAccessories(
   return { handwear, headwear, assessments, extremityMax: maximum, warnings };
 }
 
-/** Required helmet for alpine and the touring descent (which one: #373). */
-function selectHelmet(headwear: HeadwearRow[], tempC: number): HeadwearRow | null {
-  return selectBestFromCategory(headwear.filter((h) => HELMET_TYPES.includes(h.headwear_type)), tempC, false);
+/** The helmet a sport or phase requires (REQUIRED_HELMET_TYPES), worn whatever the thermal budget. */
+function selectHelmet(headwear: HeadwearRow[], tempC: number, types: readonly string[]): HeadwearRow | null {
+  return selectBestFromCategory(headwear.filter((h) => types.includes(h.headwear_type)), tempC, false);
 }
 
 /**

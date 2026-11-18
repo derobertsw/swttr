@@ -341,6 +341,8 @@ export function GearUpForm({
       >
         {submitLabel}
       </Button>
+      {/* Says the request is running: a focused button's new label isn't always announced (#284). */}
+      <p role="status" className="sr-only">{loading ? submitLabel : null}</p>
     </form>
   );
 }
