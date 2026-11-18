@@ -10,6 +10,8 @@ import type { TripMapDay, TripMapPlace } from "@/types/trip-map";
 
 const linkClass = "inline-flex min-h-11 items-center font-semibold text-primary underline";
 const noteClass = "block text-sm text-muted-foreground";
+/** Lets a one-line Button link wrap its text and grow, keeping its 44px minimum. */
+export const WRAPPING_BUTTON = "max-w-full [&>a]:h-auto [&>a]:min-h-11 [&>a]:max-w-full [&>a]:whitespace-normal [&>a]:py-2 [&>a]:text-left";
 
 function Row({ term, children }: { term: string; children: ReactNode }) {
   return <div className="min-w-0"><dt className="text-muted-foreground">{term}</dt><dd className="break-words text-foreground">{children}</dd></div>;
@@ -107,7 +109,8 @@ export function TripMapDaySummary({ tripId, day, places, canEdit, memberId = nul
       </Row>}
     </dl>
     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-      <Directions day={drive} label={`Directions to ${drive.destination?.label}`} />
+      {/* The label names the access point, which can be long: wrap it rather than widen a phone's page (#235). */}
+      {drive.directions && drive.origin && drive.destination && <span className={WRAPPING_BUTTON}><Directions day={drive} label={`Directions to ${drive.destination.label}`} /></span>}
       {tour?.route_url && <a href={tour.route_url} target="_blank" rel="noopener noreferrer" className={linkClass}>Open tour route (new tab)</a>}
       <Link href={dayHref} className={linkClass}>View day</Link>
       {fix && <Link href={fix.href} className={linkClass}>{fix.label}</Link>}

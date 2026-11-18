@@ -157,6 +157,8 @@ export interface TripFull {
   conditions?: TripDayConditionsSource[];
   /** People's own starting points (#333); missing or empty before its migration. */
   member_origins?: TripMemberDayOrigin[];
+  /** Where each day starts for the people taking part (#333), own starting points included; optional like `lodging`. */
+  starts?: TripDayStart[];
   /** Backcountry days' day checks (#212); optional like `lodging`. */
   day_checks?: TripDayChecks[];
   /** Tour preparation the signed-in person can act on, for Plan's own page (#212); optional like `lodging`. */
@@ -176,6 +178,25 @@ export interface TripFocus {
   reason: "today" | "unfinished" | "first_day" | null;
   /** The first thing still to do from today on, or null when nothing is. */
   next_step: { kind: "add_destination" | "choose_activity" | "plan_kit"; date: string | null } | null;
+}
+
+/**
+ * Where a day starts (#333), as its departures work it out: a person's own
+ * starting point, then the day's own, then the stay they slept in. The day
+ * brief reads it, so its Starting from matches the drive below it.
+ */
+export interface TripDayStart {
+  date: string;
+  /** Where the people taking part start, e.g. "Pine rental (3) · Ridge cabin (1)"; null when nobody has a starting point. */
+  starting_from: string | null;
+  /** Each person with a departure that day: everyone taking part, and a pending invitation once it has a starting point. */
+  people: Array<{
+    member_id: string;
+    /** The stay's or place's name, "Not set" or "Arrives this day". */
+    starting_from: string;
+    /** Their own or the day's own starting point, not the stay they slept in. */
+    own: boolean;
+  }>;
 }
 
 /**
