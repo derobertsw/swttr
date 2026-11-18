@@ -10,7 +10,7 @@ import { projectTripMap } from "@/lib/trip-map";
 import { LODGE_PLACE, PINE_PLACE, splitDriveTrip, VILLAGE_PLACE } from "@/test/driveTrip";
 import { ALEX, BLAIR, CASEY, ELI, FRAN, FRI, LODGE, MON, personNight, PINE, SAT, splitRows, SUN, VILLAGE } from "@/test/splitStays";
 import { fakeTripApi, reply, sentBodies } from "@/test/tripApi";
-import { departurePlans } from "@/lib/trip-drive";
+import { dayStarts, departurePlans } from "@/lib/trip-drive";
 import type { TripDriveEstimates, TripFull } from "@/types/trips";
 
 /**
@@ -51,6 +51,30 @@ describe("Your departure on the day (#333)", () => {
     const crew = day(null);
     expect(row(crew.container, "Starting from")).toHaveTextContent("Pine rental (3) · Village hotel (2)");
     expect(within(crew.container).queryByText("Crew starting from")).not.toBeInTheDocument();
+  });
+  it("starts you from your own starting point, as your drive does, and counts you there in the crew's", () => {
+    // Eli drives up from a cabin on Saturday; he slept in the hotel.
+    const full = splitDriveTrip();
+    full.member_origins = [{ trip_id: full.trip.id, trip_day_id: `day-${SAT}`, member_id: ELI.id,
+      origin: { ...VILLAGE_PLACE, label: "Ridge cabin", latitude: 44.51, longitude: -72.75 }, origin_stay_id: null, no_drive: false }];
+    full.starts = dayStarts(full);
+    const { unmount } = render(<DayStart data={full} date={SAT} memberId={ELI.id} />);
+    const start = screen.getByRole("region", { name: "Start of the day" });
+    expect(row(start, "Starting from")).toHaveTextContent("Ridge cabin · only this day");
+    expect(row(start, "Crew starting from")).toHaveTextContent("Pine rental (3) · Village hotel (1) · Ridge cabin (1)");
+    unmount();
+    // Fran still starts from the hotel, as she slept there.
+    render(<DayStart data={full} date={SAT} memberId={FRAN.id} />);
+    expect(row(screen.getByRole("region", { name: "Start of the day" }), "Starting from")).toHaveTextContent(/^Village hotel$/);
+  });
+  it("starts everyone from the day's own starting point, with no second crew row", () => {
+    const base = splitDriveTrip();
+    const full = splitDriveTrip({ days: base.days.map((day) => day.date === SAT ? { ...day, origin: { ...LODGE_PLACE, label: "Ridge cabin" } } : day) });
+    full.starts = dayStarts(full);
+    render(<DayStart data={full} date={SAT} memberId={ELI.id} />);
+    const start = screen.getByRole("region", { name: "Start of the day" });
+    expect(row(start, "Starting from")).toHaveTextContent("Ridge cabin · only this day");
+    expect(within(start).queryByText("Crew starting from")).not.toBeInTheDocument();
   });
   it("names the move on a changeover morning, with the stays' check-out and check-in times (#334)", () => {
     const rows = splitRows();
