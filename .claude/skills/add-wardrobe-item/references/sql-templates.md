@@ -102,7 +102,7 @@ ON CONFLICT (brand, model_name) DO NOTHING;
 -- <Construction facts.> (<product URL>) Calibrated against <analogues>.
 INSERT INTO headwear (brand, model_name, year_released, msrp_usd, headwear_type, weight_grams,
   covers_ears, covers_neck, covers_face, helmet_compatible, rcl_clo, windproof, min_temp_active, min_temp_static)
-VALUES ('<Brand>', '<Model>', <year|NULL>, <usd|NULL>, '<liner_beanie|midweight_beanie|heavy_beanie|balaclava_light|balaclava_heavy|headband|buff_thin|buff_heavy|facemask|ski_helmet>', <g|NULL>,
+VALUES ('<Brand>', '<Model>', <year|NULL>, <usd|NULL>, '<liner_beanie|midweight_beanie|heavy_beanie|balaclava_light|balaclava_heavy|headband|buff_thin|buff_heavy|facemask|ski_helmet|bike_helmet>', <g|NULL>,
   <bool>, <bool>, <bool>, <bool>, <clo>, <bool>, <°C>, <°C>)
 ON CONFLICT (brand, model_name) DO NOTHING;
 ```
