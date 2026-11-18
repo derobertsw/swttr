@@ -18,14 +18,21 @@ export function xcPhaseContext(input: XCContext & {
 }): XCPhaseContext {
   const exposure = input.xcExposure ?? 'unknown';
   const effectiveWindMs = Math.max(input.windMs, exposure === 'descents' ? 5 : exposure === 'exposed' ? 4 : 0);
-  // Snow near melting can wet clothing. Unknown precipitation is treated
-  // conservatively as wet; the weather contract has no measured snow water.
-  const precipitation = !input.precipitation ? 'dry'
-    : input.precipitationType === 'snow' && input.tempC < -1 ? 'dry_snow' : 'wet';
+  const precipitation = classifyPrecipitation(input.precipitation, input.precipitationType, input.tempC);
   return {
     outingPattern: input.outingPattern ?? 'unknown', exposure, effectiveWindMs, precipitation,
     carryWarmth: input.outingPattern === 'frequent_stops' || input.tempC <= 5 || precipitation === 'wet',
   };
+}
+
+/** Snow near melting can wet clothing. Unknown precipitation is treated
+ * conservatively as wet; the weather contract has no measured snow water.
+ * Shared by XC and the ski-touring climb. */
+export function classifyPrecipitation(
+  precipitation: boolean, precipitationType: PrecipitationType | undefined, tempC: number,
+): XCPhaseContext['precipitation'] {
+  if (!precipitation) return 'dry';
+  return precipitationType === 'snow' && tempC < -1 ? 'dry_snow' : 'wet';
 }
 
 /** Condition-based wind protection, independent of garment category. */

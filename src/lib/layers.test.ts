@@ -114,6 +114,16 @@ describe("buildDescentLayers", () => {
     expect(layers.headNeck.outer).toEqual([{ name: "Helmet", rcl: 0.3, sourceId: "hw-3", item_type: "headwear" }]);
   });
 
+  it("puts packed pants on the legs and packed bibs on both regions", () => {
+    const layers = buildDescentLayers(GARMENTS, CLIMB_GLOVES, HEADWEAR, [
+      { id: "p-2", name: "Over-pants", rcl_torso: 0, rcl_legs: 1.8, covers_torso: false, covers_arms: false, covers_legs: true },
+      { id: "p-3", name: "Bibs", rcl_torso: 0.35, rcl_legs: 0.65, covers_torso: true, covers_arms: false, covers_legs: true },
+    ], null, null);
+    expect(layers.legs.outer.map((item) => [item.name, item.rcl])).toEqual(expect.arrayContaining([["Over-pants", 1.8], ["Bibs", 0.65]]));
+    expect(layers.torso.outer.map((item) => item.name)).toContain("Bibs");
+    expect(layers.torso.outer.map((item) => item.name)).not.toContain("Over-pants");
+  });
+
   it("keeps the climb gloves and headwear when the descent has none of its own", () => {
     const layers = buildDescentLayers(GARMENTS, CLIMB_GLOVES, HEADWEAR, [], null, null);
     expect(layers.hands.outer).toEqual([{ name: "Liner Gloves", rcl: 0.3, sourceId: "h-1", item_type: "handwear" }]);

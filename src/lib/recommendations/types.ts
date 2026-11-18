@@ -94,6 +94,8 @@ export interface HeadwearRow {
   covers_ears?: boolean;
   covers_neck?: boolean;
   covers_face?: boolean;
+  /** Fits under a helmet; only head warmth with this set is worn with one. */
+  helmet_compatible?: boolean | null;
   min_temp_active?: number;
   min_temp_static?: number;
 }

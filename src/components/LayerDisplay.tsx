@@ -240,8 +240,8 @@ const LayerDisplay = ({
   // Thermal evaluation of the worn layers (including edits) runs on the server.
   const climbInput: PhaseEvaluationInput = {
     items: evaluationItemsByBodyPart(climb.layers),
-    requireStandalone: Boolean(ireq?.policy),
-    protectionNeeds: ireq?.policy?.protection,
+    requireStandalone: Boolean(ireq?.policy) || ireq?.outfit_checks?.require_standalone === true,
+    protectionNeeds: ireq?.policy?.protection ?? ireq?.outfit_checks?.protection,
     breathabilityTarget: biophysicsData?.recommendation.evaluation?.breathabilityTarget,
     targets: bodyPartTargets(ireq?.regional, ireq?.extremity),
     minTargets: bodyPartTargets(ireq?.regional, ireq?.extremity, "min"),
@@ -264,6 +264,13 @@ const LayerDisplay = ({
     minTargets: descentBreakdown
       ? bodyPartTargets(descentBreakdown.regional_ireq, descentBreakdown.extremity_ireq, "min")
       : climbInput.minTargets,
+    // The descent's own accessory limits, as its server evaluation used.
+    extremityMaxTargets: descentBreakdown
+      ? descentBreakdown.extremity_ireq.max && {
+          hands: descentBreakdown.extremity_ireq.max.hands,
+          headNeck: descentBreakdown.extremity_ireq.max.head,
+        }
+      : climbInput.extremityMaxTargets,
     arms: regionalClo
       ? {
           clo: descentBreakdown?.regional_clo?.arms ?? regionalClo.arms,

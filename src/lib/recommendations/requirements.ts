@@ -1,17 +1,21 @@
 /**
- * Requirement-first matching for running/XC: derive what the activity needs
+ * Requirement-first matching for running, cycling and XC: derive what the activity needs
  * from the thermal targets, then match owned garments against it. An owned
  * garment that is unsuitable (underlayer-only worn alone, too warm for a
  * light requirement, unknown thermal data) is never presented as a match;
  * the requirement survives as `missing` with a generic suggestion.
+ * Required protection (a helmet) follows the same contract for every sport
+ * that needs it, independent of thermal demand.
  */
 import type { AccessoryAssessments, ClothingRequirement } from '@/types/biophysics';
+import type { ActivityType } from '@/lib/biophysics/constants';
 import type { GarmentRow, HandwearRow, HeadwearRow } from './types';
 import { garmentCapabilities, hasUsableThermalData } from './garment-semantics';
-import { HEAD_WARMTH_TYPES } from './extremities';
+import { HEAD_WARMTH_TYPES, REQUIRED_HELMET_TYPES } from './extremities';
 import type { PhaseTargets } from './thermal-targets';
 import { xcBasic, xcRegionMatches, xcRequirementLabel } from './sports/xc-outfit';
 import { runningBasic, runningRegionMatches, runningRegionIssues, runningRequirementLabel } from './sports/running-outfit';
+import { cyclingRequirementLabel } from './sports/cycling-outfit';
 
 const CLO_MARGIN = 0.15;
 const EXTREMITY_NEEDED_CLO = 0.05;
@@ -22,6 +26,12 @@ const LABELS: Record<string, Record<string, { light: string; standard: string }>
     legs: { light: 'Running shorts', standard: 'Running tights or pants' },
     hands: { light: 'Lightweight running gloves', standard: 'Running gloves' },
     head: { light: 'Lightweight running hat', standard: 'Running beanie or hat' },
+  },
+  biking: {
+    torso: { light: 'Short-sleeve cycling jersey', standard: 'Breathable cycling top' },
+    legs: { light: 'Cycling shorts', standard: 'Cycling tights or pants' },
+    hands: { light: 'Lightweight cycling gloves', standard: 'Cycling gloves' },
+    head: { light: 'Thin cycling cap or headband', standard: 'Under-helmet cap or balaclava' },
   },
   xc_skiing: {
     torso: { light: 'Breathable Nordic top', standard: 'Breathable Nordic top and wind layer' },
@@ -137,10 +147,13 @@ export function buildClothingRequirements(
       continue;
     }
 
-    if (activity === 'running' && (pool.selectedGarments || pool.garments.length === 0)) {
+    // Cycling selects with running's search and its own protection needs.
+    if ((activity === 'running' || activity === 'biking') && (pool.selectedGarments || pool.garments.length === 0)) {
       const selected = pool.selectedGarments ?? [];
-      const matched = runningRegionMatches(selected, targets, region) ? runningBasic(selected, region) : undefined;
-      const result = requirement(activity, region, runningRequirementLabel(targets, region), neutral, matched, pool.ownership.garments);
+      const needs = pool.functional?.protection ?? targets.policy?.protection;
+      const matched = runningRegionMatches(selected, targets, region, needs) ? runningBasic(selected, region) : undefined;
+      const label = activity === 'biking' ? cyclingRequirementLabel(targets, region, needs) : runningRequirementLabel(targets, region);
+      const result = requirement(activity, region, label, neutral, matched, pool.ownership.garments);
       const names = selected.filter(g => g[`covers_${region}`]).map(g => `${g.brand} ${g.model_name}`).join(' + ');
       if (matched) {
         result.matched_garment_name = names;
@@ -149,7 +162,7 @@ export function buildClothingRequirements(
         // Missing refers to the ideal requirement, not to ownership of the
         // best available clothing that is actually selected and evaluated.
         const source = pool.ownership.garments ? 'in your wardrobe' : 'from the catalog (not owned)';
-        result.message = `${result.label} — best available ${source}: ${names}; ${runningRegionIssues(selected, targets, region).join('; ')}. Additional or alternative clothing is needed to meet this requirement.`;
+        result.message = `${result.label} — best available ${source}: ${names}; ${runningRegionIssues(selected, targets, region, needs).join('; ')}. Additional or alternative clothing is needed to meet this requirement.`;
       }
       requirements.push(result);
       continue;
@@ -204,6 +217,47 @@ export function buildClothingRequirements(
       matched ? { id: matched.id, name: `${matched.brand} ${matched.model_name}` } : undefined, owned));
   }
   return requirements;
+}
+
+const HELMET_LABELS: Record<string, string> = { ski_helmet: 'Ski helmet', bike_helmet: 'Bike helmet' };
+
+/**
+ * The helmet a sport or phase requires, reported apart from insulation.
+ * Thermal demand never removes it; a missing helmet is reported with a
+ * warning and a generic suggestion, and a catalog helmet is never presented
+ * as owned. Undefined when the activity requires no helmet.
+ */
+export function buildHelmetRequirement(
+  activity: ActivityType,
+  helmet: HeadwearRow | null,
+  pool: { usingWardrobe: boolean; headwearOwned?: boolean },
+): { requirement: ClothingRequirement; warnings: string[] } | undefined {
+  const types = REQUIRED_HELMET_TYPES[activity];
+  if (!types?.length) return undefined;
+  const label = HELMET_LABELS[types[0]] ?? 'Helmet';
+  const base = { id: `${activity}:helmet`, region: 'head' as const, kind: 'protection' as const, label };
+  // Signed-in headwear comes from the wardrobe alone; otherwise from the catalog.
+  const owned = pool.headwearOwned ?? false;
+  if (helmet && types.includes(helmet.headwear_type)) {
+    const name = `${helmet.brand} ${helmet.model_name}`;
+    return {
+      requirement: {
+        ...base, status: owned ? 'owned_match' : 'generic_suggestion',
+        matched_garment_id: helmet.id, matched_garment_name: name, matched_is_owned: owned,
+        message: owned ? `${label} — matched to ${name} in your wardrobe` : `${label} — suggested: ${name} (not in your wardrobe)`,
+      },
+      warnings: [],
+    };
+  }
+  const where = pool.usingWardrobe || owned ? 'in your wardrobe' : 'available to suggest';
+  return {
+    requirement: {
+      ...base, status: 'missing',
+      generic_suggestion: { label, generic_estimate: true, owned: false },
+      message: `${label} — required protection in any weather; none ${where}`,
+    },
+    warnings: [`No ${label.toLowerCase()} ${where}. Wear one in any weather: it's required protection, not optional warmth.`],
+  };
 }
 
 function requirement(
