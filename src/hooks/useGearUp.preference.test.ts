@@ -19,7 +19,13 @@ vi.mock("@/lib/logger", () => ({ logWarn: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 const STOWE = { id: 1, name: "Stowe", country: "US", latitude: 44.47, longitude: -72.69 };
+const BEND = { id: 2, name: "Bend", country: "US", latitude: 44.06, longitude: -121.31 };
 const WEATHER = { temperature: 45, windSpeed: 4 };
+/** Current conditions, or a forecast for a dated request. */
+function weatherAt(url: string) {
+  const datetime = new URL(url, "http://localhost").searchParams.get("datetime");
+  return datetime ? { ...WEATHER, isForecast: true, forecastTime: `${datetime.slice(0, 13)}:00-07:00`, timeZone: "America/Los_Angeles" } : WEATHER;
+}
 
 /** A personalized answer naming the setting it was asked with. */
 function advice(sensitivity: unknown) {
@@ -40,7 +46,7 @@ describe("useGearUp with Run Warm/Run Cold (#251)", () => {
     window.history.replaceState(null, "", "/");
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (url.includes("/api/weather")) return Response.json(WEATHER);
+      if (url.includes("/api/weather")) return Response.json(weatherAt(url));
       if (url.includes("/api/plan-ahead")) {
         return Response.json({ plan: { days: [], asked: JSON.parse(String(init?.body)).sensitivity } });
       }
@@ -163,6 +169,32 @@ describe("useGearUp with Run Warm/Run Cold (#251)", () => {
     rerender();
     await waitFor(() => expect(result.current.result).toMatchObject({ sensitivity: "cold" }));
     expect(recommendationBodies(fetchMock).map(body => body.temperature_sensitivity)).toEqual(["cold", "cold"]);
+  });
+
+  it("keeps a failed update for another outing when the setting changes while it loads", async () => {
+    const { result, rerender } = await seeResult();
+    const shown = result.current.result;
+    const held = Promise.withResolvers<Response>();
+    fetchMock.mockClear();
+    fetchMock.mockImplementationOnce(() => held.promise);
+    let update!: Promise<boolean>;
+    act(() => { update = result.current.handleWeatherChange(BEND, "2026-10-08T23:15"); });
+    prefs.sensitivity = "cold";
+    rerender();
+    await act(async () => {
+      held.resolve(Response.json({ error: "Forecast unavailable" }, { status: 502 }));
+      expect(await update).toBe(false);
+    });
+    rerender();
+    await act(async () => {});
+    // Bend's failed update keeps its notice and Try again: Stowe isn't asked for again over it.
+    expect(result.current.result).toBe(shown);
+    expect(result.current.request).toMatchObject({ status: "error", outing: { place: BEND } });
+    expect(recommendationBodies(fetchMock)).toEqual([]);
+    // Try again asks for Bend, with the new setting.
+    await act(async () => { expect(await result.current.handleRetryUpdate()).toBe(true); });
+    expect(result.current.result).toMatchObject({ outing: { place: BEND }, sensitivity: "cold" });
+    expect(recommendationBodies(fetchMock).at(-1)).toMatchObject({ temperature_sensitivity: "cold" });
   });
 
   it("asks for a shown multi-day plan again with the new setting", async () => {

@@ -41,6 +41,11 @@ function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boole
   return b !== null && a.latitude === b.latitude && a.longitude === b.longitude;
 }
 
+/** The same outing asked for: a request for the shown result copies its outing field by field. */
+function sameOuting(a: Outing, b: Outing): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 /** Browser tools learn that the device's position was used, not where it is. */
 function readbackPlace(place: LocationSuggestion): ReadbackPlace {
   return isYourLocation(place) ? { kind: "device_location", name: place.name } : place;
@@ -421,7 +426,9 @@ export function useGearUp() {
    * update fails, the result stays with the failed-update notice, as for any
    * other update, and Try again uses the new setting. The attempt is keyed by
    * result and setting, so a failed setting doesn't loop but choosing another
-   * one (or coming back to the failed one later) asks again.
+   * one (or coming back to the failed one later) asks again. A failed update
+   * for another outing stays as it is, notice and Try again included: Try
+   * again asks for that outing with the new setting.
    */
   const refreshedForSetting = useRef<{ result: OutingResult; sensitivity: typeof sensitivity } | null>(null);
   useEffect(() => {
@@ -433,6 +440,7 @@ export function useGearUp() {
     }
     const attempted = refreshedForSetting.current;
     if (attempted?.result === shown && attempted.sensitivity === sensitivity) return;
+    if (state.request.status === "error" && !sameOuting(state.request.outing, shown.outing)) return;
     if (!state.restored || !readyToRequest || owner !== state.owner || state.request.status === "loading") return;
     const attempt = { result: shown, sensitivity };
     refreshedForSetting.current = attempt;
@@ -446,7 +454,7 @@ export function useGearUp() {
         void planFor(startRequest(shown.outing), { ...shown.outing, when: shown.outing.when });
       }
     });
-  }, [sensitivity, state.result, state.request.status, state.owner, state.restored, readyToRequest, owner,
+  }, [sensitivity, state.result, state.request, state.owner, state.restored, readyToRequest, owner,
     recommendForShownWeather, planFor, startRequest]);
 
   /**
