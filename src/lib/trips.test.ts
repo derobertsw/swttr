@@ -7,7 +7,8 @@ import { GET } from "@/app/api/v1/trips/[id]/route";
 import { GET as GET_LIST } from "@/app/api/v1/trips/route";
 import { ORGANIZER, SAM, STOWE_STOP, TRIP } from "@/test/tripApi";
 import type { TripFull } from "@/types/trips";
-import { classifyTripStatus, listTripsForUser, loadTripFull, tripFullFor } from "./trips";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { assertCanAccessTrip, classifyTripStatus, listTripsForUser, loadTripFull, TripAccessUnavailable, tripFullFor } from "./trips";
 
 vi.mock("@/lib/api", async (original) => ({
   ...await original<typeof import("@/lib/api")>(),
@@ -133,6 +134,38 @@ describe("Trip loading", () => {
       { ...TRIP, member_count: 1, stop_count: 1, crew_counts: { joined: 1, pending: 0, guests: 0 } },
     ]);
     expect(Date.now() - started).toBe(300);
+  });
+
+  it.each([
+    ["the trip", ["trips"]],
+    ["the membership", ["trip_members"]],
+  ])("answers a failed read of %s as retryable, never as Not found", async (_what, failures) => {
+    vi.useFakeTimers();
+    const { supabase } = database({ trips: [{ ...TRIP, owner_user_id: "another-owner" }], trip_members: [{ ...ORGANIZER }] }, {}, failures);
+    vi.mocked(requireUser).mockResolvedValue({ supabase, userId: ORGANIZER.user_id! });
+    const pending = GET(new NextRequest(`http://localhost/api/v1/trips/${TRIP.id}`), { params: Promise.resolve({ id: TRIP.id }) });
+    await vi.runAllTimersAsync();
+    const response = await pending;
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "Couldn't check access. Try again." });
+  });
+
+  it("still reads the owner's trip when only the membership table fails, since the owner needs no membership", async () => {
+    vi.useFakeTimers();
+    const { supabase } = database({ trips: [{ ...TRIP }] }, {}, ["trip_members"]);
+    expect(await (async () => {
+      const pending = assertCanAccessTrip(supabase, TRIP.id, TRIP.owner_user_id);
+      await vi.runAllTimersAsync();
+      return pending;
+    })()).toMatchObject({ id: TRIP.id });
+  });
+
+  it("treats an id that isn't a trip id as no trip, and any other read error as unknown", async () => {
+    const reading = (error: { code: string; message: string }) => ({
+      from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error }) }) }) }),
+    }) as unknown as SupabaseClient;
+    expect(await assertCanAccessTrip(reading({ code: "22P02", message: "invalid input syntax for type uuid" }), "not-a-uuid", "user-1")).toBeNull();
+    await expect(assertCanAccessTrip(reading({ code: "XX000", message: "Database unavailable" }), TRIP.id, "user-1")).rejects.toBeInstanceOf(TripAccessUnavailable);
   });
 
   it("counts accounts, invitations and managed guests separately, omitting left members", async () => {

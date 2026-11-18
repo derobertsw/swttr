@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TripOfflineSave } from "./OfflineBrief";
 import { readSavedBrief, readSavedBriefs, storeSavedBrief } from "@/lib/offline-briefs";
@@ -113,13 +113,22 @@ describe("Save for offline on the trip (#214)", () => {
     expect(screen.getByRole("button", { name: "Save for offline" })).toBeInTheDocument();
   });
 
-  it("removes the copy once the server says the member can't open the trip any more, and keeps it on other failures", async () => {
+  it.each([
+    ["the server fails", () => briefApi({ fail: 500 }), /^Couldn't check for changes: Couldn't build the trip brief/],
+    // A failed access read (#214 review): retryable, not "not on this trip".
+    ["access couldn't be checked", () => vi.fn(async () => ({ ok: false, status: 503, json: async () => ({ error: "Couldn't check access. Try again." }) }) as Response), /^Couldn't check for changes: Couldn't check access\. Try again\./],
+    ["the connection fails", () => vi.fn(async () => { throw new TypeError("Failed to fetch"); }), /^Showing saved copy; changes since .* are unknown\.$/],
+  ])("keeps the copy when %s", async (_why, api, status) => {
     await storeSavedBrief("user_1", offlineBrief());
-    vi.stubGlobal("fetch", briefApi({ fail: 500 }));
-    const { unmount } = render(<TripOfflineSave tripId="trip-1" />);
-    expect(await screen.findByText(/^Couldn't check for changes/)).toBeInTheDocument();
+    vi.stubGlobal("fetch", api());
+    render(<TripOfflineSave tripId="trip-1" />);
+    expect(await screen.findByText(status)).toBeInTheDocument();
     expect(await readSavedBrief("trip-1", "user_1")).not.toBeNull();
-    unmount();
+    expect(screen.getByRole("link", { name: "Open saved brief" })).toBeInTheDocument();
+  });
+
+  it("removes the copy once the server says the member can't open the trip any more", async () => {
+    await storeSavedBrief("user_1", offlineBrief());
 
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: "Not found" }) }) as Response));
     render(<TripOfflineSave tripId="trip-1" />);
@@ -131,7 +140,7 @@ describe("Save for offline on the trip (#214)", () => {
   it("doesn't keep a brief that finishes downloading after the account signed out", async () => {
     const user = userEvent.setup();
     const preview = briefApi();
-    let finish!: () => void;
+    let finish: (() => void) | undefined;
     // The preview answers at once; the save's download waits until released.
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       if (!saving) return preview(url);
@@ -146,10 +155,13 @@ describe("Save for offline on the trip (#214)", () => {
     await within(dialog).findByRole("heading", { name: "Included" });
     saving = true;
     await user.click(within(dialog).getByRole("button", { name: "Save for offline" }));
+    // The download has started…
+    await waitFor(() => expect(finish).toBeTypeOf("function"));
 
+    // …when the account signs out.
     fakeClerkState.signedIn = false;
     rerender(view());
-    finish();
+    finish!();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect((await readSavedBriefs()).briefs).toEqual([]);
   });

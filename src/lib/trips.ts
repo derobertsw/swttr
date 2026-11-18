@@ -37,7 +37,18 @@ export function enumerateDates(startISO: string, endISO: string): string[] {
 }
 
 /**
+ * Reading the trip or its membership failed, so whether the user is on it
+ * is unknown. Callers answer it as retryable, never as Not found: a saved
+ * offline brief (#214) treats Not found as access removed.
+ */
+export class TripAccessUnavailable extends Error {}
+
+/** A failed read, other than an id that isn't a uuid, which just names no trip. */
+const readFailed = (error: { code?: string } | null) => !!error && error.code !== "22P02";
+
+/**
  * The trip if `userId` owns it or is a current member, otherwise null.
+ * Throws TripAccessUnavailable when either read fails.
  * @public For routes that already hold a client and user id; most routes
  * should use requireTripAccess.
  */
@@ -46,28 +57,31 @@ export async function assertCanAccessTrip(
   tripId: string,
   userId: string
 ): Promise<Trip | null> {
-  const { data: trip } = await supabase
+  const { data: trip, error: tripError } = await supabase
     .from("trips")
     .select("*")
     .eq("id", tripId)
     .maybeSingle();
+  if (readFailed(tripError)) throw new TripAccessUnavailable(tripError!.message);
   if (!trip) return null;
   if (trip.owner_user_id === userId) return trip as Trip;
 
-  const { data: membership } = await supabase
+  const { data: membership, error: memberError } = await supabase
     .from("trip_members")
     .select("id")
     .eq("trip_id", tripId)
     .eq("user_id", userId)
     .neq("status", "left")
     .maybeSingle();
+  if (readFailed(memberError)) throw new TripAccessUnavailable(memberError!.message);
   return membership ? (trip as Trip) : null;
 }
 
 /**
  * The signed-in user, a database client, and the trip, or the error response
  * to return: 401/503 from requireUser, 404 when the trip does not exist or the
- * user is not on it, 403 when `organizerOnly` and the user is not the owner.
+ * user is not on it, 503 when that couldn't be read, 403 when `organizerOnly`
+ * and the user is not the owner.
  */
 export async function requireTripAccess(
   tripId: string,
@@ -76,7 +90,13 @@ export async function requireTripAccess(
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
 
-  const trip = await assertCanAccessTrip(auth.supabase, tripId, auth.userId);
+  let trip: Trip | null;
+  try {
+    trip = await assertCanAccessTrip(auth.supabase, tripId, auth.userId);
+  } catch (error) {
+    if (error instanceof TripAccessUnavailable) return jsonError("Couldn't check access. Try again.", 503);
+    throw error;
+  }
   if (!trip) return jsonError("Not found", 404);
   if (options.organizerOnly && trip.owner_user_id !== auth.userId) {
     return jsonError("Organizer only", 403);
