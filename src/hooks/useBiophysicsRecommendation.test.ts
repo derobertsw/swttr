@@ -53,6 +53,16 @@ describe("useBiophysicsRecommendation", () => {
     });
   });
 
+  it("sends Run Warm/Run Cold, and neutral when the caller has none (#251)", async () => {
+    fetchMock.mockImplementation(async () => Response.json({ recommendation: { score: 80, garments: [] } }));
+    const { result } = renderHook(() => useBiophysicsRecommendation());
+    await act(async () => {
+      await result.current.fetch("running", WEATHER, "moderate", BODY);
+      await result.current.fetch("running", WEATHER, "moderate", BODY, undefined, undefined, "hot");
+    });
+    expect(fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body).temperature_sensitivity)).toEqual(["neutral", "hot"]);
+  });
+
   it("reports activities without a biophysics model as unsupported, without a request", async () => {
     expect(await fetchOutcome("hiking_snowshoeing")).toEqual({ status: "unsupported", data: null });
     expect(fetchMock).not.toHaveBeenCalled();

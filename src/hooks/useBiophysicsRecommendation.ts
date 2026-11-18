@@ -11,7 +11,7 @@ import {
   type ExertionLevel,
   exertionToXcIntensity,
 } from "@/lib/biophysics/exertion";
-import type { UserBodyMetrics } from "@/types/preferences";
+import type { TemperatureSensitivity, UserBodyMetrics } from "@/types/preferences";
 import type { WeatherData } from "@/types/weather";
 import { useAuth } from "@clerk/nextjs";
 import { logWarn } from "@/lib/logger";
@@ -30,6 +30,7 @@ interface UseBiophysicsResult {
     bodyMetrics: UserBodyMetrics,
     signal?: AbortSignal,
     xcContext?: XCContext,
+    sensitivity?: TemperatureSensitivity,
   ) => Promise<BiophysicsOutcome>;
   reset: () => void;
 }
@@ -49,15 +50,19 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  /** Fetch advice with optional cancellation and XC context; return a fallback status on failure. */
+  /**
+   * Fetch advice with optional cancellation, XC context and Run Warm/Run Cold
+   * (neutral when omitted); return a fallback status on failure.
+   */
   const fetchBiophysics = useCallback(
     async (
       activity: string,
       weather: BiophysicsWeather,
       exertion: ExertionLevel,
       bodyMetrics: UserBodyMetrics,
-    signal?: AbortSignal,
-    xcContext?: XCContext,
+      signal?: AbortSignal,
+      xcContext?: XCContext,
+      sensitivity: TemperatureSensitivity = "neutral",
     ): Promise<BiophysicsOutcome> => {
       signal?.throwIfAborted();
       if (!isBiophysicsSupported(activity)) {
@@ -94,6 +99,8 @@ export function useBiophysicsRecommendation(): UseBiophysicsResult {
             use_wardrobe_only: Boolean(userId),
             height_inches: bodyMetrics.heightInches,
             weight_lbs: bodyMetrics.weightLbs,
+            // Always sent, so the server uses this choice rather than a saved one still being updated.
+            temperature_sensitivity: sensitivity,
           }),
         });
 

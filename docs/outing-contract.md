@@ -17,14 +17,14 @@ An `Outing` is what a person asked for, as submitted:
 
 Every outing is plain data, so it can be stored and restored.
 
-Account preferences aren't part of the outing: temperature sensitivity, body metrics and wardrobe. The request reads them for the signed-in user. On the device, `usePreferences` keeps sensitivity, default activity, height and weight apart for the guest and for each account (`swttr-preferences:guest`, `swttr-preferences:user:<id>`), and reads neither until Clerk says who's signed in. The first account to sign in takes the guest's copy when it has nothing saved, and drops it otherwise (#256).
+Account preferences aren't part of the outing: temperature sensitivity, body metrics and wardrobe. The request reads them for the signed-in user. Each result records the sensitivity it was asked with; changing Run Warm/Run Cold asks for the shown result again at the same weather, and a request that finishes after a change asks again before anything is shown (#251). On the device, `usePreferences` keeps sensitivity, default activity, height and weight apart for the guest and for each account (`swttr-preferences:guest`, `swttr-preferences:user:<id>`), and reads neither until Clerk says who's signed in. The first account to sign in takes the guest's copy when it has nothing saved, and drops it otherwise (#256).
 
 ## Result
 
 A result keeps the outing it was requested for:
 
-- **`{ kind: "layers", outing, weather, advice }`** for a one-day outing, now or later. `weather` is the reading the advice used. Its `context` says where it applies and, for a forecast, the forecast hour and the place's time zone.
-- **`{ kind: "plan", outing, plan }`** for a 2–7 day outing. The plan's days carry their own forecasts.
+- **`{ kind: "layers", outing, weather, advice, sensitivity }`** for a one-day outing, now or later. `weather` is the reading the advice used. Its `context` says where it applies and, for a forecast, the forecast hour and the place's time zone.
+- **`{ kind: "plan", outing, plan, sensitivity }`** for a 2–7 day outing. The plan's days carry their own forecasts.
 
 `advice` says what kind of advice a one-day result has:
 

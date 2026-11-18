@@ -8,6 +8,7 @@ import type { BiophysicsRecommendation, BiophysicsStatus } from "@/types/biophys
 import type { MultiDayLayerPlan } from "@/types/plan";
 import type { LocationSuggestion, Recommendation } from "@/types/recommendations";
 import type { WeatherData } from "@/types/weather";
+import type { TemperatureSensitivity } from "@/types/preferences";
 
 /**
  * When an outing happens. A later date ("yyyy-MM-dd") and time ("HH:mm") are
@@ -40,10 +41,13 @@ export type Advice =
   | { kind: "general"; layers: Recommendation; reason: PersonalizationGap }
   | { kind: "none"; reason: PersonalizationGap };
 
-/** A result, tied to the outing it was requested for. */
+/**
+ * A result, tied to the outing it was requested for, and to the Run Warm/Run
+ * Cold setting it was asked with (#251), so a change of setting asks again.
+ */
 export type OutingResult =
-  | { kind: "layers"; outing: Outing; weather: WeatherData; advice: Advice }
-  | { kind: "plan"; outing: Outing; plan: MultiDayLayerPlan };
+  | { kind: "layers"; outing: Outing; weather: WeatherData; advice: Advice; sensitivity?: TemperatureSensitivity }
+  | { kind: "plan"; outing: Outing; plan: MultiDayLayerPlan; sensitivity?: TemperatureSensitivity };
 
 export type LayersResult = Extract<OutingResult, { kind: "layers" }>;
 export type PlanResult = Extract<OutingResult, { kind: "plan" }>;

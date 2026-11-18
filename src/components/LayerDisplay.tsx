@@ -239,6 +239,8 @@ const LayerDisplay = ({
 
   // Thermal evaluation of the worn layers (including edits) runs on the server.
   const climbInput: PhaseEvaluationInput = {
+    // Run Warm/Run Cold narrowed these targets: the check explains that (#251).
+    ...(ireq?.policy?.preference?.targetsChanged ? { sensitivity: ireq.policy.preference.sensitivity } : {}),
     items: evaluationItemsByBodyPart(climb.layers),
     requireStandalone: Boolean(ireq?.policy) || ireq?.outfit_checks?.require_standalone === true,
     protectionNeeds: ireq?.policy?.protection ?? ireq?.outfit_checks?.protection,

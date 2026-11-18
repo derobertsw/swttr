@@ -22,6 +22,7 @@ interface EnsembleScoringInput {
   activity: ActivityProfile;
   activityKey: ActivityType;
   comfortContext?: {
+    sensitivity?: PhaseEvaluationInput['sensitivity'];
     requireStandalone?: boolean;
     protectionNeeds?: PhaseEvaluationInput['protectionNeeds'];
     targetRange: [number, number];
@@ -63,6 +64,7 @@ export function buildScoredRecommendation(
   const legs = garments.filter(g => g.covers_legs);
   const context = input.comfortContext;
   const evaluation = context ? evaluatePhase({
+    ...(context.sensitivity ? { sensitivity: context.sensitivity } : {}),
     requireStandalone: context.requireStandalone,
     protectionNeeds: context.protectionNeeds,
     items: {

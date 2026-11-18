@@ -255,7 +255,35 @@ export interface VentilationAdvice {
   estimates: VentOpenEstimate[];
 }
 
+/**
+ * What Run Warm or Run Cold did to a personalized response (#251). Absent for
+ * neutral, which uses the standard targets.
+ */
+export interface RecommendationPreference {
+  /** `hot` is Run Warm. */
+  sensitivity: 'hot' | 'cold';
+  /** Sent with the request, or the signed-in user's saved setting. */
+  source: 'request' | 'saved';
+  /**
+   * - `not_supported`: this sport's targets don't take the setting yet.
+   * - `no_change`: the setting can't narrow the bands in these conditions.
+   * - `targets_only`: narrowed targets, with no gear to choose from.
+   * - `same_layers`: narrowed targets; the standard layers still fit best.
+   * - `changed_layers`: narrowed targets chose other layers.
+   * - `standard_layers_kept`: other layers would fall short of minimum warmth
+   *   (Run Warm) or go past the upper limit (Run Cold), so the standard ones stay.
+   */
+  effect: 'not_supported' | 'no_change' | 'targets_only' | 'same_layers' | 'changed_layers' | 'standard_layers_kept';
+  /** Whether the response's targets (and so its scoring and manual edits) are narrowed for the setting. */
+  targets_adjusted: boolean;
+  /** The whole-body band the standard targets use, when the targets are adjusted. */
+  standard_target_range?: [number, number];
+  message: string;
+}
+
 export interface BiophysicsRecommendation {
+  /** Run Warm/Run Cold and its effect; absent for neutral. */
+  preference?: RecommendationPreference;
   /** What the activity needs, before wardrobe matching: running/XC clothing
    * (requirement-first flow), and the helmet alpine, cycling and the touring
    * descent require. Absent when a sport has neither. */
@@ -335,6 +363,8 @@ export interface EvaluationItem extends GarmentSemantics {
 }
 
 export interface PhaseEvaluationInput {
+  /** Run Warm/Run Cold when the targets were narrowed for it; explains them, never changes them. */
+  sensitivity?: 'hot' | 'cold';
   requireStandalone?: boolean;
   protectionNeeds?: { wind: boolean; wet: boolean; poleGrip: boolean };
   /** Server-issued moisture heuristic threshold, forwarded with phase targets. */

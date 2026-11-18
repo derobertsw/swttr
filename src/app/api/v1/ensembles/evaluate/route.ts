@@ -27,8 +27,9 @@ function isTargetMap(value: unknown): boolean {
 /** Validate phase inputs and whitelist item references before catalog resolution. */
 function parsePhase(value: unknown): PhaseEvaluationInput | null {
   if (!value || typeof value !== "object") return null;
-  const { itemClo, items: metadata, targets, minTargets, arms, targetRange, extremityMaxTargets, breathabilityTarget, requireStandalone, protectionNeeds } = value as Record<string, unknown>;
+  const { itemClo, items: metadata, targets, minTargets, arms, targetRange, extremityMaxTargets, breathabilityTarget, requireStandalone, protectionNeeds, sensitivity } = value as Record<string, unknown>;
 
+  if (sensitivity !== undefined && sensitivity !== 'hot' && sensitivity !== 'cold') return null;
   if (requireStandalone !== undefined && typeof requireStandalone !== 'boolean') return null;
   if (protectionNeeds !== undefined && (!protectionNeeds || typeof protectionNeeds !== 'object'
     || !['wind', 'wet', 'poleGrip'].every(key => typeof (protectionNeeds as Record<string, unknown>)[key] === 'boolean'))) return null;
@@ -95,6 +96,7 @@ function parsePhase(value: unknown): PhaseEvaluationInput | null {
   return {
     ...(metadata !== undefined ? { items: parsedItems } : { itemClo: parsedClo }),
     targets, minTargets, arms, targetRange, extremityMaxTargets, breathabilityTarget, requireStandalone, protectionNeeds,
+    ...(sensitivity ? { sensitivity } : {}),
   } as PhaseEvaluationInput;
 }
 
