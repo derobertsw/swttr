@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Settings } from "lucide-react";
@@ -94,6 +94,9 @@ function dayCount(start: string, end: string) {
  * one is its own page. The bar sticks below the safe area so a long day can
  * change section without scrolling back up; `data-trip-sections` gives the
  * page scroll padding (globals.css), so linked headings land below it.
+ * Four in a row need about 17.5rem; with enlarged text a phone has less than
+ * that, so they go two by two rather than run into each other (#337). The
+ * container query is in rem, so it follows the text size.
  */
 function TripSectionNav({ tripId, current, currentIsSectionPage, planPath }: {
   tripId: string;
@@ -102,9 +105,23 @@ function TripSectionNav({ tripId, current, currentIsSectionPage, planPath }: {
   currentIsSectionPage: boolean;
   planPath: string | null;
 }) {
+  // The bar is one row or two (enlarged text), so the page's scroll padding
+  // (globals.css) follows its actual height and linked headings clear it.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(() => root.style.setProperty("--trip-sections-height", `${nav.offsetHeight}px`));
+    observer.observe(nav);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--trip-sections-height");
+    };
+  }, []);
   return (
-    <nav aria-label="Trip sections" data-trip-sections className="sticky top-[env(safe-area-inset-top)] z-20 bg-background">
-      <ul className="grid grid-cols-4 border-b border-border sm:flex sm:gap-2">
+    <nav ref={navRef} aria-label="Trip sections" data-trip-sections className="@container sticky top-[env(safe-area-inset-top)] z-20 bg-background">
+      <ul className="grid grid-cols-2 border-b border-border @min-[17.5rem]:grid-cols-4 sm:flex sm:gap-2">
         {TRIP_SECTIONS.map((section) => {
           const active = section.id === current;
           // Plan, from elsewhere, goes back to the day it showed, or opens

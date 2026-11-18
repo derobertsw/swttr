@@ -324,7 +324,8 @@ export function EquipmentItems({ equipment, busy, onQuantity, onRemove, onAdd, c
         </p>
       )}
       {editable ? (
-        <Button type="button" variant="outline" className="mt-3" onClick={onAdd}>
+        // The label wraps rather than run past a phone's edge with enlarged text (#337).
+        <Button type="button" variant="outline" className="mt-3 h-auto min-h-11 max-w-full whitespace-normal py-2" onClick={onAdd}>
           <Plus aria-hidden="true" />
           {items.length > 0 ? "Add more touring equipment" : "Add touring equipment"}
         </Button>

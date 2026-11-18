@@ -55,6 +55,34 @@ describe("Trip workspace (#330)", () => {
     ]);
   });
 
+  // jsdom doesn't lay out, so this pins the classes; docs/qa/337-group-planning
+  // measured the labels running into each other at 200% text on a phone.
+  it("puts the section tabs two by two when four in a row don't fit the text size (#337)", async () => {
+    await open("/trips/trip-1/days/2026-10-10");
+    const nav = screen.getByRole("navigation", { name: "Trip sections" });
+    expect(nav).toHaveClass("@container");
+    expect(within(nav).getByRole("list")).toHaveClass("grid-cols-2", "@min-[17.5rem]:grid-cols-4");
+    expect(within(nav).getByRole("list")).not.toHaveClass("grid-cols-4");
+  });
+
+  it("gives the page's scroll padding the bar's actual height, one row or two (#337)", async () => {
+    let resized = () => {};
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: () => void) { resized = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    const view = await open("/trips/trip-1/days/2026-10-10");
+    const nav = screen.getByRole("navigation", { name: "Trip sections" });
+    const root = document.documentElement;
+    vi.spyOn(nav, "offsetHeight", "get").mockReturnValue(88);
+    act(() => resized());
+    expect(root.style.getPropertyValue("--trip-sections-height")).toBe("88px");
+    view.unmount();
+    expect(root.style.getPropertyValue("--trip-sections-height")).toBe("");
+    vi.unstubAllGlobals();
+  });
+
   it.each([
     ["/trips/trip-1", "Plan", "page"],
     ["/trips/trip-1/days/2026-10-10", "Plan", "true"],
