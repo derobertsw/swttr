@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireTripAccess } from "@/lib/trips";
+import { readMemberPacking } from "@/lib/trip-member-packing";
 import { createFakeSupabase } from "@/test/fakeSupabase";
 import { ORGANIZER, SAM, STOWE_STOP, TRIP } from "@/test/tripApi";
 import { savedOutfit } from "@/test/savedKit";
@@ -9,6 +10,10 @@ import type { TripOfflineBriefResponse } from "@/types/trip-offline-brief";
 import { GET } from "./route";
 
 vi.mock("@/lib/trips", async (original) => ({ ...await original<typeof import("@/lib/trips")>(), requireTripAccess: vi.fn() }));
+vi.mock("@/lib/trip-member-packing", async (original) => {
+  const actual = await original<typeof import("@/lib/trip-member-packing")>();
+  return { ...actual, readMemberPacking: vi.fn(actual.readMemberPacking) };
+});
 
 // Saturday–Monday at Stowe. Alex has joined; Sam's invitation is pending.
 const ALEX = { ...SAM, id: "member-alex", user_id: "user-2", display_name: "Alex", status: "joined", invite_token: null };
@@ -25,10 +30,10 @@ const get = (query = "") => GET(
   new NextRequest(`http://localhost/api/v1/trips/${TRIP.id}/brief${query}`),
   { params: Promise.resolve({ id: TRIP.id }) },
 );
-const signIn = (userId: string) => {
+const signIn = (userId: string, tripDays = days) => {
   const supabase = createFakeSupabase({
     trips: [TRIP], trip_stops: [STOWE_STOP], trip_members: [ORGANIZER, SAM, ALEX],
-    trip_days: structuredClone(days), trip_member_day_kits: structuredClone(kits), trip_group_gear: [],
+    trip_days: structuredClone(tripDays), trip_member_day_kits: structuredClone(kits), trip_group_gear: [],
   } as unknown as Parameters<typeof createFakeSupabase>[0]) as unknown as SupabaseClient;
   vi.mocked(requireTripAccess).mockResolvedValue({ supabase, userId, trip: TRIP });
 };
@@ -83,5 +88,13 @@ describe("GET /api/v1/trips/:id/brief", () => {
     const gone = await get("?dates=2026-11-01");
     expect(gone.status).toBe(409);
     expect(await gone.json()).toEqual({ error: "None of these days are on the trip any more. Choose the days to save again." });
+  });
+
+  it("says touring equipment couldn't be read when the packing list reads without it", async () => {
+    signIn("user-2", days.map((day) => day.id === "day-11" ? { ...day, activity: "Backcountry" } : day));
+    vi.mocked(readMemberPacking).mockResolvedValueOnce({ saved: null, readable: true, equipment: false });
+    const body = await (await get("?dates=2026-10-11")).json() as TripOfflineBriefResponse;
+    expect(body.brief.days[0].equipment).toEqual([]);
+    expect(body.brief.contents.absent).toContain("Your touring equipment couldn't be read, so it isn't in this copy");
   });
 });

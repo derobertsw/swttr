@@ -53,7 +53,8 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
       // Without a member row there's no packing list, so no equipment to save.
       me ? readMemberPacking(supabase, me.id).catch(() => null) : Promise.resolve({ saved: null, readable: true, equipment: true }),
     ]);
-    const equipment = packing?.readable ? (() => {
+    // Before the equipment column (032) the list reads but its equipment doesn't: the brief says so.
+    const equipment = packing?.readable && packing.equipment ? (() => {
       const touring = buildTouringEquipment({ dates: touringDates(full), saved: readEquipment(packing.saved?.equipment), names: [], editable: false });
       return { items: touring.items, dates: touring.dates, checks: readPackingChecks(packing.saved?.checks) };
     })() : null;

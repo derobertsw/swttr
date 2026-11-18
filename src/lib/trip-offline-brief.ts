@@ -310,7 +310,8 @@ export function buildOfflineBrief({ full, userId, dates, drive, equipment, now }
         yours: yoursTonight,
         crew: mine && context && mine.staying_tonight !== context.staying_tonight ? context.staying_tonight : null,
         moving: move ? `${move.from} → ${move.to}${moveTimes ? `: ${moveTimes} (property local time)` : ""}` : null,
-        stay: stayOf(stayById(mine?.tonight_stay_id ?? context?.tonight_stay_id)),
+        // A personal night with no stay keeps none; the crew's stay is only for someone without one.
+        stay: stayOf(stayById(mine ? mine.tonight_stay_id : context?.tonight_stay_id)),
       } : null,
       tour_plan: plan ? {
         objective: plan.objective,

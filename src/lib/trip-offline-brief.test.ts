@@ -167,6 +167,14 @@ describe("A member's offline trip brief (#214)", () => {
     expect(orgSun.starting_from).toEqual({ yours: "Ridge cabin · only this day", crew: null });
   });
 
+  it("keeps a member's own night with no stay, rather than the crew's stay", () => {
+    const trip = fullTrip();
+    const org = trip.lodging!.people.find((person) => person.member_id === "m-org")!;
+    org.days = org.days.map((entry) => entry.date === SAT ? { ...entry, tonight_stay_id: null, staying_tonight: "No accommodation needed" } : entry);
+    const [sat] = buildOfflineBrief({ full: tripFullFor(trip, "user-org"), userId: "user-org", dates: [SAT], drive: drive(), equipment, now: NOW }).days;
+    expect(sat.tonight).toMatchObject({ yours: "No accommodation needed", crew: "Glacier Park Lodge", stay: null });
+  });
+
   it("keeps the tour plan, conditions sources with dated reviews, and the member's day checks", () => {
     const [sat] = briefFor("user-org").days;
     expect(sat.tour_plan).toMatchObject({
