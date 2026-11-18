@@ -45,6 +45,25 @@ function fit(map: LibreMap, places: TripMapPlace[]) {
   map.fitBounds(bounds, { padding: 65, maxZoom: 12, duration: 0 });
 }
 
+/**
+ * Whether a failed request was one of the style's sprite files: MapLibre adds
+ * "@2x.json" or ".png" to the sprite's path, and reports a network failure
+ * with the request's URL too.
+ */
+function spriteRequest(map: LibreMap, url: unknown): boolean {
+  if (typeof url !== "string") return false;
+  try {
+    const file = new URL(url);
+    return map.getSprite().some((sprite) => {
+      const base = new URL(sprite.url);
+      return file.origin === base.origin && file.pathname.startsWith(base.pathname);
+    });
+  } catch {
+    // No stylesheet yet (the style itself failed), or a URL that isn't absolute.
+    return false;
+  }
+}
+
 /** Shapes are bundled pixels, independent of a provider's available glyphs. */
 function roleImage(role: MapDisplayRole, primary: string, contrast: string) {
   const canvas = document.createElement("canvas");
@@ -96,8 +115,14 @@ export default function TripMapCanvas(props: Props) {
       map.getCanvas().setAttribute("aria-label", "Trip places map. Use the place list for keyboard navigation.");
       map.getCanvas().setAttribute("tabindex", "-1");
       let loaded = false;
-      // Tile/glyph/sprite failures can recover after the first successful load.
-      map.on("error", () => { if (!loaded) fail(); });
+      // Before the first load, only a failure that leaves no map fails it: the style, a source such
+      // as its TileJSON, the worker. One tile (or its glyphs) or the sprite loses part of the basemap,
+      // which is all it does after load too, and those can recover (#235).
+      map.on("error", (event) => {
+        if (loaded) return;
+        const partial = !!(event as { tile?: unknown } | undefined)?.tile || spriteRequest(map, (event?.error as { url?: unknown } | undefined)?.url);
+        if (!partial) fail();
+      });
       map.getCanvas().addEventListener("webglcontextlost", fail);
       map.on("load", () => {
         if (disposed) return;

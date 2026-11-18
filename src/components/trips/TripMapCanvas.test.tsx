@@ -3,6 +3,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { tripMapFixture } from "@/test/tripMap";
 import TripMapCanvas from "./TripMapCanvas";
 
+const SPRITE = "https://tiles.example/sprites/ofm_f384/ofm";
 const sdk = vi.hoisted(() => ({ map: null as unknown as FakeMap, fail: false, worker: vi.fn(), bounds: [] as number[][][] }));
 type Callback = (event?: unknown) => unknown;
 class FakeMap {
@@ -13,6 +14,8 @@ class FakeMap {
   dragRotate = { disable: vi.fn() }; touchZoomRotate = { disableRotation: vi.fn() };
   fitBounds = vi.fn(); remove = vi.fn(); resize = vi.fn(); zoomIn = vi.fn(); zoomOut = vi.fn(); addImage = vi.fn();
   on(event: string, layer: string | Callback, cb?: Callback) { this.events[`${event}:${typeof layer === "string" ? layer : ""}`] = cb ?? layer as Callback; }
+  /** The style's sprite, as MapLibre reports it once the style has loaded. */
+  getSprite() { return [{ id: "default", url: SPRITE }]; }
   getCanvas() { return this.canvas; }
   addSource(id: string) { this.sources[id] = { setData: vi.fn(), getClusterLeaves: vi.fn() }; }
   getSource(id: string) { return this.sources[id]; }
@@ -91,15 +94,26 @@ describe("Lazy map canvas", () => {
     act(() => sdk.map.getCanvas().dispatchEvent(new Event("webglcontextlost")));
     expect(input.onError).toHaveBeenCalledOnce();
   });
-  it("reports worker/tile/WebGL errors and initialization timeout for list recovery", async () => {
+  it("reports style, source and WebGL errors and initialization timeout for list recovery", async () => {
     vi.useFakeTimers(); const input = props(); const view = render(<TripMapCanvas {...input} />);
-    act(() => sdk.map.events["error:"]()); expect(input.onError).toHaveBeenCalledOnce();
+    act(() => sdk.map.events["error:"]({ error: new Error("Failed to fetch the style") })); expect(input.onError).toHaveBeenCalledOnce();
     act(() => vi.advanceTimersByTime(20_000)); expect(input.onError).toHaveBeenCalledTimes(2);
     view.unmount();
     sdk.fail = true;
     render(<TripMapCanvas {...input} />); expect(input.onError).toHaveBeenCalledTimes(3);
   });
 
+  it("keeps the map through a tile or sprite failure before the first load, as after it, but not a source failure (#235)", () => {
+    const input = props(); render(<TripMapCanvas {...input} />);
+    // One tile, its glyphs or the sprite only loses part of the basemap.
+    act(() => sdk.map.events["error:"]({ error: Object.assign(new Error("AJAXError: Not Found (404)"), { url: "https://tiles.example/planet/1/0/0.pbf" }), tile: {}, sourceId: "openmaptiles" }));
+    act(() => sdk.map.events["error:"]({ error: Object.assign(new Error("Failed to fetch"), { url: `${SPRITE}@2x.json` }) }));
+    act(() => sdk.map.events["error:"]({ error: Object.assign(new Error("Failed to fetch"), { url: `${SPRITE}@2x.png` }) }));
+    expect(input.onError).not.toHaveBeenCalled();
+    // A source that never loads, such as its TileJSON, leaves no basemap at all.
+    act(() => sdk.map.events["error:"]({ error: Object.assign(new Error("Failed to fetch"), { url: "https://tiles.example/planet" }), sourceId: "openmaptiles" }));
+    expect(input.onError).toHaveBeenCalledOnce();
+  });
   it("labels a day's roles and fits the drive's two places only when asked", async () => {
     const day = data.days.find((entry) => entry.date === "2027-01-10")!;
     const places = data.places.filter((place) => place.visits.some((visit) => visit.date === day.date));
