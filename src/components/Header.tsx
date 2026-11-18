@@ -123,14 +123,16 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
       variant === "compact" ? "gap-3" : "gap-4"
     )}>
       <div className="flex items-center gap-2">
-        {/* Mobile: show logo */}
+        {/* Mobile: show logo. It's a wordmark, so it keeps its pixel size when
+            the text is enlarged; in rem, 200% text pushed the menu button
+            past a phone's edge (#337). */}
         <Link href="/" onClick={onLogoClick} className={cn("rounded-control", mobileOnly)}>
           <span
             className={cn(
               "block leading-none font-bold text-foreground",
               variant === "compact"
-                ? "text-[2rem] tracking-[0.16em]"
-                : "text-[2.5rem] tracking-[0.2em]"
+                ? "text-[32px] tracking-[0.16em]"
+                : "text-[40px] tracking-[0.2em]"
             )}
           >
             SWTTR

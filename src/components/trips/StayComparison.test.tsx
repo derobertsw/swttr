@@ -5,9 +5,10 @@ import { StayComparison } from "./StayComparison";
 import type { DriveLeg } from "@/lib/locations/routing";
 import { stayWindowChoices, summarizeCandidate } from "@/lib/trip-stay-candidates";
 import { compareStays, parseComparisonRequest } from "@/lib/trip-stay-comparison";
+import { previewLodgingChange } from "@/lib/trip-lodging-changes";
 import { place, splitDriveTrip } from "@/test/driveTrip";
-import { FRI, PINE, SPLIT_TRIP, SUN } from "@/test/splitStays";
-import type { TripFull, TripLocation, TripStayCandidate, TripStayCandidates } from "@/types/trips";
+import { ALEX, BLAIR, CASEY, DANA, ELI, FRAN, FRI, PINE, SPLIT_MEMBERS, SPLIT_TRIP, splitRows, SUN } from "@/test/splitStays";
+import type { TripFull, TripLocation, TripStayCandidate, TripStayCandidates, TripStayUsePreview } from "@/types/trips";
 
 const A = "3c000000-0000-4000-8000-000000000001", B = "3c000000-0000-4000-8000-000000000002";
 const LONG = "The Very Long Name Of A Mountainside Chalet With Hot Tub, Sauna And A Ski-In Ski-Out Boot Room Near The Gondola Base";
@@ -52,8 +53,11 @@ async function renderPage({ full = splitDriveTrip(), candidates = [candidate(A, 
   const state = { candidates, available };
   const api = fakeApi(full, state, writes);
   vi.stubGlobal("fetch", api);
-  await act(async () => { render(<StayComparison data={full} canEdit={canEdit} initial={initial} />); });
-  return { api, state, user: userEvent.setup() };
+  const onPlanSaved = vi.fn().mockResolvedValue(undefined);
+  let view: ReturnType<typeof render> | undefined;
+  await act(async () => { view = render(<StayComparison data={full} canEdit={canEdit} initial={initial} onPlanSaved={onPlanSaved} />); });
+  const rerender = (next: TripFull) => act(async () => { view!.rerender(<StayComparison data={next} canEdit={canEdit} initial={initial} onPlanSaved={onPlanSaved} />); });
+  return { api, state, onPlanSaved, rerender, user: userEvent.setup() };
 }
 
 describe("Compare stays (#213)", () => {
@@ -188,5 +192,88 @@ describe("Compare stays (#213)", () => {
     await renderPage({ candidates: [], available: false });
     expect(await screen.findByText("Options can't be added yet. Saved stays can still be compared.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add a stay to compare" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Use for these nights (#213)", () => {
+  beforeEach(() => { window.history.replaceState(null, "", "/trips/trip-1/stays/compare"); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  /** The server's preview of everyone, or the people named, moving into Ridge chalet on Friday and Saturday. */
+  const usePreview = (memberIds = [ALEX, BLAIR, CASEY, DANA, ELI, FRAN].map((person) => person.id)): TripStayUsePreview => {
+    const preview = previewLodgingChange(SPLIT_TRIP, splitRows(), SPLIT_MEMBERS, { action: "save", existing: false, occupants: memberIds, stay: {
+      id: A, name: "Ridge chalet", check_in: FRI, check_out: SUN, type: null, address: null, property_url: null, check_in_time: null, check_out_time: null,
+      notes: null, booking_status: "not_booked", location: RIDGE } });
+    if ("error" in preview) throw new Error(preview.error);
+    return { ...preview, member_ids: memberIds, stay_name: "Ridge chalet", new_stay: true, candidate_revision: 1, booked_kept: ["Pine rental", "Village hotel"] };
+  };
+  const initial = { options: [`stay:${PINE.id}`, `candidate:${A}`], first_night: FRI, checkout: SUN };
+
+  it("previews who and which nights change, then saves only after the replacement is confirmed", async () => {
+    const sent: Array<Record<string, unknown>> = [];
+    const full = splitDriveTrip();
+    // The trip as it's loaded again after the save: Ridge chalet is a stay, with the option's id.
+    const after: TripFull = { ...full, lodging: { ...full.lodging!, stays: [...full.lodging!.stays, { ...full.lodging!.stays[0], id: A, name: "Ridge chalet", location: RIDGE, booking_status: "not_booked" }] } };
+    const { onPlanSaved, rerender, state, user } = await renderPage({ full, initial, writes: {
+      [`POST ${base}/use`]: (body: unknown) => {
+        const request = body as Record<string, unknown>;
+        sent.push(request);
+        return request.preview ? { status: 200, body: usePreview(request.member_ids as string[] | undefined) } : { status: 200, body: { revision: 5 } };
+      },
+    } });
+    onPlanSaved.mockImplementation(async () => { state.candidates.splice(0, 1); await rerender(after); });
+    await user.click((await screen.findAllByRole("button", { name: "Use Ridge chalet for these nights" }))[0]);
+    expect(await screen.findByText("Move Alex, Blair and Dana from Pine rental to Ridge chalet for the nights of Fri Oct 9 and Sat Oct 10.")).toBeInTheDocument();
+    expect(sent[0]).toEqual({ option: `candidate:${A}`, first_night: FRI, checkout: SUN, preview: true });
+    expect(screen.getByText("Nobody else's nights change.")).toBeInTheDocument();
+    expect(screen.getByText("Pine rental and Village hotel stay booked: nothing is canceled. Change the booking on Stays once you've changed the reservation.")).toBeInTheDocument();
+    expect(screen.getByText("Ridge chalet becomes a saved stay for Fri Oct 9 → Sun Oct 11 · 2 nights, booking not confirmed. Your other options stay as they are.")).toBeInTheDocument();
+    // Their existing plans need explicit replacement before saving.
+    const use = screen.getByRole("button", { name: "Use for these nights" });
+    expect(use).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: /Replace their existing plans for Fri Oct 9, Sat Oct 10/ }));
+    await user.click(screen.getByRole("button", { name: "Replace those nights and use it" }));
+    expect(await screen.findByText("Ridge chalet is now the stay for these nights. Bookings weren't changed.")).toBeInTheDocument();
+    const preview = usePreview();
+    expect(sent[1]).toEqual({ option: `candidate:${A}`, first_night: FRI, checkout: SUN, preview: false, member_ids: preview.member_ids,
+      expected_revision: preview.revision, expected_people_key: preview.people_key, mutation_id: expect.any(String), replace_nights: true,
+      // The option as reviewed: an edit to it since then is refused.
+      expected_candidate_revision: 1 });
+    expect(onPlanSaved).toHaveBeenCalled();
+    // The option is a saved stay now, and stays in the comparison as one.
+    await waitFor(() => expect(window.location.search).toContain(`stay%3A${A}`));
+  }, 20_000);
+
+  it("asks again for the people chosen, and reviews again after the plan changed", async () => {
+    const sent: Array<Record<string, unknown>> = [];
+    let saves = 0;
+    const { onPlanSaved, user } = await renderPage({ initial, writes: {
+      [`POST ${base}/use`]: (body: unknown) => {
+        const request = body as Record<string, unknown>;
+        sent.push(request);
+        if (request.preview) return { status: 200, body: usePreview(request.member_ids as string[] | undefined) };
+        return ++saves === 1 ? { status: 409, body: { error: "The lodging plan changed. Review the saved plan before retrying." } } : { status: 200, body: { revision: 6 } };
+      },
+    } });
+    await user.click((await screen.findAllByRole("button", { name: "Use Ridge chalet for these nights" }))[0]);
+    await screen.findByText(/Move Alex, Blair and Dana/);
+    for (const name of [/^Blair/, /^Casey/, /^Dana/, /^Eli/, /^Fran/]) await user.click(screen.getByRole("checkbox", { name }));
+    expect(screen.queryByText(/Move Alex/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Review nights" }));
+    expect(await screen.findByText("Move Alex from Pine rental to Ridge chalet for the nights of Fri Oct 9 and Sat Oct 10.")).toBeInTheDocument();
+    expect(sent.at(-1)).toMatchObject({ member_ids: [ALEX.id], preview: true });
+    await user.click(screen.getByRole("checkbox", { name: /Replace their existing plans/ }));
+    await user.click(screen.getByRole("button", { name: "Replace those nights and use it" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The lodging plan changed.");
+    await user.click(screen.getByRole("button", { name: "Review again" }));
+    expect(onPlanSaved).toHaveBeenCalledOnce();
+    await screen.findByText("Move Alex from Pine rental to Ridge chalet for the nights of Fri Oct 9 and Sat Oct 10.");
+    expect(sent.at(-1)).toMatchObject({ member_ids: [ALEX.id], preview: true });
+  }, 20_000);
+
+  it("isn't offered to members", async () => {
+    await renderPage({ initial, canEdit: false });
+    await screen.findAllByRole("table");
+    expect(screen.queryByRole("button", { name: /for these nights/ })).not.toBeInTheDocument();
   });
 });

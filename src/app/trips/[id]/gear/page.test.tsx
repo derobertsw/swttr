@@ -236,6 +236,8 @@ describe("Group gear page", () => {
       const section = (await screen.findByRole("heading", { name: "Shared touring items" })).closest("section")!;
       expect(section).toHaveTextContent("Group items for the Backcountry days: Sat Oct 10, Sun Oct 11.");
       const open = within(section).getByRole("button", { name: "Add shared touring items" });
+      // Its label wraps with enlarged text rather than run off a phone (#337).
+      expect(open).toHaveClass("whitespace-normal");
       await user.click(open);
       const dialog = await screen.findByRole("dialog", { name: "Shared touring items" });
       expect(dialog).toHaveTextContent("Added items start unassigned");
