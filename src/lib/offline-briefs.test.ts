@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { IDBObjectStore } from "fake-indexeddb";
 import {
   clearSavedBriefs, countSavedBriefs, fetchOfflineBrief, noteSignedInAccount, readOfflineBrief, readSavedBrief, readSavedBriefs,
-  reconcileSavedBriefs, removeSavedBrief, savedBriefsAccountHint, storeSavedBrief,
+  reconcileSavedBriefs, removeSavedBrief, saveTicket, savedBriefsAccountHint, storeSavedBrief,
 } from "@/lib/offline-briefs";
 import { fakeTripApi, reply } from "@/test/tripApi";
 import { briefResponse, offlineBrief, resetDeviceStorage } from "@/test/offlineBrief";
@@ -51,6 +52,36 @@ describe("Trip briefs saved on this device (#214)", () => {
     noteSignedInAccount("user_2");
     await expect(storeSavedBrief("user_1", offlineBrief({ revision: "rev-late" }))).rejects.toThrow("nothing was saved");
     expect((await readSavedBriefs()).briefs[0].brief.revision).toBe("rev-1");
+  });
+
+  it("doesn't keep a save when the account signs out while its write transaction waits", async () => {
+    noteSignedInAccount("user_1");
+    // The sign-out lands while the write reads what's already stored.
+    const getAll = IDBObjectStore.prototype.getAll;
+    const spy = vi.spyOn(IDBObjectStore.prototype, "getAll").mockImplementation(function (this: IDBObjectStore, ...args) {
+      noteSignedInAccount(null);
+      return getAll.apply(this, args);
+    });
+    try {
+      await expect(storeSavedBrief("user_1", offlineBrief())).rejects.toThrow("nothing was saved");
+    } finally {
+      spy.mockRestore();
+    }
+    expect((await readSavedBriefs()).briefs).toEqual([]);
+    expect(savedBriefsAccountHint()).toBeNull();
+  });
+
+  it("refuses a download that finishes in one tab after another tab signed out", async () => {
+    noteSignedInAccount("user_1");
+    // This tab took its ticket and started downloading…
+    const ticket = await saveTicket();
+    // …while the other tab signed out, clearing the device, before this tab heard of it.
+    await clearSavedBriefs();
+    await expect(storeSavedBrief("user_1", offlineBrief(), ticket)).rejects.toThrow("nothing was saved");
+    expect((await readSavedBriefs()).briefs).toEqual([]);
+    // A save started after the sign-out, with its own ticket, is fine.
+    await storeSavedBrief("user_1", offlineBrief(), await saveTicket());
+    expect((await readSavedBriefs()).briefs).toHaveLength(1);
   });
 
   it("refuses a brief missing a field its page reads, before it's stored", async () => {

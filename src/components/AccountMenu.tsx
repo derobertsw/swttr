@@ -81,11 +81,14 @@ export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) 
     setSignOutError(null);
     // A save still downloading for this account mustn't land after the clear.
     noteSignedInAccount(null);
-    if (savedBriefsAccountHint() !== null) {
-      try {
-        await clearSavedBriefs();
-      } catch {
-        // Saved trips stay on this device, so the account stays signed in, and says why.
+    // Always cleared, even with nothing saved here, so a save still
+    // downloading in another tab is refused too.
+    try {
+      await clearSavedBriefs();
+    } catch {
+      // Storage this browser won't open can't hold any; otherwise saved trips
+      // stay on this device, so the account stays signed in, and says why.
+      if (savedBriefsAccountHint() !== null) {
         noteSignedInAccount(userId ?? null);
         setSignOutError("Couldn't remove the trips saved on this device, so you're still signed in. Try again, or remove them from Trips, then Saved on this device.");
         setConfirming((count) => count ?? 0);

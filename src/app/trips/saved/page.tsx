@@ -11,7 +11,7 @@ import {
   CheckStatus, OfflineBriefView, absoluteTime, savedBriefHref, savedLine, useBriefCheck, useOnline,
 } from "@/components/trips/OfflineBrief";
 import {
-  fetchOfflineBrief, readSavedBriefs, reconcileSavedBriefs, removeSavedBrief, storeSavedBrief, type SavedBrief,
+  fetchOfflineBrief, readSavedBriefs, reconcileSavedBriefs, removeSavedBrief, saveTicket, storeSavedBrief, type SavedBrief,
 } from "@/lib/offline-briefs";
 import { prepareOfflineOpening } from "@/lib/offline-shell";
 import { errorMessage } from "@/lib/trip-requests";
@@ -189,8 +189,9 @@ function SavedBriefDetail({ saved, canCheck, onChanged, onRemoved }: {
     if (working || !saved.account_id) return;
     setWorking("update"); setError(null); setMessage("");
     try {
+      const ticket = await saveTicket();
       const { brief } = await fetchOfflineBrief(saved.trip_id, saved.brief.covered.dates);
-      await storeSavedBrief(saved.account_id, brief);
+      await storeSavedBrief(saved.account_id, brief, ticket);
       const opening = await prepareOfflineOpening();
       setMessage("Updated.");
       if (!opening.ready) setError(opening.reason);

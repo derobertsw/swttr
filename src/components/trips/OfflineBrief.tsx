@@ -8,7 +8,7 @@ import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/tr
 import { useUserId } from "@/hooks/useUserId";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import {
-  fetchOfflineBrief, readSavedBrief, removeSavedBrief, storeSavedBrief, type SavedBrief,
+  fetchOfflineBrief, readSavedBrief, removeSavedBrief, saveTicket, storeSavedBrief, type SavedBrief,
 } from "@/lib/offline-briefs";
 import { prepareOfflineOpening, SAVED_BRIEFS_PATH } from "@/lib/offline-shell";
 import { errorMessage, TripRequestError } from "@/lib/trip-requests";
@@ -389,8 +389,9 @@ export function TripOfflineSave({ tripId }: { tripId: string }) {
     if (!saved || working) return;
     setWorking("update"); setError(null); setStatus("");
     try {
+      const ticket = await saveTicket();
       const { brief } = await fetchOfflineBrief(tripId, saved.brief.covered.dates);
-      const stored = await storeSavedBrief(userId, brief);
+      const stored = await storeSavedBrief(userId, brief, ticket);
       const opening = await prepareOfflineOpening();
       setSaved(stored);
       setStatus(`Updated. ${savedLine(stored.brief)}.${opening.ready ? ` ${OPENS_OFFLINE}` : ""}`);
@@ -561,8 +562,9 @@ function SaveOfflineSheet({ tripId, userId, saved, onClose, onCloseAutoFocus, on
     if (!selected?.length || saving) return;
     setSaving(true); setSaveError(null);
     try {
+      const ticket = await saveTicket();
       const { brief } = await fetchOfflineBrief(tripId, selected);
-      const stored = await storeSavedBrief(userId, brief);
+      const stored = await storeSavedBrief(userId, brief, ticket);
       onSaved(stored, await prepareOfflineOpening());
     } catch (err) {
       const changed = err instanceof TripRequestError && err.status === 409;

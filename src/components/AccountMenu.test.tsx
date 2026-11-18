@@ -169,4 +169,17 @@ describe("AccountMenu", () => {
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
     expect((await readSavedBriefs()).briefs).toEqual([]);
   });
+
+  it("still signs out where the browser won't keep trips at all, since none can be saved there", async () => {
+    vi.mocked(clearSavedBriefs).mockRejectedValueOnce(new Error("This browser can't keep trips on this device."));
+    const signOut = vi.fn(async () => {});
+    fakeClerkState.signOut = signOut;
+    const user = userEvent.setup();
+    render(<AccountMenu onOpenSettings={vi.fn()} onShare={vi.fn()} />);
+
+    await user.click(avatar());
+    await user.click(screen.getByRole("menuitem", { name: "Sign out" }));
+    await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
 });

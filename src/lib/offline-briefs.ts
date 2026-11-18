@@ -228,26 +228,43 @@ export async function readSavedBrief(tripId: string, accountId: string): Promise
  * transaction. Briefs another account saved on this device go in the same
  * transaction: a device holds one account's briefs.
  */
-export async function storeSavedBrief(accountId: string, brief: TripOfflineBrief): Promise<SavedBrief> {
+export async function storeSavedBrief(accountId: string, brief: TripOfflineBrief, ticket?: number): Promise<SavedBrief> {
   if (!readOfflineBrief(brief) || brief.viewer.user_id !== accountId) {
     throw new OfflineStorageError("The brief isn't for the account that's signed in. Nothing was saved.");
   }
   const saved: SavedBrief = { trip_id: brief.trip.id, account_id: accountId, stored_at: new Date().toISOString(), brief };
   await transact("readwrite", async ({ briefs, meta }) => {
-    // A download that finishes after its account signed out or switched
-    // isn't written: checked in the transaction, so no clear can come between.
-    if (signedIn !== undefined && signedIn !== accountId) {
+    const [rows, generation] = await Promise.all([
+      requestOf(briefs.getAll()) as Promise<unknown[]>,
+      requestOf(meta.get("generation")) as Promise<{ value?: unknown } | undefined>,
+    ]);
+    // A download that finishes after its account signed out or switched isn't
+    // written. Checked here, after the last wait and right before the writes:
+    // in this tab by the account the guard noted, and in any tab by the
+    // generation every clear moves on, which the save took before downloading.
+    if ((signedIn !== undefined && signedIn !== accountId) || (ticket !== undefined && generationOf(generation) !== ticket)) {
       throw new OfflineStorageError("You signed out or switched accounts while it downloaded, so nothing was saved.");
     }
-    const rows = await requestOf(briefs.getAll()) as unknown[];
+    // The hint first, so a sign-out from here on clears this save too, once it commits.
+    setHint(accountId);
     for (const row of rows) {
       if (isObject(row) && row.account_id !== accountId && isString(row.trip_id)) briefs.delete(row.trip_id);
     }
     briefs.put(saved);
     meta.put({ key: "account", account_id: accountId });
   });
-  setHint(accountId);
   return saved;
+}
+
+const generationOf = (record: { value?: unknown } | undefined) => typeof record?.value === "number" ? record.value : 0;
+
+/**
+ * Where this device's briefs stand before a save downloads: pass it to
+ * storeSavedBrief, which refuses the save if a sign-out or account change in
+ * any tab cleared the briefs meanwhile.
+ */
+export async function saveTicket(): Promise<number> {
+  return transact("readonly", async ({ meta }) => generationOf(await requestOf(meta.get("generation")) as { value?: unknown } | undefined));
 }
 
 /** Removes this device's copy of the trip. The trip itself isn't touched. */
@@ -268,13 +285,16 @@ export async function removeSavedBrief(tripId: string): Promise<void> {
  */
 export async function clearSavedBriefs(owner?: string): Promise<boolean> {
   const cleared = await transact("readwrite", async ({ briefs, meta }) => {
+    const [stored, generation] = await Promise.all([
+      requestOf(meta.get("account")) as Promise<{ account_id?: unknown } | undefined>,
+      requestOf(meta.get("generation")) as Promise<{ value?: unknown } | undefined>,
+    ]);
     // Only the owner checked for: a newer account's save that finished first stays.
-    if (owner !== undefined) {
-      const stored = await requestOf(meta.get("account")) as { account_id?: unknown } | undefined;
-      if (stored?.account_id !== owner) return false;
-    }
+    if (owner !== undefined && stored?.account_id !== owner) return false;
     briefs.clear();
-    meta.clear();
+    meta.delete("account");
+    // Saves that took a ticket before this, in any tab, are refused.
+    meta.put({ key: "generation", value: generationOf(generation) + 1 });
     return true;
   });
   if (cleared) setHint(null);
