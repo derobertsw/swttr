@@ -216,6 +216,24 @@ describe("Synchronized trip map and accessible list", () => {
   });
 });
 
+describe("Reading and Tab order (#235)", () => {
+  const follows = (first: Node, second: Node) => !!(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it("reaches the map, its controls and credits before the day below them on a phone, and the list first beside the map on desktop", () => {
+    nativePush({}, "", `${path}?date=2027-01-10`);
+    const phone = view();
+    const credits = screen.getByRole("contentinfo", { name: "Map and place attribution" });
+    expect(follows(screen.getByRole("region", { name: "Map view" }), credits)).toBe(true);
+    expect(follows(credits, screen.getByRole("region", { name: /Sun Jan 10/ }))).toBe(true);
+    phone.unmount();
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+    view();
+    expect(follows(screen.getByRole("region", { name: /Sun Jan 10/ }), screen.getByRole("region", { name: "Map view" }))).toBe(true);
+    expect(follows(screen.getByRole("region", { name: "Map view" }), screen.getByRole("contentinfo", { name: "Map and place attribution" }))).toBe(true);
+  });
+});
+
 describe("Selected day logistics in the map (#234)", () => {
   const SAT = "2027-01-09", SUN = "2027-01-10";
   const geometryUrl = (date: string) => `GET /api/v1/trips/trip-drive/days/${date}/geometry`;
