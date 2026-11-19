@@ -94,9 +94,12 @@ function SavedBriefs() {
     let current = true;
     reconcileSavedBriefs(signedInAs ?? null, account).then((cleared) => {
       if (!current) return;
-      if (cleared) setNotice(signedInAs ? "Trips saved by another account were removed from this device." : "You signed out, so the trips saved on this device were removed.");
+      // The root layout's account guard may have removed them first: gone either way.
+      const hint = savedBriefsAccountHint();
+      const gone = cleared || (hint !== undefined && hint !== account);
+      if (gone) setNotice(signedInAs ? "Trips saved by another account were removed from this device." : "You signed out, so the trips saved on this device were removed.");
       setSettled(reconcileKey);
-      if (cleared) void load();
+      if (gone) void load();
     }, () => { if (current) setSettled(reconcileKey); });
     return () => { current = false; };
   }, [reconcileKey, signedInAs, account, load]);
