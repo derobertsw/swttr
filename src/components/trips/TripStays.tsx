@@ -10,7 +10,7 @@ import { LocationSummary } from "@/components/trips/LocationPicker";
 import { StayDepartures, useDriveEstimates } from "@/components/trips/DriveEstimate";
 import { LodgingEditor, personNote, possessive, STAY_EXACT, type LodgingEditorTarget } from "@/components/trips/LodgingEditor";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
-import type { TripDayMeet, TripFull, TripLodging, TripLodgingPerson, TripPersonRun, TripStaySummary } from "@/types/trips";
+import type { TripDayMeet, TripDayStart, TripFull, TripLodging, TripLodgingPerson, TripPersonRun, TripStaySummary } from "@/types/trips";
 
 type Open = (target: LodgingEditorTarget) => void;
 
@@ -94,7 +94,7 @@ export function TripStays({ data, canEdit, onSaved, viewerMemberId = null }: {
         </div>}
       </div>
       {mine && lodging ? <MyNights person={me} lodging={lodging} canEdit={canEdit && perMember} open={open} />
-        : lodging && people.length > 0 && !!lodging.stays.length && <PeopleByNight className="mt-6 hidden @3xl:block" lodging={lodging} people={people}
+        : lodging && people.length > 0 && !!lodging.stays.length && <PeopleByNight className="mt-6 hidden @3xl:block" lodging={lodging} people={people} starts={data.starts}
           viewerMemberId={viewerMemberId} canEdit={canEdit && perMember} open={open} />}
       <div className="max-w-3xl">
         {!(lodging?.stays.length) && <p className="mt-3 text-base text-muted-foreground">No stays saved yet. Accommodation can be planned later.</p>}
@@ -149,8 +149,8 @@ function MyNights({ person, lodging, canEdit, open }: { person: TripLodgingPerso
 }
 
 /** People down the side and nights across: each run of nights in one place is one cell. */
-function PeopleByNight({ lodging, people, viewerMemberId, canEdit, open, className }: {
-  lodging: TripLodging; people: TripLodgingPerson[]; viewerMemberId: string | null; canEdit: boolean; open: Open; className?: string;
+function PeopleByNight({ lodging, people, starts, viewerMemberId, canEdit, open, className }: {
+  lodging: TripLodging; people: TripLodgingPerson[]; starts?: TripDayStart[]; viewerMemberId: string | null; canEdit: boolean; open: Open; className?: string;
 }) {
   const [selected, setSelected] = useState<{ member: string; start: string } | null>(null);
   const person = selected ? people.find((candidate) => candidate.member_id === selected.member) : undefined;
@@ -190,22 +190,28 @@ function PeopleByNight({ lodging, people, viewerMemberId, canEdit, open, classNa
         </tbody>
       </table>
     </div>
-    {person && run && <RunDetails person={person} run={run} lodging={lodging} canEdit={canEdit} open={open} />}
+    {person && run && <RunDetails person={person} run={run} lodging={lodging} starts={starts} canEdit={canEdit} open={open} />}
   </section>;
 }
 
-function RunDetails({ person, run, lodging, canEdit, open }: { person: TripLodgingPerson; run: TripPersonRun; lodging: TripLodging; canEdit: boolean; open: Open }) {
+function RunDetails({ person, run, lodging, starts, canEdit, open }: {
+  person: TripLodgingPerson; run: TripPersonRun; lodging: TripLodging; starts?: TripDayStart[]; canEdit: boolean; open: Open;
+}) {
   const stay = run.stay_id ? lodging.stays.find((candidate) => candidate.id === run.stay_id) : undefined;
   const changeover = person.changeovers.find((entry) => entry.date === run.end);
   const morning = person.days.find((day) => day.date === run.end);
   const morningLabel = lodging.nights.find((night) => night.date === run.end)?.date_label;
+  // Where they actually start that morning, as the day brief says (#329): their own or the day's
+  // own starting point before the stay they slept in, from the server's `starts`.
+  const start = starts?.find((entry) => entry.date === run.end)?.people.find((entry) => entry.member_id === person.member_id);
+  const startsFrom = start ? `${start.starting_from}${start.own ? " · only this day" : ""}` : morning?.starting_from;
   return <div className="mt-4 max-w-3xl border-l-2 border-border pl-4 text-base">
     <h3 className="break-words font-semibold text-foreground">{person.display_name} · {run.gap ? "Not planned yet" : run.label}</h3>
     <p className="text-foreground">{run.date_label}</p>
     {personNote(person) && <p className="text-muted-foreground">{personNote(person)}</p>}
     {stay && <p className="text-muted-foreground">{stayFacts(stay)}</p>}
     {changeover ? <p className="text-foreground">{changeover.date_label}: leaves {changeover.from} in the morning, then {changeover.to} that night</p>
-      : stay && morningLabel && morning?.participation === "participating" && <p className="text-foreground">{morningLabel} morning: starts from {morning.starting_from}</p>}
+      : stay && morningLabel && morning?.participation === "participating" && <p className="text-foreground">{morningLabel} morning: starts from {startsFrom}</p>}
     {canEdit && <div className="mt-2 flex flex-wrap gap-2">
       <Button type="button" variant="outline" onClick={() => open({ action: "assign", memberIds: [person.member_id], dates: runDates(lodging, run) })}>Change these nights</Button>
       <Button type="button" variant="outline" onClick={() => open({ action: "attendance", memberId: person.member_id })}>Change {possessive(person.display_name)} trip dates</Button>
