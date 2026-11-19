@@ -78,7 +78,14 @@ async function open(page, path) {
   await sleep(300);
 }
 
-const text = (selector = '#main-content') => `(document.querySelector(${JSON.stringify(selector)})?.innerText ?? '')`;
+/**
+ * A value as a JavaScript literal for code run in the page: JSON, with the characters
+ * that could end a script or a line in page code escaped too.
+ */
+const ESCAPES = { '<': '\\u003C', '>': '\\u003E', '/': '\\u002F', '\u2028': '\\u2028', '\u2029': '\\u2029' };
+const literal = (value) => JSON.stringify(value).replace(/[<>/\u2028\u2029]/g, (ch) => ESCAPES[ch]);
+
+const text = (selector = '#main-content') => `(document.querySelector(${literal(selector)})?.innerText ?? '')`;
 
 // ------------------------------------------------------- in-page audits
 
@@ -288,7 +295,7 @@ const selection = (page) => page.eval(`({
   address: location.pathname + location.search, scrollY: Math.round(scrollY),
 })`);
 /** Clicks the visible control with this text or name (the phone and desktop layouts each have one, and one is hidden). */
-const clickText = (page, selector, label) => page.eval(`(() => { const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find((node) => (node.innerText.trim() === ${JSON.stringify(label)} || node.getAttribute('aria-label') === ${JSON.stringify(label)}) && node.checkVisibility()); if (!el) return false; el.focus(); el.click(); return true; })()`);
+const clickText = (page, selector, label) => page.eval(`(() => { const el = [...document.querySelectorAll(${literal(selector)})].find((node) => (node.innerText.trim() === ${literal(label)} || node.getAttribute('aria-label') === ${literal(label)}) && node.checkVisibility()); if (!el) return false; el.focus(); el.click(); return true; })()`);
 const compareRequests = async () => JSON.parse(await api('/__qa/log', undefined, 'GET')).filter((entry) => entry.key.endsWith('/stay-candidates/compare')).length;
 
 async function journeyChecks(page, cdp) {
