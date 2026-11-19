@@ -28,9 +28,9 @@ const port = Number(process.env.API_PORT ?? 39214);
 process.env.GEOAPIFY_API_KEY = 'qa214-fixture-key';
 for (const key of ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CLERK_SECRET_KEY']) delete process.env[key];
 
-// Each trip's fixed "now", advancing in real time from the server's start.
+// Each trip's fixed "now", advancing in real time from the last reset.
 const RealDate = Date;
-const started = RealDate.now();
+let started = RealDate.now();
 let offset = 0;
 class FixtureDate extends RealDate {
   constructor(...args) {
@@ -91,6 +91,7 @@ let overrides = {};
 const log = [];
 async function reset() {
   offset = 0;
+  started = RealDate.now();
   databases = await fixtures.buildFixtureDatabase();
   overrides = {};
 }
