@@ -30,7 +30,7 @@ Line numbers are for this branch. "The day page" is `src/app/trips/[id]/(plan)/d
 | 9. The listed test cases | Implemented (two tests added) |
 | Delivery quality: authorization, failed saves, conflicts, keyboard, labels, announced states, phone and desktop | **Gap fixed** (button label and wrapping fixes); VoiceOver and devices are **Manual check** |
 
-Counts: 6 Implemented, 2 Gap fixed, 1 Gap fixed with a Gap left (box 3), and the delivery-quality row Gap fixed with manual checks.
+Counts over the nine boxes: 7 Implemented (1, 2, 5, 6, 7, 8, 9), 1 Gap fixed (4), and 1 Gap fixed with a Gap left (3). The delivery-quality row is Gap fixed, with VoiceOver and devices as manual checks.
 
 ### What this PR changes
 
