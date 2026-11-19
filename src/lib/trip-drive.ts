@@ -335,7 +335,9 @@ export function driveDay(plan: DrivePlan, row: StoredDriveEstimate | undefined, 
   if (yours?.current && !(yours.use_calculated && calculated.estimate)) {
     return { ...calculated, state: "manual", directions };
   }
-  return calculated;
+  // With no road route there's no drive to avoid a closure on (#235); an
+  // unknown route, such as an expired answer that can't be checked, keeps them.
+  return calculated.state === "no_route" ? { ...calculated, closures: [] } : calculated;
 }
 
 /**
