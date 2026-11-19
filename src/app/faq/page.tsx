@@ -68,9 +68,9 @@ const getHowItWorks = (temperatureUnit: TemperatureUnit): Faq[] => [
       "Each activity has its own metabolic rates for easy, moderate, and hard effort. Running and XC skiing follow the 2024 Adult Compendium of Physical Activities: about 6.5 MET easy, 8.5 MET moderate and 11 MET hard. Alpine skiing at a moderate effort is about 2.5 MET, and a chairlift ride about 1.2 MET. Higher exertion means your body generates more heat, so you need less insulation. This is why XC skiing recommendations are lighter than alpine skiing at the same temperature — you're producing more than three times as much body heat. Running and XC skiing convert MET to heat from your weight and body surface area (the DuBois formula); other activities adjust a reference rate for body size. Alpine skiing blends the run and the chairlift ride: its minimum weighs skiing 60% and the chairlift 40%, and its comfortable end follows the colder chairlift.",
   },
   {
-    question: "Why are there different targets for torso, arms, and legs?",
+    question: "Do torso, arms, and legs have different targets?",
     answer:
-      "Your body doesn't lose heat evenly. During running, your core runs hot from the sustained effort, so the torso needs less insulation (0.75x) while the legs, out in the airflow, need a little more (1.05x). During alpine skiing, your legs are more exposed to cold air on the chairlift (legs: 1.2x). XC skiing puts extra demand on legs too (1.15x). These regional multipliers are rescaled so they average back to the whole-body target, distributing it to where you actually need it.",
+      "Each gets the same band as the whole body. SWTTR used to ask some sports for extra insulation on the arms and legs, but there was no source for that, and measured cold-weather clothing systems put less insulation on the limbs than on the torso, not more. Each region still has its own minimum, so extra warmth on your torso can't make up for cold legs. The total clo SWTTR shows is its own weighted mean of torso, arm and leg insulation (half torso, a quarter each for arms and legs), without head, hands, and feet. Compare it only with SWTTR's targets: a lab's whole-body clo for the same outfit is much lower.",
   },
   {
     question: "Why do hands and head need special treatment?",

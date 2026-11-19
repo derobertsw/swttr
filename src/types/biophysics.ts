@@ -169,6 +169,11 @@ export interface RegionalClo {
 }
 
 export interface EnsembleProperties {
+  /**
+   * SWTTR's whole-body clo: the 0.5 / 0.25 / 0.25 mean of torso, arm and leg
+   * clo, without head, hands and feet. Comparable only with SWTTR's own target
+   * range, not with a manikin's whole-body clo.
+   */
   total_clo: number;
   regional_clo?: RegionalClo;
   evap_potential: number;
@@ -378,6 +383,7 @@ export interface BiophysicsRecommendation {
   descent_headwear?: RecommendedHeadwear | null;
   descent_handwear?: RecommendedHandwear | null;
   descent_breakdown?: {
+    /** SWTTR's whole-body clo, as `EnsembleProperties.total_clo`. */
     total_clo: number;
     regional_clo: RegionalClo;
     regional_ireq: RegionalIreqRange;
@@ -481,6 +487,7 @@ export interface PhaseEvaluation {
     regions: { region: "torso" | "arms" | "legs"; clo: number; weight: number; contribution: number }[];
     total: number;
   };
+  /** SWTTR's whole-body clo, as `EnsembleProperties.total_clo`. */
   totalClo?: number;
   maxRegionalDeficit: number | null;
   maxExtremityDeficit: number | null;

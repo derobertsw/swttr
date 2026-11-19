@@ -171,3 +171,30 @@ describe('dynamic exposure', () => {
     expect(phaseExposure(5, 145.5, 1).walkingSpeedMs).toBeCloseTo(0.455, 3);
   });
 });
+
+describe('regional bands for every sport and phase (#375)', () => {
+  const activities = ['running', 'biking', 'xc_skiing', 'ski_touring_uphill', 'ski_touring_downhill', 'alpine_skiing'] as const;
+  const areaWeighted = (clo: { torso: number; arms: number; legs: number }) =>
+    clo.torso * REGIONAL_WEIGHTS.torso + clo.arms * REGIONAL_WEIGHTS.arm + clo.legs * REGIONAL_WEIGHTS.leg;
+
+  it.each(activities)('%s regional minimums and neutral targets average back to the whole-body band', activity => {
+    for (const [tempC, windMs, precipitation] of [[-25, 8, false], [-10, 3.6, false], [0, 5.4, true], [7, 2, false], [13.33, 3.6, false]] as const) {
+      for (const exertion of ['easy', 'moderate', 'hard'] as const) {
+        const resultant = targets(activity, tempC, windMs, exertion, precipitation);
+        const conditions = { tempC, humidity: precipitation ? 95 : 50, precipitation };
+        const basic = phaseTargets(activity, resultant.ireq, resultant.rate, conditions, windMs, resultant.ireq, exertion,
+          phaseExposure(windMs, resultant.rate, OUTER_AIR_PERMEABILITY.windResistant));
+        for (const result of [resultant, basic]) {
+          // Each band is rounded to 0.01 clo.
+          expect(Math.abs(areaWeighted(result.regional.min) - result.targetRange[0])).toBeLessThanOrEqual(0.00501);
+          expect(Math.abs(areaWeighted(result.regional.neutral) - result.targetRange[1])).toBeLessThanOrEqual(0.00501);
+          // No region is asked for more or less than the whole-body band.
+          for (const region of ['torso', 'arms', 'legs'] as const) {
+            expect(result.regional.min[region]).toBe(result.targetRange[0]);
+            expect(result.regional.neutral[region]).toBe(result.targetRange[1]);
+          }
+        }
+      }
+    }
+  });
+});

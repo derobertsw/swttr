@@ -95,6 +95,9 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
               </span>
             </div>
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Total clo is SWTTR&apos;s weighted mean of torso, arm and leg insulation. Compare it only with these targets, not with lab whole-body clo, which reads lower for the same outfit.
+          </p>
         </div>
 
         <ExposureLimitDetails phases={exposurePhases} />

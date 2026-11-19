@@ -63,7 +63,7 @@ All cases use basic clo, air permeability 1 l/(m²·s) (membrane), relative humi
 | Touring climb 233 W/m², −4°C, 1.6 m/s, 0.6 clo | 0.60 / 0.61 | −26.2 / +3.1 | 1.53 / none | −50.9 / −52.7 | 0.79 / 0.76 |
 | Cycling 290 W/m², −4°C, 5.4 m/s, 0.5 clo | 0.50 / 0.53 | −59.1 / +4.3 | 0.68 / none | −92.6 / −81.8 | 0.43 / 0.49 |
 
-**Hand check.** Take the golden alpine "cold, windy, snowing, hard" catalog outfit (5°F, 20 mph): basic 4.34 clo becomes resultant 3.02 clo. S is −20.2 W/m² at 30°C skin and −27.7 W/m² at 33.7°C, so DLEmin = 40 / 20.2 = 1.98 h and DLEneutral = 40 / 27.7 = 1.44 h. These match the snapshot.
+**Hand check.** Take the golden alpine "extreme cold" catalog outfit (−15°F, 10 mph): basic 4.34 clo becomes resultant 3.02 clo. S is −20.2 W/m² at 30°C skin and −27.7 W/m² at 33.7°C, so DLEmin = 40 / 20.2 = 1.98 h and DLEneutral = 40 / 27.7 = 1.44 h. These match the snapshot.
 
 ### Gaps found
 
