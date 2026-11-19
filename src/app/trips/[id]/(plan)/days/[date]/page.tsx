@@ -198,7 +198,7 @@ export default function DayDetailPage({
     // way there and back, the tour and its conditions, then clothing and crew.
     <div className="flex w-full max-w-3xl flex-col gap-8">
       {loading && <Skeleton className="h-32 w-full rounded-card" />}
-      {error && <TripError>{error}</TripError>}
+      {error && <TripError onRetry={data ? undefined : () => void refresh()}>{error}</TripError>}
 
       {data && !day && (
         <MissingDayPlan tripId={id} date={date} dateLabel={dateLabel} canCreate={canCreateDay} tripDates={formatDateRange(data.trip.start_date, data.trip.end_date)} onSaved={refresh} />

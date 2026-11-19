@@ -96,8 +96,13 @@ export function BackLink({ href, children }: { href: string; children: ReactNode
 }
 
 /** A trip-level error, such as a trip that failed to load. It appears after the page does, so it's announced. */
-export function TripError({ className, ...props }: ComponentProps<"div">) {
-  return (
+/**
+ * An error for the page. `onRetry`, for a page with nothing loaded to show,
+ * adds Retry (#337): without it only a window focus, reconnecting or a
+ * reload would read the trip again.
+ */
+export function TripError({ className, onRetry, ...props }: ComponentProps<"div"> & { onRetry?: () => void }) {
+  const alert = (
     <div
       role="alert"
       className={cn(
@@ -106,6 +111,13 @@ export function TripError({ className, ...props }: ComponentProps<"div">) {
       )}
       {...props}
     />
+  );
+  if (!onRetry) return alert;
+  return (
+    <div className="flex flex-col items-start gap-3">
+      {alert}
+      <Button type="button" variant="outline" onClick={onRetry}>Retry</Button>
+    </div>
   );
 }
 

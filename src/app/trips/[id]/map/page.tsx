@@ -21,7 +21,7 @@ export default function TripMapPage({ params }: { params: Promise<{ id: string }
     <div className="w-full min-w-0 space-y-5">
       <Suspense fallback={<BackLink href={`/trips/${id}`}>Back to Plan</BackLink>}><MapBackLink tripId={id} days={trip.data?.days} /></Suspense>
       <header><h1 className="text-title font-semibold">Trip map</h1></header>
-      {trip.error && <TripError>{trip.error}</TripError>}
+      {trip.error && <TripError onRetry={trip.data ? undefined : () => void trip.refresh()}>{trip.error}</TripError>}
       {map.error && <div className="space-y-2"><TripError>{map.error.message}</TripError>{map.data && <p className="text-base text-muted-foreground">Showing previously loaded places. Changes may be missing until you reconnect and retry.</p>}<Button variant="outline" onClick={() => void map.refresh()}>Retry places</Button></div>}
       {(!trip.data || !map.data) && !trip.error && !map.error && <p role="status">Loading trip places…</p>}
       {trip.data && map.data && <Suspense fallback={<p>Loading map view…</p>}><TripMapView key={map.data.trip.id} data={map.data} canEdit={trip.data.trip.owner_user_id === userId}

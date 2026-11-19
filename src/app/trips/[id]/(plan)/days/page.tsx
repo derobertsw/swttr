@@ -47,7 +47,7 @@ export default function OpenTripPage({ params }: { params: Promise<{ id: string 
 
   return (
     <div className="flex w-full max-w-3xl flex-col gap-8">
-      {error && !data ? <TripError>{error}</TripError> : <Skeleton className="h-32 w-full rounded-card" />}
+      {error && !data ? <TripError onRetry={() => void reload()}>{error}</TripError> : <Skeleton className="h-32 w-full rounded-card" />}
     </div>
   );
 }

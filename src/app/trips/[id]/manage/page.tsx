@@ -139,7 +139,7 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
       </header>
 
       {loading && <Skeleton className="h-32 w-full rounded-card" />}
-      {error && <TripError>{error}</TripError>}
+      {error && <TripError onRetry={data ? undefined : () => void refresh()}>{error}</TripError>}
 
       {data && (
         <>

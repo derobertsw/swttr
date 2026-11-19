@@ -72,6 +72,22 @@ describe("Trip day page", () => {
     vi.useRealTimers();
   });
 
+  it("offers Retry when the trip fails to load, and shows the day once it does (#337)", async () => {
+    let reads = 0;
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": () => ++reads === 1 ? reply(500, { error: "Database unavailable" }) : TRIP_ROUTE,
+      "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      "GET /api/v1/trips/trip-1/drive-estimates": reply(200, { days: [], stays: [] }),
+    }));
+    await renderPage();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/load the trip|Database unavailable/i);
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("heading", { name: "Getting there" })).toBeVisible();
+    expect(reads).toBe(2);
+    expect(alert).not.toBeInTheDocument();
+  });
+
   it("shows the day's forecast", async () => {
     vi.stubGlobal(
       "fetch",
