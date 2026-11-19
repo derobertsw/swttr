@@ -5,6 +5,8 @@ import { POST } from "./route";
 import catalog from '@/test/fixtures/gear-catalog.json';
 import { createFakeSupabase } from '@/test/fakeSupabase';
 import type { EvaluationItem } from '@/types/biophysics';
+import { HOOD_CLO_VALUES } from '@/lib/biophysics/constants';
+import { HOOD_HEAD_CREDIT } from '@/lib/recommendations/extremities';
 
 const state = vi.hoisted(() => ({ client: null as unknown, userId: null as string | null }));
 vi.mock('@/lib/supabase', () => ({ getSupabase: () => state.client }));
@@ -159,12 +161,13 @@ describe("POST /api/v1/ensembles/evaluate", () => {
   it('counts worn hood insulation from catalog data during running/XC manual checks', async () => {
     state.client = createFakeSupabase({ garments: [{ ...shirt, hood_type: 'attached' }] });
     const { phases: [result] } = await (await post({ phases: [{
-      ...itemPhase([reference(shirt.id)]), targets: { headNeck: 0.4 }, minTargets: { headNeck: 0.3 },
-      extremityMaxTargets: { headNeck: 0.5 },
+      ...itemPhase([reference(shirt.id)]), targets: { headNeck: 0.18 }, minTargets: { headNeck: 0.14 },
+      extremityMaxTargets: { headNeck: 0.23 },
       // Untrusted client hood values must not override the resolved catalog hood.
       hoodClo: 9,
     }] })).json();
-    expect(result.bodyParts.headNeck).toMatchObject({ clo: 0.4, status: 'in_range' });
+    expect(result.bodyParts.headNeck).toMatchObject({ status: 'in_range' });
+    expect(result.bodyParts.headNeck.clo).toBeCloseTo(HOOD_CLO_VALUES.attached * HOOD_HEAD_CREDIT, 10);
   });
 
   it.each([null, [], { hands: -1 }, { headNeck: 'warm' }])('rejects invalid local accessory limits: %j', async extremityMaxTargets => {

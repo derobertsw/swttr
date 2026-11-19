@@ -7,11 +7,13 @@ import { buildDayMeets } from "@/lib/trip-meets";
 import { projectTripMap } from "@/lib/trip-map";
 import { tripDriveEstimates } from "@/lib/trip-drive-estimates";
 import { buildTourPlanSummary } from "@/lib/trip-tour-plans";
+import { briefChoices, buildOfflineBrief } from "@/lib/trip-offline-brief";
 import { tripFullFor } from "@/lib/trips";
 import { driveDayRow, driveStay, driveTrip, MOTEL, place, splitDriveTrip } from "@/test/driveTrip";
 import { storedDrive } from "@/test/tripMap";
 import { ALEX, CASEY, ELI, SPLIT_MEMBERS } from "@/test/splitStays";
 import type { TripMap } from "@/types/trip-map";
+import type { TripOfflineBriefResponse } from "@/types/trip-offline-brief";
 import type { TripDriveEstimates, TripFull, TripLodgingNight, TripMember, TripStop } from "@/types/trips";
 
 export interface QaTrip {
@@ -21,6 +23,8 @@ export interface QaTrip {
   estimates: TripDriveEstimates;
   /** Hand-drawn fictional road lines by geometry revision, standing in for the provider. */
   lines: Record<string, number[][][]>;
+  /** #214's brief API for each viewer, built by the production builder for the default days. */
+  brief?: Record<string, TripOfflineBriefResponse>;
 }
 
 const member = (tripId: string, id: string, userId: string, name: string, role: TripMember["role"] = "member", status: TripMember["status"] = "joined"): TripMember =>
@@ -66,14 +70,20 @@ async function driveFixture(now: number): Promise<QaTrip> {
     tour_plans: [buildTourPlanSummary({ id: "tour", trip_id: tripId, trip_day_id: days[1].id, objective: "Spruce Peak north glades", route_url: "https://example.com/fictional-tour",
       meet_time: "08:00", meet_day_offset: 0, return_time: null, time_zone: "America/New_York", revision: 1, updated_at: "2027-01-01T12:00:00Z",
       access_notes: "Fictional: uphill travel pass required at the ticket window.", pickup_notes: "Fictional: second car waits at the lower lot.",
-      approach_notes: "Fictional: skin about 40 minutes up the summer road." } as Parameters<typeof buildTourPlanSummary>[0], "2027-01-09")],
+      approach_notes: "Fictional: skin about 40 minutes up the summer road.",
+      // A saved row always has these; #214's brief reads both.
+      backup_plan: "Fictional: lower-angle trees by the Sterling lot if the glades are wind loaded.", checkin_notes: null } as Parameters<typeof buildTourPlanSummary>[0], "2027-01-09")],
   };
   full.meets = buildDayMeets(full.days, []);
   const hour = new Date(now - 3_600_000).toISOString();
   const rows = [storedDrive(full, "2027-01-09", hour), storedDrive(full, "2027-01-10", hour)];
   const estimates = await tripDriveEstimates(full, { read: async () => rows, write: async () => {}, manual: async () => [] }, { refresh: false, now });
   const map = projectTripMap(full, estimates);
-  return { full: { "user-1": tripFullFor(full, "user-1"), "user-sam": tripFullFor(full, "user-sam") }, map, estimates, lines: linesFor(map) };
+  const viewed = tripFullFor(full, "user-1");
+  // The organizer's copy (#214), as the brief route builds it: no packing list was saved.
+  const choices = briefChoices(viewed, now);
+  const brief = { brief: buildOfflineBrief({ full: viewed, userId: "user-1", dates: choices.default_dates, drive: estimates, equipment: null, now }), ...choices };
+  return { full: { "user-1": viewed, "user-sam": tripFullFor(full, "user-sam") }, map, estimates, lines: linesFor(map), brief: { "user-1": brief } };
 }
 
 /**

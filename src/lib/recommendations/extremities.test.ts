@@ -6,12 +6,14 @@
 import { describe, expect, it } from 'vitest';
 import catalog from '@/test/fixtures/gear-catalog.json';
 import { DEFAULT_BODY_METRICS } from '@/lib/biophysics/bodyMetrics';
-import { THERMAL_DISPLAY_CLO_EPSILON } from '@/lib/biophysics/comfort';
+import { EXTREMITY_CLO_EPSILON } from '@/lib/biophysics/comfort';
+import { HOOD_CLO_VALUES, type HoodType } from '@/lib/biophysics/constants';
+import { POLE_GRIP_MAX_CLO } from '@/lib/biophysics/sport-policy';
 import type { ExertionLevel } from '@/lib/biophysics/exertion';
 import { alpine } from './sports/alpine';
 import { biking } from './sports/biking';
 import { skiTouring } from './sports/ski-touring';
-import { selectPhaseAccessories } from './extremities';
+import { HOOD_HEAD_CREDIT, selectPhaseAccessories } from './extremities';
 import { evaluatePhase } from './layer-evaluation';
 import type { RecommendationRequest } from './request';
 import type { PhaseTargets } from './thermal-targets';
@@ -32,7 +34,9 @@ const HELMET_PHASES: Phase[] = ['alpine', 'descent'];
 
 const f2c = (f: number) => (f - 32) * 5 / 9;
 const mph = (v: number) => v * 0.44704;
-const EPS = THERMAL_DISPLAY_CLO_EPSILON;
+const EPS = EXTREMITY_CLO_EPSILON.head;
+/** What a worn hood adds to the head budget. */
+const HOOD = (type: HoodType) => HOOD_CLO_VALUES[type] * HOOD_HEAD_CREDIT;
 
 interface Conditions { tempF: number; windMph: number; exertion?: ExertionLevel; humidity?: number }
 
@@ -87,19 +91,19 @@ function manualCheck(selection: ReturnType<typeof select>, hands: number[], head
 
 describe('the #370 reproductions', () => {
   it('alpine, 25°F, 12 mph: counts the helmet and hood and stays within the head band', () => {
-    // Before: helmet, hood, a 1.5 clo balaclava and a 0.9 clo neck piece, 3.75 clo against 2.29.
+    // Before #370: helmet, hood, a heavy balaclava and a face scarf, 3.75 clo against 2.29 on the earlier scale.
     const selection = select('alpine', { tempF: 25, windMph: 12, humidity: 60 }, CATALOG, [hood('helmet_compatible')]);
     const { head, hands } = selection.assessments;
     expect(selection.headwear.helmet).not.toBeNull();
-    expect(head.clo).toBeCloseTo(0.5 + worn(selection).reduce((a, b) => a + b, 0), 10);
+    expect(head.clo).toBeCloseTo(HOOD('helmet_compatible') + worn(selection).reduce((a, b) => a + b, 0), 10);
     expect(head).toMatchObject({ state: 'selected', thermal_status: 'in_range' });
     expect(head.clo).toBeLessThanOrEqual(selection.targets.extremity.neutral.head + EPS);
     expect(hands).toMatchObject({ state: 'selected', thermal_status: 'in_range' });
   });
 
-  it('cycling, 32°F, 5 mph: no balaclava against a ~0.55 clo head target', () => {
+  it('cycling, 32°F, 5 mph: no balaclava against a ~0.25 clo head target', () => {
     const selection = select('cycling', { tempF: 32, windMph: 5 });
-    expect(selection.targets.extremity.neutral.head).toBeLessThan(0.6);
+    expect(selection.targets.extremity.neutral.head).toBeLessThan(0.27);
     expect(selection.headwear.headWarmth?.headwear_type).not.toMatch(/^balaclava/);
     expect(selection.assessments.head.thermal_status).toBe('in_range');
     expect(selection.assessments.hands.thermal_status).toBe('in_range');
@@ -111,21 +115,26 @@ describe('the #370 reproductions', () => {
     expect(bareHeaded.assessments.head.thermal_status).toBe('in_range');
     const hooded = select('cycling', conditions, CATALOG, [hood('attached')]);
     expect(hooded.headwear.headWarmth).toBeNull();
-    expect(hooded.assessments.head.clo).toBe(0.4);
+    expect(hooded.assessments.head.clo).toBeCloseTo(HOOD('attached'), 10);
   });
 
-  it('touring climb, 25°F, 12 mph: two hoods already meet the head target, so nothing is added', () => {
-    // Before: a balaclava, a neck piece and two hoods, 3.2 clo against 0.85.
-    const selection = select('climb', { tempF: 25, windMph: 12 }, CATALOG, [hood('attached'), hood('attached')]);
+  it('touring climb, 25°F, 12 mph: a hood already meets the head target, so nothing is added', () => {
+    // Before #370: a balaclava, a neck piece and two hoods, 3.2 clo against 0.85 on the earlier scale.
+    // Since #374's climbing rates the head band is lower, and one hood meets it.
+    const selection = select('climb', { tempF: 25, windMph: 12 }, CATALOG, [hood('attached')]);
     expect(selection.headwear).toEqual({ helmet: null, headWarmth: null, neckWarmth: null });
-    expect(selection.assessments.head).toMatchObject({ clo: 0.8, thermal_status: 'in_range', state: 'not_needed' });
+    expect(selection.assessments.head).toMatchObject({ thermal_status: 'in_range', state: 'not_needed' });
+    expect(selection.assessments.head.clo).toBeCloseTo(HOOD('attached'), 10);
+    // Two hoods are more than the climb needs, and still nothing is added.
+    const twoHoods = select('climb', { tempF: 25, windMph: 12 }, CATALOG, [hood('attached'), hood('attached')]);
+    expect(twoHoods.headwear).toEqual({ helmet: null, headWarmth: null, neckWarmth: null });
     expect(selection.assessments.head.message).toBe('head: no additional thermal coverage needed.');
   });
 
   it('touring descent, −15°F, 10 mph: the warmest rated mitten bounds the choice and the shortfall is reported', () => {
     const selection = select('descent', { tempF: -15, windMph: 10 }, CATALOG, [hood('helmet_compatible')]);
     const { hands, head } = selection.assessments;
-    expect(selection.targets.extremity.min.hands).toBeGreaterThan(5);
+    expect(selection.targets.extremity.min.hands).toBeGreaterThan(3);
     const warmest = Math.max(...HANDWEAR.map(item => item.rcl_clo));
     expect(selection.handwear?.rcl_clo).toBe(warmest);
     expect(hands).toMatchObject({ state: 'missing', thermal_status: 'under', clo: warmest });
@@ -134,7 +143,7 @@ describe('the #370 reproductions', () => {
     expect(head).toMatchObject({ state: 'missing', thermal_status: 'under' });
     expect(selection.warnings).toEqual(expect.arrayContaining([hands.message, head.message]));
     // The limits aren't lowered to hide the gap: the manual check agrees it is short.
-    expect(manualCheck(selection, [hands.clo], worn(selection), 0.5).hands.status).toBe('under');
+    expect(manualCheck(selection, [hands.clo], worn(selection), HOOD('helmet_compatible')).hands.status).toBe('under');
   });
 
   it('touring descent, 45°F easy: a glove within the band, not the −25°C glove the old rule chose', () => {
@@ -183,7 +192,7 @@ describe.each(ALL_PHASES)('%s keeps its own policy', phase => {
       for (const pool of [CATALOG, WARDROBE]) {
         const ensemble = [hood(helmet ? 'helmet_compatible' : 'attached')];
         const selection = select(phase, conditions, pool, ensemble);
-        const hoodClo = helmet ? 0.5 : 0.4;
+        const hoodClo = HOOD(helmet ? 'helmet_compatible' : 'attached');
         const manual = manualCheck(selection, selection.handwear ? [selection.handwear.rcl_clo] : [], worn(selection), hoodClo);
         expect(manual.hands.status).toBe(selection.assessments.hands.thermal_status);
         expect(manual.headNeck.status).toBe(selection.assessments.head.thermal_status);
@@ -196,12 +205,12 @@ describe('gloves stay on outside running and XC', () => {
   it.each(ALL_PHASES)('%s: a thin glove is within the band even when warm air asks for almost nothing', phase => {
     const selection = select(phase, { tempF: 65, windMph: 4 });
     expect(selection.handwear).not.toBeNull();
-    expect(selection.extremityMax.hands).toBeGreaterThanOrEqual(0.55);
+    expect(selection.extremityMax.hands).toBeGreaterThanOrEqual(POLE_GRIP_MAX_CLO);
     expect(selection.assessments.hands.thermal_status).toBe('in_range');
   });
 
   it('keeps the only owned pair when it is warmer than the band, and says so', () => {
-    const selection = select('cycling', { tempF: 65, windMph: 4 }, { handwear: [glove('ski-glove', 2.1)], headwear: [] });
+    const selection = select('cycling', { tempF: 65, windMph: 4 }, { handwear: [glove('ski-glove', 1.26)], headwear: [] });
     expect(selection.handwear?.id).toBe('ski-glove');
     expect(selection.assessments.hands).toMatchObject({ state: 'selected', thermal_status: 'over' });
     expect(selection.assessments.hands.message).toContain('gloves stay on');
@@ -232,43 +241,44 @@ describe('gloves stay on outside running and XC', () => {
 });
 
 describe('required helmets', () => {
-  const helmet = hat('helmet', 0.85, { headwear_type: 'ski_helmet' });
+  const helmet = hat('helmet', 0.38, { headwear_type: 'ski_helmet' });
 
   it.each(HELMET_PHASES)('%s: a helmet warmer than a mild head band is still worn, and not judged as overheating', phase => {
-    const selection = select(phase, { tempF: 65, windMph: 4 }, { handwear: [], headwear: [helmet, hat('beanie', 0.5)] });
-    expect(selection.targets.extremity.neutral.head).toBeLessThan(0.85);
+    const selection = select(phase, { tempF: 65, windMph: 4 }, { handwear: [], headwear: [helmet, hat('beanie', 0.23)] });
+    expect(selection.targets.extremity.neutral.head).toBeLessThan(0.38);
     expect(selection.headwear).toEqual({ helmet, headWarmth: null, neckWarmth: null });
-    expect(selection.extremityMax.head).toBe(0.85);
-    expect(selection.assessments.head).toMatchObject({ thermal_status: 'in_range', clo: 0.85 });
-    expect(manualCheck(selection, [], [0.85]).headNeck.status).toBe('in_range');
+    expect(selection.extremityMax.head).toBe(0.38);
+    expect(selection.assessments.head).toMatchObject({ thermal_status: 'in_range', clo: 0.38 });
+    expect(manualCheck(selection, [], [0.38]).headNeck.status).toBe('in_range');
   });
 
   it('only a helmet-compatible hood counts under the helmet, and a vented hood is advised when it overshoots', () => {
     const conditions = { tempF: 65, windMph: 4 };
     const pool = { handwear: [], headwear: [helmet] };
-    expect(select('alpine', conditions, pool, [hood('attached')]).assessments.head.clo).toBe(0.85);
+    expect(select('alpine', conditions, pool, [hood('attached')]).assessments.head.clo).toBe(0.38);
     const compatible = select('alpine', conditions, pool, [hood('helmet_compatible')]);
-    expect(compatible.assessments.head).toMatchObject({ clo: 1.35, thermal_status: 'over' });
+    expect(compatible.assessments.head).toMatchObject({ thermal_status: 'over' });
+    expect(compatible.assessments.head.clo).toBeCloseTo(0.38 + HOOD('helmet_compatible'), 10);
     expect(compatible.assessments.head.message).toContain('vent the hood');
   });
 
   it('a neck piece may complete a helmeted head, which needs no hat underneath', () => {
     const conditions = { tempF: 45, windMph: 4, exertion: 'easy' as const };
     const band = targetsFor('alpine', conditions).extremity;
-    expect(band.min.head).toBeGreaterThan(0.85 + EPS);
-    const gaiter = hat('gaiter', Math.round(((band.min.head + band.neutral.head) / 2 - 0.85) * 100) / 100, { headwear_type: 'buff_heavy' });
+    expect(band.min.head).toBeGreaterThan(0.38 + EPS);
+    const gaiter = hat('gaiter', Math.round(((band.min.head + band.neutral.head) / 2 - 0.38) * 100) / 100, { headwear_type: 'buff_heavy' });
     const selection = select('alpine', conditions, { handwear: [], headwear: [helmet, gaiter] });
     expect(selection.headwear).toEqual({ helmet, headWarmth: null, neckWarmth: gaiter });
     expect(selection.assessments.head.thermal_status).toBe('in_range');
   });
 
   it('a neck piece goes over a balaclava only when nothing else reaches the head band', () => {
-    const balaclava = hat('balaclava', 1.5, { headwear_type: 'balaclava_heavy', covers_neck: true });
-    const mask = hat('mask', 0.9, { headwear_type: 'facemask', covers_neck: true });
+    const balaclava = hat('balaclava', 0.68, { headwear_type: 'balaclava_heavy', covers_neck: true });
+    const mask = hat('mask', 0.41, { headwear_type: 'facemask', covers_neck: true });
     const pool = { handwear: [], headwear: [helmet, balaclava, mask] };
-    // 5°F, 20 mph: helmet + balaclava (2.35) is short of the descent band; the mask over it reaches it.
+    // 5°F, 20 mph: helmet + balaclava (1.06) is short of the descent band; the mask over it reaches it.
     const cold = select('descent', { tempF: 5, windMph: 20, exertion: 'hard' }, pool);
-    expect(cold.targets.extremity.min.head).toBeGreaterThan(2.35 + EPS);
+    expect(cold.targets.extremity.min.head).toBeGreaterThan(1.06 + EPS);
     expect(cold.headwear).toEqual({ helmet, headWarmth: balaclava, neckWarmth: mask });
     // 32°F: the balaclava alone overshoots less than layering, so no mask goes over it.
     const freezing = select('descent', { tempF: 32, windMph: 5 }, pool);
@@ -279,15 +289,16 @@ describe('required helmets', () => {
     const conditions = { tempF: -4, windMph: 10 };
     const base = targetsFor('descent', conditions);
     const band = (head: number) => ({ ...base.extremity.neutral, head });
-    const targets: PhaseTargets = { ...base, extremity: { ...base.extremity, min: band(1.5), neutral: band(1.9), max: band(2.3) } };
-    const balaclava = hat('balaclava', 0.5, { headwear_type: 'balaclava_light', covers_neck: true, min_temp_static: -30 });
-    const neck = hat('neck', 0.9, { headwear_type: 'buff_heavy', min_temp_static: -30 });
+    const targets: PhaseTargets = { ...base, extremity: { ...base.extremity, min: band(0.68), neutral: band(0.86), max: band(1.04) } };
+    const balaclava = hat('balaclava', 0.23, { headwear_type: 'balaclava_light', covers_neck: true, min_temp_static: -30 });
+    const neck = hat('neck', 0.41, { headwear_type: 'buff_heavy', min_temp_static: -30 });
     // A lighter hat that isn't rated for −20°C makes this deep cold, so the head needs a hat.
-    const lightHat = hat('light-hat', 0.3, { headwear_type: 'liner_beanie', min_temp_static: 10 });
+    const lightHat = hat('light-hat', 0.14, { headwear_type: 'liner_beanie', min_temp_static: 10 });
     const selection = selectPhaseAccessories('ski_touring_downhill', targets,
       { handwear: [], headwear: [helmet, balaclava, neck, lightHat] }, f2c(conditions.tempF));
     expect(selection.headwear).toEqual({ helmet, headWarmth: balaclava, neckWarmth: neck });
-    expect(selection.assessments.head).toMatchObject({ clo: 2.25, thermal_status: 'in_range' });
+    expect(selection.assessments.head).toMatchObject({ thermal_status: 'in_range' });
+    expect(selection.assessments.head.clo).toBeCloseTo(1.02, 10);
   });
 
   it.each(['cycling', 'climb'] as const)('%s never selects a helmet from the thermal budget', phase => {
@@ -371,7 +382,7 @@ describe('sparse wardrobes and unknown accessory data', () => {
 
   it('a helmet with unknown insulation is worn, and the head is reported unknown', () => {
     const helmet = hat('helmet', null as unknown as number, { headwear_type: 'ski_helmet' });
-    const selection = select('alpine', { tempF: 45, windMph: 4 }, { handwear: [], headwear: [helmet, hat('beanie', 0.7)] });
+    const selection = select('alpine', { tempF: 45, windMph: 4 }, { handwear: [], headwear: [helmet, hat('beanie', 0.32)] });
     expect(selection.headwear.helmet?.id).toBe('helmet');
     expect(selection.assessments.head.state).toBe('unknown');
   });

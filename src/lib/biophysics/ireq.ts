@@ -9,6 +9,7 @@ import {
   SKIN_TEMP_MINIMUM,
   EXTREMITY_IREQ_MULTIPLIERS,
   DEFAULT_EXTREMITY_MULTIPLIERS,
+  ACCESSORY_CLO_SCALE,
   type ExtremityIreqActivity,
 } from './constants';
 import type { IreqResult } from '@/types/garments';
@@ -389,6 +390,9 @@ interface ExtremityIreqResult {
  * balance, gloves about as warm as the whole-body ensemble kept fingers at
  * 33°C (Gao et al. 2016).
  *
+ * Targets are on the part-manikin scale hand and head items are rated in
+ * (`ACCESSORY_CLO_SCALE`, #376).
+ *
  * @param baseIreq - The whole-body IREQ result
  * @param activity - The activity type
  * @param airTempC - Air temperature in Celsius (for scaling)
@@ -412,8 +416,8 @@ export function calculateExtremityIreq(
   const windFactor = 1.0 + (windSpeedMs * 0.03);
 
   // Calculate final multipliers
-  const handMult = activityMultipliers.hands * tempFactor * windFactor;
-  const headMult = activityMultipliers.head * tempFactor * windFactor;
+  const handMult = activityMultipliers.hands * tempFactor * windFactor * ACCESSORY_CLO_SCALE.hands;
+  const headMult = activityMultipliers.head * tempFactor * windFactor * ACCESSORY_CLO_SCALE.head;
 
   return {
     min: {

@@ -60,8 +60,10 @@ All cases use basic clo, air permeability 1 l/(m²·s) (membrane), relative humi
 | 116 W/m², −30°C, 2 m/s, 3.0 clo | 2.69 / 2.69 | −35.3 / −31.3 | 1.13 / 1.28 | −43.2 / −42.4 | 0.93 / 0.94 |
 | Chairlift 70 W/m², −15°C, 2 m/s, 4.3 clo | 3.90 / 3.90 | −11.4 / −12.0 | 3.52 / 3.33 | −17.1 / −17.4 | 2.34 / 2.30 |
 | Alpine cycle 115 W/m², −15°C, 5 m/s, 4.3 clo | 3.28 / 3.28 | +12.0 / +16.0 | none / none | +5.1 / +6.4 | none / none |
-| Touring climb 233 W/m², −4°C, 1.6 m/s, 0.6 clo | 0.60 / 0.61 | −26.2 / +3.1 | 1.53 / none | −50.9 / −52.7 | 0.79 / 0.76 |
-| Cycling 290 W/m², −4°C, 5.4 m/s, 0.5 clo | 0.50 / 0.53 | −59.1 / +4.3 | 0.68 / none | −92.6 / −81.8 | 0.43 / 0.49 |
+| 233 W/m², −4°C, 1.6 m/s, 0.6 clo | 0.60 / 0.61 | −26.2 / +3.1 | 1.53 / none | −50.9 / −52.7 | 0.79 / 0.76 |
+| 290 W/m², −4°C, 5.4 m/s, 0.5 clo | 0.50 / 0.53 | −59.1 / +4.3 | 0.68 / none | −92.6 / −81.8 | 0.43 / 0.49 |
+| Touring climb, moderate (316 W/m², #374), −4°C, 1.6 m/s, 0.6 clo | 0.60 / 0.61 | +44.2 / +98.4 | none / none | +19.5 / +30.9 | none / none |
+| Cycling, moderate (325 W/m², 7.3 m/s riding air speed, #374), −4°C, 0.5 clo | 0.50 / 0.53 | −43.2 / +28.2 | 0.93 / none | −78.1 / −71.8 | 0.51 / 0.56 |
 
 **Hand check.** Take the golden alpine "extreme cold" catalog outfit (−15°F, 10 mph): basic 4.34 clo becomes resultant 3.02 clo. S is −20.2 W/m² at 30°C skin and −27.7 W/m² at 33.7°C, so DLEmin = 40 / 20.2 = 1.98 h and DLEneutral = 40 / 27.7 = 1.44 h. These match the snapshot.
 
@@ -70,8 +72,8 @@ All cases use basic clo, air permeability 1 l/(m²·s) (membrane), relative humi
 1. **No skin evaporation.** ISO includes diffusion through the skin at wettedness 0.06 (minimal) or 0.001 × M (neutral). SWTTR has no skin-evaporation term, in IREQ or here. So both lose heat more slowly than ISO, most of all at low output in light air: DLEneutral is 2.66 h against 1.70 h at 2 MET and −10°C.
 2. **Fixed skin temperatures.** ISO lowers both with metabolic rate: minimal 33.34 − 0.0354 M and neutral 35.7 − 0.0285 M. SWTTR fixes 30°C and 33.7°C.
    - DLEmin is longer than ISO's at rest, where ISO's minimal skin is 31.3°C.
-   - At 233–290 W/m², where ISO's minimal skin is 25.1–23.1°C, DLEmin is much shorter than ISO's or present where ISO has none. This is conservative.
-   - Neutral agrees within 0.06 h on the chairlift and at 233–290 W/m².
+   - At 233–325 W/m², where ISO's minimal skin is 25.1–21.8°C, DLEmin is much shorter than ISO's or present where ISO has none. This is conservative.
+   - Neutral agrees within 0.06 h on the chairlift and at 233–325 W/m².
 3. **Convective coefficient.** SWTTR uses hc = max(3, 8.3 v^0.6, natural convection) and a bounded hr. ISO derives hc from the dynamic air insulation (hc = 1/Ia,r − hr). Even with ISO's skin evaporation removed and SWTTR's skin temperatures used, ISO's balance gives about 20–40 % faster cooling at 0.5 m/s (−7.8 against −5.5 W/m² minimal, at 2 MET and −10°C).
 4. **ICLR floor.** In still air ISO's ICLR can come out slightly above the basic value (3.04 against 3.00 clo at rest). SWTTR keeps `requiredBasicInsulation`'s floor, so ICLR never exceeds basic. The effect is within 0.04 clo.
 

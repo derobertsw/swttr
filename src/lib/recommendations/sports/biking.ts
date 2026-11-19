@@ -5,6 +5,7 @@
  * rain protection follow `cyclingProtection`.
  */
 import { OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
+import { cyclingRelativeAirSpeed } from '@/lib/biophysics/sport-policy';
 import { createSinglePhaseSport } from './single-phase';
 import { runningProtectionWarnings, runningRegionMatches } from './running-outfit';
 import { buildCyclingEnsemble, cyclingProtection } from './cycling-outfit';
@@ -17,13 +18,18 @@ export const biking = createSinglePhaseSport({
   activity: 'biking',
   profile: { name: 'Biking', windExposure: 'exposed' },
   minEvapPotential: MIN_EVAP_POTENTIAL,
-  // Targets keep assuming a windproof outer, as before (#374 owns ride speed).
+  // Targets keep assuming a windproof outer, as before.
   outerAirPermeability: () => OUTER_AIR_PERMEABILITY.windproof,
+  // Riding speed combined with ambient wind (#374); see cyclingRelativeAirSpeed.
+  airSpeedMs: (request) => cyclingRelativeAirSpeed(request.windMs, request.exertion),
   protection: cyclingProtection,
   protect: (ensemble, _categorized, targets) => ({ ensemble, warnings: runningProtectionWarnings(ensemble, targets, targets.protection) }),
   buildEnsemble: (categorized, targets) =>
     buildCyclingEnsemble(categorized, targets, MIN_EVAP_POTENTIAL, targets.protection!),
-  conditions: (request) => ({ precipitation: request.precipitation }),
+  conditions: (request) => ({
+    precipitation: request.precipitation,
+    relative_air_speed_ms: Math.round(cyclingRelativeAirSpeed(request.windMs, request.exertion) * 100) / 100,
+  }),
   guidance: (_request, _ireq, ensemble, targets) => {
     if (!ensemble || !targets) return ['Choose a cycling top and shorts or tights to meet the riding targets.'];
     const needs = targets.protection;

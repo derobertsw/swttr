@@ -141,6 +141,9 @@ export function formatValidationBuffer(buffer: CowedaValidationBuffer) {
 /**
  * The `ireq` block shared by single-phase sports
  */
+/** Margin source for phases whose CoWEDA-inspired margins taper with exposure. */
+export const UNVALIDATED_MARGIN_SOURCE = 'coweda_inspired_unvalidated_swttr_margin';
+
 export function formatSinglePhaseIreq(ireq: IreqResult, targets: PhaseTargets) {
   return {
     min: ireq.ireqMin,
@@ -150,7 +153,9 @@ export function formatSinglePhaseIreq(ireq: IreqResult, targets: PhaseTargets) {
     regional: targets.regional,
     extremity: targets.extremity,
     validation_buffer_clo: formatValidationBuffer(targets.validationBuffer),
-    validation_source: targets.policy ? 'coweda_inspired_unvalidated_swttr_margin' : COWEDA_VALIDATION_SOURCE,
+    validation_source: targets.policy || targets.coldExposureFactor !== undefined ? UNVALIDATED_MARGIN_SOURCE : COWEDA_VALIDATION_SOURCE,
+    // Cycling (#374): the tapered margins' applicability, outside a sustained policy.
+    ...(targets.coldExposureFactor !== undefined ? { cold_exposure_factor: targets.coldExposureFactor } : {}),
     ...(targets.policy ? { policy: targets.policy } : {}),
   };
 }

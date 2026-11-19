@@ -161,4 +161,16 @@ describe('touring descent pack', () => {
     expect(selectDescentPack([baseTop], insulationPool, cold, false).insulation?.id).toBe('heavy-hoody');
     expect(selectDescentPack([baseTop], insulationPool, cold, true).insulation?.id).toBe('light-vest');
   });
+
+  it('packs the layer leaving the smallest gap when none reaches the minimum, however heavy', () => {
+    // Deep cold: neither puffy reaches the band. Before #374's fix the 30% weight
+    // share picked the light one and left the descent colder.
+    const deep = band(5, 6);
+    const lightDown = garment('light-down', 'insulation_down', 'torso', 2.5, { weight_grams: 150 });
+    const heavyPuffy = garment('heavy-puffy', 'insulation_synthetic', 'torso', 3.9, { weight_grams: 800 });
+    const insulationPool = { shells: [hardJacket], insulation: [lightDown, heavyPuffy], legs: [] };
+    expect(selectDescentPack([baseTop], insulationPool, deep, false).insulation?.id).toBe('heavy-puffy');
+    // A light pack, when asked for, still trades warmth for weight.
+    expect(selectDescentPack([baseTop], insulationPool, deep, true).insulation?.id).toBe('light-down');
+  });
 });

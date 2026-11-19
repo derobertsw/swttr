@@ -10,7 +10,8 @@ import { POST as touring } from '@/app/api/v1/recommendations/ski-touring/route'
 import { POST as alpine } from '@/app/api/v1/recommendations/alpine/route';
 import { formatGarmentResponse } from './formatting';
 import { hasUsableThermalData } from './garment-semantics';
-import { hoodInsulation } from './extremities';
+import { HOOD_HEAD_CREDIT, hoodInsulation } from './extremities';
+import { HOOD_CLO_VALUES } from '@/lib/biophysics/constants';
 import { loadGearPool } from './gear-pool';
 import { parseRecommendationRequest } from './request';
 import { skiTouring } from './sports/ski-touring';
@@ -84,7 +85,7 @@ describe('#41 catalog migration and API integration', () => {
         data_source: 'docs/catalog-issue-41.md#thermal-estimates',
       } });
       expect(hoodInsulation([g], false)).toBeGreaterThan(0);
-      expect(hoodInsulation([g], true)).toBe(model === models[0] ? 0.5 : 0);
+      expect(hoodInsulation([g], true)).toBe(model === models[0] ? HOOD_CLO_VALUES.helmet_compatible * HOOD_HEAD_CREDIT : 0);
       await access(`public${g.item_image_url}`);
     }
     expect((await db.query('SELECT count(*)::int AS count FROM garment_materials')).rows[0]).toEqual({ count: 11 });
@@ -141,8 +142,9 @@ describe('#41 catalog migration and API integration', () => {
     const request = () => new NextRequest('http://localhost/api/v1/recommendations/ski-touring', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       // Calm enough on the climb that no shell is needed (#372), so the
-      // wind-resistant Senja is the climb's warmth layer.
-      body: JSON.stringify({ weather: { temperature: 5, wind_speed: 10 }, exertion: 'moderate' }),
+      // wind-resistant Senja is the climb's warmth layer. Easy effort: since
+      // #374's climbing rates a moderate climb at 5°F needs no fleece.
+      body: JSON.stringify({ weather: { temperature: 5, wind_speed: 10 }, exertion: 'easy' }),
     });
     const parsed = await parseRecommendationRequest(request());
     if (parsed instanceof Response) throw new Error('Unexpected invalid recommendation request');

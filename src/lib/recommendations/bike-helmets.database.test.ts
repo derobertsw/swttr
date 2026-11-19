@@ -6,6 +6,7 @@ import bikeHelmets from '@/test/fixtures/bike-helmets.json';
 
 const ENUM = 'supabase/migrations/20261117031000_add_bike_helmet_type.sql';
 const SEED = 'supabase/migrations/20261117031100_seed_bike_helmets.sql';
+const ACCESSORY_SCALE = 'supabase/migrations/20261119120000_anchor_accessory_clo.sql';
 const COLUMNS = 'brand, model_name, headwear_type, weight_grams, covers_ears, covers_neck, covers_face, helmet_compatible, rcl_clo, windproof, min_temp_active, min_temp_static';
 const opened: PGlite[] = [];
 
@@ -40,10 +41,11 @@ describe('#373 bike helmet migrations in Postgres', () => {
       .toEqual(['Giro Syntax MIPS', 'Smith Signal MIPS', 'Specialized Align II MIPS']);
   }, 30_000);
 
-  it('seeds the rows the bike helmet test fixture uses', async () => {
+  it('seeds the rows the bike helmet test fixture uses, on the #376 accessory scale', async () => {
     const db = await freshDatabase();
     await db.exec(await readFile(ENUM, 'utf8'));
     await db.exec(await readFile(SEED, 'utf8'));
+    await db.exec(await readFile(ACCESSORY_SCALE, 'utf8'));
     const fixture = bikeHelmets.headwear
       .map(({ brand, model_name, headwear_type, weight_grams, covers_ears, covers_neck, covers_face, helmet_compatible, rcl_clo, windproof, min_temp_active, min_temp_static }) =>
         ({ brand, model_name, headwear_type, weight_grams, covers_ears, covers_neck, covers_face, helmet_compatible, rcl_clo, windproof, min_temp_active, min_temp_static }));

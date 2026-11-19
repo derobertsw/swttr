@@ -32,7 +32,7 @@ The climb clothing stays on. The pack adds, region by region:
 - **Upper body:** a fleece or puffy when torso or arms would fall short of the descent minimum. Insulated outerwear isn't packed, since it would replace the shell.
 - **Legs:** an over-pant when the legs would fall short of the descent minimum. Over shell or insulated pants only insulation is added; over soft-shell pants, a hard shell or insulation, not a second soft shell. Base and fleece layers go underneath, so they are never added at the transition.
 
-Each candidate has to bring its region closer to the band, where a shortfall counts double an excess (the descent is the cold phase; the accessory fallback uses the same weighting). Among those, a layer that reaches the minimum wins. Then the score is the share of the gap closed against weight, 70/30 as the pack always was. With `prioritize_light_pack` the split is 40/60 and reaching the minimum no longer comes first, so a lighter layer can leave a small shortfall.
+Each candidate has to bring its region closer to the band, where a shortfall counts double an excess (the descent is the cold phase; the accessory fallback uses the same weighting). Among those, a layer that reaches the minimum wins. Then the score is the share of the gap closed against weight, 70/30 as the pack always was. When no layer reaches the minimum, the one leaving the smallest gap wins and weight only breaks ties (#374), so lightness never buys a colder descent. With `prioritize_light_pack` the split is 40/60 and reaching the minimum no longer comes first, so a lighter layer can leave a small shortfall.
 
 Pack items now include `covers_torso`, `covers_arms`, `covers_legs` and `rcl_legs`, so the client puts packed pants on the legs and the descent's manual check matches `descent_evaluation`. The transition protocol names the leg layer, and guidance suggests full side zips, which let pants go on over ski boots. The catalog doesn't record side zips.
 
@@ -69,5 +69,6 @@ Most climbs still read "Warmer than recommended" because of head and hand access
 - Climb targets assume a membrane outer (above), #374.
 - Leg bias and regional weights, #375: decided 2026-11-19. Every region gets the whole-body band and the weights stay, so the descent's legs still rely on the packed over-pant described above.
 - The catalog has no side-zip insulated over-pants, the usual touring descent leg layer, so cold descents pack insulated resort ski pants.
+- Since #374's climbing rates the climb wears lighter pants, and one 1.8 clo over-pant no longer covers the descent's leg minimum in more golden cases (25°F and colder). The causes and per-case numbers are in [Cycling and touring-climb calibration](cycling-touring-calibration.md#descent-findings); the descent's targets are the open question.
 - The climb's manual check doesn't carry its protection needs, so removing a shell in rain isn't flagged as incomplete. Touring has no `ireq.policy`, which is where running and XC pass them.
 - In deep cold with no wind, the climb doesn't wear an owned hard shell for warmth, even when it falls short.

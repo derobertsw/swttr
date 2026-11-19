@@ -124,11 +124,14 @@ describe('running/XC calibrated policy', () => {
   it('keeps body-size sensitivity finite and separates current defaults from other sports', () => {
     expect(targets('running', -5, 3.6, 'moderate', false, { heightInches: 62, weightLbs: 110 }).rate)
       .toBeLessThan(targets('running', -5, 3.6, 'moderate', false, { heightInches: 76, weightLbs: 230 }).rate);
-    expect(getMetabolicRateForActivity('biking', 'moderate')).toBe(290);
-    expect(getMetabolicRateForActivity('ski_touring_uphill', 'moderate')).toBe(232.8);
+    // Cycling and the touring climb share the Compendium conversion (#374);
+    // the descent keeps its earlier rate.
+    expect(getMetabolicRateForActivity('biking', 'moderate')).toBeCloseTo(metabolicHeatFluxFromMet(7.0, DEFAULT_BODY_METRICS), 8);
+    expect(getMetabolicRateForActivity('ski_touring_uphill', 'moderate')).toBeCloseTo(metabolicHeatFluxFromMet(6.8, DEFAULT_BODY_METRICS), 8);
     expect(getMetabolicRateForActivity('ski_touring_downhill', 'moderate')).toBe(145.5);
     expect(targets('alpine_skiing', -5).policy).toBeUndefined();
     expect(targets('ski_touring_uphill', -5).policy).toBeUndefined();
+    expect(targets('biking', -5).policy).toBeUndefined();
   });
 });
 

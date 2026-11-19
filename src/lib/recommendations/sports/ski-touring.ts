@@ -38,6 +38,7 @@ import {
   formatHeadwearSet,
   formatIreqPhase,
   formatValidationBuffer,
+  UNVALIDATED_MARGIN_SOURCE,
 } from '../formatting';
 
 // ============================================
@@ -109,16 +110,20 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
 
   computeTargets({ tempC, windMs, humidity, exertion, bodyMetrics, precipitation, weather }) {
     const conditions = { tempC, humidity };
+    const uphillWind = windMs * UPHILL_WIND_FACTOR;
+    const climbNeeds = climbProtection(tempC, uphillWind, precipitation, weather.precipitation_type);
+    // The climb's margins taper like running/XC (#374); wet means what the
+    // climb's protection calls wet. The descent and transition keep theirs.
+    const climbConditions = { ...conditions, precipitation: climbNeeds.wet };
     const uphillRate = metabolicRateFor('ski_touring_uphill', exertion, bodyMetrics);
     const downhillRate = metabolicRateFor('ski_touring_downhill', exertion, bodyMetrics);
     const transitionRate = applyBodySizeMetabolicAdjustment(
       getTransitionMetabolicRate(exertion),
       bodyMetrics
     );
-    const uphillWind = windMs * UPHILL_WIND_FACTOR;
     const downhillWind = windMs + DOWNHILL_SPEED_WIND;
 
-    const uphillIreq = phaseIreq(conditions, uphillWind, uphillRate);
+    const uphillIreq = phaseIreq(climbConditions, uphillWind, uphillRate);
     const downhillIreq = phaseIreq(conditions, downhillWind, downhillRate);
     const transitionWind = windMs * TRANSITION_WIND_FACTOR;
     const transitionIreq = phaseIreq(conditions, transitionWind, transitionRate);
@@ -141,9 +146,9 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
       basic: {
         transition: basicIreq(transitionIreq, phaseExposure(transitionWind, transitionRate, outer)),
       },
-      uphill: phaseTargets('ski_touring_uphill', uphillIreq, uphillRate, conditions, uphillWind, uphillIreq, undefined, uphillExposure),
+      uphill: phaseTargets('ski_touring_uphill', uphillIreq, uphillRate, climbConditions, uphillWind, uphillIreq, exertion, uphillExposure),
       downhill: phaseTargets('ski_touring_downhill', downhillIreq, downhillRate, conditions, downhillWind, downhillIreq, undefined, downhillExposure),
-      climbProtection: climbProtection(tempC, uphillWind, precipitation, weather.precipitation_type),
+      climbProtection: climbNeeds,
     };
   },
 
@@ -159,6 +164,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
           downhill: formatValidationBuffer(targets.downhill.validationBuffer),
         },
         validation_source: COWEDA_VALIDATION_SOURCE,
+        ...climbMarginEcho(targets.uphill),
       },
       guidance: generateTouringGuidance(tempC, targets.uphillIreq, targets.downhillIreq),
     };
@@ -278,6 +284,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
           downhill: formatValidationBuffer(downhill.validationBuffer),
         },
         validation_source: COWEDA_VALIDATION_SOURCE,
+        ...climbMarginEcho(uphill),
       },
       recommendation: uphillResult.recommendation,
       descent_evaluation: downhillResult.recommendation.evaluation,
@@ -325,6 +332,15 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     };
   },
 };
+
+/** The climb's tapered margins (#374): their applicability and source. The
+ * descent's margins stay untapered under `validation_source`. */
+function climbMarginEcho(uphill: PhaseTargets) {
+  return {
+    uphill_cold_exposure_factor: uphill.coldExposureFactor,
+    uphill_validation_source: UNVALIDATED_MARGIN_SOURCE,
+  };
+}
 
 // ============================================
 // CLIMB PROTECTION
