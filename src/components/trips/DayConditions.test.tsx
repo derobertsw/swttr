@@ -60,6 +60,8 @@ describe("Day conditions", () => {
     expect(screen.getByRole("link", { name: "Open forecast (new tab)" })).toHaveAttribute("target", "_blank");
     expect(screen.getByRole("link", { name: "Open access information (new tab)" })).toHaveAttribute("href", "https://example.org/roads");
     expect(screen.getAllByText("Validity not available in SWTTR — check the source.")).toHaveLength(2);
+    // Every link is the organizer's: SWTTR never adds one by itself.
+    expect(screen.getAllByText("Added by the organizer")).toHaveLength(2);
     expect(screen.getAllByText("No review recorded for this day")).toHaveLength(2);
     expect(screen.getByText("Your reviews: 0 of 2 recorded for Saturday")).toBeInTheDocument();
   });
@@ -241,6 +243,55 @@ describe("Day conditions", () => {
     expect(sentBodies(api, `POST ${reviewsRoute}`).map((body) => (body as { context_key: string }).context_key)).toEqual(["key-1", "key-2"]);
   });
 
+  it("records against the plan the form opened with when the trip reloads behind it, as on coming back from the source", async () => {
+    const api = fakeTripApi({ [`POST ${reviewsRoute}`]: (body) => (body as { context_key: string }).context_key === "key-2"
+      ? reply(200, { entry_id: "entry-1" })
+      : reply(409, { error: "This day's plan or the source changed since you opened it. Check the latest before recording your review." }) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    const view = renderConditions({ userId: "user-2", conditions: [source()] });
+    await user.click(screen.getByRole("button", { name: /Record my review/ }));
+    await user.type(screen.getByLabelText("Note (optional)"), "Read the bulletin");
+    // Coming back from the forecast's tab reloads the trip behind the form, and the route changed meanwhile.
+    view.rerender(<DayConditions data={data([source({ context_key: "key-2" })], "user-2")} date={DATE} dateLabel="Sat Oct 10" activity="Backcountry" userId="user-2" onSaved={onSaved} />);
+    await user.click(screen.getByRole("button", { name: "Save review" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("changed since you opened it");
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue("Read the bulletin");
+    await user.click(screen.getByRole("button", { name: "Check the latest" }));
+    expect(await screen.findByText(/Check the source again; your note is still here./)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save review" }));
+    expect(await screen.findByText("Review recorded.")).toBeInTheDocument();
+    expect(sentBodies(api, `POST ${reviewsRoute}`).map((body) => (body as { context_key: string }).context_key)).toEqual(["key-1", "key-2"]);
+  });
+
+  it("corrects only the entry the form opened from, even after the trip reloads behind it", async () => {
+    const api = fakeTripApi({ [`POST ${reviewsRoute}`]: reply(409, { error: "Your review or this day's sources changed. Check the latest before saving again." }) });
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    const view = renderConditions({ userId: "user-2", conditions: [source({ reviews: [review("user-2", {}, { note: "Low" })] })] });
+    await user.click(screen.getByRole("button", { name: /Edit note/ }));
+    // The same person corrected it in another window, and this one reloaded the trip.
+    const corrected = review("user-2", { history: [{ id: "entry-user-2", action: "reviewed", note: "Low", reviewed_at: "2026-10-09T22:12:00Z", created_at: "2026-10-09T22:12:00Z" }] },
+      { id: "entry-newer", action: "corrected", note: "Moderate", created_at: "2026-10-09T23:00:00Z" });
+    view.rerender(<DayConditions data={data([source({ reviews: [corrected] })], "user-2")} date={DATE} dateLabel="Sat Oct 10" activity="Backcountry" userId="user-2" onSaved={onSaved} />);
+    const note = screen.getByLabelText("Note (optional)");
+    await user.clear(note);
+    await user.type(note, "Considerable");
+    await user.click(screen.getByRole("button", { name: "Save note" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your review or this day's sources changed.");
+    expect(sentBodies(api, `POST ${reviewsRoute}`)[0]).toMatchObject({ action: "correct", expected_entry_id: "entry-user-2", note: "Considerable" });
+  });
+
+  it("starts each action's spoken name with the words on its button", () => {
+    render(<DayConditions data={tripFull({ days: [...DAYS, { id: "day-2", trip_id: TRIP.id, stop_id: null, date: "2026-10-11", activity: "Backcountry" }],
+      members: [ORGANIZER, SAM, ALEX], conditions: [source({ reviews: [review("user-1")] })],
+      conditions_sources: [{ ...source(), dates: [DATE] }] })} date={DATE} dateLabel="Sat Oct 10" activity="Backcountry" userId="user-1" onSaved={onSaved} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.map((button) => button.textContent)).toEqual(expect.arrayContaining(["Record my review", "Edit note", "Withdraw review", "Edit source", "Use on other days"]));
+    // Speech input users say what they see (WCAG 2.5.3).
+    for (const button of buttons) expect(button.getAttribute("aria-label") ?? button.textContent).toMatch(new RegExp(`^${button.textContent}`));
+  });
+
   describe("reusing sources across days", () => {
     const WEEKEND: TripDay[] = [
       { id: "day-0", trip_id: TRIP.id, stop_id: null, date: "2026-10-09", activity: "Backcountry" },
@@ -268,7 +319,7 @@ describe("Day conditions", () => {
       vi.stubGlobal("fetch", api);
       const user = userEvent.setup();
       renderWeekend([source({ reviews: [review("user-2")] })], [use([DATE])]);
-      await user.click(screen.getByRole("button", { name: "Use Mount Washington Avalanche Center on other days" }));
+      await user.click(screen.getByRole("button", { name: "Use on other days: Mount Washington Avalanche Center" }));
       const sheet = within(screen.getByRole("dialog"));
       expect(sheet.getByText("Already listed on 1 day.")).toBeInTheDocument();
       // Saturday lists it already, so only Friday and Sunday are offered.
@@ -312,7 +363,7 @@ describe("Day conditions", () => {
       vi.stubGlobal("fetch", api);
       const user = userEvent.setup();
       renderWeekend([source()], [use([DATE])]);
-      await user.click(screen.getByRole("button", { name: "Use Mount Washington Avalanche Center on other days" }));
+      await user.click(screen.getByRole("button", { name: "Use on other days: Mount Washington Avalanche Center" }));
       await user.click(screen.getByRole("checkbox", { name: /Sun, Oct 11/ }));
       await user.click(screen.getByRole("button", { name: "Review 1 day" }));
       await user.click(await screen.findByRole("button", { name: "List on 1 day" }));
