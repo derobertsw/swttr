@@ -13,8 +13,9 @@ import { resolve } from 'node:path';
 const MARK = '/* QA-235 PREVIEW ONLY */';
 const EDITS = [
   ['src/proxy.ts',
-    'if (PUBLIC_INFORMATION_ROUTES.includes(request.nextUrl.pathname)) {',
-    `if (PUBLIC_INFORMATION_ROUTES.includes(request.nextUrl.pathname) || /^\\/trips\\/trip-(drive|edge|split)(\\/|$)/.test(request.nextUrl.pathname) ${MARK}) {`],
+    // Since #382 the condition goes on (|| the saved briefs route), so the anchor stops at the first test.
+    'if (PUBLIC_INFORMATION_ROUTES.includes(request.nextUrl.pathname)',
+    `if (PUBLIC_INFORMATION_ROUTES.includes(request.nextUrl.pathname) || /^\\/trips\\/trip-(drive|edge|split)(\\/|$)/.test(request.nextUrl.pathname) ${MARK}`],
   ['src/hooks/useUserId.ts',
     '  const { userId, isLoaded } = useAuth();\n',
     `  const { userId, isLoaded } = useAuth();\n  const qa = typeof window === "undefined" ? null : window.localStorage.getItem("qa235User"); ${MARK}\n  if (qa) return qa;\n`],
