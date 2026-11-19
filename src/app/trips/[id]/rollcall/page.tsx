@@ -134,7 +134,8 @@ function Fact({ term, children }: { term: string; children: ReactNode }) {
   </div>;
 }
 
-const linkClassName = "underline underline-offset-4 hover:no-underline";
+// Inline links were 21px tall on phones (#337): a 44px target on touch screens, dense rows with a mouse.
+const linkClassName = "underline underline-offset-4 hover:no-underline pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center";
 
 function PersonTasks({ tripId, day, person, viewer }: { tripId: string; day: TripDayChecklist; person: TripChecklistPerson; viewer: boolean }) {
   const name = viewer && person.display_name !== "You" ? `${person.display_name} (you)` : person.display_name;
