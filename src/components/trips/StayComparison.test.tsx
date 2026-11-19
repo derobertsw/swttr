@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StayComparison } from "./StayComparison";
@@ -188,6 +188,16 @@ describe("Compare stays (#213)", () => {
     expect(screen.getByText("Choose one more stay to compare.")).toBeInTheDocument();
   });
 
+  it("wraps its buttons' labels, so large text never widens the page", async () => {
+    // jsdom doesn't lay out: the browser check (docs/qa/213-compare-stays) measures it, at 200% text on 320 and 390px phones.
+    await renderPage();
+    expect(await screen.findByRole("button", { name: "Add a stay to compare" })).toHaveClass("h-auto", "max-w-full", "whitespace-normal");
+    expect(screen.getByRole("button", { name: "Change Ridge chalet" }).parentElement).toHaveClass("flex-wrap", "min-w-0");
+    const one = splitDriveTrip();
+    await renderPage({ full: { ...one, lodging: { ...one.lodging!, stays: one.lodging!.stays.slice(0, 1) } }, candidates: [] });
+    expect(await screen.findByRole("button", { name: "Add another stay" })).toHaveClass("h-auto", "max-w-full", "whitespace-normal");
+  });
+
   it("still compares saved stays before options can be saved", async () => {
     await renderPage({ candidates: [], available: false });
     expect(await screen.findByText("Options can't be added yet. Saved stays can still be compared.")).toBeInTheDocument();
@@ -242,6 +252,10 @@ describe("Use for these nights (#213)", () => {
     expect(onPlanSaved).toHaveBeenCalled();
     // The option is a saved stay now, and stays in the comparison as one.
     await waitFor(() => expect(window.location.search).toContain(`stay%3A${A}`));
+    // Its Use button is new, so focus goes to the Comparison heading, scrolled into view rather than left off-screen.
+    const heading = screen.getByRole("heading", { name: "Comparison" });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(vi.mocked(Element.prototype.scrollIntoView).mock.contexts).toContain(heading);
   }, 20_000);
 
   it("asks again for the people chosen, and reviews again after the plan changed", async () => {
@@ -269,6 +283,44 @@ describe("Use for these nights (#213)", () => {
     expect(onPlanSaved).toHaveBeenCalledOnce();
     await screen.findByText("Move Alex from Pine rental to Ridge chalet for the nights of Fri Oct 9 and Sat Oct 10.");
     expect(sent.at(-1)).toMatchObject({ member_ids: [ALEX.id], preview: true });
+  }, 20_000);
+
+  it("moves focus to What changes as each preview renders, so it isn't lost when the sheet's buttons change", async () => {
+    let saves = 0;
+    await renderPage({ initial, writes: {
+      [`POST ${base}/use`]: (body: unknown) => {
+        const request = body as Record<string, unknown>;
+        if (request.preview) return { status: 200, body: usePreview(request.member_ids as string[] | undefined) };
+        return ++saves === 1 ? { status: 409, body: { error: "The lodging plan changed. Review the saved plan before retrying." } } : { status: 200, body: { revision: 6 } };
+      },
+    } });
+    await screen.findAllByRole("table");
+    // Focus must move as the preview renders, not on a timer: a browser can run a zero-delay timer
+    // before React renders the preview, as these do.
+    const later = globalThis.setTimeout;
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((callback: (...args: unknown[]) => void, ms?: number, ...args: unknown[]) => {
+      if (ms !== 0) return later(callback, ms, ...args);
+      callback(...args);
+      return 0;
+    }) as typeof setTimeout);
+    const press = (element: HTMLElement) => act(async () => { fireEvent.click(element); });
+    const heading = () => screen.getByRole("heading", { name: "What changes" });
+    try {
+      await press(screen.getAllByRole("button", { name: "Use Ridge chalet for these nights" })[0]);
+      expect(heading()).toHaveFocus();
+      // Changing who asks for Review nights, which becomes the save button.
+      await press(screen.getByRole("checkbox", { name: /^Fran/ }));
+      await press(screen.getByRole("button", { name: "Review nights" }));
+      expect(heading()).toHaveFocus();
+      await press(screen.getByRole("checkbox", { name: /Replace their existing plans/ }));
+      await press(screen.getByRole("button", { name: "Replace those nights and use it" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("The lodging plan changed.");
+      // Review again becomes the save button too, once the new preview is in.
+      await press(screen.getByRole("button", { name: "Review again" }));
+      expect(heading()).toHaveFocus();
+    } finally {
+      vi.mocked(globalThis.setTimeout).mockRestore();
+    }
   }, 20_000);
 
   it("isn't offered to members", async () => {

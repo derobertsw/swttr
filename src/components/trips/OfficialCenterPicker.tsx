@@ -13,6 +13,8 @@ type State =
   | { status: "ready"; directory: AvalancheCenterDirectory };
 
 const PLACE = { access_point: "access point", destination: "destination" } as const;
+/** Long labels ("Use Parks Canada avalanche forecast") wrap with enlarged text on a narrow phone. */
+const wrapping = "h-auto min-h-11 max-w-full whitespace-normal py-2";
 
 /**
  * Official avalanche forecast centers for the source editor (#211, PR 3): the
@@ -46,7 +48,7 @@ export function OfficialCenterPicker({ tripId, date, onPick }: {
   if (state.status !== "ready") {
     return (
       <div className="min-w-0 space-y-1 text-base text-foreground">
-        <Button type="button" variant="outline" loading={state.status === "loading"} onClick={() => void load()}>
+        <Button type="button" variant="outline" className={wrapping} loading={state.status === "loading"} onClick={() => void load()}>
           {state.status === "error" ? "Try loading official centers again" : "Choose an official center"}
         </Button>
         {state.status === "error" && <p role="alert" className="text-destructive">{state.message} You can still enter the source yourself.</p>}
@@ -75,7 +77,7 @@ export function OfficialCenterPicker({ tripId, date, onPick }: {
                   <p className="break-words">
                     Avalanche Canada&apos;s forecast areas put this day&apos;s {place} in {item.area ? `“${item.area}”` : "a combined forecast area"} today, forecast by {item.forecaster}.
                   </p>
-                  <Button type="button" variant="outline" onClick={() => pick(center)}>Use {center.name}</Button>
+                  <Button type="button" variant="outline" className={wrapping} onClick={() => pick(center)}>Use {center.name}</Button>
                 </li>
               );
             })}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TripSheet, TripSheetDescription, TripSheetTitle } from "@/components/trips/TripSheet";
 import { personNote } from "@/components/trips/LodgingEditor";
@@ -42,9 +42,13 @@ export function UseStayOption({ tripId, option, window, people, onClose, onClose
 
   const fetchPreview = useCallback((who: string[] | null) => timedTripRequest<TripStayUsePreview>(url, "POST",
     { option: key, first_night: firstNight, checkout, preview: true, ...(who ? { member_ids: who } : {}) }), [url, key, firstNight, checkout]);
+  // Each preview moves focus to What changes once it has rendered. A timer could run before the
+  // render, leaving focus on the button that becomes Use for these nights, or on the page.
+  const [shown, setShown] = useState(0);
+  useLayoutEffect(() => { if (shown) reviewRef.current?.focus(); }, [shown]);
   const show = useCallback((result: TripStayUsePreview) => {
     setPreview(result); setMemberIds(result.member_ids); mutationId.current = crypto.randomUUID();
-    setTimeout(() => reviewRef.current?.focus(), 0);
+    setShown((count) => count + 1);
   }, []);
   // The sheet opens on the preview for everyone on the trip those nights.
   useEffect(() => {
