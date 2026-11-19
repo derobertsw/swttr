@@ -195,7 +195,7 @@ const EXPECT = {
       'Not totaled: 3 drives aren\'t known', '0 of 3 drives known', 'None known yet',
       "Sums aren't compared until every drive is known. Not known yet: Hilltop barn (3 drives) and Notch cabin (no location). A missing drive never counts as zero.",
       'The Very Long Name Of A Mountainside Chalet'],
-    not: ['Shortest that morning', 'lowest sum', /\bbest\b/i, /0 min\b/],
+    not: ['Shortest that morning', 'lowest sum', /\bbest\b/i, /\b0 min\b/],
   },
   stale: {
     has: ['Thu Oct 8 → Mon Oct 12 · 4 nights', 'Mornings compared: Fri Oct 9, Sat Oct 10, Sun Oct 11 and Mon Oct 12 (check-out)',
@@ -287,7 +287,8 @@ const selection = (page) => page.eval(`({
   first_night: document.querySelector('select[name=first_night]')?.value, checkout: document.querySelector('select[name=checkout]')?.value,
   address: location.pathname + location.search, scrollY: Math.round(scrollY),
 })`);
-const clickText = (page, selector, label) => page.eval(`(() => { const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find((node) => node.innerText.trim() === ${JSON.stringify(label)} || node.getAttribute('aria-label') === ${JSON.stringify(label)}); if (!el) return false; el.click(); return true; })()`);
+/** Clicks the visible control with this text or name (the phone and desktop layouts each have one, and one is hidden). */
+const clickText = (page, selector, label) => page.eval(`(() => { const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find((node) => (node.innerText.trim() === ${JSON.stringify(label)} || node.getAttribute('aria-label') === ${JSON.stringify(label)}) && node.checkVisibility()); if (!el) return false; el.focus(); el.click(); return true; })()`);
 const compareRequests = async () => JSON.parse(await api('/__qa/log', undefined, 'GET')).filter((entry) => entry.key.endsWith('/stay-candidates/compare')).length;
 
 async function journeyChecks(page, cdp) {
@@ -299,12 +300,15 @@ async function journeyChecks(page, cdp) {
     await open(page, compareUrl(TRIP, [c('ridge'), s('pine')], [FRI, SUN]));
 
     // External link: the property page opens in a new tab; coming back keeps the selection, nights and scroll.
-    await page.eval(`[...document.querySelectorAll('a[target=_blank]')].find((a) => a.getBoundingClientRect().width > 0).scrollIntoView({ block: 'center' })`);
+    const PROPERTY = `[...document.querySelectorAll('#main-content a[target=_blank][aria-label^="Open "]')].find((a) => a.getBoundingClientRect().width > 0)`;
+    await page.eval(`${PROPERTY}.scrollIntoView({ block: 'center' })`);
     await sleep(300);
     const before = await selection(page);
     const requestsBefore = await compareRequests();
-    const opened = new Promise((done) => { cdp.on((message) => { if (message.method === 'Target.targetCreated' && message.params.targetInfo.type === 'page' && message.params.targetInfo.url.includes('example.com')) done(message.params.targetInfo); }); setTimeout(() => done(null), 8000); });
-    const link = await page.eval(`(() => { const a = [...document.querySelectorAll('a[target=_blank]')].find((node) => node.getBoundingClientRect().width > 0); a.click(); return { href: a.href, rel: a.rel, label: a.getAttribute('aria-label') }; })()`);
+    // Any new tab (noopener leaves it without an opener), opened by a real click, which counts as a user gesture.
+    const opened = new Promise((done) => { cdp.on((message) => { if (message.method === 'Target.targetCreated' && message.params.targetInfo.type === 'page' && message.params.targetInfo.targetId !== page.targetId) done(message.params.targetInfo); }); setTimeout(() => done(null), 8000); });
+    const link = await page.eval(`(() => { const a = ${PROPERTY}; const r = a.getBoundingClientRect(); return { href: a.href, rel: a.rel, target: a.target, label: a.getAttribute('aria-label'), x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: link.x, y: link.y, button: 'left', clickCount: 1 });
     const target = await opened;
     if (target) await cdp.send('Target.closeTarget', { targetId: target.targetId }).catch(() => undefined);
     await page.send('Page.bringToFront');
@@ -313,7 +317,7 @@ async function journeyChecks(page, cdp) {
     const after = await selection(page);
     const requestsAfter = await compareRequests();
     record('journeys', `external link return at ${width}px`, !!target && JSON.stringify(before) === JSON.stringify(after) && link.rel.includes('noopener'),
-      { width, link, newTab: target?.url ?? null, before, after, comparisonRequestsOnReturn: requestsAfter - requestsBefore });
+      { width, link, newTab: target ? 'opened (no opener: noopener)' : null, before, after, comparisonRequestsOnReturn: requestsAfter - requestsBefore });
 
     // Reload: the address keeps the selection and nights.
     await page.send('Page.reload');
@@ -395,7 +399,7 @@ async function useChecks(page) {
       'Replace their existing plans for Fri Oct 9, Sat Oct 10, Sun Oct 11',
     ];
     const missing = wanted.filter((needle) => !preview.includes(needle));
-    record('use', `preview, old → new per night, at ${width}px`, !missing.length && useDisabled === true && !preview.includes('Village hotel stay') && !preview.includes('Village hotel and'),
+    record('use', `preview, old → new per night, at ${width}px`, !missing.length && useDisabled === true && focusOnOpen.name === 'What changes' && !preview.includes('Village hotel stay') && !preview.includes('Village hotel and'),
       { width, missing, useDisabledUntilReplaceTicked: useDisabled, focusOnOpen, preview });
     const unchangedByPreview = JSON.stringify(await savedPlan()) === JSON.stringify(plan);
 
@@ -413,6 +417,8 @@ async function useChecks(page) {
     await clickText(page, '[role=dialog] button', 'Review again');
     await page.waitFor(`document.querySelector('[role=dialog]')?.innerText.includes('What changes') && !document.querySelector('[role=dialog] [role=alert]')`, 15_000);
     const people = await page.eval(`[...document.querySelectorAll('[role=dialog] input[name=member_ids]:checked')].length`);
+    await sleep(300);
+    const focusAfterReview = await page.run(focusState);
 
     // A failed save: the server errors; the preview, the people and the replacement stay as they were.
     await page.eval(`document.querySelector('[role=dialog] input[type=checkbox]:not([name=member_ids])').click()`);
@@ -422,7 +428,7 @@ async function useChecks(page) {
     const failed = { alert: await page.eval(`document.querySelector('[role=dialog] [role=alert]').innerText`), sheet: await sheetText(page),
       replaceTicked: await page.eval(`document.querySelector('[role=dialog] input[type=checkbox]:not([name=member_ids])')?.checked`) };
     record('use', `failed save keeps the plan and the sheet at ${width}px`, JSON.stringify(await savedPlan()) === JSON.stringify(plan) && failed.replaceTicked === true
-      && failed.sheet.includes('What changes') && people === 6, { width, alert: failed.alert, replaceTicked: failed.replaceTicked, peopleAfterReview: people });
+      && failed.sheet.includes('What changes') && people === 6 && focusAfterReview.name === 'What changes', { width, alert: failed.alert, replaceTicked: failed.replaceTicked, peopleAfterReview: people, focusAfterReview });
 
     // The save: the option becomes the stay for these nights; bookings and other options stay as they were.
     await clickText(page, '[role=dialog] button', 'Replace those nights and use it');
@@ -445,7 +451,7 @@ async function useChecks(page) {
     await key(page, 'Escape', 'Escape', 27);
     await page.waitFor(`!document.querySelector('[role=dialog]')`, 8000);
     const focusAfterEscape = await page.run(focusState);
-    record('use', `saved stay outside its dates at ${width}px`, outside.includes("Pine rental's dates don't include the night of Sun Oct 11") && focusAfterEscape.name === 'Comparison',
+    record('use', `saved stay outside its dates at ${width}px`, outside.includes("Pine rental's dates don't include the night of Sun Oct 11") && focusAfterEscape.name === 'Use Pine rental for these nights',
       { width, outside, focusAfterEscape });
   }
   await api('/__qa/reset');
