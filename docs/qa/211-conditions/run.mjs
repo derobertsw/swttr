@@ -109,7 +109,6 @@ async function open(page, viewer, path) {
   await page.waitFor(`document.getElementById('conditions-heading') || document.body.innerText.includes('Not found')`, 30_000);
 }
 const day = (date, id = TOUR) => `/trips/${id}/days/${date}`;
-const evalIn = (page, expression) => page.eval(`(() => { ${expression} })()`);
 const closed = (page) => page.waitFor(`!document.querySelector('[role=dialog]')`, 15_000);
 /** A PNG of the page (or just the viewport), kept for the record; a slow capture is skipped, not a failure. */
 async function shot(page, name, full = true) {
