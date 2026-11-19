@@ -128,10 +128,12 @@ export default function DayDetailPage({
     };
   }, [weatherKey, id, date]);
 
-  // Links from the trip map open an editor here, like #getting-there-<date>.
-  // Cold links resolve before the async day plan renders. Those ids are plain
-  // ASCII, so the fragment is matched as is: decoding a malformed one like #%
-  // would throw.
+  // Links from the trip map open an editor here, like #getting-there-<date>,
+  // and Back to day returns there. Focus follows, so keyboard and screen
+  // reader users continue from that heading, not the top of the page (#235);
+  // a target that can't take focus ignores it. Cold links resolve before the
+  // async day plan renders. Those ids are plain ASCII, so the fragment is
+  // matched as is: decoding a malformed one like #% would throw.
   const restoredHash = useRef(false);
   useEffect(() => {
     if (restoredHash.current || !day || !window.location.hash) return;
@@ -139,6 +141,7 @@ export default function DayDetailPage({
     if (!target) return;
     restoredHash.current = true;
     target.scrollIntoView({ block: "start", behavior: "instant" });
+    target.focus({ preventScroll: true });
   }, [day]);
 
   const dateObj = new Date(`${date}T00:00:00`);
@@ -195,7 +198,7 @@ export default function DayDetailPage({
     // way there and back, the tour and its conditions, then clothing and crew.
     <div className="flex w-full max-w-3xl flex-col gap-8">
       {loading && <Skeleton className="h-32 w-full rounded-card" />}
-      {error && <TripError>{error}</TripError>}
+      {error && <TripError onRetry={data ? undefined : () => void refresh()}>{error}</TripError>}
 
       {data && !day && (
         <MissingDayPlan tripId={id} date={date} dateLabel={dateLabel} canCreate={canCreateDay} tripDates={formatDateRange(data.trip.start_date, data.trip.end_date)} onSaved={refresh} />
@@ -227,7 +230,7 @@ export default function DayDetailPage({
             )}
           </header>
 
-          <DayStart data={data} date={date} meet={meet} meetingPoint={meetingPoint} notes={day.notes} memberId={me?.id}>
+          <DayStart data={data} date={date} meet={meet} meetingPoint={meetingPoint} meetExpected={!!activity && needsClothing} notes={day.notes} memberId={me?.id}>
             {isOrganizer && <>
               <DayMeetControls tripId={id} day={day} dateLabel={dateLabel} onSaved={refresh} />
               <DayNotesControls tripId={id} day={day} dateLabel={dateLabel} onSaved={refresh} />

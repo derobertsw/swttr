@@ -5,7 +5,9 @@ import { TripStays, DayStart, DayTonight } from "./TripStays";
 import { buildLodging, previewCrewLodging } from "@/lib/trip-lodging";
 import { previewLodgingChange, type LodgingChange } from "@/lib/trip-lodging-changes";
 import { fakeTripApi, ORGANIZER, reply, sentBodies, TRIP, tripFull } from "@/test/tripApi";
-import { ALEX, BLAIR, CASEY, DANA, ELI, FRI, PINE, SAT, SPLIT_MEMBERS, SPLIT_TRIP, SUN, VILLAGE, splitRows } from "@/test/splitStays";
+import { ALEX, BLAIR, CASEY, DANA, ELI, FRI, MON, PINE, SAT, SPLIT_MEMBERS, SPLIT_TRIP, SUN, VILLAGE, personNight, splitRows } from "@/test/splitStays";
+import { splitDriveTrip, VILLAGE_PLACE } from "@/test/driveTrip";
+import { dayStarts } from "@/lib/trip-drive";
 import type { TripLocation, TripLodgingAction, TripLodgingNight, TripStay, TripStayInput } from "@/types/trips";
 
 const hotel: TripStay = { id: "40f9f55e-0e74-4c4a-923f-d7a3f92468a0", trip_id: TRIP.id, name: "Hotel", check_in: "2026-10-09", check_out: "2026-10-11", type: null, address: null, property_url: "https://example.com", check_in_time: null, check_out_time: null, notes: "Meet in lobby", booking_status: "booked", created_at: TRIP.created_at, updated_at: TRIP.updated_at };
@@ -347,6 +349,22 @@ describe("Split stays (#332)", () => {
     expect(screen.getByText("Sun Oct 11: leaves Pine rental in the morning, then Mountain lodge that night")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Change Alex's trip dates" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Nights without a stay" })).not.toBeInTheDocument();
+  });
+
+  it("says where someone starts the morning after their nights as the day brief does, own starting point included (#329)", async () => {
+    vi.stubGlobal("fetch", fakeTripApi(estimates));
+    // Alex sleeps at the Mountain lodge on Sunday only (no stay needed Monday night), and drives up from a cabin on Monday.
+    const rows = splitRows();
+    rows.assignments = rows.assignments.map((night) => night.member_id === ALEX.id && night.date === MON ? personNight(ALEX.id, MON, null) : night);
+    const full = splitDriveTrip({ rows });
+    full.member_origins = [{ trip_id: full.trip.id, trip_day_id: `day-${MON}`, member_id: ALEX.id,
+      origin: { ...VILLAGE_PLACE, label: "Ridge cabin", latitude: 44.51, longitude: -72.75 }, origin_stay_id: null, no_drive: false }];
+    full.starts = dayStarts(full);
+    const user = userEvent.setup();
+    render(<TripStays data={full} canEdit onSaved={onSaved} viewerMemberId={ALEX.id} />);
+    await user.click(within(peopleTable()).getByRole("button", { name: /^Alex: Mountain lodge/ }));
+    expect(screen.getByText("Mon Oct 12 morning: starts from Ridge cabin · only this day")).toBeInTheDocument();
+    expect(screen.queryByText(/morning: starts from Mountain lodge/)).not.toBeInTheDocument();
   });
 
   it("moves only the chosen people and nights, after a preview that says so in words", async () => {

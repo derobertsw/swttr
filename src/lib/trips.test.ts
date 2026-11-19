@@ -80,6 +80,24 @@ describe("Trip loading", () => {
     expect(full!.starts![0]).toEqual({ date: day.date, starting_from: null, people: [{ member_id: ORGANIZER.id, starting_from: "Not set", own: false }] });
   });
 
+  it("labels when shared gear was accepted and packed on the trip's clock, like its day checks (#337)", async () => {
+    vi.useFakeTimers();
+    const lot = { label: "Spruce Peak lot", address: null, latitude: 44.53, longitude: -72.78, precision: "exact", time_zone: "America/New_York",
+      source: "manual", provider: null, provider_id: null, attribution: null };
+    const gear = { id: "stove", trip_id: TRIP.id, description: "Stove", assignee_member_id: ORGANIZER.id, sort_order: 0, created_at: TRIP.created_at,
+      revision: "1", accepted_at: "2026-10-03T11:00:00Z", accepted_by: ORGANIZER.user_id, packed_at: "2026-10-09T22:30:00Z", packed_by: ORGANIZER.user_id };
+    const waiting = { ...gear, id: "tent", description: "Tent", accepted_at: null, accepted_by: null, packed_at: null, packed_by: null };
+    const { supabase } = database({
+      trip_days: [{ ...day, stop_id: STOWE_STOP.id }], trip_members: [{ ...ORGANIZER }], trip_stops: [{ ...STOWE_STOP, access_point: lot }], trip_group_gear: [gear, waiting],
+    });
+    const pending = loadTripFull(supabase, TRIP);
+    await vi.runAllTimersAsync();
+    const full = await pending;
+    expect(full!.gear[0]).toMatchObject({ accepted_at: gear.accepted_at, accepted_label: "7:00 AM EDT · Sat Oct 3", packed_label: "6:30 PM EDT · Fri Oct 9" });
+    expect(full!.gear[1]).not.toHaveProperty("accepted_label");
+    expect(full!.gear[1]).not.toHaveProperty("packed_label");
+  });
+
   it("does not turn failed shared gear reads into an empty confirmed list", async () => {
     const { supabase } = database({}, {}, ["trip_group_gear"]);
     await expect(loadTripFull(supabase, TRIP)).rejects.toThrow("Couldn't load shared gear");

@@ -180,6 +180,17 @@ describe("Drive estimates", () => {
     expect(result.days.find((day) => day.date === SAT)).toMatchObject({ state: "no_route", estimate: null, directions: null });
     expect(store.saved.get(SAT)).toMatchObject({ status: "no_route", duration_seconds: null, distance_meters: null });
   });
+  it("names no closure for a drive with no road route, but keeps it while the route is unknown (#235)", async () => {
+    const store = memoryStore();
+    // Sunday's drive to Smuggs lot runs up VT 108 towards the closed Notch.
+    const none = await tripDriveEstimates(driveTrip(), store, { now: NOW, matrix: fakeMatrix({}) });
+    expect(none.days.find((day) => day.date === SUN)).toMatchObject({ state: "no_route", closures: [] });
+    const failing = vi.fn(async () => { throw new RoutingUnavailable("timeout"); });
+    const expired = await tripDriveEstimates(driveTrip(), store, { now: NOW + 8 * 86_400_000, matrix: failing });
+    expect(expired.days.find((day) => day.date === SUN)).toMatchObject({
+      state: "unavailable", closures: ["VT 108 through Smugglers' Notch, usually closed November to mid-May"],
+    });
+  });
   it("offers recovery when an expired no-route result can't be checked again", async () => {
     const store = memoryStore();
     await tripDriveEstimates(driveTrip(), store, { now: NOW, matrix: fakeMatrix({}) });

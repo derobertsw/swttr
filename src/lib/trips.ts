@@ -8,7 +8,7 @@ import { buildDayMeets } from "@/lib/trip-meets";
 import { loadConditions, summarizeConditions, summarizeConditionsSources } from "@/lib/trip-conditions";
 import { loadMemberDayOrigins } from "@/lib/trip-drive-estimates";
 import { dayStarts } from "@/lib/trip-drive";
-import { dayChecksFor, loadDayChecks, preparationFor, summarizeDayChecks } from "@/lib/trip-day-checks";
+import { checkTimeLabel, dayChecksFor, loadDayChecks, preparationFor, summarizeDayChecks, tripTimeZone } from "@/lib/trip-day-checks";
 import { tripFocusFor } from "@/lib/trip-focus";
 import type {
   Trip,
@@ -227,6 +227,13 @@ export async function loadTripFull(
   const members = (membersRes.data ?? []) as TripMember[];
   const lodging = buildLodging(trip, lodgingRows.stays, lodgingRows.assignments,
     { members, attendance: lodgingRows.attendance, per_member: lodgingRows.per_member });
+  // When shared gear was accepted and packed, on the trip's clock like its day checks (#337).
+  const zone = tripTimeZone({ stops, tour_plans }, days);
+  const gear = ((gearRes.data ?? []) as TripGroupGear[]).map((item) => ({
+    ...item,
+    ...item.accepted_at ? { accepted_label: checkTimeLabel(item.accepted_at, zone) } : {},
+    ...item.packed_at ? { packed_label: checkTimeLabel(item.packed_at, zone) } : {},
+  }));
   // Where each day starts, own starting points included (#333): the day brief's Starting from.
   const starts = dayStarts({ trip, stops, members, days, kits: [], gear: [], lodging, member_origins: memberOrigins });
   return {
@@ -238,7 +245,7 @@ export async function loadTripFull(
     crew_counts: countTripCrew((membersRes.data ?? []) as TripMember[]),
     days,
     kits,
-    gear: (gearRes.data ?? []) as TripGroupGear[],
+    gear,
     lodging,
     tour_plans,
     meets: buildDayMeets(days, tourPlans),

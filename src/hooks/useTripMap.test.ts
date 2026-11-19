@@ -20,6 +20,18 @@ describe("Private trip map loading", () => {
     expect(fetcher.mock.calls.every((call) => !String(call[0]).includes("geometry"))).toBe(true);
   });
 
+  it("loads before the trip it refreshes for arrives, and only reloads when that trip changes (#235)", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json(snapshot));
+    vi.stubGlobal("fetch", fetcher);
+    const { result, rerender } = renderHook(({ trip }) => useTripMap(snapshot.trip.id, trip), { initialProps: { trip: null as object | null } });
+    await waitFor(() => expect(result.current.data).toEqual(snapshot));
+    rerender({ trip: { revision: 1 } });
+    await act(async () => {});
+    expect(fetcher).toHaveBeenCalledOnce();
+    rerender({ trip: { revision: 2 } });
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+  });
+
   it("drops late requests across a trip switch, including a switch away and back", async () => {
     const finish: Array<(value: Response) => void> = [];
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => finish.push(resolve))));

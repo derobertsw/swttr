@@ -17,7 +17,7 @@ import { TripOfflineSave } from "@/components/trips/OfflineBrief";
  */
 export default function TripPlanPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data, loading, error } = useTrip(id);
+  const { data, loading, error, refresh } = useTrip(id);
   const router = useRouter();
 
   // Stays used to be part of this page. Older links to a stay, like
@@ -35,7 +35,7 @@ export default function TripPlanPage({ params }: { params: Promise<{ id: string 
           <Skeleton className="h-16 w-full rounded-card" />
         </>
       )}
-      {error && <TripError>{error}</TripError>}
+      {error && <TripError onRetry={data ? undefined : () => void refresh()}>{error}</TripError>}
 
       {data && (
         <>

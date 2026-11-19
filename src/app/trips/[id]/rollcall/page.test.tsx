@@ -56,6 +56,16 @@ describe("Day checklist page (#336)", () => {
     expect(screen.getByRole("link", { name: "Alex's source reviews for Sat Oct 10: No sources reviewed yet" })).toBeInTheDocument();
   });
 
+  it("gives every status link a 44px target on a touch screen, keeping the rows dense with a mouse (#337)", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({ [ROUTE]: reply(200, checklist) }));
+    await renderPage();
+    await screen.findByRole("link", { name: "Alex's clothing for Sat Oct 10: Outfit saved" });
+    // jsdom doesn't lay out; the browser check measured 21px tall inline links on phones.
+    const links = screen.getAllByRole("listitem").flatMap((item) => within(item).queryAllByRole("link"));
+    expect(links.length).toBeGreaterThan(5);
+    for (const link of links) expect(link).toHaveClass("pointer-coarse:inline-flex", "pointer-coarse:min-h-11", "pointer-coarse:items-center");
+  });
+
   it("changes day without reloading, and names who isn't on the trip that day", async () => {
     const api = fakeTripApi({ [ROUTE]: reply(200, checklist) });
     vi.stubGlobal("fetch", api);

@@ -113,8 +113,12 @@ export interface TripGroupGear {
   revision?: string;
   accepted_at?: string | null;
   accepted_by?: string | null;
+  /** When it was accepted, on the trip's clock like its day checks: "7:00 AM EDT · Sat Oct 3" (#337). */
+  accepted_label?: string;
   packed_at?: string | null;
   packed_by?: string | null;
+  /** When it was packed, labelled like `accepted_label`. */
+  packed_label?: string;
   assigned_at?: string | null;
   assigned_by?: string | null;
   events?: SharedGearEvent[];

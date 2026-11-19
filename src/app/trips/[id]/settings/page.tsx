@@ -26,7 +26,7 @@ export default function TripSettingsPage({ params }: { params: Promise<{ id: str
         <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">Name and dates</h1>
       </header>
       {loading && <Skeleton className="h-64 w-full rounded-card" />}
-      {error && <TripError>{error}</TripError>}
+      {error && <TripError onRetry={data ? undefined : () => void reload()}>{error}</TripError>}
       {data && <SettingsForm key={data.trip.id} trip={data.trip} onSaved={reload} />}
     </div>
   );

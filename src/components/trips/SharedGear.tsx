@@ -96,8 +96,8 @@ export function SharedGearList({ tripId, gear, members = [], userId, ownerId, on
             </>}
             {!personal && organizer && <Button variant="ghost" disabled={blocked} onClick={() => void change(item, "delete")} aria-label={`Remove ${item.description}`}>Remove</Button>}
           </div>
-          {item.accepted_at && <p className="mt-2 break-words text-sm text-muted-foreground">Accepted by {members.find((m) => m.user_id === item.accepted_by)?.display_name ?? (personal ? "you" : "a former crew member")} · {new Date(item.accepted_at).toLocaleString()}</p>}
-          {item.packed_at && <p className="mt-1 break-words text-sm text-muted-foreground">Packed by {members.find((m) => m.user_id === item.packed_by)?.display_name ?? (personal ? "you" : "a former crew member")} · {new Date(item.packed_at).toLocaleString()}</p>}
+          {item.accepted_at && <p className="mt-2 break-words text-sm text-muted-foreground">Accepted by {members.find((m) => m.user_id === item.accepted_by)?.display_name ?? (personal ? "you" : "a former crew member")}{item.accepted_label ? ` · ${item.accepted_label}` : ""}</p>}
+          {item.packed_at && <p className="mt-1 break-words text-sm text-muted-foreground">Packed by {members.find((m) => m.user_id === item.packed_by)?.display_name ?? (personal ? "you" : "a former crew member")}{item.packed_label ? ` · ${item.packed_label}` : ""}</p>}
         </div>;
       })}
     </div>

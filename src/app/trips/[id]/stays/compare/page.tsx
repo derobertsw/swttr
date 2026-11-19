@@ -25,7 +25,7 @@ export default function CompareStaysPage({ params, searchParams }: {
   return (
     <div className="flex w-full max-w-6xl flex-col gap-5">
       {loading && !data && <Skeleton className="h-48 w-full rounded-card" />}
-      {error && <TripError>{error}</TripError>}
+      {error && <TripError onRetry={data ? undefined : () => void refresh()}>{error}</TripError>}
       {data && <StayComparison data={data} canEdit={data.trip.owner_user_id === userId} onPlanSaved={refresh} initial={{
         options: (first(query.options) ?? "").split(",").map((key) => key.trim().toLowerCase()).filter(Boolean),
         first_night: first(query.first_night), checkout: first(query.checkout),

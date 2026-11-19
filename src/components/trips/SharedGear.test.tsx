@@ -82,6 +82,14 @@ describe("Shared equipment controls", () => {
     expect(screen.queryByRole("button", { name: "Accept Stove" })).not.toBeInTheDocument();
   });
 
+  it("says when it was accepted and packed as the server labels it, like every other time on the trip (#337)", () => {
+    const done: TripGroupGear = { ...item, accepted_at: "2026-10-03T11:00:00Z", accepted_by: "ana", accepted_label: "7:00 AM EDT · Sat Oct 3",
+      packed_at: "2026-10-09T22:30:00Z", packed_by: "ana", packed_label: "6:30 PM EDT · Fri Oct 9" };
+    render(<SharedGearList tripId={TRIP.id} gear={[done]} members={[ORGANIZER, ana]} ownerId="user-1" userId="user-1" onSaved={async () => true} />);
+    expect(screen.getByText("Accepted by Sam · 7:00 AM EDT · Sat Oct 3")).toBeInTheDocument();
+    expect(screen.getByText("Packed by Sam · 6:30 PM EDT · Fri Oct 9")).toBeInTheDocument();
+  });
+
   it("returns declined and removed-member items to attention with direct links and no Ready verdict", () => {
     render(<SharedGearAttention tripId={TRIP.id} gear={[{ ...item, assignee_member_id: null }, { ...item, id: "tent", description: "Tent" }, { ...item, id: "packed", accepted_at: TRIP.created_at, packed_at: TRIP.created_at }]} />);
     expect(screen.getByRole("link", { name: "View item" })).toHaveAttribute("href", "/trips/trip-1/gear#shared-stove");

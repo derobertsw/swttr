@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { tripRequest, TripRequestError } from "@/lib/trip-requests";
 import type { TripMap } from "@/types/trip-map";
 
-/** Private, component-owned snapshot. No storage or cross-session cache. */
+/**
+ * Private, component-owned snapshot. No storage or cross-session cache.
+ * `revision` is what to refresh for, such as the trip itself: a new value
+ * reads the places again, but its first arrival doesn't, so the places can
+ * load alongside it instead of after it (#235).
+ */
 export function useTripMap(tripId: string | null, revision?: unknown) {
   const [state, setState] = useState<{ id: string | null; data: TripMap | null; error: Error | null; loading: boolean }>({ id: tripId, data: null, error: null, loading: true });
   const pending = useRef<AbortController | null>(null);
@@ -29,6 +34,13 @@ export function useTripMap(tripId: string | null, revision?: unknown) {
       });
   }, [tripId]);
 
+  const seen = useRef(revision);
+  useEffect(() => {
+    const previous = seen.current;
+    seen.current = revision;
+    if (previous != null && revision != null && previous !== revision) void load();
+  }, [revision, load]);
+
   useEffect(() => {
     void load();
     const onReturn = () => { if (document.visibilityState === "visible") void load(); };
@@ -41,7 +53,7 @@ export function useTripMap(tripId: string | null, revision?: unknown) {
       window.removeEventListener("online", onReturn);
       document.removeEventListener("visibilitychange", onReturn);
     };
-  }, [load, revision]);
+  }, [load]);
   const refresh = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
     await load();

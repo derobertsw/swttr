@@ -10,7 +10,7 @@ import { LocationSummary } from "@/components/trips/LocationPicker";
 import { StayDepartures, useDriveEstimates } from "@/components/trips/DriveEstimate";
 import { LodgingEditor, personNote, possessive, STAY_EXACT, type LodgingEditorTarget } from "@/components/trips/LodgingEditor";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
-import type { TripDayMeet, TripFull, TripLodging, TripLodgingPerson, TripPersonRun, TripStaySummary } from "@/types/trips";
+import type { TripDayMeet, TripDayStart, TripFull, TripLodging, TripLodgingPerson, TripPersonRun, TripStaySummary } from "@/types/trips";
 
 type Open = (target: LodgingEditorTarget) => void;
 
@@ -94,7 +94,7 @@ export function TripStays({ data, canEdit, onSaved, viewerMemberId = null }: {
         </div>}
       </div>
       {mine && lodging ? <MyNights person={me} lodging={lodging} canEdit={canEdit && perMember} open={open} />
-        : lodging && people.length > 0 && !!lodging.stays.length && <PeopleByNight className="mt-6 hidden @3xl:block" lodging={lodging} people={people}
+        : lodging && people.length > 0 && !!lodging.stays.length && <PeopleByNight className="mt-6 hidden @3xl:block" lodging={lodging} people={people} starts={data.starts}
           viewerMemberId={viewerMemberId} canEdit={canEdit && perMember} open={open} />}
       <div className="max-w-3xl">
         {!(lodging?.stays.length) && <p className="mt-3 text-base text-muted-foreground">No stays saved yet. Accommodation can be planned later.</p>}
@@ -149,8 +149,8 @@ function MyNights({ person, lodging, canEdit, open }: { person: TripLodgingPerso
 }
 
 /** People down the side and nights across: each run of nights in one place is one cell. */
-function PeopleByNight({ lodging, people, viewerMemberId, canEdit, open, className }: {
-  lodging: TripLodging; people: TripLodgingPerson[]; viewerMemberId: string | null; canEdit: boolean; open: Open; className?: string;
+function PeopleByNight({ lodging, people, starts, viewerMemberId, canEdit, open, className }: {
+  lodging: TripLodging; people: TripLodgingPerson[]; starts?: TripDayStart[]; viewerMemberId: string | null; canEdit: boolean; open: Open; className?: string;
 }) {
   const [selected, setSelected] = useState<{ member: string; start: string } | null>(null);
   const person = selected ? people.find((candidate) => candidate.member_id === selected.member) : undefined;
@@ -190,22 +190,28 @@ function PeopleByNight({ lodging, people, viewerMemberId, canEdit, open, classNa
         </tbody>
       </table>
     </div>
-    {person && run && <RunDetails person={person} run={run} lodging={lodging} canEdit={canEdit} open={open} />}
+    {person && run && <RunDetails person={person} run={run} lodging={lodging} starts={starts} canEdit={canEdit} open={open} />}
   </section>;
 }
 
-function RunDetails({ person, run, lodging, canEdit, open }: { person: TripLodgingPerson; run: TripPersonRun; lodging: TripLodging; canEdit: boolean; open: Open }) {
+function RunDetails({ person, run, lodging, starts, canEdit, open }: {
+  person: TripLodgingPerson; run: TripPersonRun; lodging: TripLodging; starts?: TripDayStart[]; canEdit: boolean; open: Open;
+}) {
   const stay = run.stay_id ? lodging.stays.find((candidate) => candidate.id === run.stay_id) : undefined;
   const changeover = person.changeovers.find((entry) => entry.date === run.end);
   const morning = person.days.find((day) => day.date === run.end);
   const morningLabel = lodging.nights.find((night) => night.date === run.end)?.date_label;
+  // Where they actually start that morning, as the day brief says (#329): their own or the day's
+  // own starting point before the stay they slept in, from the server's `starts`.
+  const start = starts?.find((entry) => entry.date === run.end)?.people.find((entry) => entry.member_id === person.member_id);
+  const startsFrom = start ? `${start.starting_from}${start.own ? " · only this day" : ""}` : morning?.starting_from;
   return <div className="mt-4 max-w-3xl border-l-2 border-border pl-4 text-base">
     <h3 className="break-words font-semibold text-foreground">{person.display_name} · {run.gap ? "Not planned yet" : run.label}</h3>
     <p className="text-foreground">{run.date_label}</p>
     {personNote(person) && <p className="text-muted-foreground">{personNote(person)}</p>}
     {stay && <p className="text-muted-foreground">{stayFacts(stay)}</p>}
     {changeover ? <p className="text-foreground">{changeover.date_label}: leaves {changeover.from} in the morning, then {changeover.to} that night</p>
-      : stay && morningLabel && morning?.participation === "participating" && <p className="text-foreground">{morningLabel} morning: starts from {morning.starting_from}</p>}
+      : stay && morningLabel && morning?.participation === "participating" && <p className="text-foreground">{morningLabel} morning: starts from {startsFrom}</p>}
     {canEdit && <div className="mt-2 flex flex-wrap gap-2">
       <Button type="button" variant="outline" onClick={() => open({ action: "assign", memberIds: [person.member_id], dates: runDates(lodging, run) })}>Change these nights</Button>
       <Button type="button" variant="outline" onClick={() => open({ action: "attendance", memberId: person.member_id })}>Change {possessive(person.display_name)} trip dates</Button>
@@ -293,8 +299,13 @@ const lodgingRow = (term: string, value: string) =>
  * point of your own, or the day's own, reads as it does in the drive below.
  * The drive follows in Getting there, and tonight's stay after it.
  */
-export function DayStart({ data, date, meet, meetingPoint = null, notes = null, memberId = null, children }: {
+export function DayStart({ data, date, meet, meetingPoint = null, meetExpected = false, notes = null, memberId = null, children }: {
   data: TripFull; date: string; meet?: TripDayMeet | null; meetingPoint?: string | null;
+  /**
+   * An activity day, not Travel or Rest: at an access point it says the meet
+   * time isn't set yet, so a member can tell that from no meet (#337).
+   */
+  meetExpected?: boolean;
   /** The day's notes for everyone (#334): tickets, rentals, parking. */
   notes?: string | null;
   /** The signed-in person's membership, whose own start leads. */
@@ -303,19 +314,21 @@ export function DayStart({ data, date, meet, meetingPoint = null, notes = null, 
   children?: ReactNode;
 }) {
   const { context, mine } = dayLodging(data, date, memberId);
-  if (!context && !meet && !notes && !children) return null;
+  const meetNotSet = !meet && meetExpected && !!meetingPoint;
+  if (!context && !meet && !meetNotSet && !notes && !children) return null;
   // Someone without a departure, such as a person not taking part, keeps the lodging's reason.
   const start = data.starts?.find((entry) => entry.date === date);
   const myStart = start?.people.find((person) => person.member_id === memberId);
   const crewFrom = start?.starting_from ?? context?.starting_from ?? "Not set";
   const myFrom = myStart?.starting_from ?? mine?.starting_from;
   return <section aria-labelledby={`day-start-${date}`} className="min-w-0">
-    <h2 id={`day-start-${date}`} className={sectionLabelClassName}>{meet ? "Meet and start" : "Start of the day"}</h2>
+    <h2 id={`day-start-${date}`} className={sectionLabelClassName}>{meet || meetNotSet ? "Meet and start" : "Start of the day"}</h2>
     <dl className="mt-2 space-y-2 text-base">
       {meet && <div><dt className="text-muted-foreground">Meet</dt><dd className="break-words text-foreground">
         {meet.meet_label} · {meetingPoint ?? "Meeting point not set"}
         <span className="block text-sm text-muted-foreground">{meet.time_zone_label}</span>
       </dd></div>}
+      {meetNotSet && lodgingRow("Meet", `Not set yet · ${meetingPoint}`)}
       {notes && <div><dt className="text-muted-foreground">Notes</dt><dd className="whitespace-pre-wrap break-words text-foreground">{notes}</dd></div>}
       {context && lodgingRow("Starting from", myFrom ? `${myFrom}${myStart?.own ? " · only this day" : ""}` : crewFrom)}
       {context && myFrom && myFrom !== crewFrom && lodgingRow("Crew starting from", crewFrom)}

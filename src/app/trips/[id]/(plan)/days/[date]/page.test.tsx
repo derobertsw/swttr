@@ -73,6 +73,22 @@ describe("Trip day page", () => {
     vi.useRealTimers();
   });
 
+  it("offers Retry when the trip fails to load, and shows the day once it does (#337)", async () => {
+    let reads = 0;
+    vi.stubGlobal("fetch", fakeTripApi({
+      "GET /api/v1/trips/trip-1": () => ++reads === 1 ? reply(500, { error: "Database unavailable" }) : TRIP_ROUTE,
+      "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      "GET /api/v1/trips/trip-1/drive-estimates": reply(200, { days: [], stays: [] }),
+    }));
+    await renderPage();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/load the trip|Database unavailable/i);
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("heading", { name: "Getting there" })).toBeVisible();
+    expect(reads).toBe(2);
+    expect(alert).not.toBeInTheDocument();
+  });
+
   it("shows the day's forecast", async () => {
     vi.stubGlobal(
       "fetch",
@@ -534,7 +550,7 @@ describe("Trip day page", () => {
       expect(document.querySelector("canvas")).toBeNull();
     });
 
-    it("scrolls a cold link from the trip map to the editor it names, once the day renders", async () => {
+    it("scrolls a cold link from the trip map to the editor it names, once the day renders, and focuses it (#235)", async () => {
       const scroll = vi.fn();
       const original = Element.prototype.scrollIntoView;
       Element.prototype.scrollIntoView = scroll;
@@ -544,6 +560,8 @@ describe("Trip day page", () => {
         await renderPage();
         await waitFor(() => expect(scroll).toHaveBeenCalledOnce());
         expect(scroll.mock.contexts[0]).toHaveAttribute("id", "getting-there-2026-10-10");
+        // Back to day from the map lands here: keyboard and screen reader users continue from Getting there.
+        expect(screen.getByRole("heading", { name: "Getting there" })).toHaveFocus();
       } finally {
         Element.prototype.scrollIntoView = original;
         window.history.replaceState(null, "", window.location.pathname);
@@ -1158,6 +1176,30 @@ describe("Trip day page", () => {
       const start = await screen.findByRole("region", { name: "Meet and start" });
       expect(within(start).getByText("8:30 AM EDT · Sat Oct 10 · Spruce Peak lot")).toBeInTheDocument();
       expect(within(start).queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("says the meet time isn't set yet on an activity day at an access point, so it doesn't read as no meet (#337)", async () => {
+      mockAuth.userId = "user-2";
+      const member: TripMember = { ...SAM, user_id: "user-2", status: "joined" };
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [{ ...STOWE_STOP, access_point: LOT }], members: [ORGANIZER, member],
+          days: [{ ...downhill, meet_time: null, meet_time_zone: null }], lodging: buildLodging(TRIP, [], []), meets: [] })),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      const start = await screen.findByRole("region", { name: "Meet and start" });
+      expect(within(start).getByText("Meet", { selector: "dt" }).nextElementSibling).toHaveTextContent(/^Not set yet · Spruce Peak lot$/);
+    });
+
+    it("leaves the meet out of a Travel day, even at an access point", async () => {
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [{ ...STOWE_STOP, access_point: LOT }],
+          days: [{ ...downhill, activity: "Travel", meet_time: null, meet_time_zone: null }], lodging: buildLodging(TRIP, [], []), meets: [] })),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      const start = await screen.findByRole("region", { name: "Start of the day" });
+      expect(within(start).queryByText("Meet", { selector: "dt" })).not.toBeInTheDocument();
     });
 
     it("offers the organizer Set meet time on a day without one", async () => {
