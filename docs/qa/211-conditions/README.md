@@ -61,3 +61,41 @@ Tests that pin behavior that was already right: "Added by the organizer" on each
 ### Boxes that could be ticked now
 
 Boxes 1, 2, 4, 5, 6, 7, 8 and 9. Box 3 waits on #146 for the iPhone app. The delivery-quality items left are VoiceOver and a real phone (below).
+
+## Browser checks
+
+This is web evidence only: headless Chrome driving the real day pages with fictional fixture trips. It isn't device, VoiceOver, signed-in, production or participant evidence. Those are under [Untested surfaces](#untested-surfaces).
+
+| | |
+|---|---|
+| Revision | `5f2b8d6` plus this PR's fixes. The "before" for each fix was measured on `main`'s code in an earlier run of the same script. |
+| Server | `next dev --turbopack` (Next 16.4.6) from this worktree on `localhost:3431`, with [`shim.patch`](shim.patch) applied while testing and reverted before commit |
+| API | The app's own `/api/v1/trips/*` route handlers, run by [`api.mjs`](api.mjs) on `127.0.0.1:34312` |
+| Database | [`db.mjs`](db.mjs): PGlite (in-memory Postgres) with **every migration in `supabase/migrations` applied**, behind the part of the Supabase client the trip code uses. Unlike #337's fake, saves run the real SQL functions: `mutate_trip_conditions_source`, `record_trip_conditions_review` (with its under-lock plan check), `attach_trip_conditions_source`, `edit_trip_itinerary_reviewed`, `mutate_trip_tour_plan` and `set_trip_day_notes`. |
+| Browser | Headless Chrome 157 over the DevTools protocol ([`run.mjs`](run.mjs), with #337's `cdp.mjs`). Host resolution is limited to this machine, so a source opened in a new tab, Clerk's script and any font fail to load and no real site is reached. |
+| Providers | Stubbed in `api.mjs`: Open-Meteo answers time zones but its forecast is down (503) the whole run; Avalanche Canada answers one fictional "Glacier" area (with ratings, which must never show); routing fails. |
+| Widths | 320 and 390 (phone, touch), 1440 (desktop, mouse); 100% and 200% text (Chrome's default font size 32px; the root font size measured 32px) |
+
+### Fixtures
+
+[`fixtures.mjs`](fixtures.mjs). Everything is fictional; the place names are public mountain areas.
+
+- **Presidential tour weekend** (`00000211-…-0001`), Fri Jan 8 – Sun Jan 10 2027, all Backcountry at Pinkham Notch (with an access point). Friday's tour plan is Tuckerman Ravine with a route link; Saturday's is Gulf of Slides. Alex is the organizer (`user-alex`); Blair and Casey are members. Zoe (`user-zoe`) isn't on the trip.
+- **Rogers Pass tour** (`…-0002`), Fri Jan 15 2027, with the day's own access point inside the fictional Glacier area. Alex organizes; Blair is a member.
+
+No source or review is seeded. The script adds them through the pages, as people would, and in a few places through the API as "another session" (the organizer changing the route while a member's form is open, for example).
+
+### Re-running
+
+From the worktree root, with dependencies installed, `.env.local` linked, and nothing else on ports 3431, 34312 or 39431:
+
+```sh
+git apply docs/qa/211-conditions/shim.patch
+API_PORT=34312 node docs/qa/211-conditions/api.mjs &
+./node_modules/.bin/next dev --turbopack --port 3431 &
+BASE=http://localhost:3431 API=http://127.0.0.1:34312 CDP_PORT=39431 OUT=/tmp/qa211 node docs/qa/211-conditions/run.mjs
+# stop both servers, then:
+git apply -R docs/qa/211-conditions/shim.patch && rm -rf .next/dev
+```
+
+The groups run in order on one database, each building on the last: `organizer review crew changes reuse copy centers recovery failures access keyboard layout`. Starting with `organizer` resets the database. Results go to `OUT/results.json`, screenshots to `OUT/*.png`. `POST /__qa/reset`, `/__qa/overrides`, `GET /__qa/log` and `POST /__qa/sql` (a read-only query) are the API's test hooks.
