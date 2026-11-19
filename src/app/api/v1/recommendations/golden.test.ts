@@ -17,6 +17,7 @@ import { POST as skiTouring } from "./ski-touring/route";
 import { POST as xc } from "./xc/route";
 import { POST as evaluateLayers } from '../ensembles/evaluate/route';
 import type { BiophysicsRecommendation, RecommendedGarment } from "@/types/biophysics";
+import { POLE_GRIP_MAX_CLO } from "@/lib/biophysics/sport-policy";
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -208,7 +209,7 @@ describe.each([
     expect(body.ireq.policy).toMatchObject({ activity, phase: 'sustained', effort: 'moderate' });
     expect(body.ireq.policy.metabolicRateWm2).toBeCloseTo(395.2, 0);
     expect(body.ireq.target_range[0]).toBe(0.03);
-    expect(body.ireq.extremity).toEqual({ min: { hands: 0, head: 0 }, neutral: { hands: 0, head: 0 }, max: { hands: activity === 'xc_skiing' ? 0.55 : 0, head: 0 } });
+    expect(body.ireq.extremity).toEqual({ min: { hands: 0, head: 0 }, neutral: { hands: 0, head: 0 }, max: { hands: activity === 'xc_skiing' ? POLE_GRIP_MAX_CLO : 0, head: 0 } });
     expect(body.ireq.validation_source).toBe('coweda_inspired_unvalidated_swttr_margin');
     expect(body.guidance).toEqual(expect.arrayContaining(body.ireq.policy.assumptions));
     expect(body.recommendation.headwear).toEqual({ helmet: null, head_warmth: null, neck_warmth: null });
@@ -527,11 +528,11 @@ describe("vent advice (#290)", () => {
 });
 
 describe("accessories against local bands (#370)", () => {
-  it("cycling at 32°F wears no balaclava against a ~0.55 clo head target", async () => {
+  it("cycling at 32°F wears no balaclava against a ~0.25 clo head target", async () => {
     useDatabase(null, []);
     const { body } = await callRoute(biking, { weather: { temperature: 32, wind_speed: 5 }, exertion: "moderate" });
     const { evaluation, headwear, handwear, accessories } = body.recommendation;
-    expect(body.ireq.extremity.neutral.head).toBeLessThan(0.6);
+    expect(body.ireq.extremity.neutral.head).toBeLessThan(0.27);
     expect(headwear.head_warmth?.type ?? "").not.toMatch(/^balaclava/);
     expect(evaluation.bodyParts.headNeck.status).not.toBe("over");
     expect(handwear).not.toBeNull();
@@ -554,7 +555,7 @@ describe("accessories against local bands (#370)", () => {
     useDatabase(null, []);
     const { body } = await callRoute(skiTouring, CONDITIONS[3].body);
     const { descent_breakdown: descent, descent_evaluation: evaluation } = body as BiophysicsRecommendation;
-    expect(descent!.extremity_ireq.min.hands).toBeGreaterThan(5);
+    expect(descent!.extremity_ireq.min.hands).toBeGreaterThan(3);
     expect(body.descent_handwear.rcl).toBe(Math.max(...catalog.handwear.map(h => h.rcl_clo)));
     expect(evaluation!.bodyParts.hands.status).toBe("under");
     expect(evaluation!.decision!.reasons).toContain("Hands needs more insulation; extra warmth elsewhere does not cover this gap.");

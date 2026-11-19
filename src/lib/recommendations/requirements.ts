@@ -8,7 +8,7 @@
  * that needs it, independent of thermal demand.
  */
 import type { AccessoryAssessments, ClothingRequirement } from '@/types/biophysics';
-import type { ActivityType } from '@/lib/biophysics/constants';
+import { ACCESSORY_CLO_SCALE, type ActivityType } from '@/lib/biophysics/constants';
 import type { GarmentRow, HandwearRow, HeadwearRow } from './types';
 import { garmentCapabilities, hasUsableThermalData } from './garment-semantics';
 import { HEAD_WARMTH_TYPES, REQUIRED_HELMET_TYPES } from './extremities';
@@ -182,6 +182,10 @@ export function buildClothingRequirements(
     ['head', targets.extremity.neutral.head, headWarmth, pool.ownership.headwear],
   ];
   for (const [region, neutral, items, owned] of extremity) {
+    // Hand and head clo are on the part-manikin scale (#376); these limits
+    // were set on the catalog's earlier accessory scale.
+    const scale = ACCESSORY_CLO_SCALE[region];
+    const light = neutral < 0.2 * scale;
     const accessory = pool.accessories?.[region];
     if (accessory) {
       const selected = (region === 'head' ? pool.headwear : items).filter(item => accessory.selected_ids.includes(item.id));
@@ -191,7 +195,7 @@ export function buildClothingRequirements(
       const neckOnly = region === 'head' && matched && !HEAD_WARMTH_TYPES.includes((matched as HeadwearRow).headwear_type);
       const label = region === 'hands' && accessory.purpose === 'pole_grip'
         ? 'Thin XC gloves for pole grip and friction protection'
-        : neckOnly ? 'Neck layer to complement hood warmth' : labels[region][neutral < 0.2 ? 'light' : 'standard'];
+        : neckOnly ? 'Neck layer to complement hood warmth' : labels[region][light ? 'light' : 'standard'];
       const result = requirement(activity, region, label, neutral,
         accessory.state === 'selected' && matched ? { id: matched.id, name: `${matched.brand} ${matched.model_name}` } : undefined, owned);
       if (accessory.state === 'not_needed' || accessory.state === 'unknown') {
@@ -202,16 +206,16 @@ export function buildClothingRequirements(
       requirements.push(result);
       continue;
     }
-    const label = labels[region][neutral < 0.2 ? 'light' : 'standard'];
-    if (neutral < EXTREMITY_NEEDED_CLO) {
+    const label = labels[region][light ? 'light' : 'standard'];
+    if (neutral < EXTREMITY_NEEDED_CLO * scale) {
       requirements.push({
         id: `${activity}:${region}`, region, label, status: 'not_needed', target_clo: neutral,
         message: `${label} — not needed in these conditions`,
       });
       continue;
     }
-    const inRange = (item: HandwearRow | HeadwearRow) => item.rcl_clo >= Math.max(0, targets.extremity.min[region] - CLO_MARGIN)
-      && item.rcl_clo <= neutral + CLO_MARGIN;
+    const inRange = (item: HandwearRow | HeadwearRow) => item.rcl_clo >= Math.max(0, targets.extremity.min[region] - CLO_MARGIN * scale)
+      && item.rcl_clo <= neutral + CLO_MARGIN * scale;
     const matched = items.find((item) => pool.selectedIds?.has(item.id) && inRange(item)) ?? items.find(inRange);
     requirements.push(requirement(activity, region, label, neutral,
       matched ? { id: matched.id, name: `${matched.brand} ${matched.model_name}` } : undefined, owned));

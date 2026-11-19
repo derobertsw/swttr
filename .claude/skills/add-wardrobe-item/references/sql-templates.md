@@ -89,9 +89,11 @@ WHERE g.brand = '<Brand>' AND g.model_name = '<Model>'
 -- HANDWEAR - <Brand> <Model>
 -- <Construction facts.> (<product URL>) Calibrated against <analogues>.
 INSERT INTO handwear (brand, model_name, year_released, msrp_usd, handwear_type, weight_grams_pair,
-  rcl_clo, dexterity_score, waterproof, windproof, touchscreen_compatible, min_temp_active, min_temp_static)
+  rcl_clo, dexterity_score, waterproof, windproof, touchscreen_compatible, min_temp_active, min_temp_static,
+  confidence_score, uncertainty_clo, data_source)
 VALUES ('<Brand>', '<Model>', <year|NULL>, <usd|NULL>, '<liner_glove|light_glove|insulated_glove|mitten|lobster_mitten|shell_overmitten>', <g|NULL>,
-  <clo>, <1..10>, <bool>, <bool>, <bool>, <°C>, <°C>)
+  <part-manikin clo>, <1..10>, <bool>, <bool>, <bool>, <°C>, <°C>,
+  <0..1>, <clo, at least 0.07>, '<product URL ; analogues: …>')
 ON CONFLICT (brand, model_name) DO NOTHING;
 ```
 
@@ -101,13 +103,15 @@ ON CONFLICT (brand, model_name) DO NOTHING;
 -- HEADWEAR - <Brand> <Model>
 -- <Construction facts.> (<product URL>) Calibrated against <analogues>.
 INSERT INTO headwear (brand, model_name, year_released, msrp_usd, headwear_type, weight_grams,
-  covers_ears, covers_neck, covers_face, helmet_compatible, rcl_clo, windproof, min_temp_active, min_temp_static)
+  covers_ears, covers_neck, covers_face, helmet_compatible, rcl_clo, windproof, min_temp_active, min_temp_static,
+  confidence_score, uncertainty_clo, data_source)
 VALUES ('<Brand>', '<Model>', <year|NULL>, <usd|NULL>, '<liner_beanie|midweight_beanie|heavy_beanie|balaclava_light|balaclava_heavy|headband|buff_thin|buff_heavy|facemask|ski_helmet|bike_helmet>', <g|NULL>,
-  <bool>, <bool>, <bool>, <bool>, <clo>, <bool>, <°C>, <°C>)
+  <bool>, <bool>, <bool>, <bool>, <part-manikin clo>, <bool>, <°C>, <°C>,
+  <0..1>, <clo, at least 0.07>, '<product URL ; analogues: …>')
 ON CONFLICT (brand, model_name) DO NOTHING;
 ```
 
-Handwear and headwear have no provenance columns, so record the method, sources and analogues in the comment above each insert.
+Since `20261119120000_anchor_accessory_clo.sql`, handwear and headwear have `confidence_score`, `uncertainty_clo` and `data_source`; still record the method in the comment above each insert. `rcl_clo` is on the part-manikin scale (see thermal-estimation.md, "Gloves and headwear").
 
 ## Paste script for the SQL editor
 

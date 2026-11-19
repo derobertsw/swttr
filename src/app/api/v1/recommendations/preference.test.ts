@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import catalog from '@/test/fixtures/gear-catalog.json';
 import { createFakeSupabase } from '@/test/fakeSupabase';
+import { POLE_GRIP_MAX_CLO } from '@/lib/biophysics/sport-policy';
 import { buildRecommendedLayers, evaluationItemsByBodyPart } from '@/lib/layers';
 import type { BiophysicsRecommendation, PhaseEvaluationInput } from '@/types/biophysics';
 import { POST as alpine } from './alpine/route';
@@ -139,7 +140,7 @@ describe.each([['running', running], ['xc', xc]] as const)('%s bands and layers'
       expect(cold.ireq.regional!.min[part]).toBeLessThanOrEqual(cold.ireq.regional!.neutral[part]);
     }
     // XC keeps its pole-grip glove allowance.
-    if (s.policy?.protection.poleGrip) expect(hot.ireq.extremity!.max!.hands).toBeGreaterThanOrEqual(0.55);
+    if (s.policy?.protection.poleGrip) expect(hot.ireq.extremity!.max!.hands).toBeGreaterThanOrEqual(POLE_GRIP_MAX_CLO);
     expect(hot.recommendation.accessories?.hands.purpose).toBe(standard.recommendation.accessories?.hands.purpose);
 
     for (const [body, direction] of [[hot, -1], [cold, 1]] as const) {
