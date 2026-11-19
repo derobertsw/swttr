@@ -102,20 +102,22 @@ describe('calculateRegionalTargets', () => {
     }
   );
 
-  it('keeps the activity multipliers in proportion', () => {
-    // Touring descent: torso 1.0, arms 1.05, legs 1.15, area-weighted mean 1.05.
-    const targets = calculateRegionalTargets('ski_touring_downhill', [2.44, 2.88]);
+  it.each(Object.keys(REGIONAL_IREQ_MULTIPLIERS) as ActivityType[])(
+    'gives %s torso, arms and legs the whole-body band (no unsourced regional bias, #375)',
+    (activity) => {
+      const targets = calculateRegionalTargets(activity, [2.44, 2.88]);
 
-    expect(targets.min).toEqual({ torso: 2.32, arms: 2.44, legs: 2.67 });
-    expect(targets.neutral).toEqual({ torso: 2.74, arms: 2.88, legs: 3.15 });
-  });
+      expect(targets.min).toEqual({ torso: 2.44, arms: 2.44, legs: 2.44 });
+      expect(targets.neutral).toEqual({ torso: 2.88, arms: 2.88, legs: 2.88 });
+    }
+  );
 
-  it('lets an outfit inside the whole-body range meet every regional minimum', () => {
+  it('lets an outfit with every region inside the whole-body range meet every regional minimum', () => {
     // Before #152 rescaled the multipliers, their area-weighted mean above 1
     // lifted the regional minimums past the whole-body one, so an outfit
     // inside the whole-body range still fell short and scored 0.
     const targets = calculateRegionalTargets('ski_touring_downhill', [2.44, 2.88]);
-    const outfit = { torso: 2.40, arms: 2.50, legs: 2.75 };
+    const outfit = { torso: 2.50, arms: 2.46, legs: 2.75 };
 
     expect(areaWeighted(outfit)).toBeGreaterThan(2.44);
     expect(areaWeighted(outfit)).toBeLessThan(2.88);
