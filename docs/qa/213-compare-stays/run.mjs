@@ -21,7 +21,7 @@ const groups = new Set(process.argv.slice(2).length ? process.argv.slice(2) : ['
 const TRIP = 'qa213-weekend';
 const ONE = 'qa213-one';
 const VIEWERS = { organizer: 'user-alex', member: 'user-blair' };
-const [FRI, SAT, SUN, MON] = ['2026-10-09', '2026-10-10', '2026-10-11', '2026-10-12'];
+const [FRI, SUN, MON] = ['2026-10-09', '2026-10-11', '2026-10-12'];
 const id = (prefix, n) => `${prefix}000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const OPT = { ridge: id('3c', 1), brook: id('3c', 2), long: id('3c', 3), hilltop: id('3c', 4), notch: id('3c', 5), town: id('3c', 6), gondola: id('3c', 7) };
 const STAY = { pine: id('2b', 1), village: id('2b', 2), lodge: id('2b', 3) };
@@ -103,7 +103,7 @@ function layoutAudit() {
   const groups = [...document.querySelectorAll('#main-content [role=group]')].filter(visible);
   return {
     vw, scrollWidth: document.documentElement.scrollWidth, overflow: document.documentElement.scrollWidth > vw,
-    offenders: offenders.map(({ node, ...rest }) => rest).slice(0, 8), spilled, rootFontSize: getComputedStyle(document.documentElement).fontSize,
+    offenders: offenders.map((entry) => ({ ...entry, node: undefined })).slice(0, 8), spilled, rootFontSize: getComputedStyle(document.documentElement).fontSize,
     layout: table ? 'table' : groups.length ? 'grouped' : 'none',
     // Phones: each day or figure, then every stay's named value beneath it.
     grouped: groups.map((group) => ({ heading: group.querySelector('h4')?.innerText, names: [...group.querySelectorAll('li > span:first-child > span:first-child')].map((el) => el.innerText.slice(0, 40)),
@@ -390,7 +390,7 @@ async function savedPlan() {
 }
 const sheetText = (page) => page.eval(`document.querySelector('[role=dialog]')?.innerText ?? ''`);
 
-async function useChecks(page) {
+async function nightsUseChecks(page) {
   await signIn(page, VIEWERS.organizer);
   for (const width of [390, 1440]) {
     await api('/__qa/reset');
@@ -551,7 +551,7 @@ try {
   if (groups.has('text')) await textChecks(page);
   if (groups.has('a11y')) await a11yChecks(page);
   if (groups.has('journeys')) await journeyChecks(page, browser.cdp);
-  if (groups.has('use')) await useChecks(page);
+  if (groups.has('use')) await nightsUseChecks(page);
   if (groups.has('sheet')) await sheetChecks(page);
   if (groups.has('recovery')) await recoveryChecks(page);
   if (groups.has('shots')) await shots(page);

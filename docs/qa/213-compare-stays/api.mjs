@@ -23,7 +23,6 @@ import { readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const root = process.cwd();
-const here = resolve(root, 'docs/qa/213-compare-stays');
 const shared = resolve(root, 'docs/qa/337-group-planning/server');
 const port = Number(process.env.API_PORT ?? 3492);
 
@@ -149,7 +148,8 @@ async function lodgingRpc(tables, params, option) {
     const saved = (tables.trip_stay_candidates ?? []).find((row) => row.id === option.id);
     if (!saved || saved.revision !== option.revision) return { error: { code: 'PT409', hint: 'option' } };
   }
-  const { people_key: _key, ...payload } = params.p_payload;
+  const payload = { ...params.p_payload };
+  delete payload.people_key;
   let change;
   if (params.p_action === 'save') {
     const { existing, occupants, ...stay } = payload;
