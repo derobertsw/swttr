@@ -174,6 +174,8 @@ Sources on Saturday (Alex):
 
 Owned by Riley, with no other members. Same days, places, stays, options, tour plans and sources as Trip A, with Saturday's sources **not** listed on Sunday (Riley reuses them in T4). Riley's kit is saved for Saturday. Riley has no touring equipment or day checks yet. No shared gear.
 
+**Riley's record**, made beforehand as Riley, for T4 and T6–T8: a review of Saturday's avalanche source, with a short note such as "Checked the morning forecast." Without it, a solo participant who follows T4 and T5 correctly reaches T6 with no source review to describe, T7 has no review to point at, and T8 has no source review to go out of date.
+
 #### Trip C — the planning trip (every session)
 
 Owned by whoever the participant signs in as (Alex, Sam or Riley). Friday to Sunday:
@@ -299,7 +301,7 @@ Then, for everyone:
 
 > "According to the trip, has anyone looked at Sunday's avalanche forecast yet? Have you?"
 
-- Correct: the sources are listed on Sunday (organizer and solo: by them), and Sunday shows no review recorded. Saturday's reviews don't count for Sunday. Members should also mention that they reviewed Saturday's.
+- Correct: the sources are listed on Sunday (organizer and solo: by them), and Sunday shows no review recorded. Saturday's reviews don't count for Sunday. Members and solo users should also mention that Saturday's has a review recorded (Sam's or Riley's, made beforehand).
 - Record whether they opened the avalanche forecast link at any point (R3: "find the relevant official bulletin").
 - Evidence for: S5 (reuse, reviews per day), R3.
 
@@ -587,7 +589,7 @@ One code per cell ([Outcome codes](#outcome-codes)), followed by ✓ when the an
 | T8 A change to the route | | | | | | |
 | T9 The second visit | | | | | | |
 | T10 Directions | | | | | | |
-| T11 When the map won't load | | — | | — | | — |
+| T11 When the map won't load | — | | — | | | — |
 | T12 Another place to stay | | | | | | |
 | T13 Which nights | | | — | — | | |
 | T14 A place without dates | | | | | | |
@@ -598,7 +600,7 @@ One code per cell ([Outcome codes](#outcome-codes)), followed by ✓ when the an
 | T19 Before you lose signal | | | | | | |
 | T20 At the trailhead | | | | | | |
 
-The dashes follow the recommended assignment: T11 runs on desktop only (P2, P4 and P5 here), and T13 isn't a member task. Move them if the devices or roles change.
+The dashes follow the recommended assignment: T11 runs on desktop only (P2, P4 and P5 here), so P1, P3 and P6, on iPhones, have a dash; and T13 isn't a member task. Move them if the devices or roles change.
 
 ### Facilitator checks
 
