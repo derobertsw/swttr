@@ -271,6 +271,8 @@ describe("Stay deep-link restoration", () => {
     expect(scroll).toHaveBeenCalledOnce();
     expect(scroll.mock.instances[0]).toBe(document.getElementById(`stay-${saved.id}`));
     expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "instant" });
+    // Focus moves to the stay too, as a link from the trip map expects (#235).
+    expect(screen.getByRole("heading", { name: saved.name })).toHaveFocus();
     result.rerender(<TripStays data={full([{ ...saved, name: "Updated room" }])} canEdit={false} onSaved={onSaved} />);
     expect(scroll).toHaveBeenCalledOnce();
   });
