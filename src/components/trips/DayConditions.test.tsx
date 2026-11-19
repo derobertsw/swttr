@@ -292,6 +292,23 @@ describe("Day conditions", () => {
     for (const button of buttons) expect(button.getAttribute("aria-label") ?? button.textContent).toMatch(new RegExp(`^${button.textContent}`));
   });
 
+  it("lets its buttons wrap, so 200% text on a 320px phone doesn't push the page sideways", async () => {
+    vi.stubGlobal("fetch", fakeTripApi({ [`GET ${sourcesRoute}/centers`]: reply(200, {
+      verified_on: "2026-11-16", centers: [{ id: "parks-canada", name: "Parks Canada avalanche forecast", country: "CA", area: "Glacier", url: "https://avalanche.ca/map", listed_on: "x" }],
+      suggestions: { status: "found", point: "access_point", checked_at: "2026-11-17T20:00:00Z", items: [{ center_id: "parks-canada", area: "Glacier", forecaster: "Parks Canada" }] },
+    }) }));
+    const user = userEvent.setup();
+    render(<DayConditions data={tripFull({ days: [...DAYS, { id: "day-2", trip_id: TRIP.id, stop_id: null, date: "2026-10-11", activity: "Backcountry" }],
+      members: [ORGANIZER, SAM, ALEX], conditions: [source({ reviews: [review("user-1")] })],
+      conditions_sources: [{ ...source(), dates: [DATE] }, { ...source(), id: "source-2", dates: [] }] })} date={DATE} dateLabel="Sat Oct 10" activity="Backcountry" userId="user-1" onSaved={onSaved} />);
+    const section = screen.getByRole("heading", { name: "Conditions" }).closest("section")!;
+    // jsdom doesn't lay out: these are the classes the browser check measured (docs/qa/211-conditions).
+    for (const button of within(section).getAllByRole("button")) expect(button).toHaveClass("whitespace-normal", "h-auto", "max-w-full");
+    await user.click(screen.getByRole("button", { name: "Add source" }));
+    await user.click(screen.getByRole("button", { name: "Choose an official center" }));
+    expect(await screen.findByRole("button", { name: "Use Parks Canada avalanche forecast" })).toHaveClass("whitespace-normal", "h-auto");
+  });
+
   describe("reusing sources across days", () => {
     const WEEKEND: TripDay[] = [
       { id: "day-0", trip_id: TRIP.id, stop_id: null, date: "2026-10-09", activity: "Backcountry" },

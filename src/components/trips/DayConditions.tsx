@@ -29,6 +29,8 @@ const CATEGORY: Record<TripConditionsCategory, { label: string; open: string }> 
 };
 
 const externalLink = "inline-flex min-h-11 items-center text-primary underline";
+/** Labels wrap rather than push the page sideways with enlarged text on a narrow phone (as in TouringEquipment). */
+const wrapping = "h-auto min-h-11 max-w-full whitespace-normal py-2";
 /** A time on the viewer's clock, e.g. "Fri Oct 9, 6:12 PM". */
 const when = (iso: string) => format(new Date(iso), "EEE MMM d, h:mm a");
 
@@ -124,8 +126,8 @@ export function DayConditions({ data, date, dateLabel, activity, userId, onSaved
         <h2 id="conditions-heading" tabIndex={-1} className="text-title font-semibold text-foreground">Conditions</h2>
         {canEdit && (
           <div className="flex flex-wrap gap-2">
-            {notHere.length > 0 && <Button type="button" variant="ghost" onClick={() => openAttach(null)}>Add a saved source</Button>}
-            <Button type="button" variant="outline" onClick={() => openEditor(null)}>Add source</Button>
+            {notHere.length > 0 && <Button type="button" variant="ghost" className={wrapping} onClick={() => openAttach(null)}>Add a saved source</Button>}
+            <Button type="button" variant="outline" className={wrapping} onClick={() => openEditor(null)}>Add source</Button>
           </div>
         )}
       </div>
@@ -213,11 +215,11 @@ function SourceRow({ data, source, userId, canEdit, onEdit, onReview, onAttach }
           )}
           {current && review!.current.note && <p className="mt-1 break-words whitespace-pre-wrap">Your note: {review!.current.note}</p>}
           <div className="mt-2 flex flex-wrap gap-2">
-            <Button type="button" variant={current && !stale ? "outline" : "default"} onClick={() => onReview("record")}
+            <Button type="button" variant={current && !stale ? "outline" : "default"} className={wrapping} onClick={() => onReview("record")}
               aria-label={`Record my review of ${source.name}`}>Record my review</Button>
-            {current && <Button type="button" variant="outline" onClick={() => onReview("correct")}
+            {current && <Button type="button" variant="outline" className={wrapping} onClick={() => onReview("correct")}
               aria-label={`Edit note on my review of ${source.name}`}>Edit note</Button>}
-            {current && <Button type="button" variant="ghost" onClick={() => onReview("withdraw")}
+            {current && <Button type="button" variant="ghost" className={wrapping} onClick={() => onReview("withdraw")}
               aria-label={`Withdraw review of ${source.name}`}>Withdraw review</Button>}
           </div>
           {review && review.history.length > 0 && <History label="Your review history" review={review} />}
@@ -234,8 +236,8 @@ function SourceRow({ data, source, userId, canEdit, onEdit, onReview, onAttach }
       )}
       {canEdit && (
         <div className="mt-1 flex flex-wrap gap-2">
-          <Button type="button" variant="ghost" onClick={onEdit} aria-label={`Edit source ${source.name}`}>Edit source</Button>
-          {onAttach && <Button type="button" variant="ghost" onClick={onAttach} aria-label={`Use on other days: ${source.name}`}>Use on other days</Button>}
+          <Button type="button" variant="ghost" className={wrapping} onClick={onEdit} aria-label={`Edit source ${source.name}`}>Edit source</Button>
+          {onAttach && <Button type="button" variant="ghost" className={wrapping} onClick={onAttach} aria-label={`Use on other days: ${source.name}`}>Use on other days</Button>}
         </div>
       )}
     </li>

@@ -70,6 +70,8 @@ const vite = await createVite({
 const load = (file) => vite.ssrLoadModule(resolve(root, file));
 const { request: current } = await load('docs/qa/337-group-planning/server/state.ts');
 const { NextRequest } = await import('next/server.js');
+// The routes' own copy, whose cached forecast areas an outage override clears.
+const { clearAvalancheCanadaAreas } = await load('src/lib/avalanche-centers.ts');
 
 const base = resolve(root, 'src/app/api/v1/trips');
 const routes = [];
@@ -161,6 +163,7 @@ createServer(async (req, res) => {
   const json = (value) => res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(value));
   if (url.pathname === '/__qa/overrides') {
     if (req.method === 'DELETE') overrides = {}; else Object.assign(overrides, JSON.parse(body.toString() || '{}'));
+    clearAvalancheCanadaAreas();
     return json(overrides);
   }
   if (url.pathname === '/__qa/reset') { queue = queue.then(reset); await queue; log.length = 0; return json({ reset: true }); }
