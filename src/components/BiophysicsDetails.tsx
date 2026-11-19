@@ -1,6 +1,7 @@
 import React from "react";
 import { BiophysicsRecommendation } from "@/types/biophysics";
 import { ThermometerSnowflake, Droplets, Shield, Gauge, Activity, Shirt } from "lucide-react";
+import { ExposureLimitDetails } from "@/components/layers/ExposureLimitDetails";
 
 interface BiophysicsDetailsProps {
   data: BiophysicsRecommendation;
@@ -19,11 +20,16 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
   const { ireq, recommendation } = data;
   const { ensemble_properties, component_scores } = recommendation;
 
-  const dleHours = ireq.dle_hours
-    ?? ireq.chairlift?.dle_hours
-    ?? ireq.downhill?.dle_hours
-    ?? ireq.uphill?.dle_hours
-    ?? ireq.skiing?.dle_hours;
+  // Each phase's exposure limit belongs to its own evaluated outfit.
+  const outfitExposure = recommendation.evaluation?.exposure;
+  const descentExposure = data.descent_evaluation?.exposure;
+  const exposurePhases = [
+    ...(outfitExposure ? [{
+      label: descentExposure ? "Climb" : ireq.chairlift ? "Ski-and-lift cycle" : undefined,
+      exposure: outfitExposure,
+    }] : []),
+    ...(descentExposure ? [{ label: "Descent", exposure: descentExposure }] : []),
+  ];
 
   // Calculate delta: midpoint of target range vs actual
   const targetMidpoint = (ireq.target_range[0] + ireq.target_range[1]) / 2;
@@ -88,19 +94,10 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
                 {delta.toFixed(2)} clo
               </span>
             </div>
-            {typeof dleHours === "number" && Number.isFinite(dleHours) && (
-              <div className="flex items-center gap-2">
-                <span className="w-12 text-xs text-muted-foreground">DLE*:</span>
-                <span className="font-mono text-xs">
-                  {dleHours.toFixed(2)} h
-                </span>
-              </div>
-            )}
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            * DLE is currently a bounded exposure-planning heuristic.
-          </p>
         </div>
+
+        <ExposureLimitDetails phases={exposurePhases} />
 
         {/* Ensemble Properties */}
         <div>

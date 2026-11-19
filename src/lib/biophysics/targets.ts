@@ -4,7 +4,7 @@ interface ActivityTargetRangeInput {
   activity: ActivityType;
   ireqMin: number;
   ireqNeutral: number;
-  dleHours?: number;
+  heuristicExposureHours?: number;
   airTempC: number;
   windSpeedMs: number;
 }
@@ -44,14 +44,17 @@ function round2(value: number): number {
 }
 
 /**
- * Compute an activity-specific target clo range using IREQ + environmental stress + DLE.
+ * Compute an activity-specific target clo range using IREQ, environmental stress
+ * and the requirement-side exposure heuristic (`heuristicExposureHours`). That
+ * heuristic ignores clothing and is not reported as DLE; the reported
+ * duration-limited exposure comes from the selected ensemble (`exposure.ts`).
  */
 export function calculateActivityTargetRange(input: ActivityTargetRangeInput): ActivityTargetRangeResult {
   const {
     activity,
     ireqMin,
     ireqNeutral,
-    dleHours = 8,
+    heuristicExposureHours = 8,
     airTempC,
     windSpeedMs,
   } = input;
@@ -59,14 +62,14 @@ export function calculateActivityTargetRange(input: ActivityTargetRangeInput): A
 
   const coldStress = clamp((-airTempC - 2) * 0.01, 0, 0.35);
   const windStress = clamp((windSpeedMs - 2) * 0.02, 0, 0.28);
-  const dleStress = clamp((6 - dleHours) * 0.06, 0, 0.30);
+  const exposureStress = clamp((6 - heuristicExposureHours) * 0.06, 0, 0.30);
 
-  // Tighten minimum when DLE is short and/or conditions are severe.
-  const minLift = clamp((dleStress * 0.45) + (coldStress * 0.15) + (windStress * 0.10), 0, 0.30);
+  // Tighten minimum when the heuristic exposure is short and/or conditions are severe.
+  const minLift = clamp((exposureStress * 0.45) + (coldStress * 0.15) + (windStress * 0.10), 0, 0.30);
   const minFloor = ireqNeutral * profile.minFloorFromNeutral;
   const targetMin = Math.max(ireqMin + minLift, minFloor);
 
-  const maxBuffer = profile.baseMaxBuffer + coldStress + (windStress * 0.7) + dleStress;
+  const maxBuffer = profile.baseMaxBuffer + coldStress + (windStress * 0.7) + exposureStress;
   const rawMax = ireqNeutral + maxBuffer;
   const targetMax = Math.min(profile.maxCap, Math.max(targetMin + 0.12, rawMax));
 

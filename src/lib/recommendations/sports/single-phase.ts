@@ -211,6 +211,7 @@ export function createSinglePhaseSport(
             extremityMinTarget: targets.extremity.min,
             extremityTarget: targets.extremity.neutral,
             extremityMaxTarget: judged.extremity.max,
+            exposureConditions: targets.exposureConditions,
           },
         },
         handwear,

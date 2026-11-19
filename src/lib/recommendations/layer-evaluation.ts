@@ -12,6 +12,7 @@ import {
   localThermalStatus,
   type BodyPartClo,
 } from '@/lib/biophysics/comfort';
+import { calculateExposureLimit } from '@/lib/biophysics/exposure';
 import type {
   BodyPartEvaluation,
   EvaluatedBodyPart,
@@ -205,6 +206,11 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
     hasExtremityGap: maxExtremityDeficit > THERMAL_DISPLAY_CLO_EPSILON,
     decision,
     comfortScore: calculateThermalComfortScore(comfortInput),
+    // Exposure limit of this outfit (edited or recommended), from its own
+    // whole-body clo: ISO 11079 DLE (src/lib/biophysics/exposure.ts).
+    ...(input.exposureConditions && breakdown
+      ? { exposure: calculateExposureLimit(breakdown.total, input.exposureConditions) }
+      : {}),
   };
 }
 

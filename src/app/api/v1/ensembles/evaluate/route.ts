@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError, readJson } from "@/lib/api";
 import { EVALUATED_BODY_PARTS, evaluatePhase } from "@/lib/recommendations/layer-evaluation";
-import type { EvaluationItem, PhaseEvaluationInput } from "@/types/biophysics";
+import type { EvaluationItem, ExposureConditions, PhaseEvaluationInput } from "@/types/biophysics";
 import { getSupabase } from '@/lib/supabase';
 import { getAuthUserId } from '@/lib/auth';
 import { resolveEvaluationItems } from '@/lib/recommendations/evaluation-items';
@@ -24,10 +24,32 @@ function isTargetMap(value: unknown): boolean {
     EVALUATED_BODY_PARTS.every((part) => isOptionalNumber((value as Record<string, unknown>)[part]));
 }
 
+/** Plausible bounds for server-issued heat-balance conditions. */
+const EXPOSURE_BOUNDS: Record<keyof ExposureConditions, [number, number]> = {
+  airTempC: [-80, 60],
+  relativeHumidity: [0, 100],
+  metabolicRate: [30, 1000],
+  relativeAirSpeedMs: [0, 40],
+  walkingSpeedMs: [0, 1.2],
+  airPermeability: [1, 1000],
+};
+
+/** Whitelist the phase's heat-balance conditions, or reject them. */
+function parseExposureConditions(value: unknown): ExposureConditions | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const parsed = {} as ExposureConditions;
+  for (const [key, [min, max]] of Object.entries(EXPOSURE_BOUNDS) as [keyof ExposureConditions, [number, number]][]) {
+    const number = (value as Record<string, unknown>)[key];
+    if (!isFiniteNumber(number) || number < min || number > max) return null;
+    parsed[key] = number;
+  }
+  return parsed;
+}
+
 /** Validate phase inputs and whitelist item references before catalog resolution. */
 function parsePhase(value: unknown): PhaseEvaluationInput | null {
   if (!value || typeof value !== "object") return null;
-  const { itemClo, items: metadata, targets, minTargets, arms, targetRange, extremityMaxTargets, breathabilityTarget, requireStandalone, protectionNeeds, sensitivity } = value as Record<string, unknown>;
+  const { itemClo, items: metadata, targets, minTargets, arms, targetRange, extremityMaxTargets, breathabilityTarget, requireStandalone, protectionNeeds, sensitivity, exposureConditions } = value as Record<string, unknown>;
 
   if (sensitivity !== undefined && sensitivity !== 'hot' && sensitivity !== 'cold') return null;
   if (requireStandalone !== undefined && typeof requireStandalone !== 'boolean') return null;
@@ -93,8 +115,12 @@ function parsePhase(value: unknown): PhaseEvaluationInput | null {
     return null;
   }
 
+  const conditions = exposureConditions === undefined ? undefined : parseExposureConditions(exposureConditions);
+  if (conditions === null) return null;
+
   return {
     ...(metadata !== undefined ? { items: parsedItems } : { itemClo: parsedClo }),
+    ...(conditions ? { exposureConditions: conditions } : {}),
     targets, minTargets, arms, targetRange, extremityMaxTargets, breathabilityTarget, requireStandalone, protectionNeeds,
     ...(sensitivity ? { sensitivity } : {}),
   } as PhaseEvaluationInput;
@@ -104,7 +130,9 @@ function parsePhase(value: unknown): PhaseEvaluationInput | null {
  * POST /api/v1/ensembles/evaluate
  *
  * Evaluates the layers shown on the recommendation screen (including the
- * user's edits) against the recommendation's targets.
+ * user's edits) against the recommendation's targets. A phase sent with the
+ * recommendation's `exposureConditions` also gets the evaluated outfit's
+ * duration-limited exposure (`exposure`, ISO 11079 DLE).
  *
  * Body: { phases: PhaseEvaluationInput[] } — one per phase shown
  * Returns: { phases: PhaseEvaluation[] } — in the same order

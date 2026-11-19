@@ -17,6 +17,7 @@ import type {
   RegionalIreqRange,
 } from "@/types/biophysics";
 import BiophysicsDetails from "@/components/BiophysicsDetails";
+import { ExposureLimitDetails } from "@/components/layers/ExposureLimitDetails";
 import ScoreDisplay from "@/components/ScoreDisplay";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -255,6 +256,9 @@ const LayerDisplay = ({
       ? { clo: regionalClo.arms, target: ireq?.regional?.neutral?.arms, minTarget: ireq?.regional?.min?.arms }
       : undefined,
     targetRange: ireq?.target_range,
+    // The phase's server-issued heat-balance conditions: the check reports the
+    // current outfit's exposure limit with them.
+    exposureConditions: ireq?.exposure_conditions,
   };
   const descentRegional = descentBreakdown?.regional_ireq ?? ireq?.regional;
   const descentInput: PhaseEvaluationInput = {
@@ -282,6 +286,7 @@ const LayerDisplay = ({
         }
       : undefined,
     targetRange: downhillTargetRange,
+    exposureConditions: descentBreakdown?.exposure_conditions,
   };
   const {
     evaluation: lastEvaluation,
@@ -779,6 +784,14 @@ const LayerDisplay = ({
                             );
                           })}
                         </dl>
+                      </div>
+                    )}
+                    {phaseLayers(shownPhase).edited && shownEvaluation?.exposure && (
+                      <div className="text-sm text-foreground">
+                        <ExposureLimitDetails phases={[{
+                          label: `Your outfit${phaseLabel ? ` · ${phaseLabel}` : ""}`,
+                          exposure: shownEvaluation.exposure,
+                        }]} />
                       </div>
                     )}
                     <section aria-label="Original recommendation">

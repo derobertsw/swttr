@@ -8,7 +8,7 @@ describe('calculateActivityTargetRange', () => {
       activity: 'running',
       ireqMin: 0.55,
       ireqNeutral: 0.72,
-      dleHours: 7.5,
+      heuristicExposureHours: 7.5,
       airTempC: -2,
       windSpeedMs: 3,
     });
@@ -23,7 +23,7 @@ describe('calculateActivityTargetRange', () => {
       activity: 'biking',
       ireqMin: 0.7,
       ireqNeutral: 0.9,
-      dleHours: 8,
+      heuristicExposureHours: 8,
       airTempC: 2,
       windSpeedMs: 2,
     });
@@ -32,7 +32,7 @@ describe('calculateActivityTargetRange', () => {
       activity: 'biking',
       ireqMin: 0.7,
       ireqNeutral: 0.9,
-      dleHours: 4,
+      heuristicExposureHours: 4,
       airTempC: -20,
       windSpeedMs: 10,
     });
@@ -46,7 +46,7 @@ describe('calculateActivityTargetRange', () => {
       activity: 'running',
       ireqMin: 1.0,
       ireqNeutral: 1.2,
-      dleHours: 6.5,
+      heuristicExposureHours: 6.5,
       airTempC: -8,
       windSpeedMs: 5,
     });
@@ -55,7 +55,7 @@ describe('calculateActivityTargetRange', () => {
       activity: 'alpine_skiing',
       ireqMin: 1.0,
       ireqNeutral: 1.2,
-      dleHours: 6.5,
+      heuristicExposureHours: 6.5,
       airTempC: -8,
       windSpeedMs: 5,
     });
@@ -63,12 +63,12 @@ describe('calculateActivityTargetRange', () => {
     expect(alpine.max).toBeGreaterThan(running.max);
   });
 
-  it('applies DLE safety: shorter DLE should increase target range', () => {
+  it('applies the exposure heuristic: a shorter heuristic exposure widens the target range', () => {
     const longDle = calculateActivityTargetRange({
       activity: 'xc_skiing',
       ireqMin: 0.9,
       ireqNeutral: 1.1,
-      dleHours: 8,
+      heuristicExposureHours: 8,
       airTempC: -5,
       windSpeedMs: 4,
     });
@@ -77,7 +77,7 @@ describe('calculateActivityTargetRange', () => {
       activity: 'xc_skiing',
       ireqMin: 0.9,
       ireqNeutral: 1.1,
-      dleHours: 3,
+      heuristicExposureHours: 3,
       airTempC: -5,
       windSpeedMs: 4,
     });

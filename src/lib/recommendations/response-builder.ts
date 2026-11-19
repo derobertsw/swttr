@@ -33,6 +33,8 @@ interface EnsembleScoringInput {
     extremityMinTarget?: ExtremityCloValues;
     extremityTarget?: ExtremityCloValues;
     extremityMaxTarget?: ExtremityCloValues;
+    /** The phase's heat-balance conditions: with them the evaluation reports the outfit's exposure limit. */
+    exposureConditions?: PhaseEvaluationInput['exposureConditions'];
   };
 }
 
@@ -88,6 +90,7 @@ export function buildScoredRecommendation(
       hands: context.extremityMinTarget?.hands, headNeck: context.extremityMinTarget?.head },
     extremityMaxTargets: context.extremityMaxTarget ? { hands: context.extremityMaxTarget.hands, headNeck: context.extremityMaxTarget.head } : undefined,
     targetRange: context.targetRange,
+    ...(context.exposureConditions ? { exposureConditions: context.exposureConditions } : {}),
     breathability: input.ensemble.length ? { evapPotential: ensembleProps.evapPotential, target: breathabilityTarget(input.activity.metabolicRate) } : undefined,
   }) : undefined;
   const score = scoreEnsemble(thermalGarments, input.weather, input.activity, input.activityKey, evaluation);

@@ -4,7 +4,6 @@
  */
 import { garmentMetadata } from '@/lib/garment-metadata';
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
-import { DLE_ESTIMATION_METHOD } from '@/lib/biophysics/ireq';
 import { buildScoredRecommendation } from '../response-builder';
 import type { ExertionLevel } from '@/lib/biophysics/exertion';
 import { applyBodySizeMetabolicAdjustment } from '@/lib/biophysics/bodyMetrics';
@@ -154,8 +153,6 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         uphill: formatIreqPhase(targets.uphillIreq),
         downhill: formatIreqPhase(targets.downhillIreq),
         transition: formatIreqPhase(targets.transitionIreq),
-        dle_hours: targets.downhillIreq.dleHours,
-        dle_method: DLE_ESTIMATION_METHOD,
         target_range: targets.uphill.targetRange,
         validation_buffer_clo: {
           uphill: formatValidationBuffer(targets.uphill.validationBuffer),
@@ -245,7 +242,8 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
       activity: { name: climb ? 'Ski Touring Uphill' : 'Ski Touring Downhill', metabolicRate: climb ? targets.uphillRate : targets.downhillRate, hasStaticPeriods: false, windExposure: climb ? 'sheltered' : 'exposed' },
       activityKey: climb ? 'ski_touring_uphill' : 'ski_touring_downhill',
       comfortContext: { targetRange: phase.targetRange, regionalMinTarget: phase.regional.min, regionalTarget: phase.regional.neutral,
-        extremityMinTarget: extremity.min, extremityTarget: extremity.neutral, extremityMaxTarget: extremity.max },
+        extremityMinTarget: extremity.min, extremityTarget: extremity.neutral, extremityMaxTarget: extremity.max,
+        exposureConditions: phase.exposureConditions },
     }, climb ? selectedHandwear : descentHandwear, climb ? climbHeadwear : descentHeadwear);
     const uphillResult = scorePhase(uphillEnsemble, uphill, climbExtremity, true);
     const downhillResult = scorePhase(downhillEnsemble, downhill, descentExtremity, false);
@@ -271,9 +269,8 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         uphill: formatIreqPhase(targets.uphillIreq),
         downhill: formatIreqPhase(targets.downhillIreq),
         downhill_target_range: downhill.targetRange,
-        dle_hours: targets.downhillIreq.dleHours,
-        dle_method: DLE_ESTIMATION_METHOD,
         target_range: uphill.targetRange,
+        ...(uphill.exposureConditions ? { exposure_conditions: uphill.exposureConditions } : {}),
         regional: uphill.regional,
         extremity: climbExtremity,
         validation_buffer_clo: {
@@ -291,6 +288,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         regional_clo: downhillRegionalClo,
         regional_ireq: downhill.regional,
         extremity_ireq: descentExtremity,
+        ...(downhill.exposureConditions ? { exposure_conditions: downhill.exposureConditions } : {}),
       },
       pack_items: {
         garments: packItems.map((g) => {

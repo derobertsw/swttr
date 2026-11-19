@@ -148,7 +148,7 @@ Recorded, not validated. None of these has field data behind it (#8).
 | CoWEDA-inspired margins | `coweda.ts` | The errors are real, the conversion to clo is SWTTR's. They are applied in wind and at outputs outside the paper's data, added to both ends of the band, and not tapered for cycling or the touring climb. |
 | Regional multipliers and extremity multipliers | `constants.ts` | No source (finding 5). Hand and head factors of 0.9–1.45, a 0.8–1.0 temperature factor and 3 % per m/s of wind are heuristics; ISO 11079 has no local method. |
 | Target-range profile | `targets.ts` | Per-sport buffers, caps and floors, and cold, wind and exposure terms. The wind term partly double-counts the Annex A correction (noted in the calibration doc). |
-| Exposure estimate | `ireq.ts` | A bounded heuristic that ignores the outfit (#86). |
+| Exposure estimate | `ireq.ts`, `exposure.ts` | The reported DLE now comes from the evaluated outfit ([exposure limits](exposure-limits.md)). The old clothing-blind heuristic only widens target ranges, as `heuristicExposureHours`. |
 | Breathability thresholds | `scorer.ts`, sport modules | 0.15–0.30 evaporative potential by output (#67). |
 | `ALPINE_CLO_TARGETS` | `constants.ts` | Unused outside a test. |
 
