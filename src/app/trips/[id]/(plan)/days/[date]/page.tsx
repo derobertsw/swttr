@@ -230,7 +230,7 @@ export default function DayDetailPage({
             )}
           </header>
 
-          <DayStart data={data} date={date} meet={meet} meetingPoint={meetingPoint} notes={day.notes} memberId={me?.id}>
+          <DayStart data={data} date={date} meet={meet} meetingPoint={meetingPoint} meetExpected={!!activity && needsClothing} notes={day.notes} memberId={me?.id}>
             {isOrganizer && <>
               <DayMeetControls tripId={id} day={day} dateLabel={dateLabel} onSaved={refresh} />
               <DayNotesControls tripId={id} day={day} dateLabel={dateLabel} onSaved={refresh} />

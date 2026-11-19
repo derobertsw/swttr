@@ -293,8 +293,13 @@ const lodgingRow = (term: string, value: string) =>
  * point of your own, or the day's own, reads as it does in the drive below.
  * The drive follows in Getting there, and tonight's stay after it.
  */
-export function DayStart({ data, date, meet, meetingPoint = null, notes = null, memberId = null, children }: {
+export function DayStart({ data, date, meet, meetingPoint = null, meetExpected = false, notes = null, memberId = null, children }: {
   data: TripFull; date: string; meet?: TripDayMeet | null; meetingPoint?: string | null;
+  /**
+   * An activity day, not Travel or Rest: at an access point it says the meet
+   * time isn't set yet, so a member can tell that from no meet (#337).
+   */
+  meetExpected?: boolean;
   /** The day's notes for everyone (#334): tickets, rentals, parking. */
   notes?: string | null;
   /** The signed-in person's membership, whose own start leads. */
@@ -303,19 +308,21 @@ export function DayStart({ data, date, meet, meetingPoint = null, notes = null, 
   children?: ReactNode;
 }) {
   const { context, mine } = dayLodging(data, date, memberId);
-  if (!context && !meet && !notes && !children) return null;
+  const meetNotSet = !meet && meetExpected && !!meetingPoint;
+  if (!context && !meet && !meetNotSet && !notes && !children) return null;
   // Someone without a departure, such as a person not taking part, keeps the lodging's reason.
   const start = data.starts?.find((entry) => entry.date === date);
   const myStart = start?.people.find((person) => person.member_id === memberId);
   const crewFrom = start?.starting_from ?? context?.starting_from ?? "Not set";
   const myFrom = myStart?.starting_from ?? mine?.starting_from;
   return <section aria-labelledby={`day-start-${date}`} className="min-w-0">
-    <h2 id={`day-start-${date}`} className={sectionLabelClassName}>{meet ? "Meet and start" : "Start of the day"}</h2>
+    <h2 id={`day-start-${date}`} className={sectionLabelClassName}>{meet || meetNotSet ? "Meet and start" : "Start of the day"}</h2>
     <dl className="mt-2 space-y-2 text-base">
       {meet && <div><dt className="text-muted-foreground">Meet</dt><dd className="break-words text-foreground">
         {meet.meet_label} · {meetingPoint ?? "Meeting point not set"}
         <span className="block text-sm text-muted-foreground">{meet.time_zone_label}</span>
       </dd></div>}
+      {meetNotSet && lodgingRow("Meet", `Not set yet · ${meetingPoint}`)}
       {notes && <div><dt className="text-muted-foreground">Notes</dt><dd className="whitespace-pre-wrap break-words text-foreground">{notes}</dd></div>}
       {context && lodgingRow("Starting from", myFrom ? `${myFrom}${myStart?.own ? " · only this day" : ""}` : crewFrom)}
       {context && myFrom && myFrom !== crewFrom && lodgingRow("Crew starting from", crewFrom)}

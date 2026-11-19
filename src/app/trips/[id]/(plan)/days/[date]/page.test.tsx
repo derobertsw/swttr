@@ -1177,6 +1177,30 @@ describe("Trip day page", () => {
       expect(within(start).queryByRole("button")).not.toBeInTheDocument();
     });
 
+    it("says the meet time isn't set yet on an activity day at an access point, so it doesn't read as no meet (#337)", async () => {
+      mockAuth.userId = "user-2";
+      const member: TripMember = { ...SAM, user_id: "user-2", status: "joined" };
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [{ ...STOWE_STOP, access_point: LOT }], members: [ORGANIZER, member],
+          days: [{ ...downhill, meet_time: null, meet_time_zone: null }], lodging: buildLodging(TRIP, [], []), meets: [] })),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      const start = await screen.findByRole("region", { name: "Meet and start" });
+      expect(within(start).getByText("Meet", { selector: "dt" }).nextElementSibling).toHaveTextContent(/^Not set yet · Spruce Peak lot$/);
+    });
+
+    it("leaves the meet out of a Travel day, even at an access point", async () => {
+      vi.stubGlobal("fetch", fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [{ ...STOWE_STOP, access_point: LOT }],
+          days: [{ ...downhill, activity: "Travel", meet_time: null, meet_time_zone: null }], lodging: buildLodging(TRIP, [], []), meets: [] })),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      }));
+      await renderPage();
+      const start = await screen.findByRole("region", { name: "Start of the day" });
+      expect(within(start).queryByText("Meet", { selector: "dt" })).not.toBeInTheDocument();
+    });
+
     it("offers the organizer Set meet time on a day without one", async () => {
       vi.stubGlobal("fetch", fakeTripApi({
         "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP], days: [{ ...DAY, meet_time: null, meet_day_offset: 0, meet_time_zone: null }],
