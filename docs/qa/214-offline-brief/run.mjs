@@ -27,7 +27,7 @@ function record(group, check, pass, evidence) {
 /** Opens Save for offline on Plan's page and waits for the sheet's lists. */
 async function openSheet(page) {
   await page.waitFor(`[...document.querySelectorAll('button')].some((b) => b.innerText.trim() === 'Save for offline' || b.innerText.trim() === 'Change saved days')`);
-  await click(page, 'Save for offline') || await click(page, 'Change saved days');
+  if (!(await click(page, 'Save for offline'))) await click(page, 'Change saved days');
   await page.waitFor(`document.querySelector('[role=dialog] input[type=checkbox]') && /Included/.test(document.querySelector('[role=dialog]').innerText) && !/Listing what/.test(document.querySelector('[role=dialog]').innerText)`, 20_000);
   await sleep(400);
   return page.eval(`(() => {

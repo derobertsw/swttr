@@ -23,6 +23,21 @@ const ACCOUNT_WAIT_MS = 3000;
 
 type Device = { account: string | null; briefs: SavedBrief[]; damaged: string[] };
 
+const MISSING_HEADING = "saved-brief-missing-heading";
+const MISSING_NOTICE = "saved-brief-missing-notice";
+// Long labels wrap rather than push the page sideways with large text.
+const WRAP = "h-auto min-h-11 max-w-full whitespace-normal py-2";
+
+/**
+ * A copy that can't be checked: offline, or before the account is known
+ * (Clerk doesn't load without a connection), changes since it was saved
+ * are unknown. Only someone the app knows is signed out is asked to sign in.
+ */
+function UncheckedStatus({ saved, signedOut }: { saved: SavedBrief; signedOut: boolean }) {
+  if (!signedOut) return <CheckStatus saved={saved} check={{ state: "failed", message: "You're offline.", offline: true }} />;
+  return <p className="text-base text-muted-foreground">Sign in to check for changes. Showing saved copy; changes since {absoluteTime(saved.brief.saved_at)} are unknown.</p>;
+}
+
 /**
  * Saved on this device (#214): the trip briefs this device keeps, and one
  * brief by `?trip=`. It reads only the browser's own storage, so it opens
@@ -92,6 +107,8 @@ function SavedBriefs() {
   const shown = tripId ? briefs.find((saved) => saved.trip_id === tripId) : undefined;
   // Checks need the copy's own account signed in; offline, the copies show as saved.
   const canCheck = !!userId && userId === account;
+  // Only with a connection can Clerk say nobody is signed in.
+  const signedOut = isLoaded && !userId && online;
 
   if (!ready) return <p role="status" className="text-base text-muted-foreground">Opening saved trips…</p>;
 
@@ -99,11 +116,11 @@ function SavedBriefs() {
     return <div className="flex w-full min-w-0 flex-col gap-5">
       <BackLink href="/trips/saved">Saved on this device</BackLink>
       {shown ? (
-        <SavedBriefDetail saved={shown} canCheck={canCheck} onChanged={load} onRemoved={setNotice} />
+        <SavedBriefDetail saved={shown} canCheck={canCheck} signedOut={signedOut} onChanged={load} onRemoved={setNotice} />
       ) : (
         <div className="flex flex-col gap-2">
-          <h1 className="text-title font-semibold text-foreground">Not saved on this device</h1>
-          <p role="status" className="text-base text-muted-foreground">{notice || "This trip isn't saved on this device. Save it for offline from the trip's Plan page while you're online."}</p>
+          <h1 id={MISSING_HEADING} tabIndex={-1} aria-describedby={MISSING_NOTICE} className="text-title font-semibold text-foreground">Not saved on this device</h1>
+          <p id={MISSING_NOTICE} role="status" className="text-base text-muted-foreground">{notice || "This trip isn't saved on this device. Save it for offline from the trip's Plan page while you're online."}</p>
           {online && <Link href={tripOpenHref(tripId)} className="inline-flex min-h-11 w-fit items-center text-base font-semibold text-primary">Open the trip</Link>}
         </div>
       )}
@@ -119,6 +136,9 @@ function SavedBriefs() {
         <p className="mt-1 text-base text-muted-foreground">
           Read-only trip briefs you saved, for when there&apos;s no connection. They change only when you update them, and signing out removes them.
         </p>
+        <p className="mt-1 text-base text-muted-foreground">
+          Without a connection, this is the only SWTTR page that opens. Bookmark it so you can find it then.
+        </p>
       </header>
       <p role="status" aria-live="polite" className="text-base text-foreground">{notice}</p>
       {storageError && <p role="alert" className="text-base font-medium text-destructive">Couldn&apos;t read this device&apos;s saved trips: {storageError}</p>}
@@ -133,14 +153,14 @@ function SavedBriefs() {
         </p>
       ) : (
         <ul className="divide-y divide-border border-y border-border">
-          {briefs.map((saved) => <SavedRow key={saved.trip_id} saved={saved} canCheck={canCheck} onChanged={load} />)}
+          {briefs.map((saved) => <SavedRow key={saved.trip_id} saved={saved} canCheck={canCheck} signedOut={signedOut} onChanged={load} />)}
         </ul>
       )}
     </div>
   );
 }
 
-function SavedRow({ saved, canCheck, onChanged }: { saved: SavedBrief; canCheck: boolean; onChanged: () => Promise<void> }) {
+function SavedRow({ saved, canCheck, signedOut, onChanged }: { saved: SavedBrief; canCheck: boolean; signedOut: boolean; onChanged: () => Promise<void> }) {
   const { check } = useBriefCheck(saved, canCheck);
   const gone = useRemoveWhenGone(saved, check?.state === "gone", onChanged);
   return (
@@ -149,7 +169,7 @@ function SavedRow({ saved, canCheck, onChanged }: { saved: SavedBrief; canCheck:
         {saved.brief.trip.name}
       </Link>
       <p className="text-base text-foreground">{savedLine(saved.brief)}</p>
-      <div role="status" aria-live="polite">{gone ?? <CheckStatus saved={saved} check={check} />}</div>
+      <div role="status" aria-live="polite">{gone ?? (canCheck ? <CheckStatus saved={saved} check={check} /> : <UncheckedStatus saved={saved} signedOut={signedOut} />)}</div>
     </li>
   );
 }
@@ -175,8 +195,8 @@ function useRemoveWhenGone(saved: SavedBrief, gone: boolean, onChanged: () => Pr
   return removed;
 }
 
-function SavedBriefDetail({ saved, canCheck, onChanged, onRemoved }: {
-  saved: SavedBrief; canCheck: boolean; onChanged: () => Promise<void>; onRemoved: (message: string) => void;
+function SavedBriefDetail({ saved, canCheck, signedOut, onChanged, onRemoved }: {
+  saved: SavedBrief; canCheck: boolean; signedOut: boolean; onChanged: () => Promise<void>; onRemoved: (message: string) => void;
 }) {
   const online = useOnline();
   const { check, recheck } = useBriefCheck(saved, canCheck);
@@ -211,6 +231,8 @@ function SavedBriefDetail({ saved, canCheck, onChanged, onRemoved }: {
       await removeSavedBrief(saved.trip_id);
       onRemoved(`Removed ${saved.brief.trip.name} from this device. The trip online hasn't changed.`);
       await onChanged();
+      // This view goes with the copy: focus moves to the page that replaces it, which says what happened.
+      setTimeout(() => document.getElementById(MISSING_HEADING)?.focus(), 0);
     } catch (err) {
       setError(`Couldn't remove the saved copy: ${errorMessage(err)}`);
       setWorking(null);
@@ -222,20 +244,20 @@ function SavedBriefDetail({ saved, canCheck, onChanged, onRemoved }: {
       brief={saved.brief}
       status={<>
         <p className="text-base text-foreground">{savedLine(saved.brief)}</p>
-        {gone ? <p className="text-base text-foreground">{gone}</p> : canCheck || !online ? <CheckStatus saved={saved} check={check ?? { state: "failed", message: "You're offline.", offline: true }} />
-          : <p className="text-base text-muted-foreground">Sign in to check for changes. Showing saved copy; changes since {absoluteTime(saved.brief.saved_at)} are unknown.</p>}
+        {gone ? <p className="text-base text-foreground">{gone}</p> : canCheck && check ? <CheckStatus saved={saved} check={check} />
+          : <UncheckedStatus saved={saved} signedOut={signedOut} />}
         {message && <p className="text-base text-foreground">{message}</p>}
       </>}
       actions={<div className="mt-2 flex flex-col gap-2">
         {error && <p role="alert" className="text-base font-medium text-destructive">{error}</p>}
         <div className="flex flex-wrap gap-2">
           {canCheck && online && (
-            <Button type="button" variant={check?.state === "changed" ? "default" : "outline"} onClick={() => void update()} disabled={!!working} aria-busy={working === "update" || undefined}>
+            <Button type="button" variant={check?.state === "changed" ? "default" : "outline"} className={WRAP} onClick={() => void update()} disabled={!!working} aria-busy={working === "update" || undefined}>
               {working === "update" ? "Updating saved copy…" : "Update saved copy"}
             </Button>
           )}
-          {canCheck && online && <Button asChild variant="outline"><Link href={tripOpenHref(saved.trip_id)}>Open the trip</Link></Button>}
-          <Button type="button" variant="ghost" onClick={() => void remove()} disabled={!!working} aria-busy={working === "remove" || undefined}>
+          {canCheck && online && <Button asChild variant="outline" className={WRAP}><Link href={tripOpenHref(saved.trip_id)}>Open the trip</Link></Button>}
+          <Button type="button" variant="ghost" className={WRAP} onClick={() => void remove()} disabled={!!working} aria-busy={working === "remove" || undefined}>
             {working === "remove" ? "Removing…" : "Remove from this device"}
           </Button>
         </div>

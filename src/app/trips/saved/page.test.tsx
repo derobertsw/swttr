@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SavedBriefsPage from "./page";
 import { readSavedBriefs, storeSavedBrief } from "@/lib/offline-briefs";
@@ -108,6 +108,62 @@ describe("Saved on this device (#214)", () => {
     await show();
     expect(await screen.findByText("You signed out, so the trips saved on this device were removed.")).toBeInTheDocument();
     expect((await readSavedBriefs()).briefs).toEqual([]);
+  });
+
+  it("lists the briefs on a cold start with no connection, before Clerk loads, saying what isn't known (#214)", async () => {
+    await storeSavedBrief("user_1", offlineBrief());
+    fakeClerkState.loaded = false;
+    setOnline(false);
+    await show();
+    expect(await screen.findByRole("link", { name: "Rogers Pass" })).toBeInTheDocument();
+    expect(screen.getByText(/^Showing saved copy; changes since .* are unknown\.$/)).toBeInTheDocument();
+  });
+
+  it("doesn't ask someone to sign in when the connection, not the account, is missing (#214)", async () => {
+    await storeSavedBrief("user_1", offlineBrief());
+    // The browser says it's online, but nothing loads, so Clerk never does.
+    fakeClerkState.loaded = false;
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
+    await show("trip=trip-1");
+    expect(await screen.findByRole("heading", { level: 1, name: "Rogers Pass" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText(/^Showing saved copy; changes since .* are unknown\.$/)).toBeInTheDocument();
+    expect(screen.queryByText(/Sign in to check/)).not.toBeInTheDocument();
+  });
+
+  it("asks to sign in to check for changes when nobody is signed in and the server can't confirm it", async () => {
+    await storeSavedBrief("user_1", offlineBrief());
+    fakeClerkState.signedIn = false;
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
+    await show("trip=trip-1");
+    expect(await screen.findByText(/^Sign in to check for changes\. Showing saved copy; changes since .* are unknown\.$/)).toBeInTheDocument();
+  });
+
+  it("tells people to bookmark it, since it's the only page that opens offline (#214)", async () => {
+    setOnline(false);
+    await show();
+    expect(await screen.findByText(/Without a connection, this is the only SWTTR page that opens\. Bookmark it/)).toBeInTheDocument();
+  });
+
+  it("moves focus to the page after removing the copy, and says what happened (#214)", async () => {
+    await storeSavedBrief("user_1", offlineBrief());
+    setOnline(false);
+    const user = userEvent.setup();
+    await show("trip=trip-1");
+    await user.click(await screen.findByRole("button", { name: "Remove from this device" }));
+    const heading = await screen.findByRole("heading", { level: 1, name: "Not saved on this device" });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(heading).toHaveAccessibleDescription("Removed Rogers Pass from this device. The trip online hasn't changed.");
+    expect((await readSavedBriefs()).briefs).toEqual([]);
+  });
+
+  it("wraps its buttons' labels, so they fit a phone with large text (#214)", async () => {
+    await storeSavedBrief("user_1", offlineBrief());
+    vi.stubGlobal("fetch", briefApi({ status: 200, body: briefResponse() }));
+    await show("trip=trip-1");
+    for (const name of ["Update saved copy", "Remove from this device"]) {
+      expect(await screen.findByRole("button", { name })).toHaveClass("whitespace-normal");
+    }
+    expect(screen.getByRole("link", { name: "Open the trip" })).toHaveClass("whitespace-normal");
   });
 
   it("says when a trip isn't saved here", async () => {

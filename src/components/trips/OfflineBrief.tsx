@@ -341,7 +341,11 @@ export function OfflineBriefView({ brief, status, actions }: { brief: TripOfflin
 }
 
 type Opening = Awaited<ReturnType<typeof prepareOfflineOpening>>;
-const OPENS_OFFLINE = "Open it from Trips, then Saved on this device, with or without a connection.";
+// Only Saved on this device has a service worker (#214): offline, Trips and
+// every other page show the browser's own error, so don't send people there.
+const OPENS_OFFLINE = "Without a connection, open Saved on this device from a bookmark or this browser's history. Other pages need a connection.";
+// Long labels wrap rather than push the page sideways with large text.
+const WRAP = "h-auto min-h-11 max-w-full whitespace-normal py-2";
 
 /**
  * Save for offline on the trip's Plan page (#214): choose days, review what's
@@ -435,12 +439,12 @@ export function TripOfflineSave({ tripId }: { tripId: string }) {
           <p className="text-base text-foreground">{savedLine(saved.brief)}</p>
           <CheckStatus saved={saved} check={check} />
           <div className="flex flex-wrap gap-2">
-            <Button asChild><Link href={savedBriefHref(tripId)}>Open saved brief</Link></Button>
-            <Button type="button" variant="outline" onClick={() => void update()} aria-busy={working === "update" || undefined} disabled={!!working}>
+            <Button asChild className={WRAP}><Link href={savedBriefHref(tripId)}>Open saved brief</Link></Button>
+            <Button type="button" variant="outline" className={WRAP} onClick={() => void update()} aria-busy={working === "update" || undefined} disabled={!!working}>
               {working === "update" ? "Updating saved copy…" : "Update saved copy"}
             </Button>
-            <Button type="button" variant="outline" onClick={choose} disabled={!!working}>Change saved days</Button>
-            <Button type="button" variant="ghost" onClick={() => void remove()} aria-busy={working === "remove" || undefined} disabled={!!working}>
+            <Button type="button" variant="outline" className={WRAP} onClick={choose} disabled={!!working}>Change saved days</Button>
+            <Button type="button" variant="ghost" className={WRAP} onClick={() => void remove()} aria-busy={working === "remove" || undefined} disabled={!!working}>
               {working === "remove" ? "Removing…" : "Remove from this device"}
             </Button>
           </div>
