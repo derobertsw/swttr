@@ -119,16 +119,60 @@ Climb targets fall by roughly a third to two thirds, so the climb now dresses cl
 
 ## Golden review
 
-All running, XC and alpine golden responses are unchanged. The cycling and touring changes, by meaning:
+Compared with `main` after #375 (equal regional multipliers), 29 snapshots change, all of them cycling or ski touring. Running, XC and alpine are unchanged.
 
-- **Cycling.** Easy rides in cool air get warmer targets and warmer outfits. At 45°F, 4 mph, easy, the band goes 0.51–0.77 → 0.72–1.12, and the catalog outfit goes from tights and a Ferrosi Hoodie (0.60 clo) to tights, the Upstride Jacket and Wind Shield Pants (0.84). Moderate and hard targets in the cold barely move, with wider upper limits. Several garment and glove choices change at about the same warmth. Comfort scores move by up to 12 points either way. Where the hand and head bands taper (45°F dry, 36°F rain), a jacket's hood or the wardrobe's gloves now read as "over". Accessory choice is #370's work, and the hood is counted as worn.
-- **Touring climb.** Lighter climb outfits: catalog 25°F / 12 mph / moderate goes from base + fleece + two pants (1.01 clo) to an R1 Pullover and R1 Fleece Pants (0.66), with comfort 81.5 → 99.3. Extreme cold goes 1.90 → 1.33 clo, comfort 75.5 → 96.2, and torso is no longer over. In mild air one top and light pants. Wardrobe-only climbs sometimes read "over" where the wardrobe's lightest suitable item is above the lower band.
-- **Touring descent, a knock-on effect.** The descent wears the climb clothing plus the pack, and its targets are unchanged, so a lighter climb leaves the pack more to do. With the catalog's warmest over-pants (1.8 clo) the descent legs now fall short in several cold cases (25°F / 12 mph: 2.45 against a 2.87 minimum, "Cooler than recommended", reported in the descent evaluation). In mild air the pack picks a warmer puffy to cover the arms, so the descent torso reads "over". Descent comfort falls in those cases (catalog mild 94.7 → 63.4, cold and windy 77.4 → 46.3). This comes from the descent's own targets and pack selection, which this change leaves alone. It belongs with the descent's leg target and pack rules (#372's open question, field feedback #8).
-- **API additions.** Cycling's `conditions.relative_air_speed_ms` and `ireq.cold_exposure_factor`, and the climb's `ireq.uphill_cold_exposure_factor` and `ireq.uphill_validation_source`. Cycling's `ireq.validation_source` is now `coweda_inspired_unvalidated_swttr_margin`.
+- **Cycling.**
+  - Easy rides in cool air get warmer targets and warmer outfits. At 45°F, 4 mph, easy, the band goes 0.51–0.77 → 0.72–1.12. The catalog outfit goes from a Ferrosi Hoodie and Ferrosi Joggers (0.52 clo) to a base pant, the Upstride Jacket and joggers (0.80).
+  - Moderate and hard targets in the cold barely move; their upper limits widen.
+  - Several garment and glove choices change at about the same warmth. Comfort moves by up to 19 points; catalog near-freezing rain, for example, goes 93.5 → 74.9.
+  - Where the hand and head bands taper (45°F dry, 36°F rain), a jacket's hood or the wardrobe's gloves now read "over". Accessory choice is #370's work, and a hood is always counted as worn.
+- **Touring climb.**
+  - Climb outfits get lighter throughout: in mild air, a single top and light pants.
+  - Catalog climbs from 25°F down to extreme cold stay "Likely comfortable" (92–99). The wardrobe extreme-cold climb improves from 67.6 to 92.1.
+  - The mild and rain climbs read warmer (catalog 96.4 → 75.9 and 74.4 → 63.5). At 45°F, easy, the catalog's lightest pants (0.48 clo) sit over the lowered leg band (0.42). In rain the same protective outfit as before now exceeds the lower band. Wardrobe climbs sometimes read "over" where the lightest suitable hat or glove is above the lower band.
+- **Touring descent.** Its targets are unchanged, but the outfit is the climb clothing plus the pack, so lighter climbing pants leave the legs shorter. See the next section.
+- **API additions.** Cycling gets `conditions.relative_air_speed_ms` and `ireq.cold_exposure_factor`; the climb gets `ireq.uphill_cold_exposure_factor` and `ireq.uphill_validation_source`. Cycling's `ireq.validation_source` is now `coweda_inspired_unvalidated_swttr_margin`.
+
+## Descent findings
+
+Every golden touring case, `main` (after #375) → this branch:
+
+| Case | Descent comfort | Summary | Regions short of minimum, clo | Descent legs / minimum, clo | Climb legs, clo |
+| --- | --- | --- | --- | --- | --- |
+| catalog: mild, calm, dry, easy | 91 → 68 | Likely comfortable → Warmer than recommended | none → none | 2.45 → 2.21 / 1.92 | 0.72 → 0.48 |
+| catalog: cool, breezy, moderate | 73.1 → 74.6 | Warmer than recommended → Cooler than recommended | none → legs 0.38 | 2.74 → 2.21 / 2.59 | 1.01 → 0.48 |
+| catalog: cold, windy, snowing, hard | 57.3 → 54.4 | Uneven warmth → Uneven warmth | legs 0.37 → legs 0.80 | 2.93 → 2.50 / 3.30 | 1.20 → 0.77 |
+| catalog: extreme cold | 62.5 → 55.3 | Uneven warmth → Cooler than recommended | legs 1.21 → arms 0.36, legs 1.84 | 3.56 → 2.93 / 4.77 | 1.83 → 1.20 |
+| catalog: near-freezing rain | 73.7 → 73.7 | Warmer than recommended (unchanged) | none → none | 2.64 → 2.64 / 1.93 | 0.91 → 0.91 |
+| catalog: large body | 68.9 → 75 | Uneven warmth → Cooler than recommended | legs 0.12 → legs 0.36 | 2.45 → 2.21 / 2.57 | 0.72 → 0.48 |
+| catalog: light pack, cold, windy | 73.4 → 67.1 | Cooler than recommended (unchanged) | arms 0.52, legs 0.37 → arms 0.48, legs 0.80 | 2.93 → 2.50 / 3.30 | 1.20 → 0.77 |
+| empty wardrobe, catalog fallback | 13 → 13 | Uneven warmth → Cooler than recommended | none → legs 0.38 | 2.74 → 2.21 / 2.59 | 1.01 → 0.48 |
+| wardrobe: mild, calm, dry, easy | 90 → 61.9 | Likely comfortable → Warmer than recommended | none → none | 2.55 → 2.26 / 1.92 | 0.82 → 0.53 |
+| wardrobe: cool, breezy, moderate | 63 → 63 | Warmer than recommended → Uneven warmth | none → legs 0.33 | 2.55 → 2.26 / 2.59 | 0.82 → 0.53 |
+| wardrobe: cold, windy, snowing, hard | 65.8 → 68.1 | Cooler than recommended → Uneven warmth | arms 0.35, legs 0.37 → legs 0.75 | 2.93 → 2.55 / 3.30 | 1.20 → 0.82 |
+| wardrobe: extreme cold | 56.9 → 55.3 | Cooler than recommended (unchanged) | arms 0.74, legs 1.74 → arms 1.09, legs 1.84 | 3.03 → 2.93 / 4.77 | 1.30 → 1.20 |
+| wardrobe: near-freezing rain | 67.5 → 67.5 | Warmer than recommended (unchanged) | none → none | 2.64 → 2.64 / 1.93 | 0.91 → 0.91 |
+| wardrobe: large body | 62.8 → 70.3 | Warmer than recommended → Uneven warmth | none → legs 0.31 | 2.55 → 2.26 / 2.57 | 0.82 → 0.53 |
+
+Comfort can rise while a shortfall appears, because the comfort score also counts excess warmth elsewhere. Every shortfall is reported in the descent evaluation ("Legs needs more insulation"), not hidden.
+
+**Why the pack doesn't close the leg gap.** I checked the three suspected causes:
+
+- **No candidate filtered out.** Every catalog insulated pant passes the descent filter (downhill score 7–8) and the over-pant category rule. So does the wardrobe's Columbia Bugaboo II.
+- **The leg layer is already the warmest available.** The pack adds one leg layer over the climbing pants. In every short case it picks a 1.8 clo insulated pant: Helly Hansen Legendary, the lightest of the catalog's three 1.8 clo pants, or the wardrobe's Bugaboo II. No catalog over-pant is warmer.
+- **The ceiling is the climb pants plus 1.8 clo.** Descent legs = 0.961 × (climb legs + over-pant). Reaching the minimum needs regressed climb legs of at least the minimum − 1.73 clo. That is 0.86 at 25°F against the climb's 0.78 upper limit, 1.57 against 1.10 in cold, windy, snowing conditions at hard effort, and 3.04 against 1.66 in extreme cold.
+
+So no climb outfit inside its own band, combined with the catalog's warmest over-pant, reaches the descent's leg minimum in these cases. Before this change the climb wore heavier pants, and the same ceiling already left cold, windy and extreme-cold descents 0.37 and 1.21 clo short. This is a target-design and catalog question, not a selection bug, so it is recorded here rather than forced:
+
+- **The descent target uses rates this change was told to leave alone.** The descent's 146 W/m² is half the Compendium's moderate downhill active time (6.3 MET, 293 W/m²), plus 5 m/s of skiing air. A low rate makes the target warmer. Since #375 the leg band also equals the whole-body band. Recalibrating the descent is option 3 of #374 and needs field feedback (#8).
+- **Catalog gap.** There are no insulated over-pants or belay pants warmer than 1.8 clo with regional data.
+- **Model limit.** Only one leg layer can be added at the transition. Base and fleece layers would go underneath, which would mean taking boots and pants off.
+
+**One selection fix made here.** When no layer reaches the descent minimum, the pack used to trade the gap it closes against weight (70/30). In the wardrobe's extreme-cold case that chose a 226 g down jacket over an owned 539 g synthetic puffy that closes more of the gap. Now, unless a light pack is asked for, the layer leaving the smallest remaining gap wins and weight only breaks ties (`packForRegion` in `ski-touring-outfit.ts`). In that case the torso shortfall drops from 0.63 to none and the arms from 1.37 to 1.09 clo. The descent's metabolic rate, air speed and margins are unchanged.
 
 ## Limits
 
 - The MET mapping, riding speeds, the wind combination, the margin taper and the conversion of CoWEDA errors to clo are assumptions. Nothing here measures an individual's heat production, and there are no field data (#8).
 - Cycling assumes continuous riding. Stops and long descents still need the extra layer the guidance mentions. The climb assumes continuous skinning; the transition handles stops.
 - The IREQ solver is simplified, with no skin-evaporation term (see the [algorithm review](algorithm-review.md)).
-- The regional and extremity multipliers are untouched here; #375 owns the regional weights and leg bias.
+- The regional and extremity multipliers are untouched here. #375 has since set every regional multiplier to 1.0; the reference calculations above are whole-body, IREQ and hand/head values, which #375 doesn't change.

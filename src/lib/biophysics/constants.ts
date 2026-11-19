@@ -68,39 +68,24 @@ export const OUTER_AIR_PERMEABILITY = {
 // Regional IREQ multipliers by activity: each region's relative insulation
 // need. calculateRegionalTargets rescales them to an area-weighted mean of 1,
 // so only their ratios matter.
+//
+// Every sport and phase is unbiased (#375): torso, arms and legs each get the
+// whole-body band. Running, cycling, XC and touring used to ask arms and legs
+// for up to 1.27x and 1.4x the torso's clo, with no cited source. In all 43
+// ensemble configurations USARIEM T21-03 measured (Tables 14-18), arms carry
+// 0.56-0.87x and legs 0.19-0.91x the torso's clo; #317 removed alpine's leg
+// bias for the same reason. Equal shares are an assumption, not a measured
+// need: add a bias back only with regional evidence. See
+// docs/algorithm-review.md, finding 5.
+const UNBIASED_REGIONS = { torso: 1.0, arms: 1.0, legs: 1.0 } as const;
+
 export const REGIONAL_IREQ_MULTIPLIERS = {
-  running: {
-    torso: 0.75,   // High core heat from sustained effort
-    arms: 0.95,    // Moderate arm movement
-    legs: 1.05,    // High leg output with airflow exposure
-  },
-  biking: {
-    torso: 0.80,   // Warm core, sustained effort
-    arms: 0.90,    // Arms are static but exposed
-    legs: 1.10,    // High leg output with wind exposure
-  },
-  xc_skiing: {
-    torso: 0.85,   // Core runs hot, needs less
-    arms: 1.0,     // Poles = arm movement = moderate
-    legs: 1.15,    // Legs work hard but get cold air exposure
-  },
-  ski_touring_uphill: {
-    torso: 0.80,   // Very hot core while climbing
-    arms: 0.95,    // Pole work
-    legs: 1.10,    // Working hard but wind on descents
-  },
-  ski_touring_downhill: {
-    torso: 1.0,    // Standard
-    arms: 1.05,    // Less movement, wind exposure
-    legs: 1.15,    // Wind hits legs hard at speed
-  },
-  alpine_skiing: {
-    torso: 1.0,    // Standard
-    arms: 1.0,     // Less arm work than XC
-    // No regional bias. Cold-weather systems put less on the legs, not more:
-    // USARIEM T21-03's warmest ensembles carry 0.45–0.54x the torso's clo there.
-    legs: 1.0,
-  },
+  running: UNBIASED_REGIONS,
+  biking: UNBIASED_REGIONS,
+  xc_skiing: UNBIASED_REGIONS,
+  ski_touring_uphill: UNBIASED_REGIONS,
+  ski_touring_downhill: UNBIASED_REGIONS,
+  alpine_skiing: UNBIASED_REGIONS,
 } as const;
 
 // Extremity multipliers by activity: scale the whole-body IREQ of the phase

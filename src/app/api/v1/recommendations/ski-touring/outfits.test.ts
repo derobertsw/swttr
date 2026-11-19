@@ -137,7 +137,7 @@ describe('ski-touring outfits (#372)', () => {
   });
 
   it('prioritize_light_pack still reports a lighter pack', async () => {
-    const conditions = { weather: { temperature: 32, wind_speed: 8 }, exertion: 'easy' };
+    const conditions = { weather: { temperature: 25, wind_speed: 4 }, exertion: 'easy' };
     const normal = await recommend(conditions);
     const light = await recommend({ ...conditions, prioritize_light_pack: true });
     expect(light.pack_items!.total_weight_g).toBeLessThan(normal.pack_items!.total_weight_g);

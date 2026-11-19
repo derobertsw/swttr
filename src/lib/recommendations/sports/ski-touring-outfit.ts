@@ -113,6 +113,14 @@ function selectDescentShell(candidates: GarmentRow[]): GarmentRow | null {
   return sortByBreathability(candidates)[0] ?? null;
 }
 
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+/** Lexicographic comparison: the first differing value decides. */
+function isBetter(rank: number[], than: number[]): boolean {
+  const i = rank.findIndex((value, j) => value !== than[j]);
+  return i >= 0 && rank[i] > than[i];
+}
+
 const upperBody = (g: GarmentRow) => (g.covers_torso || g.covers_arms) && !g.covers_legs;
 
 /** Distance from a region's descent band. The descent is the cold phase, so
@@ -128,7 +136,9 @@ function descentGap(outfit: GarmentRow[], targets: Regional, region: Region): nu
  * closer to its band qualify. Each is scored by the share of the gap it
  * closes, traded against weight as the pack always was (70/30, or 40/60
  * with `prioritizeLightPack`). Unless a light pack is asked for, a layer
- * that reaches the minimum beats one that doesn't, however light.
+ * that reaches the minimum beats one that doesn't, however light, and when
+ * none reaches it the layer leaving the smallest gap wins, with weight only
+ * breaking ties: lightness never buys a colder descent (#374).
  */
 function packForRegion(
   worn: GarmentRow[],
@@ -139,16 +149,19 @@ function packForRegion(
 ): GarmentRow | null {
   if (xcRegionFit(worn, targets, region).deficit <= 0) return null;
   const before = descentGap(worn, targets, region);
-  let best: { garment: GarmentRow; rank: [number, number] } | null = null;
+  let best: { garment: GarmentRow; rank: [number, number, number] } | null = null;
   for (const garment of candidates) {
     const outfit = [...worn, garment];
-    const closed = (before - descentGap(outfit, targets, region)) / before;
+    const after = descentGap(outfit, targets, region);
+    const closed = (before - after) / before;
     if (closed <= 1e-6) continue;
     const weightScore = Math.max(0, 1.0 - ((garment.weight_grams ?? 500) - 200) / 600);
     const score = prioritizeLightPack ? closed * 0.4 + weightScore * 0.6 : closed * 0.7 + weightScore * 0.3;
     const reaches = prioritizeLightPack || xcRegionFit(outfit, targets, region).deficit <= 0 ? 1 : 0;
-    if (!best || reaches > best.rank[0] || (reaches === best.rank[0] && score > best.rank[1])) {
-      best = { garment, rank: [reaches, score] };
+    // Higher is better, compared in order.
+    const rank: [number, number, number] = reaches ? [1, score, 0] : [0, -round2(after), score];
+    if (!best || isBetter(rank, best.rank)) {
+      best = { garment, rank };
     }
   }
   return best?.garment ?? null;
