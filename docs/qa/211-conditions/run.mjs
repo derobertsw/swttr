@@ -17,6 +17,13 @@ import { spawn } from 'node:child_process';
 import { Cdp, emulate, key, newPage, sleep, tab, visit } from '../337-group-planning/cdp.mjs';
 import { CANADA, DATES, DAYS, TOUR, VIEWERS } from './fixtures.mjs';
 
+/**
+ * A value as a JavaScript literal for code run in the page: JSON, with the characters
+ * that could end a script or a line in page code escaped too.
+ */
+const ESCAPES = { '<': '\\u003C', '>': '\\u003E', '/': '\\u002F', '\u2028': '\\u2028', '\u2029': '\\u2029' };
+const literal = (value) => JSON.stringify(value).replace(/[<>/\u2028\u2029]/g, (ch) => ESCAPES[ch]);
+
 const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const CDP_PORT = Number(process.env.CDP_PORT ?? 39431);
 /**
@@ -149,7 +156,7 @@ async function organizer(page) {
   await page.eval(`qa.click('Save source')`);
   await closed(page);
   await page.waitFor(`qa.status().includes('Source added.')`);
-  const row = await page.eval(`(() => { const r = qa.row(${JSON.stringify(MWAC)}); const a = r?.querySelector('a[href]'); return r && { text: r.innerText, href: a?.getAttribute('href'), link: a?.textContent, target: a?.target, rel: a?.rel }; })()`);
+  const row = await page.eval(`(() => { const r = qa.row(${literal(MWAC)}); const a = r?.querySelector('a[href]'); return r && { text: r.innerText, href: a?.getAttribute('href'), link: a?.textContent, target: a?.target, rel: a?.rel }; })()`);
   check(g, 'The row shows type and area, Open forecast in a new tab, unknown validity and that the organizer added it', row
     && row.text.includes('Avalanche forecast · Presidential Range') && row.link === 'Open forecast (new tab)' && row.target === '_blank'
     && row.rel === 'noopener noreferrer' && row.href === filled.url && row.text.includes('Validity not available in SWTTR — check the source.')
@@ -158,15 +165,15 @@ async function organizer(page) {
   // A custom weather source.
   await page.eval(`qa.click('Add source')`);
   await page.waitFor(`qa.field('Source name')`);
-  await page.eval(`qa.set('Type', 'weather'); qa.set('Source name', ${JSON.stringify(WEATHER)}); qa.set('Area or region', 'Presidential Range'); qa.set('Link', 'https://example.org/summit-forecast')`);
+  await page.eval(`qa.set('Type', 'weather'); qa.set('Source name', ${literal(WEATHER)}); qa.set('Area or region', 'Presidential Range'); qa.set('Link', 'https://example.org/summit-forecast')`);
   await page.eval(`qa.click('Save source')`);
   await closed(page);
-  await page.waitFor(`qa.row(${JSON.stringify(WEATHER)})`);
+  await page.waitFor(`qa.row(${literal(WEATHER)})`);
 
   // An invalid link: the server refuses it, focus goes to Link and the typed source stays.
   await page.eval(`qa.click('Add source')`);
   await page.waitFor(`qa.field('Source name')`);
-  await page.eval(`qa.set('Type', 'access'); qa.set('Source name', ${JSON.stringify(ACCESS)}); qa.set('Link', 'ftp://example.org/roads')`);
+  await page.eval(`qa.set('Type', 'access'); qa.set('Source name', ${literal(ACCESS)}); qa.set('Link', 'ftp://example.org/roads')`);
   since = await logLength();
   await page.eval(`qa.click('Save source')`);
   await page.waitFor(`document.querySelector('[role=dialog] [role=alert]')`);
@@ -179,19 +186,19 @@ async function organizer(page) {
   await page.eval(`qa.set('Link', 'https://example.org/road-status')`);
   await page.eval(`qa.click('Save source')`);
   await closed(page);
-  await page.waitFor(`qa.row(${JSON.stringify(ACCESS)})`);
+  await page.waitFor(`qa.row(${literal(ACCESS)})`);
 
   // Edit: a new name.
-  await page.eval(`qa.click(${JSON.stringify(`Edit source ${WEATHER}`)})`);
+  await page.eval(`qa.click(${literal(`Edit source ${WEATHER}`)})`);
   await page.waitFor(`qa.field('Source name')`);
-  await page.eval(`qa.set('Source name', ${JSON.stringify(WEATHER_RENAMED)})`);
+  await page.eval(`qa.set('Source name', ${literal(WEATHER_RENAMED)})`);
   await page.eval(`qa.click('Save source')`);
   await closed(page);
-  await page.waitFor(`qa.status().includes('Source saved.') && qa.row(${JSON.stringify(WEATHER_RENAMED)})`);
+  await page.waitFor(`qa.status().includes('Source saved.') && qa.row(${literal(WEATHER_RENAMED)})`);
   check(g, 'The organizer edits a source', true, await page.eval(`qa.status()`));
 
   // Remove from the day, after confirming; the source stays on the trip.
-  await page.eval(`qa.click(${JSON.stringify(`Edit source ${ACCESS}`)})`);
+  await page.eval(`qa.click(${literal(`Edit source ${ACCESS}`)})`);
   await page.waitFor(`qa.field('Source name')`);
   await page.eval(`qa.click('Remove from this day')`);
   await page.waitFor(`qa.dialogText().includes('will no longer be listed for')`);
@@ -201,7 +208,7 @@ async function organizer(page) {
   await page.waitFor(`qa.status().includes('Source removed from')`);
   const kept = await sql(`SELECT s.name, (SELECT count(*) FROM trip_day_conditions_sources a WHERE a.source_id = s.id) AS days FROM trip_conditions_sources s WHERE s.trip_id = '${TOUR}' ORDER BY s.created_at`);
   check(g, 'Removing a source from the day asks first, says its reviews are kept, and keeps the source on the trip',
-    confirm.includes('Reviews already recorded for it are kept.') && !(await page.eval(`!!qa.row(${JSON.stringify(ACCESS)})`))
+    confirm.includes('Reviews already recorded for it are kept.') && !(await page.eval(`!!qa.row(${literal(ACCESS)})`))
     && kept.some((source) => source.name === ACCESS && Number(source.days) === 0), { confirm: confirm.slice(0, 300), status: await page.eval('qa.status()'), kept });
 
   // The forecast provider is down for the whole run: its failure is shown on its own, and Conditions is unaffected.
@@ -231,13 +238,13 @@ async function comeBack(page) {
 /** Records the viewer's own review with `note` from the row's button; returns the status said. */
 async function record(page, source, note, mode = 'record') {
   const opener = { record: `Record my review of ${source}`, correct: `Edit note on my review of ${source}`, withdraw: `Withdraw review of ${source}` }[mode];
-  await page.eval(`qa.click(${JSON.stringify(opener)})`);
+  await page.eval(`qa.click(${literal(opener)})`);
   await page.waitFor(`document.querySelector('[role=dialog]')`);
   if (mode !== 'withdraw') {
     await page.waitFor(`qa.field('Note (optional)')`);
-    await page.eval(`qa.set('Note (optional)', ${JSON.stringify(note)})`);
+    await page.eval(`qa.set('Note (optional)', ${literal(note)})`);
   }
-  await page.eval(`qa.click(${JSON.stringify({ record: 'Save review', correct: 'Save note', withdraw: 'Withdraw review' }[mode])}, document.querySelector('[role=dialog]'))`);
+  await page.eval(`qa.click(${literal({ record: 'Save review', correct: 'Save note', withdraw: 'Withdraw review' }[mode])}, document.querySelector('[role=dialog]'))`);
   await closed(page);
   await page.waitFor(`qa.status()`);
   return page.eval('qa.status()');
@@ -256,7 +263,7 @@ async function review(page, browser) {
   const tabs = async () => (await browser.cdp.send('Target.getTargets')).targetInfos.filter((target) => target.type === 'page');
   const before = await tabs();
   // A real click (a script's click() on a new-tab link is a blocked popup).
-  const at = await page.eval(`(() => { const a = qa.row(${JSON.stringify(MWAC)}).querySelector('a[href]'); a.scrollIntoView({ block: 'center' });
+  const at = await page.eval(`(() => { const a = qa.row(${literal(MWAC)}).querySelector('a[href]'); a.scrollIntoView({ block: 'center' });
     const r = a.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
   for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 });
   await sleep(1500);
@@ -271,7 +278,7 @@ async function review(page, browser) {
     { opened: opened.map((target) => target.url), requests: after.map((entry) => `${entry.key} ${entry.status}`) });
 
   // Record, with the status said in a live region that the open dialog doesn't hide.
-  await page.eval(`qa.click(${JSON.stringify(`Record my review of ${MWAC}`)})`);
+  await page.eval(`qa.click(${literal(`Record my review of ${MWAC}`)})`);
   await page.waitFor(`qa.field('Note (optional)')`);
   const form = await page.eval(`({ text: qa.dialogText(), hidden: !!qa.section().querySelector('[aria-live=polite]').closest('[aria-hidden=true], [inert]') })`);
   await page.eval(`(() => { const status = qa.section().querySelector('[aria-live=polite]'); window.__said = [];
@@ -281,7 +288,7 @@ async function review(page, browser) {
   await page.eval(`qa.click('Save review', document.querySelector('[role=dialog]'))`);
   await closed(page);
   await page.waitFor(`qa.status().includes('Review recorded.')`);
-  const recorded = await page.eval(`({ row: qa.row(${JSON.stringify(MWAC)}).innerText, summary: qa.text(), said: window.__said, focus: qa.name(document.activeElement) })`);
+  const recorded = await page.eval(`({ row: qa.row(${literal(MWAC)}).innerText, summary: qa.text(), said: window.__said, focus: qa.name(document.activeElement) })`);
   check(g, 'Record my review says opening the link records nothing, and records only on Save review', form.text.includes("Opening the link doesn't record anything."), form.text.slice(0, 300));
   check(g, 'The recorded review shows "You reviewed this source" with its time and note, and counts', /You reviewed this source \w{3} \w{3} \d+, \d+:\d\d [AP]M/.test(recorded.row)
     && recorded.row.includes('Your note: Considerable above treeline') && recorded.summary.includes('Your reviews: 1 of 2 recorded for Friday'), recorded);
@@ -290,13 +297,13 @@ async function review(page, browser) {
 
   // Correct, withdraw and record again: each an attributed entry.
   const corrected = await record(page, MWAC, 'Considerable above treeline, moderate below', 'correct');
-  const correctedRow = await page.eval(`qa.row(${JSON.stringify(MWAC)}).innerText`);
+  const correctedRow = await page.eval(`qa.row(${literal(MWAC)}).innerText`);
   const withdrawn = await record(page, MWAC, null, 'withdraw');
-  const withdrawnRow = await page.eval(`qa.row(${JSON.stringify(MWAC)}).innerText`);
+  const withdrawnRow = await page.eval(`qa.row(${literal(MWAC)}).innerText`);
   const again = await record(page, MWAC, 'Rechecked after the update');
-  await page.eval(`qa.click('Your review history', qa.row(${JSON.stringify(MWAC)}))`);
+  await page.eval(`qa.click('Your review history', qa.row(${literal(MWAC)}))`);
   await sleep(300);
-  const history = await page.eval(`[...qa.row(${JSON.stringify(MWAC)}).querySelectorAll('details ol li')].filter(qa.shown).map((li) => li.textContent)`);
+  const history = await page.eval(`[...qa.row(${literal(MWAC)}).querySelectorAll('details ol li')].filter(qa.shown).map((li) => li.textContent)`);
   const stored = await sql(`SELECT action, note, reviewed_at = first_value(reviewed_at) OVER (ORDER BY entry_number) AS kept_time FROM trip_conditions_reviews WHERE user_id = 'user-blair' AND trip_day_id = '${DAYS.fri}' ORDER BY entry_number`);
   check(g, 'A member corrects their note and withdraws their review', corrected === 'Note saved.' && correctedRow.includes('Your note: Considerable above treeline, moderate below')
     && withdrawn === 'Review withdrawn.' && /No review recorded for this day · You withdrew your review/.test(withdrawnRow), { corrected, correctedRow, withdrawn, withdrawnRow });
@@ -314,14 +321,14 @@ async function crew(page) {
   await record(page, WEATHER_RENAMED, 'Summit winds 60 mph by noon');
   await open(page, VIEWERS.organizer, day(DATES.fri));
   await record(page, WEATHER_RENAMED, '');
-  const organizerView = await page.eval(`({ summary: qa.text(), crew: [...qa.row(${JSON.stringify(MWAC)}).querySelectorAll('details summary')].map((x) => x.textContent).find((x) => x.startsWith('Crew')) })`);
+  const organizerView = await page.eval(`({ summary: qa.text(), crew: [...qa.row(${literal(MWAC)}).querySelectorAll('details summary')].map((x) => x.textContent).find((x) => x.startsWith('Crew')) })`);
 
   await open(page, VIEWERS.blair, day(DATES.fri));
-  const collapsed = await page.eval(`(() => { const d = [...qa.row(${JSON.stringify(MWAC)}).querySelectorAll('details')].find((x) => x.querySelector('summary').textContent.startsWith('Crew reviews')); return { summary: d.querySelector('summary').textContent, open: d.open, visible: d.querySelector('ul').checkVisibility() }; })()`);
-  await page.eval(`qa.click('Crew reviews (1)', qa.row(${JSON.stringify(MWAC)}))`);
-  await page.eval(`qa.click('Crew reviews (2)', qa.row(${JSON.stringify(WEATHER_RENAMED)}))`);
+  const collapsed = await page.eval(`(() => { const d = [...qa.row(${literal(MWAC)}).querySelectorAll('details')].find((x) => x.querySelector('summary').textContent.startsWith('Crew reviews')); return { summary: d.querySelector('summary').textContent, open: d.open, visible: d.querySelector('ul').checkVisibility() }; })()`);
+  await page.eval(`qa.click('Crew reviews (1)', qa.row(${literal(MWAC)}))`);
+  await page.eval(`qa.click('Crew reviews (2)', qa.row(${literal(WEATHER_RENAMED)}))`);
   await sleep(300);
-  const blair = await page.eval(`({ mwac: qa.row(${JSON.stringify(MWAC)}).innerText, weather: qa.row(${JSON.stringify(WEATHER_RENAMED)}).innerText, summary: qa.text() })`);
+  const blair = await page.eval(`({ mwac: qa.row(${literal(MWAC)}).innerText, weather: qa.row(${literal(WEATHER_RENAMED)}).innerText, summary: qa.text() })`);
   check(g, 'Crew reviews are collapsed under their own heading, apart from yours', collapsed.summary === 'Crew reviews (1)' && !collapsed.open && !collapsed.visible, collapsed);
   check(g, 'Each crew review is attributed and dated: "Casey recorded a review", "Organizer recorded a review"',
     /Casey recorded a review · \w{3} \w{3} \d+, \d+:\d\d [AP]M/.test(blair.mwac) && /Organizer recorded a review/.test(blair.weather)
@@ -329,9 +336,9 @@ async function crew(page) {
   check(g, 'Another person\'s review doesn\'t count as yours', blair.summary.includes('Your reviews: 1 of 2 recorded for Friday')
     && blair.weather.includes('No review recorded for this day') && organizerView.summary.includes('Your reviews: 1 of 2') && organizerView.crew === 'Crew reviews (2)', { blair: blair.summary.slice(0, 160), organizerView });
   await open(page, VIEWERS.casey, day(DATES.fri));
-  await page.eval(`qa.click('Crew reviews (1)', qa.row(${JSON.stringify(MWAC)}))`);
+  await page.eval(`qa.click('Crew reviews (1)', qa.row(${literal(MWAC)}))`);
   await sleep(200);
-  const casey = await page.eval(`qa.row(${JSON.stringify(MWAC)}).innerText`);
+  const casey = await page.eval(`qa.row(${literal(MWAC)}).innerText`);
   check(g, 'Casey sees Blair\'s current review and note, with Blair\'s history on demand', casey.includes('Blair recorded a review') && casey.includes('Rechecked after the update')
     && casey.includes("Blair's review history") && casey.includes('You reviewed this source'), casey);
 }
@@ -356,22 +363,22 @@ async function changes(page) {
     day_id: DAYS.fri, mutation_id: randomUUID(), expected_days: [{ date: DATES.fri, day_id: DAYS.fri }],
     source: { category: weather.category, name: 'Summit weather desk', region: weather.region, url: weather.url } });
   await open(page, VIEWERS.blair, day(DATES.fri));
-  const cosmetic = await page.eval(`({ mwac: qa.row(${JSON.stringify(MWAC)}).innerText, summary: qa.text() })`);
+  const cosmetic = await page.eval(`({ mwac: qa.row(${literal(MWAC)}).innerText, summary: qa.text() })`);
   check(g, 'Notes, the backup plan and a source\'s new name leave reviews as recorded', [notes, backup, rename].every((r) => r.status === 200)
     && cosmetic.mwac.includes('You reviewed this source') && !cosmetic.summary.includes('Plan changed'), { status: [notes.status, backup.status, rename.status], mwac: cosmetic.mwac.slice(0, 200) });
 
   // Relevant: the route's link.
   const route = await changePlan({ route_url: 'https://example.org/routes/tuckerman-lip' });
   await open(page, VIEWERS.blair, day(DATES.fri));
-  const stale = await page.eval(`({ mwac: qa.row(${JSON.stringify(MWAC)}).innerText, summary: qa.text(), task: document.querySelector('a[href="#conditions-heading"]')?.textContent })`);
+  const stale = await page.eval(`({ mwac: qa.row(${literal(MWAC)}).innerText, summary: qa.text(), task: document.querySelector('a[href="#conditions-heading"]')?.textContent })`);
   check(g, 'A route change marks the review "Plan changed — review again" with its reason, and it stops counting', route.status === 200
     && stale.mwac.includes('Plan changed — review again') && stale.mwac.includes('Route changed') && /You reviewed it .*, before the change\./.test(stale.mwac)
     && stale.summary.includes('Your reviews: 0 of 2 recorded for Friday') && stale.task === 'Conditions · Your reviews: 0 of 2 recorded · 1 reviewed before the plan changed', stale);
   await shot(page, 'member-plan-changed-1440');
   await open(page, VIEWERS.casey, day(DATES.fri));
-  await page.eval(`qa.click('Crew reviews (1)', qa.row(${JSON.stringify(MWAC)}))`);
+  await page.eval(`qa.click('Crew reviews (1)', qa.row(${literal(MWAC)}))`);
   await sleep(200);
-  const crewView = await page.eval(`qa.row(${JSON.stringify(MWAC)}).innerText`);
+  const crewView = await page.eval(`qa.row(${literal(MWAC)}).innerText`);
   const entries = await sql(`SELECT count(*)::int AS n FROM trip_conditions_reviews WHERE trip_day_id = '${DAYS.fri}'`);
   check(g, 'The crew sees it too, and every entry is kept', crewView.includes('Plan changed since · Route changed') && entries[0].n === 7, { crewView, entries });
 
@@ -389,7 +396,7 @@ async function changes(page) {
   // Blair reviews again against the plan as it is now.
   await open(page, VIEWERS.blair, day(DATES.fri));
   const said = await record(page, MWAC, 'Rechecked with the new route');
-  const fresh = await page.eval(`({ row: qa.row(${JSON.stringify(MWAC)}).innerText, summary: qa.text() })`);
+  const fresh = await page.eval(`({ row: qa.row(${literal(MWAC)}).innerText, summary: qa.text() })`);
   check(g, 'Recording again after a change clears "Plan changed" and keeps the history', said === 'Review recorded.' && fresh.row.includes('You reviewed this source')
     && !fresh.row.includes('Plan changed') && fresh.summary.includes('Your reviews: 1 of 2'), fresh.row.slice(0, 300));
 }
@@ -397,7 +404,7 @@ async function changes(page) {
 async function reuse(page) {
   const g = 'reuse';
   await open(page, VIEWERS.organizer, day(DATES.fri));
-  await page.eval(`qa.click(${JSON.stringify(`Use on other days: ${MWAC}`)})`);
+  await page.eval(`qa.click(${literal(`Use on other days: ${MWAC}`)})`);
   await page.waitFor(`qa.dialogText().includes('Already listed on 1 day.')`);
   await page.eval(`qa.tick('Sat, Jan 9')`);
   let since = await logLength();
@@ -412,7 +419,7 @@ async function reuse(page) {
   await closed(page);
   await page.waitFor(`qa.status().includes('added to 1 day')`);
   await open(page, VIEWERS.blair, day(DATES.sat));
-  const saturday = await page.eval(`({ row: qa.row(${JSON.stringify(MWAC)})?.innerText, summary: qa.text() })`);
+  const saturday = await page.eval(`({ row: qa.row(${literal(MWAC)})?.innerText, summary: qa.text() })`);
   const entries = await sql(`SELECT count(*)::int AS n FROM trip_conditions_reviews WHERE trip_day_id = '${DAYS.sat}'`);
   check(g, 'The other day lists the source with "No review recorded for this day" and no reviews', saturday.row?.includes('No review recorded for this day')
     && !saturday.row.includes('Crew reviews') && saturday.summary.includes('Your reviews: 0 of 1 recorded for Saturday') && entries[0].n === 0, { saturday, entries });
@@ -420,7 +427,7 @@ async function reuse(page) {
   // Editing a reused source reviews the days first; Back to editing keeps the change, Discard saves nothing.
   await open(page, VIEWERS.organizer, day(DATES.fri));
   const revision = (await sourceNamed(MWAC)).revision;
-  await page.eval(`qa.click(${JSON.stringify(`Edit source ${MWAC}`)})`);
+  await page.eval(`qa.click(${literal(`Edit source ${MWAC}`)})`);
   await page.waitFor(`qa.field('Link')`);
   await page.eval(`qa.set('Link', 'https://www.mountwashingtonavalanchecenter.org/forecasts/presidential-range')`);
   await page.eval(`qa.click('Save source')`);
@@ -449,10 +456,10 @@ async function copy(page) {
   const review = await page.eval(`(document.querySelector('[role=dialog]') ?? document.querySelector('#main-content')).innerText`);
   const confirm = await page.eval(`qa.buttons().filter((name) => /^Copy/.test(name))`);
   check(g, 'Copy day\'s review says each copied source starts with no review on the new day', review.includes(`Lists ${MWAC} and Summit weather desk too, with no review recorded for this day: reviews stay on Fri Jan 8.`), { review: review.slice(0, 800), confirm });
-  await page.eval(`qa.click(${JSON.stringify(confirm[0])})`);
+  await page.eval(`qa.click(${literal(confirm[0])})`);
   await page.waitFor(`!document.querySelector('[role=dialog]') && /Copied|copied/.test(document.body.innerText)`, 20_000);
   await open(page, VIEWERS.blair, day(DATES.sun));
-  const sunday = await page.eval(`({ text: qa.text(), mwac: qa.row(${JSON.stringify(MWAC)})?.innerText, weather: qa.row('Summit weather desk')?.innerText })`);
+  const sunday = await page.eval(`({ text: qa.text(), mwac: qa.row(${literal(MWAC)})?.innerText, weather: qa.row('Summit weather desk')?.innerText })`);
   const entries = await sql(`SELECT count(*)::int AS n FROM trip_conditions_reviews WHERE trip_day_id = '${DAYS.sun}'`);
   check(g, 'A copied day lists the sources with "No review recorded for this day"', sunday.mwac?.includes('No review recorded for this day')
     && sunday.weather?.includes('No review recorded for this day') && !sunday.text.includes('Crew reviews') && entries[0].n === 0, { sunday, entries });
@@ -540,7 +547,7 @@ async function recovery(page) {
 
   // A source removed while a member is recording a review of it.
   await open(page, VIEWERS.blair, day(DATES.sat));
-  await page.eval(`qa.click(${JSON.stringify(`Record my review of ${MWAC}`)})`);
+  await page.eval(`qa.click(${literal(`Record my review of ${MWAC}`)})`);
   await page.waitFor(`qa.field('Note (optional)')`);
   await page.eval(`qa.set('Note (optional)', 'Saturday check')`);
   const mwac = (await trip()).conditions.find((entry) => entry.name === MWAC && entry.date === DATES.sat);
@@ -559,7 +566,7 @@ async function recovery(page) {
 
   // The plan changes while Casey's form is open and she reads the source in another tab (this PR's fix).
   await open(page, VIEWERS.casey, day(DATES.fri));
-  await page.eval(`qa.click(${JSON.stringify(`Record my review of ${MWAC}`)})`);
+  await page.eval(`qa.click(${literal(`Record my review of ${MWAC}`)})`);
   await page.waitFor(`qa.field('Note (optional)')`);
   await page.eval(`qa.set('Note (optional)', 'Read it on my phone')`);
   await changePlan({ route_url: 'https://example.org/routes/tuckerman-right-gully' });
@@ -680,7 +687,7 @@ async function keyboard(page) {
 
   // Open Record my review with Enter; Escape asks before discarding a note; focus comes back.
   const opener = 'Record my review of Trailhead parking notices';
-  await page.eval(`qa.button(${JSON.stringify(opener)}).focus()`);
+  await page.eval(`qa.button(${literal(opener)}).focus()`);
   await key(page, 'Enter', 'Enter', 13);
   await page.waitFor(`qa.field('Note (optional)')`);
   await sleep(400);
@@ -759,8 +766,8 @@ async function layout(page) {
       await open(page, viewer, day(DATES.fri));
       const section = await page.eval(LAYOUT);
       // The sheets: the review form, and for the organizer the source editor with the center list.
-      await page.eval(`qa.click(${JSON.stringify(viewer === VIEWERS.blair ? 'Record my review of Trailhead parking notices' : 'Add source')})`);
-      await page.waitFor(`qa.field(${JSON.stringify(viewer === VIEWERS.blair ? 'Note (optional)' : 'Source name')})`);
+      await page.eval(`qa.click(${literal(viewer === VIEWERS.blair ? 'Record my review of Trailhead parking notices' : 'Add source')})`);
+      await page.waitFor(`qa.field(${literal(viewer === VIEWERS.blair ? 'Note (optional)' : 'Source name')})`);
       if (viewer === VIEWERS.organizer) { await page.eval(`qa.click('Choose an official center')`); await page.waitFor(`qa.field('Official center')`); }
       await sleep(600);
       const sheet = await page.eval(LAYOUT);
