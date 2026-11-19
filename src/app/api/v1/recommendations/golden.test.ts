@@ -509,9 +509,11 @@ describe("vent advice (#290)", () => {
   });
 
   it("closes vents opened for the touring climb at the transition", async () => {
-    useDatabase(null, []);
-    // #372's climb wears a vented shell only for wind or wet, so a vented climb outfit is the deep-cold one.
-    const { body } = await callRoute(skiTouring, CONDITIONS[3].body);
+    // #372's climb wears a vented shell only for wind or wet. Since #374's
+    // climbing rates the catalog's climbs need no vented layer, so this uses
+    // the wardrobe's cool, breezy climb, which opens a jacket's side vents.
+    useDatabase(USER_ID, FULL_WARDROBE);
+    const { body } = await callRoute(skiTouring, { ...CONDITIONS[1].body, use_wardrobe_only: true });
     const { advice } = (body as BiophysicsRecommendation).ventilation!;
     const opened = advice.filter(a => a.phase === "climb" && a.setting === "open");
 
@@ -544,7 +546,9 @@ describe("accessories against local bands (#370)", () => {
     // Before #370 the climb wore a balaclava, a neck piece and two hoods: 3.2 clo against 0.85.
     // #372's climb outfit has no hoods, so at most one light head layer fills the band.
     expect(body.recommendation.headwear).toMatchObject({ helmet: null, neck_warmth: null });
-    expect(body.recommendation.evaluation.bodyParts.headNeck.status).toBe("in_range");
+    // Since #374 the climb's head band (0.45–0.53 clo) sits below every
+    // available hat this wardrobe owns; the lightest (0.7 clo) beats going bare.
+    expect(body.recommendation.evaluation.bodyParts.headNeck.status).toBe(mode.userId ? "over" : "in_range");
     expect(body.descent_headwear.helmet).not.toBeNull();
     expect(body.descent_evaluation.bodyParts.headNeck.status).toBe("in_range");
     expect(body.recommendation.handwear).not.toBeNull();

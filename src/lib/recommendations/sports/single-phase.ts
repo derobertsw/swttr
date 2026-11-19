@@ -8,6 +8,7 @@ import type { BiophysicsRecommendation } from '@/types/biophysics';
 import type { ActivityType } from '@/lib/biophysics/constants';
 import type { ActivityProfile } from '@/lib/biophysics/scorer';
 import type { SustainedSportPolicy } from '@/lib/biophysics/sport-policy';
+import type { ExertionLevel } from '@/lib/biophysics/exertion';
 import type { IreqResult } from '@/types/garments';
 import type { SportRecommender } from '../handler';
 import type { CatalogFilter } from '../gear-pool';
@@ -18,6 +19,7 @@ import {
   metabolicRateFor,
   phaseExposure,
   phaseIreq,
+  noWarmerThan,
   phaseTargets,
   type PhaseTargets,
 } from '../thermal-targets';
@@ -38,6 +40,8 @@ interface SinglePhaseTargets extends PhaseTargets {
 }
 
 type Protection = SustainedSportPolicy['protection'];
+
+const EASIER_EFFORT: Record<ExertionLevel, ExertionLevel | null> = { easy: null, moderate: 'easy', hard: 'moderate' };
 
 /** Protection the worn outfit must establish: the sustained policy's or the sport's own. */
 function outfitNeeds(targets: SinglePhaseTargets): Protection | undefined {
@@ -80,6 +84,10 @@ interface SinglePhaseSportConfig {
   windTorsoRequirement?(request: RecommendationRequest): boolean;
   /** Wind and rain protection for a sport without a sustained policy. */
   protection?(request: RecommendationRequest): Protection;
+  /** Relative air speed at the body, m/s, for the heat balance and the
+   * basic-clo conversion only (cycling's riding speed, #374). Defaults to the
+   * phase wind. Heuristic wind terms and the margin taper keep the phase wind. */
+  airSpeedMs?(request: RecommendationRequest): number;
 }
 
 /** Compose one-phase targets, outfit/protection selection, and response evaluation for a sport. */
@@ -95,10 +103,11 @@ export function createSinglePhaseSport(
       const conditions = { tempC: request.tempC, humidity: request.humidity,
         precipitation: xc ? xc.precipitation === 'wet' : request.precipitation, ...(xc ? { xc } : {}) };
       const windMs = xc?.effectiveWindMs ?? request.windMs;
+      const airSpeedMs = config.airSpeedMs?.(request) ?? windMs;
       const metabolicRate = metabolicRateFor(config.activity, request.exertion, request.bodyMetrics);
-      const ireq = phaseIreq(conditions, windMs, metabolicRate);
-      const exposure = phaseExposure(windMs, metabolicRate, config.outerAirPermeability(request));
-      return {
+      const ireq = phaseIreq(conditions, airSpeedMs, metabolicRate);
+      const exposure = phaseExposure(airSpeedMs, metabolicRate, config.outerAirPermeability(request));
+      const targets: SinglePhaseTargets = {
         metabolicRate,
         ireq,
         basicIreq: basicIreq(ireq, exposure),
@@ -106,6 +115,13 @@ export function createSinglePhaseSport(
         ...phaseTargets(config.activity, ireq, metabolicRate, conditions, windMs, ireq, request.exertion, exposure,
           request.preference?.sensitivity),
       };
+      // When air speed rises with effort (cycling, #374), a harder effort's
+      // faster riding raises the basic-clo conversion. Where the resultant
+      // upper band sits at its cap, that alone could make the harder band
+      // warmer, so it is bounded by the next easier effort's bands.
+      const easier = config.airSpeedMs && EASIER_EFFORT[request.exertion];
+      if (!easier) return targets;
+      return { ...targets, ...noWarmerThan(targets, sport.computeTargets({ ...request, exertion: easier })) };
     },
 
     /** Report clothing gaps and carry advice when no usable garments are available. */

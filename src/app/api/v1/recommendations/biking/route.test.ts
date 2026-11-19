@@ -64,7 +64,8 @@ describe('POST /api/v1/recommendations/biking (complete outfits, #371)', () => {
     expect(evaluation?.bodyParts.legs.status).toBe('in_range');
     expect(garments.some(g => g.category === 'hard_shell')).toBe(false);
     expect(body.ireq.outfit_checks).toEqual({ require_standalone: true, protection: { wind: false, wet: false, poleGrip: false } });
-    expect(body.guidance.join(' ')).toMatch(/while riding/);
+    // The catalog now fits both regions, so the guidance names a complete outfit.
+    expect(body.guidance.join(' ')).toMatch(/^While riding, wear:/m);
     // The helmet is required protection (#373); the golden catalog has no bike helmets yet.
     expect(body.requirements?.map(r => r.id)).toEqual(['biking:torso', 'biking:legs', 'biking:hands', 'biking:head', 'biking:helmet']);
   });
@@ -73,11 +74,14 @@ describe('POST /api/v1/recommendations/biking (complete outfits, #371)', () => {
     useCatalog();
     const body = await ride(65, 4);
     expect(body.recommendation.ensemble_properties.total_clo).toBeLessThanOrEqual(body.ireq.target_range[1]);
-    for (const region of ['torso', 'legs'] as const) {
-      const requirement = body.requirements!.find(r => r.region === region)!;
-      expect(requirement.status).toBe('missing');
-      expect(requirement.generic_suggestion).toMatchObject({ generic_estimate: true, owned: false });
-    }
+    // Riding speed (#374) puts a lightweight long-sleeve top inside the torso
+    // band at 65°F; the catalog still has no cycling shorts.
+    const torso = body.requirements!.find(r => r.region === 'torso')!;
+    expect(torso.status).toBe('generic_suggestion');
+    expect(body.recommendation.ensemble_properties.regional_clo!.torso).toBeLessThanOrEqual(body.ireq.regional!.neutral.torso + 0.05);
+    const legs = body.requirements!.find(r => r.region === 'legs')!;
+    expect(legs.status).toBe('missing');
+    expect(legs.generic_suggestion).toMatchObject({ generic_estimate: true, owned: false });
     expect(body.recommendation.evaluation?.decision?.summary).toBe('Outfit incomplete');
   });
 

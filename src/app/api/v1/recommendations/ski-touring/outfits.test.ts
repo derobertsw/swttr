@@ -61,7 +61,11 @@ describe('ski-touring outfits (#372)', () => {
     // Was legs 1.01 against a 2.87 minimum: the pack now brings a leg layer.
     const legLayer = packed(body).find((g) => g.covers_legs);
     expect(legLayer).toBeDefined();
-    expect(body.descent_evaluation?.bodyParts.legs.status).toBe('in_range');
+    // Since #374 the climb wears lighter fleece pants, and the warmest catalog
+    // over-pants leave the descent (whose targets are unchanged) short on the
+    // legs. The shortfall is reported, not hidden.
+    expect(body.descent_evaluation?.bodyParts.legs.status).toBe('under');
+    expect(body.descent_evaluation?.decision?.status).toBe('cooler');
     expect(body.transition_protocol?.steps).toContain(`Leg layer to add: ${legLayer!.name}`);
     // The shell the climb didn't wear goes on for the descent.
     expect(packed(body).some((g) => g.covers_torso && g.covers_arms && g.protection?.waterproof_rating === 'waterproof')).toBe(true);
@@ -133,7 +137,7 @@ describe('ski-touring outfits (#372)', () => {
   });
 
   it('prioritize_light_pack still reports a lighter pack', async () => {
-    const conditions = { weather: { temperature: 45, wind_speed: 4 }, exertion: 'easy' };
+    const conditions = { weather: { temperature: 32, wind_speed: 8 }, exertion: 'easy' };
     const normal = await recommend(conditions);
     const light = await recommend({ ...conditions, prioritize_light_pack: true });
     expect(light.pack_items!.total_weight_g).toBeLessThan(normal.pack_items!.total_weight_g);

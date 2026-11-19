@@ -14,11 +14,14 @@ import { calculateActivityTargetRange, calculateRegionalTargets } from '@/lib/bi
 import { getMetabolicRateForActivity, type ExertionLevel } from '@/lib/biophysics/exertion';
 import { applyBodySizeMetabolicAdjustment, metabolicHeatFluxFromMet } from '@/lib/biophysics/bodyMetrics';
 import {
+  coldExposureFactor,
+  COMPENDIUM_ACTIVITY_METS,
   isCalibratedActivity,
   POLE_GRIP_MAX_CLO,
   preferenceBand,
-  SUSTAINED_ACTIVITY_METS,
   sustainedSportPolicy,
+  tapersColdMargins,
+  usesCompendiumMets,
   type PolicyPreference,
 } from '@/lib/biophysics/sport-policy';
 import {
@@ -38,14 +41,19 @@ interface Conditions {
   xc?: XCPhaseContext;
 }
 
-/** Metabolic rate for an activity at the given exertion, scaled for body size. */
+/**
+ * Metabolic rate for an activity at the given exertion, scaled for body size.
+ * Running, XC, cycling and the ski-touring climb convert a Compendium MET by
+ * body mass and Du Bois area; the other phases keep the 58.2 W/m² labels and
+ * the bounded size factor.
+ */
 export function metabolicRateFor(
   activity: ActivityType,
   exertion: ExertionLevel,
   bodyMetrics: UserBodyMetrics
 ): number {
-  if (isCalibratedActivity(activity)) {
-    return metabolicHeatFluxFromMet(SUSTAINED_ACTIVITY_METS[activity][exertion], bodyMetrics);
+  if (usesCompendiumMets(activity)) {
+    return metabolicHeatFluxFromMet(COMPENDIUM_ACTIVITY_METS[activity][exertion], bodyMetrics);
   }
   return applyBodySizeMetabolicAdjustment(
     getMetabolicRateForActivity(activity, exertion),
@@ -106,8 +114,11 @@ export function phaseIreq(conditions: Conditions, windMs: number, metabolicRate:
  * Target clo range and regional/extremity targets for one activity phase.
  *
  * `baseline` is the IREQ the phase is designed against, `metabolicRate` sizes
- * the CoWEDA-inspired margin, and `windMs` is the phase's effective wind
- * speed. `extremityBaseline` is the IREQ the hands and head follow, when it
+ * the CoWEDA-inspired margin, and `windMs` is the weather's wind as the phase
+ * sees it: it drives the heuristic wind terms and the margin taper. Cycling's
+ * riding speed enters only `baseline` and `dynamicExposure`, so it never adds
+ * margin (#374). Running, XC, cycling and the ski-touring climb taper their
+ * margins with cold, wind and wet exposure. `extremityBaseline` is the IREQ the hands and head follow, when it
  * differs from `baseline`. With `dynamicExposure`, the whole-body and regional
  * bands are converted to basic clo (`requiredBasicInsulation`); without it
  * they stay resultant, like IREQ. Hand and head targets stay resultant either
@@ -132,7 +143,10 @@ export function phaseTargets(
   const policy = isCalibratedActivity(activity)
     ? sustainedSportPolicy(activity, exertion, metabolicRate, conditions, windMs, sensitivity)
     : undefined;
-  const exposure = policy?.coldExposureFactor ?? 1;
+  // Cycling and the ski-touring climb taper their margins like running/XC
+  // (#374) without taking on the rest of the sustained policy.
+  const tapered = tapersColdMargins(activity);
+  const exposure = policy?.coldExposureFactor ?? (tapered ? coldExposureFactor(conditions, windMs) : 1);
   const range = calculateActivityTargetRange({
     activity,
     ireqMin: baseline.ireqMin,
@@ -146,7 +160,7 @@ export function phaseTargets(
     relativeHumidity: conditions.humidity,
     metabolicRate,
   });
-  const validationBuffer = policy ? {
+  const validationBuffer = tapered ? {
     ...rawBuffer,
     wholeBody: round2(rawBuffer.wholeBody * exposure),
     coldRisk: round2(rawBuffer.coldRisk * exposure),
@@ -156,7 +170,7 @@ export function phaseTargets(
   // minimum can remain positive in mild air for easy efforts and smaller
   // bodies. Local extremity targets below are wholly heuristic
   // (IREQ supplies no local heat balance), so their full bands still taper.
-  const minimum = policy
+  const minimum = tapered
     ? round2(baseline.ireqMin + Math.max(0, range.min - baseline.ireqMin) * exposure)
     : range.min;
   const adjustedRange = applyCowedaBufferToTargetRange(
@@ -182,7 +196,7 @@ export function phaseTargets(
     neutral: convertRegions(resultantRegional.neutral, resultantRange[1]),
   };
   const rawExtremity = calculateExtremityIreq(extremityBaseline, activity, conditions.tempC, windMs);
-  const taperedExtremity = policy ? {
+  const taperedExtremity = tapered ? {
     min: { hands: round2(rawExtremity.min.hands * exposure), head: round2(rawExtremity.min.head * exposure) },
     neutral: { hands: round2(rawExtremity.neutral.hands * exposure), head: round2(rawExtremity.neutral.head * exposure) },
   } : rawExtremity;
@@ -210,6 +224,7 @@ export function phaseTargets(
 
   return {
     targetRange, validationBuffer, regional,
+    ...(tapered && !policy ? { coldExposureFactor: round2(exposure) } : {}),
     extremity: {
       ...extremity,
       ...(policy ? { max: {
@@ -222,3 +237,18 @@ export function phaseTargets(
 }
 
 export type PhaseTargets = ReturnType<typeof phaseTargets>;
+
+/**
+ * `targets`' whole-body, regional and hand/head bands, each limited to
+ * `bound`'s: never warmer than it anywhere. Every band's minimum stays at or
+ * below its upper limit, since both sets keep that order.
+ */
+export function noWarmerThan(targets: PhaseTargets, bound: PhaseTargets): Pick<PhaseTargets, 'targetRange' | 'regional' | 'extremity'> {
+  const lower = <Part extends string>(own: Record<Part, number>, limit: Record<Part, number>) =>
+    Object.fromEntries(Object.entries(own).map(([part, clo]) => [part, Math.min(clo as number, limit[part as Part])])) as Record<Part, number>;
+  return {
+    targetRange: [Math.min(targets.targetRange[0], bound.targetRange[0]), Math.min(targets.targetRange[1], bound.targetRange[1])],
+    regional: { min: lower(targets.regional.min, bound.regional.min), neutral: lower(targets.regional.neutral, bound.regional.neutral) },
+    extremity: { ...targets.extremity, min: lower(targets.extremity.min, bound.extremity.min), neutral: lower(targets.extremity.neutral, bound.extremity.neutral) },
+  };
+}

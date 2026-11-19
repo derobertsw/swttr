@@ -141,11 +141,11 @@ Recorded, not validated. None of these has field data behind it (#8).
 
 | Assumption | Where | What the evidence says |
 |---|---|---|
-| Metabolic rates for cycling, alpine and touring | `METABOLIC_RATES`, `exertion.ts` | For the default body a Compendium MET is 46.5 W/m². Cycling uses 233 / 290 / 349 W/m² against the Compendium's self-selected easy, moderate and vigorous at 200 / 325 / 418. Alpine skiing uses 116 / 146 / 175 against 200 / 293 / 372 for active time. The Compendium has no ski-touring row; the climb's 175 / 233 / 290 sits below snowshoeing (246 moderate) and XC ski walking (316). Low rates make the outfit warmer. |
-| Two MET conventions | `constants.ts` comments, `bodyMetrics.ts` | Running and XC convert Compendium METs by body mass. The other sports' "MET" labels assume 58.2 W/m² per MET, with a bounded size factor. |
-| Air speed from movement | `biking.ts`, `alpine.ts`, `ski-touring.ts`, `xc-policy.ts` | Cycling uses ambient wind only. At 45°F / 4 mph a 6 m/s ride raises IREQ from 0.22–0.32 to 0.40–0.50. Alpine and the touring descent add a fixed 5 m/s; XC uses exposure floors. |
+| Metabolic rates for cycling, alpine and touring | `sport-policy.ts`, `METABOLIC_RATES`, `exertion.ts` | For the default body a Compendium MET is 46.5 W/m². **#374:** cycling now uses the Compendium's self-selected easy, moderate and vigorous rows (200 / 325 / 418 W/m²). The climb uses snowshoeing moderate, XC ski walking and moderate XC (246 / 316 / 395); the Compendium has no ski-touring row, so that mapping is an assumption ([calibration doc](cycling-touring-calibration.md)). Still uncalibrated: alpine skiing at 116 / 146 / 175 against 200 / 293 / 372 for active time, and the descent and transition. Low rates make the outfit warmer. |
+| Two MET conventions | `constants.ts` comments, `bodyMetrics.ts` | Running, XC, cycling and the touring climb (#374) convert Compendium METs by body mass. Alpine, the chairlift, the touring descent and the transition still use 58.2 W/m² per "MET" label, with a bounded size factor. |
+| Air speed from movement | `biking.ts`, `sport-policy.ts`, `alpine.ts`, `ski-touring.ts`, `xc-policy.ts` | **#374:** cycling adds an assumed riding speed (3 / 5 / 6.3 m/s by effort) to ambient wind at right angles, capped at 18 m/s, in the heat balance and basic-clo conversion only. Before, cycling used ambient wind only: at 45°F / 4 mph a 6 m/s ride raised IREQ from 0.22–0.32 to 0.40–0.50. Alpine and the touring descent still add a fixed 5 m/s; XC uses exposure floors. |
 | 60/40 ski-and-lift split | `alpine.ts` | Chosen with #318; no source. |
-| CoWEDA-inspired margins | `coweda.ts` | The errors are real, the conversion to clo is SWTTR's. They are applied in wind and at outputs outside the paper's data, added to both ends of the band, and not tapered for cycling or the touring climb. |
+| CoWEDA-inspired margins | `coweda.ts`, `sport-policy.ts` | The errors are real, the conversion to clo is SWTTR's. They are applied in wind and at outputs outside the paper's data and added to both ends of the band. Since #374 they taper for cycling and the touring climb as for running and XC; alpine and the descent keep full margins. |
 | Regional multipliers and extremity multipliers | `constants.ts` | No source (finding 5). Hand and head factors of 0.9–1.45, a 0.8–1.0 temperature factor and 3 % per m/s of wind are heuristics; ISO 11079 has no local method. |
 | Target-range profile | `targets.ts` | Per-sport buffers, caps and floors, and cold, wind and exposure terms. The wind term partly double-counts the Annex A correction (noted in the calibration doc). |
 | Exposure estimate | `ireq.ts` | A bounded heuristic that ignores the outfit (#86). |
@@ -187,7 +187,7 @@ Filed on 2026-11-11 and nested under #116. Ordered by expected improvement, then
 - *Scope:* a requirement and warning when required protection is not owned; a cycling helmet type and requirement. Protection is never dropped because thermal demand is low.
 - *Accept:* route tests for owned, missing and catalog cases in alpine, touring descent and cycling.
 
-**#374. Policy inputs for cycling, alpine and touring: metabolic rate, air speed, margins** (medium to high effect, needs a decision)
+**#374. Policy inputs for cycling, alpine and touring: metabolic rate, air speed, margins** (medium to high effect, needs a decision). Decided 2026-11-19: option 2, cycling and the touring climb only; see [Cycling and touring-climb calibration](cycling-touring-calibration.md).
 - *Evidence:* the assumptions table.
 - *Scope:* one MET convention; Compendium-based rates with documented mapping from Easy, Moderate and Hard; a rider air-speed assumption; whether cold margins taper as they do for running and XC. Alpine's change must be weighed against the #318 decision.
 - *Accept:* reference calculations like #245's table; monotonic in temperature and effort; chairlift, climb and descent phases stay separate.
