@@ -56,8 +56,10 @@ export function cyclingRelativeAirSpeed(windMs: number, effort: ExertionLevel): 
 }
 
 /** Catalog liner-glove allowance for pole grip, not added thermal demand.
- * Uses existing liner estimates; see docs/running-xc-foundations.md. */
-export const POLE_GRIP_MAX_CLO = 0.55;
+ * Uses existing liner estimates: 0.55 clo on the earlier accessory scale,
+ * × 0.60 on the part-manikin scale (#376). See docs/running-xc-foundations.md
+ * and docs/catalog-accessory-clo.md. */
+export const POLE_GRIP_MAX_CLO = 0.33;
 
 /** Share of each warmth band that Run Warm or Run Cold leaves out (#251).
  * Run Warm drops the warmest share and Run Cold the coolest; no limit moves

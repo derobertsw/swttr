@@ -64,30 +64,30 @@ The climb's air speed does not depend on effort, so only its rates change with e
 
 ## Reference calculations
 
-Default body, 50% humidity, dry. Old → new. Raw IREQ is resultant clo. The whole-body band is in the basic clo garments are rated in, after the margins and the ISO 11079 Annex A conversion. The margin factor is `coldExposureFactor` (1 meant untapered before this change). These are model outputs, not measurements.
+Default body, 50% humidity, dry. Old → new. Raw IREQ is resultant clo. The whole-body band is in the basic clo garments are rated in, after the margins and the ISO 11079 Annex A conversion. Hand and head minimums are on #376's part-manikin scale (hands × 0.60, head × 0.45), old and new alike. The margin factor is `coldExposureFactor` (1 meant untapered before this change). These are model outputs, not measurements.
 
 ### Cycling
 
 | Conditions | Effort | Heat flux, W/m² | Air speed, m/s | Raw IREQ min–neutral, clo | Whole-body band, clo | Hand / head minimum, clo | Margin factor |
 | --- | --- | ---: | ---: | --- | --- | --- | ---: |
-| 70°F, 5 mph | easy | 233 → 200 | 2.2 → 3.7 | 0.00–0.06 → 0.05–0.19 | 0.11–0.26 → 0.05–0.35 | 0.09 / 0.09 → 0 / 0 | 0 |
-| 70°F, 5 mph | moderate | 290 → 325 | 2.2 → 5.5 | 0.00–0.00 → 0.00–0.06 | 0.05–0.19 → 0.00–0.22 | 0.07 / 0.07 → 0 / 0 | 0 |
-| 70°F, 5 mph | hard | 349 → 418 | 2.2 → 6.7 | 0.00–0.00 → 0.00–0.01 | 0.05–0.19 → 0.00–0.17 | 0.07 / 0.07 → 0 / 0 | 0 |
-| 56°F, 8 mph | easy | 233 → 200 | 3.6 → 4.7 | 0.26–0.38 → 0.38–0.52 | 0.38–0.69 → 0.38–0.87 | 0.37 / 0.32 → 0 / 0 | 0 |
-| 56°F, 8 mph | moderate | 290 → 325 | 3.6 → 6.1 | 0.15–0.25 → 0.17–0.25 | 0.26–0.49 → 0.17–0.46 | 0.23 / 0.20 → 0 / 0 | 0 |
-| 56°F, 8 mph | hard | 349 → 418 | 3.6 → 7.2 | 0.08–0.16 → 0.10–0.16 | 0.19–0.37 → 0.10–0.34 | 0.16 / 0.14 → 0 / 0 | 0 |
-| 45°F, 4 mph | easy | 233 → 200 | 1.8 → 3.5 | 0.37–0.49 → 0.59–0.73 | 0.51–0.77 → 0.72–1.12 | 0.46 / 0.40 → 0.20 / 0.17 | 0.28 |
-| 45°F, 4 mph | moderate | 290 → 325 | 1.8 → 5.3 | 0.22–0.32 → 0.30–0.39 | 0.32–0.54 → 0.32–0.66 | 0.30 / 0.27 → 0.10 / 0.09 | 0.28 |
-| 45°F, 4 mph | hard | 349 → 418 | 1.8 → 6.5 | 0.11–0.20 → 0.20–0.27 | 0.22–0.39 → 0.22–0.48 | 0.18 / 0.16 → 0.08 / 0.07 | 0.28 |
-| 32°F, 8 mph | easy | 233 → 200 | 3.6 → 4.7 | 0.71–0.84 → 0.91–1.05 | 0.95–1.35 → 1.30–1.75 | 0.85 / 0.73 → 1.08 / 0.92 | 1 |
-| 32°F, 8 mph | moderate | 290 → 325 | 3.6 → 6.1 | 0.52–0.62 → 0.49–0.58 | 0.67–1.02 → 0.64–1.06 | 0.63 / 0.54 → 0.59 / 0.50 | 1 |
-| 32°F, 8 mph | hard | 349 → 418 | 3.6 → 7.2 | 0.38–0.47 → 0.35–0.42 | 0.48–0.81 → 0.43–0.82 | 0.47 / 0.41 → 0.44 / 0.38 | 1 |
-| 14°F, 12 mph | easy | 233 → 200 | 5.4 → 6.1 | 1.11–1.24 → 1.35–1.49 | 1.69–2.28 → 2.16–2.65 | 1.65 / 1.39 → 1.99 / 1.68 | 1 |
-| 14°F, 12 mph | moderate | 290 → 325 | 5.4 → 7.3 | 0.85–0.95 → 0.76–0.85 | 1.24–1.80 → 1.17–1.78 | 1.26 / 1.07 → 1.13 / 0.95 | 1 |
-| 14°F, 12 mph | hard | 349 → 418 | 5.4 → 8.3 | 0.67–0.75 → 0.56–0.63 | 0.95–1.48 → 0.84–1.43 | 1.00 / 0.85 → 0.85 / 0.72 | 1 |
-| −4°F, 8 mph | easy | 233 → 200 | 3.6 → 4.7 | 1.43–1.56 → 1.74–1.89 | 2.03–2.33 → 2.63–2.82 | 2.00 / 1.68 → 2.42 / 2.04 | 1 |
-| −4°F, 8 mph | moderate | 290 → 325 | 3.6 → 6.1 | 1.09–1.19 → 1.00–1.10 | 1.51–2.10 → 1.55–2.23 | 1.53 / 1.29 → 1.40 / 1.18 | 1 |
-| −4°F, 8 mph | hard | 349 → 418 | 3.6 → 7.2 | 0.86–0.94 → 0.75–0.82 | 1.18–1.74 → 1.17–1.84 | 1.21 / 1.02 → 1.07 / 0.90 | 1 |
+| 70°F, 5 mph | easy | 233 → 200 | 2.2 → 3.7 | 0.00–0.06 → 0.05–0.19 | 0.11–0.26 → 0.05–0.35 | 0.05 / 0.04 → 0 / 0 | 0 |
+| 70°F, 5 mph | moderate | 290 → 325 | 2.2 → 5.5 | 0.00–0.00 → 0.00–0.06 | 0.05–0.19 → 0.00–0.22 | 0.04 / 0.03 → 0 / 0 | 0 |
+| 70°F, 5 mph | hard | 349 → 418 | 2.2 → 6.7 | 0.00–0.00 → 0.00–0.01 | 0.05–0.19 → 0.00–0.17 | 0.04 / 0.03 → 0 / 0 | 0 |
+| 56°F, 8 mph | easy | 233 → 200 | 3.6 → 4.7 | 0.26–0.38 → 0.38–0.52 | 0.38–0.69 → 0.38–0.87 | 0.22 / 0.14 → 0 / 0 | 0 |
+| 56°F, 8 mph | moderate | 290 → 325 | 3.6 → 6.1 | 0.15–0.25 → 0.17–0.25 | 0.26–0.49 → 0.17–0.46 | 0.14 / 0.09 → 0 / 0 | 0 |
+| 56°F, 8 mph | hard | 349 → 418 | 3.6 → 7.2 | 0.08–0.16 → 0.10–0.16 | 0.19–0.37 → 0.10–0.34 | 0.09 / 0.06 → 0 / 0 | 0 |
+| 45°F, 4 mph | easy | 233 → 200 | 1.8 → 3.5 | 0.37–0.49 → 0.59–0.73 | 0.51–0.77 → 0.72–1.12 | 0.27 / 0.18 → 0.12 / 0.07 | 0.28 |
+| 45°F, 4 mph | moderate | 290 → 325 | 1.8 → 5.3 | 0.22–0.32 → 0.30–0.39 | 0.32–0.54 → 0.32–0.66 | 0.18 / 0.12 → 0.06 / 0.04 | 0.28 |
+| 45°F, 4 mph | hard | 349 → 418 | 1.8 → 6.5 | 0.11–0.20 → 0.20–0.27 | 0.22–0.39 → 0.22–0.48 | 0.11 / 0.07 → 0.04 / 0.03 | 0.28 |
+| 32°F, 8 mph | easy | 233 → 200 | 3.6 → 4.7 | 0.71–0.84 → 0.91–1.05 | 0.95–1.35 → 1.30–1.75 | 0.51 / 0.33 → 0.65 / 0.41 | 1 |
+| 32°F, 8 mph | moderate | 290 → 325 | 3.6 → 6.1 | 0.52–0.62 → 0.49–0.58 | 0.67–1.02 → 0.64–1.06 | 0.38 / 0.25 → 0.35 / 0.23 | 1 |
+| 32°F, 8 mph | hard | 349 → 418 | 3.6 → 7.2 | 0.38–0.47 → 0.35–0.42 | 0.48–0.81 → 0.43–0.82 | 0.28 / 0.18 → 0.26 / 0.17 | 1 |
+| 14°F, 12 mph | easy | 233 → 200 | 5.4 → 6.1 | 1.11–1.24 → 1.35–1.49 | 1.69–2.28 → 2.16–2.65 | 0.99 / 0.63 → 1.20 / 0.76 | 1 |
+| 14°F, 12 mph | moderate | 290 → 325 | 5.4 → 7.3 | 0.85–0.95 → 0.76–0.85 | 1.24–1.80 → 1.17–1.78 | 0.76 / 0.48 → 0.68 / 0.43 | 1 |
+| 14°F, 12 mph | hard | 349 → 418 | 5.4 → 8.3 | 0.67–0.75 → 0.56–0.63 | 0.95–1.48 → 0.84–1.43 | 0.60 / 0.38 → 0.51 / 0.32 | 1 |
+| −4°F, 8 mph | easy | 233 → 200 | 3.6 → 4.7 | 1.43–1.56 → 1.74–1.89 | 2.03–2.33 → 2.63–2.82 | 1.20 / 0.76 → 1.46 / 0.92 | 1 |
+| −4°F, 8 mph | moderate | 290 → 325 | 3.6 → 6.1 | 1.09–1.19 → 1.00–1.10 | 1.51–2.10 → 1.55–2.23 | 0.92 / 0.58 → 0.84 / 0.53 | 1 |
+| −4°F, 8 mph | hard | 349 → 418 | 3.6 → 7.2 | 0.86–0.94 → 0.75–0.82 | 1.18–1.74 → 1.17–1.84 | 0.73 / 0.46 → 0.64 / 0.40 | 1 |
 
 The #116 review's example (45°F, 4 mph, moderate, 290 W/m²) had IREQ 0.22–0.32 with ambient wind only. The calibrated moderate ride gives 0.30–0.39, at a higher heat flux and 5.3 m/s air.
 
@@ -99,32 +99,32 @@ The climb's air speed is 0.3 × ambient wind, as before.
 
 | Conditions | Effort | Heat flux, W/m² | Climb air, m/s | Raw IREQ min–neutral, clo | Whole-body band, clo | Hand / head minimum, clo | Margin factor |
 | --- | --- | ---: | ---: | --- | --- | --- | ---: |
-| 56°F, 8 mph | easy | 175 → 246 | 1.1 | 0.26–0.43 → 0.04–0.16 | 0.46–0.66 → 0.04–0.34 | 0.35 / 0.32 → 0 / 0 | 0 |
-| 56°F, 8 mph | moderate | 233 → 316 | 1.1 | 0.07–0.20 → 0.00–0.02 | 0.24–0.42 → 0.00–0.20 | 0.15 / 0.14 → 0 / 0 | 0 |
-| 56°F, 8 mph | hard | 290 → 395 | 1.1 | 0.00–0.07 → 0.00–0.00 | 0.11–0.28 → 0.00–0.18 | 0.07 / 0.07 → 0 / 0 | 0 |
-| 45°F, 4 mph | easy | 175 → 246 | 0.5 | 0.42–0.59 → 0.11–0.23 | 0.60–0.82 → 0.16–0.42 | 0.48 / 0.44 → 0.06 / 0.05 | 0.28 |
-| 45°F, 4 mph | moderate | 233 → 316 | 0.5 | 0.15–0.29 → 0.00–0.05 | 0.32–0.51 → 0.02–0.24 | 0.22 / 0.21 → 0.02 / 0.02 | 0.28 |
-| 45°F, 4 mph | hard | 290 → 395 | 0.5 | 0.00–0.11 → 0.00–0.00 | 0.15–0.32 → 0.01–0.19 | 0.08 / 0.08 → 0.02 / 0.02 | 0.28 |
-| 32°F, 8 mph | easy | 175 → 246 | 1.1 | 0.87–1.03 → 0.48–0.60 | 1.02–1.32 → 0.59–0.83 | 0.87 / 0.80 → 0.51 / 0.47 | 1 |
-| 32°F, 8 mph | moderate | 233 → 316 | 1.1 | 0.53–0.66 → 0.26–0.36 | 0.65–0.90 → 0.37–0.57 | 0.56 / 0.52 → 0.30 / 0.27 | 1 |
-| 32°F, 8 mph | hard | 290 → 395 | 1.1 | 0.33–0.44 → 0.11–0.19 | 0.44–0.65 → 0.22–0.40 | 0.37 / 0.34 → 0.17 / 0.16 | 1 |
-| 14°F, 12 mph | easy | 175 → 246 | 1.6 | 1.40–1.57 → 0.88–0.99 | 1.63–2.07 → 1.00–1.40 | 1.66 / 1.51 → 1.06 / 0.97 | 1 |
-| 14°F, 12 mph | moderate | 233 → 316 | 1.6 | 0.95–1.08 → 0.59–0.69 | 1.09–1.50 → 0.66–1.03 | 1.15 / 1.05 → 0.72 / 0.66 | 1 |
-| 14°F, 12 mph | hard | 290 → 395 | 1.6 | 0.68–0.78 → 0.39–0.47 | 0.75–1.14 → 0.46–0.78 | 0.83 / 0.76 → 0.50 / 0.46 | 1 |
-| −4°F, 8 mph | easy | 175 → 246 | 1.1 | 1.82–1.99 → 1.14–1.27 | 2.08–2.22 → 1.30–1.79 | 2.10 / 1.91 → 1.33 / 1.21 | 1 |
-| −4°F, 8 mph | moderate | 233 → 316 | 1.1 | 1.24–1.37 → 0.78–0.88 | 1.42–1.91 → 0.88–1.34 | 1.44 / 1.32 → 0.92 / 0.83 | 1 |
-| −4°F, 8 mph | hard | 290 → 395 | 1.1 | 0.90–1.00 → 0.53–0.60 | 1.01–1.48 → 0.61–1.03 | 1.06 / 0.96 → 0.64 / 0.59 | 1 |
+| 56°F, 8 mph | easy | 175 → 246 | 1.1 | 0.26–0.43 → 0.04–0.16 | 0.46–0.66 → 0.04–0.34 | 0.21 / 0.14 → 0 / 0 | 0 |
+| 56°F, 8 mph | moderate | 233 → 316 | 1.1 | 0.07–0.20 → 0.00–0.02 | 0.24–0.42 → 0.00–0.20 | 0.09 / 0.06 → 0 / 0 | 0 |
+| 56°F, 8 mph | hard | 290 → 395 | 1.1 | 0.00–0.07 → 0.00–0.00 | 0.11–0.28 → 0.00–0.18 | 0.04 / 0.03 → 0 / 0 | 0 |
+| 45°F, 4 mph | easy | 175 → 246 | 0.5 | 0.42–0.59 → 0.11–0.23 | 0.60–0.82 → 0.16–0.42 | 0.29 / 0.20 → 0.04 / 0.02 | 0.28 |
+| 45°F, 4 mph | moderate | 233 → 316 | 0.5 | 0.15–0.29 → 0.00–0.05 | 0.32–0.51 → 0.02–0.24 | 0.13 / 0.09 → 0.01 / 0.01 | 0.28 |
+| 45°F, 4 mph | hard | 290 → 395 | 0.5 | 0.00–0.11 → 0.00–0.00 | 0.15–0.32 → 0.01–0.19 | 0.05 / 0.04 → 0.01 / 0.01 | 0.28 |
+| 32°F, 8 mph | easy | 175 → 246 | 1.1 | 0.87–1.03 → 0.48–0.60 | 1.02–1.32 → 0.59–0.83 | 0.52 / 0.36 → 0.30 / 0.21 | 1 |
+| 32°F, 8 mph | moderate | 233 → 316 | 1.1 | 0.53–0.66 → 0.26–0.36 | 0.65–0.90 → 0.37–0.57 | 0.34 / 0.24 → 0.18 / 0.12 | 1 |
+| 32°F, 8 mph | hard | 290 → 395 | 1.1 | 0.33–0.44 → 0.11–0.19 | 0.44–0.65 → 0.22–0.40 | 0.22 / 0.16 → 0.10 / 0.07 | 1 |
+| 14°F, 12 mph | easy | 175 → 246 | 1.6 | 1.40–1.57 → 0.88–0.99 | 1.63–2.07 → 1.00–1.40 | 0.99 / 0.68 → 0.63 / 0.43 | 1 |
+| 14°F, 12 mph | moderate | 233 → 316 | 1.6 | 0.95–1.08 → 0.59–0.69 | 1.09–1.50 → 0.66–1.03 | 0.69 / 0.48 → 0.43 / 0.29 | 1 |
+| 14°F, 12 mph | hard | 290 → 395 | 1.6 | 0.68–0.78 → 0.39–0.47 | 0.75–1.14 → 0.46–0.78 | 0.50 / 0.34 → 0.30 / 0.20 | 1 |
+| −4°F, 8 mph | easy | 175 → 246 | 1.1 | 1.82–1.99 → 1.14–1.27 | 2.08–2.22 → 1.30–1.79 | 1.26 / 0.86 → 0.79 / 0.54 | 1 |
+| −4°F, 8 mph | moderate | 233 → 316 | 1.1 | 1.24–1.37 → 0.78–0.88 | 1.42–1.91 → 0.88–1.34 | 0.87 / 0.60 → 0.55 / 0.37 | 1 |
+| −4°F, 8 mph | hard | 290 → 395 | 1.1 | 0.90–1.00 → 0.53–0.60 | 1.01–1.48 → 0.61–1.03 | 0.64 / 0.44 → 0.38 / 0.26 | 1 |
 
 Climb targets fall by roughly a third to two thirds, so the climb now dresses closer to what skinners often wear: a base or light fleece with light pants in the cold, a single layer in mild air. Descent and transition IREQ, targets and margins are unchanged in every golden response.
 
 ## Golden review
 
-Compared with `main` after #375 (equal regional multipliers), 29 snapshots change, all of them cycling or ski touring. Running, XC and alpine are unchanged.
+Compared with `main` after #375 (equal regional multipliers) and #376 (hand and head clo on the part-manikin scale), 29 snapshots change, all of them cycling or ski touring. Running, XC and alpine are unchanged.
 
 - **Cycling.**
   - Easy rides in cool air get warmer targets and warmer outfits. At 45°F, 4 mph, easy, the band goes 0.51–0.77 → 0.72–1.12. The catalog outfit goes from a Ferrosi Hoodie and Ferrosi Joggers (0.52 clo) to a base pant, the Upstride Jacket and joggers (0.80).
   - Moderate and hard targets in the cold barely move; their upper limits widen.
-  - Several garment and glove choices change at about the same warmth. Comfort moves by up to 19 points; catalog near-freezing rain, for example, goes 93.5 → 74.9.
+  - Several garment and glove choices change at about the same warmth. Comfort moves by up to 19 points; catalog near-freezing rain, for example, goes 93.5 → 74.5.
   - Where the hand and head bands taper (45°F dry, 36°F rain), a jacket's hood or the wardrobe's gloves now read "over". Accessory choice is #370's work, and a hood is always counted as worn.
 - **Touring climb.**
   - Climb outfits get lighter throughout: in mild air, a single top and light pants.
@@ -135,7 +135,7 @@ Compared with `main` after #375 (equal regional multipliers), 29 snapshots chang
 
 ## Descent findings
 
-Every golden touring case, `main` (after #375) → this branch:
+Every golden touring case, `main` (after #375 and #376) → this branch:
 
 | Case | Descent comfort | Summary | Regions short of minimum, clo | Descent legs / minimum, clo | Climb legs, clo |
 | --- | --- | --- | --- | --- | --- |
@@ -148,11 +148,11 @@ Every golden touring case, `main` (after #375) → this branch:
 | catalog: light pack, cold, windy | 73.4 → 67.1 | Cooler than recommended (unchanged) | arms 0.52, legs 0.37 → arms 0.48, legs 0.80 | 2.93 → 2.50 / 3.30 | 1.20 → 0.77 |
 | empty wardrobe, catalog fallback | 13 → 13 | Uneven warmth → Cooler than recommended | none → legs 0.38 | 2.74 → 2.21 / 2.59 | 1.01 → 0.48 |
 | wardrobe: mild, calm, dry, easy | 90 → 61.9 | Likely comfortable → Warmer than recommended | none → none | 2.55 → 2.26 / 1.92 | 0.82 → 0.53 |
-| wardrobe: cool, breezy, moderate | 63 → 63 | Warmer than recommended → Uneven warmth | none → legs 0.33 | 2.55 → 2.26 / 2.59 | 0.82 → 0.53 |
+| wardrobe: cool, breezy, moderate | 62.8 → 62.8 | Warmer than recommended → Uneven warmth | none → legs 0.33 | 2.55 → 2.26 / 2.59 | 0.82 → 0.53 |
 | wardrobe: cold, windy, snowing, hard | 65.8 → 68.1 | Cooler than recommended → Uneven warmth | arms 0.35, legs 0.37 → legs 0.75 | 2.93 → 2.55 / 3.30 | 1.20 → 0.82 |
 | wardrobe: extreme cold | 56.9 → 55.3 | Cooler than recommended (unchanged) | arms 0.74, legs 1.74 → arms 1.09, legs 1.84 | 3.03 → 2.93 / 4.77 | 1.30 → 1.20 |
 | wardrobe: near-freezing rain | 67.5 → 67.5 | Warmer than recommended (unchanged) | none → none | 2.64 → 2.64 / 1.93 | 0.91 → 0.91 |
-| wardrobe: large body | 62.8 → 70.3 | Warmer than recommended → Uneven warmth | none → legs 0.31 | 2.55 → 2.26 / 2.57 | 0.82 → 0.53 |
+| wardrobe: large body | 62.8 → 70.4 | Warmer than recommended → Uneven warmth | none → legs 0.31 | 2.55 → 2.26 / 2.57 | 0.82 → 0.53 |
 
 Comfort can rise while a shortfall appears, because the comfort score also counts excess warmth elsewhere. Every shortfall is reported in the descent evaluation ("Legs needs more insulation"), not hidden.
 
@@ -175,4 +175,4 @@ So no climb outfit inside its own band, combined with the catalog's warmest over
 - The MET mapping, riding speeds, the wind combination, the margin taper and the conversion of CoWEDA errors to clo are assumptions. Nothing here measures an individual's heat production, and there are no field data (#8).
 - Cycling assumes continuous riding. Stops and long descents still need the extra layer the guidance mentions. The climb assumes continuous skinning; the transition handles stops.
 - The IREQ solver is simplified, with no skin-evaporation term (see the [algorithm review](algorithm-review.md)).
-- The regional and extremity multipliers are untouched here. #375 has since set every regional multiplier to 1.0; the reference calculations above are whole-body, IREQ and hand/head values, which #375 doesn't change.
+- The regional and extremity multipliers are untouched here. #375 has since set every regional multiplier to 1.0, which doesn't change the whole-body, IREQ or hand/head values above. #376 restated hand and head targets on the part-manikin scale; the tapered bands and buffers here carry that scale, and the tables show it.

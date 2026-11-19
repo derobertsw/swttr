@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useTripMapGeometry } from "@/hooks/useTripMapGeometry";
+import { useUserId } from "@/hooks/useUserId";
+import { readSavedBrief, type SavedBrief } from "@/lib/offline-briefs";
+import { savedBriefHref, savedLine } from "./OfflineBrief";
 import { dateLabelIn, dayRoles, followDeparture, placeDates, type MapDisplayRole } from "./trip-map-presentation";
 import type { TripMap, TripMapDay } from "@/types/trip-map";
 import { TripMapAttribution, TripMapPlaceDetail, TripMapPlaceList, PlaceLabel } from "./TripMapPlaces";
@@ -32,6 +35,34 @@ const DAY_ORDER: MapDisplayRole[] = ["origin", "access", "meeting", "pickup", "d
 const dayRank = (roles: MapDisplayRole[]) => roles.length ? DAY_ORDER.indexOf(roles[0]) : DAY_ORDER.length;
 /** Drive states with a saved origin → access pair to focus on (#209). */
 const DRIVE_PAIR_STATES = new Set<TripMapDay["drive"]["state"]>(["available", "stale", "manual", "unavailable", "no_route"]);
+
+/**
+ * Offline, the map can't draw. The copy of this trip saved on this device
+ * (#214) is offered only when there is one for the signed-in account; until
+ * that's known, or if the device storage can't be read, no copy is mentioned.
+ */
+function OfflineMapNotice({ tripId, onList }: { tripId: string; onList: () => void }) {
+  const userId = useUserId();
+  const key = userId ? `${userId}:${tripId}` : null;
+  const [read, setRead] = useState<{ key: string; saved: SavedBrief | null } | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let current = true;
+    readSavedBrief(tripId, userId).then((saved) => { if (current) setRead({ key: `${userId}:${tripId}`, saved }); }, () => undefined);
+    return () => { current = false; };
+  }, [tripId, userId]);
+  const known = read && read.key === key ? read : null;
+  return <Card className="space-y-3">
+    <h2 className="font-semibold">Map needs a connection</h2>
+    <p className="text-base">Use List for places already loaded. Maps aren&apos;t available offline.{known && !known.saved && " This trip isn't saved on this device."}</p>
+    {known?.saved && <p className="text-base">{savedLine(known.saved.brief)}. The saved brief has the day logistics, not a map.</p>}
+    <div className="flex flex-wrap gap-2">
+      {/* A full page load, which the offline page's worker answers without a connection. */}
+      {known?.saved && <Button asChild className="h-auto min-h-11 max-w-full whitespace-normal py-2"><a href={savedBriefHref(tripId)}>Open saved brief</a></Button>}
+      <Button variant="outline" onClick={onList}>Use list</Button>
+    </div>
+  </Card>;
+}
 
 function subscribeDesktop(change: () => void) {
   const media = window.matchMedia("(min-width: 1024px)"); media.addEventListener("change", change);
@@ -216,7 +247,7 @@ export function TripMapView({ data, canEdit, memberId = null }: { data: TripMap;
       {desktop && listPane}
       <section aria-label="Map view" className={cn("order-1 min-w-0 space-y-3 lg:order-2", view === "list" && "hidden lg:block")}>
         {driveFocus && day && !offline && !failed && <RoadLineStatus day={day} geometry={geometry} road={!!road} />}
-        {offline ? <Card><h2 className="font-semibold">Map needs a connection</h2><p className="mt-2 text-base">Use List for places already loaded. Offline maps and a saved offline brief are not available here.</p><Button variant="outline" className="mt-3" onClick={showList}>Use list</Button></Card>
+        {offline ? <OfflineMapNotice tripId={data.trip.id} onList={showList} />
           : !shown ? <Card><p className="text-base">No mapped places in this scope. The list includes places with missing or invalid locations.</p><Button variant="outline" className="mt-3" onClick={showList}>Use list</Button></Card>
           : failed ? failure : (view === "map" || desktop) && <CanvasBoundary key={attempt} fallback={failure} onError={() => setFailed(true)}>
             <Canvas places={places} date={date} day={day} route={road?.geometry.coordinates ?? null} focusIds={driveFocus ? pair : null} provider={data.provider} scope={`${data.trip.id}:${date}`} selectedId={selectedId} fitRequest={fitRequest} onSelect={selectPlace} onGroup={(ids) => setGroup({ date, revision: data.revision, ids })} onError={() => setFailed(true)} />

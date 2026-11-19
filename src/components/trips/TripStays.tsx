@@ -64,6 +64,9 @@ export function TripStays({ data, canEdit, onSaved, viewerMemberId = null }: {
     // Cold links can resolve before the async lodging rows exist.
     restoredHash.current = true;
     article.scrollIntoView({ block: "start", behavior: "instant" });
+    // Focus follows, as on the day page, so keyboard and screen reader users
+    // arriving from the trip map continue at the stay, not the top (#235).
+    document.getElementById(`stay-${stay.id}-name`)?.focus({ preventScroll: true });
   }, [lodging, mine]);
   // A stay has departures once it has nights or a day starts from it as its
   // own starting point; until then each call would only cost provider credits.
@@ -223,7 +226,7 @@ function StayArticle({ stay, people, canEdit, perMember, open, departures }: {
   stay: TripStaySummary; people: TripLodgingPerson[]; canEdit: boolean; perMember: boolean; open: Open; departures: ReactNode;
 }) {
   return <article id={`stay-${stay.id}`} className="min-w-0 scroll-mt-4 py-4">
-    <h3 className="break-words text-xl font-semibold text-foreground">{stay.name}</h3>
+    <h3 id={`stay-${stay.id}-name`} tabIndex={-1} className="break-words text-xl font-semibold text-foreground">{stay.name}</h3>
     <p className="mt-1 text-base text-foreground">{stay.date_label}</p>
     {stay.checkout_label && <p className="text-base text-muted-foreground">{stay.checkout_label} · a starting point, not another night</p>}
     <p className="text-base text-muted-foreground">{stayFacts(stay)}</p>

@@ -4,10 +4,11 @@
  * POST /api/v1/ensembles/evaluate so the recommendation view never does
  * thermal math in the browser.
  */
-import { ENSEMBLE_REGRESSION, REGIONAL_WEIGHTS } from '@/lib/biophysics/constants';
+import { ACCESSORY_CLO_SCALE, ENSEMBLE_REGRESSION, REGIONAL_WEIGHTS } from '@/lib/biophysics/constants';
 import {
   calculateThermalComfortScore,
   evaluateThermalComfort,
+  EXTREMITY_CLO_EPSILON,
   THERMAL_DISPLAY_CLO_EPSILON,
   localThermalStatus,
   type BodyPartClo,
@@ -37,7 +38,11 @@ interface PartAgainstMinimum {
   clo: number;
   minimum: number | undefined;
   maximum?: number;
+  scale?: number;
 }
+
+/** Hands and head are on the part-manikin scale (#376). */
+const EXTREMITY_PART = { hands: 'hands', headNeck: 'head' } as const;
 
 function hasMinimum(part: PartAgainstMinimum): part is BodyPartClo {
   return part.minimum !== undefined;
@@ -91,8 +96,13 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
         target === undefined
           ? { clo }
           : { clo, target, delta: target - clo, status: bodyPartStatus(clo, minimum(part) ?? target, target) };
-      if ((part === 'hands' || part === 'headNeck') && input.extremityMaxTargets?.[part] !== undefined) {
-        evaluation.status = localThermalStatus(clo, minimum(part) ?? target ?? 0, input.extremityMaxTargets[part]!);
+      if (part === 'hands' || part === 'headNeck') {
+        const tolerance = EXTREMITY_CLO_EPSILON[EXTREMITY_PART[part]];
+        if (input.extremityMaxTargets?.[part] !== undefined) {
+          evaluation.status = localThermalStatus(clo, minimum(part) ?? target ?? 0, input.extremityMaxTargets[part]!, tolerance);
+        } else if (target !== undefined) {
+          evaluation.status = localThermalStatus(clo, minimum(part) ?? target, target, tolerance);
+        }
       }
       return [part, evaluation];
     })
@@ -120,8 +130,10 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
     });
   }
   const extremities: PartAgainstMinimum[] = [
-    { name: 'Hands', clo: hands.clo!, minimum: minimum('hands'), maximum: input.extremityMaxTargets?.hands ?? input.targets.hands },
-    { name: 'Head and neck', clo: headNeck.clo!, minimum: minimum('headNeck'), maximum: input.extremityMaxTargets?.headNeck ?? input.targets.headNeck },
+    { name: 'Hands', clo: hands.clo!, minimum: minimum('hands'), maximum: input.extremityMaxTargets?.hands ?? input.targets.hands,
+      scale: ACCESSORY_CLO_SCALE.hands },
+    { name: 'Head and neck', clo: headNeck.clo!, minimum: minimum('headNeck'), maximum: input.extremityMaxTargets?.headNeck ?? input.targets.headNeck,
+      scale: ACCESSORY_CLO_SCALE.head },
   ];
   const maxRegionalDeficit = maxDeficit(regions);
   const maxExtremityDeficit = maxDeficit(extremities);
@@ -202,7 +214,8 @@ export function evaluatePhase(input: PhaseEvaluationInput): PhaseEvaluation {
     maxRegionalDeficit,
     maxExtremityDeficit,
     hasRegionalGap: maxRegionalDeficit > THERMAL_DISPLAY_CLO_EPSILON,
-    hasExtremityGap: maxExtremityDeficit > THERMAL_DISPLAY_CLO_EPSILON,
+    hasExtremityGap: extremities.some(part => part.minimum !== undefined
+      && part.minimum - part.clo > THERMAL_DISPLAY_CLO_EPSILON * (part.scale ?? 1)),
     decision,
     comfortScore: calculateThermalComfortScore(comfortInput),
   };

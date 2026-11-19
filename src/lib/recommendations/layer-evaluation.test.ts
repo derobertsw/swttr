@@ -73,18 +73,19 @@ describe("evaluatePhase", () => {
   });
 
   it("scores gloves against the hand minimum when it exceeds the whole-body minimum", () => {
-    // Easy biking at -15°F in 40 mph wind: the hands need 3.42 clo, the whole
-    // body 1.99, and every other part sits at its minimum.
+    // Easy biking at -15°F in 40 mph wind: the hands need 2.05 clo on the
+    // part-manikin scale (3.42 on the earlier accessory scale the score was
+    // tuned in, #376), the whole body 1.99, and every other part sits at its minimum.
     const withGloves = (gloveClo: number) => evaluatePhase({
-      itemClo: { torso: [2.4], legs: [2.1], hands: [gloveClo], headNeck: [1.0] },
-      targets: { torso: 2.2, legs: 2.3, hands: 3.6, headNeck: 1.2 },
-      minTargets: { torso: 2.0, legs: 2.0, hands: 3.42, headNeck: 1.0 },
+      itemClo: { torso: [2.4], legs: [2.1], hands: [gloveClo], headNeck: [0.45] },
+      targets: { torso: 2.2, legs: 2.3, hands: 2.16, headNeck: 0.54 },
+      minTargets: { torso: 2.0, legs: 2.0, hands: 2.052, headNeck: 0.45 },
       arms: { clo: 2.0, target: 2.2, minTarget: 2.0 },
       targetRange: [1.99, 2.11],
     });
 
-    expect(withGloves(0.6).comfortScore).toBeCloseTo(23.9, 1);
-    expect(withGloves(0.9).comfortScore).toBeCloseTo(30.4, 1);
+    expect(withGloves(0.36).comfortScore).toBeCloseTo(23.9, 1);
+    expect(withGloves(0.54).comfortScore).toBeCloseTo(30.4, 1);
   });
 
   it("flags cold risk when a region is under target even if the total is in range", () => {
@@ -93,7 +94,8 @@ describe("evaluatePhase", () => {
       itemClo: { ...base.itemClo!, hands: [0.2] },
     });
     expect(result.decision).toMatchObject({ riskType: "cold" });
-    expect(result.decision?.delta).toBeCloseTo(0.8, 10);
+    // A hand shortfall is judged in the earlier accessory scale's units (#376).
+    expect(result.decision?.delta).toBeCloseTo(0.8 / 0.6, 10);
   });
 
   it("has no total, decision, or score without arm clo and a target range", () => {

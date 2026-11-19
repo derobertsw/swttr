@@ -100,8 +100,10 @@ function checkExtremity(kind, h) {
   if (active === null || stat === null) warnings.push(`${name}: min_temp_active/static missing; the selector filters on them`);
   else {
     if (active > stat) warnings.push(`${name}: min_temp_active ${active} is warmer than static ${stat}; active should reach colder`);
-    if (kind === 'handwear' && Math.abs(stat - (10 - 10 * clo)) > 8) {
-      warnings.push(`${name}: static min ${stat}°C vs ${(10 - 10 * clo).toFixed(0)}°C expected for ${clo} clo (Gao rule); explain or adjust`);
+    // Gao rule on the part-manikin scale (#376): 0.6 clo per 10°C of static rating.
+    const expected = 10 - 10 * (clo / 0.6);
+    if (kind === 'handwear' && Math.abs(stat - expected) > 8) {
+      warnings.push(`${name}: static min ${stat}°C vs ${expected.toFixed(0)}°C expected for ${clo} clo (Gao rule, part-manikin scale); explain or adjust`);
     }
   }
   if (kind === 'handwear' && h.dexterity_score === null) warnings.push(`${name}: dexterity_score is NULL`);
