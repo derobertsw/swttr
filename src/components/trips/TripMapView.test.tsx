@@ -5,9 +5,13 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { driveTrip } from "@/test/driveTrip";
 import { fakeTripApi, reply } from "@/test/tripApi";
 import { storedDrive, tripMapFixture } from "@/test/tripMap";
+import { fakeClerkState, resetFakeClerk } from "@/test/fakeClerk";
+import { offlineBrief, resetDeviceStorage } from "@/test/offlineBrief";
+import { storeSavedBrief } from "@/lib/offline-briefs";
 import type { TripMap, TripMapDay } from "@/types/trip-map";
 import { TripMapView } from "./TripMapView";
 
+vi.mock("@clerk/nextjs", async () => (await import("@/test/fakeClerk")).fakeClerkModule);
 const canvas = vi.hoisted(() => ({ props: null as unknown as Record<string, unknown>, crash: false }));
 vi.mock("next/navigation", () => ({ useSearchParams: () => {
   const search = useSyncExternalStore((cb) => { window.addEventListener("popstate", cb); return () => window.removeEventListener("popstate", cb); }, () => window.location.search);
@@ -25,6 +29,7 @@ const path = "/trips/trip-drive/map";
 const nativePush = window.history.pushState.bind(window.history);
 beforeEach(() => {
   data = structuredClone(base); canvas.crash = false;
+  resetDeviceStorage(); resetFakeClerk();
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
   nativePush({}, "", path);
   vi.spyOn(window.history, "pushState").mockImplementation((state, unused, url) => { nativePush(state, unused, url); window.dispatchEvent(new PopStateEvent("popstate")); });
@@ -120,6 +125,41 @@ describe("Synchronized trip map and accessible list", () => {
     expect(screen.getByRole("heading", { name: /Village Inn/ })).toBeVisible();
     Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
     act(() => window.dispatchEvent(new Event("online")));
+  });
+
+  it("offline, offers the trip's saved brief only when this account saved one (#235, #214)", async () => {
+    const tripBrief = (tripId: string, userId = "user_1") => offlineBrief({
+      trip: { ...offlineBrief().trip, id: tripId }, viewer: { user_id: userId, member_id: "m-1" },
+    });
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+    try {
+      // Another trip's copy doesn't count: this one isn't saved.
+      await storeSavedBrief("user_1", tripBrief("trip-other"));
+      const { unmount } = view();
+      expect(await screen.findByText(/This trip isn't saved on this device\./)).toBeVisible();
+      expect(screen.queryByRole("link", { name: "Open saved brief" })).not.toBeInTheDocument();
+      unmount();
+
+      await storeSavedBrief("user_1", tripBrief("trip-drive"));
+      const second = view();
+      const open = await screen.findByRole("link", { name: "Open saved brief" });
+      // A full page load, which the saved page's worker answers with no connection.
+      expect(open).toHaveAttribute("href", "/trips/saved?trip=trip-drive");
+      expect(screen.getByText(/^Saved on this device .* · Sat Feb 13 – Sun Feb 14\. The saved brief has the day logistics, not a map\.$/)).toBeVisible();
+      expect(screen.queryByText(/isn't saved on this device/)).not.toBeInTheDocument();
+      second.unmount();
+
+      // Nobody known to be signed in (Clerk hasn't loaded): no copy is offered or denied.
+      fakeClerkState.loaded = false;
+      view();
+      expect(screen.getByRole("heading", { name: "Map needs a connection" })).toBeVisible();
+      await act(async () => { await new Promise((done) => setTimeout(done, 20)); });
+      expect(screen.queryByRole("link", { name: "Open saved brief" })).not.toBeInTheDocument();
+      expect(screen.queryByText(/saved on this device/i)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Use list" })).toBeEnabled();
+    } finally {
+      Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    }
   });
 
   it("restores a deep-linked date/place and scroll through history, and recovers removed IDs", async () => {

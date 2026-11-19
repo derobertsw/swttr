@@ -1,7 +1,13 @@
 // #235 trip map checks against a local production build with the QA-only
 // preview edits (see README.md, "Re-running"):
 //   node docs/qa/235-trip-maps/run.mjs [--base http://127.0.0.1:3435] [--out <dir>] [group ...]
-// Groups: lazy journeys departures edge keyboard ax recovery stale layout perf shots.
+// Groups: lazy journeys departures edge keyboard ax recovery stale layout perf shots,
+// plus three that only run when named:
+// - offline (#214's saved brief and offline entry) needs --upstream <next start URL>:
+//   --base is then a gate this script closes, so even the service worker finds no server.
+// - edits (map links into the editors, and a failed edit).
+// - compare (box 6's core trip load) needs --compare name=url=dir,... with each
+//   build's server and its .next directory, e.g. before=http://localhost:3437=../qa-235-before/.next.
 // Every trip API request is answered in the browser from fixtures.ts; Clerk is
 // blocked; OpenFreeMap tiles are fetched once and then served from
 // <out>/tile-cache, except in `perf`, which measures the real network.
@@ -9,6 +15,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { join, resolve } from 'node:path';
+import { connect, createServer as tcpServer } from 'node:net';
 import { launch, sleep } from './cdp.mjs';
 import { loadFixtures } from './fixtures.mjs';
 
@@ -25,10 +32,46 @@ const option = (name, fallback) => {
 };
 const BASE = option('--base', 'http://127.0.0.1:3435');
 const OUT = resolve(option('--out', 'docs/qa/235-trip-maps/out'));
+const UPSTREAM = option('--upstream', null);
+const COMPARE = option('--compare', '');
 const ALL = ['lazy', 'journeys', 'departures', 'edge', 'keyboard', 'ax', 'recovery', 'stale', 'layout', 'perf', 'shots'];
 const groups = args.length ? args : ALL;
 const API_DELAY = 150;
 const fx = await loadFixtures();
+
+/**
+ * With --upstream, --base is a TCP gate in front of `next start`. down() drops
+ * every connection and stops listening, so the page, the service worker and
+ * Chrome itself find no server: a real loss of connection, not just a tab's.
+ */
+const gate = UPSTREAM ? await (async () => {
+  const from = new URL(BASE), to = new URL(UPSTREAM), sockets = new Set();
+  let server = null;
+  const up = () => new Promise((done, fail) => {
+    if (server) return done();
+    const current = server = tcpServer((client) => {
+      // A connection Chrome opens while the gate closes is dropped too.
+      if (server !== current) return client.destroy();
+      const target = connect(Number(to.port), to.hostname);
+      const end = () => { client.destroy(); target.destroy(); sockets.delete(client); sockets.delete(target); };
+      for (const socket of [client, target]) { sockets.add(socket); socket.on('error', end); socket.on('close', end); }
+      client.pipe(target).pipe(client);
+    });
+    server.once('error', fail);
+    server.listen(Number(from.port), from.hostname, done);
+  });
+  // Stops listening at once; close() only calls back once every connection is gone, so don't wait for it.
+  const down = async () => {
+    if (!server) return;
+    const closing = server; server = null;
+    closing.close();
+    for (const socket of sockets) socket.destroy();
+    sockets.clear();
+    await sleep(100);
+  };
+  await up();
+  return { up, down };
+})() : null;
 await mkdir(join(OUT, 'tile-cache'), { recursive: true });
 // Groups run separately add to the same results file.
 const results = await readFile(join(OUT, 'results.json'), 'utf8').then(JSON.parse).catch(() => ({}));
@@ -132,6 +175,13 @@ function tripApi(url, method, viewer, data = fx) {
   if (rest === '') return trip.full[viewer] ? { body: trip.full[viewer], delay: API_DELAY } : { status: 403, body: { error: 'Not a member of this trip' } };
   if (rest === '/map') return { body: trip.map, delay: API_DELAY };
   if (rest === '/drive-estimates') return { body: trip.estimates, delay: API_DELAY };
+  if (rest === '/brief') {
+    // #214's brief, built by the production builder for the default days only.
+    const brief = trip.brief?.[viewer], asked = url.searchParams.get('dates');
+    if (!brief) return { status: 503, body: { error: 'No #235 fixture brief for this viewer' } };
+    if (asked && asked !== brief.brief.covered.dates.join(',')) return { status: 503, body: { error: 'The #235 fixture brief has the default days only' } };
+    return { body: brief, delay: API_DELAY };
+  }
   const days = rest.match(/^\/days\/([\d-]+)\/geometry$/);
   if (days) return geometry(trip, days[1], url.searchParams.get('revision'));
   return { status: 503, body: { error: 'Not part of the #235 fixture' } };
@@ -139,15 +189,16 @@ function tripApi(url, method, viewer, data = fx) {
 const deferred = () => { let release; const promise = new Promise((done) => { release = done; }); return { promise, release }; };
 
 const log = (...parts) => { if (process.env.QA_VERBOSE) console.log(new Date().toISOString().slice(11, 19), ...parts); };
-async function open(browser, { viewer = 'user-1', width = 1440, height = 1000, dpr = 2, mobile, scheme = 'light', motion = 'no-preference', tiles = 'cache', statics = false } = {}) {
+async function open(browser, { viewer = 'user-1', width = 1440, height = 1000, dpr = 2, mobile, scheme = 'light', motion = 'no-preference', tiles = 'cache', statics = false, base = BASE } = {}) {
   const page = await browser.newPage();
+  page.base = base;
   await page.viewport(width, height, { dpr, mobile: mobile ?? width < 768 });
   await page.media({ scheme, motion });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: helpers(viewer) });
   page.rules = [];           // (url, request) => answer | undefined, first match wins
   page.api = [];             // every trip API request: { path, at }
   page.viewer = viewer;
-  const patterns = [`${BASE}/api/*`, '*clerk*', ...tiles === 'network' ? [] : ['*openfreemap.org*'], ...statics ? [`${BASE}/_next/static/*`] : []];
+  const patterns = [`${base}/api/*`, '*clerk*', ...tiles === 'network' ? [] : ['*openfreemap.org*'], ...statics ? [`${base}/_next/static/*`] : []];
   page.fetchPatterns = patterns.map((urlPattern) => ({ urlPattern, requestStage: 'Request' }));
   if (tiles === 'cache') page.fetchPatterns.push({ urlPattern: '*openfreemap.org*', requestStage: 'Response' });
   page.on('Fetch.requestPaused', (params, session) => void handle(page, params, session).catch((error) => {
@@ -177,8 +228,8 @@ async function handle(page, { requestId, request, responseStatusCode }, session)
     return page.send('Fetch.fulfillRequest', { requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: type }, { name: 'Access-Control-Allow-Origin', value: '*' }],
       body: cached.base64Encoded ? cached.body : Buffer.from(cached.body).toString('base64') }, session);
   }
-  if (url.origin === BASE && url.pathname.startsWith('/api/')) {
-    page.api.push({ path: url.pathname + url.search, at: Date.now() });
+  if (url.origin === page.base && url.pathname.startsWith('/api/')) {
+    page.api.push({ path: url.pathname + url.search, method: request.method, at: Date.now() });
     return respond(page, session, requestId, tripApi(url, request.method, page.viewer, page.data ?? fx));
   }
   return page.send('Fetch.continueRequest', { requestId }, session);
@@ -825,6 +876,223 @@ await run('shots', async () => {
   return { taken };
 });
 
+// ---------- box 4: offline, with and without #214's saved brief (named only; needs --upstream) ----------
+await run('offline', async () => {
+  if (!gate) throw new Error('offline needs --upstream <next start URL>, with --base as the gate in front of it');
+  const out = {};
+  // One page, so one browser context: the saved brief and its worker stay for every step.
+  const page = await open(browser);
+  const cutOff = () => ({ fail: 'InternetDisconnected' });
+  const goOffline = async () => { page.rules.unshift(cutOff); await gate.down(); await page.offline(true); };
+  const goOnline = async () => { page.rules = page.rules.filter((rule) => rule !== cutOff); await gate.up(); await page.offline(false); };
+  // Plain DOM only: Chrome's own error page doesn't run the helpers.
+  const where = () => page.eval(`({ url: location.href.replace(${literal(BASE)}, ''), title: document.title, h1: (document.querySelector('h1')?.textContent || '').trim(),
+    text: (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 220) })`).catch((error) => ({ error: error.message }));
+  const notice = () => page.eval(`(() => { const card = __qa.find('h2', 'Map needs a connection')?.parentElement; return card && { text: __qa.norm(card.textContent),
+    links: [...card.querySelectorAll('a')].map((a) => ({ text: __qa.norm(a.textContent), href: a.getAttribute('href') })), buttons: [...card.querySelectorAll('button')].map((b) => __qa.norm(b.textContent)) }; })()`);
+  const mapOffline = async (name, wait) => {
+    await goOffline();
+    await page.waitFor('__qa.find("h2", "Map needs a connection")', 10_000);
+    await page.waitFor(wait, 5000).catch(() => {});
+    out[name] = { notice: await notice(), list: await page.eval('[...document.querySelectorAll(\'ul[aria-label="Itinerary places"] button\')].length'), showDrive: await page.eval('__qa.find("button", "Show drive")?.disabled ?? null') };
+    await page.screenshot(shot(`offline-${name}`));
+  };
+
+  log('offline: nothing saved');
+  await page.goto(`${BASE}/trips/trip-drive/map?date=${SAT}`);
+  await ready(page); await page.waitFor('__qa.canvasReady()', 30_000);
+  await mapOffline('mapNothingSaved', '/saved on this device/i.test(__qa.find("h2", "Map needs a connection").parentElement.textContent)');
+  await goOnline();
+
+  log('offline: save from Plan');
+  await page.goto(`${BASE}/trips/trip-drive`);
+  await page.waitFor('__qa.find("button", "Save for offline")', 20_000);
+  await page.eval('__qa.click("button", "Save for offline")');
+  await page.waitFor('document.querySelector("[role=dialog]") && document.querySelectorAll("[role=dialog] input[type=checkbox]:checked").length > 0', 15_000).catch(async (error) => {
+    throw new Error(`${error.message}\nPage: ${await page.eval('__qa.norm((document.querySelector("[role=dialog]") ?? document.querySelector("main"))?.textContent).slice(0, 700)')}\nAPI: ${JSON.stringify(page.api.slice(-6))}`);
+  });
+  out.sheet = await page.eval('[...document.querySelectorAll("[role=dialog] input[type=checkbox]")].map((box) => [__qa.norm(box.closest("label")?.textContent), box.checked])');
+  log('offline: saving', JSON.stringify(out.sheet));
+  await page.eval('[...document.querySelectorAll("[role=dialog] button")].find((button) => __qa.norm(button.textContent) === "Save for offline").click()');
+  await page.waitFor('!document.querySelector("[role=dialog]") && /Saved on this device/.test(document.body.textContent)', 45_000);
+  await sleep(800);
+  out.saved = await page.eval(`(async () => ({ status: __qa.live().filter((text) => /saved/i.test(text)), alerts: [...document.querySelectorAll('[role=alert]')].map((el) => __qa.norm(el.textContent)).filter(Boolean),
+    workers: (await navigator.serviceWorker.getRegistrations()).map((registration) => ({ scope: registration.scope.replace(${literal(BASE)}, ''), active: !!registration.active })),
+    caches: await Promise.all((await caches.keys()).map(async (name) => [name, (await (await caches.open(name)).keys()).map((request) => new URL(request.url).pathname).filter((path) => !path.startsWith('/_next/static/')).slice(0, 12)])) }))()`);
+
+  log('offline: map with the copy saved');
+  await page.eval('__qa.click("a", "View trip map")');
+  await page.waitFor('location.pathname.endsWith("/map")', 15_000); await ready(page);
+  await page.eval(`__qa.select("map-date", "${SAT}")`); await sleep(400);
+  await page.waitFor('__qa.canvasReady()', 30_000);
+  await mapOffline('mapSaved', '__qa.find("a", "Open saved brief")');
+  await page.eval('__qa.click("a", "Open saved brief")');
+  await page.waitFor('location.pathname === "/trips/saved" && /Showing saved copy/.test(document.body.textContent)', 20_000).catch(() => {});
+  out.openedFromMap = { ...await where(), controlled: await page.eval('!!navigator.serviceWorker?.controller').catch(() => null),
+    has: await page.eval('({ saturday: /Sat Jan 9/.test(document.body.innerText), accessPoint: /Spruce Peak lot/.test(document.body.innerText), unknown: /changes since .* are unknown/.test(document.body.innerText) })').catch(() => null) };
+  await page.screenshot(shot('offline-opened-from-map'));
+
+  log('offline: entry with the connection already gone');
+  for (const [name, path] of [['map', `/trips/trip-drive/map?date=${SAT}`], ['plan', '/trips/trip-drive'], ['start', '/'], ['saved', '/trips/saved']]) {
+    await page.goto(`${BASE}${path}`);
+    await sleep(name === 'saved' ? 4500 : 1500);   // the saved list waits up to 3 s for an account Clerk can't load offline
+    out[`entry_${name}`] = await where();
+  }
+
+  log('offline: a loaded Plan tab loses its connection');
+  await goOnline();
+  await page.goto(`${BASE}/trips/trip-drive`);
+  await page.waitFor('__qa.find("a", "View trip map") && __qa.find("a", "Open saved brief")', 20_000);
+  await goOffline();
+  await page.eval('__qa.click("a", "View trip map")');
+  await sleep(5000);
+  out.tabIntoMap = { ...await where(), notice: await notice().catch(() => null) };
+  await goOnline();
+  await page.goto(`${BASE}/trips/trip-drive`);
+  await page.waitFor('__qa.find("a", "Open saved brief")', 20_000);
+  await goOffline();
+  await page.eval('__qa.click("a", "Open saved brief")');
+  await page.waitFor('location.pathname === "/trips/saved" && /Showing saved copy/.test(document.body.textContent)', 20_000).catch(() => {});
+  out.planOpenSaved = await where();
+
+  log('offline: another account on the same device');
+  await goOnline();
+  page.viewer = 'user-sam';
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.setItem('qa235User', 'user-sam'); } catch {}" });
+  await page.goto(`${BASE}/trips/trip-drive/map?date=${SAT}`);
+  await ready(page); await page.waitFor('__qa.canvasReady()', 30_000);
+  await mapOffline('mapOtherAccount', '/saved on this device/i.test(__qa.find("h2", "Map needs a connection").parentElement.textContent)');
+  await goOnline();
+  await page.close();
+  return out;
+});
+
+// ---------- box 4: from the map into the editors, and a failed edit (named only) ----------
+await run('edits', async () => {
+  const out = { links: [], land: [] };
+  const page = await open(browser);
+  const atMap = () => page.waitFor('location.pathname.endsWith("/map") && document.querySelector("#map-day-heading") && document.querySelector(\'ul[aria-label="Itinerary places"] button\')', 20_000);
+  const placeRows = () => page.eval('[...document.querySelectorAll(\'ul[aria-label="Itinerary places"] button\')].map((button) => __qa.norm(button.textContent))');
+  const editLinks = '[...document.querySelectorAll("main a")].filter((a) => /^(Edit|Add destination)/.test(__qa.norm(a.textContent)))';
+  // The day summary's edit links, then a selected stay's and destination's "Edit in trip plan".
+  const starts = [[`/trips/trip-drive/map?date=${SAT}`, null], [`/trips/trip-drive/map?date=${SAT}`, 'Stowe Motel'], [`/trips/trip-drive/map?date=${SAT}`, 'Destination']];
+  for (const [path, select] of starts) {
+    await page.goto(`${BASE}${path}`); await atMap();
+    if (select) { await page.eval(`__qa.click('ul[aria-label="Itinerary places"] button', ${literal(select)})`); await sleep(400); }
+    const links = await page.eval(`${editLinks}.map((a) => ({ text: __qa.norm(a.textContent), href: a.getAttribute('href') }))`);
+    for (const link of links) {
+      if (out.links.some((seen) => seen.text === link.text && seen.href === link.href)) continue;
+      out.links.push({ ...link, from: select ?? 'day summary' });
+      await page.goto(`${BASE}${path}`); await atMap();
+      if (select) { await page.eval(`__qa.click('ul[aria-label="Itinerary places"] button', ${literal(select)})`); await sleep(400); }
+      const search = await page.eval('location.search');
+      await page.eval(`${editLinks}.find((a) => a.getAttribute('href') === ${literal(link.href)}).click()`);
+      await page.waitFor(`location.pathname + location.hash === ${literal(link.href)}`, 15_000).catch(() => {});
+      await sleep(2500);
+      const at = await page.eval(`(() => { const id = decodeURIComponent(location.hash.slice(1)), target = id ? document.getElementById(id) : null, box = target?.getBoundingClientRect();
+        return { url: location.pathname + location.hash, target: target ? __qa.describe(target) : null, inView: box ? box.top >= -1 && box.top < innerHeight : null, focus: __qa.describe(document.activeElement), h1: __qa.norm(document.querySelector('main h1, h1')?.textContent) }; })()`);
+      await page.eval('history.back()');
+      await atMap().catch(() => {}); await sleep(600);
+      at.back = { kept: await page.eval('location.search') === search, url: await page.eval('location.pathname + location.search') };
+      out.land.push({ link: link.text, from: select ?? 'day summary', ...at });
+    }
+  }
+
+  log('edits: a stay edit that fails');
+  await page.goto(`${BASE}/trips/trip-drive/map?date=${SAT}`); await atMap();
+  const rowsBefore = await placeRows();
+  const writes = [];
+  page.rules.unshift((url, request) => {
+    if (request.method === 'GET' || !/^\/api\/v1\/trips\//.test(url.pathname)) return undefined;
+    writes.push(`${request.method} ${url.pathname}`);
+    return writes.length === 1 ? { fail: 'ConnectionReset' } : { status: 500, body: { error: "Couldn't save the stay. Try again." } };
+  });
+  await page.eval('__qa.click("main a", "Edit tonight")');
+  await page.waitFor('location.pathname.endsWith("/stays") && document.getElementById(decodeURIComponent(location.hash.slice(1)))?.querySelector(\'button[aria-label^="Edit "]\')', 15_000);
+  const stay = await page.eval('(() => { const article = document.getElementById(decodeURIComponent(location.hash.slice(1))); return { id: article.id, button: article.querySelector(\'button[aria-label^="Edit "]\').getAttribute("aria-label") }; })()');
+  await page.eval(`document.querySelector('button[aria-label=${literal(stay.button)}]').click()`);
+  await page.waitFor('document.querySelector("[role=dialog] input[name=name]")', 10_000);
+  const original = await page.eval('document.querySelector("[role=dialog] input[name=name]").value');
+  await page.eval('(() => { const input = document.querySelector("[role=dialog] input[name=name]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, input.value + " (renamed)"); input.dispatchEvent(new Event("input", { bubbles: true })); })()');
+  const attempt = async () => {
+    await page.eval('[...document.querySelectorAll("[role=dialog] button")].find((button) => /^Review/.test(__qa.norm(button.textContent))).click()');
+    await page.waitFor('document.querySelector("#stay-error") && !document.querySelector("[role=dialog] [aria-busy=true]")', 15_000);
+    await sleep(300);
+    return page.eval('({ alert: __qa.norm(document.querySelector("#stay-error").textContent), role: document.querySelector("#stay-error").getAttribute("role"), open: !!document.querySelector("[role=dialog]"), name: document.querySelector("[role=dialog] input[name=name]")?.value, focus: __qa.describe(document.activeElement), onPage: /\\(renamed\\)/.test(document.querySelector("main").textContent.replace(document.querySelector("[role=dialog]")?.textContent ?? "", "")) })');
+  };
+  out.failedStay = { stay, original, network: await attempt(), server: await attempt(), writes };
+  await page.eval('[...document.querySelectorAll("[role=dialog] button")].find((button) => __qa.norm(button.textContent) === "Cancel").click()');
+  await sleep(600);
+  out.failedStay.cancel = await page.eval('__qa.norm(document.querySelector("[role=dialog]")?.textContent).slice(0, 140)');
+  await page.eval('[...document.querySelectorAll("[role=dialog] button")].find((button) => __qa.norm(button.textContent) === "Discard changes")?.click()');
+  await page.waitFor('!document.querySelector("[role=dialog]")', 10_000).catch(() => {});
+  await sleep(1200);
+  out.failedStay.closed = await page.eval('({ url: location.pathname + location.hash, focus: __qa.describe(document.activeElement), renamed: /\\(renamed\\)/.test(document.body.textContent) })');
+  for (let step = 0; step < 4 && !await page.eval('location.pathname.endsWith("/map")'); step++) { await page.eval('history.back()'); await sleep(1500); }
+  await atMap().catch(() => {});
+  out.failedStay.backAtMap = { url: await page.eval('location.pathname + location.search'), rowsUnchanged: JSON.stringify(await placeRows()) === JSON.stringify(rowsBefore),
+    renamed: await page.eval('/\\(renamed\\)/.test(document.body.textContent)'), errors: await page.eval('[...document.querySelectorAll("[role=alert]")].map((el) => __qa.norm(el.textContent)).filter(Boolean)') };
+  await page.close();
+  return out;
+});
+
+// ---------- box 6: the core trip load before and after maps (named only; needs --compare) ----------
+await run('compare', async () => {
+  const builds = COMPARE.split(',').filter(Boolean).map((spec) => { const [name, url, dir] = spec.split('='); return { name, url, dir: resolve(dir) }; });
+  if (!builds.length) throw new Error('compare needs --compare name=url=dir,...');
+  for (const build of builds) {
+    const chunks = join(build.dir, 'static/chunks');
+    build.mapChunks = [];
+    for (const name of await readdir(chunks)) if (name.endsWith('.js') && /MapLibre GL JS|maplibregl/.test(await readFile(join(chunks, name), 'utf8'))) build.mapChunks.push(name);
+    build.id = (await readFile(join(build.dir, 'BUILD_ID'), 'utf8')).trim();
+  }
+  const name = fx['trip-drive'].map.trip.name;
+  const marks = `(() => { window.__marks = {}; window.__lcp = 0;
+    try { new PerformanceObserver((list) => { for (const entry of list.getEntries()) window.__lcp = entry.startTime; }).observe({ type: 'largest-contentful-paint', buffered: true }); } catch {}
+    const tick = () => { const m = window.__marks, now = performance.now();
+      if (!m.core && [...document.querySelectorAll('h1')].some((h) => h.textContent.includes(${literal(name)})) && document.querySelector('main a[href*="/days/2027-01-"]')) m.core = now;
+      if (!m.places && /places shown/.test(document.body?.textContent || '')) m.places = now;
+      if (performance.now() < 90000) setTimeout(tick, 20); }; tick(); })();`;
+  const profiles = { unthrottled: { cpu: 1, network: null }, 'cpu4x-slow4g': { cpu: 4, network: { latency: 150, downloadThroughput: 1.6 * 1024 * 1024 / 8, uploadThroughput: 750 * 1024 / 8 } } };
+  const RUNS = Number(process.env.QA_COMPARE_RUNS ?? 5);
+  const { loadavg } = await import('node:os');
+  const out = { trip: `/trips/trip-drive (${name})`, runs: RUNS, builds: builds.map(({ name, url, id, mapChunks }) => ({ name, url, id, mapChunks })), load: { start: loadavg().map((v) => Math.round(v)) } };
+  const sum = (entries) => Math.round(entries.reduce((total, entry) => total + (entry.bytes ?? 0), 0) / 1024);
+  for (const [profile, settings] of Object.entries(profiles)) {
+    const runs = Object.fromEntries(builds.map((build) => [build.name, []]));
+    // Interleaved, so machine load falls on every build alike.
+    for (let attempt = 0; attempt < RUNS; attempt++) for (const build of builds) {
+      log(`compare: ${profile} ${build.name} run ${attempt + 1}`);
+      const page = await open(browser, { tiles: 'network', base: build.url });
+      await page.send('Page.addScriptToEvaluateOnNewDocument', { source: marks });
+      await page.throttle(settings);
+      await page.goto(`${build.url}/trips/trip-drive`);
+      const reached = await page.waitFor('window.__marks?.core', Number(process.env.QA_COMPARE_WAIT ?? 90_000)).then(() => true, () => false);
+      if (!reached) {
+        await page.screenshot(shot(`compare-${build.name}-no-core`));
+        log('compare: no core mark', await page.eval('location.href + " | " + __qa.norm(document.querySelector("main")?.textContent ?? document.body.textContent).slice(0, 400)'), JSON.stringify(page.api));
+      }
+      log('compare: core');
+      await sleep(settings.cpu > 1 ? 6000 : 2500);
+      const m = await page.eval('({ ...window.__marks, lcp: window.__lcp, fcp: performance.getEntriesByName("first-contentful-paint")[0]?.startTime, dcl: performance.getEntriesByType("navigation")[0].domContentLoadedEventEnd })');
+      const own = page.requests.filter((entry) => entry.url.startsWith(build.url) && !/\/api\//.test(entry.url));
+      const js = own.filter((entry) => /\/_next\/static\/chunks\/.+\.js/.test(entry.url));
+      runs[build.name].push({ coreMs: Math.round(m.core), placesMs: m.places ? Math.round(m.places) : null, lcpMs: Math.round(m.lcp), fcpMs: Math.round(m.fcp), dclMs: Math.round(m.dcl),
+        jsKB: sum(js), jsFiles: js.length, appKB: sum(own), requests: page.requests.filter((entry) => !/clerk/.test(entry.url)).length,
+        api: page.api.map((entry) => entry.path), mapChunk: js.some((entry) => build.mapChunks.some((chunk) => entry.url.endsWith(chunk))),
+        worker: page.requests.some((entry) => /maplibre-gl-worker/.test(entry.url)), tiles: tileRequests(page).length,
+        // QA_COMPARE_URLS=1 lists every request, to explain a difference.
+        ...process.env.QA_COMPARE_URLS ? { urls: page.requests.filter((entry) => !/clerk/.test(entry.url)).map((entry) => `${entry.type} ${entry.url.replace(build.url, '')} ${entry.bytes ?? '-'}`) } : {} });
+      await page.close();
+    }
+    const median = (list, key) => { const values = list.map((entry) => entry[key]).filter((value) => value != null).sort((a, b) => a - b); return values.length ? values[Math.floor(values.length / 2)] : null; };
+    out[profile] = Object.fromEntries(builds.map((build) => [build.name, { median: Object.fromEntries(['coreMs', 'placesMs', 'lcpMs', 'fcpMs', 'dclMs', 'jsKB', 'jsFiles', 'appKB', 'requests'].map((key) => [key, median(runs[build.name], key)])), runs: runs[build.name] }]));
+  }
+  out.load.end = loadavg().map((v) => Math.round(v));
+  return out;
+});
+
 await browser.close();
+await gate?.down();
 await writeFile(join(OUT, 'results.json'), JSON.stringify(results, null, 2));
 console.log(`Results in ${join(OUT, 'results.json')}`);
