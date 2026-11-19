@@ -51,7 +51,7 @@ Line numbers are for `main` at `b4e63d7`, plus this PR's changes where it says s
 
 **Manual check (#333).** With the migrations applied, sign in on a split trip as the organizer and as a member. Give one person their own starting point, then reset it. Confirm the brief's Starting from, Your drive, Departures and the map agree. Check with real routing credits. #344, #346 and #356 all list this as not verified.
 
-**Gap left (minor, not in #333's boxes).** In Stays, a run's details say "Sat Oct 10 morning: starts from Village hotel" (`RunDetails` in `TripStays.tsx`). That's the stay's checkout morning, and it doesn't reflect an own starting point. I left it alone because Stays is shared with the #213 work. I'd recommend reading `starts` there too in a small follow-up. **Fixed in #PR_TBD:** `RunDetails` now reads the server's `starts`, as the day brief does, so a run's morning says "starts from Ridge cabin · only this day" for someone with their own starting point (`TripStays.test.tsx`).
+**Gap left (minor, not in #333's boxes).** In Stays, a run's details say "Sat Oct 10 morning: starts from Village hotel" (`RunDetails` in `TripStays.tsx`). That's the stay's checkout morning, and it doesn't reflect an own starting point. I left it alone because Stays is shared with the #213 work. I'd recommend reading `starts` there too in a small follow-up. **Fixed in #401:** `RunDetails` now reads the server's `starts`, as the day brief does, so a run's morning says "starts from Ridge cabin · only this day" for someone with their own starting point (`TripStays.test.tsx`).
 
 ## #334: sport-specific day briefs
 
