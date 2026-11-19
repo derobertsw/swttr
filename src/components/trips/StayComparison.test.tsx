@@ -188,6 +188,16 @@ describe("Compare stays (#213)", () => {
     expect(screen.getByText("Choose one more stay to compare.")).toBeInTheDocument();
   });
 
+  it("wraps its buttons' labels, so large text never widens the page", async () => {
+    // jsdom doesn't lay out: the browser check (docs/qa/213-compare-stays) measures it, at 200% text on 320 and 390px phones.
+    await renderPage();
+    expect(await screen.findByRole("button", { name: "Add a stay to compare" })).toHaveClass("h-auto", "max-w-full", "whitespace-normal");
+    expect(screen.getByRole("button", { name: "Change Ridge chalet" }).parentElement).toHaveClass("flex-wrap", "min-w-0");
+    const one = splitDriveTrip();
+    await renderPage({ full: { ...one, lodging: { ...one.lodging!, stays: one.lodging!.stays.slice(0, 1) } }, candidates: [] });
+    expect(await screen.findByRole("button", { name: "Add another stay" })).toHaveClass("h-auto", "max-w-full", "whitespace-normal");
+  });
+
   it("still compares saved stays before options can be saved", async () => {
     await renderPage({ candidates: [], available: false });
     expect(await screen.findByText("Options can't be added yet. Saved stays can still be compared.")).toBeInTheDocument();
