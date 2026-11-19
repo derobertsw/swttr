@@ -218,8 +218,8 @@ Before the first session, run the whole script yourself on one set of trips, in 
 | T1 | Meet 7:30 at [trailhead lot]. Leaving Saturday from Valley inn. Sleeping Saturday night at Ridge lodge. |
 | T2 | Route: ______. Backup: ______. Back by 3:00 PM. Their kit for Saturday: ______. |
 | T3 | Saturday's drive, Valley inn → [lot]: about ___ min, one way, a road estimate. Then the approach (ski or walk), about 1 h, from the crew's notes. Longest drive: Monday, about ___ min. |
-| T4 | Sunday: no review recorded for this day, from anyone. Saturday's reviews don't count. |
-| T6 | Jordan has the transceiver packed for the trip, recorded a review of the avalanche forecast at ___, and has no transceiver check recorded. None of these says the conditions are safe. |
+| T4 | Saturday: reviews recorded beforehand (Trip A: Jordan's, and Sam's in member sessions; Trip B: Riley's). Sunday: no review recorded for this day, from anyone; Saturday's reviews don't count. The official forecast opens from Saturday's avalanche source: [center's page]. |
+| T6 | Organizer and member sessions: Jordan has the transceiver packed for the trip, recorded a review of the avalanche forecast at ___, and has no transceiver check recorded. Solo sessions: they have the transceiver packed (from T5), a review of the avalanche forecast at ___ (Riley's, made beforehand), and no transceiver check recorded. None of these says the conditions are safe. |
 | T9 | The trailhead lot's Sunday visit: ______. |
 | T10 | Directions from Ridge lodge to [resort lot], by car. |
 | T11 | Ridge lodge, found in the list. |
@@ -283,6 +283,10 @@ Names in the tasks are the fictional QA names. Say "Alex" for the organizer, "Sa
 
 Then:
 
+> "And from there to the bottom of the route? Where does each of those times come from?"
+
+Then:
+
 > "Which day of the trip has the longest drive?"
 
 - Correct: the road drive (a one-way estimate) and the approach (ski or walk, from the crew's notes), told apart, and Monday as the longest drive.
@@ -299,10 +303,14 @@ Then:
 
 Then, for everyone:
 
-> "According to the trip, has anyone looked at Sunday's avalanche forecast yet? Have you?"
+> "According to the trip, has anyone looked at Saturday's avalanche forecast? And Sunday's? Have you?"
 
-- Correct: the sources are listed on Sunday (organizer and solo: by them), and Sunday shows no review recorded. Saturday's reviews don't count for Sunday. Members and solo users should also mention that Saturday's has a review recorded (Sam's or Riley's, made beforehand).
-- Record whether they opened the avalanche forecast link at any point (R3: "find the relevant official bulletin"). For touring participants this counts toward R3's [pass threshold](#pass-thresholds); record it in [Facilitator checks](#facilitator-checks).
+Then:
+
+> "Show me where you'd read Saturday's avalanche forecast itself."
+
+- Correct: the sources are listed on Sunday (organizer and solo: by them), and Sunday shows no review recorded. Saturday shows the reviews recorded beforehand (Jordan's on Trip A, Sam's too in member sessions, Riley's on Trip B), and they don't count for Sunday. They then open the official avalanche forecast from Saturday's sources.
+- Record whether they opened the official avalanche forecast from the trip (R3: "find the relevant official bulletin"). For touring participants this counts toward R3's [pass threshold](#pass-thresholds); record it in [Facilitator checks](#facilitator-checks).
 - Evidence for: S5 (reuse, reviews per day), R3.
 
 **T5 · Your own preparation**
@@ -521,13 +529,13 @@ For every task, on the results sheet:
 | ID | Passes when | Set by |
 |---|---|---|
 | G2 | At least 5 of 6 say all four T1 facts correctly, unaided, within 15 seconds | #337 |
-| M1 + M2 | At least 5 of 6 find the meeting point and tell the two stays apart in T1, unaided: all three of T1's meeting point, leaving from and sleeping rows unaided and correct | #235 |
+| M1 + M2 | At least 5 of 6 find the meeting point and tell the two stays apart in T1, unaided: all three of T1's meeting place, leaving from and sleeping rows unaided and correct (the meeting time isn't part of M1) | #235 |
 | R1 | At least 5 of 6 complete T15 and T17 correctly, unaided | #205 |
 | R2 | At least 5 of 6 complete T3 correctly, unaided | #205 |
 | G1 | At least 5 of 6 complete all six core logistics tasks (T1, T2, T3, T14, T15, T17) correctly, unaided | #337 |
 | R3 | Every touring participant completes T2, T4 and T5 correctly, unaided, and opens the official avalanche bulletin from the trip (the T4 facilitator check), **and** nobody, touring or not, reads a review, check or clothing result as a safety verdict in T6 or T7 | #205 sets no count for the first part; this plan reads it as every touring participant |
 | M5 | No wrong destination or start in any T10 | #235 |
-| R4 | In every session that ran T8 and T17, the facilitator saw the affected reviews marked out of date and the drives updated, with kits and bookings unchanged | #205 |
+| R4 | All six sessions ran T8 and T17, and in each the facilitator saw the affected reviews marked out of date and the drives updated, with kits and bookings unchanged. A session where either wasn't run counts as not observed, so R4 isn't met; report why it didn't run | #205 |
 | B1 | Every iPhone session finds all four T20 items in the saved copy, and no session finds a wrong one | This plan. #214 only says to validate on actual devices before claiming offline availability. |
 | S1–S7, M3, M4, C1, H1 | No target: report the counts | — |
 
@@ -580,7 +588,8 @@ One code per cell ([Outcome codes](#outcome-codes)), followed by ✓ when the an
 | T1 Your day at a glance | | | | | | |
 | T1 time (seconds) | | | | | | |
 | T1 facts right (of 4) | | | | | | |
-| T1 meeting time and place (M1) | | | | | | |
+| T1 meeting place (M1) | | | | | | |
+| T1 meeting time | | | | | | |
 | T1 leaving from on Saturday morning (M2) | | | | | | |
 | T1 sleeping on Saturday night (M2) | | | | | | |
 | T2 Saturday's tour | | | | | | |
