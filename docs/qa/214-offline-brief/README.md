@@ -147,3 +147,70 @@ Raw output: `results.json` in `OUT` when you re-run. **main** is the first run o
 | a11y | Saved brief: one h1, a heading per day, no unnamed control, its state in a polite status region; the list has no unnamed control | Pass (2 checks) | Pass (2 checks) |
 | layout | No sideways scroll on the Plan page, the list, the brief and the Change saved days sheet at 320, 390 and 1280 px, and at 1280 px with 200% text | Pass (16 checks) | Pass (16 checks) |
 | layout | The same at 390 px with 200% text | **Fail** on the Plan page, the brief and the sheet (427 px wide: Remove from this device was 395 px) | Pass (4 checks) |
+
+Final branch run: 79 passed, 1 failed (the start-page gap). The account-switch notice also passed in 4 separate reruns of that group.
+
+## Bugs found, not fixed
+
+| Severity | Where | What happens | Recommended fix |
+|---|---|---|---|
+| Medium (box 1 and 8) | Site start page and Trips, offline | A cold start offline on `/` or `/trips` shows Chrome's "No internet" page. Only `/trips/saved` itself opens, from a bookmark, history or the typed path. Someone who opens SWTTR the usual way can't reach the copy. | Add a second, tiny worker registered at scope `/` when a brief is saved. It answers only navigations to `/` and `/trips`, and only while `navigator.onLine` is false, with a redirect to `/trips/saved`. It caches nothing. Online navigations are never touched, and in Chromium `addRoutes` (static routing) keeps every other request off the worker. #382 chose no site-wide fallback on purpose and left widening to #146/#361, so this needs the maintainer's call; the iPhone app gets its own entry from #146 either way. |
+| Low (not #214) | Trips list at 390 px with 200% text | The trip cards' "2 stops" badge pushes the page to 489 px. | Let the card's badge row wrap, as #337 did for the touring buttons. |
+| Low (not #214) | Bottom navigation at 390 px with 200% text, every page | The Wardrobe tab runs to 432 px, past the right edge. The bar is fixed, so the page doesn't scroll, but the tab is cut off. | Let the tab labels shrink or wrap below a width, or drop to icons with labels for screen readers. |
+
+## Untested surfaces
+
+These need a person, a device or #146. They move to the iPhone tracker #144 and the #205 pilot, and #214 can then close.
+
+1. **iPhone app cold start in airplane mode, once #146 lands.** On a real iPhone with a TestFlight or Xcode build that has App-Bound Domains and the offline entry:
+   1. Sign in, open a backcountry trip's Plan page, tap Save for offline, keep the ticked days, tap Save for offline. Confirm "Saved on this device …" and no alert saying the device can't open it offline.
+   2. Force-quit the app (swipe it away). Turn on airplane mode, Wi-Fi off too.
+   3. Launch the app. The start page fails and #146's "Can't reach SWTTR" view shows. Tap **Open saved trips**, without typing anything.
+   4. Pass if the list shows the trip with "Showing saved copy; changes since … are unknown.", and tapping it shows the day, the trailhead with coordinates, the backup plan and My kit / My equipment.
+   5. Restart the phone, stay in airplane mode, repeat 3–4.
+   6. Turn airplane mode off, sign out from the account menu, confirm the warning, then go offline and repeat 3: the list must be empty.
+2. **Safari and WebKit service workers.** On an iPhone in Safari (not the app) and on a Mac in Safari:
+   1. Save a brief, bookmark Saved on this device, close every Safari tab and quit Safari.
+   2. Airplane mode (or Wi-Fi off on the Mac), open Safari, open the bookmark. Pass if the brief opens as in 1.4.
+   3. Leave the brief saved and don't open SWTTR in Safari for 8 days, then repeat 2. WebKit deletes a site's script-written storage after 7 days of browser use without a visit, so the copy may be gone; record what happens and what the page says.
+   4. Add Saved on this device to the iPhone home screen, open it from there online, save a brief inside it, then repeat 2 from the home-screen icon (home-screen web apps have their own storage).
+3. **VoiceOver.** On an iPhone (Safari now, the app after #146), with VoiceOver on:
+   1. On the Plan page, swipe to Offline copy and open Save for offline. Each day is read as "[date] · [activity], checkbox, checked/not checked"; changing one reads the updated lists.
+   2. Save. VoiceOver reads "Saved on this device …" without moving focus. Then make a save fail (airplane mode before tapping Save): it reads the alert "Couldn't save on this device: … Nothing was saved."
+   3. On Saved on this device, open the brief: the status line is read; each day is a heading; every link ends "Requires connection".
+   4. Tap Remove from this device: focus lands on "Not saved on this device" and VoiceOver reads "Removed … from this device. The trip online hasn't changed."
+   5. Sign out from the avatar menu: the dialog "Sign out and remove saved trips?" takes focus and its buttons are named.
+4. **A signed-in account on production data.**
+   1. As an organizer with a pending invitation, save a real trip's brief. In Safari's Web Inspector (or Chrome DevTools) → Storage → IndexedDB → `swttr-offline` → `briefs`, confirm no invite token, no stay notes or booking link, and no other member's kit.
+   2. As a member, save the same trip. Confirm the Included / Not available offline lists match what the trip shows online, and that only your kit is there.
+   3. Have the organizer change a backup plan. The member's Plan page and Saved on this device say "Trip changed — update saved copy"; Update saved copy then matches.
+   4. Remove the member from the trip. The member opens Saved on this device online: the copy goes with "Removed from this device: you're no longer on …".
+5. **The real Clerk menu.** Signed in on desktop (1280 px) and phone width (390 px), open the avatar menu:
+   1. Exactly one Sign out shows (the app's, last), not Clerk's own as well.
+   2. With a brief saved, Sign out asks "Sign out and remove saved trips?"; Cancel keeps you signed in with the brief; Sign out and remove signs you out and Saved on this device is then empty.
+   3. With two accounts signed in (Clerk multi-session, if enabled), check that "Sign out of all accounts" doesn't show either.
+6. **Participant task in airplane mode.** Give a pilot participant (#205) a phone with their trip's brief saved the day before. Turn on airplane mode and ask: "Find the meet time and trailhead for Saturday, the backup plan, and what you're wearing and bringing." Don't help. Pass if they find all four, starting from the app (or the site) as they normally open it; record how long it took and where they first looked. Do it on the web now (from their bookmark) and in the iPhone app after #146.
+
+## What #146 must provide
+
+`docs/trip-offline-brief.md` ("iPhone app (#146)") has the detail. In short:
+
+1. `WKAppBoundDomains` in `Info.plist` with the app's host and every host the app's main frame loads (including Clerk's development handshake host while production uses a Clerk development instance), and `limitsNavigationsToAppBoundDomains = true` on the tabs' web view configuration. That's what turns service workers on in WKWebView. Recheck the activity bridge script, cookies and sign-in, since App-Bound Domains also limit script injection.
+2. **Open saved trips** in the "Can't reach SWTTR" view, loading `/trips/saved` in the same web view: the app's cold-start entry without a URL. A Trips tab (#361) can link there too.
+3. The device checks in [Untested surfaces](#untested-surfaces) 1.
+4. If App-Bound Domains break sign-in: the fallback is a native copy (the page hands the brief JSON to a message handler; the shell stores and renders it), decided in #146.
+
+## Re-running
+
+From the worktree root, with dependencies installed, `.env.local` present and nothing else on ports 3433, 39214 or 9433:
+
+```sh
+node docs/qa/214-offline-brief/preview-auth.mjs apply
+npx next build --turbopack; node docs/qa/214-offline-brief/preview-auth.mjs revert
+API_PORT=39214 node docs/qa/214-offline-brief/api.mjs &
+QA214_API=http://127.0.0.1:39214 npx next start -p 3433 -H localhost &
+OUT=/tmp/qa214 node docs/qa/214-offline-brief/run.mjs        # or name groups: save restart coldstart changed interrupted storage logistics account membership remove a11y layout
+# stop both servers; `revert` already checked next.config.ts and src/proxy.ts match HEAD
+```
+
+Run `revert` even if the build fails. `save`, `restart` and `coldstart` share one Chrome profile under `OUT` and must run in that order; the other groups start fresh. Files: `api.mjs` (fixture API), `fake-clerk.tsx` (Clerk stand-in for the preview build), `preview-auth.mjs` (the build-only edits), `browser.mjs` (Chrome launch and page helpers) and `run.mjs` (the checks).
