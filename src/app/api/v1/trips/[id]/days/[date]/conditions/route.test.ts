@@ -155,6 +155,14 @@ describe("Conditions sources API", () => {
       expect([invalid.status, await invalid.json()]).toEqual([400, expect.objectContaining({ field: "url" })]);
     });
 
+    it("refuses to review an edit from a day the source was removed from, so the editor checks the latest (409)", async () => {
+      // Opened on Saturday; removed from Saturday since, still on Sunday. Saving would be refused, so the review is too.
+      identity("user-1", { tables: listedOn(sundayId) });
+      const response = await POST(request({ action: "save", preview: true, source_id: sourceId, source: edit.source }), context());
+      expect([response.status, await response.json()]).toEqual([409, { error: "This day or its sources changed. Review them before saving again." }]);
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
     it("saves an edit only while the source is on the days its review listed", async () => {
       identity("user-1", { tables: listedOn(dayId, sundayId) });
       const stale = await POST(request({ ...edit, expected_days: [{ date: "2026-10-10", day_id: dayId }] }), context());

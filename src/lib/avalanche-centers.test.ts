@@ -102,6 +102,12 @@ describe("Suggested centers for a day's place", () => {
     expect(await items(48.95, -66.1)).toEqual([{ center_id: "avalanche-quebec", area: "Chic-Chocs", forecaster: "Avalanche Québec" }]);
   });
 
+  it("suggests nothing out of season, when Avalanche Canada publishes no forecast areas", async () => {
+    stubAvalancheCanada({ type: "FeatureCollection", features: [] }, []);
+    expect((await avalancheCenterDirectory(ROGERS_PASS)).suggestions)
+      .toEqual({ status: "none", point: "access_point", checked_at: expect.any(String), items: [] });
+  });
+
   it("doesn't suggest a U.S. center, even in the U.S.", async () => {
     stubAvalancheCanada();
     // Mount Washington, New Hampshire.

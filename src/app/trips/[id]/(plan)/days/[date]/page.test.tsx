@@ -24,6 +24,7 @@ import { tripDayOutingFor } from "@/lib/trip-day-outing";
 import type { TripDay, TripFull, TripItineraryRequest, TripLocation, TripMember, TripMemberDayKit, TripTourPlan } from "@/types/trips";
 import { savedOutfit, savedPlan, WEAR } from "@/test/savedKit";
 import DayDetailPage from "./page";
+import { TripProvider } from "@/components/trips/TripProvider";
 import { TemperatureUnitProvider } from "@/components/TemperatureUnitProvider";
 import { STORAGE_KEYS } from "@/lib/storage";
 
@@ -1344,6 +1345,41 @@ describe("Trip day page", () => {
       expect(screen.getByText("Crew reviews (1)")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Record my review of Mount Washington Avalanche Center" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add source" })).not.toBeInTheDocument();
+    });
+
+    it("records no review when a member opens a source and comes back to the day (#211)", async () => {
+      mockAuth.userId = "user-2";
+      const member: TripMember = { ...SAM, user_id: "user-2", status: "joined" };
+      const source = { id: "source-1", trip_id: TRIP.id, category: "avalanche" as const, name: "Mount Washington Avalanche Center", region: null,
+        url: "https://www.mountwashingtonavalanchecenter.org/", revision: 1, created_by: "user-1", updated_by: "user-1",
+        created_at: "2026-10-14T20:00:00Z", updated_at: "2026-10-14T20:00:00Z", date: DAY.date, trip_day_id: DAY.id, context_key: "key-1", reviews: [] };
+      const api = fakeTripApi({
+        "GET /api/v1/trips/trip-1": reply(200, tripFull({ stops: [STOWE_STOP], days: [tourDay], members: [ORGANIZER, member],
+          lodging: buildLodging(TRIP, [], []), tour_plans: [plan], conditions: [source] })),
+        "GET /api/v1/trips/trip-1/days/2026-10-10/weather": NO_FORECAST,
+      });
+      vi.stubGlobal("fetch", api);
+      const user = userEvent.setup();
+      await act(async () => {
+        render(
+          <TripProvider tripId={TRIP.id}>
+            <Suspense fallback={null}><DayDetailPage params={Promise.resolve({ id: TRIP.id, date: DAY.date })} /></Suspense>
+          </TripProvider>
+        );
+      });
+      const link = await screen.findByRole("link", { name: "Open forecast (new tab)" });
+      link.addEventListener("click", (event) => event.preventDefault());
+      await user.click(link);
+      // An hour later the person comes back to SWTTR, which reads the trip again.
+      vi.spyOn(Date, "now").mockReturnValue(Date.now() + 3_600_000);
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await waitFor(() => expect(sentBodies(api, "GET /api/v1/trips/trip-1")).toHaveLength(2));
+      expect(api.mock.calls.filter(([, init]) => (init?.method ?? "GET") !== "GET")).toEqual([]);
+      expect(screen.getByText("No review recorded for this day")).toBeInTheDocument();
+      expect(screen.getByText("Your reviews: 0 of 1 recorded for Saturday")).toBeInTheDocument();
     });
   });
 

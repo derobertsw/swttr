@@ -59,7 +59,13 @@ export async function POST(request: Request, context: Context) {
     try { full = await loadTripFull(auth.supabase, auth.trip); }
     catch { return jsonError("Couldn't load the review. Try again.", 500); }
     if (!full) return jsonError("Not found", 404);
-    const review = previewConditionsEdit(full, body.source_id.toLowerCase(), source);
+    // The editor opened from this day. Once the source is off it, saving is refused, so the review is too, and the editor checks the latest.
+    const sourceId = body.source_id.toLowerCase();
+    if (full.conditions && !full.conditions.some((listing) => listing.id === sourceId && listing.date === date)
+      && full.conditions_sources?.some((candidate) => candidate.id === sourceId)) {
+      return jsonError("This day or its sources changed. Review them before saving again.", 409);
+    }
+    const review = previewConditionsEdit(full, sourceId, source);
     return "error" in review ? jsonError(review.error, review.status) : NextResponse.json(review);
   }
 

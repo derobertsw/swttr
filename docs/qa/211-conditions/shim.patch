@@ -1,0 +1,45 @@
+diff --git a/src/components/trips/TripProvider.tsx b/src/components/trips/TripProvider.tsx
+index 76fb4fb..2f304f7 100644
+--- a/src/components/trips/TripProvider.tsx
++++ b/src/components/trips/TripProvider.tsx
+@@ -9,7 +9,8 @@ export function TripProvider({ tripId, children }: { tripId: string; children: R
+   // Remount immediately when the trip or Clerk session changes. Private trip
+   // data never persists into a different account, including pending responses.
+   return (
+-    <TripSession key={`${tripId}:${isLoaded}:${userId}:${sessionId}`} tripId={tripId} enabled={isLoaded && !!userId}>
++    // QA #211 fixture shim (docs/qa/211-conditions/shim.patch). Never commit.
++    <TripSession key={`${tripId}:${isLoaded}:${userId}:${sessionId}`} tripId={tripId} enabled={(isLoaded && !!userId) || tripId.startsWith("00000211-")}>
+       {children}
+     </TripSession>
+   );
+diff --git a/src/hooks/useUserId.ts b/src/hooks/useUserId.ts
+index c8b554d..2924d01 100644
+--- a/src/hooks/useUserId.ts
++++ b/src/hooks/useUserId.ts
+@@ -8,6 +8,10 @@ import { useAuth } from "@clerk/nextjs";
+  */
+ export function useUserId(): string | null {
+   const { userId, isLoaded } = useAuth();
++  // QA #211 fixture shim (docs/qa/211-conditions/shim.patch). Never commit.
++  if (typeof window !== "undefined" && window.location.pathname.startsWith("/trips/00000211-")) {
++    return /(?:^|;\s*)qa211_viewer=([^;]+)/.exec(document.cookie)?.[1] ?? null;
++  }
+ 
+   if (!isLoaded) return null;
+   return userId ?? null;
+diff --git a/src/proxy.ts b/src/proxy.ts
+index c2b1499..62b9ccb 100644
+--- a/src/proxy.ts
++++ b/src/proxy.ts
+@@ -75,6 +75,11 @@ const authenticate = clerkMiddleware(async (auth, request) => {
+ });
+ 
+ export default function proxy(request: NextRequest, event: NextFetchEvent) {
++  // QA #211 fixture shim (docs/qa/211-conditions/shim.patch). Never commit.
++  if (request.nextUrl.pathname.startsWith("/trips/00000211-")) return NextResponse.next();
++  if (request.nextUrl.pathname.startsWith("/api/v1/trips/00000211-")) {
++    return NextResponse.rewrite(new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, process.env.QA211_API ?? "http://127.0.0.1:34312"));
++  }
+   // Clerk can redirect even public HTML requests through its development
+   // handshake. App Review and fresh browsers must reach these pages directly.
+   // They use client-side account UI and do not need server authentication.
