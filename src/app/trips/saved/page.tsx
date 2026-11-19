@@ -11,7 +11,8 @@ import {
   CheckStatus, OfflineBriefView, absoluteTime, savedBriefHref, savedLine, useBriefCheck, useOnline,
 } from "@/components/trips/OfflineBrief";
 import {
-  fetchOfflineBrief, readSavedBriefs, reconcileSavedBriefs, removeSavedBrief, saveTicket, storeSavedBrief, type SavedBrief,
+  fetchOfflineBrief, readSavedBriefs, reconcileSavedBriefs, removeSavedBrief, savedBriefsAccountHint, saveTicket, storeSavedBrief,
+  type SavedBrief,
 } from "@/lib/offline-briefs";
 import { prepareOfflineOpening } from "@/lib/offline-shell";
 import { errorMessage } from "@/lib/trip-requests";
@@ -100,6 +101,14 @@ function SavedBriefs() {
     return () => { current = false; };
   }, [reconcileKey, signedInAs, account, load]);
 
+  // Whose briefs the device held as the page opened. The root layout's
+  // account guard can remove them before this page reads the device, and
+  // the page should still say why the list is empty.
+  const [openedWith] = useState(() => (typeof window === "undefined" ? null : savedBriefsAccountHint() ?? null));
+  const removedFirst = signedInAs !== undefined && !!device && !!openedWith && openedWith !== signedInAs && device.account !== openedWith;
+  const shownNotice = notice || (!removedFirst ? ""
+    : signedInAs ? "Trips saved by another account were removed from this device." : "You signed out, so the trips saved on this device were removed.");
+
   const otherAccount = typeof signedInAs === "string" && !!account && signedInAs !== account;
   const checkingAccount = !!reconcileKey && settled !== reconcileKey;
   const ready = !!device && (isLoaded || !online || waited) && !checkingAccount;
@@ -120,7 +129,7 @@ function SavedBriefs() {
       ) : (
         <div className="flex flex-col gap-2">
           <h1 id={MISSING_HEADING} tabIndex={-1} aria-describedby={MISSING_NOTICE} className="text-title font-semibold text-foreground">Not saved on this device</h1>
-          <p id={MISSING_NOTICE} role="status" className="text-base text-muted-foreground">{notice || "This trip isn't saved on this device. Save it for offline from the trip's Plan page while you're online."}</p>
+          <p id={MISSING_NOTICE} role="status" className="text-base text-muted-foreground">{shownNotice || "This trip isn't saved on this device. Save it for offline from the trip's Plan page while you're online."}</p>
           {online && <Link href={tripOpenHref(tripId)} className="inline-flex min-h-11 w-fit items-center text-base font-semibold text-primary">Open the trip</Link>}
         </div>
       )}
@@ -140,7 +149,7 @@ function SavedBriefs() {
           Without a connection, this is the only SWTTR page that opens. Bookmark it so you can find it then.
         </p>
       </header>
-      <p role="status" aria-live="polite" className="text-base text-foreground">{notice}</p>
+      <p role="status" aria-live="polite" className="text-base text-foreground">{shownNotice}</p>
       {storageError && <p role="alert" className="text-base font-medium text-destructive">Couldn&apos;t read this device&apos;s saved trips: {storageError}</p>}
       {!otherAccount && device && device.damaged.length > 0 && (
         <p className="text-base text-foreground">

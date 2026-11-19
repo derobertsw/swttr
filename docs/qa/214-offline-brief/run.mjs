@@ -96,6 +96,8 @@ groups.save = async () => {
   record('save', 'Save stores one brief for this account and says when and which dates, without an alert',
     !saved.dialogOpen && device.briefs.length === 1 && device.briefs[0].account_id === 'user-blair' && !saved.alert
       && /Saved on this device .* · Sat Jan 9 – Mon Jan 11/.test(saved.status), { saved, briefs: device.briefs.map((b) => [b.trip_id, b.account_id, b.brief.covered]) , meta: device.meta, hint: device.hint });
+  record('save', 'After saving, the app says how to reach the copy offline and doesn\'t claim Trips opens without a connection',
+    !/from Trips|with or without a connection/.test(saved.status), { status: saved.status });
   record('save', 'Section then shows the saved line and Open saved brief / Update saved copy / Change saved days / Remove from this device',
     ['Open saved brief', 'Update saved copy', 'Change saved days', 'Remove from this device'].every((label) => saved.section.includes(label)), { section: saved.section });
   const cached = Object.values(worker.caches).flat();
@@ -145,6 +147,7 @@ groups.coldstart = async () => {
   const list = await text(page, '#main-content');
   record('coldstart', 'Cold start offline: /trips/saved opens from the kept copy and lists the brief, no sign-in redirect',
     !opened.error && /Saved on this device/.test(list) && /Smugglers' Notch hut tour/.test(list) && (await page.eval('location.pathname')) === '/trips/saved', { list, console: page.console.slice(0, 5) });
+  record('coldstart', 'Offline, the list says it is the only page that opens without a connection and suggests a bookmark', /the only SWTTR page that opens\. Bookmark it/.test(list), { list });
   record('coldstart', 'Offline list row says changes since saving are unknown', /Showing saved copy; changes since .* are unknown/.test(list), { list });
 
   await click(page, "Smugglers' Notch hut tour", { role: 'a' });
@@ -339,10 +342,13 @@ groups.account = async () => {
   ({ browser, page } = await freshSave('user-alex'));
   await signInAs(page, 'user-blair');
   await go(page, '/trips/saved');
-  await page.waitFor(`/removed from this device/.test(document.body.innerText)`, 10_000);
+  await page.waitFor(`/removed from this device|No trips are saved/.test(document.body.innerText)`, 10_000);
+  await sleep(500);
   const notice = await page.eval(`[...document.querySelectorAll('#main-content [role=status]')].map((el) => el.innerText).join(' | ')`);
-  record('account', 'Saved on this device signed in as someone else removes the copies instead of showing them, and says so',
-    /Trips saved by another account were removed from this device\./.test(notice) && !/Smugglers/.test(await text(page, '#main-content')) && (await readDevice(page)).briefs.length === 0, { notice });
+  record('account', 'Saved on this device signed in as someone else never shows the other account\'s copies, and they are removed',
+    !/Smugglers/.test(await text(page, '#main-content')) && (await readDevice(page)).briefs.length === 0, { notice });
+  record('account', 'Saved on this device then says why the list is empty ("Trips saved by another account were removed")',
+    /Trips saved by another account were removed from this device\./.test(notice), { notice, list: (await text(page, '#main-content')).slice(-200) });
   await browser.quit();
 
   // Signed out somewhere else (session ended): cleared once the server agrees, kept while it can't answer.
@@ -388,7 +394,7 @@ groups.remove = async () => {
   const detail = { text: await text(page, '#main-content'), focus: await focused(page), briefs: (await readDevice(page)).briefs.length };
   record('remove', 'Saved brief: Remove from this device removes only the device copy and says the trip online is unchanged',
     detail.briefs === 0 && /Removed Smugglers' Notch hut tour from this device\. The trip online hasn't changed\./.test(detail.text), detail);
-  record('remove', 'Saved brief: after Remove, keyboard focus lands on the page, not lost to the document body', detail.focus.tag !== 'body', detail.focus);
+  record('remove', 'Saved brief: after Remove, keyboard focus moves to the "Not saved on this device" heading, not the document body', /Not saved on this device/.test(detail.focus.name ?? ''), detail.focus);
   const online = await api('/__qa/log');
   record('remove', 'Removing never touches the trip online (no write request)', !online.some((entry) => !entry.key.startsWith('GET ')), { writes: online.filter((entry) => !entry.key.startsWith('GET ')) });
   await browser.quit();

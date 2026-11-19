@@ -3,6 +3,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SavedBriefsPage from "./page";
 import { readSavedBriefs, storeSavedBrief } from "@/lib/offline-briefs";
+import { OfflineBriefAccountGuard } from "@/components/OfflineBriefAccountGuard";
 import { fakeClerkState, resetFakeClerk } from "@/test/fakeClerk";
 import { briefResponse, offlineBrief, resetDeviceStorage } from "@/test/offlineBrief";
 
@@ -96,6 +97,17 @@ describe("Saved on this device (#214)", () => {
     await storeSavedBrief("user_2", offlineBrief({ viewer: { user_id: "user_2", member_id: "m-2" } }));
     vi.stubGlobal("fetch", vi.fn());
     await show();
+    expect(await screen.findByText("Trips saved by another account were removed from this device.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Rogers Pass" })).not.toBeInTheDocument();
+    expect((await readSavedBriefs()).briefs).toEqual([]);
+  });
+
+  it("says another account's briefs were removed when the app's account guard removed them first (#214)", async () => {
+    await storeSavedBrief("user_2", offlineBrief({ viewer: { user_id: "user_2", member_id: "m-2" } }));
+    vi.stubGlobal("fetch", vi.fn());
+    search.params = new URLSearchParams();
+    // The root layout's guard runs on this page too, and can win the race to remove them.
+    await act(async () => { render(<><OfflineBriefAccountGuard /><SavedBriefsPage /></>); });
     expect(await screen.findByText("Trips saved by another account were removed from this device.")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Rogers Pass" })).not.toBeInTheDocument();
     expect((await readSavedBriefs()).briefs).toEqual([]);
