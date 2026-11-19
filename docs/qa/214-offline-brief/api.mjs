@@ -184,7 +184,8 @@ async function handle(req, res, url, body) {
     res.end(payload);
   } catch (error) {
     entry.status = 500;
-    entry.error = String(error?.stack ?? error);
+    // The request log (GET /__qa/log) keeps the message only; the stack goes to this server's console.
+    entry.error = String(error?.message ?? error);
     console.error(key, error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'QA fixture server error' }));
