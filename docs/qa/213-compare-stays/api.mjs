@@ -33,7 +33,7 @@ for (const key of ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CLE
 
 // Each trip's fixed "now", advancing in real time from the server's start.
 const RealDate = Date;
-const started = RealDate.now();
+let started = RealDate.now();
 let offset = 0;
 class FixtureDate extends RealDate {
   constructor(...args) {
@@ -99,6 +99,8 @@ let overrides = {};
 let receipts = new Map();
 const log = [];
 async function reset() {
+  // Each reset starts the trips' clocks again, so stored drives' ages read as fixtures.ts set them.
+  started = RealDate.now();
   offset = 0;
   databases = await fixtures.buildFixtureDatabase();
   overrides = {};
