@@ -6,7 +6,7 @@
 //   BASE=http://localhost:3432 API=http://127.0.0.1:3492 CDP_PORT=9432 OUT=/tmp/qa213 \
 //     node docs/qa/213-compare-stays/run.mjs [group ...]
 //
-// Groups: content, layout, text, a11y, journeys, use, shots (default: all).
+// Groups: content, layout, text, a11y, journeys, use, sheet, recovery, shots (default: all).
 import { spawn } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -16,7 +16,7 @@ import { api, BASE, Cdp, emulate, key, newPage, sleep, tab, visit } from '../337
 const OUT = resolve(process.env.OUT ?? join(tmpdir(), 'qa213'));
 const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const CDP_PORT = Number(process.env.CDP_PORT ?? 9432);
-const groups = new Set(process.argv.slice(2).length ? process.argv.slice(2) : ['content', 'layout', 'text', 'a11y', 'journeys', 'use', 'shots']);
+const groups = new Set(process.argv.slice(2).length ? process.argv.slice(2) : ['content', 'layout', 'text', 'a11y', 'journeys', 'use', 'sheet', 'recovery', 'shots']);
 
 const TRIP = 'qa213-weekend';
 const ONE = 'qa213-one';
@@ -326,6 +326,21 @@ async function journeyChecks(page, cdp) {
     record('journeys', `reload keeps the choice and nights at ${width}px`, JSON.stringify(reloaded.checked) === JSON.stringify(before.checked)
       && reloaded.first_night === FRI && reloaded.checkout === SUN, { width, reloaded });
 
+    // Choosing stays and nights never saves anything.
+    const writesBefore = JSON.parse(await api('/__qa/log', undefined, 'GET')).filter((entry) => !entry.key.startsWith('GET')).length;
+    const planBefore = await savedPlan();
+    await page.eval(`[...document.querySelectorAll('#main-content input[type=checkbox]')].find((box) => box.closest('label').innerText.startsWith('Brook inn')).click()`);
+    await sleep(800);
+    await page.eval(`(() => { const select = document.querySelector('select[name=checkout]'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; set.call(select, '${MON}'); select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await sleep(1200);
+    const chosen = await selection(page);
+    await page.eval(`[...document.querySelectorAll('#main-content input[type=checkbox]')].find((box) => box.closest('label').innerText.startsWith('Brook inn')).click()`);
+    await page.eval(`(() => { const select = document.querySelector('select[name=checkout]'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; set.call(select, '${SUN}'); select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await sleep(1200);
+    const writesAfter = JSON.parse(await api('/__qa/log', undefined, 'GET')).filter((entry) => !entry.key.startsWith('GET')).length;
+    record('journeys', `choosing stays and nights saves nothing at ${width}px`, writesAfter === writesBefore && JSON.stringify(await savedPlan()) === JSON.stringify(planBefore)
+      && chosen.checked.length === 3 && chosen.checkout === MON, { width, chosen, writes: writesAfter - writesBefore });
+
     // Add a stay to compare: a sheet on the page; on save it joins the comparison as the third, and nothing else moves.
     await page.eval(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Add a stay to compare').scrollIntoView({ block: 'center' })`);
     await sleep(300);
@@ -343,9 +358,12 @@ async function journeyChecks(page, cdp) {
     const afterAdd = await selection(page);
     const focusAfter = await page.run(focusState);
     const announced = await page.eval(`document.querySelector('[aria-live=polite]')?.innerText`);
+    const planAfterAdd = await savedPlan();
+    const lodgingKept = planAfterAdd.revision === planBefore.revision && JSON.stringify(planAfterAdd.nights) === JSON.stringify(planBefore.nights)
+      && JSON.stringify(planAfterAdd.bookings) === JSON.stringify(planBefore.bookings) && planAfterAdd.options.length === planBefore.options.length + 1;
     record('journeys', `add a stay and return at ${width}px`, afterAdd.checked.length === 3 && afterAdd.checked[2].startsWith(`Maple farmhouse ${width}`)
       && afterAdd.checked.slice(0, 2).join() === beforeAdd.checked.join() && afterAdd.first_night === FRI && afterAdd.checkout === SUN
-      && Math.abs(afterAdd.scrollY - beforeAdd.scrollY) <= 40, { width, beforeAdd, afterAdd, focusInSheet, focusAfter, announced });
+      && Math.abs(afterAdd.scrollY - beforeAdd.scrollY) <= 40 && lodgingKept, { width, beforeAdd, afterAdd, focusInSheet, focusAfter, announced, lodgingKept });
   }
 
   // A member compares, but can't add, change, remove or use.
@@ -441,7 +459,7 @@ async function useChecks(page) {
     const pageAfter = await selection(page);
     record('use', `save at ${width}px`, saved.bookings['Pine rental'] === 'booked' && saved.bookings['Mountain lodge'] === 'booked' && saved.bookings['Village hotel'] === 'not_booked'
       && saved.bookings['Ridge chalet'] === 'not_booked' && saved.options.length === 7 && shown.includes('Chosen for these nights · 6 people')
-      && pageAfter.address.includes(`stay%3A${OPT.ridge}`) && focusAfter.name === 'Comparison',
+      && pageAfter.address.includes(`stay%3A${OPT.ridge}`) && focusAfter.name === 'Comparison' && focusAfter.inView,
       { width, revision: [plan.revision, saved.revision], bookings: saved.bookings, options: saved.options.length, announced: await page.eval(`document.querySelector('[aria-live=polite]')?.innerText`), focusAfter, address: pageAfter.address });
 
     // A saved stay whose dates don't cover the nights says so, and nothing is saved.
@@ -455,6 +473,55 @@ async function useChecks(page) {
       { width, outside, focusAfterEscape });
   }
   await api('/__qa/reset');
+  await save();
+}
+
+/** The Use sheet: names, Tab order kept inside it, and nothing wider than the sheet, at 100% and 200% text. */
+async function sheetChecks(page) {
+  await signIn(page, VIEWERS.organizer);
+  for (const [width, fontSize] of [[390, 16], [1440, 16], [320, 32], [390, 32]]) {
+    await api('/__qa/reset');
+    await emulate(page, { width, fontSize });
+    await open(page, compareUrl(TRIP, [s('pine'), c('ridge')]));
+    await clickText(page, 'button', 'Use Ridge chalet for these nights');
+    await page.waitFor(`document.querySelector('[role=dialog]')?.innerText.includes('What changes')`, 15_000);
+    await page.eval(`document.querySelectorAll('[role=dialog] details').forEach((d) => { d.open = true; })`);
+    await sleep(400);
+    const ax = await axSummary(page);
+    const stops = [];
+    for (let index = 0; index < 14; index += 1) { await tab(page); stops.push(await page.run(focusState)); }
+    const wide = await page.eval(`(() => { const d = document.querySelector('[role=dialog]'); const inner = [...d.querySelectorAll('*')].filter((el) => el.getBoundingClientRect().right > d.getBoundingClientRect().right + 1 && getComputedStyle(el).position !== 'fixed');
+      return { dialog: Math.round(d.getBoundingClientRect().width), scrollWidth: d.scrollWidth, clientWidth: d.clientWidth, past: inner.slice(0, 5).map((el) => el.tagName + ':' + (el.innerText ?? '').slice(0, 40)) }; })()`);
+    const pass = !ax.unnamed.length && stops.every((stop) => stop.dialog) && stops.every((stop) => stop.shown) && wide.scrollWidth <= wide.clientWidth + 1 && !wide.past.length;
+    record('use', `sheet at ${width}px, ${fontSize === 32 ? '200%' : '100%'} text`, pass, { width, fontSize, unnamed: ax.unnamed, checkboxes: ax.checkboxes.filter((name) => !/comparison|nights ·|Booked|Booking|Nights not set/.test(name)),
+      tabOrder: stops.map((stop) => `${stop.tag}${stop.type ? `[${stop.type}]` : ''}:${stop.name}${stop.dialog ? '' : ' (outside the sheet)'}${stop.shown ? '' : ' (no visible focus)'}`), wide });
+    await key(page, 'Escape', 'Escape', 27);
+    await page.waitFor(`!document.querySelector('[role=dialog]')`, 8000);
+  }
+  await emulate(page, { width: 390 });
+  await save();
+}
+
+/** The comparison request fails: an alert with Try again, and the choice stays; trying again recovers. */
+async function recoveryChecks(page) {
+  await signIn(page, VIEWERS.organizer);
+  await api('/__qa/reset');
+  for (const width of [390, 1440]) {
+    await emulate(page, { width });
+    await api('/__qa/overrides', { [`GET /api/v1/trips/${TRIP}/stay-candidates/compare`]: { status: 500, body: { error: "Couldn't compare these stays. Try again." } } });
+    // Failing until it's switched off: development mode mounts twice and asks twice.
+    await visit(page, STATES.known);
+    await page.waitFor(`document.querySelector('#main-content [role=alert]')`, 15_000);
+    const alert = await page.eval(`document.querySelector('#main-content [role=alert]').innerText`);
+    const kept = await selection(page);
+    await api('/__qa/overrides', undefined, 'DELETE');
+    await clickText(page, '#main-content button', 'Try again');
+    await page.waitFor(`document.querySelector('table, [role=group]') && !document.querySelector('#main-content [role=alert]')`, 15_000);
+    const shown = await page.eval(text());
+    record('journeys', `comparison fails, then Try again at ${width}px`, alert.includes("Couldn't compare these stays. Try again.") && kept.checked.length === 3
+      && shown.includes('Pine rental has the lowest sum of planned outbound drives'), { width, alert, kept: kept.checked });
+  }
+  await api('/__qa/overrides', undefined, 'DELETE');
   await save();
 }
 
@@ -485,6 +552,8 @@ try {
   if (groups.has('a11y')) await a11yChecks(page);
   if (groups.has('journeys')) await journeyChecks(page, browser.cdp);
   if (groups.has('use')) await useChecks(page);
+  if (groups.has('sheet')) await sheetChecks(page);
+  if (groups.has('recovery')) await recoveryChecks(page);
   if (groups.has('shots')) await shots(page);
   results.meta.finished = new Date().toISOString();
   await save();

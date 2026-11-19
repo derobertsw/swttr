@@ -195,7 +195,13 @@ export function StayComparison({ data, canEdit, initial, onPlanSaved }: {
       </div>}
       {result.comparison && <ComparisonView comparison={result.comparison}
         onUse={canEdit && data.lodging?.per_member ? (option) => {
-          focus.remember(() => document.getElementById("comparison-heading"));
+          // An option used for the nights gets a new button as the stay it became, so focus goes to the
+          // heading instead, scrolled into view: the button was at the foot of the comparison.
+          focus.remember(() => {
+            const heading = document.getElementById("comparison-heading");
+            heading?.scrollIntoView({ block: "center" });
+            return heading;
+          });
           setUsing({ option, window: result.comparison!.window });
         } : undefined} />}
       {result.comparison && canEdit && !data.lodging?.per_member && <p className="mt-3 max-w-3xl text-base text-muted-foreground">To use one of these for the nights, plan them on Stays: choosing from here needs per-person nights.</p>}

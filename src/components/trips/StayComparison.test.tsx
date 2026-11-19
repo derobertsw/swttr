@@ -252,6 +252,10 @@ describe("Use for these nights (#213)", () => {
     expect(onPlanSaved).toHaveBeenCalled();
     // The option is a saved stay now, and stays in the comparison as one.
     await waitFor(() => expect(window.location.search).toContain(`stay%3A${A}`));
+    // Its Use button is new, so focus goes to the Comparison heading, scrolled into view rather than left off-screen.
+    const heading = screen.getByRole("heading", { name: "Comparison" });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(vi.mocked(Element.prototype.scrollIntoView).mock.contexts).toContain(heading);
   }, 20_000);
 
   it("asks again for the people chosen, and reviews again after the plan changed", async () => {
