@@ -15,6 +15,8 @@ import type { TripFull, TripStayCandidate, TripStayCandidates, TripStayCompariso
 
 /** Up to three stays side by side: more don't fit beside each other on a phone or in one look. */
 const MAX_OPTIONS = 3;
+/** A button whose label wraps rather than widening the page with large text. */
+const WRAPPING = "h-auto min-h-11 max-w-full whitespace-normal py-2";
 
 /** The comparison's starting point, from the page's address. */
 interface ComparisonSelection {
@@ -152,7 +154,7 @@ export function StayComparison({ data, canEdit, initial, onPlanSaved }: {
     {choices && <section aria-labelledby="stay-options-heading" className="mt-6 max-w-3xl">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="stay-options-heading" tabIndex={-1} className="text-lg font-semibold text-foreground">Stays to compare</h2>
-        {canEdit && choices.available && <Button type="button" variant="outline" onClick={() => openEditor(null)}>Add a stay to compare</Button>}
+        {canEdit && choices.available && <Button type="button" variant="outline" className={WRAPPING} onClick={() => openEditor(null)}>Add a stay to compare</Button>}
       </div>
       <p className="text-base text-muted-foreground">Choose two or three. They&apos;re shown in the order you choose them.{full ? " Three are chosen: clear one to choose another." : ""}</p>
       {!choices.available && <p className="mt-1 text-base text-muted-foreground">Options can&apos;t be added yet. Saved stays can still be compared.</p>}
@@ -184,7 +186,7 @@ export function StayComparison({ data, canEdit, initial, onPlanSaved }: {
         <p className="text-base text-foreground">{chosen.length ? "Choose one more stay to compare." : "Choose two or three stays to compare."}</p>
         <p className="text-base text-muted-foreground">A comparison puts each stay&apos;s drives to the same planned days side by side. Each needs a location for its drive times.</p>
         {stays.length + listedCandidates.length < 2 && (canEdit && choices.available
-          ? <Button type="button" className="mt-2" onClick={() => openEditor(null)}>Add another stay</Button>
+          ? <Button type="button" className={cn("mt-2", WRAPPING)} onClick={() => openEditor(null)}>Add another stay</Button>
           : <p className="text-base text-muted-foreground">{canEdit ? "Save another stay first." : "The organizer can add stays to compare."}</p>)}
       </div>}
       {result.loading && <p role="status" className="text-base text-muted-foreground">Comparing the drives…</p>}
@@ -193,7 +195,13 @@ export function StayComparison({ data, canEdit, initial, onPlanSaved }: {
       </div>}
       {result.comparison && <ComparisonView comparison={result.comparison}
         onUse={canEdit && data.lodging?.per_member ? (option) => {
-          focus.remember(() => document.getElementById("comparison-heading"));
+          // An option used for the nights gets a new button as the stay it became, so focus goes to the
+          // heading instead, scrolled into view: the button was at the foot of the comparison.
+          focus.remember(() => {
+            const heading = document.getElementById("comparison-heading");
+            heading?.scrollIntoView({ block: "center" });
+            return heading;
+          });
           setUsing({ option, window: result.comparison!.window });
         } : undefined} />}
       {result.comparison && canEdit && !data.lodging?.per_member && <p className="mt-3 max-w-3xl text-base text-muted-foreground">To use one of these for the nights, plan them on Stays: choosing from here needs per-person nights.</p>}
@@ -241,7 +249,7 @@ function OptionCheck({ name, chosen, disabled, facts, onChange, actions }: {
         <span className="block text-muted-foreground">{facts.filter(Boolean).join(" · ")}</span>
       </span>
     </label>
-    {actions && <div className="flex shrink-0 gap-1 pl-6 @lg:pl-0">{actions}</div>}
+    {actions && <div className="flex min-w-0 flex-wrap gap-1 pl-6 @lg:pl-0">{actions}</div>}
   </li>;
 }
 

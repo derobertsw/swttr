@@ -1,0 +1,1218 @@
+{
+  "meta": {
+    "base": "http://localhost:3432",
+    "browser": "Chrome/157.0.8103.79",
+    "started": "2026-11-19T00:58:26.084Z",
+    "finished": "2026-11-19T01:00:39.451Z"
+  },
+  "passed": 63,
+  "total": 63,
+  "checks": [
+    {
+      "group": "content",
+      "name": "known at 390px",
+      "pass": true,
+      "width": 390,
+      "missing": [],
+      "unwanted": []
+    },
+    {
+      "group": "content",
+      "name": "known at 1440px",
+      "pass": true,
+      "width": 1440,
+      "missing": [],
+      "unwanted": []
+    },
+    {
+      "group": "content",
+      "name": "unknown at 390px",
+      "pass": true,
+      "width": 390,
+      "missing": [],
+      "unwanted": []
+    },
+    {
+      "group": "content",
+      "name": "unknown at 1440px",
+      "pass": true,
+      "width": 1440,
+      "missing": [],
+      "unwanted": []
+    },
+    {
+      "group": "content",
+      "name": "stale at 390px",
+      "pass": true,
+      "width": 390,
+      "missing": [],
+      "unwanted": []
+    },
+    {
+      "group": "content",
+      "name": "stale at 1440px",
+      "pass": true,
+      "width": 1440,
+      "missing": [],
+      "unwanted": []
+    },
+    {
+      "group": "content",
+      "name": "empty state (organizer)",
+      "pass": true,
+      "add": [
+        "Add a stay to compare",
+        "Add another stay"
+      ],
+      "compareRequests": 0
+    },
+    {
+      "group": "content",
+      "name": "empty state (member)",
+      "pass": true,
+      "add": [],
+      "compareRequests": 0
+    },
+    {
+      "group": "layout",
+      "name": "known at 320px (grouped)",
+      "pass": true,
+      "width": 320,
+      "vw": 320,
+      "scrollWidth": 320,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "known at 390px (grouped)",
+      "pass": true,
+      "width": 390,
+      "vw": 390,
+      "scrollWidth": 390,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "known at 768px (grouped)",
+      "pass": true,
+      "width": 768,
+      "vw": 768,
+      "scrollWidth": 768,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "known at 1024px (grouped)",
+      "pass": true,
+      "width": 1024,
+      "vw": 1024,
+      "scrollWidth": 1024,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "known at 1440px (table)",
+      "pass": true,
+      "width": 1440,
+      "vw": 1440,
+      "scrollWidth": 1440,
+      "layout": "table",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "unknown at 320px (grouped)",
+      "pass": true,
+      "width": 320,
+      "vw": 320,
+      "scrollWidth": 320,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "unknown at 390px (grouped)",
+      "pass": true,
+      "width": 390,
+      "vw": 390,
+      "scrollWidth": 390,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "unknown at 768px (grouped)",
+      "pass": true,
+      "width": 768,
+      "vw": 768,
+      "scrollWidth": 768,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "unknown at 1024px (grouped)",
+      "pass": true,
+      "width": 1024,
+      "vw": 1024,
+      "scrollWidth": 1024,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "unknown at 1440px (table)",
+      "pass": true,
+      "width": 1440,
+      "vw": 1440,
+      "scrollWidth": 1440,
+      "layout": "table",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "stale at 320px (grouped)",
+      "pass": true,
+      "width": 320,
+      "vw": 320,
+      "scrollWidth": 320,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "stale at 390px (grouped)",
+      "pass": true,
+      "width": 390,
+      "vw": 390,
+      "scrollWidth": 390,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "stale at 768px (grouped)",
+      "pass": true,
+      "width": 768,
+      "vw": 768,
+      "scrollWidth": 768,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "stale at 1024px (grouped)",
+      "pass": true,
+      "width": 1024,
+      "vw": 1024,
+      "scrollWidth": 1024,
+      "layout": "grouped",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "stale at 1440px (table)",
+      "pass": true,
+      "width": 1440,
+      "vw": 1440,
+      "scrollWidth": 1440,
+      "layout": "table",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "empty at 320px (none)",
+      "pass": true,
+      "width": 320,
+      "vw": 320,
+      "scrollWidth": 320,
+      "layout": "none",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "empty at 390px (none)",
+      "pass": true,
+      "width": 390,
+      "vw": 390,
+      "scrollWidth": 390,
+      "layout": "none",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "empty at 768px (none)",
+      "pass": true,
+      "width": 768,
+      "vw": 768,
+      "scrollWidth": 768,
+      "layout": "none",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "empty at 1024px (none)",
+      "pass": true,
+      "width": 1024,
+      "vw": 1024,
+      "scrollWidth": 1024,
+      "layout": "none",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "layout",
+      "name": "empty at 1440px (none)",
+      "pass": true,
+      "width": 1440,
+      "vw": 1440,
+      "scrollWidth": 1440,
+      "layout": "none",
+      "groupedOk": true,
+      "tablesOk": true,
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "text",
+      "name": "200% text, known at 320px (grouped)",
+      "pass": true,
+      "width": 320,
+      "vw": 320,
+      "scrollWidth": 320,
+      "layout": "grouped",
+      "map": false,
+      "offenders": [
+        {
+          "el": "a.flex.min-h-11.min-w-16",
+          "text": "Wardrobe",
+          "right": 432
+        }
+      ],
+      "spilled": []
+    },
+    {
+      "group": "text",
+      "name": "200% text, known at 390px (grouped)",
+      "pass": true,
+      "width": 390,
+      "vw": 390,
+      "scrollWidth": 390,
+      "layout": "grouped",
+      "map": false,
+      "offenders": [
+        {
+          "el": "a.flex.min-h-11.min-w-16",
+          "text": "Wardrobe",
+          "right": 432
+        }
+      ],
+      "spilled": []
+    },
+    {
+      "group": "text",
+      "name": "200% text, known at 1440px (grouped)",
+      "pass": true,
+      "width": 1440,
+      "vw": 1440,
+      "scrollWidth": 1440,
+      "layout": "grouped",
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "text",
+      "name": "200% text, unknown at 320px (grouped)",
+      "pass": true,
+      "width": 320,
+      "vw": 320,
+      "scrollWidth": 320,
+      "layout": "grouped",
+      "map": false,
+      "offenders": [
+        {
+          "el": "a.flex.min-h-11.min-w-16",
+          "text": "Wardrobe",
+          "right": 432
+        }
+      ],
+      "spilled": []
+    },
+    {
+      "group": "text",
+      "name": "200% text, unknown at 390px (grouped)",
+      "pass": true,
+      "width": 390,
+      "vw": 390,
+      "scrollWidth": 390,
+      "layout": "grouped",
+      "map": false,
+      "offenders": [
+        {
+          "el": "a.flex.min-h-11.min-w-16",
+          "text": "Wardrobe",
+          "right": 432
+        }
+      ],
+      "spilled": []
+    },
+    {
+      "group": "text",
+      "name": "200% text, unknown at 1440px (grouped)",
+      "pass": true,
+      "width": 1440,
+      "vw": 1440,
+      "scrollWidth": 1440,
+      "layout": "grouped",
+      "map": false,
+      "offenders": [],
+      "spilled": []
+    },
+    {
+      "group": "a11y",
+      "name": "organizer at 390px: 41 Tab stops",
+      "pass": true,
+      "width": 390,
+      "unnamed": [],
+      "keyboard": {
+        "stops": 41,
+        "hidden": [],
+        "outOfView": [],
+        "order": [
+          "a:All trips",
+          "a:Edit trip",
+          "a:Plan",
+          "a:Stays",
+          "a:Crew",
+          "a:Packing",
+          "a:Stays",
+          "select:First night Night before the trip · Thu Oct 8 Night of Fri O",
+          "select:Check-out morning Morning of Sat Oct 10 Morning of Sun Oct 1",
+          "button[button]:Add a stay to compare",
+          "input[checkbox]:Pine rental · Second in the comparison Fri Oct 9 → Sun Oct 1",
+          "input[checkbox]:Ridge chalet · First in the comparison About $1,260 total fo",
+          "button[button]:Change Ridge chalet",
+          "button[button]:Remove Ridge chalet from the options",
+          "input[checkbox]:Brook inn · Third in the comparison About CA$900.50 total fo",
+          "button[button]:Change Brook inn",
+          "button[button]:Remove Brook inn from the options",
+          "button[button]:Change The Very Long Name Of A Mountainside Chalet With Hot ",
+          "button[button]:Remove The Very Long Name Of A Mountainside Chalet With Hot ",
+          "button[button]:Change Hilltop barn",
+          "button[button]:Remove Hilltop barn from the options",
+          "button[button]:Change Notch cabin",
+          "button[button]:Remove Notch cabin from the options",
+          "button[button]:Change Town apartment",
+          "button[button]:Remove Town apartment from the options",
+          "button[button]:Change Gondola condo",
+          "button[button]:Remove Gondola condo from the options",
+          "a:Open Ridge chalet's website (new tab)",
+          "a:Open Pine rental's website (new tab)",
+          "a:Open Brook inn's website (new tab)",
+          "button[button]:Use Ridge chalet for these nights",
+          "button[button]:Use Pine rental for these nights",
+          "button[button]:Use Brook inn for these nights",
+          "a:Powered by Geoapify",
+          "a:© OpenStreetMap contributors"
+        ]
+      },
+      "headings": [
+        "1:Compare stays",
+        "2:Stays to compare",
+        "2:Comparison",
+        "3:The plan for these nights now",
+        "3:Stays compared",
+        "3:Drive each morning",
+        "3:Totals",
+        "3:Cost and details",
+        "4:Sat Oct 10",
+        "4:Sun Oct 11",
+        "4:Mon Oct 12 · check-out morning",
+        "4:Longest known drive",
+        "4:Drives known",
+        "4:Sum of planned outbound drives",
+        "4:Estimated lodging cost",
+        "4:Booking",
+        "4:Property",
+        "4:Notes",
+        "4:Use for these nights"
+      ]
+    },
+    {
+      "group": "a11y",
+      "name": "organizer at 1440px: 46 Tab stops",
+      "pass": true,
+      "width": 1440,
+      "unnamed": [],
+      "keyboard": {
+        "stops": 46,
+        "hidden": [],
+        "outOfView": [],
+        "order": [
+          "a:All trips",
+          "a:Edit trip",
+          "a:Plan",
+          "a:Stays",
+          "a:Crew",
+          "a:Packing",
+          "a:Stays",
+          "select:First night Night before the trip · Thu Oct 8 Night of Fri O",
+          "select:Check-out morning Morning of Sat Oct 10 Morning of Sun Oct 1",
+          "button[button]:Add a stay to compare",
+          "input[checkbox]:Pine rental · Second in the comparison Fri Oct 9 → Sun Oct 1",
+          "input[checkbox]:Ridge chalet · First in the comparison About $1,260 total fo",
+          "button[button]:Change Ridge chalet",
+          "button[button]:Remove Ridge chalet from the options",
+          "input[checkbox]:Brook inn · Third in the comparison About CA$900.50 total fo",
+          "button[button]:Change Brook inn",
+          "button[button]:Remove Brook inn from the options",
+          "button[button]:Change The Very Long Name Of A Mountainside Chalet With Hot ",
+          "button[button]:Remove The Very Long Name Of A Mountainside Chalet With Hot ",
+          "button[button]:Change Hilltop barn",
+          "button[button]:Remove Hilltop barn from the options",
+          "button[button]:Change Notch cabin",
+          "button[button]:Remove Notch cabin from the options",
+          "button[button]:Change Town apartment",
+          "button[button]:Remove Town apartment from the options",
+          "button[button]:Change Gondola condo",
+          "button[button]:Remove Gondola condo from the options",
+          "a:Open Ridge chalet's website (new tab)",
+          "a:Open Pine rental's website (new tab)",
+          "a:Open Brook inn's website (new tab)",
+          "button[button]:Use Ridge chalet for these nights",
+          "button[button]:Use Pine rental for these nights",
+          "button[button]:Use Brook inn for these nights",
+          "a:Powered by Geoapify",
+          "a:© OpenStreetMap contributors"
+        ]
+      },
+      "headings": [
+        "1:Compare stays",
+        "2:Stays to compare",
+        "2:Comparison",
+        "3:The plan for these nights now"
+      ]
+    },
+    {
+      "group": "a11y",
+      "name": "member at 390px: 23 Tab stops",
+      "pass": true,
+      "width": 390,
+      "unnamed": [],
+      "keyboard": {
+        "stops": 23,
+        "hidden": [],
+        "outOfView": [],
+        "order": [
+          "a:All trips",
+          "a:Edit trip",
+          "a:Plan",
+          "a:Stays",
+          "a:Crew",
+          "a:Packing",
+          "a:Stays",
+          "select:First night Night before the trip · Thu Oct 8 Night of Fri O",
+          "select:Check-out morning Morning of Sat Oct 10 Morning of Sun Oct 1",
+          "input[checkbox]:Pine rental · Second in the comparison Fri Oct 9 → Sun Oct 1",
+          "input[checkbox]:Ridge chalet · First in the comparison About $1,260 total fo",
+          "input[checkbox]:Brook inn · Third in the comparison About CA$900.50 total fo",
+          "a:Open Ridge chalet's website (new tab)",
+          "a:Open Pine rental's website (new tab)",
+          "a:Open Brook inn's website (new tab)",
+          "a:Powered by Geoapify",
+          "a:© OpenStreetMap contributors"
+        ]
+      },
+      "headings": [
+        "1:Compare stays",
+        "2:Stays to compare",
+        "2:Comparison",
+        "3:The plan for these nights now",
+        "3:Stays compared",
+        "3:Drive each morning",
+        "3:Totals",
+        "3:Cost and details",
+        "4:Sat Oct 10",
+        "4:Sun Oct 11",
+        "4:Mon Oct 12 · check-out morning",
+        "4:Longest known drive",
+        "4:Drives known",
+        "4:Sum of planned outbound drives",
+        "4:Estimated lodging cost",
+        "4:Booking",
+        "4:Property",
+        "4:Notes"
+      ]
+    },
+    {
+      "group": "a11y",
+      "name": "member at 1440px: 28 Tab stops",
+      "pass": true,
+      "width": 1440,
+      "unnamed": [],
+      "keyboard": {
+        "stops": 28,
+        "hidden": [],
+        "outOfView": [],
+        "order": [
+          "a:All trips",
+          "a:Edit trip",
+          "a:Plan",
+          "a:Stays",
+          "a:Crew",
+          "a:Packing",
+          "a:Stays",
+          "select:First night Night before the trip · Thu Oct 8 Night of Fri O",
+          "select:Check-out morning Morning of Sat Oct 10 Morning of Sun Oct 1",
+          "input[checkbox]:Pine rental · Second in the comparison Fri Oct 9 → Sun Oct 1",
+          "input[checkbox]:Ridge chalet · First in the comparison About $1,260 total fo",
+          "input[checkbox]:Brook inn · Third in the comparison About CA$900.50 total fo",
+          "a:Open Ridge chalet's website (new tab)",
+          "a:Open Pine rental's website (new tab)",
+          "a:Open Brook inn's website (new tab)",
+          "a:Powered by Geoapify",
+          "a:© OpenStreetMap contributors"
+        ]
+      },
+      "headings": [
+        "1:Compare stays",
+        "2:Stays to compare",
+        "2:Comparison",
+        "3:The plan for these nights now"
+      ]
+    },
+    {
+      "group": "journeys",
+      "name": "external link return at 390px",
+      "pass": true,
+      "width": 390,
+      "link": {
+        "href": "https://example.com/qa213/01",
+        "rel": "noopener noreferrer",
+        "target": "_blank",
+        "label": "Open Ridge chalet's website (new tab)",
+        "x": 287.7734375,
+        "y": 428.390625
+      },
+      "newTab": "opened (no opener: noopener)",
+      "before": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-11",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001&first_night=2026-10-09&checkout=2026-10-11",
+        "scrollY": 3692
+      },
+      "after": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-11",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001&first_night=2026-10-09&checkout=2026-10-11",
+        "scrollY": 3692
+      },
+      "comparisonRequestsOnReturn": 0
+    },
+    {
+      "group": "journeys",
+      "name": "reload keeps the choice and nights at 390px",
+      "pass": true,
+      "width": 390,
+      "reloaded": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-11",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001&first_night=2026-10-09&checkout=2026-10-11",
+        "scrollY": 0
+      }
+    },
+    {
+      "group": "journeys",
+      "name": "choosing stays and nights saves nothing at 390px",
+      "pass": true,
+      "width": 390,
+      "chosen": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison",
+          "Brook inn · Third in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-12",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001%2Ccandidate%3A3c000000-0000-4000-8000-000000000002&first_night=2026-10-09&checkout=2026-10-12",
+        "scrollY": 0
+      },
+      "writes": 0
+    },
+    {
+      "group": "journeys",
+      "name": "add a stay and return at 390px",
+      "pass": true,
+      "width": 390,
+      "beforeAdd": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-11",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001&first_night=2026-10-09&checkout=2026-10-11",
+        "scrollY": 315
+      },
+      "afterAdd": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison",
+          "Maple farmhouse 390 · Third in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-11",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001%2Ccandidate%3A066feb90-2222-47bb-8c51-ed098369c775&first_night=2026-10-09&checkout=2026-10-11",
+        "scrollY": 315
+      },
+      "announced": "Maple farmhouse 390 saved and added to the comparison.",
+      "lodgingKept": true,
+      "focusAfter": {
+        "tag": "button",
+        "type": "button",
+        "name": "Add a stay to compare",
+        "shown": true,
+        "inView": true,
+        "inMain": true,
+        "dialog": false
+      }
+    },
+    {
+      "group": "journeys",
+      "name": "external link return at 1440px",
+      "pass": true,
+      "width": 1440,
+      "link": {
+        "href": "https://example.com/qa213/01",
+        "rel": "noopener noreferrer",
+        "target": "_blank",
+        "label": "Open Ridge chalet's website (new tab)",
+        "x": 706.8515625,
+        "y": 472
+      },
+      "newTab": "opened (no opener: noopener)",
+      "before": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-11",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001&first_night=2026-10-09&checkout=2026-10-11",
+        "scrollY": 2231
+      },
+      "after": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-11",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001&first_night=2026-10-09&checkout=2026-10-11",
+        "scrollY": 2231
+      },
+      "comparisonRequestsOnReturn": 0
+    },
+    {
+      "group": "journeys",
+      "name": "reload keeps the choice and nights at 1440px",
+      "pass": true,
+      "width": 1440,
+      "reloaded": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-11",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001&first_night=2026-10-09&checkout=2026-10-11",
+        "scrollY": 0
+      }
+    },
+    {
+      "group": "journeys",
+      "name": "choosing stays and nights saves nothing at 1440px",
+      "pass": true,
+      "width": 1440,
+      "chosen": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison",
+          "Brook inn · Third in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-12",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001%2Ccandidate%3A3c000000-0000-4000-8000-000000000002&first_night=2026-10-09&checkout=2026-10-12",
+        "scrollY": 0
+      },
+      "writes": 0
+    },
+    {
+      "group": "journeys",
+      "name": "add a stay and return at 1440px",
+      "pass": true,
+      "width": 1440,
+      "beforeAdd": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-11",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001&first_night=2026-10-09&checkout=2026-10-11",
+        "scrollY": 175
+      },
+      "afterAdd": {
+        "checked": [
+          "Pine rental · Second in the comparison",
+          "Ridge chalet · First in the comparison",
+          "Maple farmhouse 1440 · Third in the comparison"
+        ],
+        "first_night": "2026-10-09",
+        "checkout": "2026-10-11",
+        "address": "/trips/qa213-weekend/stays/compare?options=candidate%3A3c000000-0000-4000-8000-000000000001%2Cstay%3A2b000000-0000-4000-8000-000000000001%2Ccandidate%3A9f4b064c-cafc-4f30-99f7-a12656a6e5a6&first_night=2026-10-09&checkout=2026-10-11",
+        "scrollY": 175
+      },
+      "announced": "Maple farmhouse 1440 saved and added to the comparison.",
+      "lodgingKept": true,
+      "focusAfter": {
+        "tag": "button",
+        "type": "button",
+        "name": "Add a stay to compare",
+        "shown": true,
+        "inView": true,
+        "inMain": true,
+        "dialog": false
+      }
+    },
+    {
+      "group": "journeys",
+      "name": "member view",
+      "pass": true,
+      "buttons": []
+    },
+    {
+      "group": "journeys",
+      "name": "comparison fails, then Try again at 390px",
+      "pass": true,
+      "width": 390,
+      "alert": "Couldn't compare these stays. Try again.\n\nTry again",
+      "kept": [
+        "Pine rental · Second in the comparison",
+        "Ridge chalet · First in the comparison",
+        "Brook inn · Third in the comparison"
+      ]
+    },
+    {
+      "group": "journeys",
+      "name": "comparison fails, then Try again at 1440px",
+      "pass": true,
+      "width": 1440,
+      "alert": "Couldn't compare these stays. Try again.\n\nTry again",
+      "kept": [
+        "Pine rental · Second in the comparison",
+        "Ridge chalet · First in the comparison",
+        "Brook inn · Third in the comparison"
+      ]
+    },
+    {
+      "group": "use",
+      "name": "preview, old → new per night, at 390px",
+      "pass": true,
+      "width": 390,
+      "missing": [],
+      "useDisabledUntilReplaceTicked": true,
+      "focusOnOpen": {
+        "tag": "h3",
+        "type": null,
+        "name": "What changes",
+        "shown": true,
+        "inView": true,
+        "inMain": false,
+        "dialog": true
+      }
+    },
+    {
+      "group": "use",
+      "name": "conflicting save keeps the plan at 390px",
+      "pass": true,
+      "width": 390,
+      "buttons": [
+        "Review again",
+        "Cancel",
+        "Close"
+      ],
+      "alert": "The lodging plan changed. Review the saved plan before retrying.",
+      "unchangedByPreview": true,
+      "revision": 4
+    },
+    {
+      "group": "use",
+      "name": "failed save keeps the plan and the sheet at 390px",
+      "pass": true,
+      "width": 390,
+      "alert": "Couldn't save lodging. Your changes are still here; try again.",
+      "replaceTicked": true,
+      "peopleAfterReview": 6,
+      "focusAfterReview": {
+        "tag": "h3",
+        "type": null,
+        "name": "What changes",
+        "shown": true,
+        "inView": true,
+        "inMain": false,
+        "dialog": true
+      }
+    },
+    {
+      "group": "use",
+      "name": "save at 390px",
+      "pass": true,
+      "width": 390,
+      "announced": "Ridge chalet is now the stay for these nights. Bookings weren't changed.",
+      "focusAfter": {
+        "tag": "h2",
+        "type": null,
+        "name": "Comparison",
+        "shown": true,
+        "inView": true,
+        "inMain": true,
+        "dialog": false
+      },
+      "revision": [
+        4,
+        5
+      ],
+      "bookings": {
+        "Pine rental": "booked",
+        "Village hotel": "not_booked",
+        "Mountain lodge": "booked",
+        "Ridge chalet": "not_booked"
+      },
+      "options": 7,
+      "address": "/trips/qa213-weekend/stays/compare?options=stay%3A2b000000-0000-4000-8000-000000000001%2Cstay%3A3c000000-0000-4000-8000-000000000001"
+    },
+    {
+      "group": "use",
+      "name": "saved stay outside its dates at 390px",
+      "pass": true,
+      "width": 390,
+      "outside": "Pine rental's dates don't include the night of Sun Oct 11. Change its dates on Stays first, or choose nights within them.",
+      "focusAfterEscape": {
+        "tag": "button",
+        "type": "button",
+        "name": "Use Pine rental for these nights",
+        "shown": true,
+        "inView": true,
+        "inMain": true,
+        "dialog": false
+      }
+    },
+    {
+      "group": "use",
+      "name": "preview, old → new per night, at 1440px",
+      "pass": true,
+      "width": 1440,
+      "missing": [],
+      "useDisabledUntilReplaceTicked": true,
+      "focusOnOpen": {
+        "tag": "h3",
+        "type": null,
+        "name": "What changes",
+        "shown": true,
+        "inView": true,
+        "inMain": false,
+        "dialog": true
+      }
+    },
+    {
+      "group": "use",
+      "name": "conflicting save keeps the plan at 1440px",
+      "pass": true,
+      "width": 1440,
+      "buttons": [
+        "Review again",
+        "Cancel",
+        "Close"
+      ],
+      "alert": "The lodging plan changed. Review the saved plan before retrying.",
+      "unchangedByPreview": true,
+      "revision": 4
+    },
+    {
+      "group": "use",
+      "name": "failed save keeps the plan and the sheet at 1440px",
+      "pass": true,
+      "width": 1440,
+      "alert": "Couldn't save lodging. Your changes are still here; try again.",
+      "replaceTicked": true,
+      "peopleAfterReview": 6,
+      "focusAfterReview": {
+        "tag": "h3",
+        "type": null,
+        "name": "What changes",
+        "shown": true,
+        "inView": true,
+        "inMain": false,
+        "dialog": true
+      }
+    },
+    {
+      "group": "use",
+      "name": "save at 1440px",
+      "pass": true,
+      "width": 1440,
+      "announced": "Ridge chalet is now the stay for these nights. Bookings weren't changed.",
+      "focusAfter": {
+        "tag": "h2",
+        "type": null,
+        "name": "Comparison",
+        "shown": true,
+        "inView": true,
+        "inMain": true,
+        "dialog": false
+      },
+      "revision": [
+        4,
+        5
+      ],
+      "bookings": {
+        "Pine rental": "booked",
+        "Village hotel": "not_booked",
+        "Mountain lodge": "booked",
+        "Ridge chalet": "not_booked"
+      },
+      "options": 7,
+      "address": "/trips/qa213-weekend/stays/compare?options=stay%3A2b000000-0000-4000-8000-000000000001%2Cstay%3A3c000000-0000-4000-8000-000000000001"
+    },
+    {
+      "group": "use",
+      "name": "saved stay outside its dates at 1440px",
+      "pass": true,
+      "width": 1440,
+      "outside": "Pine rental's dates don't include the night of Sun Oct 11. Change its dates on Stays first, or choose nights within them.",
+      "focusAfterEscape": {
+        "tag": "button",
+        "type": "button",
+        "name": "Use Pine rental for these nights",
+        "shown": true,
+        "inView": true,
+        "inMain": true,
+        "dialog": false
+      }
+    },
+    {
+      "group": "use",
+      "name": "sheet at 390px, 100% text",
+      "pass": true,
+      "width": 390,
+      "fontSize": 16,
+      "unnamed": [],
+      "tabOrder": [
+        "summary:Each night and person",
+        "summary:The mornings after",
+        "input[checkbox]:Replace their existing plans for Fri Oct 9, Sat Oct 10, Sun ",
+        "button[button]:Cancel",
+        "button[button]:Close",
+        "input[checkbox]:Alex",
+        "input[checkbox]:Blair",
+        "input[checkbox]:Casey · Arrives Sat Oct 10 · Skips Sat Oct 10",
+        "input[checkbox]:Dana · Managed guest",
+        "input[checkbox]:Eli",
+        "input[checkbox]:Fran · Invitation pending",
+        "summary:Each night and person",
+        "summary:The mornings after",
+        "input[checkbox]:Replace their existing plans for Fri Oct 9, Sat Oct 10, Sun "
+      ],
+      "wide": {
+        "dialog": 390,
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "past": []
+      }
+    },
+    {
+      "group": "use",
+      "name": "sheet at 1440px, 100% text",
+      "pass": true,
+      "width": 1440,
+      "fontSize": 16,
+      "unnamed": [],
+      "tabOrder": [
+        "summary:Each night and person",
+        "summary:The mornings after",
+        "input[checkbox]:Replace their existing plans for Fri Oct 9, Sat Oct 10, Sun ",
+        "button[button]:Cancel",
+        "button[button]:Close",
+        "input[checkbox]:Alex",
+        "input[checkbox]:Blair",
+        "input[checkbox]:Casey · Arrives Sat Oct 10 · Skips Sat Oct 10",
+        "input[checkbox]:Dana · Managed guest",
+        "input[checkbox]:Eli",
+        "input[checkbox]:Fran · Invitation pending",
+        "summary:Each night and person",
+        "summary:The mornings after",
+        "input[checkbox]:Replace their existing plans for Fri Oct 9, Sat Oct 10, Sun "
+      ],
+      "wide": {
+        "dialog": 576,
+        "scrollWidth": 574,
+        "clientWidth": 574,
+        "past": []
+      }
+    },
+    {
+      "group": "use",
+      "name": "sheet at 320px, 200% text",
+      "pass": true,
+      "width": 320,
+      "fontSize": 32,
+      "unnamed": [],
+      "tabOrder": [
+        "summary:Each night and person",
+        "summary:The mornings after",
+        "input[checkbox]:Replace their existing plans for Fri Oct 9, Sat Oct 10, Sun ",
+        "button[button]:Cancel",
+        "button[button]:Close",
+        "input[checkbox]:Alex",
+        "input[checkbox]:Blair",
+        "input[checkbox]:Casey · Arrives Sat Oct 10 · Skips Sat Oct 10",
+        "input[checkbox]:Dana · Managed guest",
+        "input[checkbox]:Eli",
+        "input[checkbox]:Fran · Invitation pending",
+        "summary:Each night and person",
+        "summary:The mornings after",
+        "input[checkbox]:Replace their existing plans for Fri Oct 9, Sat Oct 10, Sun "
+      ],
+      "wide": {
+        "dialog": 320,
+        "scrollWidth": 320,
+        "clientWidth": 320,
+        "past": []
+      }
+    },
+    {
+      "group": "use",
+      "name": "sheet at 390px, 200% text",
+      "pass": true,
+      "width": 390,
+      "fontSize": 32,
+      "unnamed": [],
+      "tabOrder": [
+        "summary:Each night and person",
+        "summary:The mornings after",
+        "input[checkbox]:Replace their existing plans for Fri Oct 9, Sat Oct 10, Sun ",
+        "button[button]:Cancel",
+        "button[button]:Close",
+        "input[checkbox]:Alex",
+        "input[checkbox]:Blair",
+        "input[checkbox]:Casey · Arrives Sat Oct 10 · Skips Sat Oct 10",
+        "input[checkbox]:Dana · Managed guest",
+        "input[checkbox]:Eli",
+        "input[checkbox]:Fran · Invitation pending",
+        "summary:Each night and person",
+        "summary:The mornings after",
+        "input[checkbox]:Replace their existing plans for Fri Oct 9, Sat Oct 10, Sun "
+      ],
+      "wide": {
+        "dialog": 390,
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "past": []
+      }
+    }
+  ]
+}
