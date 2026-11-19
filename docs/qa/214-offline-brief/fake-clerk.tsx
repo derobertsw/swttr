@@ -77,4 +77,6 @@ export function SignIn() {
   return <p>Sign-in is stubbed in this QA build.</p>;
 }
 
-export const SignUp = SignIn;
+export function SignUp() {
+  return <p>Sign-up is stubbed in this QA build.</p>;
+}
