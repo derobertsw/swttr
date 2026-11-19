@@ -135,7 +135,13 @@ function worker(network: Map<string, Reply>, { timeScale = 1 / 1000 }: { timeSca
     });
     return { answer: answer!, settled: async () => { await answer; await Promise.all(pending); } };
   };
-  return { prime, openOffline, openOnline, staticOffline, hold, holdNavigation, kept, stores };
+  /** Whether the worker answers a request at all; when it doesn't, the browser goes to the network as usual. */
+  const answers = (request: { method: string; mode: string; url: string }) => {
+    let answered = false;
+    listeners.get("fetch")!({ request, respondWith: () => { answered = true; }, waitUntil: () => undefined });
+    return answered;
+  };
+  return { prime, openOffline, openOnline, staticOffline, answers, hold, holdNavigation, kept, stores };
 }
 
 const network = (chunk: string, overrides: Record<string, Reply> = {}) => new Map<string, Reply>(Object.entries({
@@ -262,6 +268,22 @@ describe("The saved trips page's service worker (#214)", () => {
     // Both copies' files open offline: the new page's, and the old page's for one already open.
     expect(await sw.staticOffline("/_next/static/chunks/v2.js")).toBe(200);
     expect(await sw.staticOffline("/_next/static/chunks/v1.js")).toBe(200);
+  });
+
+  it("leaves every API request, every other page and every write to the network, so nothing is synced or queued (#214)", async () => {
+    const sw = worker(net);
+    expect(await sw.prime()).toEqual({ ok: true });
+    for (const request of [
+      { method: "GET", mode: "cors", url: `${ORIGIN}/api/v1/trips/trip-1/brief?dates=2027-02-13` },
+      { method: "GET", mode: "cors", url: `${ORIGIN}/api/v1/trips` },
+      { method: "POST", mode: "cors", url: `${ORIGIN}/api/v1/trips/trip-1/days/2027-02-13/checks` },
+      { method: "GET", mode: "navigate", url: `${ORIGIN}/trips/trip-1` },
+      { method: "GET", mode: "navigate", url: `${ORIGIN}/trips` },
+      { method: "GET", mode: "navigate", url: `${ORIGIN}/` },
+      { method: "GET", mode: "cors", url: `${ORIGIN}/trips/saved?_rsc=abc` },
+      { method: "GET", mode: "cors", url: "https://tiles.example.com/1/2/3.png" },
+    ]) expect(sw.answers(request), request.url).toBe(false);
+    expect(sw.answers({ method: "GET", mode: "navigate", url: `${ORIGIN}/trips/saved?trip=trip-1` })).toBe(true);
   });
 
   it("reports a failure when the connection drops part way", async () => {
