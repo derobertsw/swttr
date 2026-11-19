@@ -286,7 +286,10 @@ describe('running accessory selection and manual evaluation', () => {
     ]));
   });
 
-  it.each(MODES)('explains remaining gaps in the best available extreme-cold outfit: $name', async mode => {
+  // Since #375 removed the leg bias, the catalog's best extreme-cold running
+  // outfit meets every regional minimum; the test wardrobe still has no warm
+  // enough leg wear.
+  it.each(MODES.filter(mode => mode.userId))('explains remaining gaps in the best available extreme-cold outfit: $name', async mode => {
     useDatabase(mode.userId, mode.wardrobe);
     const { body } = await callRoute(running, { ...CONDITIONS[3].body, ...mode.extraBody });
     const missing = (body as BiophysicsRecommendation).requirements!.filter(r =>
@@ -510,9 +513,9 @@ describe("vent advice (#290)", () => {
   });
 
   it("closes vents opened for the touring climb at the transition", async () => {
-    useDatabase(null, []);
-    // #372's climb wears a vented shell only for wind or wet, so a vented climb outfit is the deep-cold one.
-    const { body } = await callRoute(skiTouring, CONDITIONS[3].body);
+    useDatabase(USER_ID, FULL_WARDROBE);
+    // The wardrobe's mild climb is over its band in a full-zip hoody and vented pants.
+    const { body } = await callRoute(skiTouring, { ...CONDITIONS[0].body, use_wardrobe_only: true });
     const { advice } = (body as BiophysicsRecommendation).ventilation!;
     const opened = advice.filter(a => a.phase === "climb" && a.setting === "open");
 
@@ -543,8 +546,11 @@ describe("accessories against local bands (#370)", () => {
     useDatabase(mode.userId, mode.wardrobe);
     const { body } = await callRoute(skiTouring, { ...CONDITIONS[1].body, ...mode.extraBody });
     // Before #370 the climb wore a balaclava, a neck piece and two hoods: 3.2 clo against 0.85.
-    // #372's climb outfit has no hoods, so at most one light head layer fills the band.
-    expect(body.recommendation.headwear).toMatchObject({ helmet: null, neck_warmth: null });
+    // Now at most one light head or neck layer goes with the climb's hood, if any.
+    const { headwear } = body.recommendation;
+    expect(headwear.helmet).toBeNull();
+    expect(headwear.head_warmth?.type ?? "").not.toMatch(/^balaclava/);
+    expect([headwear.head_warmth, headwear.neck_warmth].filter(Boolean).length).toBeLessThanOrEqual(1);
     expect(body.recommendation.evaluation.bodyParts.headNeck.status).toBe("in_range");
     expect(body.descent_headwear.helmet).not.toBeNull();
     expect(body.descent_evaluation.bodyParts.headNeck.status).toBe("in_range");

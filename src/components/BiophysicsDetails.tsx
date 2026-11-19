@@ -100,6 +100,9 @@ const BiophysicsDetails = ({ data }: BiophysicsDetailsProps) => {
           <p className="mt-2 text-xs text-muted-foreground">
             * DLE is currently a bounded exposure-planning heuristic.
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Total clo is SWTTR&apos;s weighted mean of torso, arm and leg insulation. Compare it only with these targets, not with lab whole-body clo, which reads lower for the same outfit.
+          </p>
         </div>
 
         {/* Ensemble Properties */}
