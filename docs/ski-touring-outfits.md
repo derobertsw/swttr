@@ -67,7 +67,7 @@ Most climbs still read "Warmer than recommended" because of head and hand access
 ## Open
 
 - Climb targets assume a membrane outer (above), #374.
-- Leg bias and regional weights, #375: decided 2026-11-19. Every region gets the whole-body band and the weights stay, so the descent's legs still need a packed layer the pack doesn't add.
+- Leg bias and regional weights, #375: decided 2026-11-19. Every region gets the whole-body band and the weights stay, so the descent's legs still rely on the packed over-pant described above.
 - The catalog has no side-zip insulated over-pants, the usual touring descent leg layer, so cold descents pack insulated resort ski pants.
 - The climb's manual check doesn't carry its protection needs, so removing a shell in rain isn't flagged as incomplete. Touring has no `ireq.policy`, which is where running and XC pass them.
 - In deep cold with no wind, the climb doesn't wear an owned hard shell for warmth, even when it falls short.

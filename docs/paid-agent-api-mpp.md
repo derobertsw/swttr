@@ -144,7 +144,9 @@ scores where the schema has them (alpine, xc, ski-touring).
 `descent_breakdown.total_clo` are SWTTR's own whole-body clo: a linear
 0.5 / 0.25 / 0.25 mean of the outfit's torso, arm and leg clo, leaving out head,
 hands and feet. It is comparable only with SWTTR's `ireq.target_range`, not with a
-manikin's whole-body clo, which reads much lower for the same outfit.
+manikin's whole-body clo. The gap depends on the outfit; for example, USARIEM
+T21-03's ECWCS Ensemble 4 measures 1.7 clo on a manikin and about 5.9 on SWTTR's
+scale.
 `ireq.regional` gives torso, arms and legs the same band as `target_range`
 (#375). See README section 7, "Thermal Targets and Comfort".
 
