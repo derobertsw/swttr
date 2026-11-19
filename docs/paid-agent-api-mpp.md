@@ -138,6 +138,16 @@ Because agent calls are anonymous, garment ensembles and extremity picks
 user wardrobe; garment candidates are filtered by per-activity suitability
 scores where the schema has them (alpine, xc, ski-touring).
 
+### Clo values in the response
+
+`recommendation.ensemble_properties.total_clo`, `evaluation.totalClo` and
+`descent_breakdown.total_clo` are SWTTR's own whole-body clo: a linear
+0.5 / 0.25 / 0.25 mean of the outfit's torso, arm and leg clo, leaving out head,
+hands and feet. It is comparable only with SWTTR's `ireq.target_range`, not with a
+manikin's whole-body clo, which reads much lower for the same outfit.
+`ireq.regional` gives torso, arms and legs the same band as `target_range`
+(#375). See README section 7, "Thermal Targets and Comfort".
+
 ## Adding a paid route for a new sport
 
 1. Ensure the free `POST` exists at `src/app/api/v1/recommendations/<sport>/route.ts`.
