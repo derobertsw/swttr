@@ -6,7 +6,7 @@
   // Benchmarks run separately from Vitest's test.include patterns; skill
   // scripts are run directly with node. The offline brief's service worker
   // is registered by URL (src/lib/offline-shell.ts).
-  "entry": ["src/**/*.bench.ts", "public/offline-sw.js", ".claude/skills/*/scripts/*.mjs", "docs/qa/179-shared-gear/lock-order.mjs", "docs/qa/233-overview-map/preview.mjs", "docs/qa/233-overview-map/preview/*.tsx", "docs/qa/234-day-map/preview.mjs", "docs/qa/234-day-map/preview/*.tsx", "docs/qa/235-trip-maps/*.mjs", "docs/qa/235-trip-maps/fixtures.ts", "docs/qa/337-group-planning/*.mjs", "docs/qa/337-group-planning/fixtures.ts", "docs/qa/337-group-planning/server/*.ts", "docs/qa/213-compare-stays/*.mjs", "docs/qa/213-compare-stays/fixtures.ts"],
+  "entry": ["src/**/*.bench.ts", "public/offline-sw.js", ".claude/skills/*/scripts/*.mjs", "docs/qa/179-shared-gear/lock-order.mjs", "docs/qa/233-overview-map/preview.mjs", "docs/qa/233-overview-map/preview/*.tsx", "docs/qa/234-day-map/preview.mjs", "docs/qa/234-day-map/preview/*.tsx", "docs/qa/235-trip-maps/*.mjs", "docs/qa/235-trip-maps/fixtures.ts", "docs/qa/337-group-planning/*.mjs", "docs/qa/337-group-planning/fixtures.ts", "docs/qa/337-group-planning/server/*.ts", "docs/qa/214-offline-brief/*.mjs", "docs/qa/214-offline-brief/fake-clerk.tsx", "docs/qa/213-compare-stays/*.mjs", "docs/qa/213-compare-stays/fixtures.ts"],
   "ignoreDependencies": [
     // Required by `npx cap sync ios`, which pins capacitor-swift-pm to its
     // version in ios/App/CapApp-SPM/Package.swift; never imported from JS.

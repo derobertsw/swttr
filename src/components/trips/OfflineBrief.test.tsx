@@ -61,6 +61,41 @@ describe("Save for offline on the trip (#214)", () => {
     expect(screen.getByRole("link", { name: "Open saved brief" })).toHaveAttribute("href", "/trips/saved?trip=trip-1");
   });
 
+  it("says how to open the copy with no connection, without claiming Trips opens offline (#214)", async () => {
+    // A browser whose service worker keeps the page: it answers the worker's "prime" message.
+    const worker = { postMessage: (_message: unknown, [port]: MessagePort[]) => port.postMessage({ ok: true }) };
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: { register: async () => ({ installing: null, waiting: null, active: worker }) },
+    });
+    try {
+      vi.stubGlobal("fetch", briefApi());
+      const user = userEvent.setup();
+      render(<TripOfflineSave tripId="trip-1" />);
+      await user.click(await screen.findByRole("button", { name: "Save for offline" }));
+      const dialog = await screen.findByRole("dialog");
+      await within(dialog).findByRole("heading", { name: "Included" });
+      await user.click(within(dialog).getByRole("button", { name: "Save for offline" }));
+      const status = await screen.findByText(/^Saved on this device .* · Sat Feb 13 – Sun Feb 14\./);
+      // Only Saved on this device opens offline: Trips and every other page need a connection.
+      expect(status).toHaveTextContent("Without a connection, open Saved on this device from a bookmark or this browser's history. Other pages need a connection.");
+      expect(status).not.toHaveTextContent(/from Trips|with or without a connection/);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(navigator, "serviceWorker");
+    }
+  });
+
+  it("wraps its buttons' labels, so they fit a phone with large text (#214)", async () => {
+    await storeSavedBrief("user_1", offlineBrief());
+    vi.stubGlobal("fetch", briefApi());
+    render(<TripOfflineSave tripId="trip-1" />);
+    for (const name of ["Update saved copy", "Change saved days", "Remove from this device"]) {
+      expect(await screen.findByRole("button", { name })).toHaveClass("whitespace-normal");
+    }
+    expect(screen.getByRole("link", { name: "Open saved brief" })).toHaveClass("whitespace-normal");
+  });
+
   it("won't save with no days chosen", async () => {
     vi.stubGlobal("fetch", briefApi());
     const user = userEvent.setup();

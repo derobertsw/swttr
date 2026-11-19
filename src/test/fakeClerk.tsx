@@ -15,6 +15,8 @@ import { createPortal } from "react-dom";
  * behaves this way; check that in a browser.
  */
 export const fakeClerkState = {
+  /** False while Clerk hasn't loaded, as with no connection: nobody is known to be signed in or out. */
+  loaded: true,
   signedIn: true,
   /** False when focus stays put as the menu closes, e.g. while the tab is hidden. */
   returnFocus: true,
@@ -23,6 +25,7 @@ export const fakeClerkState = {
 };
 
 export function resetFakeClerk() {
+  fakeClerkState.loaded = true;
   fakeClerkState.signedIn = true;
   fakeClerkState.returnFocus = true;
   fakeClerkState.signOut = async () => { fakeClerkState.signedIn = false; };
@@ -114,6 +117,6 @@ export const fakeClerkModule = {
   SignedIn: ({ children }: { children: ReactNode }) => (fakeClerkState.signedIn ? <>{children}</> : null),
   SignedOut: ({ children }: { children: ReactNode }) => (fakeClerkState.signedIn ? null : <>{children}</>),
   UserButton: Object.assign(FakeUserButton, { MenuItems, Action: MenuItem, Link: MenuItem }),
-  useAuth: () => ({ isLoaded: true, userId: fakeClerkState.signedIn ? "user_1" : null }),
+  useAuth: () => ({ isLoaded: fakeClerkState.loaded, userId: fakeClerkState.loaded && fakeClerkState.signedIn ? "user_1" : null }),
   useClerk: () => ({ signOut: () => fakeClerkState.signOut() }),
 };
