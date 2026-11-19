@@ -204,6 +204,17 @@ async function organizer(page) {
   check(g, 'Removing a source from the day asks first, says its reviews are kept, and keeps the source on the trip',
     confirm.includes('Reviews already recorded for it are kept.') && !(await page.eval(`!!qa.row(${JSON.stringify(ACCESS)})`))
     && kept.some((source) => source.name === ACCESS && Number(source.days) === 0), { confirm: confirm.slice(0, 300), status: await page.eval('qa.status()'), kept });
+
+  // The forecast provider is down for the whole run: its failure is shown on its own, and Conditions is unaffected.
+  await open(page, VIEWERS.organizer, day(DATES.fri));
+  await page.waitFor(`document.body.innerText.includes("Couldn't load the forecast")`);
+  const independent = await page.eval(`(() => { const main = document.querySelector('#main-content').innerText;
+    return { weather: main.match(/Couldn't load the forecast[^\\n]*/)?.[0] ?? null, sources: [...qa.section().querySelectorAll('li p.font-semibold')].map((p) => p.textContent),
+      // No verdict anywhere: the only "safe" is the sentence saying a review doesn't mean the plan is safe.
+      verdicts: main.split('\\n').filter((line) => /\\b(safe|unsafe|no-go|go\\/no-go|safety score|risk score)\\b/i.test(line)) }; })()`);
+  check(g, 'Unavailable weather shows on its own while Conditions lists its sources, and nothing on the day is a safety verdict',
+    independent.weather?.includes('Retry weather') && independent.sources.length === 2
+    && independent.verdicts.every((line) => line.includes("It doesn't mean the forecast is current or the plan is safe.")), independent);
   await shot(page, 'organizer-sources-1440');
 }
 
