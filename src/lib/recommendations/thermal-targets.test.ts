@@ -165,7 +165,7 @@ describe('dynamic exposure', () => {
     expect(basicIreq(ireq, exposure)).toEqual({
       ireqMin: Math.round(requiredBasicInsulation(ireq.ireqMin, exposure) * 100) / 100,
       ireqNeutral: Math.round(requiredBasicInsulation(ireq.ireqNeutral, exposure) * 100) / 100,
-      dleHours: ireq.dleHours,
+      heuristicExposureHours: ireq.heuristicExposureHours,
     });
   });
 

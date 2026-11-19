@@ -31,6 +31,7 @@ import {
 } from '@/lib/biophysics/coweda';
 import type { ActivityType } from '@/lib/biophysics/constants';
 import type { IreqResult } from '@/types/garments';
+import type { ExposureConditions } from '@/types/biophysics';
 import type { TemperatureSensitivity, UserBodyMetrics } from '@/types/preferences';
 import type { XCPhaseContext } from '@/lib/biophysics/xc-policy';
 
@@ -79,7 +80,7 @@ export function basicIreq(ireq: IreqResult, exposure: DynamicExposure): IreqResu
   return {
     ireqMin: round2(requiredBasicInsulation(ireq.ireqMin, exposure)),
     ireqNeutral: round2(requiredBasicInsulation(ireq.ireqNeutral, exposure)),
-    dleHours: ireq.dleHours,
+    heuristicExposureHours: ireq.heuristicExposureHours,
   };
 }
 
@@ -123,6 +124,9 @@ export function phaseIreq(conditions: Conditions, windMs: number, metabolicRate:
  * bands are converted to basic clo (`requiredBasicInsulation`); without it
  * they stay resultant, like IREQ. Hand and head targets stay resultant either
  * way: their heuristic multipliers already include a wind factor.
+ * `dynamicExposure` must use the relative air speed and metabolic rate
+ * `baseline` was computed at: the returned `exposureConditions` reuse them
+ * for the selected outfit's exposure limit.
  *
  * `sensitivity` (Run Warm/Run Cold, #251) applies only through the sustained
  * running/XC policy: it narrows every final band from one side by the
@@ -151,7 +155,7 @@ export function phaseTargets(
     activity,
     ireqMin: baseline.ireqMin,
     ireqNeutral: baseline.ireqNeutral,
-    dleHours: baseline.dleHours,
+    heuristicExposureHours: baseline.heuristicExposureHours,
     airTempC: conditions.tempC,
     windSpeedMs: windMs,
   });
@@ -222,8 +226,19 @@ export function phaseTargets(
     },
   } : policy;
 
+  // The phase's heat-balance conditions, for the selected outfit's exposure
+  // limit (`calculateExposureLimit`): the same inputs as its IREQ and its
+  // basic-clo conversion.
+  const exposureConditions: ExposureConditions | undefined = dynamicExposure && {
+    airTempC: conditions.tempC,
+    relativeHumidity: conditions.humidity,
+    metabolicRate,
+    ...dynamicExposure,
+  };
+
   return {
     targetRange, validationBuffer, regional,
+    ...(exposureConditions ? { exposureConditions } : {}),
     ...(tapered && !policy ? { coldExposureFactor: round2(exposure) } : {}),
     extremity: {
       ...extremity,

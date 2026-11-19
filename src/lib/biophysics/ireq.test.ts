@@ -221,7 +221,7 @@ describe('calculateIreq', () => {
 
       expect(result.ireqMin).toBeCloseTo(0.5, 2);
       expect(result.ireqNeutral).toBeCloseTo(0.59, 2);
-      expect(result.dleHours).toBeCloseTo(8, 2);
+      expect(result.heuristicExposureHours).toBeCloseTo(8, 2);
     });
 
     it('should match benchmark: cold moderate output', () => {
@@ -234,7 +234,7 @@ describe('calculateIreq', () => {
 
       expect(result.ireqMin).toBeCloseTo(0.84, 2);
       expect(result.ireqNeutral).toBeCloseTo(0.94, 2);
-      expect(result.dleHours).toBeCloseTo(7.27, 2);
+      expect(result.heuristicExposureHours).toBeCloseTo(7.27, 2);
     });
 
     it('should match benchmark: very cold low metabolic output', () => {
@@ -247,12 +247,12 @@ describe('calculateIreq', () => {
 
       expect(result.ireqMin).toBeCloseTo(2.84, 2);
       expect(result.ireqNeutral).toBeCloseTo(3.04, 2);
-      expect(result.dleHours).toBeCloseTo(5.16, 2);
+      expect(result.heuristicExposureHours).toBeCloseTo(5.16, 2);
     });
   });
 
-  describe('DLE behavior', () => {
-    it('should return finite DLE hours', () => {
+  describe('target-range exposure heuristic', () => {
+    it('should return bounded heuristic hours', () => {
       const result = calculateIreq({
         airTemp: -10,
         windSpeed: 5,
@@ -260,12 +260,12 @@ describe('calculateIreq', () => {
         metabolicRate: METABOLIC_RATES.alpine_skiing,
       });
 
-      expect(Number.isFinite(result.dleHours)).toBe(true);
-      expect(result.dleHours).toBeGreaterThanOrEqual(0.5);
-      expect(result.dleHours).toBeLessThanOrEqual(8);
+      expect(Number.isFinite(result.heuristicExposureHours)).toBe(true);
+      expect(result.heuristicExposureHours).toBeGreaterThanOrEqual(0.5);
+      expect(result.heuristicExposureHours).toBeLessThanOrEqual(8);
     });
 
-    it('should reduce DLE in harsher cold and wind', () => {
+    it('should shorten the heuristic in harsher cold and wind', () => {
       const mild = calculateIreq({
         airTemp: -5,
         windSpeed: 2,
@@ -280,7 +280,7 @@ describe('calculateIreq', () => {
         metabolicRate: METABOLIC_RATES.alpine_skiing,
       });
 
-      expect(severe.dleHours).toBeLessThan(mild.dleHours);
+      expect(severe.heuristicExposureHours).toBeLessThan(mild.heuristicExposureHours);
     });
   });
 });
@@ -289,7 +289,7 @@ describe('calculateExtremityIreq', () => {
   const baseIreq = {
     ireqMin: 1.0,
     ireqNeutral: 1.5,
-    dleHours: Infinity,
+    heuristicExposureHours: Infinity,
   };
 
   describe('basic extremity calculations', () => {

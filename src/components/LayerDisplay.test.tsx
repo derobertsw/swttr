@@ -479,6 +479,15 @@ describe("LayerDisplay", () => {
       expect(sent.phases[0].items.torso[0]).toMatchObject({ sourceId: '72ec5159-3cc2-542f-9cde-945471fff950', item_type: 'garment' });
     });
 
+    it('forwards the phase heat-balance conditions so the server reports the worn outfit\'s exposure limit', async () => {
+      const exposureConditions = { airTempC: -4, relativeHumidity: 60, metabolicRate: 115, relativeAirSpeedMs: 7.5, walkingSpeedMs: 0.3, airPermeability: 1 };
+      render(<LayerDisplay recommendation={null} temperature={25} windspeed={10}
+        biophysicsData={{ ...mockBiophysicsData, ireq: { ...mockBiophysicsData.ireq, exposure_conditions: exposureConditions } }} />);
+      await waitFor(() => expect(fetch).toHaveBeenCalled());
+      const sent = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+      expect(sent.phases[0].exposureConditions).toEqual(exposureConditions);
+    });
+
     describe("the outfit Save to trip keeps", () => {
       const outing = {
         activity: "alpine_skiing",

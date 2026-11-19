@@ -4,7 +4,6 @@
  */
 import { METABOLIC_RATES, OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
 import { COWEDA_VALIDATION_SOURCE } from '@/lib/biophysics/coweda';
-import { DLE_ESTIMATION_METHOD } from '@/lib/biophysics/ireq';
 import { applyBodySizeMetabolicAdjustment } from '@/lib/biophysics/bodyMetrics';
 import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import type { IreqResult } from '@/types/garments';
@@ -50,16 +49,18 @@ export const alpine: SportRecommender<AlpineTargets> = {
     // A lift ride lasts minutes between runs, so the outfit is sized for the
     // whole cycle: IREQ at the time-weighted metabolic rate and relative air
     // speed (ISO 8996's average over a representative work cycle), not the
-    // steady state of sitting on the lift. The exposure limit still follows
-    // the static ride. Hands and head follow the skiing phase: their alpine
-    // multipliers already add the chairlift and wind exposure.
+    // steady state of sitting on the lift. The target range's exposure
+    // heuristic still follows the static ride; the outfit's reported exposure
+    // limit uses the cycle, like its targets. Hands and head follow the skiing
+    // phase: their alpine multipliers already add the chairlift and wind
+    // exposure.
     const blendedRate = (skiingRate * SKIING_WEIGHT) + (chairliftRate * CHAIRLIFT_WEIGHT);
     const cycleWind = windMs + SKIING_SPEED_WIND_MS * SKIING_WEIGHT;
     const cycle = phaseIreq(conditions, cycleWind, blendedRate);
     const baseline: IreqResult = {
       ireqMin: cycle.ireqMin,
       ireqNeutral: cycle.ireqNeutral,
-      dleHours: chairlift.dleHours,
+      heuristicExposureHours: chairlift.heuristicExposureHours,
     };
 
     return {
@@ -78,8 +79,6 @@ export const alpine: SportRecommender<AlpineTargets> = {
       ireq: {
         skiing: formatIreqPhase(targets.skiing),
         chairlift: formatIreqPhase(targets.chairlift),
-        dle_hours: targets.chairlift.dleHours,
-        dle_method: DLE_ESTIMATION_METHOD,
         target_range: targets.targetRange,
         validation_buffer_clo: formatValidationBuffer(targets.validationBuffer),
         validation_source: COWEDA_VALIDATION_SOURCE,
@@ -128,6 +127,7 @@ export const alpine: SportRecommender<AlpineTargets> = {
           extremityMinTarget: targets.extremity.min,
           extremityTarget: targets.extremity.neutral,
           extremityMaxTarget: extremity.max,
+          exposureConditions: targets.exposureConditions,
         },
       },
       handwear,
@@ -173,9 +173,8 @@ export const alpine: SportRecommender<AlpineTargets> = {
       ireq: {
         skiing: formatIreqPhase(targets.skiing),
         chairlift: formatIreqPhase(targets.chairlift),
-        dle_hours: targets.chairlift.dleHours,
-        dle_method: DLE_ESTIMATION_METHOD,
         target_range: targets.targetRange,
+        ...(targets.exposureConditions ? { exposure_conditions: targets.exposureConditions } : {}),
         regional: targets.regional,
         extremity,
         validation_buffer_clo: formatValidationBuffer(targets.validationBuffer),

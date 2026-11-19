@@ -44,19 +44,19 @@ Golden tests in `src/app/api/v1/recommendations/golden.test.ts` pin every sport'
 
 Running/XC garment and sustained-effort policy contracts, calibration evidence, generic catalog estimates, the Run Warm/Run Cold adjustment, migration order and validation limits are documented in [Running and XC foundations](docs/running-xc-foundations.md). Cycling and the ski-touring climb share the same MET conversion and margin taper, and cycling adds riding speed to the heat balance; the evidence, assumptions and reference calculations are in [Cycling and touring-climb calibration](docs/cycling-touring-calibration.md) (#374). The running and XC selectors and the shared comfort check built on them have shipped. Of #243's work, the warm/cold preference (#251) covers running and XC so far; cycling, alpine and touring report it as not supported.
 
-The IREQ solver is a simplified heat balance, not the standard's full program: it fixes skin temperature at 33.7°C (neutral) and 30°C (minimum) and has no skin-evaporation term. Against an ISO 11079 reference its neutral value is within 0.25 clo, and its minimum runs 0.1–0.2 clo warm for high-output sports. The [algorithm review](docs/algorithm-review.md) records what was checked against the source papers, the assumptions that have no support yet, and the open gaps in alpine, cycling and touring.
+The IREQ solver is a simplified heat balance, not the standard's full program: it fixes skin temperature at 33.7°C (neutral) and 30°C (minimum) and has no skin-evaporation term. Against an ISO 11079 reference its neutral value is within 0.25 clo, and its minimum runs 0.1–0.2 clo warm for high-output sports. The exposure limit (ISO 11079 DLE) is computed from the evaluated outfit's own insulation on the same heat balance; [Exposure limits](docs/exposure-limits.md) gives its method, reference comparison and limits. The [algorithm review](docs/algorithm-review.md) records what was checked against the source papers, the assumptions that have no support yet, and the open gaps in alpine, cycling and touring.
 
 ### 1. Recommendation Pipeline
 
-Every biophysics recommendation passes through the same pipeline, from metabolic rate lookup through final comfort classification. Multi-phase sports run the target steps once per phase: alpine computes IREQ at the 60/40 ski-and-lift cycle metabolic rate and relative air speed, retaining chairlift DLE, and ski touring computes uphill, downhill, and transition phases. Running, XC, cycling and the touring climb convert Compendium METs by body mass and area; alpine skiing, the chairlift, the touring descent and the transition keep their earlier rates (#318's alpine cycle target was tuned with them). Cycling's heat balance uses its riding air speed, while its margins and heuristic wind terms read ambient wind, so a harder ride never gets a warmer target.
+Every biophysics recommendation passes through the same pipeline, from metabolic rate lookup through final comfort classification. Multi-phase sports run the target steps once per phase: alpine computes IREQ at the 60/40 ski-and-lift cycle metabolic rate and relative air speed (the target range's exposure heuristic still follows the chairlift), and ski touring computes uphill, downhill, and transition phases. Running, XC, cycling and the touring climb convert Compendium METs by body mass and area; alpine skiing, the chairlift, the touring descent and the transition keep their earlier rates (#318's alpine cycle target was tuned with them). Cycling's heat balance uses its riding air speed, while its margins and heuristic wind terms read ambient wind, so a harder ride never gets a warmer target.
 
 ```mermaid
 graph TD
     A[Activity + Exertion Level] --> B[Metabolic Rate Selection<br/>Running, XC, cycling, touring climb: shared MET-to-W/m² conversion<br/>Cycling 4.3 / 7 / 9 MET; climb 5.3 / 6.8 / 8.5 MET, an assumption<br/>Rate helper uses default mass and body area<br/>Recommendation uses user mass and body area<br/>Alpine, chairlift, descent, transition: existing rate and size heuristic]
     B --> XCP[XC only: outing pattern and exposure context<br/>Effective wind is max of ambient and exposure floor<br/>Keep existing motion correction; distinguish dry snow from wet]
-    XCP --> RIDE[Cycling only: relative air speed<br/>√ riding speed² + ambient wind², capped at 18 m/s<br/>Riding 3 / 5 / 6.3 m/s by effort, an assumption<br/>Used by IREQ and the basic-clo conversion only]
+    XCP --> RIDE[Cycling only: relative air speed<br/>√ riding speed² + ambient wind², capped at 18 m/s<br/>Riding 3 / 5 / 6.3 m/s by effort, an assumption<br/>Used by IREQ, the basic-clo conversion and the exposure limit only]
     RIDE --> C[IREQ Calculation]
-    C --> D[Activity Target Range<br/>Running, XC, cycling, touring climb: retain heat-balance minimum<br/>Taper only added activity allowance]
+    C --> D[Activity Target Range<br/>Running, XC, cycling, touring climb: retain heat-balance minimum<br/>Taper only added activity allowance<br/>Clothing-blind exposure heuristic widens the range only]
     D --> E[CoWEDA-inspired heuristic buffer<br/>Running, XC, cycling, touring climb: taper with cold, wind and wet exposure<br/>Taper and heuristic wind terms read ambient wind, never riding speed<br/>Alpine and touring descent: full margins]
     E --> F[Regional & Extremity Targets<br/>Whole-body and regional bands converted to basic clo<br/>ISO 11079 wind and motion correction<br/>Inferred movement capped at 0.7 m/s<br/>Hands and head keep resultant IREQ]
     F --> BOUND[Cycling: each effort's bands at most the next easier effort's<br/>faster riding raises the basic-clo conversion]
@@ -69,7 +69,8 @@ graph TD
     R --> PROT[Alpine, cycling, touring descent: helmet requirement<br/>whatever the thermal demand<br/>owned match, catalog suggestion, or missing with a warning]
     PROT --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
     XCCARRY --> I[Canonical server phase assessment:<br/>actual worn regional and extremity basic clo<br/>local shortfalls and excess, moisture and clothing gaps]
-    I --> H[Ensemble thermal scoring and API/UI reasons<br/>consume the same phase assessment]
+    I --> DLE[Exposure limit of the worn outfit, ISO 11079 DLE:<br/>whole-body basic clo to resultant clo for the phase's wind and motion<br/>heat-storage rate S at minimal and neutral skin temperature<br/>S below 0: 144 kJ/m² heat debt ÷ abs S, more than 8 h as ISO reports<br/>S of 0 or more: not limited by whole-body cooling, no duration]
+    DLE --> H[Ensemble thermal scoring and API/UI reasons<br/>consume the same phase assessment]
     H --> V[Alpine and ski touring: vent advice per selected garment and phase<br/>Only vents the catalog lists, a missing record means unknown<br/>Closed in precipitation, wind of 8 m/s or more, or a cold outfit or region<br/>Open when breathability is below target or the outfit is too warm<br/>Open-state breathability is a separate estimate: factor × Recl once<br/>Clo, targets, selection and the decision stay on the closed outfit]
 
     subgraph "Shared Biophysics Core — thermal-targets.ts"
@@ -93,9 +94,10 @@ graph TD
         GUARD
     end
 
-    subgraph "Shared Evaluation — layer-evaluation.ts and response-builder.ts"
+    subgraph "Shared Evaluation — layer-evaluation.ts, response-builder.ts, exposure.ts"
         H
         I
+        DLE
     end
 
     subgraph "Shared Vent Advice — ventilation.ts"
@@ -210,7 +212,7 @@ graph TD
         A1 --> A2[One base + at most one mid/puffy<br/>+ one outer per region]
         A2 --> A3[Insulated outerwear occupies outer slot<br/>Puffies pair only with hard shells or no outer]
         A3 --> A4[Budget all layers by regional clo<br/>Balance shortfalls against excess warmth]
-        A4 --> A5[60/40 ski-and-lift cycle IREQ<br/>at time-weighted metabolism and relative wind<br/>Convert cycle target to basic clo<br/>Chairlift DLE retained]
+        A4 --> A5[60/40 ski-and-lift cycle IREQ<br/>at time-weighted metabolism and relative wind<br/>Convert cycle target to basic clo<br/>Exposure limit for the cycle<br/>Target heuristic follows the chairlift]
         A5 --> A6[Vent advice: skiing follows the shared rules<br/>Close vents for the chairlift]
     end
 
@@ -313,6 +315,8 @@ graph TD
 
 The response's `recommendation.evaluation` and manual `POST /api/v1/ensembles/evaluate` share `evaluatePhase`. Touring exposes a separate `descent_evaluation`; packed layers never raise climb insulation. Pack items say which body regions they cover, so the descent's manual check puts packed pants on the legs. `decision.status`, `summary`, `reasons` and `warnings` are server-owned. The legacy `riskType` is retained for saved-outfit compatibility; it is a thermal mismatch direction, not a medical diagnosis. UI judgments must use the server summary rather than infer comfort from a score.
 
+The same assessment reports the outfit's exposure limit (`evaluation.exposure`): ISO 11079's duration-limited exposure (DLE) from the worn whole-body clo, corrected to resultant insulation for the phase's wind, motion and assumed outer fabric. The heat-storage rate S uses `calculateIreq`'s heat balance, so an outfit at IREQ is in balance. With S < 0 the limit is the 144 kJ/m² heat debt ÷ |S| (more than 8 h is reported as such), at both the minimal (30°C skin) and neutral (33.7°C) criteria. With S ≥ 0 there is no duration: whole-body cooling doesn't limit the exposure. Responses carry each phase's `exposure_conditions`, which manual edits send back, so edited outfits get their own limit from the server. It is a whole-body heat-debt time only, not a core-temperature, frostbite or hand/foot limit, and it runs longer than ISO's own program at low output in light wind (no skin evaporation, fixed skin temperatures). See [Exposure limits](docs/exposure-limits.md).
+
 The old fixed +0.3 clo extension no longer makes an outfit comfortable. Whole-body excess uses a 0.01 clo numerical tolerance (the reported 0.353 versus 0.18–0.31 case is warmer); local excess uses the same 0.05 clo tolerance as local deficits. Upper targets are the phase's regional/neutral bands or the explicit accessory limits every sport reports, including the thin-glove allowance, a required helmet and the lightest rated choice in deep cold. Small differences produce adjustment guidance without an injury warning. Significant mismatch messages retain conservative engineering allowances relative to the phase band; no numerical sport calibration or physiological safety threshold is introduced here. Field validation remains necessary. Missing regional catalog data or custom arm estimates produce unknown comfort; missing suitable clothing produces an incomplete outfit rather than an ideal outfit scored as worn. Existing evaporative resistance reasoning (#67) stays separate from clo.
 
 
@@ -345,6 +349,7 @@ graph TD
     MIX -->|Yes| UNEVEN[Uneven warmth<br/>Extra torso warmth never covers bare required regions]
     DEC -->|Within numerical tolerances| OK[Likely comfortable<br/>Estimated fit, never Optimal or a confidence percentage]
     DEC --> WARN[Separate significant mismatch warnings<br/>Cold gap exceeds band width, with a 0.2 clo floor<br/>Warm excess exceeds the larger of<br/>band width and the legacy 0.3 clo allowance<br/>Engineering heuristics, not medical risk thresholds]
+    KNOWN -->|Yes, with the phase's exposure conditions| EXPO[Exposure limit from worn whole-body clo<br/>basic to resultant clo, then heat-storage rate S<br/>S below 0: 144 kJ/m² ÷ abs S at minimal and neutral skin<br/>S of 0 or more: no duration, not limited by whole-body cooling<br/>Whole-body heat debt only, not core or extremity injury time]
     DEC --> MOISTURE[Existing evaporative-potential heuristic<br/>Report moisture limitation separately<br/>Never change fabric insulation]
     OK --> S1[Score 85 to 100 by distance from band midpoint]
     COLD --> S2[Score 85 × share of needed insulation<br/>at the worst-covered part, including 0.5 clo surface air]

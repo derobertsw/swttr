@@ -83,7 +83,13 @@ export interface EnsemblePrediction {
 export interface IreqResult {
   ireqMin: number;      // Minimum clo to prevent cooling
   ireqNeutral: number;  // Clo for thermal comfort
-  dleHours: number;     // Duration limited exposure
+  /**
+   * Bounded 0.5–8 h planning heuristic from IREQ, cold, wind and output. It
+   * ignores clothing, only widens target ranges (`calculateActivityTargetRange`)
+   * and is not reported as DLE: the API's duration-limited exposure comes from
+   * the selected ensemble (`calculateExposureLimit`).
+   */
+  heuristicExposureHours: number;
 }
 
 export interface EnsembleScore {

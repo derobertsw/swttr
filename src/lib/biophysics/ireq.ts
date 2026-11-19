@@ -1,6 +1,7 @@
 // IREQ (Required Insulation) Calculator
 // A simplified ISO 11079 heat balance: fixed skin temperatures and no skin
-// evaporation term. docs/algorithm-review.md compares it with the standard.
+// evaporation term. docs/algorithm-review.md compares it with the standard;
+// docs/exposure-limits.md covers the heat-storage rate and DLE built on it.
 
 import {
   CLO_TO_M2KW,
@@ -12,8 +13,6 @@ import {
   type ExtremityIreqActivity,
 } from './constants';
 import type { IreqResult } from '@/types/garments';
-
-export const DLE_ESTIMATION_METHOD = 'heuristic_exposure_estimate_v1';
 
 interface IreqInput {
   airTemp: number;           // °C
@@ -113,15 +112,106 @@ function calculateRequiredInsulation(
   return iClM2kw;
 }
 
-function estimateExposureLimitHoursHeuristic(
+/**
+ * Respiratory heat losses and the heat left for the skin to lose, in W/m².
+ * The same terms feed IREQ and the heat-storage rate, so an ensemble at IREQ
+ * is in heat balance.
+ */
+function availableSkinHeatFlux(
+  airTempC: number,
+  relativeHumidity: number,
+  metabolicRate: number,
+  workRate: number
+): number {
+  const M = metabolicRate;
+  // Convective respiratory heat loss
+  const cRes = 0.0014 * M * (34 - airTempC);
+  // Evaporative respiratory heat loss
+  const boundedRh = Math.max(0, Math.min(100, relativeHumidity));
+  const pA = calculateVaporPressure(airTempC, boundedRh);
+  const eRes = 0.0173 * M * (5.87 - pA / 1000);
+  return M - workRate - cRes - eRes;
+}
+
+/**
+ * Dry heat loss (R + C) through a clothing ensemble of resultant insulation
+ * `iClM2kw`, at skin temperature `tSk`, in W/m². It uses the coefficients and
+ * clothing area factor the IREQ solver uses, iterating on the clothing
+ * surface temperature.
+ */
+function calculateDryHeatLoss(
+  tSk: number,
+  iClM2kw: number,
+  airTempC: number,
+  meanRadiantTempC: number,
+  windSpeedMs: number
+): number {
+  const fCl = calculateClothingAreaFactor(iClM2kw);
+  let clothingSurfaceTempC = tSk - 2;
+  let dry = 0;
+  for (let i = 0; i < 50; i += 1) {
+    const hC = calculateConvectiveCoefficient(windSpeedMs, clothingSurfaceTempC, airTempC);
+    const hR = calculateRadiativeCoefficient(clothingSurfaceTempC, meanRadiantTempC);
+    const tO = calculateOperativeTemperature(airTempC, meanRadiantTempC, hC, hR);
+    dry = (tSk - tO) / (iClM2kw + 1 / ((hC + hR) * fCl));
+    const next = tSk - dry * iClM2kw;
+    if (Math.abs(next - clothingSurfaceTempC) < 1e-6) break;
+    clothingSurfaceTempC = (clothingSurfaceTempC * 0.4) + (next * 0.6);
+  }
+  return dry;
+}
+
+interface HeatStorageInput extends IreqInput {
+  /** Resultant (wind- and motion-corrected) clothing insulation, in clo. */
+  resultantClo: number;
+  /** Skin temperature the balance is held at, in °C. */
+  skinTemp: number;
+}
+
+/**
+ * Body heat-storage rate S, in W/m², for an ensemble of known resultant
+ * insulation: the heat available to the skin minus the dry heat the ensemble
+ * lets through, with the skin held at `skinTemp` (ISO 11079 6.2's DLE
+ * balance, simplified like `calculateIreq`). Negative S is a heat debt
+ * building up; zero or positive S means no net whole-body cooling.
+ */
+export function calculateHeatStorageRate(input: HeatStorageInput): number {
+  const {
+    airTemp,
+    meanRadiantTemp = airTemp,
+    windSpeed,
+    relativeHumidity,
+    metabolicRate,
+    workRate = 0,
+    resultantClo,
+    skinTemp,
+  } = input;
+  const available = availableSkinHeatFlux(airTemp, relativeHumidity, metabolicRate, workRate);
+  const dry = calculateDryHeatLoss(
+    skinTemp,
+    Math.max(0, resultantClo) * CLO_TO_M2KW,
+    airTemp,
+    meanRadiantTemp,
+    windSpeed
+  );
+  return available - dry;
+}
+
+/**
+ * Bounded 0.5–8 h planning heuristic that only widens target ranges
+ * (`calculateActivityTargetRange`). It ignores clothing, so it is not a
+ * duration-limited exposure; `calculateExposureLimit` computes that for the
+ * selected ensemble.
+ */
+function estimateExposureHeuristicHours(
   ireqMin: number,
   ireqNeutral: number,
   airTempC: number,
   windSpeedMs: number,
   metabolicRate: number
 ): number {
-  // This is an exposure-planning heuristic, not a direct ISO DLE derivation.
-  // We keep it bounded to avoid extreme recommendations in edge conditions.
+  // A target-range heuristic, not an ISO DLE derivation; bounded so edge
+  // conditions can't produce extreme target ranges.
   if (ireqMin <= 0) {
     return 8;
   }
@@ -153,20 +243,8 @@ export function calculateIreq(input: IreqInput): IreqResult {
     workRate = 0,
   } = input;
 
-  const M = metabolicRate;
-  const W = workRate;
-
-  // Respiratory heat losses
-  // Convective respiratory heat loss
-  const cRes = 0.0014 * M * (34 - airTemp);
-
-  // Evaporative respiratory heat loss
-  const boundedRh = Math.max(0, Math.min(100, relativeHumidity));
-  const pA = calculateVaporPressure(airTemp, boundedRh);
-  const eRes = 0.0173 * M * (5.87 - pA / 1000);
-
-  // Available heat for skin heat loss
-  const H = M - W - cRes - eRes;
+  // Heat available for skin heat loss, after respiration
+  const H = availableSkinHeatFlux(airTemp, relativeHumidity, metabolicRate, workRate);
 
   // Calculate for both neutral and minimum skin temperatures
   const results: { ireqMin: number; ireqNeutral: number } = {
@@ -195,8 +273,8 @@ export function calculateIreq(input: IreqInput): IreqResult {
   return {
     ireqMin: Math.round(results.ireqMin * 100) / 100,
     ireqNeutral: Math.round(results.ireqNeutral * 100) / 100,
-    dleHours: Math.round(
-      estimateExposureLimitHoursHeuristic(
+    heuristicExposureHours: Math.round(
+      estimateExposureHeuristicHours(
         results.ireqMin,
         results.ireqNeutral,
         airTemp,
@@ -258,6 +336,38 @@ export function requiredBasicInsulation(
   const fcl = 1 + 1.197 * Math.max(0, fclReferenceClo) * CLO_TO_M2KW;
   const basic = (resultantClo * CLO_TO_M2KW + resultantAir / fcl) / correction - STATIC_AIR_INSULATION / fcl;
   return Math.max(resultantClo, basic / CLO_TO_M2KW);
+}
+
+/**
+ * Resultant insulation of an ensemble rated in basic (static manikin) clo, in
+ * the wind, motion and outer-fabric air permeability of `exposure`: ISO
+ * 11079 Annex A's ICLR from ICL, the direction the standard uses for DLE.
+ * It inverts `requiredBasicInsulation` (including its floor, so it never
+ * returns more than `basicClo`), iterating because the clothing area factor
+ * follows the resultant value.
+ */
+export function resultantInsulationFromBasic(
+  basicClo: number,
+  { relativeAirSpeedMs, walkingSpeedMs, airPermeability }: DynamicExposure,
+): number {
+  const basic = Math.max(0, basicClo);
+  const v = Math.max(0.4, Math.min(18, relativeAirSpeedMs));
+  const w = Math.max(0, Math.min(1.2, walkingSpeedMs));
+  const p = Math.max(1, Math.min(1000, airPermeability));
+  const motion = Math.exp(-0.15 * v - 0.22 * w);
+  const resultantAir = 0.092 * motion - 0.0045;
+  const correction = 0.54 * motion * Math.pow(p, 0.075) - 0.06 * Math.log(p) + 0.5;
+  let resultant = basic;
+  for (let i = 0; i < 30; i += 1) {
+    const fcl = 1 + 1.197 * Math.max(0, resultant) * CLO_TO_M2KW;
+    const next = ((basic * CLO_TO_M2KW + STATIC_AIR_INSULATION / fcl) * correction - resultantAir / fcl) / CLO_TO_M2KW;
+    if (Math.abs(next - resultant) < 1e-9) {
+      resultant = next;
+      break;
+    }
+    resultant = next;
+  }
+  return Math.max(0, Math.min(basic, resultant));
 }
 
 interface ExtremityIreq {

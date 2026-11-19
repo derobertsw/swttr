@@ -37,12 +37,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 4.96,
         "min": 4.87,
         "neutral": 5.29,
       },
-      "dle_hours": 4.96,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -15,
+        "metabolicRate": 132.68,
+        "relativeAirSpeedMs": 11.9408,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.388336,
+      },
       "extremity": {
         "max": {
           "hands": 2.35,
@@ -70,7 +75,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         },
       },
       "skiing": {
-        "dle_hours": 5.09,
         "min": 1.88,
         "neutral": 2.04,
       },
@@ -205,6 +209,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
             "Significant insulation shortfall: improve coverage of the areas below target.",
             "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 3.81,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": 8.81,
+            "heat_storage_w_m2": -4.54,
+            "skin_temp_c": 30,
+            "status": "more_than_8_hours",
+          },
+          "neutral": {
+            "dle_hours": 2.86,
+            "heat_storage_w_m2": -14,
+            "skin_temp_c": 33.7,
+            "status": "limited",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 2.4,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": true,
@@ -441,12 +464,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 6.23,
         "min": 3.51,
         "neutral": 3.92,
       },
-      "dle_hours": 6.23,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 115.22,
+        "relativeAirSpeedMs": 8.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.297544,
+      },
       "extremity": {
         "max": {
           "hands": 1.71,
@@ -474,7 +502,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         },
       },
       "skiing": {
-        "dle_hours": 6.19,
         "min": 1.63,
         "neutral": 1.82,
       },
@@ -604,6 +631,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
           "status": "mixed",
           "summary": "Uneven warmth",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 3.28,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 7.67,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": 18.29,
+            "heat_storage_w_m2": -2.19,
+            "skin_temp_c": 33.7,
+            "status": "more_than_8_hours",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 2.27,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": true,
@@ -851,12 +897,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 4.89,
         "min": 6.2,
         "neutral": 6.62,
       },
-      "dle_hours": 4.89,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 115.22,
+        "relativeAirSpeedMs": 7.4704,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.297544,
+      },
       "extremity": {
         "max": {
           "hands": 3.18,
@@ -884,7 +935,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         },
       },
       "skiing": {
-        "dle_hours": 4.86,
         "min": 2.92,
         "neutral": 3.12,
       },
@@ -1020,6 +1070,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
             "Significant insulation shortfall: improve coverage of the areas below target.",
             "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 3.81,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": 1.18,
+            "heat_storage_w_m2": -33.76,
+            "skin_temp_c": 30,
+            "status": "limited",
+          },
+          "neutral": {
+            "dle_hours": 0.95,
+            "heat_storage_w_m2": -42.18,
+            "skin_temp_c": 33.7,
+            "status": "limited",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 2.68,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": true,
@@ -1258,12 +1327,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 6.43,
         "min": 3.7,
         "neutral": 4.09,
       },
-      "dle_hours": 6.43,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 121.26653585255957,
+        "relativeAirSpeedMs": 5.68224,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.32898598643330973,
+      },
       "extremity": {
         "max": {
           "hands": 1.82,
@@ -1291,7 +1365,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         },
       },
       "skiing": {
-        "dle_hours": 6.38,
         "min": 1.72,
         "neutral": 1.91,
       },
@@ -1423,6 +1496,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
           "warnings": [
             "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 3.25,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 9.47,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 0.38,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 2.45,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": true,
@@ -1666,12 +1758,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 7.03,
         "min": 2.11,
         "neutral": 2.51,
       },
-      "dle_hours": 7.03,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 97.76,
+        "relativeAirSpeedMs": 4.7881599999999995,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.20675200000000002,
+      },
       "extremity": {
         "max": {
           "hands": 1.22,
@@ -1699,7 +1796,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         },
       },
       "skiing": {
-        "dle_hours": 6.79,
         "min": 1.27,
         "neutral": 1.51,
       },
@@ -1827,6 +1923,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
           "status": "warmer",
           "summary": "Warmer than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 2.5,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 18.23,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 7.38,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 2,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -2065,12 +2180,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 6.77,
         "min": 2.75,
         "neutral": 3.15,
       },
-      "dle_hours": 6.77,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 115.22,
+        "relativeAirSpeedMs": 6.57632,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.297544,
+      },
       "extremity": {
         "max": {
           "hands": 1.23,
@@ -2098,7 +2218,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         },
       },
       "skiing": {
-        "dle_hours": 6.72,
         "min": 1.26,
         "neutral": 1.46,
       },
@@ -2226,6 +2345,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
           "status": "warmer",
           "summary": "Warmer than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 2.6,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 14.76,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 3.44,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.94,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -2451,12 +2589,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in with an empt
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 6.23,
         "min": 3.51,
         "neutral": 3.92,
       },
-      "dle_hours": 6.23,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 115.22,
+        "relativeAirSpeedMs": 8.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.297544,
+      },
       "extremity": {
         "max": {
           "hands": 1.71,
@@ -2484,7 +2627,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in with an empt
         },
       },
       "skiing": {
-        "dle_hours": 6.19,
         "min": 1.63,
         "neutral": 1.82,
       },
@@ -2609,6 +2751,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in with an empt
           "warnings": [
             "Significant insulation shortfall: improve coverage of the areas below target.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 3.49,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 12.33,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 2.98,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 2.41,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
@@ -2872,12 +3033,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 4.96,
         "min": 4.87,
         "neutral": 5.29,
       },
-      "dle_hours": 4.96,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -15,
+        "metabolicRate": 132.68,
+        "relativeAirSpeedMs": 11.9408,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.388336,
+      },
       "extremity": {
         "max": {
           "hands": 2.4,
@@ -2905,7 +3071,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         },
       },
       "skiing": {
-        "dle_hours": 5.09,
         "min": 1.88,
         "neutral": 2.04,
       },
@@ -3037,6 +3202,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
           "warnings": [
             "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 4.34,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 7.48,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": 40.29,
+            "heat_storage_w_m2": -0.99,
+            "skin_temp_c": 33.7,
+            "status": "more_than_8_hours",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 2.7,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": true,
@@ -3314,12 +3498,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 6.23,
         "min": 3.51,
         "neutral": 3.92,
       },
-      "dle_hours": 6.23,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 115.22,
+        "relativeAirSpeedMs": 8.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.297544,
+      },
       "extremity": {
         "max": {
           "hands": 1.71,
@@ -3347,7 +3536,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         },
       },
       "skiing": {
-        "dle_hours": 6.19,
         "min": 1.63,
         "neutral": 1.82,
       },
@@ -3475,6 +3663,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 3.49,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 12.33,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 2.98,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 2.41,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -3765,12 +3972,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 4.89,
         "min": 6.2,
         "neutral": 6.62,
       },
-      "dle_hours": 4.89,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 115.22,
+        "relativeAirSpeedMs": 7.4704,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.297544,
+      },
       "extremity": {
         "max": {
           "hands": 3.18,
@@ -3798,7 +4010,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         },
       },
       "skiing": {
-        "dle_hours": 4.86,
         "min": 2.92,
         "neutral": 3.12,
       },
@@ -3933,6 +4144,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
           "warnings": [
             "Significant insulation shortfall: improve coverage of the areas below target.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 4.34,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": 1.98,
+            "heat_storage_w_m2": -20.2,
+            "skin_temp_c": 30,
+            "status": "limited",
+          },
+          "neutral": {
+            "dle_hours": 1.44,
+            "heat_storage_w_m2": -27.73,
+            "skin_temp_c": 33.7,
+            "status": "limited",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 3.02,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": true,
@@ -4190,12 +4420,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 6.43,
         "min": 3.7,
         "neutral": 4.09,
       },
-      "dle_hours": 6.43,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 121.26653585255957,
+        "relativeAirSpeedMs": 5.68224,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.32898598643330973,
+      },
       "extremity": {
         "max": {
           "hands": 1.82,
@@ -4223,7 +4458,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         },
       },
       "skiing": {
-        "dle_hours": 6.38,
         "min": 1.72,
         "neutral": 1.91,
       },
@@ -4354,6 +4588,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
           "warnings": [
             "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 3.38,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 12.62,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 3.84,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 2.54,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -4641,12 +4894,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 7.03,
         "min": 2.11,
         "neutral": 2.51,
       },
-      "dle_hours": 7.03,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 97.76,
+        "relativeAirSpeedMs": 4.7881599999999995,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.20675200000000002,
+      },
       "extremity": {
         "max": {
           "hands": 1.22,
@@ -4674,7 +4932,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         },
       },
       "skiing": {
-        "dle_hours": 6.79,
         "min": 1.27,
         "neutral": 1.51,
       },
@@ -4802,6 +5059,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 2.42,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 16.28,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 5.11,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.94,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -5042,12 +5318,17 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 6.77,
         "min": 2.75,
         "neutral": 3.15,
       },
-      "dle_hours": 6.77,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 115.22,
+        "relativeAirSpeedMs": 6.57632,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.297544,
+      },
       "extremity": {
         "max": {
           "hands": 1.23,
@@ -5075,7 +5356,6 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         },
       },
       "skiing": {
-        "dle_hours": 6.72,
         "min": 1.26,
         "neutral": 1.46,
       },
@@ -5202,6 +5482,25 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 2.6,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 14.65,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 3.31,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.93,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -5414,14 +5713,10 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > wardrobe-only with an 
     ],
     "ireq": {
       "chairlift": {
-        "dle_hours": 4.96,
         "min": 4.87,
         "neutral": 5.29,
       },
-      "dle_hours": 4.96,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "skiing": {
-        "dle_hours": 5.09,
         "min": 1.88,
         "neutral": 2.04,
       },
@@ -5479,8 +5774,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "cold_exposure_factor": 1,
-      "dle_hours": 6.53,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": -15,
+        "metabolicRate": 418.39477867920294,
+        "relativeAirSpeedMs": 10.937454212018443,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.72,
@@ -5641,6 +5942,27 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
           "warnings": [
             "Selected legs clothing does not establish the required wet protection.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 1.49,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 78.31,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 56.09,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [
+            "metabolic_rate",
+          ],
+          "resultant_clo": 0.93,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
@@ -5885,8 +6207,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "cold_exposure_factor": 1,
-      "dle_hours": 7.46,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 325.4181611949356,
+        "relativeAirSpeedMs": 7.33332432600659,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.55,
@@ -6047,6 +6375,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.06,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 45.62,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 20.37,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.77,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -6280,8 +6627,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "cold_exposure_factor": 1,
-      "dle_hours": 6.1,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 325.4181611949356,
+        "relativeAirSpeedMs": 6.70704675397451,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 1.08,
@@ -6441,6 +6794,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
           "status": "cooler",
           "summary": "Cooler than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 2.04,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 29.25,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 13.68,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.35,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": true,
@@ -6668,8 +7040,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "cold_exposure_factor": 1,
-      "dle_hours": 7.59,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 360.99642332185,
+        "relativeAirSpeedMs": 5.674011933156292,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.54,
@@ -6827,6 +7205,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
           "status": "cooler",
           "summary": "Cooler than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.01,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 54.62,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 30.13,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.77,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
@@ -7052,8 +7449,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "cold_exposure_factor": 0.28,
-      "dle_hours": 7.77,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 199.89972759117472,
+        "relativeAirSpeedMs": 3.492494264218626,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -7212,6 +7615,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
           "status": "warmer",
           "summary": "Warmer than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.82,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 17.96,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": 5.39,
+            "heat_storage_w_m2": -7.42,
+            "skin_temp_c": 33.7,
+            "status": "limited",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.69,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -7411,8 +7833,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
     ],
     "ireq": {
       "cold_exposure_factor": 0.78,
-      "dle_hours": 7.89,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 325.4181611949356,
+        "relativeAirSpeedMs": 6.147362421591881,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -7574,6 +8002,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
           "warnings": [
             "Selected legs clothing does not establish the required wet protection.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 0.76,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 60.48,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 30.96,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.61,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -7775,8 +8222,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in with an empt
     ],
     "ireq": {
       "cold_exposure_factor": 1,
-      "dle_hours": 7.46,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 325.4181611949356,
+        "relativeAirSpeedMs": 7.33332432600659,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.55,
@@ -7934,6 +8387,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in with an empt
           "warnings": [
             "Significant insulation shortfall: improve coverage of the areas below target.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 1.02,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 40.64,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 14.84,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.75,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
@@ -8165,8 +8637,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "cold_exposure_factor": 1,
-      "dle_hours": 6.53,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": -15,
+        "metabolicRate": 418.39477867920294,
+        "relativeAirSpeedMs": 10.937454212018443,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.72,
@@ -8330,6 +8808,27 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
           "warnings": [
             "Selected legs clothing does not establish the required wet protection.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 1.41,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 68.55,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 45.53,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [
+            "metabolic_rate",
+          ],
+          "resultant_clo": 0.89,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -8560,8 +9059,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "cold_exposure_factor": 1,
-      "dle_hours": 7.46,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 325.4181611949356,
+        "relativeAirSpeedMs": 7.33332432600659,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.55,
@@ -8722,6 +9227,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.02,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 40.64,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 14.84,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.75,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -8954,8 +9478,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "cold_exposure_factor": 1,
-      "dle_hours": 6.1,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 325.4181611949356,
+        "relativeAirSpeedMs": 6.70704675397451,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 1.08,
@@ -9115,6 +9645,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 2.19,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 41.33,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 26.56,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.43,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -9360,8 +9909,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "cold_exposure_factor": 1,
-      "dle_hours": 7.59,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 360.99642332185,
+        "relativeAirSpeedMs": 5.674011933156292,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.54,
@@ -9522,6 +10077,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.01,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 54.62,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 30.13,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.77,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -9749,8 +10323,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "cold_exposure_factor": 0.28,
-      "dle_hours": 7.77,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 199.89972759117472,
+        "relativeAirSpeedMs": 3.492494264218626,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -9908,6 +10488,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
           "status": "warmer",
           "summary": "Warmer than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.8,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 16.59,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": 4.43,
+            "heat_storage_w_m2": -9.02,
+            "skin_temp_c": 33.7,
+            "status": "limited",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.68,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -10105,8 +10704,14 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
     ],
     "ireq": {
       "cold_exposure_factor": 0.78,
-      "dle_hours": 7.89,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 5,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 325.4181611949356,
+        "relativeAirSpeedMs": 6.147362421591881,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -10267,6 +10872,25 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
           "warnings": [
             "Selected legs clothing does not establish the required wet protection.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 0.76,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 60.48,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 30.96,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.61,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -10570,8 +11194,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 7.16,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -15,
+        "metabolicRate": 511.3713961634702,
+        "relativeAirSpeedMs": 8.9408,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.5,
@@ -10740,6 +11370,27 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
           "status": "mixed",
           "summary": "Uneven warmth",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.36,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 89.47,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 61.78,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [
+            "metabolic_rate",
+          ],
+          "resultant_clo": 0.7,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": true,
@@ -10978,8 +11629,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 5.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.37,
@@ -11147,6 +11804,25 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
           "status": "mixed",
           "summary": "Uneven warmth",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.83,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 46.98,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 15.34,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.54,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
@@ -11356,8 +12032,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 6.69,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 4.4704,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 1.08,
@@ -11527,6 +12209,25 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
           "status": "cooler",
           "summary": "Cooler than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.78,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 53.07,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 35.31,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.11,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": true,
@@ -11743,8 +12444,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 438.3527997479608,
+        "relativeAirSpeedMs": 2.68224,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.31,
@@ -11911,6 +12618,27 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
           "status": "warmer",
           "summary": "Warmer than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.71,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 80.27,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 51.76,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [
+            "metabolic_rate",
+          ],
+          "resultant_clo": 0.54,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -12090,8 +12818,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1000,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 302.17400682386875,
+        "relativeAirSpeedMs": 1.78816,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.05,
@@ -12259,6 +12993,25 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
             "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
           ],
         },
+        "exposure": {
+          "basic_clo": 0.54,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 62.46,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 29.6,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.38,
+        },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
         "maxExtremityDeficit": 0.04,
@@ -12420,8 +13173,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1000,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 3.57632,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.17,
@@ -12588,6 +13347,25 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
           "status": "mixed",
           "summary": "Uneven warmth",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.8,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 93.34,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 60.05,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.46,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
@@ -12801,8 +13579,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in with an emp
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 5.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.37,
@@ -12969,6 +13753,25 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in with an emp
           "warnings": [
             "Significant insulation shortfall: improve coverage of the areas below target.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 0.84,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 48.02,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 16.51,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.54,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
@@ -13203,8 +14006,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 7.16,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -15,
+        "metabolicRate": 511.3713961634702,
+        "relativeAirSpeedMs": 8.9408,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.5,
@@ -13372,6 +14181,27 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
           "status": "warmer",
           "summary": "Warmer than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.39,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 94.11,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 66.8,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [
+            "metabolic_rate",
+          ],
+          "resultant_clo": 0.71,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -13640,8 +14470,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 5.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.37,
@@ -13809,6 +14645,25 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.84,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 48.02,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 16.51,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.54,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -14044,8 +14899,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 6.69,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 4.4704,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 1.08,
@@ -14215,6 +15076,25 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.95,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 70.73,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 54.14,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.21,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -14457,8 +15337,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 438.3527997479608,
+        "relativeAirSpeedMs": 2.68224,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.31,
@@ -14626,6 +15512,27 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.6,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 53.09,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 21.86,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [
+            "metabolic_rate",
+          ],
+          "resultant_clo": 0.47,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -14817,8 +15724,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1000,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 302.17400682386875,
+        "relativeAirSpeedMs": 1.78816,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.05,
@@ -14985,6 +15898,25 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
           "warnings": [
             "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 0.46,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 49.02,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 13.9,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.33,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
@@ -15156,8 +16088,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1000,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 3.57632,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.17,
@@ -15326,6 +16264,25 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
           "status": "warmer",
           "summary": "Warmer than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.65,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 63.28,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 25.92,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.38,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -15534,8 +16491,14 @@ exports[`POST /api/v1/recommendations/'running' (golden) > wardrobe-only with an
 {
   "body": {
     "ireq": {
-      "dle_hours": 7.16,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -15,
+        "metabolicRate": 511.3713961634702,
+        "relativeAirSpeedMs": 8.9408,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.5,
@@ -15698,6 +16661,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "wind_speed": "20 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -15,
+        "metabolicRate": 174.6,
+        "relativeAirSpeedMs": 13.9408,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.60632,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 2.5,
@@ -15805,6 +16776,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
         ],
       },
+      "exposure": {
+        "basic_clo": 3.86,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 27.26,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 17.55,
+          "skin_temp_c": 33.7,
+          "status": "no_heat_debt",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 2.34,
+      },
       "hasExtremityGap": true,
       "hasRegionalGap": true,
       "maxExtremityDeficit": 0.20999999999999996,
@@ -15864,10 +16854,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 5.09,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 5.09,
         "min": 1.88,
         "neutral": 2.04,
       },
@@ -15875,6 +16862,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         3.3,
         4.55,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -15,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 2.6822399999999997,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.48,
@@ -15906,7 +16901,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         1.1,
       ],
       "uphill": {
-        "dle_hours": 7.69,
         "min": 0.58,
         "neutral": 0.65,
       },
@@ -16114,6 +17108,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "status": "cooler",
           "summary": "Cooler than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.82,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 59.5,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 37.24,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.78,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
@@ -16391,6 +17404,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "wind_speed": "12 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 145.5,
+        "relativeAirSpeedMs": 10.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.45499999999999996,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 1.84,
@@ -16494,6 +17515,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         "summary": "Uneven warmth",
         "warnings": [],
       },
+      "exposure": {
+        "basic_clo": 3,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 20.73,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 9.49,
+          "skin_temp_c": 33.7,
+          "status": "no_heat_debt",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 1.99,
+      },
       "hasExtremityGap": false,
       "hasRegionalGap": true,
       "maxExtremityDeficit": 0.0050000000000000044,
@@ -16552,10 +17592,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 6.19,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 6.19,
         "min": 1.63,
         "neutral": 1.82,
       },
@@ -16563,6 +17600,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         2.59,
         3.53,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 316.12049944650886,
+        "relativeAirSpeedMs": 1.609344,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.35,
@@ -16594,7 +17639,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         0.78,
       ],
       "uphill": {
-        "dle_hours": 8,
         "min": 0.43,
         "neutral": 0.53,
       },
@@ -16806,6 +17850,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "summary": "Warmer than recommended",
           "warnings": [],
         },
+        "exposure": {
+          "basic_clo": 0.61,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 45.98,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 21.45,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.61,
+        },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
         "maxExtremityDeficit": 0,
@@ -16998,6 +18061,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "wind_speed": "10 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 145.5,
+        "relativeAirSpeedMs": 9.4704,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.45499999999999996,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 3.46,
@@ -17108,6 +18179,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
         ],
       },
+      "exposure": {
+        "basic_clo": 4.31,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": 10.24,
+          "heat_storage_w_m2": -3.9,
+          "skin_temp_c": 30,
+          "status": "more_than_8_hours",
+        },
+        "neutral": {
+          "dle_hours": 3.34,
+          "heat_storage_w_m2": -11.98,
+          "skin_temp_c": 33.7,
+          "status": "limited",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 2.82,
+      },
       "hasExtremityGap": true,
       "hasRegionalGap": true,
       "maxExtremityDeficit": 1.1400000000000001,
@@ -17170,10 +18260,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 4.86,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 4.86,
         "min": 2.92,
         "neutral": 3.12,
       },
@@ -17181,6 +18268,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         4.77,
         6.02,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 316.12049944650886,
+        "relativeAirSpeedMs": 1.3411199999999999,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 1.08,
@@ -17212,7 +18307,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         1.66,
       ],
       "uphill": {
-        "dle_hours": 6.87,
         "min": 0.99,
         "neutral": 1.08,
       },
@@ -17423,6 +18517,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.26,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 31.08,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 16.05,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.19,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -17694,6 +18807,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "wind_speed": "6 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 153.1355751305973,
+        "relativeAirSpeedMs": 7.68224,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.4947049906791059,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 1.97,
@@ -17801,6 +18922,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
         ],
       },
+      "exposure": {
+        "basic_clo": 2.92,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 19.62,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 8.9,
+          "skin_temp_c": 33.7,
+          "status": "no_heat_debt",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 2.07,
+      },
       "hasExtremityGap": false,
       "hasRegionalGap": true,
       "maxExtremityDeficit": 0,
@@ -17860,10 +19000,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 6.38,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 6.38,
         "min": 1.72,
         "neutral": 1.91,
       },
@@ -17871,6 +19008,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         2.57,
         3.41,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 350.6822397983686,
+        "relativeAirSpeedMs": 0.804672,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -17902,7 +19047,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         0.67,
       ],
       "uphill": {
-        "dle_hours": 8,
         "min": 0.31,
         "neutral": 0.4,
       },
@@ -18111,6 +19255,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "summary": "Warmer than recommended",
           "warnings": [],
         },
+        "exposure": {
+          "basic_clo": 0.54,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 59.86,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 36.32,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.54,
+        },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
         "maxExtremityDeficit": 0,
@@ -18308,6 +19471,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "wind_speed": "4 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 116.4,
+        "relativeAirSpeedMs": 6.7881599999999995,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.30368,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 1.32,
@@ -18411,6 +19582,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         "summary": "Warmer than recommended",
         "warnings": [],
       },
+      "exposure": {
+        "basic_clo": 2.72,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 33.48,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 22.47,
+          "skin_temp_c": 33.7,
+          "status": "no_heat_debt",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 2,
+      },
       "hasExtremityGap": false,
       "hasRegionalGap": false,
       "maxExtremityDeficit": 0,
@@ -18468,10 +19658,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 6.79,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 6.79,
         "min": 1.27,
         "neutral": 1.51,
       },
@@ -18479,6 +19666,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         1.92,
         2.59,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 246.38803633330838,
+        "relativeAirSpeedMs": 0.5364479999999999,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -18510,7 +19705,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         0.42,
       ],
       "uphill": {
-        "dle_hours": 8,
         "min": 0.11,
         "neutral": 0.23,
       },
@@ -18719,6 +19913,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "summary": "Warmer than recommended",
           "warnings": [],
         },
+        "exposure": {
+          "basic_clo": 0.33,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 48.76,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 21.18,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.33,
+        },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
         "maxExtremityDeficit": 0.02,
@@ -18906,6 +20119,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "wind_speed": "8 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 145.5,
+        "relativeAirSpeedMs": 8.576319999999999,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.45499999999999996,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 1.31,
@@ -19009,6 +20230,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         "summary": "Warmer than recommended",
         "warnings": [],
       },
+      "exposure": {
+        "basic_clo": 2.79,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 40.26,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 28.84,
+          "skin_temp_c": 33.7,
+          "status": "no_heat_debt",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 1.94,
+      },
       "hasExtremityGap": false,
       "hasRegionalGap": false,
       "maxExtremityDeficit": 0,
@@ -19071,10 +20311,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 6.72,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 6.72,
         "min": 1.26,
         "neutral": 1.46,
       },
@@ -19082,6 +20319,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         1.93,
         2.71,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 316.12049944650886,
+        "relativeAirSpeedMs": 1.0728959999999998,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -19113,7 +20358,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         0.5,
       ],
       "uphill": {
-        "dle_hours": 8,
         "min": 0.2,
         "neutral": 0.3,
       },
@@ -19304,6 +20548,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
           "warnings": [
             "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 0.84,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 130.34,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 111.12,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.82,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -19547,6 +20810,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
       "wind_speed": "12 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 145.5,
+        "relativeAirSpeedMs": 10.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.45499999999999996,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 1.84,
@@ -19651,6 +20922,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
           "Significant insulation shortfall: improve coverage of the areas below target.",
         ],
       },
+      "exposure": {
+        "basic_clo": 2.85,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 16.55,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 4.85,
+          "skin_temp_c": 33.7,
+          "status": "no_heat_debt",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 1.9,
+      },
       "hasExtremityGap": true,
       "hasRegionalGap": true,
       "maxExtremityDeficit": 1.66,
@@ -19686,10 +20976,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 6.19,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 6.19,
         "min": 1.63,
         "neutral": 1.82,
       },
@@ -19697,6 +20984,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
         2.59,
         3.53,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 316.12049944650886,
+        "relativeAirSpeedMs": 1.609344,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.35,
@@ -19728,7 +21023,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
         0.78,
       ],
       "uphill": {
-        "dle_hours": 8,
         "min": 0.43,
         "neutral": 0.53,
       },
@@ -19929,6 +21223,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
             "Significant insulation shortfall: improve coverage of the areas below target.",
           ],
         },
+        "exposure": {
+          "basic_clo": 0.6,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 43.29,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 18.46,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.6,
+        },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
         "maxExtremityDeficit": 0.29,
@@ -20078,6 +21391,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "wind_speed": "20 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -15,
+        "metabolicRate": 174.6,
+        "relativeAirSpeedMs": 13.9408,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.60632,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 2.5,
@@ -20184,6 +21505,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
         ],
       },
+      "exposure": {
+        "basic_clo": 4.24,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 36.35,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 27.38,
+          "skin_temp_c": 33.7,
+          "status": "no_heat_debt",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 2.55,
+      },
       "hasExtremityGap": false,
       "hasRegionalGap": true,
       "maxExtremityDeficit": 0,
@@ -20243,10 +21583,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 5.09,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 5.09,
         "min": 1.88,
         "neutral": 2.04,
       },
@@ -20254,6 +21591,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         3.3,
         4.55,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -15,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 2.6822399999999997,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.48,
@@ -20285,7 +21630,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         1.1,
       ],
       "uphill": {
-        "dle_hours": 7.69,
         "min": 0.58,
         "neutral": 0.65,
       },
@@ -20496,6 +21840,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.8,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 57.15,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 34.69,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.77,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -20754,6 +22117,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "wind_speed": "12 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 145.5,
+        "relativeAirSpeedMs": 10.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.45499999999999996,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 1.84,
@@ -20856,6 +22227,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         "summary": "Cooler than recommended",
         "warnings": [],
       },
+      "exposure": {
+        "basic_clo": 2.85,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 16.55,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 4.85,
+          "skin_temp_c": 33.7,
+          "status": "no_heat_debt",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 1.9,
+      },
       "hasExtremityGap": false,
       "hasRegionalGap": true,
       "maxExtremityDeficit": 0.0050000000000000044,
@@ -20912,10 +22302,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 6.19,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 6.19,
         "min": 1.63,
         "neutral": 1.82,
       },
@@ -20923,6 +22310,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         2.59,
         3.53,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 316.12049944650886,
+        "relativeAirSpeedMs": 1.609344,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.35,
@@ -20954,7 +22349,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         0.78,
       ],
       "uphill": {
-        "dle_hours": 8,
         "min": 0.43,
         "neutral": 0.53,
       },
@@ -21158,6 +22552,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "summary": "Likely comfortable",
           "warnings": [],
         },
+        "exposure": {
+          "basic_clo": 0.6,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 43.29,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 18.46,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.6,
+        },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
         "maxExtremityDeficit": 0.019999999999999962,
@@ -21310,6 +22723,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "wind_speed": "10 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 145.5,
+        "relativeAirSpeedMs": 9.4704,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.45499999999999996,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 3.46,
@@ -21420,6 +22841,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
         ],
       },
+      "exposure": {
+        "basic_clo": 4.7,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 5.11,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": 16.87,
+          "heat_storage_w_m2": -2.37,
+          "skin_temp_c": 33.7,
+          "status": "more_than_8_hours",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 3.06,
+      },
       "hasExtremityGap": true,
       "hasRegionalGap": true,
       "maxExtremityDeficit": 0.8400000000000003,
@@ -21482,10 +22922,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 4.86,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 4.86,
         "min": 2.92,
         "neutral": 3.12,
       },
@@ -21493,6 +22930,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         4.77,
         6.02,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 316.12049944650886,
+        "relativeAirSpeedMs": 1.3411199999999999,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 1.08,
@@ -21524,7 +22969,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         1.66,
       ],
       "uphill": {
-        "dle_hours": 6.87,
         "min": 0.99,
         "neutral": 1.08,
       },
@@ -21735,6 +23179,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.26,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 31.08,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 16.05,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.19,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -21981,6 +23444,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "wind_speed": "6 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 153.1355751305973,
+        "relativeAirSpeedMs": 7.68224,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.4947049906791059,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 1.97,
@@ -22086,6 +23557,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
         ],
       },
+      "exposure": {
+        "basic_clo": 2.78,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 15.02,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 3.85,
+          "skin_temp_c": 33.7,
+          "status": "no_heat_debt",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 1.98,
+      },
       "hasExtremityGap": false,
       "hasRegionalGap": true,
       "maxExtremityDeficit": 0,
@@ -22150,10 +23640,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 6.38,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 6.38,
         "min": 1.72,
         "neutral": 1.91,
       },
@@ -22161,6 +23648,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         2.57,
         3.41,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 350.6822397983686,
+        "relativeAirSpeedMs": 0.804672,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -22192,7 +23687,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         0.67,
       ],
       "uphill": {
-        "dle_hours": 8,
         "min": 0.31,
         "neutral": 0.4,
       },
@@ -22394,6 +23888,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "summary": "Likely comfortable",
           "warnings": [],
         },
+        "exposure": {
+          "basic_clo": 0.52,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 57.16,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 33.34,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.52,
+        },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
         "maxExtremityDeficit": 0,
@@ -22552,6 +24065,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "wind_speed": "4 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 116.4,
+        "relativeAirSpeedMs": 6.7881599999999995,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.30368,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 1.32,
@@ -22654,6 +24175,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         "summary": "Warmer than recommended",
         "warnings": [],
       },
+      "exposure": {
+        "basic_clo": 2.57,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 30.42,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 18.91,
+          "skin_temp_c": 33.7,
+          "status": "no_heat_debt",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 1.91,
+      },
       "hasExtremityGap": false,
       "hasRegionalGap": false,
       "maxExtremityDeficit": 0,
@@ -22709,10 +24249,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 6.79,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 6.79,
         "min": 1.27,
         "neutral": 1.51,
       },
@@ -22720,6 +24257,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         1.92,
         2.59,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 246.38803633330838,
+        "relativeAirSpeedMs": 0.5364479999999999,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -22751,7 +24296,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         0.42,
       ],
       "uphill": {
-        "dle_hours": 8,
         "min": 0.11,
         "neutral": 0.23,
       },
@@ -22952,6 +24496,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "summary": "Warmer than recommended",
           "warnings": [],
         },
+        "exposure": {
+          "basic_clo": 0.32,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 46.67,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 18.73,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.32,
+        },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
         "maxExtremityDeficit": 0.02,
@@ -23101,6 +24664,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "wind_speed": "8 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 145.5,
+        "relativeAirSpeedMs": 8.576319999999999,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.45499999999999996,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 1.31,
@@ -23203,6 +24774,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         "summary": "Warmer than recommended",
         "warnings": [],
       },
+      "exposure": {
+        "basic_clo": 2.66,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 36.85,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 24.98,
+          "skin_temp_c": 33.7,
+          "status": "no_heat_debt",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 1.86,
+      },
       "hasExtremityGap": false,
       "hasRegionalGap": false,
       "maxExtremityDeficit": 0.004999999999999893,
@@ -23263,10 +24853,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 6.72,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 6.72,
         "min": 1.26,
         "neutral": 1.46,
       },
@@ -23274,6 +24861,14 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         1.93,
         2.71,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 316.12049944650886,
+        "relativeAirSpeedMs": 1.0728959999999998,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -23305,7 +24900,6 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         0.5,
       ],
       "uphill": {
-        "dle_hours": 8,
         "min": 0.2,
         "neutral": 0.3,
       },
@@ -23488,6 +25082,25 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
           "warnings": [
             "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 0.84,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 130.34,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 111.12,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.82,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -23707,10 +25320,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > wardrobe-only wit
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 5.09,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 5.09,
         "min": 1.88,
         "neutral": 2.04,
       },
@@ -23719,12 +25329,10 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > wardrobe-only wit
         1.1,
       ],
       "transition": {
-        "dle_hours": 4.66,
         "min": 3.38,
         "neutral": 3.67,
       },
       "uphill": {
-        "dle_hours": 7.69,
         "min": 0.58,
         "neutral": 0.65,
       },
@@ -23798,8 +25406,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'co
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 7.21,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -15,
+        "metabolicRate": 525.3178887861104,
+        "relativeAirSpeedMs": 8.9408,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.5,
@@ -23975,6 +25589,27 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'co
           "status": "warmer",
           "summary": "Warmer than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.26,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 84.47,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 55.42,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [
+            "metabolic_rate",
+          ],
+          "resultant_clo": 0.66,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -24189,8 +25824,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'co
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 5.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.38,
@@ -24366,6 +26007,25 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'co
           "status": "mixed",
           "summary": "Uneven warmth",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.83,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 46.98,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 15.34,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.54,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
@@ -24587,8 +26247,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ex
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 6.69,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 4.4704,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 1.08,
@@ -24766,6 +26432,25 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ex
           "status": "cooler",
           "summary": "Cooler than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.92,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 67.43,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 50.61,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.19,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": true,
@@ -24989,8 +26674,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'la
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1000,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 438.3527997479608,
+        "relativeAirSpeedMs": 2.68224,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -25167,6 +26858,27 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'la
           "warnings": [
             "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 0.82,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 70.38,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 40.88,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [
+            "metabolic_rate",
+          ],
+          "resultant_clo": 0.51,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -25357,8 +27069,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'mi
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1000,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 316.12049944650886,
+        "relativeAirSpeedMs": 1.78816,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -25533,6 +27251,25 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'mi
           "warnings": [
             "Pole-grip hand protection is missing; this is separate from a thermal cold deficit.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 0.33,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 30.45,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": 4.05,
+            "heat_storage_w_m2": -9.88,
+            "skin_temp_c": 33.7,
+            "status": "limited",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.24,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": true,
@@ -25713,8 +27450,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ne
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 3.57632,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -25897,6 +27640,25 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ne
             "Significant excess insulation: reduce unnecessary warmth or vent as conditions allow.",
             "Selected legs clothing does not establish the required wet protection.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 0.76,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 159.22,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 134.8,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.72,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -26099,8 +27861,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in with an empty wa
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 5.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.38,
@@ -26275,6 +28043,25 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in with an empty wa
             "Significant insulation shortfall: improve coverage of the areas below target.",
             "Pole-grip hand protection is missing; this is separate from a thermal cold deficit.",
           ],
+        },
+        "exposure": {
+          "basic_clo": 1,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 77.23,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 48.92,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.63,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": false,
@@ -26493,8 +28280,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'co
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 7.21,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -15,
+        "metabolicRate": 525.3178887861104,
+        "relativeAirSpeedMs": 8.9408,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.5,
@@ -26669,6 +28462,27 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'co
           "status": "warmer",
           "summary": "Warmer than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1.26,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 84.47,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 55.42,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [
+            "metabolic_rate",
+          ],
+          "resultant_clo": 0.66,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -26882,8 +28696,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'co
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -3.8888888888888893,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 5.36448,
+        "relativeHumidity": 60,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.38,
@@ -27060,6 +28880,25 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'co
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 1,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 77.23,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 48.92,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.63,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -27283,8 +29122,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ex
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 6.69,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -26.11111111111111,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 4.4704,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 1.08,
@@ -27462,6 +29307,25 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ex
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 2.01,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 76.8,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 60.61,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.25,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -27706,8 +29570,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'la
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1000,
+        "airTempC": -7.777777777777779,
+        "metabolicRate": 438.3527997479608,
+        "relativeAirSpeedMs": 2.68224,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -27882,6 +29752,27 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'la
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.8,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 67.75,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 37.98,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [
+            "metabolic_rate",
+          ],
+          "resultant_clo": 0.5,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
@@ -28069,8 +29960,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'mi
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1000,
+        "airTempC": 7.222222222222222,
+        "metabolicRate": 316.12049944650886,
+        "relativeAirSpeedMs": 1.78816,
+        "relativeHumidity": 50,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -28245,6 +30142,25 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'mi
           "status": "cooler",
           "summary": "Cooler than recommended",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.32,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 27.28,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": 2.94,
+            "heat_storage_w_m2": -13.59,
+            "skin_temp_c": 33.7,
+            "status": "limited",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.23,
         },
         "hasExtremityGap": true,
         "hasRegionalGap": true,
@@ -28426,8 +30342,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ne
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
     "ireq": {
-      "dle_hours": 8,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": 2.2222222222222223,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 3.57632,
+        "relativeHumidity": 95,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.33,
@@ -28612,6 +30534,25 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ne
             "Selected legs clothing does not establish the required wet protection.",
           ],
         },
+        "exposure": {
+          "basic_clo": 2.16,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 253.19,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 241.34,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 1.78,
+        },
         "hasExtremityGap": false,
         "hasRegionalGap": false,
         "maxExtremityDeficit": 0,
@@ -28788,8 +30729,14 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > wardrobe-only with an empt
       },
     ],
     "ireq": {
-      "dle_hours": 7.21,
-      "dle_method": "heuristic_exposure_estimate_v1",
+      "exposure_conditions": {
+        "airPermeability": 50,
+        "airTempC": -15,
+        "metabolicRate": 525.3178887861104,
+        "relativeAirSpeedMs": 8.9408,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.5,
@@ -28954,6 +30901,14 @@ exports[`POST /api/v1/recommendations/ski-touring (golden, pack options) > prior
       "wind_speed": "20 mph",
     },
     "descent_breakdown": {
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -15,
+        "metabolicRate": 174.6,
+        "relativeAirSpeedMs": 13.9408,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.60632,
+      },
       "extremity_ireq": {
         "max": {
           "hands": 2.5,
@@ -29061,6 +31016,25 @@ exports[`POST /api/v1/recommendations/ski-touring (golden, pack options) > prior
           "Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
         ],
       },
+      "exposure": {
+        "basic_clo": 3.06,
+        "heat_debt_limit_kj_m2": 144,
+        "method": "iso11079_dle_selected_ensemble_v1",
+        "minimal": {
+          "dle_hours": null,
+          "heat_storage_w_m2": 2.17,
+          "skin_temp_c": 30,
+          "status": "no_heat_debt",
+        },
+        "neutral": {
+          "dle_hours": 4.17,
+          "heat_storage_w_m2": -9.6,
+          "skin_temp_c": 33.7,
+          "status": "limited",
+        },
+        "outside_iso_range": [],
+        "resultant_clo": 1.91,
+      },
       "hasExtremityGap": false,
       "hasRegionalGap": true,
       "maxExtremityDeficit": 0,
@@ -29121,10 +31095,7 @@ exports[`POST /api/v1/recommendations/ski-touring (golden, pack options) > prior
       "Prioritize breathability for uphill (evap potential >= 0.2)",
     ],
     "ireq": {
-      "dle_hours": 5.09,
-      "dle_method": "heuristic_exposure_estimate_v1",
       "downhill": {
-        "dle_hours": 5.09,
         "min": 1.88,
         "neutral": 2.04,
       },
@@ -29132,6 +31103,14 @@ exports[`POST /api/v1/recommendations/ski-touring (golden, pack options) > prior
         3.3,
         4.55,
       ],
+      "exposure_conditions": {
+        "airPermeability": 1,
+        "airTempC": -15,
+        "metabolicRate": 395.15062430813606,
+        "relativeAirSpeedMs": 2.6822399999999997,
+        "relativeHumidity": 85,
+        "walkingSpeedMs": 0.7,
+      },
       "extremity": {
         "max": {
           "hands": 0.48,
@@ -29163,7 +31142,6 @@ exports[`POST /api/v1/recommendations/ski-touring (golden, pack options) > prior
         1.1,
       ],
       "uphill": {
-        "dle_hours": 7.69,
         "min": 0.58,
         "neutral": 0.65,
       },
@@ -29367,6 +31345,25 @@ exports[`POST /api/v1/recommendations/ski-touring (golden, pack options) > prior
           "status": "near_target",
           "summary": "Likely comfortable",
           "warnings": [],
+        },
+        "exposure": {
+          "basic_clo": 0.8,
+          "heat_debt_limit_kj_m2": 144,
+          "method": "iso11079_dle_selected_ensemble_v1",
+          "minimal": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 57.15,
+            "skin_temp_c": 30,
+            "status": "no_heat_debt",
+          },
+          "neutral": {
+            "dle_hours": null,
+            "heat_storage_w_m2": 34.69,
+            "skin_temp_c": 33.7,
+            "status": "no_heat_debt",
+          },
+          "outside_iso_range": [],
+          "resultant_clo": 0.77,
         },
         "hasExtremityGap": false,
         "hasRegionalGap": false,

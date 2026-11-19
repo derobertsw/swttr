@@ -173,6 +173,39 @@ describe("POST /api/v1/ensembles/evaluate", () => {
   it.each([null, [], { hands: -1 }, { headNeck: 'warm' }])('rejects invalid local accessory limits: %j', async extremityMaxTargets => {
     expect((await post({ phases: [{ ...phase, extremityMaxTargets }] })).status).toBe(400);
   });
+  describe('exposure limit of the evaluated outfit', () => {
+    const conditions = {
+      airTempC: -15, relativeHumidity: 70, metabolicRate: 116,
+      relativeAirSpeedMs: 4, walkingSpeedMs: 0.3, airPermeability: 1,
+    };
+    const outfit = (torso: number) => ({ ...phase, itemClo: { ...phase.itemClo, torso: [torso] }, arms: { clo: torso }, exposureConditions: conditions });
+
+    it('derives the limit from the worn ensemble, so a warmer edit lasts longer', async () => {
+      const response = await post({ phases: [outfit(1.5), outfit(3)] });
+      expect(response.status).toBe(200);
+      const { phases: [light, warm] } = await response.json();
+      expect(light.exposure).toMatchObject({ method: 'iso11079_dle_selected_ensemble_v1', heat_debt_limit_kj_m2: 144 });
+      expect(light.exposure.basic_clo).toBeCloseTo(light.totalClo, 2);
+      expect(warm.exposure.basic_clo).toBeGreaterThan(light.exposure.basic_clo);
+      expect(light.exposure.neutral.status).toBe('limited');
+      expect(warm.exposure.neutral.dle_hours).toBeGreaterThan(light.exposure.neutral.dle_hours);
+    });
+
+    it('omits the limit without conditions and rejects implausible ones', async () => {
+      const { phases: [result] } = await (await post({ phases: [phase] })).json();
+      expect(result.exposure).toBeUndefined();
+      for (const bad of [{ ...conditions, metabolicRate: 'high' }, { ...conditions, relativeHumidity: 150 }, { airTempC: -15 }, []]) {
+        expect((await post({ phases: [{ ...phase, exposureConditions: bad }] })).status).toBe(400);
+      }
+    });
+
+    it('whitelists the conditions it echoes', async () => {
+      const { phases: [result] } = await (await post({ phases: [{ ...outfit(2), exposureConditions: { ...conditions, injected: 1 } }] })).json();
+      expect(result.exposure).toBeDefined();
+      expect(JSON.stringify(result)).not.toContain('injected');
+    });
+  });
+
   it("evaluates each phase in order", async () => {
     const response = await post({ phases: [phase, { ...phase, targetRange: [2, 3] }] });
     expect(response.status).toBe(200);

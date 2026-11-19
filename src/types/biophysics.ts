@@ -10,8 +10,67 @@ import type { OutingPattern, XCExposure } from '@/types/xc';
 export interface IreqData {
   min: number;
   neutral: number;
-  dle_hours?: number;
-  dle_method?: string;
+}
+
+/**
+ * Server-issued conditions of one phase's heat balance, echoed back with
+ * manual edits so `POST /api/v1/ensembles/evaluate` can compute the edited
+ * outfit's exposure limit. The same values as the phase's IREQ and its
+ * basic-clo conversion: air temperature, humidity, metabolic rate, relative
+ * air speed, walking speed and the assumed outer-fabric air permeability.
+ */
+export interface ExposureConditions {
+  airTempC: number;
+  relativeHumidity: number;
+  /** W/m². */
+  metabolicRate: number;
+  /** m/s, including movement through the air. */
+  relativeAirSpeedMs: number;
+  /** m/s. */
+  walkingSpeedMs: number;
+  /** l/(m²·s). */
+  airPermeability: number;
+}
+
+/** Whole-body heat debt at one ISO 11079 strain criterion. */
+export interface ExposureCriterion {
+  /** Skin temperature the balance is held at, in °C. */
+  skin_temp_c: number;
+  /** Heat-storage rate S, in W/m²; negative is a heat debt building up. */
+  heat_storage_w_m2: number;
+  /**
+   * - `limited`: S < 0 and the heat-debt limit is reached within 8 h.
+   * - `more_than_8_hours`: S < 0, but the limit takes longer than 8 h (ISO
+   *   11079 reports these as "more than 8 h").
+   * - `no_heat_debt`: S ≥ 0, so whole-body cooling does not limit the
+   *   exposure; there is no finite duration.
+   */
+  status: 'limited' | 'more_than_8_hours' | 'no_heat_debt';
+  /** Heat-debt limit ÷ |S|, in hours; null without a heat debt. */
+  dle_hours: number | null;
+}
+
+/**
+ * Duration-limited exposure (ISO 11079 DLE) of the evaluated ensemble: the
+ * time until the whole body has lost the standard's allowed heat debt, with
+ * the ensemble's actual insulation. It is not a time to a core temperature,
+ * frostbite or hand/foot injury. See docs/exposure-limits.md.
+ */
+export interface ExposureLimit {
+  method: 'iso11079_dle_selected_ensemble_v1';
+  /** The evaluated outfit's whole-body (torso, arms, legs) basic clo. */
+  basic_clo: number;
+  /** That clo corrected for the phase's wind, motion and outer fabric. */
+  resultant_clo: number;
+  /** ISO 11079's allowed heat debt Qlim, in kJ/m² (40 Wh/m²). */
+  heat_debt_limit_kj_m2: number;
+  /** ISO 11079's DLEmin criterion: skin at the minimal-strain temperature. */
+  minimal: ExposureCriterion;
+  /** DLEneutral: skin at the neutral (comfort) temperature. */
+  neutral: ExposureCriterion;
+  /** Inputs outside ISO 11079's stated range (metabolic rate 58–400 W/m²,
+   * air at 10°C or below, air speed 0.4–18 m/s); empty when within it. */
+  outside_iso_range: Array<'metabolic_rate' | 'air_temperature' | 'air_speed'>;
 }
 
 export interface RegionalIreqData {
@@ -73,8 +132,9 @@ export interface IreqRange {
   uphill?: IreqData;
   downhill?: IreqData;
   downhill_target_range?: [number, number];
-  dle_hours?: number;
-  dle_method?: string;
+  /** Heat-balance conditions of the phase `recommendation.evaluation` judges,
+   * for manual edits to forward (touring's descent: `descent_breakdown`). */
+  exposure_conditions?: ExposureConditions;
   target_range: [number, number];
   regional?: RegionalIreqRange;
   extremity?: ExtremityIreqRange;
@@ -328,6 +388,7 @@ export interface BiophysicsRecommendation {
     regional_clo: RegionalClo;
     regional_ireq: RegionalIreqRange;
     extremity_ireq: ExtremityIreqRange;
+    exposure_conditions?: ExposureConditions;
   };
   pack_items?: PackItems;
   /** Generic carry advice, excluded from moving insulation and ownership. */
@@ -399,6 +460,9 @@ export interface PhaseEvaluationInput {
    */
   arms?: { clo: number; target?: number; minTarget?: number; deficitClo?: number };
   targetRange?: [number, number];
+  /** Server-issued phase conditions, forwarded unchanged; with them the
+   * evaluation includes the outfit's `exposure` limit. */
+  exposureConditions?: ExposureConditions;
   /** Internal: existing evaporative-potential heuristic, independent of insulation. */
   breathability?: { evapPotential: number; target: number };
 }
@@ -431,6 +495,9 @@ export interface PhaseEvaluation {
   hasExtremityGap: boolean | null;
   decision: ThermalDecision | null;
   comfortScore: number | null;
+  /** The evaluated outfit's duration-limited exposure, when the phase's
+   * conditions were sent and its whole-body clo is known. */
+  exposure?: ExposureLimit;
 }
 
 /**

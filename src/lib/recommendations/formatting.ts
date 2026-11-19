@@ -3,7 +3,6 @@
  */
 import { garmentToThermalProps } from '@/lib/biophysics/ensemble';
 import { COWEDA_VALIDATION_SOURCE, type CowedaValidationBuffer } from '@/lib/biophysics/coweda';
-import { DLE_ESTIMATION_METHOD } from '@/lib/biophysics/ireq';
 import type { GarmentWithProtection } from '@/lib/biophysics/scorer';
 import type { IreqResult } from '@/types/garments';
 import type { GarmentRow, HandwearRow, HeadwearRow, HeadwearRecommendations } from './types';
@@ -120,10 +119,11 @@ export function formatConditions(weather: WeatherInput) {
 }
 
 /**
- * Format one phase's IREQ (clo) and duration-limited exposure
+ * Format one phase's IREQ (clo). The duration-limited exposure depends on the
+ * outfit, so it is reported with the evaluation (`evaluation.exposure`).
  */
 export function formatIreqPhase(ireq: IreqResult) {
-  return { min: ireq.ireqMin, neutral: ireq.ireqNeutral, dle_hours: ireq.dleHours };
+  return { min: ireq.ireqMin, neutral: ireq.ireqNeutral };
 }
 
 /**
@@ -148,9 +148,8 @@ export function formatSinglePhaseIreq(ireq: IreqResult, targets: PhaseTargets) {
   return {
     min: ireq.ireqMin,
     neutral: ireq.ireqNeutral,
-    dle_hours: ireq.dleHours,
-    dle_method: DLE_ESTIMATION_METHOD,
     target_range: targets.targetRange,
+    ...(targets.exposureConditions ? { exposure_conditions: targets.exposureConditions } : {}),
     regional: targets.regional,
     extremity: targets.extremity,
     validation_buffer_clo: formatValidationBuffer(targets.validationBuffer),
