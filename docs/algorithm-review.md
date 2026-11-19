@@ -123,6 +123,8 @@ Garments were moved to T21-03's scale in migrations 035 and 036. Handwear and he
 
 These are analogues, not the same products. The local targets were tuned against the catalog's scale, so both would move together.
 
+Update 2026-11-19: #376 moves hand and head items and the local bands onto this part-manikin scale together (hands × 0.60, head × 0.45); see [catalog-accessory-clo.md](catalog-accessory-clo.md).
+
 ### 7. `calculateIreq` is a simplified ISO 11079 solver
 
 It uses fixed skin temperatures (33.7 and 30°C), no skin-evaporation term, and no validity limits. ISO 11079 lowers skin temperature with metabolic rate, includes skin wettedness, and applies to 58–400 W/m² at 10°C and below.

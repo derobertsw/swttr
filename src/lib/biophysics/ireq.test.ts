@@ -9,7 +9,7 @@ import {
   requiredBasicInsulation,
   walkingSpeedFromMetabolicRate,
 } from './ireq';
-import { METABOLIC_RATES, getAlpineCloTargets, ALPINE_CLO_TARGETS } from './constants';
+import { METABOLIC_RATES, getAlpineCloTargets, ALPINE_CLO_TARGETS, ACCESSORY_CLO_SCALE } from './constants';
 
 describe('Unit Conversions', () => {
   describe('fahrenheitToCelsius', () => {
@@ -293,12 +293,14 @@ describe('calculateExtremityIreq', () => {
   };
 
   describe('basic extremity calculations', () => {
-    it('should return higher values for hands than base IREQ', () => {
+    it('states hand targets on the part-manikin scale (#376)', () => {
       const result = calculateExtremityIreq(baseIreq, 'alpine_skiing', -10, 5);
 
-      // Alpine skiing hands multiplier is 1.45
-      expect(result.min.hands).toBeGreaterThan(baseIreq.ireqMin);
-      expect(result.neutral.hands).toBeGreaterThan(baseIreq.ireqNeutral);
+      // Alpine skiing hands multiplier 1.45, wind factor 1.15, manikin scale 0.60
+      expect(result.neutral.hands).toBeCloseTo(baseIreq.ireqNeutral * 1.45 * 1.15 * ACCESSORY_CLO_SCALE.hands, 2);
+      expect(result.min.hands).toBeCloseTo(baseIreq.ireqMin * 1.45 * 1.15 * ACCESSORY_CLO_SCALE.hands, 2);
+      // Above the whole-body IREQ before the scale, as the multipliers intend
+      expect(result.neutral.hands / ACCESSORY_CLO_SCALE.hands).toBeGreaterThan(baseIreq.ireqNeutral);
     });
 
     it('should apply temperature scaling', () => {
@@ -316,8 +318,8 @@ describe('calculateExtremityIreq', () => {
       const atMinus30 = calculateExtremityIreq(baseIreq, 'xc_skiing', -30, 0);
 
       expect(atMinus30).toEqual(atMinus10);
-      // XC hands multiplier is 1.10
-      expect(atMinus30.neutral.hands).toBeCloseTo(1.65, 2);
+      // XC hands multiplier is 1.10, on the part-manikin scale (x 0.60)
+      expect(atMinus30.neutral.hands).toBeCloseTo(0.99, 2);
     });
 
     it('should apply wind scaling', () => {

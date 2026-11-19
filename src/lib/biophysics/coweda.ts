@@ -1,4 +1,4 @@
-import { CLO_TO_M2KW, METABOLIC_RATES } from "./constants";
+import { ACCESSORY_CLO_SCALE, CLO_TO_M2KW, METABOLIC_RATES } from "./constants";
 
 export const COWEDA_VALIDATION_SOURCE = "potter_2020_coweda_validation";
 
@@ -136,19 +136,23 @@ export function applyCowedaBufferToTargetRange(
 
 /**
  * Applies extremity-focused uncertainty buffer from CoWEDA finger validation.
+ * The buffer is restated on the part-manikin scale of the hand and head
+ * targets (`ACCESSORY_CLO_SCALE`, #376).
  */
 export function applyCowedaBufferToExtremityTargets<T extends ExtremityTargetShape>(
   extremityTargets: T,
   buffer: CowedaValidationBuffer
 ): T {
+  const hands = buffer.extremity * ACCESSORY_CLO_SCALE.hands;
+  const head = buffer.extremity * ACCESSORY_CLO_SCALE.head;
   return {
     min: {
-      hands: round2(extremityTargets.min.hands + buffer.extremity),
-      head: round2(extremityTargets.min.head + buffer.extremity),
+      hands: round2(extremityTargets.min.hands + hands),
+      head: round2(extremityTargets.min.head + head),
     },
     neutral: {
-      hands: round2(extremityTargets.neutral.hands + buffer.extremity),
-      head: round2(extremityTargets.neutral.head + buffer.extremity),
+      hands: round2(extremityTargets.neutral.hands + hands),
+      head: round2(extremityTargets.neutral.head + head),
     },
   } as T;
 }

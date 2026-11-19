@@ -4,8 +4,8 @@
 import type { GarmentRow, HandwearRow, HeadwearRow, HeadwearRecommendations } from './types';
 import type { AccessoryAssessment, AccessoryAssessments } from '@/types/biophysics';
 import type { ActivityType, HoodType } from '@/lib/biophysics/constants';
-import { HOOD_CLO_VALUES } from '@/lib/biophysics/constants';
-import { localThermalStatus, THERMAL_DISPLAY_CLO_EPSILON, type ExtremityCloValues } from '@/lib/biophysics/comfort';
+import { ACCESSORY_CLO_SCALE, HOOD_CLO_VALUES } from '@/lib/biophysics/constants';
+import { EXTREMITY_CLO_EPSILON, localThermalStatus, type ExtremityCloValues } from '@/lib/biophysics/comfort';
 import { POLE_GRIP_MAX_CLO } from '@/lib/biophysics/sport-policy';
 import type { PhaseTargets } from './thermal-targets';
 
@@ -22,12 +22,22 @@ export const HELMET_TYPES: readonly string[] = ['ski_helmet', 'bike_helmet'];
 export const HEAD_WARMTH_TYPES = ['liner_beanie', 'midweight_beanie', 'heavy_beanie', 'balaclava_light', 'balaclava_heavy', 'headband'];
 const NECK_WARMTH_TYPES = ['buff_thin', 'buff_heavy', 'facemask'];
 
+/**
+ * How much of a worn hood's hood-up insulation counts toward the head. The
+ * engine can't tell whether a hood is up, so it keeps the weight the head
+ * bands were tuned with: on the earlier accessory scale a hood counted at its
+ * hood-up value against hats at about 2.2x theirs. An unvalidated
+ * assumption that keeps selection where it was; counting hoods in full is a
+ * product decision (docs/catalog-accessory-clo.md, "Hoods").
+ */
+export const HOOD_HEAD_CREDIT = ACCESSORY_CLO_SCALE.head;
+
 /** Shared with response scoring: incompatible hoods cannot count under a helmet. */
 export function hoodInsulation(ensemble: GarmentRow[], hasHelmet: boolean): number {
   return ensemble.reduce((clo, garment) => {
     const hood = garment.hood_type;
     return clo + (hood && hood in HOOD_CLO_VALUES && (!hasHelmet || hood === 'helmet_compatible')
-      ? HOOD_CLO_VALUES[hood as HoodType] : 0);
+      ? HOOD_CLO_VALUES[hood as HoodType] * HOOD_HEAD_CREDIT : 0);
   }, 0);
 }
 
@@ -111,9 +121,9 @@ function ratedFor(item: HandwearRow | HeadwearRow, tempC: number, basis: RatingB
  * outfit check accepts, with a shortfall counting double an excess. A much
  * warmer item loses to a small shortfall, and a large one loses to it.
  */
-function outsideRange(clo: number, minimum: number, maximum: number): number {
-  return Math.round((2 * Math.max(0, minimum - clo - THERMAL_DISPLAY_CLO_EPSILON)
-    + Math.max(0, clo - maximum - THERMAL_DISPLAY_CLO_EPSILON)) * 1e4);
+function outsideRange(clo: number, minimum: number, maximum: number, tolerance: number): number {
+  return Math.round((2 * Math.max(0, minimum - clo - tolerance)
+    + Math.max(0, clo - maximum - tolerance)) * 1e4);
 }
 
 interface PhaseAccessorySelection {
@@ -144,6 +154,11 @@ export function selectPhaseAccessories(
   const { min, neutral } = targets.extremity;
   const maximum = { ...(targets.extremity.max ?? neutral) };
   if (!policy.bareHands) maximum.hands = Math.max(maximum.hands, KEPT_GLOVE_MAX_CLO);
+  /** A hand or head option against the part's band, at the part's tolerance. */
+  const status = (part: 'hands' | 'head', clo: number) =>
+    localThermalStatus(clo, min[part], maximum[part], EXTREMITY_CLO_EPSILON[part]);
+  const outside = (part: 'hands' | 'head', clo: number) =>
+    outsideRange(clo, min[part], maximum[part], EXTREMITY_CLO_EPSILON[part]);
   const rated = (item: HandwearRow | HeadwearRow) => ratedFor(item, tempC, policy.rating);
   /** Items rated for these conditions, or every item when none is: something beats nothing in the cold. */
   const preferRated = <T extends HandwearRow | HeadwearRow>(items: T[]): T[] => {
@@ -161,8 +176,8 @@ export function selectPhaseAccessories(
   // XC gloves must grip poles; warmth alone decides only when none can.
   const gripHands = poleGrip ? ratedHands.filter(supportsPoleGrip) : [];
   const hands = gripHands.length > 0 ? gripHands : ratedHands;
-  const handsInRange = hands.filter(item => localThermalStatus(item.rcl_clo, min.hands, maximum.hands) === 'in_range');
-  const thermalHandsNeeded = min.hands > THERMAL_DISPLAY_CLO_EPSILON;
+  const handsInRange = hands.filter(item => status('hands', item.rcl_clo) === 'in_range');
+  const thermalHandsNeeded = min.hands > EXTREMITY_CLO_EPSILON.hands;
   const preferred = (item: HandwearRow | null) => (item && item.id === options.preferHandwearId ? 1 : 0);
   // Bare hands are a real candidate only where the policy allows it. Functional
   // XC gloves may win even when no insulation is needed, but an expedition
@@ -188,10 +203,10 @@ export function selectPhaseAccessories(
     // glove that reaches the band's minimum, or else the warmest, with any
     // shortfall still reported.
     const coldHands = deepCold(knownHands);
-    const reaching = coldHands ? hands.filter(item => localThermalStatus(item.rcl_clo, min.hands, maximum.hands) !== 'under') : [];
+    const reaching = coldHands ? hands.filter(item => status('hands', item.rcl_clo) !== 'under') : [];
     const nearest = reaching.length > 0 ? reaching : [...(policy.bareHands && !coldHands ? [null] : []), ...hands];
     handwear = nearest.sort((a, b) =>
-      outsideRange(a?.rcl_clo ?? 0, min.hands, maximum.hands) - outsideRange(b?.rcl_clo ?? 0, min.hands, maximum.hands)
+      outside('hands', a?.rcl_clo ?? 0) - outside('hands', b?.rcl_clo ?? 0)
       || Number(!!b && poleGrip && supportsPoleGrip(b)) - Number(!!a && poleGrip && supportsPoleGrip(a))
       || preferred(b) - preferred(a)
       || (a?.rcl_clo ?? 0) - (b?.rcl_clo ?? 0) || (a?.id ?? '').localeCompare(b?.id ?? ''))[0] ?? null;
@@ -207,7 +222,7 @@ export function selectPhaseAccessories(
   const baseClo = hoodClo + helmetClo;
   // A required helmet is never judged as overheating: when it alone is
   // above the band, it sets the head's upper limit.
-  if (localThermalStatus(helmetClo, min.head, maximum.head) === 'over') maximum.head = Math.round(helmetClo * 100) / 100;
+  if (status('head', helmetClo) === 'over') maximum.head = Math.round(helmetClo * 100) / 100;
   // Under a helmet, only head warmth that fits under one (#373); a thick beanie doesn't.
   const heads = pool.headwear.filter(item => HEAD_WARMTH_TYPES.includes(item.headwear_type)
     && (!helmet || item.helmet_compatible !== false));
@@ -225,7 +240,7 @@ export function selectPhaseAccessories(
     }));
   // In deep cold, a head left short by the helmet and hood alone gets a hat:
   // a neck piece can't stand in for one, even within the band.
-  const hatRequired = deepCold(knownHeads) && localThermalStatus(baseClo, min.head, maximum.head) === 'under';
+  const hatRequired = deepCold(knownHeads) && status('head', baseClo) === 'under';
   const allowed = <T extends { head: HeadwearRow | null }>(options: T[]) => {
     const withHat = options.filter(option => option.head);
     return hatRequired && withHat.length > 0 ? withHat : options;
@@ -233,17 +248,17 @@ export function selectPhaseAccessories(
   // A neck piece goes over a balaclava only when nothing else allowed reaches
   // the band's minimum, as in deep cold.
   const separate = combine(false);
-  const combinations = allowed(separate).some(option => localThermalStatus(option.clo, min.head, maximum.head) !== 'under')
+  const combinations = allowed(separate).some(option => status('head', option.clo) !== 'under')
     ? separate : [...separate, ...combine(true)];
   const byItems = (a: typeof combinations[number], b: typeof combinations[number]) => a.count - b.count || a.clo - b.clo
     || (a.head?.id ?? '').localeCompare(b.head?.id ?? '') || (a.neck?.id ?? '').localeCompare(b.neck?.id ?? '');
   const headOptions = allowed(combinations);
-  const headInRange = headOptions.filter(option => localThermalStatus(option.clo, min.head, maximum.head) === 'in_range');
+  const headInRange = headOptions.filter(option => status('head', option.clo) === 'in_range');
   const headReaching = deepCold(knownHeads)
-    ? headOptions.filter(option => localThermalStatus(option.clo, min.head, maximum.head) !== 'under') : [];
+    ? headOptions.filter(option => status('head', option.clo) !== 'under') : [];
   const headChoice = headInRange.length > 0 ? [...headInRange].sort(byItems)[0]
     : [...(headReaching.length > 0 ? headReaching : headOptions)].sort((a, b) =>
-      outsideRange(a.clo, min.head, maximum.head) - outsideRange(b.clo, min.head, maximum.head) || byItems(a, b))[0];
+      outside('head', a.clo) - outside('head', b.clo) || byItems(a, b))[0];
   const headwear: HeadwearRecommendations = {
     helmet, headWarmth: headChoice?.head ?? null, neckWarmth: headChoice?.neck ?? null,
   };
@@ -252,7 +267,7 @@ export function selectPhaseAccessories(
   // choice sets the upper limit, so it isn't judged as overheating.
   const ratingLimited = { hands: false, head: false };
   const raiseForRating = (part: 'hands' | 'head', known: Array<HandwearRow | HeadwearRow>, clo: number) => {
-    if (!deepCold(known) || localThermalStatus(clo, min[part], maximum[part]) !== 'over') return;
+    if (!deepCold(known) || status(part, clo) !== 'over') return;
     maximum[part] = Math.round(clo * 100) / 100;
     ratingLimited[part] = true;
   };
@@ -264,8 +279,8 @@ export function selectPhaseAccessories(
     part: 'hands' | 'head', items: Array<HandwearRow | HeadwearRow>, candidates: Array<HandwearRow | HeadwearRow>,
     clo: number, functionalMissing = false, unknownWorn = false,
   ): AccessoryAssessment {
-    const thermalNeeded = min[part] > THERMAL_DISPLAY_CLO_EPSILON;
-    const thermal_status = localThermalStatus(clo, min[part], maximum[part]);
+    const thermalNeeded = min[part] > EXTREMITY_CLO_EPSILON[part];
+    const thermal_status = status(part, clo);
     const unresolved = thermal_status === 'under' || functionalMissing || unknownWorn;
     const unknownData = unknownWorn || pool.availability === 'unknown' || candidates.some(item => !knownInsulation(item));
     const state = unresolved ? unknownData ? 'unknown' : 'missing'

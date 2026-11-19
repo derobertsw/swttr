@@ -88,6 +88,8 @@ export const REGIONAL_IREQ_MULTIPLIERS = {
 // Extremity multipliers by activity: scale the whole-body IREQ of the phase
 // the hands and head follow. Values above 1 stand for exposure that IREQ
 // doesn't capture, such as alpine's chairlift rides between skiing runs.
+// They were tuned on the catalog's earlier accessory scale; ACCESSORY_CLO_SCALE
+// restates the resulting bands on the part-manikin scale (#376).
 export const EXTREMITY_IREQ_MULTIPLIERS = {
   running: {
     hands: 1.05,   // High exertion keeps hands warmer
@@ -120,7 +122,22 @@ export const DEFAULT_EXTREMITY_MULTIPLIERS = {
   head: 1.00,
 } as const;
 
-// Hood thermal contribution (additional clo)
+/**
+ * Hand and head clo are on the part-manikin scale (#376): total insulation
+ * on a hand or head manikin (ASTM F1291 conditions, 20°C, 0.4 m/s) minus the
+ * bare manikin's air layer, from USARIEM T18-01 and T22-14. The catalog's
+ * earlier accessory values ran higher by a nearly constant factor per part,
+ * and the local bands were tuned against them, so the bands carry the same
+ * factor and choose the same items. See docs/catalog-accessory-clo.md.
+ */
+export const ACCESSORY_CLO_SCALE = {
+  hands: 0.60,
+  head: 0.45,
+} as const;
+
+// Hood thermal contribution to the head (additional clo). Already on the
+// manikin scale: USARIEM T21-03's hood-up head values are 0.30-0.46 clo for
+// shell hoods and 0.74-1.32 for insulated hoods (docs/catalog-accessory-clo.md).
 export const HOOD_CLO_VALUES = {
   none: 0,
   attached: 0.4,

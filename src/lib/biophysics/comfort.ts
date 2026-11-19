@@ -1,9 +1,19 @@
 import type { ThermalDecision } from '@/types/biophysics';
+import { ACCESSORY_CLO_SCALE } from './constants';
 
 /** Legacy significant-mismatch allowance; never a comfortable-band extension. */
 const OVERHEAT_BUFFER_CLO = 0.3;
 const WHOLE_BODY_WARMTH_EPSILON = 0.01;
 export const THERMAL_DISPLAY_CLO_EPSILON = 0.05;
+/**
+ * The same tolerance for hands and head, on the part-manikin scale their
+ * items and bands are in (#376): it admits the same items it did on the
+ * catalog's earlier accessory scale.
+ */
+export const EXTREMITY_CLO_EPSILON = {
+  hands: THERMAL_DISPLAY_CLO_EPSILON * ACCESSORY_CLO_SCALE.hands,
+  head: THERMAL_DISPLAY_CLO_EPSILON * ACCESSORY_CLO_SCALE.head,
+} as const;
 /**
  * Insulation of the air layer around the clothing, in clo. ISO 9920 puts it
  * at about 0.7 clo in still air; wind and movement thin it, so this uses a
@@ -32,6 +42,12 @@ export interface BodyPartClo {
   minimum: number;
   /** Opt-in local upper limit; legacy sport policies omit it. */
   maximum?: number;
+  /**
+   * Hands and head: their `ACCESSORY_CLO_SCALE` factor. Their shortfalls and
+   * excesses are judged in the units of the catalog's earlier accessory
+   * scale, which the verdict thresholds and score were tuned in (#376).
+   */
+  scale?: number;
 }
 
 interface ThermalComfortDecision extends ThermalDecision {
@@ -59,6 +75,16 @@ function getRangeWidth(targetRange: [number, number]): number {
 
 function getSeverity(delta: number, targetRange: [number, number]): ThermalRiskSeverity {
   return delta <= getRangeWidth(targetRange) ? "moderate" : "high";
+}
+
+/** A body part in the units its verdict thresholds were tuned in. */
+function inVerdictUnits(part: BodyPartClo): BodyPartClo {
+  if (!part.scale) return part;
+  const { scale, ...rest } = part;
+  return {
+    ...rest, clo: part.clo / scale, minimum: part.minimum / scale,
+    ...(part.maximum !== undefined ? { maximum: part.maximum / scale } : {}),
+  };
 }
 
 /** Pair each region's or extremity's clo with its minimum target. */
@@ -98,10 +124,13 @@ function localShortfall(bodyParts: BodyPartClo[] = []): { deficit: number; share
   return { deficit, share };
 }
 
-/** Shared local band assessment for accessory selection and manual edits. */
-export function localThermalStatus(clo: number, minimum: number, maximum: number): 'under' | 'over' | 'in_range' {
-  if (minimum - clo > THERMAL_DISPLAY_CLO_EPSILON) return 'under';
-  if (clo - maximum > THERMAL_DISPLAY_CLO_EPSILON) return 'over';
+/** Shared local band assessment for accessory selection and manual edits.
+ * Hands and head pass their `EXTREMITY_CLO_EPSILON`. */
+export function localThermalStatus(
+  clo: number, minimum: number, maximum: number, tolerance: number = THERMAL_DISPLAY_CLO_EPSILON,
+): 'under' | 'over' | 'in_range' {
+  if (minimum - clo > tolerance) return 'under';
+  if (clo - maximum > tolerance) return 'over';
   return 'in_range';
 }
 
@@ -114,9 +143,9 @@ export function evaluateThermalComfort(input: ThermalComfortInput): ThermalComfo
   const {
     totalClo,
     targetRange,
-    bodyParts,
     overheatBufferClo = OVERHEAT_BUFFER_CLO,
   } = input;
+  const bodyParts = input.bodyParts?.map(inVerdictUnits);
 
   if (totalClo === undefined || !Number.isFinite(totalClo) || totalClo < 0 || !targetRange
     || targetRange.some(value => !Number.isFinite(value) || value < 0)
@@ -213,7 +242,8 @@ export function calculateThermalComfortScore(input: ThermalComfortInput): number
   if (!decision || totalClo === undefined || !targetRange) return null;
 
   const [targetMin, targetMax] = targetRange;
-  const localShare = localShortfall(input.bodyParts).share;
+  const bodyParts = input.bodyParts?.map(inVerdictUnits);
+  const localShare = localShortfall(bodyParts).share;
 
   let score: number;
 
@@ -228,7 +258,7 @@ export function calculateThermalComfortScore(input: ThermalComfortInput): number
       ? shortfallShare(wholeBodyDeficit, targetMin)
       : 0;
     const coldScore = 85 * (1 - Math.max(wholeBodyShare, localShare));
-    const excess = Math.max(totalClo - targetMax, 0, ...(input.bodyParts ?? []).map(part =>
+    const excess = Math.max(totalClo - targetMax, 0, ...(bodyParts ?? []).map(part =>
       part.maximum !== undefined && part.clo - part.maximum > THERMAL_DISPLAY_CLO_EPSILON ? part.clo - part.maximum : 0));
     // Preserve the existing ranking for small excesses; below half-score,
     // continue smoothly so severe excesses remain distinguishable (#152).

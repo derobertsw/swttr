@@ -14,7 +14,7 @@ Spend your care where the engine looks. Columns not listed (garment temperature 
 | `recl_torso/arms/legs` | Summed and regressed the same way (0.999 / 0.737 / 0.950) for outfit permeability | Outfit breathability and moisture risk |
 | `rcl_whole_body` | Must be non-null for the item to be recommendable; used for insulation sorting and some totals | Wrong weighting mis-ranks items |
 | `evap_potential` | Per-garment breathability: ranks garments and gates sports (table below) | Decides which sports can use the item |
-| `hood_type` | Adds head clo: attached 0.4, removable 0.3, helmet_compatible 0.5; only helmet-compatible hoods count with a helmet | Keep the hood out of torso clo |
+| `hood_type` | Adds head clo: hood-up values attached 0.4, removable 0.3, helmet_compatible 0.5 (USARIEM T21-03 range), counted at 0.45 of that in the head budget; only helmet-compatible hoods count with a helmet | Keep the hood out of torso clo |
 | `windproof_rating`, `waterproof_rating`, `waterproof_mm` | Wind/wet capabilities; shells ranked by `waterproof_mm`; **any `waterproof_mm > 0` makes the engine treat the garment as waterproof** | Weather protection for running, snow/rain outfits |
 | `category`, `garment_type`, `covers_*` | Layer slot (base, mid, insulation, shell) and which regions it occupies; bibs occupy only leg slots | Ensemble structure |
 | `usage`, `coverage_*`, `suitable_activities` | Standalone vs underlayer for running/XC; regional coverage; activity allow-list (NULL = all) | Running/XC outfits need standalone pieces |
@@ -176,38 +176,40 @@ Garment `min/max_temp_active/static` (°C): copy the pattern of close analogues;
 
 ## Gloves and headwear
 
-The engine picks the item whose `rcl_clo` is closest to the extremity target and filters by `min_temp_active` or `min_temp_static`, so make those three values consistent.
+Hand and head `rcl_clo` is on the **part-manikin scale** (#376, [docs/catalog-accessory-clo.md](../../../../docs/catalog-accessory-clo.md)): the insulation an item adds on a thermal hand or head manikin, total minus the bare manikin's air layer. That is about 0.60× the catalog's earlier hand values and 0.45× its earlier head values, and the local bands carry the same factors (`ACCESSORY_CLO_SCALE`), so an item from an older source must be converted before it's stored. Anchors: USARIEM T18-01 light glove insert 0.26, mitten liner + shell 1.74, microfleece cap 0.32, light balaclava 0.39, cap + balaclava 0.71; T22-14 trigger-finger mitten set 1.82, extreme-cold mitten set 2.85.
 
-- **Sanity rule** (Gao et al. 2016; catalog pattern): static minimum ≈ 10 − 10 × clo °C (1 clo → 0°C, 2 → −10, 3 → −20, 4 → −30); active minimum ≈ static − 10. Brand ratings are often optimistic.
+The engine picks the item whose `rcl_clo` fits the extremity band and filters by `min_temp_active` or `min_temp_static`, so make those three values consistent.
+
+- **Sanity rule for gloves** (Gao et al. 2016; catalog pattern): static minimum ≈ 10 − 10 × (clo / 0.6) °C (0.6 clo → 0°C, 1.2 → −10, 1.8 → −20, 2.4 → −30); active minimum ≈ static − 10. Brand ratings are often optimistic.
 - **Handwear clo / dexterity:**
 
   | Type | `rcl_clo` | `dexterity_score` |
   | --- | --- | --- |
-  | `liner_glove` | 0.45–0.6 | 9 |
-  | `light_glove` | 0.85–1.2 | 7–8 |
-  | `insulated_glove` | 1.5–2.2 (a few to 2.7) | 4–6 |
-  | `lobster_mitten` | 2.8–3.0 | 3–4 |
-  | `mitten` | 1.8–4.0 | 1–3 |
-  | `shell_overmitten` | 0.8–0.9 | 3 |
+  | `liner_glove` | 0.27–0.36 (T18-01 insert 0.26) | 9 |
+  | `light_glove` | 0.5–0.72 | 7–8 |
+  | `insulated_glove` | 0.9–1.32 (a few to 1.62) | 4–6 |
+  | `lobster_mitten` | 1.68–1.8 (T22-14 trigger-finger set 1.82) | 3–4 |
+  | `mitten` | 1.08–2.4 (T18-01 1.74 to T22-14 2.85 for systems) | 1–3 |
+  | `shell_overmitten` | 0.48–0.54 (T18-01 measured a shell alone at 1.48; unresolved) | 3 |
 
   `waterproof` needs a membrane insert; `windproof` needs a membrane or windproof shell. For a glove with a removable liner, store the combined system, and add the liner separately only if it's sold separately.
 - **Headwear clo:**
 
   | Type | `rcl_clo` |
   | --- | --- |
-  | `ski_helmet` | 0.5–0.85 (more venting and less liner → lower) |
-  | `bike_helmet` | about 0.2 (manikin: at most ~0.15 clo over a bare head; see `20261117031100_seed_bike_helmets.sql`); unrated for temperature |
-  | `liner_beanie` | 0.45–0.5 |
-  | `midweight_beanie` | 0.7–0.85 |
-  | `heavy_beanie` | about 1.1 |
-  | `balaclava_light` | 0.75–0.8 |
-  | `balaclava_heavy` | 1.4–1.5 |
-  | `buff_thin` | 0.3–0.35 |
-  | `buff_heavy` | 0.55–0.65 |
-  | `headband` | 0.3 |
-  | `facemask` | about 0.9 |
+  | `ski_helmet` | 0.23–0.38 (more venting and less liner → lower; no manikin data) |
+  | `bike_helmet` | about 0.09 (manikin: 0–0.15 clo over a bare head; see `20261117031100_seed_bike_helmets.sql`); unrated for temperature |
+  | `liner_beanie` | 0.2–0.23 |
+  | `midweight_beanie` | 0.32–0.38 (T18-01 microfleece cap 0.32) |
+  | `heavy_beanie` | about 0.5 |
+  | `balaclava_light` | 0.34–0.36 (T18-01 0.39) |
+  | `balaclava_heavy` | 0.63–0.68 |
+  | `buff_thin` | 0.14–0.16 |
+  | `buff_heavy` | 0.25–0.29 |
+  | `headband` | 0.14 |
+  | `facemask` | about 0.41 |
 
-  Set `covers_ears/neck/face`, `helmet_compatible` (a beanie or balaclava thin enough to wear under a helmet) and `windproof`.
+  Set `covers_ears/neck/face`, `helmet_compatible` (a beanie or balaclava thin enough to wear under a helmet) and `windproof`. Fill `confidence_score`, `uncertainty_clo` (never below 0.07 clo) and `data_source` on handwear and headwear rows too.
 
 ## Provenance
 
