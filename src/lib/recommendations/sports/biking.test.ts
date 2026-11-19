@@ -82,8 +82,10 @@ describe('complete cycling outfits', () => {
     // Before #371: base top, base tights, wind jacket and soft-shell joggers at 0.82 clo.
     expect(clo.whole).toBeGreaterThanOrEqual(t.targetRange[0]);
     expect(clo.whole).toBeLessThanOrEqual(t.targetRange[1]);
-    expect(clo.torso).toBeLessThanOrEqual(t.regional.neutral.torso);
-    expect(clo.legs).toBeLessThanOrEqual(t.regional.neutral.legs);
+    // Within the shared 0.05 clo local tolerance: since #374 and #375 the
+    // legs' upper limit is the whole-body one (0.46), and the tights give 0.48.
+    expect(clo.torso).toBeLessThanOrEqual(t.regional.neutral.torso + 0.05);
+    expect(clo.legs).toBeLessThanOrEqual(t.regional.neutral.legs + 0.05);
     expect(outfit.filter(g => g.covers_torso)).toHaveLength(1);
     expect(outfit.filter(g => g.covers_legs)).toHaveLength(1);
     expect(outfit.some(g => g.category === 'hard_shell')).toBe(false);
@@ -98,8 +100,8 @@ describe('complete cycling outfits', () => {
     expect(clo.whole).toBeGreaterThanOrEqual(t.targetRange[0] - 0.05);
     expect(clo.whole).toBeLessThanOrEqual(t.targetRange[1]);
     expect(runningRegionMatches(withBasics, t, 'legs', t.protection)).toBe(true);
-    // Today's untapered cycling band (#374) leaves bare forearms 0.004 clo short.
-    expect(t.regional.min.arms - 0.05 - clo.arms).toBeLessThan(0.01);
+    // With tapered margins (#374) bare forearms sit within the arm band's tolerance.
+    expect(clo.arms).toBeGreaterThanOrEqual(t.regional.min.arms - 0.05);
 
     // Before #371 the same outfit as at 56°F: 0.82 clo against 0.07–0.21.
     const catalogOnly = select(t);
@@ -108,8 +110,9 @@ describe('complete cycling outfits', () => {
       garments, selectedGarments: catalogOnly, handwear: [], headwear: [],
       ownership: { garments: false, handwear: false, headwear: false }, functional: { protection: t.protection },
     });
+    // Riding speed (#374) puts a lightweight long-sleeve top inside the torso band.
     expect(requirements.filter(r => r.region === 'torso' || r.region === 'legs')).toEqual([
-      expect.objectContaining({ id: 'biking:torso', status: 'missing', generic_suggestion: expect.objectContaining({ owned: false }) }),
+      expect.objectContaining({ id: 'biking:torso', status: 'generic_suggestion' }),
       expect.objectContaining({ id: 'biking:legs', label: 'Cycling shorts', status: 'missing' }),
     ]);
   });

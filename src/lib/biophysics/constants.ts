@@ -5,8 +5,11 @@
 export const CLO_TO_M2KW = 0.155; // 1 clo = 0.155 m²K/W
 
 // Metabolic rates (W/m²). The MET labels use 58.2 W/m² per MET. A Compendium
-// MET (1 kcal/kg/h) is about 46.5 W/m² for the default body; running and XC
-// convert that way in bodyMetrics.ts. See docs/algorithm-review.md.
+// MET (1 kcal/kg/h) is about 46.5 W/m² for the default body; running, XC,
+// cycling and the ski-touring climb convert that way in bodyMetrics.ts
+// (sport-policy.ts holds their METs), so biking_moderate and
+// ski_touring_uphill below are reference values only. Alpine, the chairlift
+// and the touring descent still use these. See docs/algorithm-review.md.
 export const METABOLIC_RATES = {
   resting: 58.2,              // 1 MET
   light_activity: 116.4,      // 2 MET

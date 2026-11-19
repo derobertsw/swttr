@@ -1,6 +1,6 @@
 import { METABOLIC_RATES } from "./constants";
 import { DEFAULT_BODY_METRICS, metabolicHeatFluxFromMet } from "./bodyMetrics";
-import { SUSTAINED_ACTIVITY_METS } from './sport-policy';
+import { CYCLING_CLIMB_METS, SUSTAINED_ACTIVITY_METS } from './sport-policy';
 
 export const EXERTION_LEVELS = ["easy", "moderate", "hard"] as const;
 export type ExertionLevel = (typeof EXERTION_LEVELS)[number];
@@ -37,9 +37,9 @@ const METABOLIC_RATE_BY_ACTIVITY: Record<
     hard: metabolicHeatFluxFromMet(SUSTAINED_ACTIVITY_METS.running.hard, DEFAULT_BODY_METRICS),
   },
   biking: {
-    easy: METABOLIC_RATES.xc_skiing_easy,
-    moderate: METABOLIC_RATES.biking_moderate,
-    hard: METABOLIC_RATES.running_moderate,
+    easy: metabolicHeatFluxFromMet(CYCLING_CLIMB_METS.biking.easy, DEFAULT_BODY_METRICS),
+    moderate: metabolicHeatFluxFromMet(CYCLING_CLIMB_METS.biking.moderate, DEFAULT_BODY_METRICS),
+    hard: metabolicHeatFluxFromMet(CYCLING_CLIMB_METS.biking.hard, DEFAULT_BODY_METRICS),
   },
   xc_skiing: {
     easy: metabolicHeatFluxFromMet(SUSTAINED_ACTIVITY_METS.xc_skiing.easy, DEFAULT_BODY_METRICS),
@@ -52,9 +52,9 @@ const METABOLIC_RATE_BY_ACTIVITY: Record<
     hard: METABOLIC_RATES.moderate_activity,
   },
   ski_touring_uphill: {
-    easy: METABOLIC_RATES.moderate_activity,
-    moderate: METABOLIC_RATES.ski_touring_uphill,
-    hard: METABOLIC_RATES.xc_skiing_moderate,
+    easy: metabolicHeatFluxFromMet(CYCLING_CLIMB_METS.ski_touring_uphill.easy, DEFAULT_BODY_METRICS),
+    moderate: metabolicHeatFluxFromMet(CYCLING_CLIMB_METS.ski_touring_uphill.moderate, DEFAULT_BODY_METRICS),
+    hard: metabolicHeatFluxFromMet(CYCLING_CLIMB_METS.ski_touring_uphill.hard, DEFAULT_BODY_METRICS),
   },
   ski_touring_downhill: {
     easy: METABOLIC_RATES.light_activity,
@@ -87,7 +87,7 @@ export function parseExertionLevel(
   return fallback;
 }
 
-/** Return W/m² at default body metrics; running/XC use the calibrated MET conversion. */
+/** Return W/m² at default body metrics; running, XC, cycling and the touring climb use the calibrated MET conversion. */
 export function getMetabolicRateForActivity(
   activity: ExertionAwareActivity,
   exertion: ExertionLevel

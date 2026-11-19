@@ -118,12 +118,16 @@ describe('the #370 reproductions', () => {
     expect(hooded.assessments.head.clo).toBeCloseTo(HOOD('attached'), 10);
   });
 
-  it('touring climb, 25°F, 12 mph: two hoods already meet the head target, so nothing is added', () => {
+  it('touring climb, 25°F, 12 mph: a hood already meets the head target, so nothing is added', () => {
     // Before #370: a balaclava, a neck piece and two hoods, 3.2 clo against 0.85 on the earlier scale.
-    const selection = select('climb', { tempF: 25, windMph: 12 }, CATALOG, [hood('attached'), hood('attached')]);
+    // Since #374's climbing rates the head band is lower, and one hood meets it.
+    const selection = select('climb', { tempF: 25, windMph: 12 }, CATALOG, [hood('attached')]);
     expect(selection.headwear).toEqual({ helmet: null, headWarmth: null, neckWarmth: null });
     expect(selection.assessments.head).toMatchObject({ thermal_status: 'in_range', state: 'not_needed' });
-    expect(selection.assessments.head.clo).toBeCloseTo(2 * HOOD('attached'), 10);
+    expect(selection.assessments.head.clo).toBeCloseTo(HOOD('attached'), 10);
+    // Two hoods are more than the climb needs, and still nothing is added.
+    const twoHoods = select('climb', { tempF: 25, windMph: 12 }, CATALOG, [hood('attached'), hood('attached')]);
+    expect(twoHoods.headwear).toEqual({ helmet: null, headWarmth: null, neckWarmth: null });
     expect(selection.assessments.head.message).toBe('head: no additional thermal coverage needed.');
   });
 

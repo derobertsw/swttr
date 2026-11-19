@@ -142,8 +142,9 @@ describe('#41 catalog migration and API integration', () => {
     const request = () => new NextRequest('http://localhost/api/v1/recommendations/ski-touring', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       // Calm enough on the climb that no shell is needed (#372), so the
-      // wind-resistant Senja is the climb's warmth layer.
-      body: JSON.stringify({ weather: { temperature: 5, wind_speed: 10 }, exertion: 'moderate' }),
+      // wind-resistant Senja is the climb's warmth layer. Easy effort: since
+      // #374's climbing rates a moderate climb at 5°F needs no fleece.
+      body: JSON.stringify({ weather: { temperature: 5, wind_speed: 10 }, exertion: 'easy' }),
     });
     const parsed = await parseRecommendationRequest(request());
     if (parsed instanceof Response) throw new Error('Unexpected invalid recommendation request');

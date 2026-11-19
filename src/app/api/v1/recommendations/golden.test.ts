@@ -551,7 +551,9 @@ describe("accessories against local bands (#370)", () => {
     expect(headwear.helmet).toBeNull();
     expect(headwear.head_warmth?.type ?? "").not.toMatch(/^balaclava/);
     expect([headwear.head_warmth, headwear.neck_warmth].filter(Boolean).length).toBeLessThanOrEqual(1);
-    expect(body.recommendation.evaluation.bodyParts.headNeck.status).toBe("in_range");
+    // Since #374 the climb's head band (0.45–0.53 clo) sits below every
+    // available hat this wardrobe owns; the lightest (0.7 clo) beats going bare.
+    expect(body.recommendation.evaluation.bodyParts.headNeck.status).toBe(mode.userId ? "over" : "in_range");
     expect(body.descent_headwear.helmet).not.toBeNull();
     expect(body.descent_evaluation.bodyParts.headNeck.status).toBe("in_range");
     expect(body.recommendation.handwear).not.toBeNull();
