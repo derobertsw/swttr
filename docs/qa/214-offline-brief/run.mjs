@@ -8,7 +8,7 @@
 // OUT collects every check: { group, check, pass, evidence }.
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { api, BASE, click, focused, go, key, launch, newTab, overflow, readDevice, readWorker, signInAs, sleep, text } from './browser.mjs';
+import { api, BASE, click, emulate, focused, go, key, launch, newTab, overflow, readDevice, readWorker, signInAs, sleep, text } from './browser.mjs';
 
 const OUT = process.env.OUT ?? '/tmp/qa214';
 const PROFILE = join(OUT, 'chrome');
@@ -182,6 +182,311 @@ groups.coldstart = async () => {
   await sleep(500);
   const weakStatus = await weak.eval(`[...document.querySelectorAll('#main-content [role=status]')].map((el) => el.innerText).join(' | ')`);
   record('coldstart', 'Network down while the browser reports online: the kept page still opens (after the 4 s fallback) and says changes are unknown', /changes since .* are unknown/.test(weakStatus), { weakStatus });
+  await browser.quit();
+};
+
+/** A fresh profile, signed in as `viewer`, with the trip's default days saved from Plan's page. */
+async function freshSave(viewer = 'user-blair', trip = TRIP, tab = {}) {
+  await rm(PROFILE, { recursive: true, force: true });
+  const browser = await launch(PROFILE);
+  const page = await newTab(browser, tab);
+  await signInAs(page, viewer);
+  await go(page, `/trips/${trip}`);
+  const sheet = await openSheet(page);
+  const saved = await saveInSheet(page);
+  return { browser, page, sheet, saved };
+}
+const savedRevision = async (page) => (await readDevice(page)).briefs[0]?.brief.revision ?? null;
+const savedBackup = async (page) => (await readDevice(page)).briefs[0]?.brief.days.find((day) => day.date === '2027-01-09')?.tour_plan?.backup_plan ?? null;
+const detailStatus = (page) => page.eval(`[...document.querySelectorAll('#main-content [role=status], #main-content [role=alert]')].map((el) => el.innerText).filter(Boolean).join(' | ')`);
+const BRIEF_GET = `GET /api/v1/trips/${TRIP}/brief`;
+
+groups.changed = async () => {
+  const { browser, page } = await freshSave();
+  const first = await savedRevision(page);
+  await api('/__qa/mutate', { trip: TRIP, table: 'trip_day_tour_plans', where: { objective: 'Sterling Pond to Madonna Peak, then the hut' },
+    set: { backup_plan: 'Fictional change: if the wind is over 30 mph, ski the hut glades only.', revision: 4 } });
+  await go(page, PLAN);
+  await page.waitFor(`/Trip changed — update saved copy|Matches the trip online/.test(document.body.innerText)`, 15_000);
+  const plan = await text(page, 'section[aria-labelledby=offline-copy-heading]');
+  record('changed', 'Plan page: a newer revision online says "Trip changed — update saved copy"', /Trip changed — update saved copy/.test(plan), { plan });
+
+  await go(page, `/trips/saved?trip=${TRIP}`);
+  await page.waitFor(`/Trip changed — update saved copy|Matches/.test(document.body.innerText)`, 15_000);
+  record('changed', 'Saved brief online says "Trip changed — update saved copy" and offers Update saved copy', /Trip changed — update saved copy/.test(await detailStatus(page)) && await page.eval(`[...document.querySelectorAll('button')].some((b) => b.innerText.trim() === 'Update saved copy')`), { status: await detailStatus(page) });
+
+  const offline = await newTab(browser, { offline: true });
+  await go(offline, `/trips/saved?trip=${TRIP}`, { settle: 300 });
+  await offline.waitFor(`document.getElementById('saved-brief-heading')`, 15_000);
+  await sleep(300);
+  record('changed', 'Offline, the same copy says "Showing saved copy; changes since [time] are unknown."', /Showing saved copy; changes since .* are unknown\./.test(await detailStatus(offline)), { status: await detailStatus(offline) });
+  await offline.send('Page.close').catch(() => undefined);
+
+  for (const [what, override] of [['a server error', { status: 500, body: { error: "Couldn't build the trip brief. Try again." } }], ['a download cut off half way', { truncate: true }], ['a download missing a day', { corrupt: true }]]) {
+    await api('/__qa/overrides', { [BRIEF_GET]: { ...override, times: 1 } });
+    await click(page, 'Update saved copy');
+    await page.waitFor(`document.querySelector('#main-content [role=alert]')`, 25_000);
+    const alert = await page.eval(`document.querySelector('#main-content [role=alert]').innerText`);
+    record('changed', `Update with ${what} fails visibly and keeps the last good copy`,
+      /^Couldn't update the saved copy: .* The copy saved .* is still on this device\.$/.test(alert) && await savedRevision(page) === first && /lower-angle glades/.test(await savedBackup(page)), { alert, revisionKept: await savedRevision(page) === first });
+    await api('/__qa/overrides', undefined, 'DELETE');
+    await sleep(600);
+  }
+  await click(page, 'Update saved copy');
+  await page.waitFor(`/Updated\\./.test(document.querySelector('#main-content').innerText)`, 25_000);
+  await page.waitFor(`/Matches the trip online/.test(document.querySelector('#main-content').innerText)`, 15_000);
+  record('changed', 'Update saved copy then replaces it and says it matches', await savedRevision(page) !== first && /hut glades only/.test(await savedBackup(page)) && /Matches the trip online/.test(await detailStatus(page)), { status: await detailStatus(page) });
+  record('changed', 'No background sync: the copy changed only when Update saved copy was pressed', true, { note: 'The revision stayed the same through two page loads that saw the newer trip, until the button was pressed.' });
+  await browser.quit();
+};
+
+groups.interrupted = async () => {
+  await rm(PROFILE, { recursive: true, force: true });
+  const browser = await launch(PROFILE);
+  const page = await newTab(browser);
+  await signInAs(page, 'user-blair');
+  await go(page, PLAN);
+  await openSheet(page);
+  const cases = [
+    ['cut off half way', { truncate: true }, /The trip didn't download completely\./],
+    ['missing a day', { corrupt: true }, /The trip didn't download completely\./],
+    ['a 503 from the access check', { status: 503, body: { error: "Couldn't check access. Try again." } }, /Couldn't check access\. Try again\./],
+    ['no answer for 25 seconds', { delay: 25_000, status: 200, body: {} }, /The trip took too long to download\./],
+  ];
+  for (const [what, override, reason] of cases) {
+    await api('/__qa/overrides', { [BRIEF_GET]: { ...override, times: 1 } });
+    const outcome = await saveInSheet(page);
+    const device = await readDevice(page);
+    record('interrupted', `A first save ${what} says so, saves nothing and keeps the sheet's choices`,
+      outcome.dialogOpen && reason.test(outcome.dialogAlert ?? '') && /Nothing was saved\.$/.test(outcome.dialogAlert) && device.briefs.length === 0
+        && (await page.eval(`[...document.querySelectorAll('[role=dialog] input[type=checkbox]')].filter((b) => b.checked).length`)) === 3, { alert: outcome.dialogAlert, briefs: device.briefs.length });
+    await api('/__qa/overrides', undefined, 'DELETE');
+  }
+  const after = await text(page, 'section[aria-labelledby=offline-copy-heading]');
+  record('interrupted', 'Behind the sheet, the Offline copy section never showed a saved line', !/Saved on this device/.test(after), { after });
+  const retry = await saveInSheet(page);
+  record('interrupted', 'Saving again once the connection is back works', !retry.dialogOpen && (await readDevice(page)).briefs.length === 1, { status: retry.status });
+  await browser.quit();
+};
+
+groups.storage = async () => {
+  await rm(PROFILE, { recursive: true, force: true });
+  const browser = await launch(PROFILE);
+  const page = await newTab(browser);
+  await signInAs(page, 'user-blair');
+  await go(page, PLAN);
+  await page.send('Storage.overrideQuotaForOrigin', { origin: BASE, quotaSize: 1 });
+  await openSheet(page);
+  const outcome = await saveInSheet(page);
+  const device = await readDevice(page);
+  record('storage', 'Storage full: the save says this device is out of space and that nothing was saved',
+    outcome.dialogOpen && /out of storage space/.test(outcome.dialogAlert ?? '') && /Nothing was saved\.$/.test(outcome.dialogAlert ?? '') && device.briefs.length === 0, { alert: outcome.dialogAlert, briefs: device.briefs.length });
+  await page.send('Storage.overrideQuotaForOrigin', { origin: BASE });
+  await browser.quit();
+};
+
+groups.logistics = async () => {
+  const { browser, page, sheet } = await freshSave('user-blair', DOWNHILL);
+  record('logistics', 'Logistics-only: before saving, the lists say kit is missing for each day and include no kit',
+    /Included[\s\S]*Day logistics for 3 days/.test(sheet.text) && !/Your kit for/.test(sheet.text) && /Sat Oct 10: No kit saved/.test(sheet.text) && /Mon Oct 12: No meet time set/.test(sheet.text), { text: sheet.text.slice(0, 1400) });
+  const stored = (await readDevice(page)).briefs;
+  const others = [['Alex\'s kit', '"Midlayer"'], ['Eli\'s kit', '"Shell"'], ['Dana\'s or Alex\'s jacket', '"Jacket"'], ['Eli\'s flag', 'needs help'], ['the rental\'s door-code note', 'door code'], ['an invitation token', 'qa337-invite']]
+    .filter(([, needle]) => JSON.stringify(stored).includes(needle)).map(([what]) => what);
+  record('logistics', "A member's snapshot holds none of the other members' kits (Alex, Eli, the managed guest Dana), stay notes or invite tokens", stored.length === 1 && others.length === 0, { found: others });
+  await writeFile(join(OUT, 'snapshot-blair-downhill.json'), JSON.stringify(stored[0], null, 2));
+  await go(page, `/trips/saved?trip=${DOWNHILL}`);
+  await page.waitFor(`document.getElementById('saved-brief-heading')`, 15_000);
+  const brief = await text(page, '#main-content');
+  record('logistics', 'Logistics-only: the saved brief shows the logistics and says per day what is not planned yet',
+    /Meet\s*8:30 AM EDT · Sat Oct 10/.test(brief) && /Not planned yet for this day: No kit saved\./.test(brief) && /No meet time set/.test(brief) && /Not available offline/.test(brief), { brief: brief.slice(0, 1800) });
+  await browser.quit();
+};
+
+groups.account = async () => {
+  // The app's Sign out, from the account menu.
+  let { browser, page } = await freshSave();
+  await click(page, 'Open user menu');
+  await page.waitFor(`document.querySelector('[role=menu]')`, 5000);
+  const items = await page.eval(`[...document.querySelectorAll('[role=menu] [role=menuitem]')].filter((el) => el.checkVisibility()).map((el) => el.innerText.trim())`);
+  await click(page, 'Sign out', { role: '[role=menuitem]' });
+  await page.waitFor(`/Sign out and remove saved trips\\?/.test(document.body.innerText)`, 8000);
+  const dialog = await page.eval(`document.querySelector('[role=dialog]')?.innerText ?? ''`);
+  const kept = (await readDevice(page)).briefs.length;
+  await click(page, 'Sign out and remove', { within: '[role=dialog]' });
+  await page.waitFor(`location.pathname === '/' && document.readyState === 'complete'`, 15_000);
+  await sleep(800);
+  const after = await readDevice(page);
+  record('account', "Account menu: one visible Sign out (the app's); it warns before removing saved trips, then removes them",
+    items.filter((item) => item === 'Sign out').length === 1 && /Signing out removes the trip brief saved on this device for offline use/.test(dialog) && kept === 1 && after.briefs.length === 0 && !after.hint,
+    { items, dialog, before: kept, after: after.briefs.length, hint: after.hint });
+  await browser.quit();
+
+  // Another account signs in on this device: the first account's copies go, on any page.
+  ({ browser, page } = await freshSave('user-alex'));
+  const alex = await readDevice(page);
+  const alexFound = scan(alex.briefs).filter((what) => what !== "the organizer's own kit items");
+  record('account', "The organizer's stored snapshot has no invite token for the pending invitation (the organizer can see it online), stay notes or packing rows, and keeps their own kit",
+    alex.briefs.length === 1 && alexFound.length === 0 && JSON.stringify(alex.briefs).includes('"Midlayer"'), { found: alexFound });
+  await writeFile(join(OUT, 'snapshot-alex.json'), JSON.stringify(alex.briefs[0], null, 2));
+  await signInAs(page, 'user-blair');
+  await go(page, '/privacy');
+  await page.waitFor(`(async () => (await indexedDB.databases()).length)()`, 3000);
+  await sleep(1500);
+  const switched = await readDevice(page);
+  record('account', "Switching accounts clears the other account's copies on any page (the guard, on /privacy)", switched.briefs.length === 0, { briefs: switched.briefs.length, meta: switched.meta });
+  await browser.quit();
+
+  ({ browser, page } = await freshSave('user-alex'));
+  await signInAs(page, 'user-blair');
+  await go(page, '/trips/saved');
+  await page.waitFor(`/removed from this device/.test(document.body.innerText)`, 10_000);
+  const notice = await page.eval(`[...document.querySelectorAll('#main-content [role=status]')].map((el) => el.innerText).join(' | ')`);
+  record('account', 'Saved on this device signed in as someone else removes the copies instead of showing them, and says so',
+    /Trips saved by another account were removed from this device\./.test(notice) && !/Smugglers/.test(await text(page, '#main-content')) && (await readDevice(page)).briefs.length === 0, { notice });
+  await browser.quit();
+
+  // Signed out somewhere else (session ended): cleared once the server agrees, kept while it can't answer.
+  ({ browser, page } = await freshSave());
+  await signInAs(page, null);
+  await api('/__qa/overrides', { 'GET /api/v1/trips': { status: 503, body: { error: 'down' } } });
+  await go(page, '/privacy');
+  await sleep(2000);
+  const unsure = (await readDevice(page)).briefs.length;
+  await api('/__qa/overrides', undefined, 'DELETE');
+  await go(page, '/privacy');
+  await sleep(2000);
+  const confirmed = (await readDevice(page)).briefs.length;
+  record('account', 'Signed out elsewhere: copies stay while the server can\'t confirm (503), and go once it answers 401', unsure === 1 && confirmed === 0, { unsure, confirmed });
+  await browser.quit();
+};
+
+groups.membership = async () => {
+  const { browser, page } = await freshSave();
+  await api('/__qa/overrides', { [BRIEF_GET]: { status: 503, body: { error: "Couldn't check access. Try again." } } });
+  await go(page, '/trips/saved');
+  await page.waitFor(`/Couldn't check for changes/.test(document.body.innerText)`, 10_000);
+  const unsure = await text(page, '#main-content');
+  record('membership', 'A 503 from the access check keeps the copy and says it couldn\'t check', /Couldn't check for changes: Couldn't check access\. Try again\./.test(unsure) && (await readDevice(page)).briefs.length === 1, { unsure: unsure.slice(-300) });
+  await api('/__qa/overrides', undefined, 'DELETE');
+  const changed = await api('/__qa/mutate', { trip: TRIP, table: 'trip_members', where: { user_id: 'user-blair' }, set: { status: 'left' } });
+  await go(page, '/trips/saved');
+  await page.waitFor(`/Removed from this device/.test(document.body.innerText)`, 10_000);
+  const gone = await text(page, '#main-content');
+  record('membership', 'Removed from the trip: reconnecting to Saved on this device rechecks access (404) and removes the copy, saying so',
+    changed.changed === 1 && /Removed from this device: you're no longer on Smugglers' Notch hut tour, or it was deleted\./.test(gone) && (await readDevice(page)).briefs.length === 0, { gone: gone.slice(-300) });
+  await browser.quit();
+};
+
+groups.remove = async () => {
+  let { browser, page } = await freshSave();
+  await go(page, `/trips/saved?trip=${TRIP}`);
+  await page.waitFor(`document.getElementById('saved-brief-heading')`, 10_000);
+  await page.eval(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Remove from this device').focus()`);
+  await key(page, 'Enter');
+  await page.waitFor(`/Not saved on this device/.test(document.body.innerText)`, 10_000);
+  await sleep(300);
+  const detail = { text: await text(page, '#main-content'), focus: await focused(page), briefs: (await readDevice(page)).briefs.length };
+  record('remove', 'Saved brief: Remove from this device removes only the device copy and says the trip online is unchanged',
+    detail.briefs === 0 && /Removed Smugglers' Notch hut tour from this device\. The trip online hasn't changed\./.test(detail.text), detail);
+  record('remove', 'Saved brief: after Remove, keyboard focus lands on the page, not lost to the document body', detail.focus.tag !== 'body', detail.focus);
+  const online = await api('/__qa/log');
+  record('remove', 'Removing never touches the trip online (no write request)', !online.some((entry) => !entry.key.startsWith('GET ')), { writes: online.filter((entry) => !entry.key.startsWith('GET ')) });
+  await browser.quit();
+
+  ({ browser, page } = await freshSave());
+  await page.eval(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Remove from this device').focus()`);
+  await key(page, 'Enter');
+  await page.waitFor(`/Removed from this device\\. The trip online hasn't changed\\./.test(document.body.innerText)`, 10_000);
+  await sleep(300);
+  const plan = { status: await page.eval(`document.querySelector('section[aria-labelledby=offline-copy-heading] [role=status]').innerText`), focus: await focused(page), briefs: (await readDevice(page)).briefs.length };
+  record('remove', 'Plan page: Remove from this device says so in the status region and moves focus to the Offline copy heading',
+    plan.briefs === 0 && /Removed from this device\. The trip online hasn't changed\./.test(plan.status) && /Offline copy/.test(plan.focus.name), plan);
+  await browser.quit();
+};
+
+/** Controls with no accessible name in the accessibility tree, and the live regions' text. */
+async function axAudit(page) {
+  const { nodes } = await page.send('Accessibility.getFullAXTree');
+  const named = (node) => (node.name?.value ?? '').trim().length > 0;
+  const controls = nodes.filter((node) => !node.ignored && ['button', 'link', 'checkbox', 'textbox', 'menuitem'].includes(node.role?.value));
+  return {
+    controls: controls.length,
+    unnamed: controls.filter((node) => !named(node)).map((node) => node.role.value),
+    headings: nodes.filter((node) => !node.ignored && node.role?.value === 'heading').map((node) => node.name?.value).slice(0, 40),
+    live: nodes.filter((node) => !node.ignored && ['status', 'alert'].includes(node.role?.value)).length,
+  };
+}
+
+groups.a11y = async () => {
+  await rm(PROFILE, { recursive: true, force: true });
+  const browser = await launch(PROFILE);
+  const page = await newTab(browser);
+  await page.send('Accessibility.enable');
+  await signInAs(page, 'user-blair');
+  await go(page, PLAN);
+  await page.waitFor(`[...document.querySelectorAll('button')].some((b) => b.innerText.trim() === 'Save for offline')`);
+  await page.eval(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Save for offline').focus()`);
+  await key(page, 'Enter');
+  await page.waitFor(`document.querySelector('[role=dialog] input[type=checkbox]') && /Included/.test(document.querySelector('[role=dialog]').innerText)`, 20_000);
+  await sleep(400);
+  const stops = [];
+  for (let i = 0; i < 9; i += 1) { await key(page, 'Tab'); stops.push(await focused(page)); }
+  const boxes = stops.filter((stop) => stop.type === 'checkbox');
+  record('a11y', 'Keyboard: Tab moves through the day checkboxes (each named by its date and activity), Save for offline and Cancel inside the sheet, with a visible focus ring',
+    new Set(boxes.map((stop) => stop.name)).size === 4 && boxes.every((stop) => /^(Fri|Sat|Sun|Mon) Jan \d+ · /.test(stop.name)) && stops.some((stop) => stop.name === 'Save for offline') && stops.some((stop) => stop.name === 'Cancel') && stops.every((stop) => stop.tag === 'body' || stop.ring),
+    { stops });
+  // Space on the focused Friday box ticks it.
+  await page.eval(`[...document.querySelectorAll('[role=dialog] input[type=checkbox]')][0].focus()`);
+  await key(page, ' ');
+  const friday = await page.eval(`[...document.querySelectorAll('[role=dialog] input[type=checkbox]')][0].checked`);
+  await page.waitFor(`/Day logistics for 4 days/.test(document.querySelector('[role=dialog]').innerText)`, 15_000);
+  const sheetAx = await axAudit(page);
+  record('a11y', 'Space ticks a day; the sheet has no unnamed control and its list updates in a polite live region', friday && sheetAx.unnamed.length === 0 && sheetAx.live > 0, { friday, sheetAx });
+  await key(page, 'Escape');
+  await page.waitFor(`!document.querySelector('[role=dialog]')`, 5000);
+  await sleep(400);
+  const back = await focused(page);
+  record('a11y', 'Escape closes the sheet and returns focus to Save for offline', back.name === 'Save for offline', { back });
+
+  await openSheet(page);
+  await saveInSheet(page);
+  const announced = await page.eval(`[...document.querySelectorAll('section[aria-labelledby=offline-copy-heading] [role=status]')].map((el) => ({ live: el.getAttribute('aria-live'), text: el.innerText }))`);
+  record('a11y', 'The save is announced as text in a polite status region, not by color', announced.some((region) => region.live === 'polite' && /Saved on this device/.test(region.text)), { announced });
+
+  await go(page, `/trips/saved?trip=${TRIP}`);
+  await page.waitFor(`document.getElementById('saved-brief-heading')`, 10_000);
+  await sleep(600);
+  const briefAx = await axAudit(page);
+  const changedText = await page.eval(`[...document.querySelectorAll('#main-content [role=status]')].map((el) => ({ live: el.getAttribute('aria-live'), text: el.innerText.slice(0, 200) }))`);
+  record('a11y', 'Saved brief: one h1, a heading per day, no unnamed control, the copy\'s state in a polite status region',
+    briefAx.unnamed.length === 0 && briefAx.headings.filter((h) => /^(Sat|Sun|Mon) Jan/.test(h)).length === 3 && changedText.some((region) => region.live === 'polite' && /Matches the trip online|Checking/.test(region.text)),
+    { briefAx, changedText });
+  await go(page, '/trips/saved');
+  await sleep(800);
+  const listAx = await axAudit(page);
+  record('a11y', 'Saved on this device list: no unnamed control', listAx.unnamed.length === 0, { listAx });
+  await browser.quit();
+};
+
+groups.layout = async () => {
+  const { browser, page } = await freshSave();
+  const rows = [];
+  for (const [label, width, fontSize] of [['320', 320, 16], ['390', 390, 16], ['1280', 1280, 16], ['390 at 200% text', 390, 32], ['1280 at 200% text', 1280, 32]]) {
+    await emulate(page, { width, height: 844, fontSize });
+    for (const path of [PLAN, '/trips/saved', `/trips/saved?trip=${TRIP}`]) {
+      await go(page, path, { settle: 400 });
+      await sleep(500);
+      rows.push({ label, path, ...(await overflow(page)) });
+    }
+    await go(page, PLAN, { settle: 400 });
+    await click(page, 'Change saved days');
+    await page.waitFor(`/Included/.test(document.querySelector('[role=dialog]')?.innerText ?? '')`, 15_000);
+    await sleep(700);
+    rows.push({ label, path: 'Change saved days sheet', ...(await overflow(page)), dialog: await page.eval(`(() => { const d = document.querySelector('[role=dialog]'); const b = d.getBoundingClientRect(); return { left: Math.round(b.left), right: Math.round(b.right), scrollW: d.scrollWidth, clientW: d.clientWidth }; })()`) });
+    await key(page, 'Escape');
+    await sleep(500);
+  }
+  for (const row of rows) record('layout', `${row.label}: ${row.path} has no sideways page scroll`, !row.sideways && (!row.dialog || row.dialog.scrollW <= row.dialog.clientW + 1), row);
   await browser.quit();
 };
 
