@@ -67,3 +67,83 @@ The fake Clerk in `src/test/fakeClerk.tsx` gained a `loaded` flag, so tests can 
 6. **Remove from this device has no confirmation** (choice 11).
 7. **One account's briefs per device**; saving as a second account drops the first's (choice 7).
 8. **Stored drive times are included** with their calculation date and credit (choice 3).
+
+## Browser evidence
+
+"Pass" means the check passed in headless Chrome against fictional fixture trips on a local production build. It isn't device, Safari, VoiceOver, signed-in production or participant evidence; those are under [Untested surfaces](#untested-surfaces).
+
+### Revision and environment
+
+| | |
+|---|---|
+| Revision | `main` at `5f2b8d6` for the **main** column, then this branch's final commit for the **branch** column |
+| Build | `next build --turbopack` (Next.js 16.4.6), served by `next start` on `localhost:3433`, with [`preview-auth.mjs`](preview-auth.mjs) applied for the build only and reverted right after |
+| API | The app's own `/api/v1/trips/*` route handlers, the brief route among them, run by [`api.mjs`](api.mjs) against #337's in-memory fixture database ([`../337-group-planning/fixtures.ts`](../337-group-planning/fixtures.ts)). No database, Clerk, routing or forecast provider was called. |
+| Accounts | [`fake-clerk.tsx`](fake-clerk.tsx) stands in for `@clerk/nextjs` in the preview build: the `qa337_viewer` cookie is who's signed in, and, like Clerk's script, it doesn't load without a connection. The account menu is the test stand-in from `src/test/fakeClerk.tsx`, with Clerk's own Sign out kept and hidden through `appearance` as the app hides it. Never signed in to anything real. |
+| Browser | Headless Chrome 157.0.8103.79 over the DevTools Protocol ([`browser.mjs`](browser.mjs), reusing #337's client). Each group keeps its Chrome profile on disk so it can quit Chrome and start a new process on the same profile. |
+| Offline | **Cold start:** Chrome quit, then a new Chrome process with `--proxy-server` pointed at a closed port and `--proxy-bypass-list=<-loopback>`, so every request, `localhost` and the service worker's included, fails from the first one; plus `Network.emulateNetworkConditions` offline on the tab so `navigator.onLine` is false. **Weak signal:** the same proxy without the tab emulation (the browser reports online, nothing loads). **Offline tab:** only the tab emulation, server up. |
+| Machine | macOS 27.0.1, Apple silicon, Node 26.10.0. Four other agents shared it (load averages 6 to 100). |
+| Trips | `qa337-backcountry` (Fri Jan 8 – Mon Jan 11 2027, clock pinned to Sat Jan 9 7:00 AM EST) as Blair (member) and Alex (organizer): tour plans, three conditions sources with a current, a stale and a missing review, day checks, touring equipment, a pending invitation with a token, a hut stay whose notes hold a fictional key code. `qa337-downhill` (Fri Oct 9 – Mon Oct 12 2026) as Blair: no kit saved, Monday without a meet time, other members' kits (Alex, Eli flagged "needs help", the managed guest Dana) and a rental note with a door code. |
+
+### Results
+
+Raw output: `results.json` in `OUT` when you re-run. **main** is the first run on `main`; "—" means the check was added with its fix.
+
+| Group | Check | main | branch |
+|---|---|---|---|
+| save | Plan page offers Save for offline in an Offline copy section; viewing saved nothing | Pass | Pass |
+| save | The days from destination-local today are ticked (Sat, Sun, Mon; Fri Jan 8 is past) and can be changed | Pass | Pass |
+| save | Before saving: Included ("Day logistics for 3 days…"), Not available offline with "Not planned yet for these days" (Sat Jan 9: No kit saved) apart from "Never saved offline" (forecasts, maps, others' kits, stay notes, invitation links) | Pass | Pass |
+| save | Unticking Monday relists "Day logistics for 2 days" from the server; ticking it again, 3 | Pass | Pass |
+| save | Save writes one brief for `user-blair` and says "Saved on this device Sat, Jan 9, 7:00 AM EST · Sat Jan 9 – Mon Jan 11", with no alert | Pass | Pass |
+| save | After saving, the app says how to reach the copy offline and doesn't claim Trips opens without a connection | — (said "Open it from Trips … with or without a connection") | Pass |
+| save | The section then shows Open saved brief, Update saved copy, Change saved days and Remove from this device | Pass | Pass |
+| save | One worker, scope `/trips/saved`; its caches hold `/trips/saved`, `/_next/static/*` and icons only, no API response or other page | Pass | Pass |
+| save | IndexedDB snapshot: no invite token, hut key-code note, `property_url`, `context_key`, organizer's kit items or packing rows | Pass | Pass |
+| save | Trips links to "Saved on this device · 1 trip" | Pass | Pass |
+| restart | Chrome quit and restarted online: the brief is still listed, "Matches the trip online." | Pass | Pass |
+| coldstart | Cold start offline: the site's start page `/` and `/trips` reach the saved briefs | **Fail** (Chrome's "No internet" page, `ERR_INTERNET_DISCONNECTED`) | **Fail** (Gap left) |
+| coldstart | Cold start offline: `chrome://history` lists Saved on this device by name | **Fail** (every entry "SWTTR — What to Wear Outside") | Pass ("Saved on this device \| SWTTR") |
+| coldstart | Cold start offline: `/trips/saved` opens from the kept copy, lists the brief, no sign-in redirect | Pass | Pass |
+| coldstart | Offline, the list says it's the only page that opens without a connection and suggests a bookmark | — | Pass |
+| coldstart | Offline list row says "Showing saved copy; changes since … are unknown." | **Fail** (saved line only) | Pass |
+| coldstart | Participant task, by clicking the trip in the list: Sat Jan 9, Sterling Pond trailhead "44.555100, -72.795300", Backup plan, My kit, My equipment (transceiver Packed) | Pass | Pass |
+| coldstart | The brief opens with the trip name, "Saved on this device [time] · Sat Jan 9 – Mon Jan 11" and the offline line | Pass | Pass |
+| coldstart | Every link out of the app ends "· Requires connection" | Pass | Pass |
+| coldstart | Read-only: no inputs; the only button is Remove from this device | Pass | Pass |
+| coldstart | No offline map, navigation, monitoring or alert wording; "not a map" is said | Pass | Pass |
+| coldstart | Conditions: "Reviewed 5:00 PM EST · Thu Jan 7" with "Reviewed before the plan changed: Route changed", "You haven't recorded a review.", the not-a-forecast note, no forecast values | Pass | Pass |
+| coldstart | Drives: "Calculated Sat Jan 9 · typical traffic, not live", "No drive planned", "No road route found" | Pass | Pass |
+| coldstart | Weak signal (browser says online, nothing loads): the kept page opens after the 4 s fallback and says changes are unknown | Pass, but said "Sign in to check for changes. Showing saved copy…" | Pass ("Showing saved copy; changes since … are unknown.") |
+| changed | Organizer changes Saturday's backup plan: Plan page says "Trip changed — update saved copy" | Pass | Pass |
+| changed | The saved brief online says the same and offers Update saved copy | Pass | Pass |
+| changed | The same copy in an offline tab: "Showing saved copy; changes since Sat, Jan 9, 7:00 AM EST are unknown." | Pass | Pass |
+| changed | Update with a 500, a download cut off half way, or a download missing a day: "Couldn't update the saved copy: … The copy saved Sat, Jan 9, 7:00 AM EST is still on this device." and the old revision and backup plan stay | Pass (3 checks) | Pass (3 checks) |
+| changed | Update saved copy then stores the new backup plan and says "Matches the trip online." / "Updated." | Pass | Pass |
+| changed | No background sync: the revision stayed through two page loads that saw the newer trip, until the button was pressed | Pass | Pass |
+| interrupted | First save cut off half way, or missing a day: "Couldn't save on this device: The trip didn't download completely. Nothing was saved."; nothing stored; ticks kept | Pass (2 checks) | Pass (2 checks) |
+| interrupted | First save answered 503: "…Couldn't check access. Try again. Nothing was saved." | Pass | Pass |
+| interrupted | First save with no answer for 25 s: "…The trip took too long to download. Nothing was saved." | Pass | Pass |
+| interrupted | Behind the sheet the section never showed a saved line; the next save works | Pass (2 checks) | Pass (2 checks) |
+| storage | Quota set to 1 byte (`Storage.overrideQuotaForOrigin`): "Couldn't save on this device: This device is out of storage space for saved trips. Nothing was saved." | Pass | Pass |
+| logistics | Downhill as Blair: Included has no kit line; "Sat Oct 10: No kit saved", "Mon Oct 12: No meet time set" | Pass | Pass |
+| logistics | Blair's snapshot holds none of Alex's, Eli's or Dana's kits, Eli's flag, the rental's door-code note or an invite token | Pass | Pass |
+| logistics | The saved brief shows the meet ("8:30 AM EDT · Sat Oct 10") and "Not planned yet for this day: No kit saved." | Pass | Pass |
+| account | Account menu: one visible Sign out; "Sign out and remove saved trips?" ("…removes the trip brief saved on this device for offline use…"); confirming signs out to `/` with IndexedDB and the hint empty | Pass | Pass |
+| account | Alex's (organizer) snapshot has no invite token though Alex sees it online, no hut note or packing rows; keeps Alex's own kit | Pass | Pass |
+| account | Switching to Blair and opening `/privacy` clears Alex's copies (the guard) | Pass | Pass |
+| account | Saved on this device as Blair never shows Alex's copies, and they're removed | Pass | Pass |
+| account | It then says "Trips saved by another account were removed from this device." | **Fail** in 2 of 4 runs (empty list, no reason) | Pass (4 of 4) |
+| account | Signed out elsewhere (cookie gone): the copy stays while `/api/v1/trips` answers 503, and goes once it answers 401 | Pass | Pass |
+| membership | A 503 on the check keeps the copy: "Couldn't check for changes: Couldn't check access. Try again." | Pass | Pass |
+| membership | Blair marked as left on the trip: reopening Saved on this device online removes it, "Removed from this device: you're no longer on Smugglers' Notch hut tour, or it was deleted." | Pass | Pass |
+| remove | Saved brief: Remove from this device (Enter) removes only the device copy, "Removed Smugglers' Notch hut tour from this device. The trip online hasn't changed."; no write request reached the API | Pass (2 checks) | Pass (2 checks) |
+| remove | Saved brief: focus then goes to the "Not saved on this device" heading | **Fail** (document body) | Pass |
+| remove | Plan page: Remove says so in its status region and moves focus to the Offline copy heading | Pass | Pass |
+| a11y | Keyboard in the sheet: Close, then the four day checkboxes named "Fri Jan 8 · Travel" … "Mon Jan 11 · Travel", Save for offline, Cancel, wrapping inside the sheet; every stop has a focus ring | Pass (the first run's harness counted the wrap-around twice) | Pass |
+| a11y | Space ticks Friday and the lists update ("Day logistics for 4 days") in a polite live region; no unnamed control | Pass | Pass |
+| a11y | Escape closes the sheet and focus returns to Save for offline | Pass | Pass |
+| a11y | The save is announced as text in a polite status region | Pass | Pass |
+| a11y | Saved brief: one h1, a heading per day, no unnamed control, its state in a polite status region; the list has no unnamed control | Pass (2 checks) | Pass (2 checks) |
+| layout | No sideways scroll on the Plan page, the list, the brief and the Change saved days sheet at 320, 390 and 1280 px, and at 1280 px with 200% text | Pass (16 checks) | Pass (16 checks) |
+| layout | The same at 390 px with 200% text | **Fail** on the Plan page, the brief and the sheet (427 px wide: Remove from this device was 395 px) | Pass (4 checks) |
