@@ -105,6 +105,18 @@ export function dayTimeZone(full: Plans, day: TripDay): string | null {
   return zone && isTimeZone(zone) ? zone : null;
 }
 
+/**
+ * The trip's clock for a time that belongs to no one day, such as accepting
+ * shared gear (#337): the first day whose destination's zone is known.
+ */
+export function tripTimeZone(full: Plans, days: TripDay[]): string | null {
+  for (const day of [...days].sort((a, b) => a.date.localeCompare(b.date))) {
+    const zone = dayTimeZone(full, day);
+    if (zone) return zone;
+  }
+  return null;
+}
+
 /** "6:12 AM MST · Sat Feb 13" on the destination's clock, or in UTC when its zone isn't known. */
 export function checkTimeLabel(iso: string, zone: string | null): string {
   const instant = new Date(iso);
