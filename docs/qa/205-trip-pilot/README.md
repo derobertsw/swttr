@@ -302,7 +302,7 @@ Then, for everyone:
 > "According to the trip, has anyone looked at Sunday's avalanche forecast yet? Have you?"
 
 - Correct: the sources are listed on Sunday (organizer and solo: by them), and Sunday shows no review recorded. Saturday's reviews don't count for Sunday. Members and solo users should also mention that Saturday's has a review recorded (Sam's or Riley's, made beforehand).
-- Record whether they opened the avalanche forecast link at any point (R3: "find the relevant official bulletin").
+- Record whether they opened the avalanche forecast link at any point (R3: "find the relevant official bulletin"). For touring participants this counts toward R3's [pass threshold](#pass-thresholds); record it in [Facilitator checks](#facilitator-checks).
 - Evidence for: S5 (reuse, reviews per day), R3.
 
 **T5 · Your own preparation**
@@ -521,11 +521,11 @@ For every task, on the results sheet:
 | ID | Passes when | Set by |
 |---|---|---|
 | G2 | At least 5 of 6 say all four T1 facts correctly, unaided, within 15 seconds | #337 |
-| M1 + M2 | At least 5 of 6 find the meeting point and tell the two stays apart in T1, unaided | #235 |
+| M1 + M2 | At least 5 of 6 find the meeting point and tell the two stays apart in T1, unaided: all three of T1's meeting point, leaving from and sleeping rows unaided and correct | #235 |
 | R1 | At least 5 of 6 complete T15 and T17 correctly, unaided | #205 |
 | R2 | At least 5 of 6 complete T3 correctly, unaided | #205 |
 | G1 | At least 5 of 6 complete all six core logistics tasks (T1, T2, T3, T14, T15, T17) correctly, unaided | #337 |
-| R3 | Every touring participant completes T2, T4 and T5 correctly, unaided, **and** nobody, touring or not, reads a review, check or clothing result as a safety verdict in T6 or T7 | #205 sets no count for the first part; this plan reads it as every touring participant |
+| R3 | Every touring participant completes T2, T4 and T5 correctly, unaided, and opens the official avalanche bulletin from the trip (the T4 facilitator check), **and** nobody, touring or not, reads a review, check or clothing result as a safety verdict in T6 or T7 | #205 sets no count for the first part; this plan reads it as every touring participant |
 | M5 | No wrong destination or start in any T10 | #235 |
 | R4 | In every session that ran T8 and T17, the facilitator saw the affected reviews marked out of date and the drives updated, with kits and bookings unchanged | #205 |
 | B1 | Every iPhone session finds all four T20 items in the saved copy, and no session finds a wrong one | This plan. #214 only says to validate on actual devices before claiming offline availability. |
@@ -580,6 +580,9 @@ One code per cell ([Outcome codes](#outcome-codes)), followed by ✓ when the an
 | T1 Your day at a glance | | | | | | |
 | T1 time (seconds) | | | | | | |
 | T1 facts right (of 4) | | | | | | |
+| T1 meeting time and place (M1) | | | | | | |
+| T1 leaving from on Saturday morning (M2) | | | | | | |
+| T1 sleeping on Saturday night (M2) | | | | | | |
 | T2 Saturday's tour | | | | | | |
 | T3 Getting there | | | | | | |
 | T4 Sunday's sources | | | | | | |
@@ -607,6 +610,7 @@ The dashes follow the recommended assignment: T11 runs on desktop only (P2, P4 a
 | Check | P1 | P2 | P3 | P4 | P5 | P6 |
 |---|---|---|---|---|---|---|
 | S4: organizer-only controls the member ran into (list them, or "none") | — | — | | | — | — |
+| T4: opened the official avalanche bulletin from the trip (yes / no; counts toward R3 for touring participants) | | | | | | |
 | T8: reviews recorded before the change show as out of date | | | | | | |
 | T8: kits and booked status unchanged and shown | | | | | | |
 | T10: start and destination in the maps app | | | | | | |

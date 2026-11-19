@@ -14,7 +14,7 @@ SWTTR helps a group plan a trip: where they sleep, how they get to the trailhead
 - **Day checks**: two dated notes per person per touring day. "Tour and backup plan reviewed" before leaving, and "Transceiver check" at the trailhead.
 - **Clothing advice** for the climb, the descent and the transition between them.
 
-Nothing in SWTTR adds these up into a readiness score. Each check, review and packed item is a note of who did what and when. The pilot ([README.md](README.md)) tests whether people read them that way. This review asks whether the words are right.
+Nothing in SWTTR adds these up into a readiness score. Each check and review is a note of who did what and when. A shared item's packed mark also records who packed it and when. A personal packed mark records only that it's packed, with no time. The pilot ([README.md](README.md)) tests whether people read them that way. This review asks whether the words are right.
 
 ## How to review
 
