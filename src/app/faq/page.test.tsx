@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FAQ from "./page";
@@ -48,6 +48,16 @@ describe("FAQ support claims", () => {
       "How the advice is worked out",
       "Contact",
     ]);
+  });
+
+  // /faq#contact is the App Store Support URL (#140).
+  it("ends with a Contact section at #contact that links the feedback form and the policy", () => {
+    render(<TemperatureUnitProvider><FAQ /></TemperatureUnitProvider>);
+    const contact = screen.getByRole("region", { name: "Contact" });
+    expect(contact).toHaveAttribute("id", "contact");
+    const links = within(contact).getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["/feedback", "/privacy"]);
+    expect(within(contact).getByRole("link", { name: /feedback form/ })).toHaveAttribute("target", "_blank");
   });
 
   it("doesn't claim a body-and-gear model for Hiking / Snowshoeing", async () => {
