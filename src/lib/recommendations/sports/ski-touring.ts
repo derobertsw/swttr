@@ -20,7 +20,7 @@ import {
   phaseTargets,
   type PhaseTargets,
 } from '../thermal-targets';
-import { selectPhaseAccessories } from '../extremities';
+import { hoodHeadPlanner, selectPhaseAccessories } from '../extremities';
 import { ventilationAdvice, withVentTransitionStep } from '../ventilation';
 import { xcProtection } from './xc-outfit';
 import {
@@ -190,9 +190,11 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
       shells: categorized.shells.filter(forClimb),
     };
 
-    // Climb: fitted region by region; a protective shell only for wind or wet.
+    // Climb: fitted region by region; a protective shell only for wind or
+    // wet. Its hoods count toward the climb's head, as its accessories count them.
     const uphillEnsemble = buildTouringClimbEnsemble(
-      climbPool, uphill.regional, targets.climbProtection, UPHILL_MIN_EVAP_POTENTIAL
+      climbPool, uphill.regional, targets.climbProtection, UPHILL_MIN_EVAP_POTENTIAL,
+      hoodHeadPlanner('ski_touring_uphill', uphill, pool.headwear, tempC),
     );
 
     const uphillThermalGarments = ensembleToThermalGarments(uphillEnsemble);
@@ -206,7 +208,8 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
       shells: categorized.shells,
       insulation: [...categorized.midLayers, ...categorized.insulation].filter(forDescent),
       legs: [...categorized.shells, ...categorized.insulation].filter(forDescent),
-    }, downhill.regional, request.prioritizeLightPack);
+    }, downhill.regional, request.prioritizeLightPack,
+    hoodHeadPlanner('ski_touring_downhill', downhill, pool.headwear, tempC));
     const packItems = [pack.insulation, pack.shell, pack.legs].filter((g): g is GarmentRow => g !== null);
     const downhillEnsemble = [...uphillEnsemble, ...packItems];
 
