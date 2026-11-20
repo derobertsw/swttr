@@ -10,7 +10,7 @@ import type { IreqResult } from '@/types/garments';
 import type { SportRecommender } from '../handler';
 import { metabolicRateFor, phaseExposure, phaseIreq, phaseTargets, type PhaseTargets } from '../thermal-targets';
 import { buildAlpineEnsemble, alpineRegionalCapacity } from './alpine-ensemble';
-import { selectPhaseAccessories } from '../extremities';
+import { hoodHeadPlanner, selectPhaseAccessories } from '../extremities';
 import { buildHelmetRequirement } from '../requirements';
 import { buildScoredRecommendation } from '../response-builder';
 import { ventilationAdvice } from '../ventilation';
@@ -90,10 +90,12 @@ export const alpine: SportRecommender<AlpineTargets> = {
   recommend(request, targets, pool) {
     const { tempC, windMs, humidity, weather } = request;
 
+    // The jacket's hood counts toward the head, as the accessories count it.
     const ensemble = buildAlpineEnsemble(
       pool.categorized,
       targets.regional,
-      request.precipitation
+      request.precipitation,
+      hoodHeadPlanner('alpine_skiing', targets, pool.headwear, tempC),
     );
     const accessories = selectPhaseAccessories('alpine_skiing', targets, pool, tempC, ensemble, { precipitation: request.precipitation });
     const { handwear, headwear } = accessories;

@@ -5,6 +5,7 @@ import { THERMAL_DISPLAY_CLO_EPSILON } from '@/lib/biophysics/comfort';
 import type { SustainedSportPolicy } from '@/lib/biophysics/sport-policy';
 import { ensembleToThermalGarments } from '../formatting';
 import { garmentCapabilities, hasUsableThermalData } from '../garment-semantics';
+import type { HoodHeadPlanner } from '../extremities';
 import type { PhaseTargets } from '../thermal-targets';
 import type { CategorizedGarments, GarmentRow } from '../types';
 
@@ -15,6 +16,7 @@ type Protection = OutfitProtection;
 const NO_PROTECTION: Protection = { wind: false, wet: false };
 const REGIONS = ['torso', 'legs'] as const;
 const EPSILON = 1e-6;
+const NO_HEAD_GAP = { deficit: 0, excess: 0 } as const;
 /** Same small mismatch allowance used by wardrobe requirements. */
 const MATCH_MARGIN = 0.15;
 
@@ -133,6 +135,8 @@ interface SearchTotals {
   legsWhole: number;
   count: number;
   unbreathable: number;
+  /** Head insulation from hoods, as the outfit check counts it. */
+  hood: number;
 }
 
 interface SearchItem {
@@ -143,7 +147,7 @@ interface SearchItem {
 
 const EMPTY_TOTALS: SearchTotals = {
   coversMask: 0, basicMask: 0, windMask: 0, wetMask: 0, waterproofMask: 0, fullMask: 0,
-  torso: 0, arms: 0, legs: 0, torsoWhole: 0, legsWhole: 0, count: 0, unbreathable: 0,
+  torso: 0, arms: 0, legs: 0, torsoWhole: 0, legsWhole: 0, count: 0, unbreathable: 0, hood: 0,
 };
 
 function extendTotals(previous: SearchTotals, item: SearchItem | undefined): SearchTotals {
@@ -159,6 +163,7 @@ function extendTotals(previous: SearchTotals, item: SearchItem | undefined): Sea
     torso: previous.torso + next.torso, arms: previous.arms + next.arms, legs: previous.legs + next.legs,
     torsoWhole: previous.torsoWhole + next.torsoWhole, legsWhole: previous.legsWhole + next.legsWhole,
     count: previous.count + next.count, unbreathable: previous.unbreathable + next.unbreathable,
+    hood: previous.hood + next.hood,
   };
 }
 
@@ -171,6 +176,8 @@ interface RegionalChoice {
   deficit: number;
   excess: number;
   unbreathable: number;
+  /** Hood head insulation of the chosen items, shared garments excluded. */
+  hood: number;
 }
 
 function compareRank(a: number[], b: number[]): number {
@@ -183,9 +190,10 @@ function compareRank(a: number[], b: number[]): number {
 /** Identical selection capabilities can only tie. Keep the first sorted ID,
  * as the exhaustive search did, so duplicate products do not multiply work.
  * IDs, names and ownership never participate in the suitability rank. */
-function selectionKey(g: GarmentRow, minEvapPotential: number): string {
+function selectionKey(g: GarmentRow, minEvapPotential: number, hood: number): string {
   const t = g.garment_thermal_properties!;
   return JSON.stringify([
+    hood,
     g.category, g.covers_torso, g.covers_arms, g.covers_legs,
     g.usage, g.coverage_torso, g.coverage_arms, g.coverage_legs,
     t.rcl_torso, t.rcl_arms, t.rcl_legs, t.recl_torso, t.recl_arms, t.recl_legs,
@@ -226,7 +234,7 @@ function regionalThermal(items: Pick<SearchItem, 'thermal'>[], region: Region): 
  * disjoint regional contributions once; adding them gives the same prediction
  * (within floating-point precision) without re-running the model per outfit.
  * Evaporation is nonlinear and is still predicted for complete contenders. */
-function searchItem(garment: GarmentRow, thermal: ThermalGarment, minEvapPotential: number): SearchItem {
+function searchItem(garment: GarmentRow, thermal: ThermalGarment, minEvapPotential: number, hood: number): SearchItem {
   const capability = garmentCapabilities(garment);
   let basicMask = 0, windMask = 0, wetMask = 0, waterproofMask = 0, fullMask = 0;
   for (const [part, mask] of [['torso', 1], ['arms', 2], ['legs', 4]] as const) {
@@ -248,6 +256,7 @@ function searchItem(garment: GarmentRow, thermal: ThermalGarment, minEvapPotenti
     torso: torso.rcl.torso, arms: torso.rcl.arm, legs: legs.rcl.leg,
     torsoWhole: torso.rcl.wholeBody, legsWhole: legs.rcl.wholeBody, count: 1,
     unbreathable: Number((garment.garment_thermal_properties?.evap_potential ?? 0) < minEvapPotential),
+    hood,
   } };
 }
 
@@ -298,14 +307,16 @@ function regionalChoices(
         const outfit = [...prefix, ...chosen].sort((a, b) => slot(a.garment) - slot(b.garment));
         const thermal = regionalThermal(outfit, region);
         const unbreathable = totals.unbreathable - prefixTotals.unbreathable;
-        // Same thermal inputs and regional priorities: fewer layers, then
-        // fewer unbreathable items strictly dominate for every other region.
-        const key = JSON.stringify(thermal);
+        // Same thermal inputs, hood warmth and regional priorities: fewer
+        // layers, then fewer unbreathable items strictly dominate for every
+        // other region.
+        const hood = totals.hood - prefixTotals.hood;
+        const key = JSON.stringify([thermal, hood]);
         const existing = best.get(key);
         if (existing && compareRank([chosen.length, unbreathable], [existing.items.length, existing.unbreathable]) >= 0) continue;
         best.set(key, {
           items: chosen, thermal, priority, clo: region === 'torso' ? totals.torsoWhole : totals.legsWhole,
-          deficit, excess, unbreathable,
+          deficit, excess, unbreathable, hood,
         });
       }
     }
@@ -322,6 +333,9 @@ interface MovingOutfitOptions {
   needs?: Protection;
   /** Garments the sport can wear in a moving outfit; defaults to running's. */
   eligible?: (g: GarmentRow) => boolean;
+  /** Counts the head warmth hoods add, and what that leaves for the head
+   * accessories chosen afterwards (#413). Without it, hoods are ignored. */
+  head?: HoodHeadPlanner;
 }
 
 /** Fix cross-region items first, then prune independent regional choices
@@ -332,19 +346,20 @@ export function buildRunningEnsemble(
   categorized: CategorizedGarments,
   targets: PhaseTargets,
   minEvapPotential = 0.3,
-  { needs: requestedNeeds, eligible = runningEligible }: MovingOutfitOptions = {},
+  { needs: requestedNeeds, eligible = runningEligible, head }: MovingOutfitOptions = {},
 ): GarmentRow[] {
   const unique = new Map<string, GarmentRow>();
   const garments = [...new Map(Object.values(categorized).flat().map(g => [g.id, g])).values()]
     .filter(g => hasUsableThermalData(g) && eligible(g))
     .sort((a, b) => a.id.localeCompare(b.id));
+  const hoods = new Map(garments.map(g => [g.id, head?.hoodClo([g]) ?? 0]));
   for (const garment of garments) {
-    const key = selectionKey(garment, minEvapPotential);
+    const key = selectionKey(garment, minEvapPotential, hoods.get(garment.id)!);
     if (!unique.has(key)) unique.set(key, garment);
   }
   const candidates = [...unique.values()];
   const converted = ensembleToThermalGarments(candidates);
-  const items = candidates.map((garment, i) => searchItem(garment, converted[i], minEvapPotential));
+  const items = candidates.map((garment, i) => searchItem(garment, converted[i], minEvapPotential, hoods.get(garment.id)!));
   // Arm insulation belongs to the upper projection even if the garment
   // covers legs but not torso. Fix these items before regional pruning too;
   // adding their arms only to the leg projection would still hide local
@@ -362,12 +377,17 @@ export function buildRunningEnsemble(
     const torsoChoices = regionalChoices(separate, prefix, 'torso', targets, needs);
     const legChoices = regionalChoices(separate, prefix, 'legs', targets, needs);
     const sharedUnbreathable = prefix.filter(item => (item.garment.garment_thermal_properties?.evap_potential ?? 0) < minEvapPotential).length;
+    const sharedHood = prefix.reduce((sum, item) => sum + item.totals.hood, 0);
     for (const torso of torsoChoices) for (const legs of legChoices) {
       // Regional predictions are disjoint contributions to the same shared
       // whole-body model. Shared garments enter each covered region once.
       const totalClo = torso.clo + legs.clo;
-      const deficit = torso.deficit + legs.deficit + Math.max(0, targets.targetRange[0] - totalClo - THERMAL_DISPLAY_CLO_EPSILON);
-      const excess = torso.excess + legs.excess + Math.max(0, totalClo - targets.targetRange[1]);
+      // The head is one more part of the fit: what the outfit's hoods leave
+      // for the hat chosen afterwards, judged as the outfit check judges it.
+      const headGap = head?.gap(sharedHood + torso.hood + legs.hood) ?? NO_HEAD_GAP;
+      const deficit = torso.deficit + legs.deficit + headGap.deficit
+        + Math.max(0, targets.targetRange[0] - totalClo - THERMAL_DISPLAY_CLO_EPSILON);
+      const excess = torso.excess + legs.excess + headGap.excess + Math.max(0, totalClo - targets.targetRange[1]);
       const rank = [
         ...torso.priority.map((value, i) => value + legs.priority[i]),
         deficit + excess, excess, prefix.length + torso.items.length + legs.items.length,
