@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PreferencesDrawer } from "./PreferencesDrawer";
 import { PreferenceSaveResult } from "@/types/preferences";
@@ -237,6 +237,15 @@ describe("PreferencesDrawer", () => {
       await act(async () => saves[0].finish("kept-on-device"));
       expect(screen.getByText("Saved")).toBeInTheDocument();
       expect(screen.queryByText(/Couldn’t save to your account/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("privacy and support links", () => {
+    it("links the privacy policy and the FAQ's Contact section (#140)", () => {
+      render(<PreferencesDrawer {...defaultProps} open={true} />);
+      const nav = screen.getByRole("navigation", { name: "Privacy and support" });
+      expect(within(nav).getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
+      expect(within(nav).getByRole("link", { name: "Contact support" })).toHaveAttribute("href", "/faq#contact");
     });
   });
 
