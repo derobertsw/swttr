@@ -1,7 +1,7 @@
 // QA-only edits that let a local build open the fictional fixture trips
 // signed out:  node docs/qa/235-trip-maps/preview-auth.mjs apply|revert
 //
-// - src/proxy.ts skips Clerk for /trips/trip-drive|trip-edge|trip-split pages.
+// - src/proxy.ts skips Clerk for /trips and the /trips/trip-drive|trip-edge|trip-split pages.
 //   Builds from before #382 (the load comparison's older commits) run every
 //   request through clerkMiddleware, so there the fixture trips skip it.
 // - useUserId and TripProvider take the viewer from localStorage.qa235User.
@@ -13,7 +13,8 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const MARK = '/* QA-235 PREVIEW ONLY */';
-const FIXTURE_TRIP = '/^\\/trips\\/trip-(drive|edge|split)(\\/|$)/.test(request.nextUrl.pathname)';
+// And /trips itself (November 22), for #214's "Saved on this device" link on the trips list.
+const FIXTURE_TRIP = '/^\\/trips(\\/trip-(drive|edge|split)(\\/|$)|$)/.test(request.nextUrl.pathname)';
 // Each file lists the anchors it may have, newest first; exactly one must match once.
 const EDITS = [
   ['src/proxy.ts', [
