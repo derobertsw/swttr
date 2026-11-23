@@ -24,8 +24,8 @@ export const biking = createSinglePhaseSport({
   airSpeedMs: (request) => cyclingRelativeAirSpeed(request.windMs, request.exertion),
   protection: cyclingProtection,
   protect: (ensemble, _categorized, targets) => ({ ensemble, warnings: runningProtectionWarnings(ensemble, targets, targets.protection) }),
-  buildEnsemble: (categorized, targets) =>
-    buildCyclingEnsemble(categorized, targets, MIN_EVAP_POTENTIAL, targets.protection!),
+  buildEnsemble: (categorized, targets, _request, head) =>
+    buildCyclingEnsemble(categorized, targets, MIN_EVAP_POTENTIAL, targets.protection!, head),
   conditions: (request) => ({
     precipitation: request.precipitation,
     relative_air_speed_ms: Math.round(cyclingRelativeAirSpeed(request.windMs, request.exertion) * 100) / 100,

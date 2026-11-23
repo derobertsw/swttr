@@ -4,6 +4,7 @@
  */
 import { classifyPrecipitation, needsXCWindProtection } from '@/lib/biophysics/xc-policy';
 import type { PrecipitationType } from '@/types/weather';
+import type { HoodHeadPlanner } from '../extremities';
 import { garmentCapabilities } from '../garment-semantics';
 import { sortByBreathability } from '../sorting';
 import type { PhaseTargets } from '../thermal-targets';
@@ -70,13 +71,15 @@ const evap = (g: GarmentRow) => g.garment_thermal_properties?.evap_potential ?? 
  * required protection (waterproof when wet), then a layer that can sit next
  * to skin, then no severe excess, then more than thermal underwear alone,
  * then the regional fit, breathability and fewer layers. Fit uses the shared
- * regional prediction, as the evaluation does.
+ * regional prediction, as the evaluation does, and with `head` counts what
+ * the climb's hoods leave for its head accessories (#413).
  */
 export function buildTouringClimbEnsemble(
   categorized: CategorizedGarments,
   targets: Regional,
   needs: ClimbProtection,
   minEvapPotential: number,
+  head?: HoodHeadPlanner,
 ): GarmentRow[] {
   const climb: CategorizedGarments = { ...categorized, insulation: [] };
   const protectionNeeded = needs.wind || needs.wet;
@@ -85,7 +88,7 @@ export function buildTouringClimbEnsemble(
     rank: () => [], // The climb uses the assessment below.
     assess: (outfit, region) => {
       const regional = outfit.filter((g) => g[`covers_${region}`]);
-      const { deficit, excess, severeExcess } = xcRegionFit(outfit, targets, region);
+      const { deficit, excess, severeExcess } = xcRegionFit(outfit, targets, region, head);
       const waterproof = regional.some((g) => g.garment_protection?.waterproof_rating === 'waterproof'
         && xcProtection([g], region, { wind: false, wet: true }));
       return [
@@ -124,9 +127,11 @@ function isBetter(rank: number[], than: number[]): boolean {
 const upperBody = (g: GarmentRow) => (g.covers_torso || g.covers_arms) && !g.covers_legs;
 
 /** Distance from a region's descent band. The descent is the cold phase, so
- * a shortfall counts double an excess, as in the accessory fallback. */
-function descentGap(outfit: GarmentRow[], targets: Regional, region: Region): number {
-  const fit = xcRegionFit(outfit, targets, region);
+ * a shortfall counts double an excess, as in the accessory fallback. With
+ * `head`, it also counts what the outfit's hoods leave for the descent's
+ * helmet and hat (#413). */
+function descentGap(outfit: GarmentRow[], targets: Regional, region: Region, head?: HoodHeadPlanner): number {
+  const fit = xcRegionFit(outfit, targets, region, head);
   return 2 * fit.deficit + fit.excess;
 }
 
@@ -138,7 +143,9 @@ function descentGap(outfit: GarmentRow[], targets: Regional, region: Region): nu
  * with `prioritizeLightPack`). Unless a light pack is asked for, a layer
  * that reaches the minimum beats one that doesn't, however light, and when
  * none reaches it the layer leaving the smallest gap wins, with weight only
- * breaking ties: lightness never buys a colder descent (#374).
+ * breaking ties: lightness never buys a colder descent (#374). The gaps
+ * count the head when `head` is given; whether a region needs a layer, and
+ * whether a layer reaches its minimum, look at the region alone.
  */
 function packForRegion(
   worn: GarmentRow[],
@@ -146,13 +153,14 @@ function packForRegion(
   targets: Regional,
   region: Region,
   prioritizeLightPack: boolean,
+  head?: HoodHeadPlanner,
 ): GarmentRow | null {
   if (xcRegionFit(worn, targets, region).deficit <= 0) return null;
-  const before = descentGap(worn, targets, region);
+  const before = descentGap(worn, targets, region, head);
   let best: { garment: GarmentRow; rank: [number, number, number] } | null = null;
   for (const garment of candidates) {
     const outfit = [...worn, garment];
-    const after = descentGap(outfit, targets, region);
+    const after = descentGap(outfit, targets, region, head);
     const closed = (before - after) / before;
     if (closed <= 1e-6) continue;
     const weightScore = Math.max(0, 1.0 - ((garment.weight_grams ?? 500) - 200) / 600);
@@ -171,13 +179,16 @@ function packForRegion(
  * Descent pack: the mandatory hard shell over the torso when the climb
  * didn't wear one, then a fleece or puffy for the upper body and a leg
  * layer over the climbing pants, each only when its region would otherwise
- * fall short of the descent minimum. The climb clothing stays on.
+ * fall short of the descent minimum. The climb clothing stays on. The shell
+ * is protection, chosen whatever its hood; the upper-body layer counts what
+ * its hood leaves for the descent's head when `head` is given (#413).
  */
 export function selectDescentPack(
   climb: GarmentRow[],
   pool: { shells: GarmentRow[]; insulation: GarmentRow[]; legs: GarmentRow[] },
   targets: Regional,
   prioritizeLightPack: boolean,
+  head?: HoodHeadPlanner,
 ): DescentPack {
   const worn = new Set(climb.map((g) => g.id));
   const notWorn = (g: GarmentRow) => !worn.has(g.id);
@@ -188,7 +199,7 @@ export function selectDescentPack(
   const withShell = shell ? [...climb, shell] : climb;
   // A fleece or puffy goes with the shell; insulated outerwear would replace it.
   const insulation = packForRegion(withShell, pool.insulation.filter((g) => upperBody(g) && notWorn(g)
-    && [...MID_LAYERS, ...PUFFIES].includes(g.category)), targets, 'torso', prioritizeLightPack);
+    && [...MID_LAYERS, ...PUFFIES].includes(g.category)), targets, 'torso', prioritizeLightPack, head);
   // Over shell or insulated pants only insulation helps; soft-shell pants
   // can take a protective shell or insulation, but not another soft shell.
   const legOuters = climb.filter((g) => g.covers_legs).map((g) => g.category);

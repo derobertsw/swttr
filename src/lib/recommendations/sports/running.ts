@@ -17,7 +17,7 @@ export const running = createSinglePhaseSport({
     ? OUTER_AIR_PERMEABILITY.windResistant : OUTER_AIR_PERMEABILITY.open,
   minEvapPotential: MIN_EVAP_POTENTIAL,
   protect: (ensemble, _categorized, targets) => ({ ensemble, warnings: runningProtectionWarnings(ensemble, targets) }),
-  buildEnsemble: (categorized, targets) => buildRunningEnsemble(categorized, targets, MIN_EVAP_POTENTIAL),
+  buildEnsemble: (categorized, targets, _request, head) => buildRunningEnsemble(categorized, targets, MIN_EVAP_POTENTIAL, { head }),
   conditions: (request) => ({ precipitation: request.precipitation }),
   guidance: (_request, _ireq, ensemble, targets) => {
     if (!ensemble || !targets) return ['Choose a running top and shorts or standalone tights to meet the moving-phase targets.'];
