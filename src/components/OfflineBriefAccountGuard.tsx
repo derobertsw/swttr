@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { noteSignedInAccount, readSavedBriefs, reconcileSavedBriefs, savedBriefsAccountHint } from "@/lib/offline-briefs";
+import { keepStartPageRedirect } from "@/lib/offline-shell";
 
 /**
  * Trip briefs saved on this device belong to the account that saved them
@@ -19,6 +20,8 @@ export function OfflineBriefAccountGuard() {
     // Saves still downloading for an account that's gone aren't written.
     noteSignedInAccount(userId ?? null);
     const hint = savedBriefsAccountHint();
+    // Briefs saved before the start page's redirect existed get it too (registering again changes nothing).
+    if (hint && hint === userId) void keepStartPageRedirect();
     // Nothing saved, or saved by whoever is signed in: nothing to do, and no database to open.
     if (hint === null || (hint !== undefined && hint === userId)) return;
     void (async () => {

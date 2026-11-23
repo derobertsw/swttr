@@ -132,6 +132,48 @@ describe("Trip briefs saved on this device (#214)", () => {
     expect(savedBriefsAccountHint()).toBeNull();
   });
 
+  describe("the start page's redirect worker", () => {
+    /** This browser's registrations: the saved page's worker and the start page's redirect. */
+    let unregistered: string[];
+    beforeEach(() => {
+      unregistered = [];
+      const registration = (scope: string, script: string) => ({
+        scope: `${window.location.origin}${scope}`, installing: null, waiting: null,
+        active: { scriptURL: `${window.location.origin}${script}` },
+        unregister: async () => { unregistered.push(scope); return true; },
+      });
+      Object.defineProperty(navigator, "serviceWorker", {
+        configurable: true,
+        value: { getRegistrations: async () => [registration("/trips/saved", "/offline-sw.js"), registration("/", "/offline-start-sw.js")] },
+      });
+    });
+    afterEach(() => { Reflect.deleteProperty(navigator, "serviceWorker"); });
+
+    it("stays while a brief is left, and is unregistered with the last one removed", async () => {
+      await storeSavedBrief("user_1", offlineBrief());
+      await storeSavedBrief("user_1", offlineBrief({ trip: { ...offlineBrief().trip, id: "trip-2" } }));
+      await removeSavedBrief("trip-1");
+      expect(unregistered).toEqual([]);
+      await removeSavedBrief("trip-2");
+      expect(unregistered).toEqual(["/"]);
+    });
+
+    it("is unregistered on sign-out and when another account's briefs are cleared", async () => {
+      await storeSavedBrief("user_1", offlineBrief());
+      await clearSavedBriefs();
+      expect(unregistered).toEqual(["/"]);
+      await storeSavedBrief("user_1", offlineBrief());
+      expect(await reconcileSavedBriefs("user_2", "user_1")).toBe(true);
+      expect(unregistered).toEqual(["/", "/"]);
+    });
+
+    it("stays when a clear finds a newer account's briefs and leaves them", async () => {
+      await storeSavedBrief("user_2", forOther("trip-2"));
+      expect(await clearSavedBriefs("user_1")).toBe(false);
+      expect(unregistered).toEqual([]);
+    });
+  });
+
   describe("after an account change or sign-out", () => {
     it("clears another account's copies at once", async () => {
       await storeSavedBrief("user_1", offlineBrief());

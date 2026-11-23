@@ -52,6 +52,8 @@ export async function newTab(browser, { width = 1280, height = 900, fontSize = 1
   page.targetId = targetId;
   page.console = [];
   page.requests = [];
+  // Each response, with whether a service worker answered it and which static routing rule sent it where.
+  page.responses = [];
   cdp.on((message) => {
     if (message.sessionId !== sessionId) return;
     if (message.method === 'Page.javascriptDialogOpening') void page.send('Page.handleJavaScriptDialog', { accept: true });
@@ -60,6 +62,10 @@ export async function newTab(browser, { width = 1280, height = 900, fontSize = 1
       page.console.push(`console.error: ${message.params.args.map((arg) => arg.value ?? arg.description ?? '').join(' ')}`.slice(0, 300));
     }
     if (message.method === 'Network.requestWillBeSent') page.requests.push(message.params.request.url);
+    if (message.method === 'Network.responseReceived') {
+      const { response, type } = message.params;
+      page.responses.push({ url: response.url, type, status: response.status, fromServiceWorker: !!response.fromServiceWorker, router: response.serviceWorkerRouterInfo ?? null });
+    }
   });
   await page.send('Page.enable');
   await page.send('Runtime.enable');
@@ -121,7 +127,7 @@ export const readWorker = (page) => page.eval(`(async () => {
   const registrations = await navigator.serviceWorker.getRegistrations();
   const caches_ = {};
   for (const name of await caches.keys()) caches_[name] = (await (await caches.open(name)).keys()).map((r) => new URL(r.url).pathname + new URL(r.url).search);
-  return { scopes: registrations.map((r) => ({ scope: r.scope, active: r.active?.state ?? null, script: r.active?.scriptURL ?? null })), controller: navigator.serviceWorker.controller?.scriptURL ?? null, caches: caches_ };
+  return { scopes: registrations.map((r) => { const w = r.active ?? r.waiting ?? r.installing; return { scope: r.scope, active: w?.state ?? null, script: w?.scriptURL ?? null }; }), controller: navigator.serviceWorker.controller?.scriptURL ?? null, caches: caches_ };
 })()`);
 
 export async function api(path, body, method = 'POST') {

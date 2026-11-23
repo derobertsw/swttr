@@ -5,6 +5,7 @@
  * brief arrived and checked out, so a save that didn't finish never replaces
  * the copy that's there. See docs/trip-offline-brief.md.
  */
+import { removeStartPageRedirect } from "@/lib/offline-shell";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { TripRequestError } from "@/lib/trip-requests";
 import type { TripOfflineBrief, TripOfflineBriefResponse } from "@/types/trip-offline-brief";
@@ -275,7 +276,11 @@ export async function removeSavedBrief(tripId: string): Promise<void> {
     if (remaining === 0) meta.delete("account");
     return remaining;
   });
-  if (left === 0) setHint(null);
+  if (left === 0) {
+    setHint(null);
+    // Nothing left to open offline, so the start page stops sending people there.
+    await removeStartPageRedirect();
+  }
 }
 
 /**
@@ -297,7 +302,10 @@ export async function clearSavedBriefs(owner?: string): Promise<boolean> {
     meta.put({ key: "generation", value: generationOf(generation) + 1 });
     return true;
   });
-  if (cleared) setHint(null);
+  if (cleared) {
+    setHint(null);
+    await removeStartPageRedirect();
+  }
   return cleared;
 }
 
