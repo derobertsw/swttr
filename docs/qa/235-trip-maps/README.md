@@ -289,7 +289,7 @@ Both boxes again, on current `main`. This run adds three things the November 19 
 
 | | |
 | --- | --- |
-| Implementation checked | `main` at `10f2308d69bbc86f30a7c1a73b44e35ce6f2f2ba` ("Test the support and privacy links App Review relies on (#140) (#416)"). No app code changed in this PR. |
+| Implementation checked | `main` at `10f2308ea69caa94d19a85380db8f71dcca488df` ("Test the support and privacy links App Review relies on (#140) (#416)"). No app code changed in this PR. |
 | Before (box 6) | `f766f581d17c19f005435948b84967094bad028d` (#320), the parent of `8e4b389` (#319), which was the first map commit (#232's map data foundation) |
 | Build | `next build --turbopack` with `preview-auth.mjs`. Now uses Next.js 16.4.6 on `127.0.0.1:3435`. Before uses 16.4.0 on `localhost:3437`; its build stopped with the upgrade nudge after writing complete output. |
 | Browser | Headless Chrome 157.0.8103.79 over the DevTools Protocol, 1440 × 1000 at 2× |
