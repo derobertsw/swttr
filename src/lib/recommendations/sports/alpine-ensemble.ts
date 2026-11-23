@@ -1,3 +1,4 @@
+import type { HoodHeadPlanner } from '../extremities';
 import type { PhaseTargets } from '../thermal-targets';
 import type { CategorizedGarments, GarmentRow } from '../types';
 import { buildRegionalEnsemble, findRegionalInsulationCapacity } from './regional-ensemble';
@@ -11,24 +12,29 @@ const puffyFitsUnder = (outer: GarmentRow) => outer.category === 'hard_shell';
  * complete combinations so an insulated outer can replace a shell and its
  * warmth is budgeted before adding a mid. Never add duplicate layers just to
  * meet an unreachable target; scoring still reports the remaining shortfall.
+ * With `head`, the distance also counts what the outfit's hoods leave for
+ * the helmet and hat chosen afterwards (#413).
  */
 export function buildAlpineEnsemble(
   categorized: CategorizedGarments,
   targets: PhaseTargets['regional'],
-  precipitation: boolean
+  precipitation: boolean,
+  head?: HoodHeadPlanner,
 ): GarmentRow[] {
   return buildRegionalEnsemble(categorized, targets, {
     puffyFitsUnder,
+    ...(head ? { hoodClo: (garment: GarmentRow) => head.hoodClo([garment]) } : {}),
     rank: (candidate) => {
       const missingCoverage = candidate.missingBase + candidate.missingOuter;
       const wetExposure = precipitation ? candidate.missingWaterproof : 0;
       const { excess, deficit, surplus, breathability, count } = candidate;
+      const headGap = head?.gap(candidate.hoodClo);
       // Keep base/outer coverage and rain protection, then minimize the
-      // total distance outside each region's min–neutral band: a small
-      // torso excess must not outweigh an avoidable arms deficit, and a
-      // large torso excess must not buy a small arms gain. Among equally
-      // close outfits, prefer fewer, lighter layers.
-      const targetDistance = deficit + excess;
+      // total distance outside each region's min–neutral band, the head's
+      // included: a small torso excess must not outweigh an avoidable arms
+      // deficit, and a large torso excess must not buy a small arms gain.
+      // Among equally close outfits, prefer fewer, lighter layers.
+      const targetDistance = deficit + excess + (headGap ? headGap.deficit + headGap.excess : 0);
       return [missingCoverage, wetExposure, targetDistance, count, surplus, -breathability];
     },
   });

@@ -3,6 +3,7 @@
  * with cycling's protection needs, eligibility and requirement labels.
  */
 import type { SustainedSportPolicy } from '@/lib/biophysics/sport-policy';
+import type { HoodHeadPlanner } from '../extremities';
 import type { PhaseTargets } from '../thermal-targets';
 import type { CategorizedGarments, GarmentRow } from '../types';
 import { buildRunningEnsemble, isLightRequirement, protectionSuffix, type OutfitProtection } from './running-outfit';
@@ -27,8 +28,9 @@ export function buildCyclingEnsemble(
   targets: PhaseTargets,
   minEvapPotential: number,
   needs: OutfitProtection,
+  head?: HoodHeadPlanner,
 ): GarmentRow[] {
-  return buildRunningEnsemble(categorized, targets, minEvapPotential, { needs, eligible: cyclingEligible });
+  return buildRunningEnsemble(categorized, targets, minEvapPotential, { needs, eligible: cyclingEligible, head });
 }
 
 export function cyclingRequirementLabel(targets: PhaseTargets, region: Region, needs: OutfitProtection | undefined): string {
