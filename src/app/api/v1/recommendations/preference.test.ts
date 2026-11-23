@@ -65,8 +65,10 @@ const CONDITIONS = [
   { weather: { temperature: 10, wind_speed: 12 }, exertion: 'moderate' },
   { weather: { temperature: 36, wind_speed: 8, humidity: 95, precipitation: true, precipitation_type: 'rain' }, exertion: 'moderate' },
   // Since #375 removed the leg bias, standard running outfits sit lower in their
-  // bands; Run Warm's lighter choice shows at an easy, breezy 45°F.
-  { weather: { temperature: 45, wind_speed: 8 }, exertion: 'easy' },
+  // bands. Since #413 the standard choice counts hood head warmth, and at an
+  // easy, breezy 45°F it already matches Run Warm's; the lighter choice shows
+  // at a breezy 25°F.
+  { weather: { temperature: 25, wind_speed: 8 }, exertion: 'moderate' },
 ];
 
 describe('which setting a request uses', () => {

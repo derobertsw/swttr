@@ -2,6 +2,7 @@ import { predictEnsembleThermal } from '@/lib/biophysics/ensemble';
 import { THERMAL_DISPLAY_CLO_EPSILON } from '@/lib/biophysics/comfort';
 import { ensembleToThermalGarments } from '../formatting';
 import { garmentCapabilities, hasUsableThermalData } from '../garment-semantics';
+import type { HoodHeadPlanner } from '../extremities';
 import type { PhaseTargets } from '../thermal-targets';
 import type { GarmentRow } from '../types';
 
@@ -26,14 +27,17 @@ export function xcProtection(outfit: GarmentRow[], region: Region, needs: Needs)
     && (!needs.wet || outfit.some(g => covers(g, part) && garmentCapabilities(g).wet)));
 }
 
-/** Shared prediction with final/manual evaluation; never reapply coverage. */
-export function xcRegionFit(outfit: GarmentRow[], targets: PhaseTargets['regional'], region: Region) {
+/** Shared prediction with final/manual evaluation; never reapply coverage.
+ * With `head`, the fit also counts what the outfit's hoods leave for the
+ * head accessories chosen afterwards (#413). */
+export function xcRegionFit(outfit: GarmentRow[], targets: PhaseTargets['regional'], region: Region, head?: HoodHeadPlanner) {
   const props = predictEnsembleThermal(ensembleToThermalGarments(outfit));
   const clo = { torso: props.rcl.torso, arms: props.rcl.arm, legs: props.rcl.leg };
   const sum = (fn: (part: 'torso' | 'arms' | 'legs') => number) => parts(region).reduce((n, p) => n + fn(p), 0);
+  const headGap = head?.gap(head.hoodClo(outfit)) ?? { deficit: 0, excess: 0 };
   return {
-    deficit: sum(p => Math.max(0, targets.min[p] - clo[p] - THERMAL_DISPLAY_CLO_EPSILON)),
-    excess: sum(p => Math.max(0, clo[p] - targets.neutral[p])),
+    deficit: sum(p => Math.max(0, targets.min[p] - clo[p] - THERMAL_DISPLAY_CLO_EPSILON)) + headGap.deficit,
+    excess: sum(p => Math.max(0, clo[p] - targets.neutral[p])) + headGap.excess,
     // Same bounded wardrobe mismatch allowance as the running/XC contract.
     severeExcess: sum(p => Math.max(0, clo[p] - targets.neutral[p] - 0.15)),
   };

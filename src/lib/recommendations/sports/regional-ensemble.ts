@@ -21,6 +21,8 @@ interface OutfitTotals {
   breathability: number;
   unbreathable: number;
   count: number;
+  /** Head insulation from hoods, as `SearchOptions.hoodClo` counts it. */
+  hoodClo: number;
 }
 
 interface GarmentFeatures extends OutfitTotals {
@@ -43,12 +45,16 @@ interface OutfitRankInput {
   count: number;
   breathability: number;
   unbreathable: number;
+  /** Head insulation the outfit's hoods add (0 without `SearchOptions.hoodClo`). */
+  hoodClo: number;
 }
 
 interface SearchOptions {
   puffyFitsUnder: (outer: GarmentRow) => boolean;
   rank: (outfit: OutfitRankInput) => number[];
   breathableFrom?: Record<Layer, number>;
+  /** Head insulation one garment's hood adds (#413); hoods count as 0 without it. */
+  hoodClo?: (garment: GarmentRow) => number;
   /** Sport-specific rank; null rejects a candidate. Alpine keeps its original rank. */
   assess?: (outfit: GarmentRow[], region: 'torso' | 'legs') => number[] | null;
 }
@@ -56,7 +62,7 @@ interface SearchOptions {
 const EMPTY: OutfitTotals = {
   baseMask: 0, outerMask: 0, wearableMask: 0, waterproofMask: 0,
   torsoClo: 0, armsClo: 0, legsClo: 0,
-  breathability: 0, unbreathable: 0, count: 0,
+  breathability: 0, unbreathable: 0, count: 0, hoodClo: 0,
 };
 
 function layer(garment: GarmentRow): Layer {
@@ -65,7 +71,9 @@ function layer(garment: GarmentRow): Layer {
   return 'mid';
 }
 
-function features(garment: GarmentRow, options: Pick<SearchOptions, 'puffyFitsUnder' | 'breathableFrom'>): GarmentFeatures {
+type FeatureOptions = Pick<SearchOptions, 'puffyFitsUnder' | 'breathableFrom' | 'hoodClo'>;
+
+function features(garment: GarmentRow, options: FeatureOptions): GarmentFeatures {
   const slot = layer(garment);
   // Bibs insulate the torso but sit underneath its jacket, occupying only leg slots.
   const occupancy = (garment.covers_torso && !(garment.covers_legs && !garment.covers_arms) ? TORSO : 0) |
@@ -87,6 +95,7 @@ function features(garment: GarmentRow, options: Pick<SearchOptions, 'puffyFitsUn
     breathability,
     unbreathable: options.breathableFrom && breathability < options.breathableFrom[slot] ? 1 : 0,
     count: 1,
+    hoodClo: options.hoodClo?.(garment) ?? 0,
     puffy: garment.category === 'insulation_down' || garment.category === 'insulation_synthetic',
     acceptsPuffy: slot === 'outer' && options.puffyFitsUnder(garment),
   };
@@ -94,7 +103,7 @@ function features(garment: GarmentRow, options: Pick<SearchOptions, 'puffyFitsUn
 
 function garmentPools(
   categorized: CategorizedGarments,
-  options: Pick<SearchOptions, 'puffyFitsUnder' | 'breathableFrom'>
+  options: FeatureOptions
 ): Record<Layer, GarmentFeatures[]> {
   return {
     base: categorized.baseLayers.map((g) => features(g, options)),
@@ -219,6 +228,7 @@ function extend(prefix: OutfitTotals, item: GarmentFeatures | undefined): Outfit
     breathability: prefix.breathability + item.breathability,
     unbreathable: prefix.unbreathable + item.unbreathable,
     count: prefix.count + 1,
+    hoodClo: prefix.hoodClo + item.hoodClo,
   };
 }
 
@@ -285,6 +295,7 @@ export function buildRegionalEnsemble(
             count: partial.count + (outer ? 1 : 0),
             breathability: partial.breathability + (outer?.breathability ?? 0),
             unbreathable: partial.unbreathable + (outer?.unbreathable ?? 0),
+            hoodClo: partial.hoodClo + (outer?.hoodClo ?? 0),
           });
           if (!candidateRank) continue;
           if (isBetter(candidateRank, bestRank)) {
