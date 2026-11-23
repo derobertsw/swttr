@@ -229,7 +229,7 @@ graph TD
         T1a --> T2a[Climb: regional search shared with alpine and XC<br/>torso/arms and legs fitted separately<br/>standalone garments allowed, no mandatory base]
         T2a --> T3a[Puffies and insulated outerwear excluded<br/>from the climb — pack items only<br/>Catalog: climb garments need an uphill score of 6]
         T3a --> T4a[Descent = climb clothing + pack:<br/>hard shell if the climb wore none<br/>a fleece or puffy and over-pants only where a region<br/>falls short of its descent minimum]
-        T4a --> T6a[Pack layers that reach the minimum first<br/>then share of the region's gap closed, a shortfall counting double an excess,<br/>traded against weight; a light pack weighs weight more and may stop short<br/>When none reaches it: smallest remaining gap, weight only breaks ties<br/>One over-pant of at most 1.8 clo in the catalog can leave cold descents short]
+        T4a --> T6a[Pack layers that reach the minimum first<br/>then share of the region's gap closed, a shortfall counting double an excess,<br/>traded against weight; a light pack weighs weight more and may stop short<br/>When none reaches it: smallest remaining gap, weight only breaks ties<br/>One over-pant; the catalog's warmest is a 2.4 clo belay pant, #412<br/>Legs still short: guidance says the pack won't fully cover them]
         T6a --> T5a[Transition protocol:<br/>urgent / quick / normal<br/>names the insulation and leg layer to add]
         T5a --> T7a[Vent advice: the climb follows the shared rules<br/>Close vents at the transition, a protocol step<br/>Keep them closed for the descent]
     end

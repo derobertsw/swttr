@@ -9,6 +9,7 @@ import type { ExertionLevel } from '@/lib/biophysics/exertion';
 import { applyBodySizeMetabolicAdjustment } from '@/lib/biophysics/bodyMetrics';
 import { COWEDA_VALIDATION_SOURCE } from '@/lib/biophysics/coweda';
 import type { IreqResult } from '@/types/garments';
+import type { PhaseEvaluation } from '@/types/biophysics';
 import type { SportRecommender } from '../handler';
 import type { CategorizedGarments, GarmentRow } from '../types';
 import { OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
@@ -326,6 +327,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         ...(downhillResult.recommendation.evaluation?.decision?.reasons ?? []).map(r => `Descent: ${r}`),
         climbProtectionGuidance(targets.climbProtection, pack.shell),
         ...(pack.legs ? [`Descent: put ${pack.legs.brand} ${pack.legs.model_name} on over your climbing layers. Pants with full side zips go on over ski boots.`] : []),
+        ...descentLegsGuidance(downhillResult.recommendation.evaluation),
         ...generateTouringGuidance(tempC, targets.uphillIreq, targets.downhillIreq),
       ],
       ...(ventilation && { ventilation }),
@@ -363,6 +365,16 @@ function climbProtectionGuidance(needs: ClimbProtection, packedShell: GarmentRow
   return packedShell
     ? `Climb: no wind or wet protection is needed while climbing, so the ${packedShell.brand} ${packedShell.model_name} stays in the pack until the descent.`
     : 'Climb: no wind or wet protection is needed while climbing.';
+}
+
+/**
+ * Say plainly when the pack can't bring the legs up to the descent minimum
+ * (#412). Only one leg layer goes on at the transition, so a cold descent can
+ * stay short; the evaluation still reports the gap.
+ */
+function descentLegsGuidance(evaluation: PhaseEvaluation | undefined): string[] {
+  if (evaluation?.bodyParts?.legs?.status !== 'under') return [];
+  return ["Descent: your packed layers won't fully cover your legs on the descent. Bring warmer over-pants with full side zips, or climb in warmer pants and open their vents."];
 }
 
 // ============================================
