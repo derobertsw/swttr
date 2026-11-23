@@ -68,16 +68,22 @@ const ALSO_KNOWN_AS: Record<string, readonly string[]> = {
   headlamp: ["Head torch"],
 };
 
-type WornItem = Pick<PackingItem, "key" | "name" | "bodyPart" | "layerType">;
+type WornItem = Pick<PackingItem, "key" | "name" | "bodyPart" | "layerType" | "days">;
 
 /**
  * Template items an outfit can list under a name of its own: a helmet from
  * the wardrobe or catalog is worn as the head's outer layer and named for its
  * model ("Smith Vantage MIPS"), so its name alone doesn't say it's a helmet.
+ * Only items worn on a Backcountry day count: recommendations put a ski
+ * helmet in that slot there, while a biking day's would be a bike helmet,
+ * which doesn't stand in for one (REQUIRED_HELMET_TYPES).
  */
 const WORN_AS: Partial<Record<string, (item: WornItem) => boolean>> = {
   helmet: (item) => item.bodyPart === "headNeck" && item.layerType === "outer" && item.key.startsWith("item:"),
 };
+
+const wornOn = (item: WornItem, dates: ReadonlySet<string>) =>
+  item.days.some((day) => dates.has(day.date) && day.uses.includes("wear"));
 
 const TEMPLATE_IDS: ReadonlySet<string> = new Set(TOURING_EQUIPMENT.map((item) => item.id));
 
@@ -103,7 +109,7 @@ export function readEquipment(value: unknown): PackingEquipmentChoices {
  * their list (outfit items and items added by hand): a template item they
  * already have under one of its names shows as listed, so the preview doesn't
  * suggest adding it twice. `worn` are the outfit items in their list: a
- * helmet worn in an outfit lists the template's helmet the same way. A name
+ * helmet worn on one of `dates` lists the template's helmet the same way. A name
  * never carries a packing check across.
  */
 export function buildTouringEquipment({ dates, saved, names, worn = [], editable }: {
@@ -114,11 +120,12 @@ export function buildTouringEquipment({ dates, saved, names, worn = [], editable
   editable: boolean;
 }): TouringEquipment {
   const byName = new Map(names.map((name) => [identityText(name), name]));
+  const touringDays = new Set(dates);
   const template: EquipmentTemplateOption[] = TOURING_EQUIPMENT.map((item) => {
     if (saved[item.id]?.status === "added") return { ...item, state: "added" };
     const wornAs = WORN_AS[item.id];
     const listedAs = [item.name, ...ALSO_KNOWN_AS[item.id] ?? []].map((name) => byName.get(identityText(name))).find((name) => name !== undefined)
-      ?? (wornAs && worn.find(wornAs)?.name);
+      ?? (wornAs && worn.find((w) => wornAs(w) && wornOn(w, touringDays))?.name);
     if (listedAs) return { ...item, state: "listed", listedAs };
     return { ...item, state: saved[item.id]?.status === "removed" ? "removed" : "available" };
   });

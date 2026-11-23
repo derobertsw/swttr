@@ -37,18 +37,26 @@ describe("touring equipment", () => {
     });
   });
 
-  it("lists the helmet as the one worn in an outfit, under its model's name", () => {
+  it("lists the helmet as the one worn on a Backcountry day, under its model's name", () => {
+    const tour = [{ date: "2026-02-13", uses: ["wear" as const] }];
     const worn = [
-      { key: "item:hw-1", name: "Smith Vantage MIPS", bodyPart: "headNeck" as const, layerType: "outer" as const },
-      { key: "item:hw-2", name: "Smartwool Merino Beanie", bodyPart: "headNeck" as const, layerType: "base" as const },
+      { key: "item:hw-1", name: "Smith Vantage MIPS", bodyPart: "headNeck" as const, layerType: "outer" as const, days: tour },
+      { key: "item:hw-2", name: "Smartwool Merino Beanie", bodyPart: "headNeck" as const, layerType: "base" as const, days: tour },
     ];
-    const equipment = buildTouringEquipment({ dates: [], saved: {}, names: worn.map((item) => item.name), worn, editable: true });
+    const dates = ["2026-02-13"];
+    const equipment = buildTouringEquipment({ dates, saved: {}, names: worn.map((item) => item.name), worn, editable: true });
     expect(states(equipment)).toMatchObject({ helmet: "listed:Smith Vantage MIPS" });
     // A general guide's goggles share the slot, but aren't a wardrobe or catalog item.
-    const goggles = [{ key: "general:headNeck:outer:goggles", name: "Goggles", bodyPart: "headNeck" as const, layerType: "outer" as const }];
-    expect(states(buildTouringEquipment({ dates: [], saved: {}, names: ["Goggles"], worn: goggles, editable: true }))).toMatchObject({ helmet: "available" });
+    const goggles = [{ key: "general:headNeck:outer:goggles", name: "Goggles", bodyPart: "headNeck" as const, layerType: "outer" as const, days: tour }];
+    expect(states(buildTouringEquipment({ dates, saved: {}, names: ["Goggles"], worn: goggles, editable: true }))).toMatchObject({ helmet: "available" });
+    // A biking day's helmet is a bike helmet, which doesn't stand in for a ski helmet.
+    const bike = [{ key: "item:hw-3", name: "Giro Syntax MIPS", bodyPart: "headNeck" as const, layerType: "outer" as const, days: [{ date: "2026-02-14", uses: ["wear" as const] }] }];
+    expect(states(buildTouringEquipment({ dates, saved: {}, names: ["Giro Syntax MIPS"], worn: bike, editable: true }))).toMatchObject({ helmet: "available" });
+    // Only carried on the Backcountry day, it isn't the one worn on the descent.
+    const carried = [{ ...worn[0], days: [{ date: "2026-02-13", uses: ["carry" as const] }] }];
+    expect(states(buildTouringEquipment({ dates, saved: {}, names: [], worn: carried, editable: true }))).toMatchObject({ helmet: "available" });
     // Added from the template, it's the template's own, whatever the outfit wears.
-    expect(states(buildTouringEquipment({ dates: [], saved: { helmet: { status: "added", quantity: 1 } }, names: [], worn, editable: true })))
+    expect(states(buildTouringEquipment({ dates, saved: { helmet: { status: "added", quantity: 1 } }, names: [], worn, editable: true })))
       .toMatchObject({ helmet: "added" });
   });
 
