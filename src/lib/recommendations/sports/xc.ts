@@ -2,6 +2,7 @@
 import { OUTER_AIR_PERMEABILITY } from '@/lib/biophysics/constants';
 import { needsXCWindProtection, xcPhaseContext } from '@/lib/biophysics/xc-policy';
 import { exertionToXcIntensity } from '@/lib/biophysics/exertion';
+import type { HoodHeadPlanner } from '../extremities';
 import type { PhaseTargets } from '../thermal-targets';
 import type { CategorizedGarments, GarmentRow } from '../types';
 import { hasUsableThermalData } from '../garment-semantics';
@@ -21,6 +22,7 @@ export function buildXCEnsemble(
   targets: PhaseTargets['regional'],
   minEvapPotential: number,
   needs: { wind: boolean; wet: boolean },
+  head?: HoodHeadPlanner,
 ): GarmentRow[] {
   const known: CategorizedGarments = {
     baseLayers: categorized.baseLayers.filter(hasUsableThermalData),
@@ -36,7 +38,7 @@ export function buildXCEnsemble(
       const regional = outfit.filter(g => g[`covers_${region}`]);
       const basic = xcBasic(outfit, region);
       if (regional.length && !basic) return null;
-      const { deficit, excess, severeExcess } = xcRegionFit(outfit, targets, region);
+      const { deficit, excess, severeExcess } = xcRegionFit(outfit, targets, region, head);
       return [
         Number(!xcProtection(outfit, region, needs)),
         needs.wet ? Number(!regional.some(g => g.garment_protection?.waterproof_rating === 'waterproof'
@@ -65,8 +67,8 @@ export const xc = createSinglePhaseSport({
   minEvapPotential: MIN_EVAP_POTENTIAL,
   catalog: { minScore: { field: 'xc_skiing_score', minScore: 6 } },
   /** Select the moving outfit against regional targets and required protection. */
-  buildEnsemble: (categorized, targets) =>
-    buildXCEnsemble(categorized, targets.regional, MIN_EVAP_POTENTIAL, targets.policy!.protection),
+  buildEnsemble: (categorized, targets, _request, head) =>
+    buildXCEnsemble(categorized, targets.regional, MIN_EVAP_POTENTIAL, targets.policy!.protection, head),
   /** Preserve the selected outfit and report only the protection each region actually lacks. */
   protect: (ensemble, _categorized, targets) => {
     const needs = targets.policy!.protection;

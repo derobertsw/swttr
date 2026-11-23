@@ -23,7 +23,7 @@ import {
   phaseTargets,
   type PhaseTargets,
 } from '../thermal-targets';
-import { selectPhaseAccessories } from '../extremities';
+import { hoodHeadPlanner, selectPhaseAccessories, type HoodHeadPlanner } from '../extremities';
 import { buildScoredRecommendation } from '../response-builder';
 import { formatConditions, formatSinglePhaseIreq } from '../formatting';
 import { buildClothingRequirements, buildHelmetRequirement, filterUnsuitableEnsemble } from '../requirements';
@@ -62,10 +62,12 @@ interface SinglePhaseSportConfig {
   /** Evaporative potential a layer should reach to count as breathable. */
   minEvapPotential: number;
   catalog?: CatalogFilter;
+  /** `head` counts hood head warmth the way the accessories and outfit check do (#413). */
   buildEnsemble(
     categorized: CategorizedGarments,
     targets: SinglePhaseTargets,
-    request: RecommendationRequest
+    request: RecommendationRequest,
+    head: HoodHeadPlanner,
   ): GarmentRow[];
   /** Extra fields echoed in `conditions` after temperature, wind and exertion. */
   conditions(request: RecommendationRequest): object;
@@ -163,7 +165,8 @@ export function createSinglePhaseSport(
         : undefined;
       /** Worn clothing for one set of targets, and the protection it still lacks. */
       const select = (phase: SinglePhaseTargets) => {
-        const built = config.buildEnsemble(pool.categorized, phase, request);
+        const head = hoodHeadPlanner(config.activity, phase, pool.headwear, request.tempC);
+        const built = config.buildEnsemble(pool.categorized, phase, request, head);
         const protectedOutfit = config.protect?.(built, pool.categorized, phase);
         const builtEnsemble = protectedOutfit?.ensemble ?? built;
         return {
