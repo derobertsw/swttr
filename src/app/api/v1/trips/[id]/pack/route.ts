@@ -216,6 +216,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
       dates: touringDates(full),
       saved: readEquipment(saved?.equipment),
       names: [...derived.map((item) => item.name), ...readManualItems(saved?.items).map((item) => item.name)],
+      worn: derived,
       editable: editable && packing.equipment,
     }),
     suggestions,

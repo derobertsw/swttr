@@ -1100,7 +1100,7 @@ describe("Trip day page", () => {
         [EQUIPMENT]: reply(200, { equipment: equipment({}), checks: {} }),
         "POST /api/v1/trips/trip-1/pack": reply(200, { manual: [], quantities: {}, checks: {}, equipment: {
           transceiver: { status: "added", quantity: 1 }, probe: { status: "added", quantity: 1 },
-          shovel: { status: "added", quantity: 1 }, skins: { status: "added", quantity: 1 },
+          shovel: { status: "added", quantity: 1 }, skins: { status: "added", quantity: 1 }, helmet: { status: "added", quantity: 1 },
         } }),
       });
       vi.stubGlobal("fetch", api);
@@ -1113,9 +1113,9 @@ describe("Trip day page", () => {
       const dialog = await screen.findByRole("dialog", { name: "Touring equipment" });
       await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-      expect(sentBodies(api, "POST /api/v1/trips/trip-1/pack")).toEqual([{ op: "add_equipment", ids: ["transceiver", "probe", "shovel", "skins"] }]);
+      expect(sentBodies(api, "POST /api/v1/trips/trip-1/pack")).toEqual([{ op: "add_equipment", ids: ["transceiver", "probe", "shovel", "skins", "helmet"] }]);
       const section = screen.getByRole("heading", { name: "My equipment" }).closest("section")!;
-      expect(within(section).getAllByText("Not packed yet")).toHaveLength(4);
+      expect(within(section).getAllByText("Not packed yet")).toHaveLength(5);
     });
 
     it("says when it can't load, and retries", async () => {

@@ -106,6 +106,11 @@ Line numbers are for `main` at `b4e63d7`, plus this PR's changes where it says s
 - **Phone and VoiceOver.** The checkbox names, and the announced save and error states.
 - **Copy review.** A qualified ski-touring practitioner needs to review the equipment template and day-check copy. The issue requires this before release.
 
+**Owner decisions (#212), November 22, 2026.**
+
+- **#358's choices accepted as built.** #358 listed four choices made without asking. The owner accepted all of them: the shared touring items (First aid kit, Repair kit, Group shelter) are all suggested and start selected; they're added unassigned, for the organizer to assign in the list; a removed one is suggested again next time, with no You removed group; and saves run one item at a time, not in one transaction, so a failure partway keeps the items before it and says so. Nothing changes in the code. Row 5's evidence stands.
+- **The helmet is suggested.** The personal template had the helmet as Optional, while the descent's clothing advice calls a ski helmet required protection in any weather. The owner chose required in both: the helmet moved to Suggested additions (selected to start with), with the purpose "Head protection on the descent, in any weather." A helmet worn in a saved outfit lists it as Already in your list, so it isn't suggested twice. Template choices are stored by id with no group, so existing trips need no migration: a helmet someone added stays added, one they removed stays under You removed, and for everyone else it's preselected the next time they open the template. Nothing is added to anyone's list by itself. The practitioner review packet's EQ7 and question 4 now ask the reviewer to confirm this.
+
 ## #329 release acceptance (parent)
 
 None of these can be ticked from code alone. They're #337's evidence:

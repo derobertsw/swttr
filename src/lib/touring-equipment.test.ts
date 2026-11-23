@@ -5,9 +5,10 @@ const states = (equipment: ReturnType<typeof buildTouringEquipment>) =>
   Object.fromEntries(equipment.template.map((option) => [option.id, option.listedAs ? `${option.state}:${option.listedAs}` : option.state]));
 
 describe("touring equipment", () => {
-  it("has the rescue gear as suggested additions, with unique ids", () => {
+  it("has the rescue gear and the helmet as suggested additions, with unique ids", () => {
     const suggested = TOURING_EQUIPMENT.filter((item) => item.tier === "suggested").map((item) => item.id);
-    expect(suggested).toEqual(expect.arrayContaining(["transceiver", "probe", "shovel"]));
+    expect(suggested).toEqual(["transceiver", "probe", "shovel", "skins", "helmet"]);
+    expect(TOURING_EQUIPMENT.filter((item) => item.tier === "optional").map((item) => item.id)).toEqual(["airbag", "ski_crampons", "headlamp"]);
     expect(new Set(TOURING_EQUIPMENT.map((item) => item.id)).size).toBe(TOURING_EQUIPMENT.length);
     expect(TOURING_EQUIPMENT.every((item) => /^[a-z][a-z0-9_]{0,39}$/.test(item.id) && item.purpose.length > 0)).toBe(true);
   });
@@ -34,6 +35,21 @@ describe("touring equipment", () => {
       transceiver: "added", probe: "available", shovel: "added", skins: "available",
       airbag: "removed", ski_crampons: "available", helmet: "available", headlamp: "listed:Head Torch",
     });
+  });
+
+  it("lists the helmet as the one worn in an outfit, under its model's name", () => {
+    const worn = [
+      { key: "item:hw-1", name: "Smith Vantage MIPS", bodyPart: "headNeck" as const, layerType: "outer" as const },
+      { key: "item:hw-2", name: "Smartwool Merino Beanie", bodyPart: "headNeck" as const, layerType: "base" as const },
+    ];
+    const equipment = buildTouringEquipment({ dates: [], saved: {}, names: worn.map((item) => item.name), worn, editable: true });
+    expect(states(equipment)).toMatchObject({ helmet: "listed:Smith Vantage MIPS" });
+    // A general guide's goggles share the slot, but aren't a wardrobe or catalog item.
+    const goggles = [{ key: "general:headNeck:outer:goggles", name: "Goggles", bodyPart: "headNeck" as const, layerType: "outer" as const }];
+    expect(states(buildTouringEquipment({ dates: [], saved: {}, names: ["Goggles"], worn: goggles, editable: true }))).toMatchObject({ helmet: "available" });
+    // Added from the template, it's the template's own, whatever the outfit wears.
+    expect(states(buildTouringEquipment({ dates: [], saved: { helmet: { status: "added", quantity: 1 } }, names: [], worn, editable: true })))
+      .toMatchObject({ helmet: "added" });
   });
 
   it("shows a saved change without reading the list again", () => {
