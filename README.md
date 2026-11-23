@@ -159,25 +159,32 @@ Cycling (#371) uses the same complete-outfit search, regional checks and require
 
 Alpine and XC compare complete base + optional mid/puffy + outer combinations for each region, accounting for outer-layer warmth before choosing a mid. They allow at most one item in each slot per covered region, including items that span multiple regions, so insulated outerwear takes the outer slot and no shell goes over it. Alpine puts a puffy only under a hard shell; XC allows one under any shell, but not under insulated outerwear. Regional budgets use the same thermal regression coefficients as ensemble scoring. Bibs cover the torso but sit under a jacket, so they fill only the legs slots. After preserving coverage and rain protection, alpine minimizes each region's combined shortfall below its minimum and excess above its neutral target, so a small overshoot never loses to a large shortfall and a large overshoot never buys a small gain. XC uses the same regional enumeration with a separate assessment: reviewed standalone coverage, actual wind/wet protection, excessive warmth before filling clothing gaps, then regional thermal fit and breathability. It permits one suitable Nordic tight or pant without an extra base or outer. XC requirements assess the selected combination, including all its warmth and protection. XC never leaves a region in underwear alone. The ski-touring climb (#372) uses the same regional enumeration with its own assessment. No base layer is mandatory, so a reviewed standalone garment can be worn alone. A hard shell or windbreaker is worn only when the climb needs wind or wet protection, or when nothing else can cover a region; otherwise it stays in the pack. Puffies and insulated outerwear always stay in the pack. The climb ranks: every region covered, no unneeded protective shell, required protection (waterproof preferred when wet), a layer that can sit next to skin, no severe excess, more than thermal underwear alone, then regional fit, breathability and fewer layers. Weather-protection scoring counts windbreakers and insulated outerwear as shells. When targets cannot be met, alpine returns the best available wearable combination. Regional warnings require both a shortfall and an available wearable alternative that could reduce it by more than 0.12 clo while preserving coverage and rain protection. The thermal comfort score and overall cold warnings still report cold conditions when regional targets are unreachable.
 
+Every selector that chooses torso layers before the head (running, cycling, alpine, XC, the touring climb and the descent pack's upper-body layer) counts what a hood does to the head (#413). It credits a hood as the outfit check does (`hoodInsulation`: 0.45 of the hood-up value, only helmet-compatible hoods under a required helmet), then asks the accessory selector's own head choice (`hoodHeadPlanner` in `src/lib/recommendations/extremities.ts`) how far outside the head band the hat and neck piece chosen over that hood would still leave the head. That remaining shortfall or excess, in clo of the head itself, joins the regional fit term. A hood that leaves the head in band costs nothing, so a hooded top competes freely; one that pushes the head over, or two hoods where one and a hat would fit, lose to an outfit that fits as well without them; and where no hat fits, a hood that fills the head's gap counts in its favour. Protection ranks before fit, so a required shell is still worn whatever its hood, and the descent's mandatory hard shell is chosen as protection. Whether a hood worn down should count at all is #415.
+
 ```mermaid
 graph TD
     START[Target Clo Range from Pipeline] --> RUNNING{Running or cycling?}
     RUNNING -->|Yes| RUNOPT[Compare complete top and leg outfit combinations<br/>Standalone coverage without mandatory thermal bases<br/>Short sleeves and shorts allowed<br/>Running: exclude unreviewed ski bibs and insulated outers<br/>Cycling: exclude unreviewed ski bibs; insulation allowed]
     RUNOPT --> RCACHE[Cache regional contributions and partial totals<br/>Fix torso/arms + leg garments; prune inferior regional choices]
-    RCACHE --> RUNRANK[Actual wind/rain protection, then excess warmth<br/>Clothing coverage, thermal fit, layers, breathability]
+    RCACHE --> RUNRANK[Actual wind/rain protection, then excess warmth<br/>Clothing coverage, thermal fit with the head's hood gap, layers, breathability]
     RUNRANK --> RUNREQ[Evaluate with shared regional regression and targets<br/>Match selected combinations or report missing basics<br/>Distinguish best available clothing from absent basics<br/>Cycling forwards its checks to manual edits]
     RUNNING -->|No| SPORT[Alpine, XC or touring climb]
     SPORT --> CACHE[Cache garment features once<br/>Reuse prefix and base/mid totals]
     CACHE --> COMB[Compare optional base, mid/puffy and outer<br/>for torso, then legs<br/>XC and the touring climb can use a standalone garment]
     COMB --> CAP[One item per slot per covered region<br/>Insulated outer replaces shell<br/>Bibs fill leg slots under a jacket]
     CAP --> RANK{Sport}
-    RANK -->|Alpine| REG[Preserve coverage and rain protection<br/>Minimize combined shortfall and excess, then layers]
+    RANK -->|Alpine| REG[Preserve coverage and rain protection<br/>Minimize combined shortfall and excess, the head's hood gap included, then layers]
     REG --> WARM[Search all compatible outfit combinations for regional maxima<br/>Keep selected coverage and rain protection]
     WARM --> WARN[Warn only when a regional shortfall<br/>can be reduced by more than 0.12 clo]
-    RANK -->|XC| XREG[Actual full-region wind/wet protection<br/>Bound excess, require reviewed standalone coverage<br/>Fit regional bands, then breathable and fewer layers]
+    RANK -->|XC| XREG[Actual full-region wind/wet protection<br/>Bound excess, require reviewed standalone coverage<br/>Fit regional bands and the head's hood gap, then breathable and fewer layers]
     XREG --> XREQ[Match selected combinations or report gaps<br/>Carry stop warmth separately]
-    RANK -->|Touring climb| TREG[Cover every region, no unneeded protective shell, wind/wet protection<br/>A layer next to skin, no severe excess, more than underwear alone<br/>Fit regional bands, then breathable and fewer layers<br/>Puffies and insulated outers stay in the pack]
-    TREG --> TPACK[Descent pack per region, only where it falls short of the descent minimum:<br/>hard shell if the climb wore none, a fleece or puffy for torso/arms,<br/>over-pants for the legs]
+    RANK -->|Touring climb| TREG[Cover every region, no unneeded protective shell, wind/wet protection<br/>A layer next to skin, no severe excess, more than underwear alone<br/>Fit regional bands and the head's hood gap, then breathable and fewer layers<br/>Puffies and insulated outers stay in the pack]
+    TREG --> TPACK[Descent pack per region, only where it falls short of the descent minimum:<br/>hard shell if the climb wore none, a fleece or puffy for torso/arms<br/>whose gap counts the descent head's hood gap, over-pants for the legs]
+    HOODGAP[Hood gap: hood credit as the outfit check counts it<br/>Head choice the accessory selector would make over it<br/>Remaining shortfall or excess beyond tolerance, head clo] -.-> RUNRANK
+    HOODGAP -.-> REG
+    HOODGAP -.-> XREG
+    HOODGAP -.-> TREG
+    HOODGAP -.-> TPACK
 ```
 
 ### 4. Sport Ensemble Variants
@@ -196,14 +203,14 @@ graph TD
         RUN --> R1[Standalone top and shorts or tights<br/>Optional base, mid and outer combinations]
         R1 --> R2[Fix shared garments, prune regional choices<br/>Pair survivors using cached shared-model contributions<br/>One item per layer slot and covered region]
         R2 --> R3[Same regional ensemble model and targets<br/>as final and manual evaluation]
-        R3 --> R4[Protection and thermal fit before breathability<br/>Missing suitable basics remain clothing gaps]
+        R3 --> R4[Protection and thermal fit before breathability<br/>Fit counts the hood's head gap<br/>Missing suitable basics remain clothing gaps]
         R4 --> R5[Reasons describe worn outfit<br/>Stop layers are separate]
     end
 
     subgraph "Biking — running's complete outfit search"
         BIKE --> B1[Standalone top and shorts or tights<br/>Optional base, mid or puffy and outer<br/>Insulated outerwear allowed, ski bibs excluded]
         B1 --> B2[Cycling protection policy, ambient wind only:<br/>wind at or below 0°C or over 8 m/s<br/>rain in any precipitation]
-        B2 --> B3[Protective outer counted in the regional fit<br/>Same regional model and targets<br/>as final and manual evaluation]
+        B2 --> B3[Protective outer counted in the regional fit<br/>Hood head gap counted as in running<br/>Same regional model and targets<br/>as final and manual evaluation]
         B3 --> B4[Clothing requirements and gaps<br/>Targets assume a windproof outer and riding air speed]
     end
 
@@ -211,7 +218,7 @@ graph TD
         ALP --> A1[Compare complete regional outfits]
         A1 --> A2[One base + at most one mid/puffy<br/>+ one outer per region]
         A2 --> A3[Insulated outerwear occupies outer slot<br/>Puffies pair only with hard shells or no outer]
-        A3 --> A4[Budget all layers by regional clo<br/>Balance shortfalls against excess warmth]
+        A3 --> A4[Budget all layers by regional clo<br/>Balance shortfalls against excess warmth<br/>Helmet-compatible hoods count toward the head]
         A4 --> A5[60/40 ski-and-lift cycle IREQ<br/>at time-weighted metabolism and relative wind<br/>Convert cycle target to basic clo<br/>Exposure limit for the cycle<br/>Target heuristic follows the chairlift]
         A5 --> A6[Vent advice: skiing follows the shared rules<br/>Close vents for the chairlift]
     end
@@ -220,13 +227,13 @@ graph TD
         XC --> X1[Compare complete regional outfits:<br/>torso and legs independent]
         X1 --> X2[Standalone Nordic tights/pants or layered outfits<br/>Wind/wet needs follow exposure and precipitation<br/>Unknown usage and underwear alone cannot meet coverage]
         X2 --> X3[Insulated outerwear occupies outer slot<br/>Puffies fit under any shell, not insulated outerwear]
-        X3 --> X4[Actual protection, bounded excess, coverage and regional fit<br/>Then breathable and fewer layers]
+        X3 --> X4[Actual protection, bounded excess, coverage and regional fit<br/>with the hood's head gap, then breathable and fewer layers]
         X4 --> X5[Thin functional XC accessories use local bands<br/>Carry extra warmth for stops, outside moving score]
     end
 
     subgraph "Ski Touring"
         TOUR --> T1a[Triple-phase IREQ:<br/>uphill / downhill / transition]
-        T1a --> T2a[Climb: regional search shared with alpine and XC<br/>torso/arms and legs fitted separately<br/>standalone garments allowed, no mandatory base]
+        T1a --> T2a[Climb: regional search shared with alpine and XC<br/>torso/arms and legs fitted separately<br/>standalone garments allowed, no mandatory base<br/>fit counts the climb hood's head gap]
         T2a --> T3a[Puffies and insulated outerwear excluded<br/>from the climb — pack items only<br/>Catalog: climb garments need an uphill score of 6]
         T3a --> T4a[Descent = climb clothing + pack:<br/>hard shell if the climb wore none<br/>a fleece or puffy and over-pants only where a region<br/>falls short of its descent minimum]
         T4a --> T6a[Pack layers that reach the minimum first<br/>then share of the region's gap closed, a shortfall counting double an excess,<br/>traded against weight; a light pack weighs weight more and may stop short<br/>When none reaches it: smallest remaining gap, weight only breaks ties<br/>One over-pant; the catalog's warmest is a 2.4 clo belay pant, #412<br/>Legs still short: guidance says the pack won't fully cover them]
@@ -282,6 +289,8 @@ graph TD
 
 Every sport and phase chooses hand, head and neck warmth against its local min/max bands with one selector (`selectPhaseAccessories` in `src/lib/recommendations/extremities.ts`), under that phase's own policy. Running/XC take theirs from the sustained-activity policy: going without competes with known suitable gear, and functional XC gloves have a separate pole-grip purpose. Cycling, alpine and the ski-touring climb and descent (#370) keep gloves on whatever the thermal budget, so thin gloves up to XC's 0.33 clo liner allowance aren't judged as overheating. With no gloves available, the gloves are reported missing even when the hands need no warmth. Alpine and the touring descent wear a ski helmet and cycling a bike helmet, whatever the thermal budget; the helmet and any helmet-compatible hood count in the head budget (a worn hood at 0.45 of its hood-up value, the weight the bands were tuned with), only head warmth marked helmet-compatible is worn under it, and a helmet that alone exceeds the band sets the head's upper limit. When nothing fits, the nearest option wins, with a shortfall counting double an excess, so a much warmer item never wins just because it is the only one. Catalog temperature ratings (active for running, XC, cycling and the climb; static for alpine and the descent) check the heuristic bands in deep cold: items rated for these conditions win, the lightest rated item that reaches the band's minimum is preferred to a closer one that falls short, and the lightest rated choice sets the upper limit that scoring and manual checks use. Where no rated item reaches the band (descent and chairlift hands and head in deep cold), the warmest rated choice bounds the selection and the shortfall stays in the assessment, the warnings and the comfort verdict. The recommendation, the descent evaluation and manual edits are judged against the same reported limits (`ireq.extremity.max`, `descent_breakdown.extremity_ireq.max`). Helmets are required protection, kept apart from optional warmth: each gear recommendation reports the helmet as a requirement, either an owned match, a catalog suggestion that is never presented as owned, or missing, with a warning and a generic suggestion. A targets-only response, returned when no usable garments are available, has no helmet requirement.
 
+The head choice is shared with the torso selectors (#413): `hoodHeadPlanner` runs the same helmet, hat and neck choice for a given hood credit, so the outfit search knows what each hood leaves for the head before the accessories are picked, and the accessories are then chosen against the band minus the worn hood's credit (section 3). The helmet itself is never traded for clothing: it is chosen from the pool first, and only decides which hoods count.
+
 Hand and head clo, for catalog items and for the local bands, is on the part-manikin scale (#376): total insulation on a hand or head manikin minus the bare manikin's air layer, anchored to USARIEM T18-01 and T22-14. The catalog's earlier estimates ran higher by a nearly constant factor per part, so items and bands both carry it (`ACCESSORY_CLO_SCALE`: hands 0.60, head 0.45), and so do the selection tolerance and the comfort verdict's local terms. Selection stays where it was apart from rounding to 0.01 clo. See [catalog-accessory-clo.md](docs/catalog-accessory-clo.md).
 
 ```mermaid
@@ -309,6 +318,7 @@ graph TD
     LIMIT --> STATE[Report selected, not needed,<br/>missing suitable gear, or unknown data<br/>Explain thermal or functional purpose]
     STATE --> MATCH[Running/XC head requirements prefer selected head warmth<br/>Neck fallback only when no head layer is selected]
     STATE --> EDIT[Recommendation, descent evaluation and manual edits<br/>use the same reported limits, raised ones included<br/>Catalog data and worn hoods resolved on server<br/>Cold shortfalls and local excess affect comfort]
+    HEAD -.->|Same choice for any hood credit| PLAN[hoodHeadPlanner: the head's remaining gap<br/>for each candidate outfit's hoods<br/>joins the torso selectors' fit]
 ```
 
 ### 7. Thermal Targets and Comfort
