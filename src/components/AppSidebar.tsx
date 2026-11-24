@@ -1,9 +1,10 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useCallback, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Settings, HelpCircle, MessageSquare, Shield } from "lucide-react";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
+import { Settings, HelpCircle, LogIn, MessageSquare, Shield } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -17,8 +18,11 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { PRIMARY_NAV_ITEMS, isNavItemActive } from "@/components/AppNavigation";
+import { AccountMenu } from "@/components/AccountMenu";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
+import { useReturnFocus } from "@/hooks/useReturnFocus";
+import { shareApp } from "@/lib/share-app";
 import { cn } from "@/lib/utils";
 
 const FOOTER_ITEMS = [
@@ -41,6 +45,18 @@ const COLLAPSED_COARSE_INSET = "pointer-coarse:group-data-[collapsible=icon]:px-
 
 export function AppSidebar() {
   const pathname = usePathname();
+  // Sign-in and sign-up link to each other and keep the return path; a bare
+  // Sign in link there would drop it.
+  const showSignIn = !/^\/sign-(in|up)(\/|$)/.test(pathname);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const preferencesFocus = useReturnFocus();
+  // The avatar's menu has closed by now, so focus returns to the avatar, or
+  // to the Sign in link that replaced it after a sign-out.
+  const openPreferencesFromAvatar = useCallback(() => {
+    preferencesFocus.remember(() => accountRef.current?.querySelector<HTMLElement>("a[href], button") ?? null);
+    setPreferencesOpen(true);
+  }, [preferencesFocus]);
   const {
     sensitivity,
     defaultActivity,
@@ -113,6 +129,9 @@ export function AppSidebar() {
                   onSensitivityChange={updateSensitivity}
                   onDefaultActivityChange={updateDefaultActivity}
                   onBodyMetricsChange={updateBodyMetrics}
+                  open={preferencesOpen}
+                  onOpenChange={setPreferencesOpen}
+                  onCloseAutoFocus={preferencesFocus.restore}
                 >
                   <SidebarMenuButton
                     tooltip="Settings"
@@ -149,6 +168,31 @@ export function AppSidebar() {
           </nav>
         </SidebarFooter>
       </SidebarContent>
+      {/* The account sits at the foot of the sidebar on desktop web; phones
+          and the native shells keep it in the header (#267). */}
+      <div
+        ref={accountRef}
+        data-account-control
+        className={cn("px-2 pb-3", COLLAPSED_COARSE_INSET)}
+      >
+        <SignedIn>
+          <AccountMenu placement="sidebar" onOpenSettings={openPreferencesFromAvatar} onShare={shareApp} />
+        </SignedIn>
+        {showSignIn && (
+          <SignedOut>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Sign in" className={SIDEBAR_ITEM_CLASS}>
+                  <Link href="/sign-in">
+                    <LogIn />
+                    <span>Sign in</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SignedOut>
+        )}
+      </div>
     </Sidebar>
   );
 }

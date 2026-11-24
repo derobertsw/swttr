@@ -18,6 +18,8 @@ export const fakeClerkState = {
   /** False while Clerk hasn't loaded, as with no connection: nobody is known to be signed in or out. */
   loaded: true,
   signedIn: true,
+  /** The signed-in user's name, as useClerk().user reports it; null when the account has none. */
+  fullName: null as string | null,
   /** False when focus stays put as the menu closes, e.g. while the tab is hidden. */
   returnFocus: true,
   /** What useClerk().signOut does; a test can replace it with a spy. */
@@ -27,6 +29,7 @@ export const fakeClerkState = {
 export function resetFakeClerk() {
   fakeClerkState.loaded = true;
   fakeClerkState.signedIn = true;
+  fakeClerkState.fullName = null;
   fakeClerkState.returnFocus = true;
   fakeClerkState.signOut = async () => { fakeClerkState.signedIn = false; };
 }
@@ -118,5 +121,8 @@ export const fakeClerkModule = {
   SignedOut: ({ children }: { children: ReactNode }) => (fakeClerkState.signedIn ? null : <>{children}</>),
   UserButton: Object.assign(FakeUserButton, { MenuItems, Action: MenuItem, Link: MenuItem }),
   useAuth: () => ({ isLoaded: fakeClerkState.loaded, userId: fakeClerkState.loaded && fakeClerkState.signedIn ? "user_1" : null }),
-  useClerk: () => ({ signOut: () => fakeClerkState.signOut() }),
+  useClerk: () => ({
+    signOut: () => fakeClerkState.signOut(),
+    user: fakeClerkState.signedIn ? { fullName: fakeClerkState.fullName, firstName: null } : null,
+  }),
 };
