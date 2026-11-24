@@ -24,6 +24,24 @@ describe("Saving a stop", () => {
     expect(update).toHaveBeenCalledWith({ activities: ["Alpine"] });
     expect(from).not.toHaveBeenCalledWith("trip_days");
   });
+  it("moves a stop to a resort with the catalog's point (#7)", async () => {
+    expect((await save({ name: "Killington Resort, Vermont", latitude: 1, longitude: 2, resort_id: "wd-Q14711916" })).status).toBe(200);
+    expect(update).toHaveBeenCalledWith({
+      name: "Killington Resort, Vermont", latitude: 43.6047, longitude: -72.8187,
+      resort_id: "wd-Q14711916", forecast_elevation_m: 1262, forecast_point_label: "Top of K-1 Express Gondola",
+    });
+  });
+  it("clears an old resort's point when the stop moves to a general place", async () => {
+    expect((await save({ name: "Rutland, Vermont", latitude: 43.61, longitude: -72.97 })).status).toBe(200);
+    expect(update).toHaveBeenCalledWith({
+      name: "Rutland, Vermont", latitude: 43.61, longitude: -72.97,
+      resort_id: null, forecast_elevation_m: null, forecast_point_label: null,
+    });
+  });
+  it("refuses a resort the catalog doesn't know", async () => {
+    expect((await save({ name: "Nowhere", latitude: 1, longitude: 2, resort_id: "skimap-999999999" })).status).toBe(400);
+    expect(update).not.toHaveBeenCalled();
+  });
   it.each([[["2026-10-11"]], [[]]])("refuses day assignments, which go through the itinerary review, before any change (%#)", async (dayDates) => {
     const response = await save({ activities: ["Alpine"], day_dates: dayDates });
     expect(response.status).toBe(400);

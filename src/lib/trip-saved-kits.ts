@@ -10,6 +10,7 @@ import { diffRecommendations } from "@/lib/planAhead";
 import { formatZonedTime, isLocalDateTime, isTimeZone } from "@/lib/timeZones";
 import { tripActivityFromRecommendationKey } from "@/lib/trip-activities";
 import { readWeatherProvenance } from "@/lib/weatherProvenance";
+import { readResortFields } from "@/lib/locationSuggestion";
 import type { ThermalDecision } from "@/types/biophysics";
 import type { Outing, OutingTime, PersonalizationGap } from "@/types/outing";
 import type { DailyLayerPlan, DaypartId, DaypartLayerPlan, LayerChanges, PlanLayerItem } from "@/types/plan";
@@ -66,13 +67,16 @@ function readPlace(value: unknown): LocationSuggestion | null {
   const name = text(value.name);
   const region = optionalText(value.region);
   const country = typeof value.country === "string" && value.country.length <= 200 ? value.country : null;
-  if (!name || region === null || country === null || !isNumber(value.id)
+  const resort = readResortFields(value);
+  if (!name || region === null || country === null || resort === null
+    || !(isNumber(value.id) || typeof value.id === "string")
     || !isNumber(value.latitude) || Math.abs(value.latitude) > 90
     || !isNumber(value.longitude) || Math.abs(value.longitude) > 180) return null;
   if (value.timeZone !== undefined && !isTimeZone(value.timeZone)) return null;
   return {
-    id: value.id, name, country, latitude: value.latitude, longitude: value.longitude,
+    id: value.id as number | string, name, country, latitude: value.latitude, longitude: value.longitude,
     ...(region !== undefined && { region }),
+    ...resort,
     ...(value.timeZone !== undefined && { timeZone: value.timeZone as string }),
   };
 }

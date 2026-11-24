@@ -60,6 +60,27 @@ describe("Reviewing and saving itinerary changes", () => {
     expect(sunday.options).toMatchObject([{ key: "stop", label: "Only Sun Oct 11", payload: { scope: "stop", expected: { stop_id: JAY.id, stop: { name: "Jay Peak" }, dates: ["2026-10-11"] } } }]);
   });
 
+  it("reviews and saves a resort with the catalog's forecast point (#7)", async () => {
+    const KILLINGTON = { name: "Killington Resort, Vermont", latitude: 1, longitude: 2, resort_id: "wd-Q14711916", forecast_elevation_m: 9000 };
+    const point = {
+      name: "Killington Resort, Vermont", latitude: 43.6047, longitude: -72.8187,
+      resort_id: "wd-Q14711916", forecast_elevation_m: 1262, forecast_point_label: "Top of K-1 Express Gondola",
+    };
+    const preview = await previewOf({ action: "set_day_place", date: "2026-10-11", place: KILLINGTON });
+    expect(preview.options[0].payload).toMatchObject({ place: point });
+    const response = await post({ ...preview.options[0].payload, action: "set_day_place", access_points: { stops: {}, days: {} } });
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("edit_trip_itinerary_reviewed", expect.objectContaining({ p_payload: expect.objectContaining({ place: point }) }));
+    // A resort the catalog doesn't know is picked again.
+    expect((await post({ preview: true, action: "set_day_place", date: "2026-10-11", place: { ...KILLINGTON, resort_id: "wd-Q1" } })).status).toBe(400);
+  });
+
+  it("saves a general place without resort fields", async () => {
+    const preview = await previewOf({ action: "set_day_place", date: "2026-10-11", place: BURLINGTON });
+    expect(preview.options[0].payload).toMatchObject({ place: BURLINGTON });
+    expect((preview.options[0].payload as { place: object }).place).not.toHaveProperty("resort_id");
+  });
+
   it("previews assigning several days, including clearing their activity", async () => {
     const preview = await previewOf({ action: "assign_days", dates: ["2026-10-12", "2026-10-10"], stop_id: JAY.id, activity: null });
     expect(preview.options).toMatchObject([{

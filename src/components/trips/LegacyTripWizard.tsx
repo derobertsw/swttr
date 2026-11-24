@@ -18,7 +18,8 @@ import { ItineraryChangeSheet } from "@/components/trips/ItineraryChangeSheet";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { LocationAutocomplete, searchStateProps } from "@/components/LocationAutocomplete";
+import { searchKindFor, tripPlaceFrom } from "@/lib/locationSuggestion";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import {
   InviteLinkButton,
@@ -420,7 +421,8 @@ export function TripStopsEditor({
   const [assigning, setAssigning] = useState<{ stop: TripStop; dates: string[] } | null>(null);
   const pendingAssign = useRef<{ stop: TripStop; dates: string[] } | null>(null);
   const [announcement, setAnnouncement] = useState("");
-  const search = useLocationSearch();
+  // Stops have no single activity, so they search every place, resorts included.
+  const search = useLocationSearch({ kind: searchKindFor(null) });
   const editFocus = useReturnFocus();
   const removeFocus = useReturnFocus();
   const assignFocus = useReturnFocus();
@@ -451,14 +453,7 @@ export function TripStopsEditor({
       const { stop } = await tripRequest<{ stop: TripStop }>(
         `/api/v1/trips/${trip.id}/stops`,
         "POST",
-        {
-          name: selected.region
-            ? `${selected.name}, ${selected.region}`
-            : `${selected.name}, ${selected.country}`,
-          latitude: selected.latitude,
-          longitude: selected.longitude,
-          activities: [],
-        }
+        { ...tripPlaceFrom(selected), activities: [] }
       );
       onStopsChange((current) => [...current, stop]);
       search.reset();
@@ -528,6 +523,7 @@ export function TripStopsEditor({
           }
           onSelectLocation={search.handleSelectLocation}
           onDismiss={search.dismiss}
+          {...searchStateProps(search)}
         />
         <Button
           type="button"

@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import ActivitySelection from "@/components/ActivitySelection";
 import { DeviceLocationButton } from "@/components/DeviceLocationButton";
 import { FieldError } from "@/components/FieldError";
-import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { LocationAutocomplete, type LocationSearchStateProps } from "@/components/LocationAutocomplete";
 import { SegmentedChoice } from "@/components/SegmentedChoice";
 import { ACTIVITIES } from "@/data/activities";
 import type { DeviceLocationStatus } from "@/hooks/useDeviceLocation";
@@ -57,6 +57,8 @@ interface GearUpFormProps {
   onLocationFocus: () => void;
   onSelectLocation: (suggestion: LocationSuggestion) => void;
   onDismissSuggestions: () => void;
+  /** Empty and failed searches, and a resort search's Search all places. */
+  searchState?: LocationSearchStateProps;
   /** Where the request for the device's location stands. */
   locationStatus: DeviceLocationStatus;
   onUseMyLocation: () => void;
@@ -127,6 +129,7 @@ export function GearUpForm({
   onLocationFocus,
   onSelectLocation,
   onDismissSuggestions,
+  searchState,
   locationStatus,
   onUseMyLocation,
   onCancelLocating,
@@ -217,6 +220,7 @@ export function GearUpForm({
           onLocationFocus={onLocationFocus}
           onSelectLocation={onSelectLocation}
           onDismiss={onDismissSuggestions}
+          {...searchState}
         />
         <DeviceLocationButton
           label="Use my location"

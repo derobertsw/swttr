@@ -4,6 +4,7 @@ import { isDate } from "@/lib/gearUpDraft";
 import { isLocalDateTime, isTimeZone } from "@/lib/timeZones";
 import type { Outing } from "@/types/outing";
 import type { LocationSuggestion } from "@/types/recommendations";
+import { readResortFields } from "@/lib/locationSuggestion";
 
 /** Whether a value can be inspected as a keyed, non-array object. */
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -18,10 +19,15 @@ export function hasOnly(value: Record<string, unknown>, keys: string[]): boolean
 /** Checks the length and nonempty content of a display label. */
 const text = (value: unknown, max: number) => typeof value === "string" && value.trim().length > 0 && value.length <= max;
 
+const RESORT_KEYS = ["kind", "source", "resortId", "elevationM", "pointLabel", "pointKind"];
+
 /** Labels are untrusted display data; coordinates determine the weather request. */
 export function isResolvedPlace(value: unknown): value is LocationSuggestion {
-  return isRecord(value) && hasOnly(value, ["id", "name", "region", "country", "latitude", "longitude", "timeZone"])
-    && Number.isSafeInteger(value.id) && Number(value.id) >= 0
+  return isRecord(value)
+    && hasOnly(value, ["id", "name", "region", "country", "latitude", "longitude", "timeZone", ...RESORT_KEYS])
+    // A geocoder's numeric ID (0 for the device), or a resort's "resort:<id>" with its point (#7).
+    && ((Number.isSafeInteger(value.id) && Number(value.id) >= 0) || typeof value.id === "string")
+    && readResortFields(value) !== null
     && text(value.name, 200) && typeof value.country === "string" && value.country.length <= 100
     && (value.region === undefined || text(value.region, 200))
     && (value.timeZone === undefined || isTimeZone(value.timeZone))

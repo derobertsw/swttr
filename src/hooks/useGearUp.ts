@@ -32,14 +32,11 @@ import { RESUME_PARAM, resumeView, TRIP_PARAM, type ResumeView } from "@/lib/out
 import type { LaterTime, LayersResult, Outing, OutingResult, OutingTime } from "@/types/outing";
 import type { GearUpTripDay } from "@/types/trip-day-outing";
 import type { LocationSuggestion } from "@/types/recommendations";
+import { isSameLocation, searchKindFor } from "@/lib/locationSuggestion";
 import type { WeatherData } from "@/types/weather";
 import type { XCContext } from '@/types/xc';
 
 type CurrentRequest = (() => boolean) & { signal: AbortSignal };
-
-function isSamePlace(a: LocationSuggestion, b: LocationSuggestion | null): boolean {
-  return b !== null && a.latitude === b.latitude && a.longitude === b.longitude;
-}
 
 /** The same outing asked for: a request for the shown result copies its outing field by field. */
 function sameOuting(a: Outing, b: Outing): boolean {
@@ -104,7 +101,8 @@ export function useGearUp() {
   const initialMode: InputMode = searchParams.get("mode") === "planAhead" ? "later" : "now";
   const [state, dispatch] = useReducer(gearUpReducer, initialMode, createInitialState);
 
-  const locationSearch = useLocationSearch();
+  // Alpine skiing searches ski resorts; a place already picked stays when the activity changes.
+  const locationSearch = useLocationSearch({ kind: searchKindFor(activity) });
   const { status: locationStatus, locate, cancel: cancelLocating } = useDeviceLocation();
   const formRef = useRef<HTMLFormElement>(null);
   const biophysics = useBiophysicsRecommendation();
@@ -756,7 +754,7 @@ export function useGearUp() {
     request: state.request,
     showFieldErrors: state.showFieldErrors,
     // Only for the place it was found at: another place's forecast may cover the dates.
-    startDateError: state.startDateError && isSamePlace(state.startDateError.location, locationSearch.selectedLocation)
+    startDateError: state.startDateError && isSameLocation(state.startDateError.location, locationSearch.selectedLocation)
       ? state.startDateError.message
       : null,
     locationStatus,

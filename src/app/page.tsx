@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import PageLayout from "@/components/PageLayout";
 import LayerDisplay from "@/components/LayerDisplay";
 import { GearUpForm } from "@/components/GearUpForm";
+import { searchStateProps } from "@/components/LocationAutocomplete";
 import MultiDayPlanDisplay from "@/components/MultiDayPlanDisplay";
 import { useItemMappings } from "@/hooks/useItemMappings";
 import { formatLocationName } from "@/hooks/useLocationSearch";
@@ -115,6 +116,7 @@ const HomeContent = () => {
               onLocationFocus={() => locationSearch.suggestions.length > 0 && locationSearch.setShowSuggestions(true)}
               onSelectLocation={locationSearch.handleSelectLocation}
               onDismissSuggestions={locationSearch.dismiss}
+              searchState={searchStateProps(locationSearch)}
               locationStatus={locationStatus}
               onUseMyLocation={() => void handleUseMyLocation()}
               onCancelLocating={cancelLocating}

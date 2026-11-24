@@ -45,6 +45,16 @@ describe("A trip day as Gear up's outing (#335)", () => {
     expect(day?.outing?.place).not.toHaveProperty("timeZone");
   });
 
+  it("plans at a resort stop's forecast point, with its elevation and label (#7)", () => {
+    const resortStop = { ...STOWE_STOP, name: "Stowe Mountain Resort, Vermont", latitude: 44.5376, longitude: -72.8142, resort_id: "wd-Q7620695", forecast_elevation_m: 1116, forecast_point_label: "Top of Gondola Skyride" };
+    const day = tripDayOutingFor(trip({ stops: [resortStop, JAY] }), "user-1", "2026-10-10", null, NOW);
+    expect(day?.outing?.place).toEqual({
+      id: "resort:wd-Q7620695", kind: "resort", source: "openskidata", resortId: "wd-Q7620695",
+      name: "Stowe Mountain Resort, Vermont", country: "", latitude: 44.5376, longitude: -72.8142,
+      elevationM: 1116, pointLabel: "Top of Gondola Skyride", pointKind: "lift",
+    });
+  });
+
   it("starts at the day's meet time that morning, not one the evening before", () => {
     const at = (meet: Partial<TripDay>) => tripDayOutingFor(trip({ days: [{ ...SATURDAY, ...meet }] }), "user-1", "2026-10-10", null, NOW)?.outing?.when;
     expect(at({ meet_time: "06:45:00", meet_day_offset: 0 })).toMatchObject({ time: "06:45" });

@@ -1,11 +1,13 @@
 import { TRIP_ACTIVITY_OPTIONS } from "@/lib/trip-activities";
+import { isResortId } from "@/lib/locationSuggestion";
 
 export interface TripCreationInput {
   creation_id?: string;
   name: string;
   start_date: string;
   end_date: string;
-  destination?: { name: string; latitude: number; longitude: number };
+  /** A resort destination names its catalog ID; the route fills its point (#7). */
+  destination?: { name: string; latitude: number; longitude: number; resort_id?: string };
   activity?: string | null;
 }
 
@@ -33,7 +35,9 @@ export function parseTripCreation(body: unknown): TripCreationInput | string {
     if (!input.destination || typeof input.destination !== "object") return "Select a destination from the search results.";
     const place = input.destination as Record<string, unknown>;
     if (typeof place.name !== "string" || !place.name.trim() || place.name.trim().length > 200 || typeof place.latitude !== "number" || !Number.isFinite(place.latitude) || Math.abs(place.latitude) > 90 || typeof place.longitude !== "number" || !Number.isFinite(place.longitude) || Math.abs(place.longitude) > 180) return "Select a destination with valid coordinates.";
-    destination = { name: place.name.trim(), latitude: place.latitude, longitude: place.longitude };
+    if (place.resort_id !== undefined && place.resort_id !== null && !isResortId(place.resort_id)) return "Select the resort again from the search results.";
+    destination = { name: place.name.trim(), latitude: place.latitude, longitude: place.longitude,
+      ...(isResortId(place.resort_id) ? { resort_id: place.resort_id } : {}) };
   }
   return { name: input.name.trim(), start_date: input.start_date, end_date: input.end_date,
     ...(input.creation_id === undefined ? {} : { creation_id: input.creation_id as string }),

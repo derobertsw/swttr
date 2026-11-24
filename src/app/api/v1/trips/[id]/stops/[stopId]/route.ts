@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readJson } from "@/lib/api";
 import { requireTripAccess } from "@/lib/trips";
+import { NO_RESORT, withResortPoint } from "@/lib/locations/resort-places";
 
 type RouteContext = { params: Promise<{ id: string; stopId: string }> };
 
@@ -20,6 +21,15 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
   if (body?.latitude !== undefined) update.latitude = body.latitude;
   if (body?.longitude !== undefined) update.longitude = body.longitude;
   if (Array.isArray(body?.activities)) update.activities = body.activities;
+  // A new place is a resort with the catalog's point, or a general place
+  // without the old resort's point (#7).
+  if (body?.resort_id !== undefined && body.resort_id !== null) {
+    const resort = withResortPoint({ latitude: 0, longitude: 0, resort_id: body.resort_id });
+    if (!resort?.resort_id) return NextResponse.json({ error: "Select the resort again from the search results." }, { status: 400 });
+    Object.assign(update, resort);
+  } else if (update.latitude !== undefined || update.longitude !== undefined || body?.resort_id === null) {
+    Object.assign(update, NO_RESORT);
+  }
 
   const { data, error } = await supabase
     .from("trip_stops")

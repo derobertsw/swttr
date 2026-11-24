@@ -16,7 +16,7 @@ Alpine search finds the actual resort, forgives typos, and reads the weather at 
 What ODbL asks of us:
 
 - **The catalog is a derivative database**, so `src/data/ski-resorts.json` is distributed under ODbL 1.0, not the app's own licence. Anyone may reuse it under the same terms. The import script and `scripts/ski-resorts/overrides.json` are how it was made, which ODbL asks us to make available with it; both are in this repository.
-- **Search results and forecast-point labels shown in the app are a produced work** and need the attribution above where they're shown, so the resort picker must carry a short credit line linking to OpenSkiMap and OpenStreetMap's copyright page.
+- **Search results and forecast-point labels shown in the app are a produced work** and need the attribution above where they're shown, so the picker shows a credit line linking to OpenSkiMap and OpenStreetMap's copyright page whenever a resort is in the results.
 - Keep the attribution, source URLs and snapshot date here, and in `meta`, whenever the catalog is re-imported.
 
 ## What the catalog keeps
@@ -76,6 +76,34 @@ Ties go to fewer edits, then more lifts, then a name over an alias, then the sho
 | `all` | Both | Exact and prefix resort matches first, then the geocoder's places, then looser resort matches; at most eight. Deduplicated by source identity, so "Stowe" returns both Stowe Mountain Resort and the town of Stowe. If the geocoder fails, resort matches still come back with `placesUnavailable: true`. |
 
 The response is still `{ results: [...] }`. A resort result has `id: "resort:<resortId>"`, `kind: "resort"`, `source: "openskidata"`, `resortId`, `name`, `region`, `country`, `timeZone`, the forecast point as `latitude`/`longitude`, `elevationM` (null when unknown), `pointLabel`, `pointKind` (`lift` or `reference`) and `match`. Geocoder results are unchanged.
+
+## Picker
+
+`useLocationSearch({ kind })` and `LocationAutocomplete` (#7, PR 2). The search kind comes from `searchKindFor(activity)` in `src/lib/locationSuggestion.ts`:
+
+| Activity | Search | Fallback |
+|---|---|---|
+| Alpine skiing (`alpine_skiing`, or `Alpine` on trips) | `kind=resort` | **Search all places**, the last option in the list, so the keyboard reaches it. It lasts until the activity changes or the picker is reset. |
+| Anything else, or a trip stop with no activity | `kind=all`: places and resorts | — |
+
+**Resort search is off** (`RESORT_SEARCH_ENABLED = false`) until the forecasts read the resort's point and elevation (PR 3). Until then every picker runs the general search exactly as before, and nothing below can appear.
+
+- A resort is labelled "Ski resort · region, country" with a mountain icon; a town with the same name stays a separate option.
+- A typo match reads "Did you mean Killington Resort?". It's never chosen for the person: Enter with nothing highlighted does nothing.
+- Empty and failed searches say so ("No ski resorts match." / "Couldn't search locations. Try again."), and a live region announces result counts, the "Did you mean" suggestion, no matches and errors. An answer to an older query or an older kind of search is dropped.
+- A picked resort shows where its weather is read under the field ("forecast at Top of K-1 Express Gondola, 1,262 m (4,140 ft)"), which also describes the field for screen readers.
+- Changing the activity keeps the place already picked, and shows its real kind. A saved town stays a town until the person picks a resort.
+- "Use my location" is unchanged and stays labelled as the device's position.
+
+## Saved places
+
+A picked resort keeps its identity everywhere a place is kept:
+
+- **Gear up:** the outing's `place` (`LocationSuggestion`) carries `kind`, `source`, `resortId`, `elevationM`, `pointLabel` and `pointKind`. Drafts, saved kits and the WebMCP action check those fields together (`readResortFields`): a resort whose ID, point or label doesn't add up is refused, not half-kept. Drafts and kits from before #7 have numeric IDs and none of the fields, and still load. How the search matched (`match`) is dropped once a place is picked.
+- **Trips:** `trip_stops.resort_id`, `forecast_elevation_m` and `forecast_point_label` (migration `20261124100000_trip_stop_resort_points.sql`). The browser sends only `resort_id`. The API looks it up in the catalog (`withResortPoint` in `src/lib/locations/resort-places.ts`) and saves the catalog's coordinates, elevation and label together, so they can't drift apart; an ID the catalog doesn't know is refused with "Select the resort again". This applies to trip creation (`create_trip_draft`), adding a stop, editing a stop's place, and a day's place (`edit_trip_itinerary` `set_day_place`). Moving a stop to a general place clears its resort fields; a database check enforces that a general place has none and a resort always has a label. A stop already at a place is reused only when it's the same resort (or both are general places).
+- Equality compares coordinates **and** the resort point (`isSameLocation`), so a point change counts as a new place even at the same coordinates.
+
+**Not yet carried:** a new trip made from Gear up's **Save to trip** (`save_trip_kits`) saves a resort destination as a general place at the resort's forecast point, without its resort fields. Fixing it means redefining `save_trip_kits`, which is left for a follow-up.
 
 ## Re-importing
 

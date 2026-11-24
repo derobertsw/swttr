@@ -20,7 +20,8 @@ import {
   DrawerDescription,
   DrawerFooter,
 } from "@/components/ui/drawer";
-import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { LocationAutocomplete, searchStateProps } from "@/components/LocationAutocomplete";
+import { searchKindFor } from "@/lib/locationSuggestion";
 import { formatLocationName, useLocationSearch } from "@/hooks/useLocationSearch";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { addDaysToDateString } from "@/lib/forecastRange";
@@ -36,6 +37,8 @@ interface WeatherEditDrawerProps {
   loading?: boolean;
   /** Where focus goes on close; the drawer opens from code, not a trigger. */
   onCloseAutoFocus?: (event: Event) => void;
+  /** The shown outing's activity: alpine skiing searches ski resorts. */
+  activity?: string;
 }
 
 /** A date picked on the calendar, or a shortcut's days from today at the place. */
@@ -47,8 +50,9 @@ export function WeatherEditDrawer({
   onSubmit,
   loading = false,
   onCloseAutoFocus,
+  activity,
 }: WeatherEditDrawerProps) {
-  const locationSearch = useLocationSearch();
+  const locationSearch = useLocationSearch({ kind: searchKindFor(activity) });
   const [day, setDay] = useState<ForecastDay | null>(null);
   // Null until a time is entered, which means the current hour at the place.
   const [chosenTime, setChosenTime] = useState<string | null>(null);
@@ -148,6 +152,7 @@ export function WeatherEditDrawer({
             }
             onSelectLocation={locationSearch.handleSelectLocation}
             onDismiss={locationSearch.dismiss}
+            {...searchStateProps(locationSearch)}
           />
           {!locationSearch.selectedLocation && (
             <p className="-mt-2 text-sm text-muted-foreground">

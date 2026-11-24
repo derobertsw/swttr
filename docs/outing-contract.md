@@ -12,7 +12,7 @@ An `Outing` is what a person asked for, as submitted:
 |---|---|
 | `activity` | An activity ID from `src/data/activities.ts`. |
 | `exertion` | The effort level. |
-| `place` | The picked `LocationSuggestion`: its name, region, country and coordinates. "Your location" when it came from the device. |
+| `place` | The picked `LocationSuggestion`: its name, region, country and coordinates. "Your location" when it came from the device. A ski resort (#7) also has `id: "resort:<resortId>"`, `kind: "resort"`, `source`, `resortId`, `elevationM` (null when unknown), `pointLabel` and `pointKind`; its coordinates are the resort's forecast point. See [`ski-resort-catalog.md`](ski-resort-catalog.md). |
 | `when` | `{ mode: "now" }`, or `{ mode: "later", date, time, durationDays }`. The date (`yyyy-MM-dd`) and time (`HH:mm`) are on the destination's clock, wherever the device is. |
 
 Every outing is plain data, so it can be stored and restored.

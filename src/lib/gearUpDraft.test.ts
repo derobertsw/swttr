@@ -34,6 +34,25 @@ describe("gearUpDraft", () => {
     expect(readGearUpDraft(null)).toEqual(empty);
   });
 
+  it("keeps a resort's identity and forecast point through a reload (#7)", () => {
+    const resort = {
+      id: "resort:wd-Q14711916", kind: "resort", source: "openskidata", resortId: "wd-Q14711916",
+      name: "Killington Resort", region: "Vermont", country: "United States", latitude: 43.6047, longitude: -72.8187,
+      timeZone: "America/New_York", elevationM: 1262, pointLabel: "Top of K-1 Express Gondola", pointKind: "lift",
+    } as const;
+    const draft = { ...DRAFT, place: resort, lastOuting: { ...DRAFT.lastOuting!, place: resort } };
+    saveGearUpDraft(null, draft);
+    expect(readGearUpDraft(null)).toEqual(draft);
+    // A resort whose point doesn't add up isn't restored as one.
+    store({ ...draft, lastOuting: null, place: { ...resort, elevationM: "high" } });
+    expect(readGearUpDraft(null)).toBeNull();
+  });
+
+  it("still reads a draft saved before resorts, with a numeric place", () => {
+    store(DRAFT);
+    expect(readGearUpDraft(null)?.place).toEqual(STOWE);
+  });
+
   it("has nothing when nothing was saved, or what was saved can't be read", () => {
     expect(readGearUpDraft(null)).toBeNull();
     sessionStorage.setItem(STORAGE_KEYS.GEAR_UP_DRAFT, "{not json");

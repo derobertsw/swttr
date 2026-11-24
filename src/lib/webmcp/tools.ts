@@ -6,6 +6,7 @@ import { hasOnly, isRecord, isResolvedPlace, isSingleDayOuting } from "@/lib/out
 import type { WebMCPTool } from "./adapter";
 import type { CurrentOutingSnapshot, OutingActionOutcome } from "@/types/outingAction";
 import type { LocationSuggestion } from "@/types/recommendations";
+import { readResortFields } from "@/lib/locationSuggestion";
 
 /** Builds a closed object schema with explicit required fields. */
 const objectSchema = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({
@@ -34,7 +35,10 @@ const searchFailed = () => ({ status: "error", code: "location_unavailable", mes
 function readCandidate(value: unknown): LocationSuggestion | null {
   if (!isRecord(value)) return null;
   const { id, name, region, country = "", latitude, longitude, timeZone } = value;
-  const candidate = { id, name, country, latitude, longitude, ...(region !== undefined && { region }), ...(timeZone !== undefined && { timeZone }) };
+  // A resort keeps its identity and forecast point (#7); how the search matched it is dropped.
+  const resort = readResortFields(value);
+  if (resort === null) return null;
+  const candidate = { id, name, country, latitude, longitude, ...(region !== undefined && { region }), ...(timeZone !== undefined && { timeZone }), ...resort };
   return isResolvedPlace(candidate) ? candidate : null;
 }
 
