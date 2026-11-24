@@ -1136,6 +1136,37 @@ describe("Home Page", () => {
         })]);
       });
 
+      it("asks afresh about layers asked for again for the same outing, with another warm/cold setting (#8)", async () => {
+        const { recommendationRequests } = mockAccountApis();
+        const outingApis = mockFetch.getMockImplementation()!;
+        const keys: string[] = [];
+        mockFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+          if (url !== "/api/v1/outing-feedback") return outingApis(url, init);
+          const body = JSON.parse(String(init?.body));
+          keys.push(body.key);
+          return respond(200, { feedback: { ...body.answer, updated_at: "2026-10-06T16:00:00Z" } });
+        });
+        const user = userEvent.setup();
+        render(<Home />);
+
+        await seeRunningAtStowe(user);
+        await user.click(await screen.findByRole("button", { name: "Too cold" }));
+        expect(await screen.findByText("Saved. Thanks. Add details below if you like.")).toBeInTheDocument();
+        // The same outing and weather, asked for again with Run Warm: new layers, so a new answer.
+        // Clicked without pointer events, which Vaul's drawer can't measure in jsdom.
+        fireEvent.click(screen.getAllByRole("button", { name: "Settings" })[0]);
+        fireEvent.click(await screen.findByRole("radio", { name: /Run Warm/ }));
+        await waitFor(() => expect(recommendationRequests).toHaveLength(2));
+        await waitFor(() => expect(screen.queryByText("Saved. Thanks. Add details below if you like.")).not.toBeInTheDocument());
+        // The drawer's closing animation never ends in jsdom, so the page stays hidden from the accessibility tree.
+        const button = (name: string) => screen.getByRole("button", { name, hidden: true });
+        expect(button("Too cold")).toHaveAttribute("aria-pressed", "false");
+        fireEvent.click(button("Too warm"));
+        await screen.findByText("Saved. Thanks. Add details below if you like.");
+        expect(keys).toHaveLength(2);
+        expect(keys[1]).not.toBe(keys[0]);
+      });
+
       it("opens Save to trip on the resumed results after signing in to save, once", async () => {
         mockUseAuth.mockReturnValue(GUEST);
         mockAccountApis();

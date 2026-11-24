@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { OutingRequestNotice } from "@/components/OutingRequestNotice";
 import { SaveToTrip } from "@/components/trips/SaveToTrip";
 import { GearUpFeedback } from "@/components/OutingFeedback";
+import { resultFeedbackKey } from "@/lib/outing-feedback";
 import { TripDayBar } from "@/components/trips/TripDayGearUp";
 import { isTripDayResult, planTripDayAgain } from "@/lib/trip-day-gear-up";
 
@@ -182,7 +183,7 @@ const HomeContent = () => {
             // underway once the layers show. A later outing is asked about on
             // its trip day once it's saved there.
             feedback={(outfit) => userId && outfit && result.outing.when.mode === "now" ? (
-              <GearUpFeedback key={JSON.stringify([result.outing, result.weather.context])} outfit={outfit} sensitivity={result.sensitivity} />
+              <GearUpFeedback key={resultFeedbackKey(result)} outfit={outfit} sensitivity={result.sensitivity} />
             ) : null}
           />
         )}

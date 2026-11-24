@@ -11,6 +11,24 @@ const BODY_PART_AREA: Record<BodyPart, FeedbackBodyArea> = {
   torso: "torso", legs: "legs", headNeck: "head_neck", hands: "hands",
 };
 
+const resultKeys = new WeakMap<object, string>();
+let lastResultKey = 0;
+
+/**
+ * One key per result Gear up shows, for its How did it go? card: a result
+ * asked for again (another warm/cold setting, Try again) is a new object, so
+ * it's asked about afresh, while edits to its layers keep the same result.
+ */
+export function resultFeedbackKey(result: object): string {
+  let key = resultKeys.get(result);
+  if (!key) {
+    lastResultKey += 1;
+    key = `result-${lastResultKey}`;
+    resultKeys.set(result, key);
+  }
+  return key;
+}
+
 export interface SuggestedWornItem {
   area: FeedbackBodyArea;
   name: string;

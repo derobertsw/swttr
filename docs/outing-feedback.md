@@ -8,8 +8,8 @@ Gear up results aren't stored ([outing-contract.md](outing-contract.md)), and th
 
 | Where | When it shows | What the answer is about |
 | --- | --- | --- |
-| Gear up results for **Now**, signed in, with layers | Right away, under Save to trip: the outing is underway once the layers show, so the card says "Once you're back". It stays while the result is on screen, including when the app comes back from the background. | The outfit as shown, with any edits, sent with the answer as Save to trip sends it. Answering again on the same result replaces the answer. A reload or a new request asks for new layers, so it's a new result and a new answer. |
-| A trip day's **My kit**, for the person's own saved outfit or plan day | Once the kit's outing has started on the destination's clock: a later outing at its time, a plan day at its first hour, an outing for now at the time its conditions were read. It stays open afterwards, with the answer given. | The kit as saved. Replacing the kit (Update in Gear up) asks again about the new one. |
+| Gear up results for **Now**, signed in, with layers | Right away, under Save to trip: the outing is underway once the layers show, so the card says "Once you're back". It stays while the result is on screen, including when the app comes back from the background. | The outfit as shown, with any edits, sent with the answer as Save to trip sends it. Answering again on the same result replaces the answer, and editing its layers keeps the card as it is. A reload or any new request for layers (another warm/cold setting included) is a new result, so the card starts over with a new answer. |
+| A trip day's **My kit**, for the person's own saved outfit or plan day | Once the kit's outing has started on the destination's clock: a later outing at its time, a plan day at its first hour, an outing for now at the time its conditions were read. It stays open afterwards, with the answer given. A page opened before then asks again at the start time (at least hourly until then) and whenever it's shown again, so coming back from the outing shows the card without a reload. | The kit as the page showed it: the answer names the kit and when it was saved, and if the kit was replaced since (another tab, Update in Gear up) the save is refused with `409 kit_changed` and the card says to reload. Replacing the kit asks again about the new one. |
 
 Not asked: guests, general guidance without layers, Gear up results for **Later** (they're asked about on their trip day once saved there), multi-day plans in Gear up (each day can be saved to a trip), other people's kits and category checklists. The server refuses an answer about an outing that hasn't started (`409`, `code: "not_started"`).
 
@@ -57,7 +57,7 @@ The migration adds the feedback to `delete_user_data` by patching the function i
 | --- | --- |
 | `POST /api/v1/outing-feedback` | `{ key, outfit, sensitivity?, answer }`: a Gear up result's outfit (checked as Save to trip checks it) and the answer. `200 {feedback}`, `400` for a malformed request, `401` signed out, `409 not_started`, `503` before the migration. |
 | `GET /api/v1/trips/:id/days/:date/feedback` | `{status: "open", feedback}` (null before an answer), `{status: "not_started", opens_at}`, or `{status: "no_kit"}`. |
-| `PUT /api/v1/trips/:id/days/:date/feedback` | `{ answer }` for the person's own kit on the day. Same answers as the POST, and `404` without a saved outfit. |
+| `PUT /api/v1/trips/:id/days/:date/feedback` | `{ answer, kit: { id, saved_at } }` for the person's own kit on the day, naming the kit shown. Same answers as the POST, `404` without a saved outfit, and `409` with `code: "kit_changed"` when the kit shown has been replaced since. |
 
 `src/lib/outing-feedback-server.ts` checks the answer, works out when the outing started, and builds the row; `src/components/OutingFeedback.tsx` is the card.
 

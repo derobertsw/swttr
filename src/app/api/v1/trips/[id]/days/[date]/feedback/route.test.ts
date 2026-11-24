@@ -16,7 +16,10 @@ const SAVED_AT = "2026-10-08T20:00:00+00:00";
 const context = (date = "2026-10-10") => ({ params: Promise.resolve({ id: TRIP.id, date }) });
 const url = (date = "2026-10-10") => `http://localhost/api/v1/trips/${TRIP.id}/days/${date}/feedback`;
 const get = (date?: string) => GET(new Request(url(date)), context(date));
-const put = (body: unknown, date?: string) => PUT(new Request(url(date), { method: "PUT", body: JSON.stringify(body) }), context(date));
+/** The kit the page showed, as the trip API sent it. */
+const SHOWN = { id: kitId, saved_at: SAVED_AT };
+const put = (body: Record<string, unknown>, date?: string) =>
+  PUT(new Request(url(date), { method: "PUT", body: JSON.stringify({ kit: SHOWN, ...body }) }), context(date));
 
 let tables: Record<string, Record<string, unknown>[]>;
 function signIn(userId: string, { kit = {}, missing = [] }: { kit?: Record<string, unknown> | null; missing?: string[] } = {}) {
@@ -80,6 +83,28 @@ describe("Feedback on a trip day's saved kit (#8)", () => {
     expect(tables.user_outing_feedback[0]).toMatchObject({ overall: "just_right", worn: { as_suggested: true } });
     tables.trip_member_day_kits[0].outfit_saved_at = "2026-10-09T20:00:00+00:00";
     expect(await (await get()).json()).toEqual({ status: "open", feedback: null });
+  });
+
+  it("refuses an answer about a kit replaced since the page showed it, saving nothing", async () => {
+    signIn("user-1");
+    tables.trip_member_day_kits[0].outfit_saved_at = "2026-10-09T20:00:00+00:00";
+    const response = await put({ answer: { overall: "just_right", worn: { as_suggested: true } } });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ code: "kit_changed",
+      error: "Your kit for this day changed since this page opened. Reload to answer about the kit saved now." });
+    expect((await put({ kit: { id: "another-kit", saved_at: SAVED_AT }, answer: { overall: "too_cold" } })).status).toBe(409);
+    expect(tables.user_outing_feedback).toEqual([]);
+    // The same kit, with its time written another way, is the kit shown.
+    tables.trip_member_day_kits[0].outfit_saved_at = SAVED_AT;
+    expect((await put({ kit: { id: kitId, saved_at: "2026-10-08T20:00:00.000Z" }, answer: { overall: "too_cold" } })).status).toBe(200);
+  });
+
+  it("needs to know which kit the answer is about", async () => {
+    signIn("user-1");
+    for (const kit of [undefined, null, {}, { id: kitId }, { id: kitId, saved_at: 5 }]) {
+      expect((await put({ kit, answer: { overall: "too_cold" } })).status).toBe(400);
+    }
+    expect(tables.user_outing_feedback).toEqual([]);
   });
 
   it("is only about the person's own saved outfit", async () => {

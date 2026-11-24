@@ -79,6 +79,13 @@ export interface GearUpFeedbackRequest {
   answer: FeedbackAnswer;
 }
 
+/** PUT /api/v1/trips/:id/days/:date/feedback: the answer, about the kit as it was shown. */
+export interface TripKitFeedbackRequest {
+  answer: FeedbackAnswer;
+  /** The kit shown: an answer about a kit that has been replaced since is refused (409 `kit_changed`). */
+  kit: { id: string; saved_at: string | null };
+}
+
 /** GET /api/v1/trips/:id/days/:date/feedback: whether the day's own kit can be rated yet. */
 export type TripDayFeedbackState =
   | { status: "open"; feedback: OutingFeedbackView | null }

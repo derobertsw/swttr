@@ -7,7 +7,7 @@ import { chipClassName } from "@/components/ui/chip";
 import { segmentedGroupClassName, segmentedItemClassName } from "@/components/ui/segmented";
 import { getBodyPart } from "@/components/wardrobe/wardrobe-utils";
 import { suggestedWornItems, type SuggestedWornItem } from "@/lib/outing-feedback";
-import { errorMessage, timedTripRequest } from "@/lib/trip-requests";
+import { errorMessage, timedTripRequest, TripRequestError } from "@/lib/trip-requests";
 import { cn } from "@/lib/utils";
 import {
   BARE_AREAS,
@@ -24,6 +24,7 @@ import {
   type GenericWornItem,
   type OutingFeedbackView,
   type TripDayFeedbackState,
+  type TripKitFeedbackRequest,
   type WornItem,
 } from "@/types/outingFeedback";
 import type { TemperatureSensitivity } from "@/types/preferences";
@@ -73,7 +74,7 @@ export function OutingFeedbackCard({ suggested, initial = null, onSave }: Outing
   const [worn, setWorn] = useState<Worn>(!initial?.worn ? "unknown" : initial.worn.as_suggested ? "suggested" : "different");
   const [items, setItems] = useState<WornItem[]>(initial?.worn && !initial.worn.as_suggested ? initial.worn.items : asWorn(suggested));
   const [bare, setBare] = useState<BareArea[]>(initial?.worn && !initial.worn.as_suggested ? initial.worn.bare : []);
-  const [state, setState] = useState<{ status: "idle" | "saving" | "saved" } | { status: "error"; message: string }>({ status: "idle" });
+  const [state, setState] = useState<{ status: "idle" | "saving" | "saved" } | { status: "error"; message: string; retry: boolean }>({ status: "idle" });
   const [detailsSaved, setDetailsSaved] = useState(false);
 
   const answerFor = (next: FeedbackOverall): FeedbackAnswer => ({
@@ -91,7 +92,8 @@ export function OutingFeedbackCard({ suggested, initial = null, onSave }: Outing
       setDetailsSaved(details);
       setState({ status: "saved" });
     } catch (error) {
-      setState({ status: "error", message: errorMessage(error) });
+      // A conflict (the kit changed, or the outing hasn't started) won't go away by sending the same answer again.
+      setState({ status: "error", message: errorMessage(error), retry: !(error instanceof TripRequestError && error.status === 409) });
     }
   };
 
@@ -146,7 +148,7 @@ export function OutingFeedbackCard({ suggested, initial = null, onSave }: Outing
       {state.status === "error" && (
         <div role="alert" className="flex flex-col items-start gap-2 text-sm">
           <p className="text-destructive">Couldn&apos;t save your feedback: {state.message}</p>
-          {overall && <Button type="button" variant="outline" size="sm" onClick={() => void save(answerFor(overall), detailsSaved)}>Try again</Button>}
+          {overall && state.retry && <Button type="button" variant="outline" size="sm" onClick={() => void save(answerFor(overall), detailsSaved)}>Try again</Button>}
         </div>
       )}
 
@@ -338,30 +340,62 @@ export function GearUpFeedback({ outfit, sensitivity }: { outfit: SavedOutfit; s
   );
 }
 
+/** The longest wait before asking again whether a kit's outing has started; a sleeping device's timers can drift. */
+export const FEEDBACK_RECHECK_MAX_MS = 60 * 60 * 1000;
+
 /**
  * How did it go? on a trip day's own saved kit (#8), once its outing has
  * started, as the server judges on the destination's clock. Nothing shows
- * before then, or when it can't be checked.
+ * before then, or when it can't be checked. A page left open asks again when
+ * the outing starts, and whenever it's shown again (back from the outing, or
+ * the app brought back), so the card appears without a reload.
  */
-export function TripDayFeedback({ tripId, date, kit, savedAt }: { tripId: string; date: string; kit: SavedKit; savedAt?: string | null }) {
+export function TripDayFeedback({ tripId, date, kit, kitId, savedAt }: {
+  tripId: string; date: string; kit: SavedKit; kitId: string; savedAt?: string | null;
+}) {
   const url = `/api/v1/trips/${tripId}/days/${date}/feedback`;
-  const [state, setState] = useState<{ url: string; savedAt?: string | null; result: TripDayFeedbackState } | null>(null);
+  const version = `${url}:${kitId}:${savedAt}`;
+  const [state, setState] = useState<{ version: string; result: TripDayFeedbackState | null } | null>(null);
+  const [check, setCheck] = useState(0);
   const suggested = useMemo(() => suggestedWornItems(kit), [kit]);
   useEffect(() => {
     let cancelled = false;
     timedTripRequest<TripDayFeedbackState>(url, "GET")
-      .then((result) => { if (!cancelled) setState({ url, savedAt, result }); })
-      .catch(() => { if (!cancelled) setState(null); });
+      .then((result) => { if (!cancelled) setState({ version, result }); })
+      .catch(() => { if (!cancelled) setState({ version, result: null }); });
     return () => { cancelled = true; };
-  }, [url, savedAt]);
-  const current = state?.url === url && state.savedAt === savedAt ? state.result : null;
+  }, [url, version, check]);
+  const current = state?.version === version ? state.result : null;
+  const settled = state?.version === version;
+  const open = current?.status === "open";
+  const opensAt = current?.status === "not_started" ? Date.parse(current.opens_at) : NaN;
+
+  // Until it's open: at the start time (or every hour until then), and whenever the page is shown again.
+  useEffect(() => {
+    if (!settled || open) return;
+    const recheck = () => setCheck((count) => count + 1);
+    const onVisible = () => { if (document.visibilityState === "visible") recheck(); };
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", onVisible);
+    const timer = Number.isFinite(opensAt)
+      ? window.setTimeout(recheck, Math.min(Math.max(opensAt - Date.now(), 0) + 1000, FEEDBACK_RECHECK_MAX_MS))
+      : undefined;
+    return () => {
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearTimeout(timer);
+    };
+  }, [settled, open, opensAt]);
+
   if (current?.status !== "open") return null;
   return (
     <OutingFeedbackCard
-      key={`${url}:${savedAt}`}
+      key={version}
       suggested={suggested}
       initial={current.feedback}
-      onSave={async (answer) => (await timedTripRequest<{ feedback: OutingFeedbackView }>(url, "PUT", { answer })).feedback}
+      // The kit as shown: if it was replaced since, the server says so rather than filing the answer under the new one.
+      onSave={async (answer) => (await timedTripRequest<{ feedback: OutingFeedbackView }>(url, "PUT",
+        { answer, kit: { id: kitId, saved_at: savedAt ?? null } } satisfies TripKitFeedbackRequest)).feedback}
     />
   );
 }

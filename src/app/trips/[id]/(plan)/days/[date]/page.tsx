@@ -280,7 +280,7 @@ export default function DayDetailPage({
           {me && (myKit?.outfit ? (
             <div id={`kit-${me.id}`}>
               <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} dayOuting={dayOuting} />
-              <TripDayFeedback tripId={id} date={date} kit={myKit.outfit} savedAt={myKit.outfit_saved_at} />
+              <TripDayFeedback tripId={id} date={date} kit={myKit.outfit} kitId={myKit.id} savedAt={myKit.outfit_saved_at} />
             </div>
           ) : (
             // Without a row, the Day checklist links to the section itself (#336).

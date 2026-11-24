@@ -67,10 +67,20 @@ export async function PUT(request: Request, context: Context) {
   const body = await readJson(request);
   const answer = readFeedbackAnswer(body?.answer);
   if (typeof answer === "string") return jsonError(answer, 400);
+  const shown = body?.kit as { id?: unknown; saved_at?: unknown } | undefined;
+  if (!shown || typeof shown !== "object" || typeof shown.id !== "string" || !shown.id
+    || (shown.saved_at !== null && typeof shown.saved_at !== "string")) {
+    return jsonError("Say which kit the answer is about.", 400);
+  }
   const found = await ownKit(id, date);
   if (found instanceof NextResponse) return found;
   const { auth, kit, startedAt } = found;
   if (!kit) return jsonError("There's no saved outfit for you on this day.", 404);
+  // The answer is about the kit that was shown: one replaced since (in another tab, or by Update in Gear up) isn't what they saw.
+  if (tripKitSourceKey(shown.id, shown.saved_at as string | null) !== tripKitSourceKey(kit.id, kit.outfit_saved_at)) {
+    return NextResponse.json({ error: "Your kit for this day changed since this page opened. Reload to answer about the kit saved now.",
+      code: "kit_changed" }, { status: 409 });
+  }
   const now = Date.now();
   if (notStarted(startedAt, now)) {
     return NextResponse.json({ error: "Tell us how it went once the outing has started.", code: "not_started",
