@@ -137,6 +137,27 @@ import Testing
         #expect(startedAgain)
     }
 
+    @Test func cancelledRetryOffersRetryAgain() {
+        // A server redirect to mailto: that the policy cancels, or WebKit's
+        // own cancellation: no commit and no failure callback.
+        var overlay = SWTTRFailureOverlay()
+        overlay.loadFailed()
+        _ = overlay.retry()
+        overlay.retryEnded()
+        #expect(overlay.state == .showing)
+        let startedAgain = overlay.retry()
+        #expect(startedAgain)
+    }
+
+    @Test func cancellationsOutsideARetryChangeNothing() {
+        var overlay = SWTTRFailureOverlay()
+        overlay.retryEnded()
+        #expect(overlay.state == .hidden)
+        overlay.loadFailed()
+        overlay.retryEnded()
+        #expect(overlay.state == .showing)
+    }
+
     @Test func handOffsWithoutAFailureChangeNothing() {
         var overlay = SWTTRFailureOverlay()
         overlay.handedOffExternally(hasPage: false)

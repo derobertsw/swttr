@@ -171,8 +171,13 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
     }
 
     private func load(_ url: URL) {
-        retryURL = url
-        webView.load(URLRequest(url: url))
+        load(URLRequest(url: url))
+    }
+
+    /// Keeps the request's method, body and headers, for trusted new windows.
+    private func load(_ request: URLRequest) {
+        retryURL = request.url ?? retryURL
+        webView.load(request)
     }
 
     private func resolveURL(relativePath: String, baseURL: URL) -> URL {
@@ -458,7 +463,7 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
         case .allow where opensNewWindow:
             // Each tab has one web view, so trusted new windows load in place.
             decisionHandler(.cancel)
-            load(url)
+            load(navigationAction.request)
         case .allow:
             if isMainFrame { retryURL = url }
             decisionHandler(.allow)
@@ -467,6 +472,7 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
             openExternally(url)
         case .cancel:
             decisionHandler(.cancel)
+            if isMainFrame && !opensNewWindow { endRetry() }
         }
     }
 
@@ -502,7 +508,10 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
     private func handleLoadFailure(_ error: Error) {
         let error = error as NSError
         let kind = SWTTRLoadFailure.classify(error)
-        if kind == .cancelled { return }
+        if kind == .cancelled {
+            endRetry()
+            return
+        }
         if kind == .network, fallBackFromLocalDev() { return }
         if let failingURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL,
            let host = failingURL.host, navigationPolicy.isAllowedHost(host) {
@@ -549,7 +558,7 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
             userInitiated: navigationAction.navigationType == .linkActivated,
             sourceIsMainFrame: navigationAction.sourceFrame.isMainFrame
         ) {
-        case .allow: load(url)
+        case .allow: load(navigationAction.request)
         case .openExternal: openExternally(url)
         case .cancel: break
         }
@@ -606,6 +615,17 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
         // A Retry that redirects out of the web view never commits, and its
         // cancellation is ignored, so end it here rather than leave Retry disabled.
         failureOverlay.handedOffExternally(hasPage: hasCommittedPage)
+        syncFailureView()
+    }
+
+    /// A Retry whose load was cancelled (by the policy, or by WebKit) without
+    /// committing gets its Retry button back.
+    private func endRetry() {
+        failureOverlay.retryEnded()
+        syncFailureView()
+    }
+
+    private func syncFailureView() {
         switch failureOverlay.state {
         case .hidden: failureView.hide()
         case .showing: failureView.setRetrying(false)

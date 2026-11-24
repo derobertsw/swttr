@@ -88,8 +88,10 @@ and web content crashes.
 failure classification, crash recovery, the Gear Up pulse tracker and config
 resolution. The tabs, the Gear Up button, the injected activity script, the
 Safari sheet, native dialogs and the "Can't reach SWTTR" view have no automated
-tests; check them in the Simulator. To see the offline view, turn off the Mac's
-network (the Simulator shares it) and relaunch.
+tests; check them in the Simulator. To see the offline view, stop `npm run dev`
+first (a running dev server stays reachable on `localhost` without a network),
+then turn off the Mac's network (the Simulator shares it) and relaunch. Debug
+then fails on `localhost`, falls back to `SWTTRWebURL`, and that fails too.
 
 [`.github/workflows/ios-app.yml`](../.github/workflows/ios-app.yml) runs on pull
 requests and pushes to `main` that touch `ios/`, `apple/`, `capacitor-web/`,

@@ -13,9 +13,9 @@ public enum SWTTRLoadFailure: Sendable {
 }
 
 /// Whether a tab's failure view ("Can't reach SWTTR") is showing, and whether
-/// its Retry is in flight. Only a commit, a new failure or a hand-off out of
-/// the web view ends a retry: cancellations are ignored, so a Retry whose page
-/// redirects to another app or a Safari sheet must not leave the view stuck.
+/// its Retry is in flight. A retry ends with a commit, a new failure, a
+/// cancellation or a hand-off out of the web view. Cancellations don't count as
+/// failures, so each of these must end it, or Retry stays disabled.
 public struct SWTTRFailureOverlay: Equatable, Sendable {
     public enum State: Equatable, Sendable {
         case hidden
@@ -36,6 +36,13 @@ public struct SWTTRFailureOverlay: Equatable, Sendable {
         guard state == .showing else { return false }
         state = .retrying
         return true
+    }
+
+    /// Retry's load was cancelled without committing, by the navigation policy
+    /// (a script redirect to `mailto:`, say) or by WebKit. The view stays up
+    /// with Retry available again.
+    public mutating func retryEnded() {
+        if state == .retrying { state = .showing }
     }
 
     /// A page committed, so the web view has content again.
