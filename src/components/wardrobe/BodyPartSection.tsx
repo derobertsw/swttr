@@ -23,7 +23,7 @@ export function BodyPartSection({ area, itemCount, onAddGear, children }: BodyPa
   const headingId = sectionHeadingId(area);
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-2">
+    <section aria-labelledby={headingId} className="@container flex flex-col gap-2">
       <h2 id={headingId} tabIndex={-1} className="flex items-baseline gap-2 text-lg font-semibold text-foreground">
         {label}
         <span className="text-sm font-medium text-muted-foreground tabular-nums">
@@ -32,7 +32,7 @@ export function BodyPartSection({ area, itemCount, onAddGear, children }: BodyPa
         </span>
       </h2>
       {itemCount === 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-dashed border-border py-2 pr-2 pl-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-dashed border-border py-2 pr-2 pl-4 lg:max-w-3xl">
           <p className="text-sm text-muted-foreground">No {label.toLowerCase()} gear yet.</p>
           <Button type="button" variant="ghost" size="sm" onClick={onAddGear}>
             <Plus />
@@ -40,7 +40,8 @@ export function BodyPartSection({ area, itemCount, onAddGear, children }: BodyPa
           </Button>
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">{children}</ul>
+        // From lg, rows sit two across, and three once each keeps about 340px.
+        <ul className="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:@5xl:grid-cols-3">{children}</ul>
       )}
     </section>
   );

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <PageLayout>
-      <article className="w-full max-w-2xl space-y-8 text-sm leading-relaxed text-muted-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-foreground [&_li]:pl-1 [&_strong]:font-semibold [&_strong]:text-foreground">
+      <article className="w-full max-w-2xl space-y-8 lg:self-start text-sm leading-relaxed text-muted-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-foreground [&_li]:pl-1 [&_strong]:font-semibold [&_strong]:text-foreground">
         <header className="space-y-3">
           <h1 className="text-title font-semibold text-foreground md:text-title-lg">Privacy Policy</h1>
           <p>Last updated: <time dateTime="2026-11-01">November 1, 2026</time></p>

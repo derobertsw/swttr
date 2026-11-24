@@ -255,7 +255,8 @@ export default function Wardrobe() {
 
   return (
     <PageLayout chromeVariant="compact">
-      <div className="flex w-full max-w-3xl flex-col gap-4 pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
+      {/* From lg the page uses the whole canvas; single blocks keep a reading width. */}
+      <div className="flex w-full max-w-3xl flex-col gap-4 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-0 lg:max-w-none">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-title font-semibold text-foreground md:text-title-lg">Wardrobe</h1>
@@ -278,7 +279,7 @@ export default function Wardrobe() {
         </p>
 
         {wardrobeStatus === "loading" && (
-          <div aria-busy="true" aria-label="Loading your wardrobe" className="flex flex-col gap-3 py-2">
+          <div aria-busy="true" aria-label="Loading your wardrobe" className="flex flex-col gap-3 py-2 lg:max-w-3xl">
             <Skeleton className="h-11 w-full rounded-control" />
             <Skeleton className="h-20 w-full rounded-card" />
             <Skeleton className="h-20 w-full rounded-card" />
@@ -287,7 +288,7 @@ export default function Wardrobe() {
         )}
 
         {wardrobeStatus === "error" && (
-          <Card role="alert" className="flex flex-col items-start gap-3">
+          <Card role="alert" className="flex flex-col items-start gap-3 lg:max-w-3xl">
             <div>
               <h2 className="text-base font-semibold text-foreground">Couldn&apos;t load your wardrobe</h2>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -302,7 +303,7 @@ export default function Wardrobe() {
         )}
 
         {isEmpty && (
-          <section aria-labelledby="wardrobe-empty" className="rounded-card border border-dashed border-border p-5">
+          <section aria-labelledby="wardrobe-empty" className="rounded-card border border-dashed border-border p-5 lg:max-w-3xl">
             <h2 id="wardrobe-empty" className="text-base font-semibold text-foreground">
               Add the gear you own
             </h2>
@@ -333,8 +334,9 @@ export default function Wardrobe() {
 
         {isReady && overview.totalItems > 0 && (
           <>
-            <div className="flex flex-col gap-3">
-              <div className="relative">
+            {/* Side by side from lg when the chips fit on the line; otherwise they wrap below. */}
+            <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+              <div className="relative lg:w-80 lg:shrink-0">
                 <Search
                   aria-hidden="true"
                   className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
@@ -360,11 +362,11 @@ export default function Wardrobe() {
                   </Button>
                 )}
               </div>
-              <BodyAreaChips value={ownedBodyArea} onChange={setOwnedBodyArea} />
+              <BodyAreaChips value={ownedBodyArea} onChange={setOwnedBodyArea} className="lg:shrink-0" />
             </div>
 
             {overview.allExcluded && !isFiltering && (
-              <Card variant="muted" padding="sm">
+              <Card variant="muted" padding="sm" className="lg:max-w-3xl">
                 <p className="text-sm text-foreground">
                   Every item is excluded, so recommendations can&apos;t use any of your gear. Use an item&apos;s
                   menu to include it again.
@@ -373,7 +375,7 @@ export default function Wardrobe() {
             )}
 
             {isFiltering && ownedMatchCount === 0 ? (
-              <div className="rounded-card border border-dashed border-border p-5 text-center">
+              <div className="rounded-card border border-dashed border-border p-5 text-center lg:max-w-3xl">
                 <p className="font-medium text-foreground">
                   {ownedSearch.trim()
                     ? `None of your gear matches “${ownedSearch.trim()}”`
@@ -431,7 +433,7 @@ export default function Wardrobe() {
         )}
 
         {recentlyRemoved.length > 0 && (
-          <section aria-labelledby="recently-removed" className="mt-2 rounded-card border border-border bg-card p-3">
+          <section aria-labelledby="recently-removed" className="mt-2 rounded-card border border-border bg-card p-3 lg:max-w-3xl">
             <div className="flex items-center justify-between gap-2">
               <h2 id="recently-removed" className="text-sm font-semibold text-foreground">
                 Recently removed
