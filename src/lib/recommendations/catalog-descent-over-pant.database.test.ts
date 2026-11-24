@@ -54,6 +54,8 @@ describe('#412 belay over-pant seed in Postgres', () => {
   }, 30_000);
 
   it('seeds the values the golden fixture uses', async () => {
+    // The seed is idempotent, so applying it here lets this test run on its own.
+    await db.exec(seed);
     const [row] = await overPants();
     const fixture = catalog.garments.find(g => g.brand === 'Black Diamond' && g.model_name === 'Solution 4.0 Pants') as Row | undefined;
     expect(fixture).toBeDefined();
