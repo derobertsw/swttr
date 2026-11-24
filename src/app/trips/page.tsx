@@ -19,7 +19,11 @@ import { tripOpenHref } from "@/lib/trip-sections";
 import { useUserId } from "@/hooks/useUserId";
 import { countSavedBriefs } from "@/lib/offline-briefs";
 import { SAVED_BRIEFS_PATH } from "@/lib/offline-shell";
+import { cn } from "@/lib/utils";
 import type { TripSummary } from "@/types/trips";
+
+/** One trip to a row, and two from lg, where the list has the whole canvas. */
+const TRIP_GRID = "grid grid-cols-1 gap-2.5 lg:grid-cols-2";
 
 const STATUS_LABEL: Record<TripSummary["status"], string> = {
   planning: "Planning",
@@ -82,21 +86,24 @@ export default function TripsHomePage() {
 
   return (
     <PageLayout chromeVariant="compact">
-      <div className="flex w-full max-w-3xl flex-col gap-5">
-        <header>
-          <SectionLabel>Your trips</SectionLabel>
-          <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">Trips</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Pick a trip to plan kits, manage your crew, and pack faster.
-          </p>
-        </header>
+      {/* From lg the list uses the whole canvas (#267): the title beside New trip, and trips two to a row. */}
+      <div className="flex w-full max-w-3xl flex-col gap-5 lg:max-w-none">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
+          <header>
+            <SectionLabel>Your trips</SectionLabel>
+            <h1 className="mt-1 text-title font-semibold text-foreground md:text-title-lg">Trips</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pick a trip to plan kits, manage your crew, and pack faster.
+            </p>
+          </header>
 
-        <Button asChild size="lg" className="w-full">
-          <Link href="/trips/new">
-            <Plus />
-            New trip
-          </Link>
-        </Button>
+          <Button asChild size="lg" className="w-full lg:w-auto lg:shrink-0">
+            <Link href="/trips/new">
+              <Plus />
+              New trip
+            </Link>
+          </Button>
+        </div>
 
         {saved > 0 && (
           <Link href={SAVED_BRIEFS_PATH} className="inline-flex min-h-11 w-fit items-center text-base font-semibold text-primary underline-offset-2 hover:underline">
@@ -107,13 +114,13 @@ export default function TripsHomePage() {
         {error && <TripError>{error}</TripError>}
 
         {trips === null && !error ? (
-          <div className="flex flex-col gap-3">
+          <div className={cn(TRIP_GRID, "gap-3")}>
             <Skeleton className="h-24 w-full rounded-card" />
             <Skeleton className="h-24 w-full rounded-card" />
             <Skeleton className="h-24 w-full rounded-card" />
           </div>
         ) : trips && trips.length === 0 ? (
-          <Card variant="muted" padding="lg" className="py-10 text-center">
+          <Card variant="muted" padding="lg" className="py-10 text-center lg:max-w-3xl">
             <MapPin className="mx-auto mb-3 size-8 text-muted-foreground" aria-hidden />
             <p className="text-base font-semibold text-foreground">No trips yet</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -125,24 +132,28 @@ export default function TripsHomePage() {
             {grouped.upcoming.length > 0 && (
               <section className="flex flex-col gap-2.5">
                 <SectionLabel>Upcoming</SectionLabel>
-                {grouped.upcoming.map((trip, i) => (
-                  <TripRow key={trip.id} trip={trip} next={i === 0} />
-                ))}
+                <div className={TRIP_GRID}>
+                  {grouped.upcoming.map((trip, i) => (
+                    <TripRow key={trip.id} trip={trip} next={i === 0} />
+                  ))}
+                </div>
               </section>
             )}
             {grouped.past.length > 0 && (
               <section className="flex flex-col gap-2.5">
                 <SectionLabel>Past</SectionLabel>
-                {grouped.past.map((trip) => (
-                  <TripRow key={trip.id} trip={trip} />
-                ))}
+                <div className={TRIP_GRID}>
+                  {grouped.past.map((trip) => (
+                    <TripRow key={trip.id} trip={trip} />
+                  ))}
+                </div>
               </section>
             )}
           </>
         )}
 
         {/* Spacer for mobile tab bar */}
-        <div className="h-24" />
+        <div className="h-24 md:hidden" />
       </div>
     </PageLayout>
   );

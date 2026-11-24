@@ -167,11 +167,31 @@ describe("PageLayout", () => {
     expect(document.querySelector('[data-slot="sidebar"]')).toHaveClass("hidden", "md:block");
   });
 
-  it("shows the avatar in the header at every width, not only beside the sidebar", () => {
+  it("shows the avatar in the sidebar on desktop and in the header on phones (#267)", () => {
     renderLayout();
-    // jsdom applies no media queries, so check that no breakpoint class hides it.
+    // jsdom applies no media queries, so both render; CSS hides one per width.
+    const [inSidebar, inHeader] = screen.getAllByTestId("user-button");
+    expect(screen.getAllByTestId("user-button")).toHaveLength(2);
+    expect(inSidebar.closest('[data-slot="sidebar"]')).toHaveClass("hidden", "md:block");
+    expect(inHeader.closest("header")).toHaveClass("md:hidden");
+    expect(inHeader.closest(".hidden")).toBeNull();
+  });
+
+  it("mounts only the header's avatar below 768px", () => {
+    setWidth(390);
+    renderLayout();
     expect(screen.getAllByTestId("user-button")).toHaveLength(1);
-    expect(screen.getByTestId("user-button").closest(".hidden")).toBeNull();
+    expect(screen.getByTestId("user-button").closest("header")).not.toBeNull();
+  });
+
+  it("takes the header out of the page on desktop web, so content starts at the top (#267)", () => {
+    renderLayout();
+    expect(screen.getByRole("banner")).toHaveClass("md:hidden");
+  });
+
+  it("starts pages at the canvas's left edge from 1024px and centres them below", () => {
+    renderLayout();
+    expect(screen.getByRole("main")).toHaveClass("items-center", "lg:items-start");
   });
 
   it.each([700, 1280])("uses native navigation and bottom padding on Mac at %ipx", (width) => {
@@ -182,6 +202,7 @@ describe("PageLayout", () => {
     expect(document.querySelector('[data-slot="sidebar"]')).toBeNull();
     expect(screen.getByRole("main").parentElement).toHaveClass("pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]");
     expect(screen.getByRole("button", { name: "Open menu" })).not.toHaveClass("md:hidden");
+    expect(screen.getByRole("banner")).not.toHaveClass("md:hidden");
     expect(StatusBar.setStyle).not.toHaveBeenCalled();
   });
 
@@ -212,6 +233,7 @@ describe("PageLayout", () => {
       expect(document.querySelector('[data-slot="sidebar"]')).toBeNull();
       expect(screen.getByRole("button", { name: "Open menu" })).not.toHaveClass("md:hidden");
       expect(screen.getByTestId("user-button").closest(".hidden")).toBeNull();
+      expect(screen.getByRole("banner")).not.toHaveClass("md:hidden");
     } finally {
       userAgent.mockRestore();
     }

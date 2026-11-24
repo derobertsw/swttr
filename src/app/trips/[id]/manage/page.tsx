@@ -248,7 +248,7 @@ export default function ManageCrewPage({ params }: { params: Promise<{ id: strin
           <p className="text-sm text-muted-foreground">
             Removing someone also deletes their kits for this trip.
           </p>
-          <div className="h-24" />
+          <div className="h-24 md:hidden" />
         </>
       )}
 

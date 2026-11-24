@@ -5,8 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { Share2, HelpCircle, Menu, MessageSquare, Settings } from "lucide-react";
-import { toast } from "sonner";
-import { logWarn } from "@/lib/logger";
+import { shareApp } from "@/lib/share-app";
 import { AccountMenu, type AccountMenuHandle } from "@/components/AccountMenu";
 import { PreferencesDrawer } from "@/components/PreferencesDrawer";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -29,6 +28,9 @@ interface HeaderProps {
   variant?: "default" | "compact";
 }
 
+// The sidebar's avatar or Sign in link (see AppSidebar).
+const SIDEBAR_ACCOUNT_CONTROL = "[data-account-control] a[href], [data-account-control] button";
+
 const MENU_ITEM_CLASS =
   "flex min-h-11 w-full items-center gap-3 rounded-control px-3 text-left text-base font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground [&>svg]:size-5 [&>svg]:text-muted-foreground";
 
@@ -40,7 +42,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   const accountMenuRef = useRef<AccountMenuHandle>(null);
   const pendingPreferences = useRef<number | null>(null);
   const preferencesFocus = useReturnFocus();
-  // The native shell has no web sidebar, so its menu and logo show at every width.
+  // The native shell has no web sidebar, so its header shows at every width.
   const nativeShell = useNativeShell();
   const isNativeShell = nativeShell !== null;
   const mobileOnly = isNativeShell ? undefined : "md:hidden";
@@ -57,49 +59,36 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
     updateBodyMetrics,
   } = usePreferences();
 
-  const handleShare = async () => {
-    const shareData = {
-      title: "SWTTR",
-      text: "Check out SWTTR - get clothing recommendations for outdoor activities!",
-      url: window.location.origin,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        if (err instanceof Error && err.name !== "AbortError") {
-          logWarn("Header.share", err);
-        }
-      }
-    } else {
-      await navigator.clipboard.writeText(shareData.url);
-      toast.success("Link copied to clipboard!");
-    }
-  };
-
   const menuButton = useCallback(() => document.getElementById(menuButtonId), [menuButtonId]);
-  // The avatar when signed in, or the Sign in link after a sign-out.
+  // The avatar, while signed in.
   const accountControl = useCallback(() => accountAreaRef.current?.querySelector<HTMLElement>("a[href], button") ?? null, []);
+  // Where focus can go when a control that opened an overlay has since been
+  // hidden: the menu button and the avatar here, or the sidebar's account
+  // control once the window is wide enough to hide this header.
+  const firstShown = useCallback(
+    (...controls: Array<HTMLElement | null>) =>
+      [...controls, document.querySelector<HTMLElement>(SIDEBAR_ACCOUNT_CONTROL)].find(isShown) ?? null,
+    []
+  );
 
   const openPreferencesFromMenu = useCallback(() => {
     if (pendingPreferences.current !== null) return;
     // The menu, and its Settings item, close first, so focus returns to the
-    // menu button, or to the account area if the window has since widened.
-    preferencesFocus.remember(() => [menuButton(), accountControl()].find(isShown) ?? null);
+    // menu button, or to the account control if the window has since widened.
+    preferencesFocus.remember(() => firstShown(menuButton(), accountControl()));
     setMobileMenuOpen(false);
     pendingPreferences.current = window.setTimeout(() => {
       pendingPreferences.current = null;
       setPreferencesOpen(true);
     }, 120);
-  }, [preferencesFocus, menuButton, accountControl]);
+  }, [preferencesFocus, menuButton, accountControl, firstShown]);
 
   const openPreferencesFromAvatar = useCallback(() => {
     // The avatar's menu item is gone, so focus returns to the avatar, or to
     // whatever replaced it after a sign-out.
-    preferencesFocus.remember(() => [accountControl(), menuButton()].find(isShown) ?? null);
+    preferencesFocus.remember(() => firstShown(accountControl(), menuButton()));
     setPreferencesOpen(true);
-  }, [preferencesFocus, menuButton, accountControl]);
+  }, [preferencesFocus, menuButton, accountControl, firstShown]);
 
   useEffect(() => () => {
     if (pendingPreferences.current !== null) window.clearTimeout(pendingPreferences.current);
@@ -120,7 +109,10 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
   return (
     <header className={cn(
       "flex w-full items-center justify-between",
-      variant === "compact" ? "gap-3" : "gap-4"
+      variant === "compact" ? "gap-3" : "gap-4",
+      // On desktop web the sidebar has the wordmark, the account control and
+      // everything in the menu, so this row leaves the page (#267).
+      mobileOnly
     )}>
       <div className="flex items-center gap-2">
         {/* Mobile: show logo. It's a wordmark, so it keeps its pixel size when
@@ -141,25 +133,11 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* The avatar shows at every width. Below md, and in the native shell,
-            Sign in is in the menu instead. */}
+        {/* Signed out, Sign in is in the menu. */}
         <div ref={accountAreaRef} className="flex items-center gap-4">
           <SignedIn>
-            <AccountMenu ref={accountMenuRef} onOpenSettings={openPreferencesFromAvatar} onShare={handleShare} />
+            <AccountMenu ref={accountMenuRef} onOpenSettings={openPreferencesFromAvatar} onShare={shareApp} />
           </SignedIn>
-          {showSignIn && (
-            <SignedOut>
-              <Link
-                href="/sign-in"
-                className={cn(
-                  "hidden min-h-11 items-center rounded-control px-2 text-sm font-semibold text-foreground underline-offset-4 hover:underline",
-                  !isNativeShell && "md:inline-flex"
-                )}
-              >
-                Sign in
-              </Link>
-            </SignedOut>
-          )}
         </div>
 
         {/* Mobile: hamburger menu */}
@@ -175,10 +153,10 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
             className="w-64"
             onCloseAutoFocus={(event) => {
               // The window widened past md while the menu was open, which
-              // hid the menu button, so focus the account area instead.
+              // hid the menu button, so focus the account control instead.
               if (isShown(menuButton())) return;
               event.preventDefault();
-              accountControl()?.focus({ preventScroll: true });
+              firstShown(accountControl())?.focus({ preventScroll: true });
             }}
           >
             <SheetHeader>
@@ -224,7 +202,7 @@ const Header = ({ onLogoClick, variant = "default" }: HeaderProps) => {
                 Feedback
               </a>
               <button
-                onClick={handleShare}
+                onClick={shareApp}
                 className={MENU_ITEM_CLASS}
               >
                 <Share2 />

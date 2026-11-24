@@ -5,6 +5,7 @@ import { UserButton, useAuth, useClerk } from "@clerk/nextjs";
 import { HelpCircle, LogOut, Settings, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { clearSavedBriefs, countSavedBriefs, noteSignedInAccount, savedBriefsAccountHint } from "@/lib/offline-briefs";
 
 // Clerk's menu hands focus back to the avatar in a microtask once it closes.
@@ -32,8 +33,25 @@ const APPEARANCE = {
   },
 };
 
+// In the sidebar the trigger is the size of the other items: 32px, or 44px on
+// touch screens.
+const SIDEBAR_APPEARANCE = {
+  elements: {
+    ...APPEARANCE.elements,
+    userButtonTrigger: {
+      ...APPEARANCE.elements.userButtonTrigger,
+      width: "2rem",
+      height: "2rem",
+      flexShrink: 0,
+      "@media (pointer: coarse)": { width: "2.75rem", height: "2.75rem" },
+    },
+  },
+};
+
 interface AccountMenuProps {
   ref?: Ref<AccountMenuHandle>;
+  /** "sidebar" adds the account's name beside the avatar, as a row that opens the same menu. */
+  placement?: "header" | "sidebar";
   onOpenSettings: () => void;
   onShare: () => void;
 }
@@ -47,10 +65,15 @@ export interface AccountMenuHandle {
  * account management, FAQ, Share and, last, Sign out. Signing out removes
  * the trip briefs saved on this device (#214), and asks first when there are some.
  */
-export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) {
+export function AccountMenu({ ref, placement = "header", onOpenSettings, onShare }: AccountMenuProps) {
   const rootRef = useRef<HTMLSpanElement>(null);
   const pendingSettings = useRef<AbortController | null>(null);
-  const { signOut } = useClerk();
+  const { signOut, user } = useClerk();
+  const inSidebar = placement === "sidebar";
+  // Whether the menu was open as a press on the name began. That press closes
+  // it, and the click that follows must not open it again.
+  const openAtPress = useRef(false);
+  const trigger = () => rootRef.current?.querySelector<HTMLButtonElement>("button[aria-expanded]") ?? null;
   const { userId } = useAuth();
   // How many saved trip briefs signing out would remove, while that's being confirmed.
   const [confirming, setConfirming] = useState<number | null>(null);
@@ -125,8 +148,15 @@ export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) 
   }));
 
   return (
-    <span ref={rootRef} className="inline-flex">
-      <UserButton appearance={APPEARANCE}>
+    <span
+      ref={rootRef}
+      className={cn(
+        "inline-flex",
+        inSidebar &&
+          "min-h-10 w-full items-center gap-2 rounded-control text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:min-h-0 group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:hover:bg-transparent"
+      )}
+    >
+      <UserButton appearance={inSidebar ? SIDEBAR_APPEARANCE : APPEARANCE}>
         <UserButton.MenuItems>
           <UserButton.Action label="Settings" labelIcon={<Settings size={16} />} onClick={openSettings} />
           <UserButton.Action label="manageAccount" />
@@ -135,6 +165,19 @@ export function AccountMenu({ ref, onOpenSettings, onShare }: AccountMenuProps) 
           <UserButton.Action label="Sign out" labelIcon={<LogOut size={16} />} onClick={requestSignOut} />
         </UserButton.MenuItems>
       </UserButton>
+      {inSidebar && (
+        // A bigger pointer target for the avatar beside it, which stays the
+        // one control for the keyboard and for screen readers.
+        <span
+          aria-hidden="true"
+          data-account-name
+          className="min-w-0 flex-1 cursor-pointer truncate py-2 pr-2 group-data-[collapsible=icon]:hidden"
+          onPointerDown={() => { openAtPress.current = trigger()?.getAttribute("aria-expanded") === "true"; }}
+          onClick={() => { if (!openAtPress.current) trigger()?.click(); }}
+        >
+          {user?.fullName || user?.firstName || "Account"}
+        </span>
+      )}
       <Dialog open={confirming !== null} onOpenChange={(open) => { if (!open && !signingOut) { setConfirming(null); setSignOutError(null); } }}>
         <DialogContent
           showCloseButton={!signingOut}

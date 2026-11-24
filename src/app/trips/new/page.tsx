@@ -156,7 +156,7 @@ function TripDraftForm({ userId }: { userId: string }) {
 
   return (
     <PageLayout chromeVariant="compact">
-      <div className="flex w-full max-w-2xl flex-col gap-6 pb-24">
+      <div className="flex w-full max-w-2xl flex-col gap-6 pb-24 md:pb-0">
         <BackLink href="/trips">All trips</BackLink>
         <header>
           <SectionLabel>Plan a trip</SectionLabel>

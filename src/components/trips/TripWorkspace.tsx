@@ -49,11 +49,12 @@ export function TripWorkspace({ tripId, children }: { tripId: string; children: 
   return (
     <PageLayout chromeVariant="compact">
       <div className="flex w-full min-w-0 flex-col gap-5">
-        <header className="flex min-w-0 flex-col gap-1">
-          <div className="flex flex-wrap items-center justify-between gap-x-3">
+        {/* From lg the back link has its own row, and Edit trip sits beside the name (#267). */}
+        <header className="flex min-w-0 flex-col gap-1 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-x-6">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 lg:contents">
             <BackLink href="/trips">All trips</BackLink>
             {summary && location?.subpath !== "/settings" && (
-              <Button asChild variant="outline" size="sm">
+              <Button asChild variant="outline" size="sm" className="lg:col-start-2 lg:row-span-3 lg:row-start-2 lg:self-start">
                 <Link href={`/trips/${tripId}/settings`}>
                   <Settings />
                   Edit trip
@@ -63,12 +64,12 @@ export function TripWorkspace({ tripId, children }: { tripId: string; children: 
           </div>
           {summary && (
             <>
-              <Title className="text-xl font-semibold text-foreground wrap-anywhere">{summary.name}</Title>
-              <p className="text-sm text-muted-foreground">
+              <Title className="text-xl font-semibold text-foreground wrap-anywhere lg:col-start-1 lg:row-start-2">{summary.name}</Title>
+              <p className="text-sm text-muted-foreground lg:col-start-1 lg:row-start-3">
                 {formatDateRange(summary.start_date, summary.end_date)} · {dayCount(summary.start_date, summary.end_date)}
               </p>
               {/* A new trip opens here once it's saved (#169). */}
-              {Title === "h1" && <p role="status" className="text-sm text-success">Saved trip</p>}
+              {Title === "h1" && <p role="status" className="text-sm text-success lg:col-start-1 lg:row-start-4">Saved trip</p>}
             </>
           )}
         </header>

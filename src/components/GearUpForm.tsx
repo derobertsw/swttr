@@ -179,170 +179,175 @@ export function GearUpForm({
       noValidate
       aria-label="Outing"
       onSubmit={handleSubmit}
-      className="flex w-full max-w-md flex-col gap-6"
+      // From lg, what you're doing sits beside where and when (#267).
+      className="flex w-full max-w-md flex-col gap-6 lg:grid lg:max-w-none lg:grid-cols-2 lg:items-start lg:gap-x-8 xl:grid-cols-12 xl:gap-x-12"
     >
-      {activityInitializing ? (
-        <div className="flex flex-col gap-2" aria-busy="true">
-          <p className="text-sm font-medium text-foreground">Activity</p>
-          <div className="grid grid-cols-2 gap-2 min-[400px]:grid-cols-3">
-            {ACTIVITIES.map((item) => (
-              <Skeleton key={item.value} className="h-18 rounded-control" />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <ActivitySelection
-          value={activity}
-          onChange={onActivityChange}
-          exertion={exertion}
-          onExertionChange={onExertionChange}
-          xcContext={xcContext}
-          onXCContextChange={onXCContextChange}
-        />
-      )}
-
-      <div className="flex flex-col gap-3">
-        <LocationAutocomplete
-          label="Where?"
-          placeholder="Search for a town or mountain"
-          location={location}
-          locationQuery={locationQuery}
-          suggestions={suggestions}
-          showSuggestions={showSuggestions}
-          selectedLocation={selectedLocation}
-          isSearching={isSearching}
-          error={placeError}
-          suggestionRef={suggestionRef}
-          onLocationInputChange={onLocationInputChange}
-          onLocationFocus={onLocationFocus}
-          onSelectLocation={onSelectLocation}
-          onDismiss={onDismissSuggestions}
-        />
-        <DeviceLocationButton
-          label="Use my location"
-          status={locationStatus}
-          disabled={loading}
-          onLocate={onUseMyLocation}
-          onCancel={onCancelLocating}
-        />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <SegmentedChoice label="When?" options={WHEN_OPTIONS} value={inputMode} onChange={onInputModeChange} />
-
-        {later && (
-          <>
-            <div className="flex flex-col gap-3 min-[375px]:flex-row">
-              <div className="flex flex-col gap-2 min-[375px]:flex-1">
-                {useNativeIOSDatePicker ? (
-                  <>
-                    <label htmlFor="start-date" className="text-sm font-medium text-foreground">
-                      Start date
-                    </label>
-                    <div className="relative">
-                      <CalendarIcon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        ref={dateInputRef}
-                        id="start-date"
-                        type="date"
-                        value={date ? format(date, "yyyy-MM-dd") : ""}
-                        onChange={(event) => onDateChange(parseDateInputValue(event.target.value))}
-                        className="pl-10"
-                        aria-invalid={dateError ? true : undefined}
-                        aria-describedby={dateError ? "start-date-error" : undefined}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p id="start-date-label" className="text-sm font-medium text-foreground">
-                      Start date
-                    </p>
-                    <Popover open={dateOpen} onOpenChange={setDateOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          ref={dateButtonRef}
-                          id="start-date"
-                          type="button"
-                          variant="outline"
-                          // Read as "Start date, Oct 8, 2026", or "Start date, Pick a date".
-                          aria-labelledby="start-date-label start-date"
-                          aria-invalid={dateError ? true : undefined}
-                          aria-describedby={dateError ? "start-date-error" : undefined}
-                          className={cn(fieldClassName, "justify-start text-left font-normal", !date && "text-muted-foreground")}
-                        >
-                          <CalendarIcon aria-hidden="true" className="text-muted-foreground" />
-                          {date ? format(date, "MMM d, yyyy") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={date}
-                          onSelect={(selectedDate) => {
-                            onDateChange(selectedDate);
-                            if (selectedDate) setDateOpen(false);
-                          }}
-                          // Today at the place, which may not be the device's today.
-                          today={toPickerDate(zonedNow(selectedLocation?.timeZone).slice(0, 10))}
-                          autoFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </>
-                )}
-              </div>
-              <div className="flex flex-col gap-2 min-[375px]:w-40">
-                <label htmlFor="start-time" className="text-sm font-medium text-foreground">
-                  Start time
-                </label>
-                <Input
-                  id="start-time"
-                  type="time"
-                  value={time}
-                  onChange={(event) => onTimeChange(event.target.value)}
-                  className="tabular-nums"
-                  aria-invalid={timeError ? true : undefined}
-                  aria-describedby={timeError ? "start-time-error" : undefined}
-                />
-              </div>
+      <div className="min-w-0 xl:col-span-7">
+        {activityInitializing ? (
+          <div className="flex flex-col gap-2" aria-busy="true">
+            <p className="text-sm font-medium text-foreground">Activity</p>
+            <div className="grid grid-cols-2 gap-2 min-[400px]:grid-cols-3">
+              {ACTIVITIES.map((item) => (
+                <Skeleton key={item.value} className="h-18 rounded-control" />
+              ))}
             </div>
-            {dateError && <FieldError id="start-date-error">{dateError}</FieldError>}
-            {timeError && <FieldError id="start-time-error">{timeError}</FieldError>}
-
-            <SegmentedChoice
-              label="How long?"
-              options={LENGTH_OPTIONS}
-              value={severalDays ? "several" : "one"}
-              onChange={(length) => onDurationDaysChange(length === "one" ? 1 : 3)}
-            />
-
-            {severalDays && (
-              <DaysStepper days={durationDays} onChange={onDurationDaysChange} />
-            )}
-
-            <p className="text-sm text-muted-foreground">
-              {severalDays
-                ? "Each day's layers use the forecast from 6 am to 9 pm. On the first day, they start at your start time if it's after 6 am."
-                : "Layers use the forecast for the hour you start."}{" "}
-              Dates and times are local to the place.
-            </p>
-          </>
+          </div>
+        ) : (
+          <ActivitySelection
+            value={activity}
+            onChange={onActivityChange}
+            exertion={exertion}
+            onExertionChange={onExertionChange}
+            xcContext={xcContext}
+            onXCContextChange={onXCContextChange}
+          />
         )}
       </div>
 
-      <Button
-        type="submit"
-        size="lg"
-        className="w-full"
-        loading={loading}
-        // Waits for a requested location, which becomes the place.
-        disabled={locationStatus === "locating"}
-      >
-        {submitLabel}
-      </Button>
-      {/* Says the request is running: a focused button's new label isn't always announced (#284). */}
-      <p role="status" className="sr-only">{loading ? submitLabel : null}</p>
+      <div className="flex min-w-0 flex-col gap-6 xl:col-span-5">
+        <div className="flex flex-col gap-3">
+          <LocationAutocomplete
+            label="Where?"
+            placeholder="Search for a town or mountain"
+            location={location}
+            locationQuery={locationQuery}
+            suggestions={suggestions}
+            showSuggestions={showSuggestions}
+            selectedLocation={selectedLocation}
+            isSearching={isSearching}
+            error={placeError}
+            suggestionRef={suggestionRef}
+            onLocationInputChange={onLocationInputChange}
+            onLocationFocus={onLocationFocus}
+            onSelectLocation={onSelectLocation}
+            onDismiss={onDismissSuggestions}
+          />
+          <DeviceLocationButton
+            label="Use my location"
+            status={locationStatus}
+            disabled={loading}
+            onLocate={onUseMyLocation}
+            onCancel={onCancelLocating}
+          />
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <SegmentedChoice label="When?" options={WHEN_OPTIONS} value={inputMode} onChange={onInputModeChange} />
+
+          {later && (
+            <>
+              <div className="flex flex-col gap-3 min-[375px]:flex-row">
+                <div className="flex flex-col gap-2 min-[375px]:flex-1">
+                  {useNativeIOSDatePicker ? (
+                    <>
+                      <label htmlFor="start-date" className="text-sm font-medium text-foreground">
+                        Start date
+                      </label>
+                      <div className="relative">
+                        <CalendarIcon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          ref={dateInputRef}
+                          id="start-date"
+                          type="date"
+                          value={date ? format(date, "yyyy-MM-dd") : ""}
+                          onChange={(event) => onDateChange(parseDateInputValue(event.target.value))}
+                          className="pl-10"
+                          aria-invalid={dateError ? true : undefined}
+                          aria-describedby={dateError ? "start-date-error" : undefined}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p id="start-date-label" className="text-sm font-medium text-foreground">
+                        Start date
+                      </p>
+                      <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            ref={dateButtonRef}
+                            id="start-date"
+                            type="button"
+                            variant="outline"
+                            // Read as "Start date, Oct 8, 2026", or "Start date, Pick a date".
+                            aria-labelledby="start-date-label start-date"
+                            aria-invalid={dateError ? true : undefined}
+                            aria-describedby={dateError ? "start-date-error" : undefined}
+                            className={cn(fieldClassName, "justify-start text-left font-normal", !date && "text-muted-foreground")}
+                          >
+                            <CalendarIcon aria-hidden="true" className="text-muted-foreground" />
+                            {date ? format(date, "MMM d, yyyy") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={date}
+                            onSelect={(selectedDate) => {
+                              onDateChange(selectedDate);
+                              if (selectedDate) setDateOpen(false);
+                            }}
+                            // Today at the place, which may not be the device's today.
+                            today={toPickerDate(zonedNow(selectedLocation?.timeZone).slice(0, 10))}
+                            autoFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 min-[375px]:w-40">
+                  <label htmlFor="start-time" className="text-sm font-medium text-foreground">
+                    Start time
+                  </label>
+                  <Input
+                    id="start-time"
+                    type="time"
+                    value={time}
+                    onChange={(event) => onTimeChange(event.target.value)}
+                    className="tabular-nums"
+                    aria-invalid={timeError ? true : undefined}
+                    aria-describedby={timeError ? "start-time-error" : undefined}
+                  />
+                </div>
+              </div>
+              {dateError && <FieldError id="start-date-error">{dateError}</FieldError>}
+              {timeError && <FieldError id="start-time-error">{timeError}</FieldError>}
+
+              <SegmentedChoice
+                label="How long?"
+                options={LENGTH_OPTIONS}
+                value={severalDays ? "several" : "one"}
+                onChange={(length) => onDurationDaysChange(length === "one" ? 1 : 3)}
+              />
+
+              {severalDays && (
+                <DaysStepper days={durationDays} onChange={onDurationDaysChange} />
+              )}
+
+              <p className="text-sm text-muted-foreground">
+                {severalDays
+                  ? "Each day's layers use the forecast from 6 am to 9 pm. On the first day, they start at your start time if it's after 6 am."
+                  : "Layers use the forecast for the hour you start."}{" "}
+                Dates and times are local to the place.
+              </p>
+            </>
+          )}
+        </div>
+
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full"
+          loading={loading}
+          // Waits for a requested location, which becomes the place.
+          disabled={locationStatus === "locating"}
+        >
+          {submitLabel}
+        </Button>
+        {/* Says the request is running: a focused button's new label isn't always announced (#284). */}
+        <p role="status" className="sr-only">{loading ? submitLabel : null}</p>
+      </div>
     </form>
   );
 }

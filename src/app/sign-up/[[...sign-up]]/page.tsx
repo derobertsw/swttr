@@ -19,6 +19,8 @@ export default async function SignUpPage({
   const nativeShell = detectNativeShell(requestHeaders.get("user-agent"));
   return (
     <PageLayout>
+      {/* Pages start at the canvas's left edge on desktop; this card stays centred. */}
+      <div className="flex w-full justify-center">
       <SignUp
         appearance={AUTH_CARD_APPEARANCE}
         forceRedirectUrl={returnTo}
@@ -27,6 +29,7 @@ export default async function SignUpPage({
           signInUrl: `/sign-in?redirect_url=${encodeURIComponent(returnTo)}`,
         } : {})}
       />
+      </div>
     </PageLayout>
   );
 }

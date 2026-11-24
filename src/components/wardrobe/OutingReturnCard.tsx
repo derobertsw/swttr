@@ -30,7 +30,7 @@ export function OutingReturnCard() {
 
   return (
     <Card asChild variant="muted">
-      <section aria-labelledby={titleId} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section aria-labelledby={titleId} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:max-w-3xl">
         <div>
           <h2 id={titleId} className="text-base font-semibold text-foreground">
             Back to your outing

@@ -19,7 +19,7 @@ export default function TripStaysPage({ params }: { params: Promise<{ id: string
       {data && <TripStays data={data} canEdit={data.trip.owner_user_id === userId} onSaved={refresh}
         // Until Clerk loads there is no viewer: a guest or invitation has no user id either.
         viewerMemberId={userId ? data.members.find((member) => member.user_id === userId)?.id ?? null : null} />}
-      <div className="h-24" />
+      <div className="h-24 md:hidden" />
     </div>
   );
 }

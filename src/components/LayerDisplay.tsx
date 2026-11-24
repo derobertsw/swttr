@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId, useMemo, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, Undo2 } from "lucide-react";
 import type { ExertionLevel } from "@/lib/biophysics/exertion";
 import type { LocationSuggestion, Recommendation } from "@/types/recommendations";
@@ -556,7 +556,7 @@ const LayerDisplay = ({
   });
 
   return (
-    <div className="flex w-full flex-col gap-6 pb-24">
+    <div className="flex w-full flex-col gap-6 pb-24 md:pb-0">
       <ResultHeader
         outing={outing}
         activity={activity}
@@ -597,7 +597,9 @@ const LayerDisplay = ({
         )}
 
         {hasLayers && (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-8">
+          // With nothing to show beside it, as for general guidance, Wear takes
+          // the grid at a reading width instead of sitting next to an empty column.
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-8 lg:has-[>[data-result-aside]:empty]:grid-cols-[minmax(0,48rem)]">
             <div className="flex min-w-0 flex-col gap-4">
               {showDescent && (
                 <div className="flex flex-col gap-2">
@@ -694,7 +696,7 @@ const LayerDisplay = ({
               {saveToTrip?.(savedOutfit)}
             </div>
 
-            <div className="flex min-w-0 flex-col gap-6">
+            <ResultAside>
               {showDescent && <CarryCard items={packedItems} phase={shownPhase} />}
               {!showDescent && !!biophysicsData?.carry_items?.length && (
                 <CarryCard items={biophysicsData.carry_items.map(item => `${item.label}: ${item.reason}`)} phase="outing" />
@@ -807,7 +809,7 @@ const LayerDisplay = ({
                   </div>
                 </ResultDisclosure>
               )}
-            </div>
+            </ResultAside>
           </div>
         )}
 
@@ -832,5 +834,42 @@ const LayerDisplay = ({
     </div>
   );
 };
+
+/** The gap kept above and below the column beside Wear while it stays in view. */
+const RESULT_ASIDE_OFFSET_PX = 24;
+
+/**
+ * The column beside Wear: carry, missing items and the disclosures. From lg
+ * it stays in view while a long Wear list scrolls, unless it is taller than
+ * the window, where staying put would keep its end out of reach (#267).
+ */
+function ResultAside({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [fitsWindow, setFitsWindow] = useState(true);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const measure = () => setFitsWindow(element.offsetHeight <= window.innerHeight - 2 * RESULT_ASIDE_OFFSET_PX);
+    // Also runs once when it starts observing.
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      data-result-aside=""
+      className={cn("flex min-w-0 flex-col gap-6 lg:self-start lg:empty:hidden", fitsWindow && "lg:sticky lg:top-6")}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default LayerDisplay;
