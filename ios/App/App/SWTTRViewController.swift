@@ -55,6 +55,9 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
     private var retryURL: URL?
     private var processRecovery = SWTTRProcessRecovery()
     private lazy var failureView = SWTTRLoadFailureView { [weak self] in self?.retryAfterFailure() }
+    private var failureOverlay = SWTTRFailureOverlay()
+    /// Whether the web view shows a page that loaded, for when Retry hands off.
+    private var hasCommittedPage = false
 
     fileprivate init(shell: SWTTRShellConfig, initialPath: String) {
         self.shell = shell
@@ -468,6 +471,8 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        hasCommittedPage = true
+        failureOverlay.committed()
         failureView.hide()
     }
 
@@ -481,7 +486,9 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         // Reload once; a page that keeps crashing WebKit waits for Retry.
+        hasCommittedPage = false
         guard processRecovery.shouldReload(now: ProcessInfo.processInfo.systemUptime) else {
+            failureOverlay.loadFailed()
             failureView.show(.stoppedResponding)
             return
         }
@@ -501,10 +508,12 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
            let host = failingURL.host, navigationPolicy.isAllowedHost(host) {
             retryURL = failingURL
         }
+        failureOverlay.loadFailed()
         failureView.show(kind == .network ? .offline : .notLoaded)
     }
 
     private func retryAfterFailure() {
+        guard failureOverlay.retry() else { return }
         processRecovery.reset()
         failureView.setRetrying(true)
         if let retryURL {
@@ -593,6 +602,14 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
             if !presentOverCurrentContent(safari) { UIApplication.shared.open(url) }
         case .system:
             UIApplication.shared.open(url)
+        }
+        // A Retry that redirects out of the web view never commits, and its
+        // cancellation is ignored, so end it here rather than leave Retry disabled.
+        failureOverlay.handedOffExternally(hasPage: hasCommittedPage)
+        switch failureOverlay.state {
+        case .hidden: failureView.hide()
+        case .showing: failureView.setRetrying(false)
+        case .retrying: break
         }
     }
 

@@ -93,3 +93,55 @@ import Testing
         #expect(!second)
     }
 }
+
+/// The failure view's Retry state (PR #423 review): Retry ends with a commit,
+/// a new failure, or a hand-off to a Safari sheet or another app.
+@Suite struct FailureOverlayTests {
+    @Test func retryEndsWhenThePageCommits() {
+        var overlay = SWTTRFailureOverlay()
+        overlay.loadFailed()
+        let started = overlay.retry()
+        let startedTwice = overlay.retry()
+        #expect(started)
+        #expect(overlay.state == .retrying)
+        #expect(!startedTwice)
+        overlay.committed()
+        #expect(overlay.state == .hidden)
+    }
+
+    @Test func retryThatFailsAgainOffersRetryAgain() {
+        var overlay = SWTTRFailureOverlay()
+        overlay.loadFailed()
+        _ = overlay.retry()
+        overlay.loadFailed()
+        #expect(overlay.state == .showing)
+    }
+
+    @Test func retryHandedOffWithAPageBehindItHidesTheView() {
+        // Offline, tap Feedback, reconnect, Retry: /feedback redirects to the
+        // form, which opens a Safari sheet and cancels the load without a commit.
+        var overlay = SWTTRFailureOverlay()
+        overlay.loadFailed()
+        _ = overlay.retry()
+        overlay.handedOffExternally(hasPage: true)
+        #expect(overlay.state == .hidden)
+    }
+
+    @Test func retryHandedOffWithoutAPageKeepsRetryAvailable() {
+        var overlay = SWTTRFailureOverlay()
+        overlay.loadFailed()
+        _ = overlay.retry()
+        overlay.handedOffExternally(hasPage: false)
+        #expect(overlay.state == .showing)
+        let startedAgain = overlay.retry()
+        #expect(startedAgain)
+    }
+
+    @Test func handOffsWithoutAFailureChangeNothing() {
+        var overlay = SWTTRFailureOverlay()
+        overlay.handedOffExternally(hasPage: false)
+        #expect(overlay.state == .hidden)
+        let started = overlay.retry()
+        #expect(!started)
+    }
+}
