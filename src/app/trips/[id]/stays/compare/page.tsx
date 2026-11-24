@@ -30,7 +30,7 @@ export default function CompareStaysPage({ params, searchParams }: {
         options: (first(query.options) ?? "").split(",").map((key) => key.trim().toLowerCase()).filter(Boolean),
         first_night: first(query.first_night), checkout: first(query.checkout),
       }} />}
-      <div className="h-24" />
+      <div className="h-24 md:hidden" />
     </div>
   );
 }

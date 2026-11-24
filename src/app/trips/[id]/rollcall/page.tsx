@@ -83,7 +83,7 @@ export default function DayChecklistPage({ params }: { params: Promise<{ id: str
         <DayChooser days={data.days} selected={day.date} onSelect={setChosen} />
         <DayTasks tripId={id} day={day} viewer={data.viewer_member_id} />
       </>}
-      <div className="h-24" />
+      <div className="h-24 md:hidden" />
     </div>
   );
 }

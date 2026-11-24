@@ -351,7 +351,7 @@ export default function DayDetailPage({
             onSaved={() => void refresh()}
           />
 
-          <div className="h-24" />
+          <div className="h-24 md:hidden" />
         </>
       )}
     </div>
