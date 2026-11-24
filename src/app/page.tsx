@@ -91,7 +91,7 @@ const HomeContent = () => {
         )}
         {!result ? (
           <>
-            <div className="flex w-full max-w-md flex-col gap-1">
+            <div className="flex w-full max-w-md flex-col gap-1 lg:max-w-none">
               <h1 id={OUTING_VIEW_HEADING_IDS.form} tabIndex={-1} className="text-title font-semibold text-foreground md:text-title-lg">What should I wear?</h1>
               <p className="text-base text-muted-foreground">Layer advice for your activity and conditions.</p>
             </div>
@@ -186,12 +186,19 @@ const HomeContent = () => {
 
 const HomeLoading = () => (
   <PageLayout chromeVariant="compact">
-    <div className="flex w-full max-w-md flex-col gap-6">
-      <Skeleton className="h-9 w-3/4 rounded-control" />
-      <div className="grid grid-cols-2 gap-2 min-[400px]:grid-cols-3">
-        {Array.from({ length: 6 }, (_, index) => (
-          <Skeleton key={index} className="h-18 rounded-control" />
-        ))}
+    {/* The form's shape: one column, or from lg the activities beside where and when. */}
+    <div className="flex w-full max-w-md flex-col gap-6 lg:max-w-none">
+      <Skeleton className="h-9 w-3/4 rounded-control lg:w-80" />
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:gap-x-8 xl:grid-cols-12 xl:gap-x-12">
+        <div className="grid grid-cols-2 gap-2 min-[400px]:grid-cols-3 xl:col-span-7">
+          {Array.from({ length: 6 }, (_, index) => (
+            <Skeleton key={index} className="h-18 rounded-control" />
+          ))}
+        </div>
+        <div className="hidden flex-col gap-6 lg:flex xl:col-span-5">
+          <Skeleton className="h-18 rounded-control" />
+          <Skeleton className="h-18 rounded-control" />
+        </div>
       </div>
     </div>
   </PageLayout>
