@@ -306,6 +306,20 @@ describe("fetchPlanAhead", () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({ lat: 43.6047, lon: -72.8187, resortId: "wd-Q14711916" });
   });
 
+  it("asks for a trip stop's saved resort point by its coordinates and elevation, not its catalog ID", async () => {
+    const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => Response.json({ plan: { days: [] } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const place = {
+      id: -1, kind: "resort", source: "openskidata", resortId: "wd-Q14711916",
+      name: "Killington Resort, Vermont", country: "", latitude: 43.6, longitude: -72.82,
+      elevationM: 1250, pointLabel: "Top of K-1 Express Gondola", pointKind: "lift",
+    } as const;
+    await fetchPlanAhead({ ...PLAN_OUTING, place }, "neutral");
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body).toMatchObject({ lat: 43.6, lon: -72.82, elevationM: 1250, pointLabel: "Top of K-1 Express Gondola" });
+    expect(body).not.toHaveProperty("resortId");
+  });
+
   it("passes on the API's reason for a request it turns down, with the field to fix", async () => {
     const error = "The forecast for this place covers Oct 1 to Oct 16. A 3-day plan can start from Oct 1 to Oct 14.";
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error, field: "startDate" }, { status: 422 })));

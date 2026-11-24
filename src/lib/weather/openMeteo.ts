@@ -40,10 +40,11 @@ const finiteNumber = (value: unknown): number | null => {
 
 /**
  * A forecast point from a request: a known resort's catalog point, or
- * coordinates with an optional elevation in meters. A resort the catalog
+ * coordinates with an optional elevation in meters and label (a trip stop's
+ * saved resort point, read where the trip saved it). A resort the catalog
  * doesn't know is refused rather than read somewhere else.
  */
-export function readForecastPoint(input: { latitude: unknown; longitude: unknown; resortId?: unknown; elevationM?: unknown }): ForecastPoint | { error: string } {
+export function readForecastPoint(input: { latitude: unknown; longitude: unknown; resortId?: unknown; elevationM?: unknown; label?: unknown }): ForecastPoint | { error: string } {
   if (input.resortId !== undefined && input.resortId !== null && input.resortId !== "") {
     const resort = isResortId(input.resortId) ? findResortPlace(input.resortId) : null;
     if (!resort) return { error: "That resort isn't in the resort list anymore. Choose the place again." };
@@ -64,7 +65,9 @@ export function readForecastPoint(input: { latitude: unknown; longitude: unknown
       return { error: `Invalid elevation. Use meters from ${MIN_ELEVATION_M} to ${MAX_ELEVATION_M}.` };
     }
   }
-  return { latitude, longitude, elevationM, resortId: null, label: null };
+  // A saved point's label (a trip stop's resort) is display text only, like a place's name.
+  const label = typeof input.label === "string" && input.label.trim() && input.label.length <= 200 ? input.label.trim() : null;
+  return { latitude, longitude, elevationM, resortId: null, label };
 }
 
 /**

@@ -98,6 +98,17 @@ describe("Weather at a resort's forecast point", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
+  it("reads a trip stop's saved point where the trip saved it, with its label, even if the catalog moved or dropped the resort", async () => {
+    const spy = mockOpenMeteo(1250);
+    const { status, data } = await weather("lat=43.6&lon=-72.82&elevation=1250&label=Top%20of%20K-1%20Express%20Gondola");
+    expect(status).toBe(200);
+    const [url] = urls(spy);
+    expect([url.searchParams.get("latitude"), url.searchParams.get("longitude"), url.searchParams.get("elevation")]).toEqual(["43.6", "-72.82", "1250"]);
+    expect(data.provenance.point).toEqual({
+      latitude: 43.6, longitude: -72.82, label: "Top of K-1 Express Gondola", elevationM: 1250, elevationSource: "requested",
+    });
+  });
+
   it("refuses a resort the catalog doesn't know rather than read the weather somewhere else", async () => {
     const spy = mockOpenMeteo();
     const { status, data } = await weather("lat=44.47&lon=-72.69&resort=skimap-999999999");
@@ -124,6 +135,16 @@ describe("Weather at a resort's forecast point", () => {
     expect(urls(spy)[0].searchParams.get("latitude")).toBe("43.6047");
     const { plan } = await response.json();
     expect(plan.provenance.point).toEqual(pointProvenance);
+  });
+
+  it("reads a trip stop's saved point for a multi-day plan, as the trip's forecast does", async () => {
+    const spy = mockOpenMeteo(1250);
+    const response = await POST(new NextRequest("http://localhost/api/plan-ahead", {
+      method: "POST",
+      body: JSON.stringify({ activity: "alpine_skiing", sensitivity: "neutral", lat: 43.6, lon: -72.82, elevationM: 1250, pointLabel: "Top of K-1 Express Gondola", startDate: "2026-12-01", durationDays: 1, startHour: 9 }),
+    }));
+    expect(urls(spy)[0].searchParams.get("elevation")).toBe("1250");
+    expect((await response.json()).plan.provenance.point).toMatchObject({ latitude: 43.6, label: "Top of K-1 Express Gondola", elevationM: 1250 });
   });
 
   it("refuses a plan for an unknown resort", async () => {

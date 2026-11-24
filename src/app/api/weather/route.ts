@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
-  const point = readForecastPoint({ latitude: lat, longitude: lon, resortId, elevationM: searchParams.get("elevation") });
+  const point = readForecastPoint({ latitude: lat, longitude: lon, resortId, elevationM: searchParams.get("elevation"), label: searchParams.get("label") });
   if ("error" in point) return NextResponse.json({ error: point.error }, { status: 400 });
 
   try {

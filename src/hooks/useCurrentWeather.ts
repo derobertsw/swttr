@@ -49,8 +49,9 @@ export async function fetchWeatherAt(
     ? "Couldn't get the forecast for this place. Try again."
     : "Couldn't get the weather. Try again.";
   // A resort's weather is read at its forecast point and elevation (#7).
-  const { lat, lon, resort } = forecastLocationOf(location);
-  const query = `lat=${lat}&lon=${lon}${resort ? `&resort=${encodeURIComponent(resort)}` : ""}`;
+  const { lat, lon, resort, elevation, label } = forecastLocationOf(location);
+  const query = `lat=${lat}&lon=${lon}${resort ? `&resort=${encodeURIComponent(resort)}` : ""}`
+    + `${elevation !== undefined ? `&elevation=${elevation}` : ""}${label ? `&label=${encodeURIComponent(label)}` : ""}`;
   if (localDateTime !== undefined && !isLocalDateTime(localDateTime)) {
     return { data: null, error: "Choose a valid date and time for the forecast." };
   }

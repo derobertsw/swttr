@@ -1,6 +1,6 @@
 import "server-only";
 import { DEFAULT_EXERTION_LEVEL, type ExertionLevel } from "@/lib/biophysics/exertion";
-import { resortFieldsOfStop } from "@/lib/locationSuggestion";
+import { resortFieldsOfStop, TRIP_STOP_PLACE_ID } from "@/lib/locationSuggestion";
 import { addDaysToDateString, FORECAST_DAYS } from "@/lib/forecastRange";
 import { formatZonedTime, isTimeZone } from "@/lib/timeZones";
 import { tripActivityLabel, tripActivityNeedsClothing, tripActivityToRecommendationKey } from "@/lib/trip-activities";
@@ -14,7 +14,6 @@ import type { TripDay, TripEffort, TripFull } from "@/types/trips";
 /** When the outing starts on a day without a meet time that morning. */
 const DEFAULT_START = "09:00";
 /** A trip stop as Gear up's place: not a geocoded place (positive ids) or the device's own (0). */
-const TRIP_STOP_PLACE_ID = -1;
 const EXERTION: Record<TripEffort, ExertionLevel> = { easy: "easy", steady: "moderate", hard: "hard" };
 
 /** "Nov 3" for a "yyyy-MM-dd" date. */

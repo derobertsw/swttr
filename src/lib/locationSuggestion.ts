@@ -6,6 +6,12 @@ import type { LocationSuggestion } from "@/types/recommendations";
  * device) or a catalog resort ("resort:<resortId>") with its forecast point.
  */
 
+/**
+ * A trip stop's place in Gear up (#335). A resort stop keeps this ID with its
+ * resort fields: its point is the one the trip saved, not today's catalog's.
+ */
+export const TRIP_STOP_PLACE_ID = -1;
+
 /** Catalog resort IDs: Wikidata, skimap.org or OpenStreetMap identities (docs/ski-resort-catalog.md). */
 export function isResortId(value: unknown): value is string {
   return typeof value === "string" && /^(wd-Q\d{1,12}|skimap-\d{1,12}|osm-[nwr]\d{1,15})$/.test(value);
@@ -31,7 +37,7 @@ export function readResortFields(value: Record<string, unknown>): ResortFields |
   }
   const label = value.pointLabel;
   if (value.kind !== "resort" || value.source !== "openskidata" || !isResortId(value.resortId)
-    || value.id !== `resort:${value.resortId}`
+    || (value.id !== `resort:${value.resortId}` && value.id !== TRIP_STOP_PLACE_ID)
     || !(value.elevationM === null || isElevationM(value.elevationM))
     || typeof label !== "string" || !label.trim() || label.length > 200
     || !POINT_KINDS.has(value.pointKind as string)) return null;
@@ -97,7 +103,7 @@ export function searchKindFor(activity: string | null | undefined, enabled = RES
 export function resortFieldsOfStop(stop: { resort_id?: string | null; forecast_elevation_m?: number | null; forecast_point_label?: string | null }): Partial<LocationSuggestion> {
   if (!isResortId(stop.resort_id) || !stop.forecast_point_label) return {};
   return {
-    id: `resort:${stop.resort_id}`, kind: "resort", source: "openskidata", resortId: stop.resort_id,
+    kind: "resort", source: "openskidata", resortId: stop.resort_id,
     elevationM: isElevationM(stop.forecast_elevation_m) ? stop.forecast_elevation_m : null,
     pointLabel: stop.forecast_point_label,
     pointKind: stop.forecast_point_label === REFERENCE_POINT_LABEL ? "reference" : "lift",
@@ -108,15 +114,22 @@ export function resortFieldsOfStop(stop: { resort_id?: string | null; forecast_e
 const REFERENCE_POINT_LABEL = "Resort reference point";
 
 /**
- * Where a place's forecast is read, as the weather APIs take it: a resort by
- * its catalog ID (the API reads its point and elevation from the catalog),
- * anything else by its coordinates.
+ * Where a place's forecast is read, as the weather APIs take it:
+ * - a picked resort by its catalog ID; the API reads its point and elevation
+ *   from the catalog;
+ * - a trip stop's resort by the point and elevation the trip saved, as the
+ *   trip's own forecast reads it, so a re-imported or removed catalog entry
+ *   can't move it (or break it);
+ * - anything else by its coordinates.
  */
-export function forecastLocationOf(place: Pick<LocationSuggestion, "latitude" | "longitude" | "kind" | "resortId">): { lat: number; lon: number; resort?: string } {
+export function forecastLocationOf(place: Pick<LocationSuggestion, "id" | "latitude" | "longitude" | "kind" | "resortId" | "elevationM" | "pointLabel">): { lat: number; lon: number; resort?: string; elevation?: number; label?: string } {
+  const location = { lat: place.latitude, lon: place.longitude };
+  if (place.kind !== "resort" || !isResortId(place.resortId)) return location;
+  if (place.id !== TRIP_STOP_PLACE_ID) return { ...location, resort: place.resortId };
   return {
-    lat: place.latitude,
-    lon: place.longitude,
-    ...(place.kind === "resort" && isResortId(place.resortId) ? { resort: place.resortId } : {}),
+    ...location,
+    ...(isElevationM(place.elevationM) ? { elevation: place.elevationM } : {}),
+    ...(place.pointLabel ? { label: place.pointLabel } : {}),
   };
 }
 

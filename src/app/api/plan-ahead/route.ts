@@ -48,6 +48,8 @@ export async function POST(request: NextRequest) {
     resortId?: string;
     /** A known point's elevation in meters. */
     elevationM?: number;
+    /** A saved point's label, such as a trip stop's resort point. */
+    pointLabel?: string;
   };
 
   try {
@@ -60,7 +62,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { activity, sensitivity, lat, lon, startDate, durationDays, startHour, resortId, elevationM } = body;
+  const { activity, sensitivity, lat, lon, startDate, durationDays, startHour, resortId, elevationM, pointLabel } = body;
 
   if (!activity || !sensitivity || ((lat == null || lon == null) && !resortId) || !startDate || durationDays == null) {
     return NextResponse.json(
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest) {
   }
 
   const parsedDays = Math.min(7, Math.max(1, Math.round(durationDays)));
-  const point = readForecastPoint({ latitude: lat, longitude: lon, resortId, elevationM });
+  const point = readForecastPoint({ latitude: lat, longitude: lon, resortId, elevationM, label: pointLabel });
   if ("error" in point) return NextResponse.json({ error: point.error }, { status: 400 });
 
   try {

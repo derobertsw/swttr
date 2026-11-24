@@ -25,6 +25,17 @@ describe("fetchWeatherAt", () => {
     expect(fetch).toHaveBeenCalledWith("/api/weather?lat=43.6047&lon=-72.8187&resort=wd-Q14711916");
   });
 
+  it("reads a trip stop's resort at the point the trip saved, even after the catalog moved or dropped it", async () => {
+    const fetch = mockFetch(Response.json({ temperature: 12, windSpeed: 21, isForecast: false }));
+    const saved = {
+      id: -1, kind: "resort", source: "openskidata", resortId: "skimap-999999999",
+      name: "Killington Resort, Vermont", country: "", latitude: 43.6, longitude: -72.82,
+      elevationM: 1250, pointLabel: "Top of K-1 Express Gondola", pointKind: "lift",
+    } as const;
+    await fetchWeatherAt(saved);
+    expect(fetch).toHaveBeenCalledWith("/api/weather?lat=43.6&lon=-72.82&elevation=1250&label=Top%20of%20K-1%20Express%20Gondola");
+  });
+
   it("gets the forecast for a local time at the place, and says where and when it applies", async () => {
     const fetch = mockFetch(
       Response.json({

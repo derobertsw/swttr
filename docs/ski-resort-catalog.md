@@ -114,6 +114,7 @@ Every forecast goes through `src/lib/weather/openMeteo.ts`, which validates the 
 | `GET /api/weather` (current, hourly, date range and its retries) | `resort=<resortId>`, or `lat`/`lon` with an optional `elevation` in meters |
 | `POST /api/plan-ahead` | `resortId`, or `lat`/`lon` with an optional `elevationM` |
 | Trip day weather and packing (`src/lib/trip-forecast.ts`) | The stop's saved `resort_id`, coordinates, `forecast_elevation_m` and label |
+| Gear up opened from a trip day | The same saved coordinates, elevation and label, sent as an explicit point (`lat`/`lon`/`elevation`/`label`), not by resort ID. The place keeps the trip stop's ID (`-1`), which is how `forecastLocationOf` tells it from a fresh pick, so the layers, the day's weather and its packing read one point even after a re-import moves or drops the resort. |
 
 - A **resort ID** is looked up in the catalog, and its point and elevation are used whatever coordinates the browser sent. An ID the catalog doesn't know is a 400, so the forecast is never quietly read somewhere else. A trip stop keeps the point it saved.
 - The **elevation** goes to Open-Meteo as `elevation=` in meters. Open-Meteo already downscales its forecast to that elevation, so **no lapse-rate correction is added**: one would correct the temperature twice. Wind is never adjusted. With no known elevation (towns, reference points), the parameter is left out and Open-Meteo uses its terrain model.
