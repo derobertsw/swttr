@@ -14,12 +14,25 @@ const objectSchema = (properties: Record<string, unknown>, required = Object.key
 });
 /** Bounds the nonempty text accepted by a tool schema. */
 const stringSchema = (maxLength: number) => ({ type: "string", minLength: 1, maxLength });
+/** Resort catalog IDs (#7), as `isResortId` accepts them. */
+const RESORT_ID_PATTERN = "(wd-Q[0-9]{1,12}|skimap-[0-9]{1,12}|osm-[nwr][0-9]{1,15})";
 const placeSchema = objectSchema({
-  id: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+  // A geocoder's place, 0 for the device, or a ski resort's "resort:<resortId>".
+  id: { oneOf: [
+    { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+    { type: "string", pattern: `^resort:${RESORT_ID_PATTERN}$`, maxLength: 40 },
+  ] },
   name: stringSchema(200), region: stringSchema(200), country: { type: "string", maxLength: 100 },
   latitude: { type: "number", minimum: -90, maximum: 90 },
   longitude: { type: "number", minimum: -180, maximum: 180 },
   timeZone: stringSchema(100),
+  // A resort's fields come as a set, exactly as search or readback returned them.
+  kind: { type: "string", enum: ["resort"] },
+  source: { type: "string", enum: ["openskidata"] },
+  resortId: { type: "string", pattern: `^${RESORT_ID_PATTERN}$`, maxLength: 32 },
+  elevationM: { type: ["number", "null"], minimum: -500, maximum: 9000 },
+  pointLabel: stringSchema(200),
+  pointKind: { type: "string", enum: ["lift", "reference"] },
 }, ["id", "name", "country", "latitude", "longitude"]);
 const emptySchema = objectSchema({});
 const NAMES = ["swttr_get_capabilities", "swttr_search_locations", "swttr_recommend_outing", "swttr_get_current_outing"];
