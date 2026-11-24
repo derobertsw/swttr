@@ -83,6 +83,8 @@ interface LayerDisplayProps {
    * edits included, or null when there's nothing to save.
    */
   saveToTrip?: (outfit: SavedOutfit | null) => ReactNode;
+  /** Renders How did it go? (#8) below Save to trip, given the same outfit as shown. */
+  feedback?: (outfit: SavedOutfit | null) => ReactNode;
   /** Reports committed visible advice, including edits and evaluation updates. */
   onDisplayedLayers?: (layers: DisplayedLayers) => void;
   /** Retires pending tool advice before a manual change to the worn layers. */
@@ -174,6 +176,7 @@ const LayerDisplay = ({
   onActivityChange,
   weatherLoading,
   saveToTrip,
+  feedback,
   onDisplayedLayers,
   onLayerEdit,
 }: LayerDisplayProps) => {
@@ -692,6 +695,7 @@ const LayerDisplay = ({
               </section>
 
               {saveToTrip?.(savedOutfit)}
+              {feedback?.(savedOutfit)}
             </div>
 
             <div className="flex min-w-0 flex-col gap-6">

@@ -16,6 +16,7 @@ import { useWebMCPTools } from "@/hooks/useWebMCPTools";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OutingRequestNotice } from "@/components/OutingRequestNotice";
 import { SaveToTrip } from "@/components/trips/SaveToTrip";
+import { GearUpFeedback } from "@/components/OutingFeedback";
 import { TripDayBar } from "@/components/trips/TripDayGearUp";
 import { isTripDayResult, planTripDayAgain } from "@/lib/trip-day-gear-up";
 
@@ -177,6 +178,12 @@ const HomeContent = () => {
                 onSavedToDay={leaveTripDay}
               />
             )}
+            // How did it go? (#8) on an outing for now, for an account: it's
+            // underway once the layers show. A later outing is asked about on
+            // its trip day once it's saved there.
+            feedback={(outfit) => userId && outfit && result.outing.when.mode === "now" ? (
+              <GearUpFeedback key={JSON.stringify([result.outing, result.weather.context])} outfit={outfit} sensitivity={result.sensitivity} />
+            ) : null}
           />
         )}
       </div>

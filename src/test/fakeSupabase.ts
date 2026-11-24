@@ -97,6 +97,22 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
     return { select: () => ({ single: () => Promise.resolve(result) }) };
   }
 
+  /**
+   * Inserts a row, or updates the one with the same `onConflict` columns,
+   * read back via select().single(), as PostgREST's upsert does.
+   */
+  upsert(values: Row, { onConflict }: { onConflict: string }) {
+    const keys = onConflict.split(",");
+    const existing = this.rows.find((row) => keys.every((key) => row[key] === values[key]));
+    const now = new Date().toISOString();
+    const row = existing
+      ? Object.assign(existing, values, { updated_at: now })
+      : { id: `row_${this.rows.length + 1}`, created_at: now, updated_at: now, ...values };
+    if (!existing) this.rows.push(row);
+    const result = { data: structuredClone(row), error: null };
+    return { select: () => ({ single: () => Promise.resolve(result) }) };
+  }
+
   /** Resolves to the first matching row, or null. */
   maybeSingle() {
     return Promise.resolve({ data: this.matches()[0] ?? null, error: null });
@@ -138,6 +154,10 @@ class MissingTable {
   order() { return this; }
   limit() { return this; }
   range() { return this; }
+  maybeSingle() { return Promise.resolve(this.failure()); }
+  single() { return Promise.resolve(this.failure()); }
+  upsert() { return this; }
+  private failure() { return { data: null, error: { code: "PGRST205", message: "Could not find the table" } }; }
   then<TResult1 = { data: null; error: { code: string; message: string } }, TResult2 = never>(
     onfulfilled?: ((value: { data: null; error: { code: string; message: string } }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null

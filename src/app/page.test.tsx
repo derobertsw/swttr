@@ -1107,6 +1107,35 @@ describe("Home Page", () => {
         expect(placeField()).toHaveValue("Stowe, Vermont, United States");
       });
 
+      it("asks a signed-in person how an outing for now went, and not a guest (#8)", async () => {
+        mockUseAuth.mockReturnValue(GUEST);
+        mockAccountApis();
+        const outingApis = mockFetch.getMockImplementation()!;
+        const feedback: unknown[] = [];
+        mockFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+          if (url !== "/api/v1/outing-feedback") return outingApis(url, init);
+          const body = JSON.parse(String(init?.body));
+          feedback.push(body);
+          return respond(200, { feedback: { ...body.answer, updated_at: "2026-10-06T16:00:00Z" } });
+        });
+        const user = userEvent.setup();
+        const { unmount } = render(<Home />);
+
+        await seeRunningAtStowe(user);
+        expect(screen.queryByRole("heading", { name: "How did it go?" })).not.toBeInTheDocument();
+        unmount();
+        mockUseAuth.mockReturnValue(SIGNED_IN);
+        comeBackTo("/?resume=outing");
+
+        expect(await screen.findByRole("heading", { name: "How did it go?" })).toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "Too warm" }));
+        expect(await screen.findByText("Saved. Thanks. Add details below if you like.")).toBeInTheDocument();
+        expect(feedback).toEqual([expect.objectContaining({
+          outfit: expect.objectContaining({ outing: expect.objectContaining({ activity: "running", when: { mode: "now" } }), advice: { kind: "personalized" } }),
+          answer: { overall: "too_warm", moments: [], body_areas: [], worn: null },
+        })]);
+      });
+
       it("opens Save to trip on the resumed results after signing in to save, once", async () => {
         mockUseAuth.mockReturnValue(GUEST);
         mockAccountApis();

@@ -11,6 +11,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - **Wardrobe management** with calibrated gear data (clo, breathability, wind/water protection)
 - **Body-part guidance** (torso, legs, hands, head/neck) with target clo insights
 - **Plan ahead** with multi-day forecasts and a packing list
+- **How did it go?** asks signed-in people how an outing's layers felt, and what they actually wore, on Gear up results for now and on a trip day's saved kit once its outing has started; answers are kept for review, not learned from yet ([outing feedback](docs/outing-feedback.md))
 - **Trips** start with dates and one destination; add crew, stops, daily kits and shared gear afterward ([creation and recovery](docs/trip-creation.md))
 - **Edit trip** renames a saved trip and changes its dates after reviewing what moves, what's added and what's removed; Destinations reorders and removes stops and sets several days at once, each after a review of the days it changes ([editing rules](docs/trip-editing.md))
 - **What to pack** lists what each person's saved outfits call for, once per item with its days, flags changes since they last looked, and keeps their own items and quantities ([packing rules](docs/trip-packing.md))
