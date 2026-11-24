@@ -293,4 +293,84 @@ describe("Geocode API Route", () => {
       expect(data.results).toHaveLength(1);
     });
   });
+
+  describe("search modes (#7)", () => {
+    const stoweTown = { id: 5241803, name: "Stowe", admin1: "Vermont", country: "United States", latitude: 44.4654, longitude: -72.6874, timezone: "America/New_York" };
+    const geocoder = (results: unknown[]) => vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ results }) });
+    const search = async (query: string) => {
+      const response = await GET(new NextRequest(`http://localhost:3000/api/geocode?${query}`));
+      return { status: response.status, data: await response.json() };
+    };
+
+    it("rejects an unknown mode", async () => {
+      global.fetch = geocoder([]);
+      const { status, data } = await search("q=Stowe&kind=towns");
+      expect(status).toBe(400);
+      expect(data.error).toMatch(/kind/);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("searches only the resort catalog in resort mode, without calling the geocoder", async () => {
+      global.fetch = geocoder([stoweTown]);
+      const { status, data } = await search("q=Stowe&kind=resort");
+      expect(status).toBe(200);
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(data.results[0]).toMatchObject({
+        id: "resort:wd-Q7620695", kind: "resort", resortId: "wd-Q7620695", name: "Stowe Mountain Resort",
+        region: "Vermont", country: "United States", timeZone: "America/New_York",
+        pointKind: "lift", elevationM: expect.any(Number), pointLabel: expect.stringMatching(/^Top of /),
+      });
+      expect(data.results.every((result: { kind: string }) => result.kind === "resort")).toBe(true);
+    });
+
+    it("offers a misspelled resort as a typo match", async () => {
+      const { data } = await search("q=Killngton&kind=resort");
+      expect(data.results[0]).toMatchObject({ name: "Killington Resort", match: "typo" });
+    });
+
+    it("keeps the town and the resort apart in all-places mode", async () => {
+      global.fetch = geocoder([stoweTown]);
+      const { data } = await search("q=Stowe&kind=all");
+      expect(data.results.map((result: { name: string; kind?: string }) => [result.name, result.kind ?? "place"])).toEqual([
+        ["Stowe Mountain Resort", "resort"], ["Stowe", "place"], ["Smugglers' Notch Resort", "resort"],
+      ]);
+      // The town keeps its own coordinates; it isn't collapsed into the resort.
+      expect(data.results[1]).toMatchObject({ id: 5241803, latitude: 44.4654, longitude: -72.6874 });
+    });
+
+    it("drops a place the geocoder repeats", async () => {
+      global.fetch = geocoder([stoweTown, stoweTown]);
+      const { data } = await search("q=Stowe&kind=all");
+      expect(data.results.filter((result: { id: unknown }) => result.id === 5241803)).toHaveLength(1);
+    });
+
+    it("still returns resorts when the geocoder fails in all-places mode", async () => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: false });
+      const { status, data } = await search("q=Stowe&kind=all");
+      expect(status).toBe(200);
+      expect(data.placesUnavailable).toBe(true);
+      expect(data.results[0].name).toBe("Stowe Mountain Resort");
+    });
+
+    it("fails in all-places mode when the geocoder fails and no resort matches", async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
+      const { status } = await search("q=Montpelier&kind=all");
+      expect(status).toBe(500);
+    });
+
+    it("keeps the general search as the default, with no resorts", async () => {
+      global.fetch = geocoder([stoweTown]);
+      const { data } = await search("q=Stowe");
+      expect(data.results).toEqual([{
+        id: 5241803, name: "Stowe", region: "Vermont", country: "United States",
+        latitude: 44.4654, longitude: -72.6874, timeZone: "America/New_York",
+      }]);
+    });
+
+    it("returns nothing for a one-letter query in any mode", async () => {
+      global.fetch = geocoder([stoweTown]);
+      expect((await search("q=S&kind=resort")).data.results).toEqual([]);
+      expect((await search("q=S&kind=all")).data.results).toEqual([]);
+    });
+  });
 });

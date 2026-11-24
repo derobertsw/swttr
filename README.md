@@ -492,6 +492,7 @@ src/
   data/
     activities.ts             # Activity definitions
     layerRecommendations.json # Static layers for signed-out users
+    ski-resorts.json          # Resort catalog from OpenSkiData (ODbL); see docs/ski-resort-catalog.md
   hooks/                      # Client hooks: useGearUp, usePreferences, useWardrobe, useTrip, ...
   lib/
     api.ts                    # Route helpers: requireUser, readJson, jsonError

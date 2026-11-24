@@ -12,6 +12,7 @@ The standing decision is to stay on free tiers until launch and product-market f
 | [Supabase](#supabase) | Postgres for everything users save | **Free** (verified) | Launch: the project pauses after a week without activity and has no backups. Also more than 500 MB of data or 5 GB of egress a month | Pro, $25/month |
 | [Clerk](#clerk) | Sign-in and accounts | Development instance (last checked October 14) | More than 100 users (development instances' cap), or launch; production needs a domain we own | Free up to 50,000 retained users; Pro $25/month for MFA, passkeys, no Clerk branding |
 | [Open-Meteo](#open-meteo) | Forecasts and weather place search | Free API, no key | Any commercial use (subscriptions, ads, paid features); more than 10,000 calls a day | Standard, $29/month for 1M calls |
+| [OpenSkiData](#openskidata) | Ski resort catalog for resort search | Static snapshot in the repo, no account | Never on usage: nothing is called at runtime. A re-import is manual | None; ODbL data |
 | [Geoapify](#geoapify) | Trip place search, drive times, route lines | Free | More than 3,000 credits a day or 5 requests a second, over and over | API 10, $59/month |
 | [OpenFreeMap](#openfreemap-maplibre-and-openstreetmap) | Map tiles | Public instance, no key | Outages (there's no SLA) or the service shutting down | No paid plan; self-host or switch |
 | [MPP](#mpp-paid-agent-api) | Paid agent API | Testnet or mainnet: not verified | Taking real money makes the product commercial for Vercel and Open-Meteo | Protocol is free; network and Stripe fees not published on mpp.dev |
@@ -107,6 +108,13 @@ The standing decision is to stay on free tiers until launch and product-market f
 - **Paid:** Standard, 1M calls a month, $29 a month. Professional, 5M calls a month, $99 a month. Both include geocoding. The amounts come from Open-Meteo's [June 12, 2023 announcement](https://openmeteo.substack.com/p/api-subscriptions-for-commercial); the pricing page we fetched listed call volumes but no prices.
   - **Buying a plan alone changes nothing.** Paid plans are served from the customer endpoint `customer-api.open-meteo.com`, with the plan's API key on each request. All four forecast files above call the free `api.open-meteo.com` with no key, and `src/app/api/geocode/route.ts` calls the free `geocoding-api.open-meteo.com`. Each needs its host changed and a server-side key added (an env var, never sent to the browser) before the plan's terms and limits apply. Check Open-Meteo's docs for the customer host for geocoding.
 - **Alternatives considered:** weather search was deliberately kept on Open-Meteo when trip search moved to Geoapify (#208). No other forecast provider has been evaluated.
+
+## OpenSkiData
+
+- **What for:** the ski resort catalog behind resort search and resort forecast points (#7).
+- **In code:** `src/data/ski-resorts.json`, built by `scripts/import-ski-resorts.mjs` and searched by `src/lib/locations/resorts.ts`. Nothing calls OpenSkiMap at runtime.
+- **Terms:** the export is OpenStreetMap data under the [ODbL](https://opendatacommons.org/licenses/odbl/1-0/). The catalog is a derivative database, so it's distributed under ODbL too, and the app credits OpenSkiMap and OpenStreetMap where resort results are shown. Details, snapshot date and source URLs: [`docs/ski-resort-catalog.md`](ski-resort-catalog.md).
+- **Cost:** none. The import's time zone lookups use Open-Meteo's free API, about 1,700 calls once per import.
 
 ## Geoapify
 
