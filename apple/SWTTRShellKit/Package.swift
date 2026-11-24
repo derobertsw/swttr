@@ -6,7 +6,8 @@ let package = Package(
     platforms: [.iOS(.v15), .macOS(.v14)],
     products: [.library(name: "SWTTRShellKit", targets: ["SWTTRShellKit"])],
     targets: [
-        .target(name: "SWTTRShellKit"),
+        // The bridge scripts (#147) are injected into the web view at document start.
+        .target(name: "SWTTRShellKit", resources: [.process("Resources")]),
         .testTarget(name: "SWTTRShellKitTests", dependencies: ["SWTTRShellKit"])
     ]
 )

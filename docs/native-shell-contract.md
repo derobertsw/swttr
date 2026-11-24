@@ -77,10 +77,39 @@ The current iOS shell registers `swttrActivityChange`. Its injected script sends
 `{ value, iconPngDataUrl, source, eventId, userInitiated }`; the shell checks the
 frame host before accepting it. Bootstrap synchronization is not a user action.
 
-`swttrGeolocation` and `swttrShare` are planned by #147 for ShellKit and reused
-by #138. They are not implemented by this web integration. Their scripts,
-origin validation, message types and error mapping must land together; the web
-app continues to use the browser location/share APIs until those bridges exist.
+The iOS shell also registers two reply handlers (`WKScriptMessageHandlerWithReply`)
+from #147. Their scripts live in `apple/SWTTRShellKit/Sources/SWTTRShellKit/Resources/`
+and are injected at document start, in the main frame and the page's content
+world. The web needs no changes: it keeps calling the standard APIs, and a
+browser without the shell behaves as before. The Mac app can reuse both (#138).
+
+| Handler | Script | Replaces | Message | Reply |
+| --- | --- | --- | --- | --- |
+| `swttrGeolocation` | `geolocation-bridge.js` | `navigator.geolocation` | `{ enableHighAccuracy, timeout, maximumAge }`, in milliseconds; `null` means no limit | `{ coords: { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed }, timestamp }`, or `{ error: { code, message } }` |
+| `swttrShare` | `share-bridge.js` | `navigator.share` and `navigator.canShare`, only when missing | `{ title?, text?, url? }`, `url` absolute `http(s)` | `{ outcome: "shared" \| "cancelled" \| "failed" \| "notAllowed" \| "busy" }` |
+
+- **Who may call them.** Only the main frame of a page on the shell's own hosts,
+  over HTTPS (HTTP only for a loopback dev server). Other frames and hosts,
+  Clerk's included, get the denial reply: `{ error: { code: 1 } }` or
+  `{ outcome: "notAllowed" }`. The shell never asks for location or opens the
+  share sheet for them.
+- **Location.** The script resolves with an object shaped like
+  `GeolocationPosition` and reports errors shaped like
+  `GeolocationPositionError`, constants included. CoreLocation is asked for a
+  fix to a hundred meters. The first request asks for when-in-use permission
+  with the app's `NSLocationWhenInUseUsageDescription`, so the person sees only
+  the system prompt. Requests that arrive while a fix is coming share it.
+  `timeout` starts once permission is granted, as in browsers. Denied or
+  restricted is code 1; Location Services off or no fix is code 2; a timeout is
+  code 3. `watchPosition` reports one position, and `clearWatch` drops it if it
+  hasn't arrived yet.
+- **Sharing.** The share sheet gets the URL, or the text when there's no URL.
+  `share()` resolves when the person shares. Closing the sheet rejects with an
+  `AbortError` `DOMException`, which the web already treats as nothing
+  happening. Other outcomes reject with `NotAllowedError` (`notAllowed`),
+  `InvalidStateError` (`busy`, a share already open) or `DataError` (`failed`),
+  and the web falls back to copying the link. `canShare()` applies the Web Share
+  API's checks; files aren't supported.
 
 ## Links, dialogs and failed loads (iOS, #146)
 
@@ -118,6 +147,9 @@ without a connection in the app until the shell adopts App-Bound Domains (see
 Web tests cover marker precedence, Mac navigation at 700px and 1280px, browser
 chrome at 390px, 768px and 1280px, the Settings event and focus restoration,
 server auth appearance, safe returns and native protected-page redirect options.
+`src/lib/native-shell-bridges.test.ts` runs both bridge scripts against stubbed
+message handlers, and ShellKit's tests cover the native message types, origin
+checks, error mapping and location requests with a fake CLLocationManager.
 They do not verify WKWebView sign-in, bot protection, device location or sharing.
 
 For visual QA, append `SWTTRNativeMac/1` in Chrome DevTools → Network conditions
