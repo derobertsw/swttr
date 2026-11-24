@@ -1,5 +1,6 @@
 import "server-only";
 import { DEFAULT_EXERTION_LEVEL, type ExertionLevel } from "@/lib/biophysics/exertion";
+import { resortFieldsOfStop } from "@/lib/locationSuggestion";
 import { addDaysToDateString, FORECAST_DAYS } from "@/lib/forecastRange";
 import { formatZonedTime, isTimeZone } from "@/lib/timeZones";
 import { tripActivityLabel, tripActivityNeedsClothing, tripActivityToRecommendationKey } from "@/lib/trip-activities";
@@ -110,6 +111,8 @@ export function tripDayOutingFor(full: TripFull, userId: string, date: string, z
     place: {
       id: TRIP_STOP_PLACE_ID, name: stop.name, country: "", latitude: planned.stop.latitude, longitude: planned.stop.longitude,
       ...(zone && { timeZone: zone }),
+      // A resort stop's forecast point comes along (#7).
+      ...resortFieldsOfStop(stop),
     },
     when: { mode: "later", date, time: meet ?? DEFAULT_START, durationDays: 1 },
   };

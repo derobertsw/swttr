@@ -8,7 +8,8 @@ import { CheckCircle2 } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import LegacyTripWizard from "@/components/trips/LegacyTripWizard";
 import { BackLink, SectionLabel } from "@/components/trips/trip-primitives";
-import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { LocationAutocomplete, searchStateProps } from "@/components/LocationAutocomplete";
+import { pickedPlace, searchKindFor, tripPlaceFrom } from "@/lib/locationSuggestion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -71,7 +72,8 @@ function TripDraftForm({ userId }: { userId: string }) {
   const inFlight = useRef(false);
   const account = useRef(0);
   const request = useRef<AbortController | null>(null);
-  const search = useLocationSearch();
+  // An Alpine trip searches ski resorts; a place already picked stays when the activity changes.
+  const search = useLocationSearch({ kind: searchKindFor(draft?.activity) });
 
   useEffect(() => {
     let draft = emptyDraft();
@@ -116,7 +118,7 @@ function TripDraftForm({ userId }: { userId: string }) {
     }
     const input = draft.submitted ?? {
       creation_id: draft.id, name: draft.name.trim(), start_date: draft.start, end_date: draft.end,
-      destination: { name: [place!.name, place!.region || place!.country].filter(Boolean).join(", "), latitude: place!.latitude, longitude: place!.longitude },
+      destination: tripPlaceFrom(place!),
       activity: draft.activity || null,
     };
     const submittedDraft = { ...draft, submitted: input };
@@ -180,7 +182,8 @@ function TripDraftForm({ userId }: { userId: string }) {
                   showSuggestions={search.showSuggestions} isSearching={search.isSearching} suggestionRef={search.suggestionRef}
                   onLocationInputChange={(value) => { search.handleLocationInputChange(value); edit({ place: null }); }}
                   onLocationFocus={() => search.suggestions.length > 0 && search.setShowSuggestions(true)}
-                  onSelectLocation={(place) => { search.handleSelectLocation(place); edit({ place, ...(!draft.nameEdited ? { name: `${place.name} trip`.slice(0, 200) } : {}) }); }} onDismiss={search.dismiss} />
+                  onSelectLocation={(suggestion) => { const place = pickedPlace(suggestion); search.handleSelectLocation(place); edit({ place, ...(!draft.nameEdited ? { name: `${place.name} trip`.slice(0, 200) } : {}) }); }} onDismiss={search.dismiss}
+                  {...searchStateProps(search)} />
                 <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                   <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">Start date<Input className="min-w-0" type="date" required value={draft.start} onChange={(event) => edit({ start: event.target.value })} /></label>
                   <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">End date<Input className="min-w-0" type="date" required min={draft.start || undefined} value={draft.end} onChange={(event) => edit({ end: event.target.value })} /></label>

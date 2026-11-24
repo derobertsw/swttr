@@ -81,7 +81,7 @@ Open to any member on the trip.
 
 | Request | Response |
 |---|---|
-| `preview: true` with `action` and its fields: `remove_stop {stop_id}`, `reorder_stops {order}`, `assign_days {dates, stop_id?, activity?}` or `set_day_place {date, place: {name, latitude, longitude}}` | `{ options: [{ key, label, detail, changes: [{date, date_label, before, after}], unchanged, payload }] }`. `400` for a change that doesn't fit the trip, `404` for a stop or day that's gone. |
+| `preview: true` with `action` and its fields: `remove_stop {stop_id}`, `reorder_stops {order}`, `assign_days {dates, stop_id?, activity?}` or `set_day_place {date, place: {name, latitude, longitude, resort_id?}}` | `{ options: [{ key, label, detail, changes: [{date, date_label, before, after}], unchanged, payload }] }`. `400` for a change that doesn't fit the trip, `404` for a stop or day that's gone. |
 | `action` plus the chosen option's `payload` | Saves through `edit_trip_itinerary` and returns `{ ok: true }`. `409` with the error and the current review when the trip changed since the review; `404` when the user isn't on the trip or the stop or day is gone; `400` for an invalid change; otherwise `500` "Nothing was changed". |
 
 `previewItinerary` (`src/lib/trip-itinerary.ts`) builds the review. The save is rebuilt from validated fields only. A test runs every previewed option through the real database function and checks each day's saved label against the review, so the two can't drift apart. The old `PUT /stops` (reorder) and `DELETE /stops/:stopId` (which left the stop's days on the first stop) are gone.

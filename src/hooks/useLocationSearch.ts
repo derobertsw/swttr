@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { LocationSuggestion } from "@/types/recommendations";
 import { logWarn } from "@/lib/logger";
+import { pickedPlace, type LocationSearchKind } from "@/lib/locationSuggestion";
 
 const MIN_QUERY_LENGTH = 2;
 
@@ -11,39 +12,76 @@ export function formatLocationName(suggestion: LocationSuggestion): string {
   return [suggestion.name, suggestion.region, suggestion.country].filter(Boolean).join(", ");
 }
 
-export function useLocationSearch() {
+/** Where a search is: typing, answered with places, answered with none, or failed. */
+export type LocationSearchStatus = "idle" | "loading" | "results" | "empty" | "error";
+
+interface LocationSearchOptions {
+  /**
+   * "resort" searches ski resorts only, with a Search all places fallback;
+   * "all" searches resorts and places; undefined runs the general search.
+   */
+  kind?: LocationSearchKind;
+}
+
+export function useLocationSearch({ kind }: LocationSearchOptions = {}) {
   const [location, setLocation] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [status, setStatus] = useState<LocationSearchStatus>("idle");
+  const [placesUnavailable, setPlacesUnavailable] = useState(false);
+  // "Search all places", chosen while the activity searches resorts. A new
+  // activity starts from its own kind of search again.
+  const [allPlaces, setAllPlaces] = useState(false);
+  const [lastKind, setLastKind] = useState(kind);
+  if (kind !== lastKind) {
+    setLastKind(kind);
+    setAllPlaces(false);
+  }
+  const searchKind: LocationSearchKind | undefined = kind === "resort" && allPlaces ? "all" : kind;
   const suggestionRef = useRef<HTMLDivElement>(null);
 
+  // A new query or a new kind of search asks again; an answer to an older one is dropped.
   useEffect(() => {
     if (locationQuery.length < MIN_QUERY_LENGTH) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
     const fetchSuggestions = async () => {
+      setIsSearching(true);
+      setStatus("loading");
       try {
-        const response = await fetch(`/api/geocode?q=${encodeURIComponent(locationQuery)}`);
-        const data = await response.json();
-        if (cancelled) return;
-        setSuggestions(data.results || []);
+        const params = new URLSearchParams({ q: locationQuery, ...(searchKind ? { kind: searchKind } : {}) });
+        const response = await fetch(`/api/geocode?${params}`, { signal: controller.signal });
+        const data = await response.json().catch(() => null);
+        if (controller.signal.aborted) return;
+        if (!response.ok || !Array.isArray(data?.results)) {
+          setSuggestions([]);
+          setStatus("error");
+        } else {
+          setSuggestions(data.results);
+          setStatus(data.results.length ? "results" : "empty");
+        }
+        setPlacesUnavailable(data?.placesUnavailable === true);
         setShowSuggestions(true);
       } catch (error) {
+        if (controller.signal.aborted) return;
         logWarn("useLocationSearch", error);
+        setSuggestions([]);
+        setStatus("error");
+        setShowSuggestions(true);
       } finally {
-        if (!cancelled) setIsSearching(false);
+        if (!controller.signal.aborted) setIsSearching(false);
       }
     };
 
     const debounce = setTimeout(fetchSuggestions, 300);
     return () => {
-      cancelled = true;
+      controller.abort();
       clearTimeout(debounce);
     };
-  }, [locationQuery]);
+  }, [locationQuery, searchKind]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -57,12 +95,14 @@ export function useLocationSearch() {
   }, []);
 
   const handleSelectLocation = (suggestion: LocationSuggestion) => {
-    setSelectedLocation(suggestion);
-    setLocation(formatLocationName(suggestion));
+    const place = pickedPlace(suggestion);
+    setSelectedLocation(place);
+    setLocation(formatLocationName(place));
     setLocationQuery("");
     setSuggestions([]);
     setShowSuggestions(false);
     setIsSearching(false);
+    setStatus("idle");
   };
 
   const handleLocationInputChange = (value: string) => {
@@ -74,8 +114,19 @@ export function useLocationSearch() {
     if (value.length < MIN_QUERY_LENGTH) {
       setSuggestions([]);
       setIsSearching(false);
+      setStatus("idle");
     } else {
       setIsSearching(true);
+      setStatus("loading");
+    }
+  };
+
+  /** Widen a resort search to every place; the typed query searches again. */
+  const searchAllPlaces = () => {
+    setAllPlaces(true);
+    if (locationQuery.length >= MIN_QUERY_LENGTH) {
+      setIsSearching(true);
+      setStatus("loading");
     }
   };
 
@@ -88,6 +139,8 @@ export function useLocationSearch() {
     setShowSuggestions(false);
     setSelectedLocation(null);
     setIsSearching(false);
+    setStatus("idle");
+    setAllPlaces(false);
   };
 
   return {
@@ -97,10 +150,17 @@ export function useLocationSearch() {
     showSuggestions,
     selectedLocation,
     isSearching,
+    status,
+    placesUnavailable,
+    /** The search being run: "resort", "all", or undefined for the general search. */
+    searchKind,
+    /** Whether Search all places is on offer: a resort-only search. */
+    canSearchAllPlaces: searchKind === "resort",
     suggestionRef,
     setShowSuggestions,
     handleSelectLocation,
     handleLocationInputChange,
+    searchAllPlaces,
     dismiss,
     reset,
   };

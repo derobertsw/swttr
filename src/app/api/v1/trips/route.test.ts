@@ -16,6 +16,19 @@ describe("Atomic trip creation route", () => {
     expect((await create({ ...input, owner_user_id: "other-user" })).status).toBe(201);
     expect(rpc).toHaveBeenCalledExactlyOnceWith("create_trip_draft", expect.objectContaining({ p_trip_id: input.creation_id, p_owner_user_id: "user-1", p_name: "Ski weekend", p_destination: input.destination, p_activity: "Alpine" }));
   });
+  it("saves a resort destination with the catalog's forecast point, not the browser's (#7)", async () => {
+    expect((await create({ ...input, destination: { name: "Killington Resort, Vermont", latitude: 1, longitude: 2, resort_id: "wd-Q14711916" } })).status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("create_trip_draft", expect.objectContaining({
+      p_destination: {
+        name: "Killington Resort, Vermont", latitude: 43.6047, longitude: -72.8187,
+        resort_id: "wd-Q14711916", forecast_elevation_m: 1262, forecast_point_label: "Top of K-1 Express Gondola",
+      },
+    }));
+  });
+  it.each(["wd-Q1", "not a resort"])("refuses a resort the catalog doesn't know (%s)", async (resortId) => {
+    expect((await create({ ...input, destination: { ...input.destination, resort_id: resortId } })).status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
   it("returns the existing saved trip for an idempotent replay", async () => {
     rpc.mockResolvedValue({ data: { trip: TRIP, created: false }, error: null });
     const response = await create(input); expect(response.status).toBe(200); expect(await response.json()).toEqual({ trip: TRIP, created: false });

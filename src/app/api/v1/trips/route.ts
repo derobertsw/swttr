@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { parseTripCreation } from "@/lib/trip-creation";
+import { withResortPoint } from "@/lib/locations/resort-places";
 import { NextRequest, NextResponse } from "next/server";
 import { readJson, requireUser } from "@/lib/api";
 import {
@@ -22,6 +23,8 @@ export async function POST(request: NextRequest) {
   const { supabase, userId } = auth;
   const input = parseTripCreation(await readJson(request));
   if (typeof input === "string") return NextResponse.json({ error: input }, { status: 400 });
+  const destination = input.destination ? withResortPoint(input.destination) : null;
+  if (input.destination && !destination) return NextResponse.json({ error: "Select the resort again from the search results." }, { status: 400 });
 
   const { data, error } = await supabase.rpc("create_trip_draft", {
     p_trip_id: input.creation_id ?? randomUUID(),
@@ -30,7 +33,7 @@ export async function POST(request: NextRequest) {
     p_start_date: input.start_date,
     p_end_date: input.end_date,
     p_status: classifyTripStatus(input.start_date, input.end_date),
-    p_destination: input.destination ?? null,
+    p_destination: destination,
     p_activity: input.activity ?? null,
   });
   if (error || !data?.trip) {

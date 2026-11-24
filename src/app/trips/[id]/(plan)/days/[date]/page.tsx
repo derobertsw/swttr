@@ -44,7 +44,8 @@ import { formatTemperature } from "@/lib/temperature";
 import { TOUR_ACTIVITY, TRIP_ACTIVITY_OPTIONS, tripActivityLabel, tripActivityNeedsClothing } from "@/lib/trip-activities";
 import { outfitMismatches } from "@/lib/trip-kit-fit";
 import { errorMessage, tripRequest } from "@/lib/trip-requests";
-import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { LocationAutocomplete, searchStateProps } from "@/components/LocationAutocomplete";
+import { searchKindFor, tripPlaceFrom } from "@/lib/locationSuggestion";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { ItineraryChangeSheet } from "@/components/trips/ItineraryChangeSheet";
@@ -271,6 +272,7 @@ export default function DayDetailPage({
             date={date}
             dateLabel={dateLabel}
             stop={effectiveStop ?? null}
+            activity={day?.activity ?? null}
             result={forecast}
             onRetry={() => setWeatherAttempt((attempt) => attempt + 1)}
             onLocationSaved={() => refresh()}
@@ -395,6 +397,7 @@ function WeatherCard({
   date,
   dateLabel,
   stop,
+  activity,
   result,
   onRetry,
   onLocationSaved,
@@ -403,6 +406,8 @@ function WeatherCard({
   date: string;
   dateLabel: string;
   stop: TripStop | null;
+  /** The day's activity: an Alpine day searches ski resorts. */
+  activity: string | null;
   result: TripDayForecastResponse | null;
   onRetry: () => void;
   onLocationSaved: () => void;
@@ -411,7 +416,7 @@ function WeatherCard({
   const [editing, setEditing] = useState(false);
   // The picked place, while the review of which days use it is open.
   const [reviewing, setReviewing] = useState<TripPlace | null>(null);
-  const search = useLocationSearch();
+  const search = useLocationSearch({ kind: searchKindFor(activity) });
   const reviewFocus = useReturnFocus();
 
   const hasCoords = typeof stop?.latitude === "number" && Number.isFinite(stop.latitude)
@@ -426,11 +431,7 @@ function WeatherCard({
     const selected = search.selectedLocation;
     if (!selected) return;
     reviewFocus.remember(() => document.getElementById("day-location-change"));
-    setReviewing({
-      name: selected.region ? `${selected.name}, ${selected.region}` : `${selected.name}, ${selected.country}`,
-      latitude: selected.latitude,
-      longitude: selected.longitude,
-    });
+    setReviewing(tripPlaceFrom(selected));
   };
 
   return (
@@ -508,6 +509,7 @@ function WeatherCard({
             }
             onSelectLocation={search.handleSelectLocation}
             onDismiss={search.dismiss}
+            {...searchStateProps(search)}
           />
           <Button
             type="button"

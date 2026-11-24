@@ -257,3 +257,12 @@ export function createResortSearch(catalog: ResortCatalog) {
 
 const appCatalog = createResortSearch(catalogFile as unknown as ResortCatalog);
 export const searchResorts = appCatalog.search;
+
+/** A catalog resort as a picked place, for the API to trust its point over the browser's copy. */
+export function findResortPlace(resortId: string): Omit<ResortSuggestion, "match"> | null {
+  const record = appCatalog.byId(resortId);
+  if (!record) return null;
+  const place: Partial<ResortSuggestion> = toResortSuggestion(record, "exact");
+  delete place.match;
+  return place as Omit<ResortSuggestion, "match">;
+}

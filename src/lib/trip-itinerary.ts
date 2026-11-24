@@ -3,6 +3,7 @@ import { TOUR_ACTIVITY, tripActivityLabel } from "@/lib/trip-activities";
 import { dateLabel, isCalendarDate, isUuid } from "@/lib/trip-lodging";
 import { returningReviewsNote, type ConditionsRows } from "@/lib/trip-conditions";
 import { accessPointFor, sameLocation } from "@/lib/trip-location";
+import { withResortPoint } from "@/lib/locations/resort-places";
 import type { TripDay, TripFull, TripItineraryOption, TripItineraryPreview, TripItineraryRequest, TripMember, TripMemberDayKit, TripPlace, TripStop } from "@/types/trips";
 
 /**
@@ -40,7 +41,7 @@ type ItineraryEdit =
 
 type Invalid = { error: string };
 type Itinerary = {
-  stops: Array<Pick<TripStop, "id" | "name" | "latitude" | "longitude" | "access_point"> & Partial<Pick<TripStop, "activities">>>;
+  stops: Array<Pick<TripStop, "id" | "name" | "latitude" | "longitude" | "access_point"> & Partial<Pick<TripStop, "activities" | "resort_id">>>;
   days: Array<Pick<TripDay, "date" | "stop_id" | "activity" | "access_point" | "access_point_stop_id">>;
 };
 
@@ -76,7 +77,14 @@ function placeOf(value: unknown): TripPlace | null {
   if (!name || name.length > 200) return null;
   if (typeof latitude !== "number" || !Number.isFinite(latitude) || Math.abs(latitude) > 90) return null;
   if (typeof longitude !== "number" || !Number.isFinite(longitude) || Math.abs(longitude) > 180) return null;
-  return { name, latitude, longitude };
+  if (value.resort_id === undefined || value.resort_id === null) return { name, latitude, longitude };
+  // A resort keeps its catalog point, elevation and label, whatever the browser sent (#7).
+  const resort = withResortPoint({ latitude, longitude, resort_id: value.resort_id });
+  if (!resort?.resort_id || !resort.forecast_point_label) return null;
+  return {
+    name, latitude: resort.latitude, longitude: resort.longitude, resort_id: resort.resort_id,
+    forecast_elevation_m: resort.forecast_elevation_m, forecast_point_label: resort.forecast_point_label,
+  };
 }
 
 /** The change to preview, or why it can't be. Stops and days are checked against the trip when previewing. */
@@ -537,7 +545,9 @@ export function previewItinerary(full: TripFull, request: TripItineraryRequest, 
       const day = days.find((candidate) => candidate.date === request.date);
       if (!day) return { error: "This day isn't on the trip anymore. Reload the trip.", status: 404 };
       const { place } = request;
-      const atPlace = (stop: Itinerary["stops"][number]) => stop.name === place.name && near(stop.latitude, place.latitude) && near(stop.longitude, place.longitude);
+      // The same place is the same resort too, or both general places, as edit_trip_itinerary matches it.
+      const atPlace = (stop: Itinerary["stops"][number]) => stop.name === place.name && near(stop.latitude, place.latitude) && near(stop.longitude, place.longitude)
+        && (stop.resort_id ?? null) === (place.resort_id ?? null);
       const current = stopFor(day);
       const payload = (scope: "day" | "stop", dates: string[]) => ({
         date: day.date, place, scope,

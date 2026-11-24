@@ -6,6 +6,7 @@ import { hasOnly, isRecord, isResolvedPlace, isSingleDayOuting } from "@/lib/out
 import type { WebMCPTool } from "./adapter";
 import type { CurrentOutingSnapshot, OutingActionOutcome } from "@/types/outingAction";
 import type { LocationSuggestion } from "@/types/recommendations";
+import { readResortFields } from "@/lib/locationSuggestion";
 
 /** Builds a closed object schema with explicit required fields. */
 const objectSchema = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({
@@ -13,12 +14,25 @@ const objectSchema = (properties: Record<string, unknown>, required = Object.key
 });
 /** Bounds the nonempty text accepted by a tool schema. */
 const stringSchema = (maxLength: number) => ({ type: "string", minLength: 1, maxLength });
+/** Resort catalog IDs (#7), as `isResortId` accepts them. */
+const RESORT_ID_PATTERN = "(wd-Q[0-9]{1,12}|skimap-[0-9]{1,12}|osm-[nwr][0-9]{1,15})";
 const placeSchema = objectSchema({
-  id: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+  // A geocoder's place, 0 for the device, or a ski resort's "resort:<resortId>".
+  id: { oneOf: [
+    { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+    { type: "string", pattern: `^resort:${RESORT_ID_PATTERN}$`, maxLength: 40 },
+  ] },
   name: stringSchema(200), region: stringSchema(200), country: { type: "string", maxLength: 100 },
   latitude: { type: "number", minimum: -90, maximum: 90 },
   longitude: { type: "number", minimum: -180, maximum: 180 },
   timeZone: stringSchema(100),
+  // A resort's fields come as a set, exactly as search or readback returned them.
+  kind: { type: "string", enum: ["resort"] },
+  source: { type: "string", enum: ["openskidata"] },
+  resortId: { type: "string", pattern: `^${RESORT_ID_PATTERN}$`, maxLength: 32 },
+  elevationM: { type: ["number", "null"], minimum: -500, maximum: 9000 },
+  pointLabel: stringSchema(200),
+  pointKind: { type: "string", enum: ["lift", "reference"] },
 }, ["id", "name", "country", "latitude", "longitude"]);
 const emptySchema = objectSchema({});
 const NAMES = ["swttr_get_capabilities", "swttr_search_locations", "swttr_recommend_outing", "swttr_get_current_outing"];
@@ -34,7 +48,10 @@ const searchFailed = () => ({ status: "error", code: "location_unavailable", mes
 function readCandidate(value: unknown): LocationSuggestion | null {
   if (!isRecord(value)) return null;
   const { id, name, region, country = "", latitude, longitude, timeZone } = value;
-  const candidate = { id, name, country, latitude, longitude, ...(region !== undefined && { region }), ...(timeZone !== undefined && { timeZone }) };
+  // A resort keeps its identity and forecast point (#7); how the search matched it is dropped.
+  const resort = readResortFields(value);
+  if (resort === null) return null;
+  const candidate = { id, name, country, latitude, longitude, ...(region !== undefined && { region }), ...(timeZone !== undefined && { timeZone }), ...resort };
   return isResolvedPlace(candidate) ? candidate : null;
 }
 

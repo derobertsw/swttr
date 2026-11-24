@@ -29,6 +29,16 @@ export interface TripStop {
   created_at: string;
   /** Where the crew parks or meets on days here (#208); missing before migration 027. Not the weather location. */
   access_point?: TripLocation | null;
+  /**
+   * The resort catalog's ID when the stop is a ski resort (#7); its
+   * latitude/longitude are then the resort's forecast point. Missing before
+   * migration 20261124100000, null for a general place.
+   */
+  resort_id?: string | null;
+  /** The forecast point's elevation in meters; null when unknown. */
+  forecast_elevation_m?: number | null;
+  /** What the forecast point is: "Top of K-1 Express Gondola", "Resort reference point". */
+  forecast_point_label?: string | null;
 }
 
 export interface TripMember {
@@ -1058,11 +1068,15 @@ export interface TripStayComparison {
   credit: boolean;
 }
 
-/** A searched place: its display name and coordinates. */
+/** A searched place: its display name and coordinates, and for a ski resort its catalog ID (#7). */
 export interface TripPlace {
   name: string;
   latitude: number;
   longitude: number;
+  /** The API replaces the coordinates with the resort's forecast point and adds its elevation and label. */
+  resort_id?: string;
+  forecast_elevation_m?: number | null;
+  forecast_point_label?: string;
 }
 
 /** An itinerary change to review before saving: see docs/trip-editing.md. */

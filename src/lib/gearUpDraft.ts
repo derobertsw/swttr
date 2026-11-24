@@ -16,6 +16,7 @@ import type { GearUpTripDay, TripDayContext } from "@/types/trip-day-outing";
 import type { LocationSuggestion } from "@/types/recommendations";
 import type { XCContext } from '@/types/xc';
 import { isXCContext } from '@/types/xc';
+import { readResortFields } from "@/lib/locationSuggestion";
 
 export interface GearUpDraft extends XCContext {
   activity: string;
@@ -56,6 +57,9 @@ export function isDate(value: unknown): value is string {
 function isPlace(value: unknown): value is LocationSuggestion {
   return (
     isObject(value) &&
+    (typeof value.id === "number" || typeof value.id === "string") &&
+    // A resort keeps its forecast point; a draft from before #7 has none.
+    readResortFields(value) !== null &&
     typeof value.name === "string" &&
     typeof value.country === "string" &&
     Number.isFinite(value.latitude) &&

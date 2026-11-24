@@ -46,6 +46,28 @@ describe("Gear up WebMCP contract", () => {
     expect(result).toEqual({ status: "completed", selectionRequired: true, candidates: [{ ...place, id: 2 }, { ...noCountry, country: "" }] });
     expect(JSON.stringify(result)).not.toContain("private");
   });
+  it("accepts a resort place in the schema and at runtime, and refuses one that doesn't add up (#7)", async () => {
+    const resort = {
+      id: "resort:wd-Q14711916", name: "Killington Resort", region: "Vermont", country: "United States",
+      latitude: 43.6047, longitude: -72.8187, timeZone: "America/New_York", kind: "resort", source: "openskidata",
+      resortId: "wd-Q14711916", elevationM: 1262, pointLabel: "Top of K-1 Express Gondola", pointKind: "lift",
+    };
+    const schema = gearUpTools({ signedIn: true, submitOuting, getCurrentOuting }).find(t => t.name === "swttr_recommend_outing")!
+      .inputSchema as { properties: { place: { properties: Record<string, unknown>; additionalProperties: boolean } } };
+    expect(Object.keys(schema.properties.place.properties)).toEqual(expect.arrayContaining(Object.keys(resort)));
+    expect(schema.properties.place.additionalProperties).toBe(false);
+    const idSchemas = (schema.properties.place.properties.id as { oneOf: { type: string; pattern?: string }[] }).oneOf;
+    expect(idSchemas.find(s => s.type === "string")!.pattern && new RegExp(idSchemas.find(s => s.type === "string")!.pattern!).test(resort.id)).toBe(true);
+    expect(await execute("recommend_outing", { ...input, place: resort })).toMatchObject({ status: "completed" });
+    expect(submitOuting).toHaveBeenLastCalledWith(expect.objectContaining({ place: resort }), expect.anything());
+    submitOuting.mockClear();
+    expect(await execute("recommend_outing", { ...input, place: { ...resort, id: "resort:skimap-1" } })).toMatchObject({ code: "invalid_input" });
+    expect(await execute("recommend_outing", { ...input, place: { ...resort, elevationM: 20_000 } })).toMatchObject({ code: "invalid_input" });
+    expect(submitOuting).not.toHaveBeenCalled();
+    // Search keeps a resort candidate's identity and point, without how it matched.
+    fetchMock.mockResolvedValueOnce(Response.json({ results: [{ ...resort, match: "typo" }] }));
+    expect(await execute("search_locations", { query: "Killngton" })).toMatchObject({ candidates: [resort] });
+  });
   it("handles HTTP, parse and network failures without returning raw errors", async () => {
     for (const response of [Response.json({ results: [place] }, { status: 500 }), new Response("<html>unavailable</html>")]) {
       fetchMock.mockResolvedValueOnce(response);

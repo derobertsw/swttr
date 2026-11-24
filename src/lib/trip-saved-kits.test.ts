@@ -31,6 +31,18 @@ describe("readSavedOutfit", () => {
     expect(readSavedOutfit(savedOutfit())).toEqual(savedOutfit());
   });
 
+  it("keeps a resort's identity and forecast point, and refuses one that doesn't add up (#7)", () => {
+    const outfit = savedOutfit();
+    const place = {
+      id: "resort:wd-Q14711916", kind: "resort", source: "openskidata", resortId: "wd-Q14711916",
+      name: "Killington Resort", region: "Vermont", country: "United States", latitude: 43.6047, longitude: -72.8187,
+      timeZone: "America/New_York", elevationM: 1262, pointLabel: "Top of K-1 Express Gondola", pointKind: "lift",
+    } as const;
+    const resortOutfit = { ...outfit, outing: { ...outfit.outing, place } };
+    expect(readSavedOutfit(resortOutfit)?.outing.place).toEqual(place);
+    expect(readSavedOutfit({ ...outfit, outing: { ...outfit.outing, place: { ...place, id: "resort:skimap-1" } } })).toBeNull();
+  });
+
   it("drops fields an outfit doesn't have", () => {
     const outfit = savedOutfit();
     const tampered = {

@@ -579,6 +579,7 @@ const LayerDisplay = ({
           onSubmit={onWeatherChange}
           loading={weatherLoading}
           onCloseAutoFocus={weatherFocus.restore}
+          activity={activity}
         />
       )}
 
