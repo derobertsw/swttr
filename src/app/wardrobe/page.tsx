@@ -33,6 +33,7 @@ import { ItemThumbnail } from "@/components/wardrobe/ItemThumbnail";
 import { WardrobeItemRow, rowActionsId, rowButtonId } from "@/components/wardrobe/WardrobeItemRow";
 import { CreateCustomItemDialog } from "@/components/wardrobe/CreateCustomItemDialog";
 import { OutingReturnCard } from "@/components/wardrobe/OutingReturnCard";
+import { WardrobeCoverageCard } from "@/components/wardrobe/WardrobeCoverageCard";
 import { buildWardrobeOverview } from "@/components/wardrobe/wardrobe-overview";
 import {
   BODY_AREAS,
@@ -123,6 +124,16 @@ export default function Wardrobe() {
   const createdRowId = useRef<string | null>(null);
 
   const overview = useMemo(() => buildWardrobeOverview(wardrobeItems), [wardrobeItems]);
+  // Changes when the included items do, so the coverage section asks again.
+  const coverageKey = useMemo(
+    () =>
+      wardrobeItems
+        .filter((item) => !item.disabled)
+        .map((item) => `${item.item_type}:${item.item_id}`)
+        .sort()
+        .join(","),
+    [wardrobeItems]
+  );
   const isReady = wardrobeStatus === "ready";
   // An empty wardrobe has its own call to add the first item.
   const isEmpty = isReady && overview.totalItems === 0;
@@ -429,6 +440,8 @@ export default function Wardrobe() {
             )}
           </>
         )}
+
+        {isReady && overview.totalItems > 0 && <WardrobeCoverageCard contentsKey={coverageKey} />}
 
         {recentlyRemoved.length > 0 && (
           <section aria-labelledby="recently-removed" className="mt-2 rounded-card border border-border bg-card p-3">
