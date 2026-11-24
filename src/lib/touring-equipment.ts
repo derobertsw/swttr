@@ -8,6 +8,7 @@ import type {
   EquipmentTemplateItem,
   EquipmentTemplateOption,
   PackingEquipmentChoices,
+  PackingItem,
   PackingEquipmentItem,
   TouringEquipment,
 } from "@/types/trip-packing";
@@ -37,16 +38,17 @@ export const TOURING_EQUIPMENT: readonly EquipmentTemplateItem[] = [
     purpose: "Grip for skinning uphill.",
   },
   {
+    // Suggested, as the descent's clothing advice requires one (recommendations/requirements.ts).
+    id: "helmet", name: "Helmet", tier: "suggested",
+    purpose: "Head protection on the descent, in any weather.",
+  },
+  {
     id: "airbag", name: "Avalanche airbag pack", tier: "optional",
     purpose: "Deployed in an avalanche, it can help keep you near the surface. It doesn't replace the transceiver, probe and shovel.",
   },
   {
     id: "ski_crampons", name: "Ski crampons", tier: "optional",
     purpose: "Grip on firm or icy climbs where skins slip.",
-  },
-  {
-    id: "helmet", name: "Helmet", tier: "optional",
-    purpose: "Head protection on the descent and in steep or rocky terrain.",
   },
   {
     id: "headlamp", name: "Headlamp", tier: "optional",
@@ -65,6 +67,23 @@ const ALSO_KNOWN_AS: Record<string, readonly string[]> = {
   helmet: ["Ski helmet"],
   headlamp: ["Head torch"],
 };
+
+type WornItem = Pick<PackingItem, "key" | "name" | "bodyPart" | "layerType" | "days">;
+
+/**
+ * Template items an outfit can list under a name of its own: a helmet from
+ * the wardrobe or catalog is worn as the head's outer layer and named for its
+ * model ("Smith Vantage MIPS"), so its name alone doesn't say it's a helmet.
+ * Only items worn on a Backcountry day count: recommendations put a ski
+ * helmet in that slot there, while a biking day's would be a bike helmet,
+ * which doesn't stand in for one (REQUIRED_HELMET_TYPES).
+ */
+const WORN_AS: Partial<Record<string, (item: WornItem) => boolean>> = {
+  helmet: (item) => item.bodyPart === "headNeck" && item.layerType === "outer" && item.key.startsWith("item:"),
+};
+
+const wornOn = (item: WornItem, dates: ReadonlySet<string>) =>
+  item.days.some((day) => dates.has(day.date) && day.uses.includes("wear"));
 
 const TEMPLATE_IDS: ReadonlySet<string> = new Set(TOURING_EQUIPMENT.map((item) => item.id));
 
@@ -89,18 +108,24 @@ export function readEquipment(value: unknown): PackingEquipmentChoices {
  * template as their list stands. `names` are the names of everything else in
  * their list (outfit items and items added by hand): a template item they
  * already have under one of its names shows as listed, so the preview doesn't
- * suggest adding it twice. A name never carries a packing check across.
+ * suggest adding it twice. `worn` are the outfit items in their list: a
+ * helmet worn on one of `dates` lists the template's helmet the same way. A name
+ * never carries a packing check across.
  */
-export function buildTouringEquipment({ dates, saved, names, editable }: {
+export function buildTouringEquipment({ dates, saved, names, worn = [], editable }: {
   dates: string[];
   saved: PackingEquipmentChoices;
   names: string[];
+  worn?: readonly WornItem[];
   editable: boolean;
 }): TouringEquipment {
   const byName = new Map(names.map((name) => [identityText(name), name]));
+  const touringDays = new Set(dates);
   const template: EquipmentTemplateOption[] = TOURING_EQUIPMENT.map((item) => {
     if (saved[item.id]?.status === "added") return { ...item, state: "added" };
-    const listedAs = [item.name, ...ALSO_KNOWN_AS[item.id] ?? []].map((name) => byName.get(identityText(name))).find((name) => name !== undefined);
+    const wornAs = WORN_AS[item.id];
+    const listedAs = [item.name, ...ALSO_KNOWN_AS[item.id] ?? []].map((name) => byName.get(identityText(name))).find((name) => name !== undefined)
+      ?? (wornAs && worn.find((w) => wornAs(w) && wornOn(w, touringDays))?.name);
     if (listedAs) return { ...item, state: "listed", listedAs };
     return { ...item, state: saved[item.id]?.status === "removed" ? "removed" : "available" };
   });

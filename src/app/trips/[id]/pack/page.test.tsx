@@ -581,28 +581,30 @@ describe("Touring equipment", () => {
     expect(open).toHaveClass("whitespace-normal");
     await user.click(open);
     const dialog = await screen.findByRole("dialog", { name: "Touring equipment" });
-    // The suggested additions start selected; optional items don't.
-    for (const name of ["Avalanche transceiver", "Avalanche probe", "Avalanche shovel", "Climbing skins"]) {
-      expect(within(dialog).getByRole("checkbox", { name })).toBeChecked();
+    // The suggested additions start selected, the helmet among them (as the descent's advice requires one); optional items don't.
+    const suggested = within(dialog).getByRole("group", { name: "Suggested additions" });
+    for (const name of ["Avalanche transceiver", "Avalanche probe", "Avalanche shovel", "Climbing skins", "Helmet"]) {
+      expect(within(suggested).getByRole("checkbox", { name })).toBeChecked();
     }
-    expect(within(dialog).getByRole("checkbox", { name: "Helmet" })).not.toBeChecked();
-    expect(within(dialog).getByRole("group", { name: "Optional" })).toBeInTheDocument();
+    const optional = within(dialog).getByRole("group", { name: "Optional" });
+    expect(within(optional).queryByRole("checkbox", { name: "Helmet" })).not.toBeInTheDocument();
+    expect(within(optional).getByRole("checkbox", { name: "Headlamp" })).not.toBeChecked();
     expect(within(dialog).getByText(/not a complete safety assessment/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("checkbox", { name: "Climbing skins" }));
-    await user.click(within(dialog).getByRole("checkbox", { name: "Helmet" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "Headlamp" }));
 
     await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("Couldn't add the items: Couldn't save the change. Try again.");
-    expect(within(dialog).getByRole("checkbox", { name: "Helmet" })).toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: "Headlamp" })).toBeChecked();
 
     await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(sentBodies(fetchMock, CHANGE).at(-1)).toEqual({ op: "add_equipment", ids: ["transceiver", "probe", "shovel", "helmet"] });
+    expect(sentBodies(fetchMock, CHANGE).at(-1)).toEqual({ op: "add_equipment", ids: ["transceiver", "probe", "shovel", "helmet", "headlamp"] });
     const section = screen.getByRole("heading", { name: "Touring equipment" }).closest("section")!;
     expect(within(section).getAllByRole("checkbox").map((box) => box.getAttribute("aria-label"))).toEqual([
-      "Packed Avalanche transceiver", "Packed Avalanche probe", "Packed Avalanche shovel", "Packed Helmet",
+      "Packed Avalanche transceiver", "Packed Avalanche probe", "Packed Avalanche shovel", "Packed Helmet", "Packed Headlamp",
     ]);
-    expect(screen.getByRole("status")).toHaveTextContent("Added 4 items to your touring equipment");
+    expect(screen.getByRole("status")).toHaveTextContent("Added 5 items to your touring equipment");
     await waitFor(() => expect(screen.getByRole("button", { name: "Add more touring equipment" })).toHaveFocus());
   });
 
@@ -613,7 +615,7 @@ describe("Touring equipment", () => {
     await renderPage();
     await user.click(await screen.findByRole("button", { name: "Add touring equipment" }));
     const dialog = await screen.findByRole("dialog", { name: "Touring equipment" });
-    for (const name of ["Avalanche transceiver", "Avalanche probe", "Avalanche shovel", "Climbing skins"]) {
+    for (const name of ["Avalanche transceiver", "Avalanche probe", "Avalanche shovel", "Climbing skins", "Helmet"]) {
       await user.click(within(dialog).getByRole("checkbox", { name }));
     }
     await user.click(within(dialog).getByRole("button", { name: "Add selected items" }));

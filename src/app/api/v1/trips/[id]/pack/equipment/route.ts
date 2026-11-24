@@ -33,6 +33,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     dates: touringDates(full),
     saved: readEquipment(packing.saved?.equipment),
     names: [...derived.map((item) => item.name), ...manual.map((item) => item.name)],
+    worn: derived,
     editable: packing.readable && packing.equipment,
   });
   const keys = new Set(equipment.items.map((item) => item.key));

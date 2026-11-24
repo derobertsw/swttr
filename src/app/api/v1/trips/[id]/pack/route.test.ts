@@ -667,6 +667,17 @@ describe("GET /api/v1/trips/[id]/pack touring equipment", () => {
     });
   });
 
+  it("lists the template's helmet as the one the descent's outfit wears, so it isn't suggested twice", async () => {
+    const descent = { ...WEAR, headNeck: { base: [], outer: [{ name: "Smith Vantage MIPS", rcl: 0.3, sourceId: "hw-1" }] } };
+    const outfit = savedOutfit({ phases: [
+      { id: "climb", wear: WEAR, carry: [], decision: null },
+      { id: "descent", wear: descent, carry: [], decision: null },
+    ] });
+    touringTrip({ kits: [kit("2026-10-11", ORGANIZER, outfit)], packing: [{ trip_member_id: ORGANIZER.id, items: [], quantities: {}, equipment: {} }] });
+    const { equipment }: TripPackResponse = await (await getPack()).json();
+    expect(equipment.template.find((option) => option.id === "helmet")).toMatchObject({ tier: "suggested", state: "listed", listedAs: "Smith Vantage MIPS" });
+  });
+
   it("says when the plan has no Backcountry days, and shows the equipment the person added anyway", async () => {
     mockKitTrip({ packing: [{ trip_member_id: ORGANIZER.id, items: [], quantities: {}, equipment: { shovel: { status: "added", quantity: 1 } } }] });
     const { equipment }: TripPackResponse = await (await getPack()).json();

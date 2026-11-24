@@ -1,6 +1,6 @@
 # Touring copy review packet (#205)
 
-For a qualified ski-touring practitioner. Prepared November 18, 2026 from `origin/main` at `5f2b8d6`. **Not reviewed yet.** The verdict columns are empty.
+For a qualified ski-touring practitioner. Prepared November 18, 2026 from `origin/main` at `5f2b8d6`, and updated November 22, 2026 when the helmet became a suggested item (EQ7, questions 1, 4 and 29). **Not reviewed yet.** The verdict columns are empty.
 
 #212 and #205 ask for SWTTR's touring copy to be reviewed by a qualified ski-touring practitioner before release. This packet holds every piece of text SWTTR shows on touring days that says something close to safety: equipment, shared items, day checks, the tour plan, conditions sources and reviews, the official avalanche centers, the offline brief, and the clothing advice for the climb and descent. You don't need to read code or use the app.
 
@@ -37,7 +37,7 @@ Files: items in `src/lib/touring-equipment.ts`; the preview and day page in `src
 | EQ4 | Climbing skins | Suggested | Grip for skinning uphill. | | |
 | EQ5 | Avalanche airbag pack | Optional | Deployed in an avalanche, it can help keep you near the surface. It doesn't replace the transceiver, probe and shovel. | | |
 | EQ6 | Ski crampons | Optional | Grip on firm or icy climbs where skins slip. | | |
-| EQ7 | Helmet | Optional | Head protection on the descent and in steep or rocky terrain. | | |
+| EQ7 | Helmet | Suggested | Head protection on the descent, in any weather. | | |
 | EQ8 | Headlamp | Optional | For early starts and returns after dark. | | |
 
 | ID | Shown | Text | File | Verdict | Suggested change |
@@ -49,10 +49,10 @@ Files: items in `src/lib/touring-equipment.ts`; the preview and day page in `src
 
 **Questions**
 
-1. Is the split right? Transceiver, probe, shovel and skins are suggested; airbag pack, ski crampons, helmet and headlamp are optional. Should anything move between the groups?
+1. Is the split right? Transceiver, probe, shovel, skins and helmet are suggested; airbag pack, ski crampons and headlamp are optional. Should anything move between the groups?
 2. Is anything missing from the personal template? For example spare transceiver batteries, a way to call for help, navigation, an extra warm layer, eye and sun protection, or ski straps. We'd rather leave something out than list something wrong, so say which you'd add and which you'd deliberately leave off.
 3. Are the purposes accurate, and do any of them claim too much? Especially EQ1 ("Wear it switched on") and EQ5 ("can help keep you near the surface").
-4. **The helmet disagrees with the clothing advice.** Here it's optional ("Head protection on the descent and in steep or rocky terrain"). The clothing advice for the descent calls a ski helmet required, in any weather (CL15 below). Which should it be for touring, and should both say the same?
+4. **The helmet now matches the clothing advice.** It used to be optional here, while the clothing advice for the descent calls a ski helmet required in any weather (CL15 below). SWTTR now treats it as required in both: the helmet is a suggested item, selected to start with, and its purpose reads "Head protection on the descent, in any weather." Can you confirm a helmet should be suggested for every touring day, and that EQ7 and CL15 say the same thing?
 5. Is the National Avalanche Center's gear page the right reference? Users in Canada will see the same link.
 
 ## 2. Shared touring items
@@ -324,7 +324,7 @@ Files: the labels in `src/lib/biophysics/comfort.ts` and `src/components/ScoreDi
 26. In CL13, "Standard touring conditions" means only a temperature between 0 and −10 °C. Is "conditions" risky there, next to avalanche "conditions"? The same goes for CL12, CL14 and "For the suggested outfit and conditions" (CL4).
 27. Is "IMMEDIATELY add insulation layer before doing anything else" (CL6) the right first step? Should the transition steps say anything about where to transition? Are the suggested times (5 and 10 minutes) sensible?
 28. Are the thresholds sensible: the frozen-skin warning below −15 °C air temperature (wind isn't counted), and the high-wind advice above 10 m/s?
-29. The helmet again (question 4): CL15 calls a ski helmet required on the descent, while the equipment template has it as optional (EQ7). Which wording should both use?
+29. The helmet again (question 4): CL15 calls a ski helmet required on the descent, and the equipment template now suggests one too (EQ7). Is "required protection, not optional warmth" the right wording here, alongside EQ7's purpose?
 
 ## Anything else
 
