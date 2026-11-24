@@ -109,7 +109,9 @@ const PageLayout = ({
                 // From lg every page starts at the canvas's left edge, so its
                 // title stays put from one destination to the next (#267).
                 "flex flex-1 min-h-0 w-full flex-col items-center justify-start focus:outline-none lg:items-start",
-                isCompactChrome ? "gap-5 pt-0 sm:gap-6 sm:pt-1" : "gap-6 pt-2 sm:gap-7 sm:pt-3"
+                isCompactChrome ? "gap-5 pt-0 sm:gap-6 sm:pt-1" : "gap-6 pt-2 sm:gap-7 sm:pt-3",
+                // With no header row on desktop web, every title starts at the same height.
+                !isNativeShell && "md:pt-0"
               )}
             >
               {children}
