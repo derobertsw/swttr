@@ -15,7 +15,7 @@ describe("delete_user_data in Postgres", () => {
   beforeAll(async () => { db = await createAccountDeletionDatabase(); }, 60_000);
   afterAll(async () => { await db.close(); });
   beforeEach(async () => {
-    await db.exec(`TRUNCATE trips, user_preferences, user_wardrobe, user_item_mappings, user_custom_items, trip_kit_saves CASCADE;`);
+    await db.exec(`TRUNCATE trips, user_preferences, user_wardrobe, user_item_mappings, user_custom_items, trip_kit_saves, catalog_item_reports CASCADE;`);
     await seedAccounts(db);
   });
 
@@ -31,7 +31,7 @@ describe("delete_user_data in Postgres", () => {
       // Two shared gear items, the guest's day check, the tour plan, the conditions
       // source and its day link, the manual drive estimate and the organizer's starting point.
       trip_rows_anonymized: 8,
-      user_preferences: 1, user_wardrobe: 2, user_item_mappings: 1, user_custom_items: 1,
+      user_preferences: 1, user_wardrobe: 2, user_item_mappings: 1, user_custom_items: 1, catalog_item_reports: 2,
     });
     expect(await rows(db, "SELECT id FROM trips")).toEqual([{ id: SHARED_TRIP }]);
     expect(await rows(db, "SELECT display_name FROM trip_members ORDER BY display_name")).toEqual([{ display_name: "Gus" }, { display_name: "You" }]);
@@ -90,7 +90,7 @@ describe("delete_user_data in Postgres", () => {
     const sharedBefore = await rows(db, "SELECT to_jsonb(t) AS row FROM trip_stays t WHERE trip_id = $1", [SHARED_TRIP]);
     await deleteUserData(db, DELETED);
     const after = await rowsMentioning(db, OTHER);
-    for (const table of ["user_preferences", "user_wardrobe", "user_item_mappings", "user_custom_items", "trips"]) {
+    for (const table of ["user_preferences", "user_wardrobe", "user_item_mappings", "user_custom_items", "catalog_item_reports", "trips"]) {
       expect(after[table], table).toBe(before[table]);
     }
     // Only the deleted account's trip took the other account's rows with it.
@@ -102,7 +102,7 @@ describe("delete_user_data in Postgres", () => {
     await deleteUserData(db, DELETED);
     const before = await snapshot(db);
     const zero = { trips: 0, trip_memberships: 0, trip_conditions_reviews: 0, trip_kit_saves: 0, trip_rows_anonymized: 0,
-      user_preferences: 0, user_wardrobe: 0, user_item_mappings: 0, user_custom_items: 0 };
+      user_preferences: 0, user_wardrobe: 0, user_item_mappings: 0, user_custom_items: 0, catalog_item_reports: 0 };
     expect(await deleteUserData(db, DELETED)).toEqual(zero);
     expect(await deleteUserData(db, "user_2NeverSeen000000000000000")).toEqual(zero);
     expect(await snapshot(db)).toEqual(before);

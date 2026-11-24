@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <article className="w-full max-w-2xl space-y-8 text-sm leading-relaxed text-muted-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-foreground [&_li]:pl-1 [&_strong]:font-semibold [&_strong]:text-foreground">
         <header className="space-y-3">
           <h1 className="text-title font-semibold text-foreground md:text-title-lg">Privacy Policy</h1>
-          <p>Last updated: <time dateTime="2026-11-01">November 1, 2026</time></p>
+          <p>Last updated: <time dateTime="2026-11-23">November 23, 2026</time></p>
           <p>
             SWTTR helps you choose layers and plan outdoor trips. This policy covers the SWTTR
             website and its iPhone and Mac apps. We use information to provide these features,
@@ -41,6 +41,8 @@ export default function PrivacyPage() {
             <li>
               <strong>Wardrobe.</strong> We store the gear you add, custom item details, and your choices
               about which items to use, so we can recommend layers from your wardrobe and build packing lists.
+              If you report a problem with a catalog item, we store the report with your account, including
+              any note and link you add, so we can check and correct the catalog.
             </li>
             <li>
               <strong>Trips and crew.</strong> We store trip names, dates, destinations, lodging and access

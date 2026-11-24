@@ -1,6 +1,6 @@
 # Deleting an account's data — #139
 
-People delete their account from the account menu: **Manage account** → **Delete account** (Clerk's `delete_self`). Clerk then sends a signed `user.deleted` webhook to `POST /api/webhooks/clerk`, and the route deletes the account's SWTTR data in one database transaction, `public.delete_user_data` (migration `20261116150000_delete_user_data.sql`).
+People delete their account from the account menu: **Manage account** → **Delete account** (Clerk's `delete_self`). Clerk then sends a signed `user.deleted` webhook to `POST /api/webhooks/clerk`, and the route deletes the account's SWTTR data in one database transaction, `public.delete_user_data` (migration `20261116150000_delete_user_data.sql`, replaced by `20261124120000_catalog_item_reports.sql` to cover catalog reports).
 
 Nothing happens until the webhook is set up in Clerk and Vercel ([setup](#setup)).
 
@@ -11,6 +11,7 @@ The account's own data is deleted. So are trips it owns, for their whole crew, a
 | Table | What happens |
 | --- | --- |
 | `user_preferences` (including height and weight), `user_wardrobe`, `user_item_mappings`, `user_custom_items` | Deleted. |
+| `catalog_item_reports` (`user_id`) | Deleted, whatever their status: the note and link are the person's own words ([catalog-reports.md](catalog-reports.md)). Catalog fixes they led to stay. |
 | `trips` they own (`owner_user_id`) | Deleted, with everything on them through `ON DELETE CASCADE`: stops, days (and their notes, meets and starting points), crew, invitations, kits, packing lists, attendance, nights, stays, shared gear, tour plans, conditions sources and reviews, day checks, drive estimates, nudges and the mutation receipts. |
 | `trip_members` on other people's trips (`user_id`) | Deleted. Their kits, packing list, attendance, nights, starting points, own day checks and nudges cascade. Shared gear they were bringing goes back to the organizer to reassign (`release_member_shared_gear`), with a `member_removed` event. |
 | `trip_conditions_reviews` on other people's trips (`user_id`) | Deleted. The review and its note were theirs, not the crew's. |
@@ -78,6 +79,7 @@ Prod runs on Clerk's **development** instance (its key is `pk_test_…`), so the
      UNION ALL SELECT 'user_wardrobe', user_id FROM user_wardrobe
      UNION ALL SELECT 'user_item_mappings', user_id FROM user_item_mappings
      UNION ALL SELECT 'user_custom_items', user_id FROM user_custom_items
+     UNION ALL SELECT 'catalog_item_reports', user_id FROM catalog_item_reports
      UNION ALL SELECT 'trips', owner_user_id FROM trips
      UNION ALL SELECT 'trip_members', user_id FROM trip_members
      UNION ALL SELECT 'trip_kit_saves', user_id FROM trip_kit_saves
@@ -92,7 +94,7 @@ Prod runs on Clerk's **development** instance (its key is `pk_test_…`), so the
    ) ids WHERE id = 'user_…' GROUP BY t;
    ```
 
-   If `SELECT to_regclass('public.trip_member_day_origins');` isn't null (migration `20261023233000` is applied), add `UNION ALL SELECT 'trip_member_day_origins', updated_by FROM trip_member_day_origins` inside the parentheses. Before that migration the table doesn't exist and the line fails.
+   If `SELECT to_regclass('public.trip_member_day_origins');` isn't null (migration `20261023233000` is applied), add `UNION ALL SELECT 'trip_member_day_origins', updated_by FROM trip_member_day_origins` inside the parentheses. Before that migration the table doesn't exist and the line fails. The `catalog_item_reports` line likewise needs migration `20261124120000`; leave it out until that's applied.
 6. Check that the shared-gear item from step 3 stayed on the other trip, with the account replaced. Put that trip's ID in the query:
 
    ```sql
@@ -105,12 +107,13 @@ Prod runs on Clerk's **development** instance (its key is `pk_test_…`), so the
 
 ### Orphan check
 
-Accounts deleted before the webhook was set up still have data. This read-only query lists every Clerk user ID the database holds. Once migration `20261023233000` is applied (`SELECT to_regclass('public.trip_member_day_origins');` isn't null), add `UNION SELECT updated_by FROM trip_member_day_origins` inside the parentheses too; before that the table doesn't exist and the line fails:
+Accounts deleted before the webhook was set up still have data. This read-only query lists every Clerk user ID the database holds. Once migration `20261023233000` is applied (`SELECT to_regclass('public.trip_member_day_origins');` isn't null), add `UNION SELECT updated_by FROM trip_member_day_origins` inside the parentheses too; before that the table doesn't exist and the line fails. Leave out the `catalog_item_reports` line until migration `20261124120000` is applied:
 
 ```sql
 SELECT DISTINCT id FROM (
   SELECT user_id AS id FROM user_preferences UNION SELECT user_id FROM user_wardrobe
   UNION SELECT user_id FROM user_item_mappings UNION SELECT user_id FROM user_custom_items
+  UNION SELECT user_id FROM catalog_item_reports
   UNION SELECT owner_user_id FROM trips UNION SELECT user_id FROM trip_members
   UNION SELECT user_id FROM trip_kit_saves UNION SELECT user_id FROM trip_conditions_reviews
   UNION SELECT unnest(ARRAY[assigned_by, accepted_by, packed_by]) FROM trip_group_gear

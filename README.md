@@ -8,7 +8,7 @@ SWTTR helps you pick the right layers for outdoor activities based on conditions
 - **Activity-based recommendations** across multiple sports and intensity profiles
 - **Manual or forecast mode** for quick input or location/time-based planning
 - **Fahrenheit or Celsius** in Settings, remembered per account on this device (with a separate guest choice)
-- **Wardrobe management** with calibrated gear data (clo, breathability, wind/water protection)
+- **Wardrobe management** with calibrated gear data (clo, breathability, wind/water protection), and **Report a problem** on a catalog item's details for wrong photos, specs or warmth ([triage](docs/catalog-reports.md))
 - **Body-part guidance** (torso, legs, hands, head/neck) with target clo insights
 - **Plan ahead** with multi-day forecasts and a packing list
 - **Trips** start with dates and one destination; add crew, stops, daily kits and shared gear afterward ([creation and recovery](docs/trip-creation.md))
@@ -516,6 +516,7 @@ The app uses a biophysics-based garment database with calibrated thermal propert
 - `handwear` / `headwear` - Extremity items with thermal properties
 - `user_wardrobe` - Links users to their owned gear
 - `user_custom_items`, `user_item_mappings`, `user_preferences` - Per-user data
+- `catalog_item_reports` - People's reports of catalog problems, triaged by hand ([docs](docs/catalog-reports.md))
 - `trips`, `trip_stops`, `trip_members`, `trip_days`, `trip_member_day_kits`, `trip_group_gear` - Trips/crew planning
 
 **Access model:** the browser never talks to Supabase. API routes use the service-role key (`src/lib/supabase.ts`, guarded by `server-only`) and enforce per-user access in code, for example with `requireUser()` in `src/lib/api.ts` and `requireTripAccess()` in `src/lib/trips.ts`. Migration `014_restrict_to_service_role.sql` revokes all table access from the public `anon`/`authenticated` roles, so the anon key grants nothing.

@@ -53,7 +53,7 @@ describe("POST /api/webhooks/clerk", () => {
     for (const level of ["info", "warn", "error"] as const) {
       vi.spyOn(console, level).mockImplementation((...args: unknown[]) => { logs.push(args); });
     }
-    await db.exec("TRUNCATE trips, user_preferences, user_wardrobe, user_item_mappings, user_custom_items, trip_kit_saves CASCADE;");
+    await db.exec("TRUNCATE trips, user_preferences, user_wardrobe, user_item_mappings, user_custom_items, trip_kit_saves, catalog_item_reports CASCADE;");
     await seedAccounts(db);
   });
   afterEach(() => {
@@ -69,7 +69,7 @@ describe("POST /api/webhooks/clerk", () => {
     expect(rpc).toHaveBeenCalledExactlyOnceWith("delete_user_data", { p_user_id: DELETED });
     expect(await rowsMentioning(db, DELETED)).toEqual({});
     const othersAfter = await rowsMentioning(db, OTHER);
-    for (const table of ["user_preferences", "user_wardrobe", "user_item_mappings", "user_custom_items", "trips"]) {
+    for (const table of ["user_preferences", "user_wardrobe", "user_item_mappings", "user_custom_items", "catalog_item_reports", "trips"]) {
       expect(othersAfter[table], table).toBe(othersBefore[table]);
     }
   });
