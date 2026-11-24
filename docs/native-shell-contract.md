@@ -82,6 +82,37 @@ by #138. They are not implemented by this web integration. Their scripts,
 origin validation, message types and error mapping must land together; the web
 app continues to use the browser location/share APIs until those bridges exist.
 
+## Links, dialogs and failed loads (iOS, #146)
+
+These don't need web changes; they describe what the iOS shell does with
+ordinary web behavior. The rules live in `apple/SWTTRShellKit`
+(`SWTTRNavigationPolicy`, `SWTTRExternalOpener`, `SWTTRLoadFailure`,
+`SWTTRProcessRecovery`) and are tested there.
+
+- **New windows** (`target="_blank"`, `window.open`) on SWTTR's own hosts or
+  Clerk's load in the same tab; the shell never opens a second web view. Other
+  `http(s)` hosts open in a Safari sheet, and closing it returns to the same
+  page. `maps.apple.com` links open the Maps app instead.
+- **Other schemes** (`mailto:`, `tel:`, `sms:`, `maps:`) open their system app
+  when the person taps a link in the page itself. Script redirects and links
+  inside embedded frames can't launch another app.
+- **`alert`, `confirm` and `prompt`** show native alerts. `prompt` has a text
+  field filled with its default text. Only pages on SWTTR's own hosts can show
+  them; embedded frames from other hosts get the default answer (`false` or
+  `null`) without a dialog.
+- **Failed loads.** Not connected, timed out, host not found, can't connect
+  and connection lost show "Can't reach SWTTR" with Retry, which loads the
+  failed page again. Other load errors show the same view with a different
+  message. Cancelled navigations (`NSURLErrorCancelled`, WebKit 102) are
+  ignored. Debug builds first fall back once from a stopped local dev server
+  to the remote site.
+- **Web content process crashes** reload the page once. A second crash within
+  30 seconds shows "This page stopped responding" with Retry instead.
+
+The offline view doesn't link to `/trips/saved` yet: the page can't open
+without a connection in the app until the shell adopts App-Bound Domains (see
+[trip-offline-brief.md](trip-offline-brief.md#iphone-app-146)).
+
 ## Verification
 
 Web tests cover marker precedence, Mac navigation at 700px and 1280px, browser

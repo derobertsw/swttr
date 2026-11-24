@@ -66,8 +66,9 @@ compiles the package, but `swift test` and `xcodebuild` need Xcode.
 - **Debug** loads `SWTTRWebURLDebug`, which defaults to `http://localhost:3000`.
   To test your checkout, start the web app with `npm run dev` before running
   the app. The Simulator shares the Mac's `localhost`. When a load from
-  `localhost` or `127.0.0.1` fails, that tab switches to `SWTTRWebURL` (once per
-  tab), so without a dev server you see production.
+  `localhost`, `127.0.0.1` or `[::1]` fails with a network error, that tab
+  switches to `SWTTRWebURL` (once per tab), so without a dev server you see
+  production.
 - To point Debug somewhere else, change `SWTTRWebURLDebug` in
   `App/App/Info.plist` locally and don't commit it. Plain `http` is accepted
   only for `localhost`, `127.0.0.1` and `[::1]`. Anything else must be `https`,
@@ -76,14 +77,21 @@ compiles the package, but `swift test` and `xcodebuild` need Xcode.
 
 The web side of the shell (user-agent marker, events, query parameters and
 storage keys) is described in the
-[native shell contract](../docs/native-shell-contract.md).
+[native shell contract](../docs/native-shell-contract.md), along with how the
+shell handles new windows, other link schemes, JavaScript dialogs, failed loads
+and web content crashes.
 
 ## Tests and CI
 
-`apple/SWTTRShellKit` has swift-testing tests for the navigation policy, the
-Gear Up pulse tracker and config resolution. The tabs, the Gear Up button and
-the injected activity script have no automated tests; check them in the
-Simulator.
+`apple/SWTTRShellKit` has swift-testing tests for the navigation policy
+(including new windows and other link schemes), where external links open, load
+failure classification, crash recovery, the Gear Up pulse tracker and config
+resolution. The tabs, the Gear Up button, the injected activity script, the
+Safari sheet, native dialogs and the "Can't reach SWTTR" view have no automated
+tests; check them in the Simulator. To see the offline view, stop `npm run dev`
+first (a running dev server stays reachable on `localhost` without a network),
+then turn off the Mac's network (the Simulator shares it) and relaunch. Debug
+then fails on `localhost`, falls back to `SWTTRWebURL`, and that fails too.
 
 [`.github/workflows/ios-app.yml`](../.github/workflows/ios-app.yml) runs on pull
 requests and pushes to `main` that touch `ios/`, `apple/`, `capacitor-web/`,
