@@ -1,12 +1,17 @@
 /**
- * The service worker that lets Saved on this device open with no connection
- * (#214). It's registered for that one page, so it never handles another
- * page or any API: see public/offline-sw.js and docs/trip-offline-brief.md.
+ * The service workers that let Saved on this device open with no connection
+ * (#214). The first is registered for that one page, so it never handles
+ * another page or any API: see public/offline-sw.js. The second, at scope /,
+ * only sends the start page and Trips there when they can't load, and only
+ * while this device holds a saved brief: see public/offline-start-sw.js and
+ * docs/trip-offline-brief.md.
  */
 
 /** The page that lists and shows this device's saved briefs. */
 export const SAVED_BRIEFS_PATH = "/trips/saved";
 const WORKER_URL = "/offline-sw.js";
+const START_WORKER_URL = "/offline-start-sw.js";
+const START_SCOPE = "/";
 const TIMEOUT_MS = 30_000;
 
 type OfflineOpening = { ready: true } | { ready: false; reason: string };
@@ -67,9 +72,51 @@ export async function prepareOfflineOpening(): Promise<OfflineOpening> {
     const { worker, fresh } = await withTimeout(activeWorker(registration), "the offline page took too long to download");
     // A worker that just installed kept the page as it installed.
     if (!fresh) await withTimeout(prime(worker), "the offline page took too long to download");
+    // The page opens offline, so the start page and Trips can send people to it.
+    await keepStartPageRedirect();
     return { ready: true };
   } catch (error) {
     const why = error instanceof Error && error.message ? error.message : "the offline page didn't download";
     return { ready: false, reason: `Saved, but this device can't open it without a connection yet: ${why}. Update the saved copy while you're online to try again.` };
+  }
+}
+
+const hasServiceWorkers = () => typeof navigator !== "undefined" && "serviceWorker" in navigator;
+
+/**
+ * Registers the worker that redirects the start page and Trips to Saved on
+ * this device when they can't load. Call it only while this device holds a
+ * saved brief. A failure is ignored: Saved on this device still opens from a
+ * bookmark or history.
+ */
+export async function keepStartPageRedirect(): Promise<void> {
+  if (!hasServiceWorkers()) return;
+  try {
+    await navigator.serviceWorker.register(START_WORKER_URL, { scope: START_SCOPE, updateViaCache: "none" });
+  } catch {
+    // Not registered: offline, the start page shows the browser's own offline page, as before.
+  }
+}
+
+/** Whether a registration is the start page's redirect worker. */
+function isStartPageRedirect(registration: ServiceWorkerRegistration): boolean {
+  if (new URL(registration.scope).pathname !== START_SCOPE) return false;
+  return [registration.installing, registration.waiting, registration.active]
+    .some((worker) => worker && new URL(worker.scriptURL).pathname === START_WORKER_URL);
+}
+
+/**
+ * Unregisters the start page's redirect worker once this device holds no
+ * saved brief: after the last one is removed, on sign-out, or when another
+ * account's are cleared. Never throws, so removing briefs never fails because
+ * of it.
+ */
+export async function removeStartPageRedirect(): Promise<void> {
+  if (!hasServiceWorkers()) return;
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.filter(isStartPageRedirect).map((registration) => registration.unregister()));
+  } catch {
+    // Still registered: offline, the start page then opens an empty Saved on this device.
   }
 }

@@ -54,6 +54,23 @@ async function saveInSheet(page) {
   }))()`);
 }
 
+const START_SCOPE = `${BASE}/`;
+const START_SCRIPT = `${BASE}/offline-start-sw.js`;
+
+/** The registrations once `done(worker)` holds, or as they are after 10 s. */
+async function workersWhen(page, done) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const worker = await readWorker(page);
+    if (done(worker)) return worker;
+    await sleep(200);
+  }
+  return readWorker(page);
+}
+const bothActive = (worker) => worker.scopes.length === 2 && worker.scopes.every((s) => s.active === 'activated');
+const noStartWorker = (worker) => !worker.scopes.some((s) => s.scope === START_SCOPE);
+/** Every cache is the saved page's own, so the start page's worker kept nothing. */
+const onlySavedPageCaches = (worker) => Object.keys(worker.caches).every((name) => name.startsWith('swttr-saved-shell-'));
+
 const groups = {};
 
 const SECRETS = [
@@ -75,6 +92,8 @@ groups.save = async () => {
   await page.waitFor(`document.getElementById('offline-copy-heading')`);
   const before = await text(page, 'section[aria-labelledby=offline-copy-heading]');
   record('save', 'Plan page offers Save for offline in an Offline copy section, nothing saved by viewing', /Save for offline/.test(before) && (await readDevice(page)).briefs.length === 0, { section: before });
+  const unsaved = await readWorker(page);
+  record('save', 'Before a brief is saved, no service worker is registered (neither the saved page\'s nor the start page\'s)', unsaved.scopes.length === 0 && !unsaved.controller, { worker: unsaved });
 
   const sheet = await openSheet(page);
   const ticked = sheet.days.filter((day) => day.checked).map((day) => day.label);
@@ -92,7 +111,7 @@ groups.save = async () => {
 
   const saved = await saveInSheet(page);
   const device = await readDevice(page);
-  const worker = await readWorker(page);
+  const worker = await workersWhen(page, bothActive);
   record('save', 'Save stores one brief for this account and says when and which dates, without an alert',
     !saved.dialogOpen && device.briefs.length === 1 && device.briefs[0].account_id === 'user-blair' && !saved.alert
       && /Saved on this device .* · Sat Jan 9 – Mon Jan 11/.test(saved.status), { saved, briefs: device.briefs.map((b) => [b.trip_id, b.account_id, b.brief.covered]) , meta: device.meta, hint: device.hint });
@@ -101,9 +120,13 @@ groups.save = async () => {
   record('save', 'Section then shows the saved line and Open saved brief / Update saved copy / Change saved days / Remove from this device',
     ['Open saved brief', 'Update saved copy', 'Change saved days', 'Remove from this device'].every((label) => saved.section.includes(label)), { section: saved.section });
   const cached = Object.values(worker.caches).flat();
-  record('save', 'Service worker scope is /trips/saved only; its cache holds the page, build files and icons, no API response or other page',
-    worker.scopes.length === 1 && worker.scopes[0].scope === `${BASE}/trips/saved` && cached.includes('/trips/saved')
-      && cached.every((path) => path === '/trips/saved' || path.startsWith('/_next/static/') || /\.(png|ico|svg)(\?|$)/.test(path)), { worker });
+  const savedScope = worker.scopes.find((s) => s.scope === `${BASE}/trips/saved`);
+  const startScope = worker.scopes.find((s) => s.scope === START_SCOPE);
+  record('save', 'Two workers once saved: offline-sw.js at /trips/saved, and the start page\'s redirect offline-start-sw.js at /',
+    bothActive(worker) && savedScope?.script === `${BASE}/offline-sw.js` && startScope?.script === START_SCRIPT, { scopes: worker.scopes });
+  record('save', 'Caches hold the saved page, build files and icons only, all in the saved page\'s own caches: no API response, other page, or anything from the start page\'s worker',
+    onlySavedPageCaches(worker) && cached.includes('/trips/saved')
+      && cached.every((path) => path === '/trips/saved' || path.startsWith('/_next/static/') || /\.(png|ico|svg)(\?|$)/.test(path)), { caches: Object.keys(worker.caches), cached: cached.filter((p) => !p.startsWith('/_next/static/')) });
   record('save', 'The stored snapshot has no invite token, stay notes, booking link field, context key, or another member\'s kit or packing',
     scan(device.briefs).length === 0, { found: scan(device.briefs), bytes: JSON.stringify(device.briefs).length });
   await writeFile(join(OUT, 'snapshot-blair.json'), JSON.stringify(device.briefs[0], null, 2));
@@ -124,6 +147,29 @@ groups.restart = async () => {
   const list = await text(page, '#main-content');
   record('restart', 'After quitting and restarting Chrome online, the brief is still listed and checked against the trip',
     /Smugglers' Notch hut tour/.test(list) && /Matches the trip online\./.test(list), { list });
+
+  // Online, the start page and Trips load as they always do: the start page's worker passes them through, and every other request skips it.
+  const online = {};
+  for (const path of ['/', '/trips']) {
+    page.responses.length = 0;
+    await go(page, path);
+    await sleep(800);
+    const doc = page.responses.find((r) => r.type === 'Document');
+    const others = page.responses.filter((r) => r.type !== 'Document');
+    online[path] = {
+      path: await page.eval('location.pathname'), h1: await page.eval(`document.querySelector('h1')?.innerText ?? ''`), doc,
+      subresources: others.length,
+      answeredByWorker: others.filter((r) => r.fromServiceWorker).map((r) => r.url),
+      routedToNetwork: others.filter((r) => r.router?.matchedSourceType === 'network').length,
+      routedToWorker: others.filter((r) => r.router && r.router.matchedSourceType !== 'network').map((r) => r.url),
+      controller: (await readWorker(page)).controller,
+    };
+  }
+  record('restart', 'Online, / and /trips stay where they are and show their own page, with the server\'s answer (200)',
+    Object.entries(online).every(([path, o]) => o.path === path && o.doc?.status === 200 && !/^Saved on this device$/.test(o.h1.trim())), online);
+  record('restart', 'Online, no request a page at / or /trips makes is answered by a worker: static routing sends each to the network',
+    Object.values(online).every((o) => o.controller === START_SCRIPT && o.subresources > 0 && o.answeredByWorker.length === 0 && o.routedToWorker.length === 0 && o.routedToNetwork === o.subresources),
+    Object.fromEntries(Object.entries(online).map(([path, o]) => [path, { controller: o.controller, subresources: o.subresources, routedToNetwork: o.routedToNetwork, answeredByWorker: o.answeredByWorker.slice(0, 5), routedToWorker: o.routedToWorker.slice(0, 5) }])));
   await browser.quit();
 };
 
@@ -133,9 +179,13 @@ groups.coldstart = async () => {
   const tries = {};
   for (const path of ['/', '/trips']) {
     const result = await go(page, path, { settle: 300, timeout: 15_000 });
-    tries[path] = { error: result.error, text: (await text(page)).slice(0, 160), url: await page.eval('location.href') };
+    await page.waitFor(`/Smugglers' Notch hut tour/.test(document.body.innerText)`, 15_000);
+    const body = await text(page);
+    tries[path] = { error: result.error, url: await page.eval('location.href'), listsBrief: /Saved on this device/.test(body) && /Smugglers' Notch hut tour/.test(body), text: body.slice(0, 160) };
   }
-  record('coldstart', 'Cold start offline: the site\'s start page and Trips open the saved briefs', Object.values(tries).every((t) => !t.error && /Saved on this device/.test(t.text)), tries);
+  record('coldstart', 'Cold start offline: the site\'s start page and Trips open the saved briefs', Object.values(tries).every((t) => !t.error && t.url === `${BASE}/trips/saved` && t.listsBrief), tries);
+  const coldWorker = await readWorker(page);
+  record('coldstart', 'After the redirects, every cache is still the saved page\'s own: the start page\'s worker kept nothing', onlySavedPageCaches(coldWorker), { caches: Object.keys(coldWorker.caches) });
 
   await go(page, 'chrome://history', { settle: 300 });
   await sleep(1500);
@@ -185,6 +235,16 @@ groups.coldstart = async () => {
   await sleep(500);
   const weakStatus = await weak.eval(`[...document.querySelectorAll('#main-content [role=status]')].map((el) => el.innerText).join(' | ')`);
   record('coldstart', 'Network down while the browser reports online: the kept page still opens (after the 4 s fallback) and says changes are unknown', /changes since .* are unknown/.test(weakStatus), { weakStatus });
+  const weakStart = {};
+  for (const path of ['/', '/trips']) {
+    const started = Date.now();
+    const result = await go(weak, path, { settle: 300, timeout: 20_000 });
+    // The page waits for the 4 s fallback and then for Clerk, which never loads; on a loaded machine that can take a while.
+    await weak.waitFor(`/Smugglers' Notch hut tour/.test(document.body.innerText)`, 45_000);
+    weakStart[path] = { error: result.error, onLine: await weak.eval('navigator.onLine'), url: await weak.eval('location.href'), listsBrief: /Smugglers' Notch hut tour/.test(await text(weak)), seconds: Math.round((Date.now() - started) / 1000) };
+  }
+  record('coldstart', 'Network down while the browser reports online: / and /trips reach the saved briefs once their load fails',
+    Object.values(weakStart).every((t) => !t.error && t.onLine && t.url === `${BASE}/trips/saved` && t.listsBrief), weakStart);
   await browser.quit();
 };
 
@@ -315,6 +375,7 @@ groups.account = async () => {
   await page.waitFor(`/Sign out and remove saved trips\\?/.test(document.body.innerText)`, 8000);
   const dialog = await page.eval(`document.querySelector('[role=dialog]')?.innerText ?? ''`);
   const kept = (await readDevice(page)).briefs.length;
+  const signedInWorker = await workersWhen(page, bothActive);
   await click(page, 'Sign out and remove', { within: '[role=dialog]' });
   await page.waitFor(`location.pathname === '/' && document.readyState === 'complete'`, 15_000);
   await sleep(800);
@@ -322,6 +383,9 @@ groups.account = async () => {
   record('account', "Account menu: one visible Sign out (the app's); it warns before removing saved trips, then removes them",
     items.filter((item) => item === 'Sign out').length === 1 && /Signing out removes the trip brief saved on this device for offline use/.test(dialog) && kept === 1 && after.briefs.length === 0 && !after.hint,
     { items, dialog, before: kept, after: after.briefs.length, hint: after.hint });
+  const signedOutWorker = await workersWhen(page, noStartWorker);
+  record('account', "Signing out unregisters the start page's redirect worker (the saved page's own worker stays, holding no account data)",
+    signedInWorker.scopes.some((s) => s.scope === START_SCOPE) && noStartWorker(signedOutWorker), { before: signedInWorker.scopes, after: signedOutWorker.scopes });
   await browser.quit();
 
   // Another account signs in on this device: the first account's copies go, on any page.
@@ -337,6 +401,8 @@ groups.account = async () => {
   await sleep(1500);
   const switched = await readDevice(page);
   record('account', "Switching accounts clears the other account's copies on any page (the guard, on /privacy)", switched.briefs.length === 0, { briefs: switched.briefs.length, meta: switched.meta });
+  const switchedWorker = await workersWhen(page, noStartWorker);
+  record('account', "Switching accounts also unregisters the start page's redirect worker", noStartWorker(switchedWorker), { scopes: switchedWorker.scopes });
   await browser.quit();
 
   ({ browser, page } = await freshSave('user-alex'));
@@ -385,6 +451,7 @@ groups.membership = async () => {
 
 groups.remove = async () => {
   let { browser, page } = await freshSave();
+  const registeredWorker = await workersWhen(page, bothActive);
   await go(page, `/trips/saved?trip=${TRIP}`);
   await page.waitFor(`document.getElementById('saved-brief-heading')`, 10_000);
   await page.eval(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Remove from this device').focus()`);
@@ -397,6 +464,13 @@ groups.remove = async () => {
   record('remove', 'Saved brief: after Remove, keyboard focus moves to the "Not saved on this device" heading, not the document body', /Not saved on this device/.test(detail.focus.name ?? ''), detail.focus);
   const online = await api('/__qa/log');
   record('remove', 'Removing never touches the trip online (no write request)', !online.some((entry) => !entry.key.startsWith('GET ')), { writes: online.filter((entry) => !entry.key.startsWith('GET ')) });
+  const removedWorker = await workersWhen(page, noStartWorker);
+  record('remove', "Removing the last saved brief unregisters the start page's redirect worker",
+    registeredWorker.scopes.some((s) => s.scope === START_SCOPE) && noStartWorker(removedWorker), { before: registeredWorker.scopes, after: removedWorker.scopes });
+  // With no brief saved, offline / is left to the browser again rather than sent to an empty list.
+  const emptyOffline = await newTab(browser, { offline: true });
+  const emptyResult = await go(emptyOffline, '/', { settle: 300, timeout: 15_000 });
+  record('remove', "Then, offline, / isn't redirected: the browser shows its own offline page", !!emptyResult.error || (await emptyOffline.eval('location.pathname')) !== '/trips/saved', { error: emptyResult.error });
   await browser.quit();
 
   ({ browser, page } = await freshSave());
@@ -407,6 +481,8 @@ groups.remove = async () => {
   const plan = { status: await page.eval(`document.querySelector('section[aria-labelledby=offline-copy-heading] [role=status]').innerText`), focus: await focused(page), briefs: (await readDevice(page)).briefs.length };
   record('remove', 'Plan page: Remove from this device says so in the status region and moves focus to the Offline copy heading',
     plan.briefs === 0 && /Removed from this device\. The trip online hasn't changed\./.test(plan.status) && /Offline copy/.test(plan.focus.name), plan);
+  const planRemoved = await workersWhen(page, noStartWorker);
+  record('remove', "Plan page: removing the last brief there unregisters the start page's redirect worker too", noStartWorker(planRemoved), { scopes: planRemoved.scopes });
   await browser.quit();
 };
 
