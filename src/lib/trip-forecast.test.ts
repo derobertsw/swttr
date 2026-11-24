@@ -35,6 +35,20 @@ describe("trip forecast reuse", () => {
     expect(latitudes).toEqual(["44.47", "45"]);
   });
 
+  it("reads a resort stop at its saved point and elevation, apart from the same coordinates without one (#7)", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => weatherResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const resortStop = { ...STOWE_STOP, resort_id: "wd-Q7620695", forecast_elevation_m: 1116, forecast_point_label: "Top of Gondola Skyride" };
+    const [resort] = await Promise.all([fetchTripForecast(resortStop), fetchTripForecast(STOWE_STOP)]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const elevations = fetchMock.mock.calls.map(([url]) => new URL(url).searchParams.get("elevation"));
+    expect(elevations).toEqual(["1116", null]);
+    expect(resort?.point).toEqual({
+      latitude: 44.47, longitude: -72.69, label: "Top of Gondola Skyride", resortId: "wd-Q7620695",
+      elevationM: 1116, elevationSource: "requested",
+    });
+  });
+
   it("uses a five-minute server cache without including private trip details in the key", async () => {
     const fetchMock = vi.fn().mockImplementation(async () => weatherResponse());
     vi.stubGlobal("fetch", fetchMock);

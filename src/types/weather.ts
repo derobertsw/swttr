@@ -10,6 +10,21 @@ export interface WeatherProvenance {
   observedTime?: string;
   /** Bounds and count of usable hours; bounds alone do not promise gap-free coverage. */
   coverage?: { firstHour: string; lastHour: string; availableHours: number };
+  /** Where the forecast was read (#7). Missing from weather saved before it. */
+  point?: ForecastPointProvenance;
+}
+
+/** The forecast point: a resort's labelled point, or the place's coordinates. */
+export interface ForecastPointProvenance {
+  latitude: number;
+  longitude: number;
+  /** What the point is, for a resort: "Top of K-1 Express Gondola", "Resort reference point". */
+  label?: string;
+  resortId?: string;
+  /** The elevation the forecast was read at, in meters, as the provider reported it. */
+  elevationM?: number;
+  /** "requested": the resort's mapped elevation was sent; "terrain": the provider's own terrain model. */
+  elevationSource: "requested" | "terrain";
 }
 
 /** Where a weather reading applies, and for forecasts, the hour and time zone the weather API reported. */

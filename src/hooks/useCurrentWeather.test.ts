@@ -14,6 +14,17 @@ describe("fetchWeatherAt", () => {
     vi.unstubAllGlobals();
   });
 
+  it("asks for a resort's weather by its catalog ID, so the API reads its point and elevation (#7)", async () => {
+    const fetch = mockFetch(Response.json({ temperature: 12, windSpeed: 21, isForecast: false }));
+    const resort = {
+      id: "resort:wd-Q14711916", kind: "resort", source: "openskidata", resortId: "wd-Q14711916",
+      name: "Killington Resort", region: "Vermont", country: "United States", latitude: 43.6047, longitude: -72.8187,
+      elevationM: 1262, pointLabel: "Top of K-1 Express Gondola", pointKind: "lift",
+    } as const;
+    await fetchWeatherAt(resort);
+    expect(fetch).toHaveBeenCalledWith("/api/weather?lat=43.6047&lon=-72.8187&resort=wd-Q14711916");
+  });
+
   it("gets the forecast for a local time at the place, and says where and when it applies", async () => {
     const fetch = mockFetch(
       Response.json({

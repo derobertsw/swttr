@@ -13,7 +13,7 @@ import { ACTIVITIES } from "@/data/activities";
 import type { MultiDayLayerPlan, UncoveredPlanDay } from "@/types/plan";
 import type { PackingListData, PackingListWardrobe } from "@/lib/packingList";
 import { OutingTimeSummary } from "@/components/OutingTimeSummary";
-import { WeatherSourceDetails } from "@/components/WeatherSourceDetails";
+import { ForecastPointLine, WeatherSourceDetails } from "@/components/WeatherSourceDetails";
 import type { Outing } from "@/types/outing";
 import type { SavedPlan } from "@/types/savedKit";
 
@@ -195,6 +195,7 @@ export default function MultiDayPlanDisplay({
             {startsLate && ` The first day starts at ${formatHour(plan.firstDayStartHour)}.`}
           </p>
           {outing && <OutingTimeSummary when={outing.when} />}
+          <ForecastPointLine point={plan.provenance?.point} />
         </div>
         <WeatherSourceDetails provenance={plan.provenance} />
       </header>

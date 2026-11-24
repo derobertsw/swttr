@@ -43,7 +43,7 @@ export function readResortFields(value: Record<string, unknown>): ResortFields |
 }
 
 /** "1,262 m (4,140 ft)": both, since the forecast point is the same for everyone. */
-function formatElevation(meters: number): string {
+export function formatElevation(meters: number): string {
   const feet = Math.round(meters * 3.28084);
   return `${Math.round(meters).toLocaleString("en-US")} m (${feet.toLocaleString("en-US")} ft)`;
 }
@@ -79,10 +79,10 @@ export function pickedPlace(suggestion: LocationSuggestion): LocationSuggestion 
 export type LocationSearchKind = "resort" | "all";
 
 /**
- * Resort search ships off until its weather reads the resort's point (#7);
- * until then every picker runs the general search, as before.
+ * Resort search (#7). Every forecast path reads a resort's point and
+ * elevation; set to false to put every picker back on the general search.
  */
-const RESORT_SEARCH_ENABLED = false;
+const RESORT_SEARCH_ENABLED = true;
 
 /** Alpine skiing searches resorts; every other activity, and none, searches all places. */
 export function searchKindFor(activity: string | null | undefined, enabled = RESORT_SEARCH_ENABLED): LocationSearchKind | undefined {
@@ -106,6 +106,19 @@ export function resortFieldsOfStop(stop: { resort_id?: string | null; forecast_e
 
 /** What the catalog calls a resort's fallback point (src/lib/locations/resorts.ts). */
 const REFERENCE_POINT_LABEL = "Resort reference point";
+
+/**
+ * Where a place's forecast is read, as the weather APIs take it: a resort by
+ * its catalog ID (the API reads its point and elevation from the catalog),
+ * anything else by its coordinates.
+ */
+export function forecastLocationOf(place: Pick<LocationSuggestion, "latitude" | "longitude" | "kind" | "resortId">): { lat: number; lon: number; resort?: string } {
+  return {
+    lat: place.latitude,
+    lon: place.longitude,
+    ...(place.kind === "resort" && isResortId(place.resortId) ? { resort: place.resortId } : {}),
+  };
+}
 
 /** A trip place (stop or destination) from a picked place; the API fills the resort's point from the catalog. */
 export function tripPlaceFrom(place: LocationSuggestion): { name: string; latitude: number; longitude: number; resort_id?: string } {

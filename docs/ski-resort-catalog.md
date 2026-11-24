@@ -86,7 +86,7 @@ The response is still `{ results: [...] }`. A resort result has `id: "resort:<re
 | Alpine skiing (`alpine_skiing`, or `Alpine` on trips) | `kind=resort` | **Search all places**, the last option in the list, so the keyboard reaches it. It lasts until the activity changes or the picker is reset. |
 | Anything else, or a trip stop with no activity | `kind=all`: places and resorts | — |
 
-**Resort search is off** (`RESORT_SEARCH_ENABLED = false`) until the forecasts read the resort's point and elevation (PR 3). Until then every picker runs the general search exactly as before, and nothing below can appear.
+Resort search is on (`RESORT_SEARCH_ENABLED` in `src/lib/locationSuggestion.ts`). Setting it to `false` puts every picker back on the general search, with nothing else to undo.
 
 - A resort is labelled "Ski resort · region, country" with a mountain icon; a town with the same name stays a separate option.
 - A typo match reads "Did you mean Killington Resort?". It's never chosen for the person: Enter with nothing highlighted does nothing.
@@ -104,6 +104,24 @@ A picked resort keeps its identity everywhere a place is kept:
 - Equality compares coordinates **and** the resort point (`isSameLocation`), so a point change counts as a new place even at the same coordinates.
 
 **Not yet carried:** a new trip made from Gear up's **Save to trip** (`save_trip_kits`) saves a resort destination as a general place at the resort's forecast point, without its resort fields. Fixing it means redefining `save_trip_kits`, which is left for a follow-up.
+
+## Forecasts at the point
+
+Every forecast goes through `src/lib/weather/openMeteo.ts`, which validates the location and builds the Open-Meteo request:
+
+| Path | How the point arrives |
+|---|---|
+| `GET /api/weather` (current, hourly, date range and its retries) | `resort=<resortId>`, or `lat`/`lon` with an optional `elevation` in meters |
+| `POST /api/plan-ahead` | `resortId`, or `lat`/`lon` with an optional `elevationM` |
+| Trip day weather and packing (`src/lib/trip-forecast.ts`) | The stop's saved `resort_id`, coordinates, `forecast_elevation_m` and label |
+
+- A **resort ID** is looked up in the catalog, and its point and elevation are used whatever coordinates the browser sent. An ID the catalog doesn't know is a 400, so the forecast is never quietly read somewhere else. A trip stop keeps the point it saved.
+- The **elevation** goes to Open-Meteo as `elevation=` in meters. Open-Meteo already downscales its forecast to that elevation, so **no lapse-rate correction is added**: one would correct the temperature twice. Wind is never adjusted. With no known elevation (towns, reference points), the parameter is left out and Open-Meteo uses its terrain model.
+- Units, times and errors are unchanged: °F and mph internally, the destination's clock and DST handling, the 16-day horizon, partial-hour handling, and 422/500 errors. A failed mountain forecast is an error, never current weather or the town's.
+- Every response's `provenance.point` says where the forecast was read: coordinates, the resort's label and ID, the elevation Open-Meteo reports it used (`elevationM`), and whether that was the resort's mapped elevation (`requested`) or the terrain model's (`terrain`). Gear up's result header, the multi-day plan header and the trip day's weather card show "Forecast at Top of K-1 Express Gondola, 1,262 m (4,140 ft)" for a resort. The weather source details show the point and elevation for every place.
+- Cache and request keys include the point. Trip forecasts share in-flight requests by coordinates and elevation, and the trip day page refetches when a stop's resort or elevation changes, even at the same coordinates.
+
+OpenSnow was considered and deferred: [`mountain-weather-providers.md`](mountain-weather-providers.md).
 
 ## Re-importing
 

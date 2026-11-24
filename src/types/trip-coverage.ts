@@ -1,3 +1,4 @@
+import type { ForecastPointProvenance } from "@/types/weather";
 export interface TripForecastCoverage {
   status: "not_requested" | "available" | "partial" | "unavailable" | "error";
   availableHours: number;
@@ -15,6 +16,8 @@ export interface TripDayWeather {
 export interface TripDayForecastResponse {
   forecast: TripForecastCoverage;
   weather: TripDayWeather | null;
+  /** Where the forecast was read (#7): a resort's labelled point and elevation. Only with the day's weather. */
+  point?: ForecastPointProvenance;
 }
 
 export interface TripDayCoverage {

@@ -59,9 +59,12 @@ describe("comparing places", () => {
 });
 
 describe("searchKindFor", () => {
-  it("runs the general search while resort search is off", () => {
-    expect(searchKindFor("alpine_skiing")).toBeUndefined();
-    expect(searchKindFor("Alpine")).toBeUndefined();
+  it("runs the general search when resort search is switched off", () => {
+    expect(searchKindFor("alpine_skiing", false)).toBeUndefined();
+    expect(searchKindFor("Alpine", false)).toBeUndefined();
+  });
+  it("is on, now that forecasts read the resort's point", () => {
+    expect(searchKindFor("alpine_skiing")).toBe("resort");
   });
   it("searches resorts for alpine skiing and every place otherwise once it's on", () => {
     expect(searchKindFor("alpine_skiing", true)).toBe("resort");

@@ -16,5 +16,5 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
   const stop = resolveTripStop(day ?? { stop_id: null }, full.stops);
   const source = hasTripCoordinates(stop) ? await fetchTripForecast(stop) : undefined;
   const { forecast, weather } = tripDayForecast(date, source);
-  return NextResponse.json({ forecast, weather });
+  return NextResponse.json({ forecast, weather, ...(weather && source ? { point: source.point } : {}) });
 }

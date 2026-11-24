@@ -6,6 +6,7 @@ import { parse } from "date-fns";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
 import type { Recommendation, LocationSuggestion } from "@/types/recommendations";
+import { forecastLocationOf } from "@/lib/locationSuggestion";
 import type { WeatherData } from "@/types/weather";
 import type { BiophysicsOutcome, BiophysicsRecommendation, BiophysicsStatus } from "@/types/biophysics";
 import type { MultiDayLayerPlan } from "@/types/plan";
@@ -305,6 +306,8 @@ export async function fetchPlanAhead(
       sensitivity,
       lat: outing.place.latitude,
       lon: outing.place.longitude,
+      // A resort's plan is read at its forecast point and elevation (#7).
+      ...(forecastLocationOf(outing.place).resort ? { resortId: forecastLocationOf(outing.place).resort } : {}),
       startDate: outing.when.date,
       durationDays: outing.when.durationDays,
       startHour: Number.isFinite(parsedStartHour) ? parsedStartHour : undefined,

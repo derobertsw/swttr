@@ -45,6 +45,7 @@ import { TOUR_ACTIVITY, TRIP_ACTIVITY_OPTIONS, tripActivityLabel, tripActivityNe
 import { outfitMismatches } from "@/lib/trip-kit-fit";
 import { errorMessage, tripRequest } from "@/lib/trip-requests";
 import { LocationAutocomplete, searchStateProps } from "@/components/LocationAutocomplete";
+import { ForecastPointLine } from "@/components/WeatherSourceDetails";
 import { searchKindFor, tripPlaceFrom } from "@/lib/locationSuggestion";
 import { useLocationSearch } from "@/hooks/useLocationSearch";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
@@ -92,7 +93,7 @@ export default function DayDetailPage({
   const hasCoords = typeof effectiveStop?.latitude === "number" && Number.isFinite(effectiveStop.latitude)
     && typeof effectiveStop.longitude === "number" && Number.isFinite(effectiveStop.longitude);
   const weatherKey = hasCoords
-    ? `${id}:${effectiveStop?.latitude},${effectiveStop?.longitude},${date}:${weatherAttempt}`
+    ? `${id}:${effectiveStop?.latitude},${effectiveStop?.longitude},${effectiveStop?.resort_id ?? ""},${effectiveStop?.forecast_elevation_m ?? ""},${date}:${weatherAttempt}`
     : null;
   const forecast = weatherKey && weatherResult?.key === weatherKey ? weatherResult.result : null;
 
@@ -461,6 +462,7 @@ function WeatherCard({
                   : "dry"}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">{result?.forecast.message}</p>
+              {result?.point && <div className="mt-1"><ForecastPointLine point={result.point} /></div>}
             </>
           ) : hasCoords ? (
             <p className="text-sm text-muted-foreground">

@@ -66,6 +66,7 @@ describe("POST /api/plan-ahead", () => {
     expect(plan.days[1].dayparts[0]).toMatchObject({ id: "morning", minTemp: 46 });
     expect(plan.provenance).toEqual({
       provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" },
+      point: { latitude: 44.47, longitude: -72.69, elevationSource: "terrain" },
       timeZone: "America/New_York",
       coverage: { firstHour: "2026-10-08T00:00", lastHour: "2026-10-09T23:00", availableHours: 48 },
     });
