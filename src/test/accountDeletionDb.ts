@@ -39,7 +39,7 @@ const MIGRATIONS = ["001_schema", "004_user_preferences_body_metrics", "005_user
   "20261018131917_trip_shared_gear_responsibility", "20261020000407_trip_conflicts_no_retry",
   "20261021201500_trip_attendance_lodging", "20261023000200_trip_drive_departures",
   "20261023233000_trip_member_starting_points", "20261024230000_trip_day_meet_times", "20261026120000_trip_day_checks",
-  "20261028130000_trip_day_notes", "20261116150000_delete_user_data"];
+  "20261028130000_trip_day_notes", "20261116150000_delete_user_data", "20261124120000_catalog_item_reports"];
 
 // Prod also has trip_nudges, from a migration that isn't in this repo
 // (20260520002401). Its rows go with either member.
@@ -86,6 +86,12 @@ export async function seedAccounts(db: PGlite) {
     ($1, 'torso', 'base', 'Light', 'My merino'), ($2, 'torso', 'base', 'Light', 'Their merino')`, [DELETED, OTHER]);
   await db.query(`INSERT INTO user_custom_items (user_id, body_part, layer_type, generic_option, custom_name, rcl_clo) VALUES
     ($1, 'legs', 'mid', 'Medium', 'Fleece tights', 0.4), ($2, 'legs', 'mid', 'Medium', 'Wool tights', 0.4)`, [DELETED, OTHER]);
+
+  // Reports of catalog problems: two of theirs (one resolved), and one of the other account's.
+  await db.query(`INSERT INTO catalog_item_reports (user_id, item_type, item_id, reasons, note, status, resolved_at) VALUES
+    ($1, 'garment', gen_random_uuid(), ARRAY['wrong_photo'], 'Old photo', 'open', NULL),
+    ($1, 'handwear', gen_random_uuid(), ARRAY['discontinued'], NULL, 'resolved', now()),
+    ($2, 'garment', gen_random_uuid(), ARRAY['wrong_specs'], 'Weighs 420 g', 'open', NULL)`, [DELETED, OTHER]);
 
   await db.query(`INSERT INTO trips (id, owner_user_id, name, start_date, end_date) VALUES
     ($1, $3, 'Their weekend', '2026-12-05', '2026-12-06'), ($2, $4, 'Presidentials', '2026-12-12', '2026-12-13')`,
@@ -159,10 +165,10 @@ export async function seedAccounts(db: PGlite) {
   }
 }
 
-/** The app's tables: everything but the gear catalog. */
+/** The app's tables: everything but the gear catalog, plus people's reports about it. */
 async function appTables(db: PGlite): Promise<string[]> {
   const { rows } = await db.query<{ table_name: string }>(`SELECT table_name FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND (table_name LIKE 'trip%' OR table_name LIKE 'user%')
+    WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND (table_name LIKE 'trip%' OR table_name LIKE 'user%' OR table_name = 'catalog_item_reports')
     ORDER BY table_name`);
   return rows.map((row) => row.table_name);
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useReturnFocus } from "@/hooks/useReturnFocus";
 import {
   Dialog,
   DialogContent,
@@ -17,11 +18,12 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { CircleCheck, CircleSlash, Trash2 } from "lucide-react";
+import { CircleCheck, CircleSlash, Flag, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WardrobeItem } from "@/types/wardrobe";
 import type { ActionState, RowAction } from "@/hooks/useWardrobe";
 import { ItemDetailContent } from "./item-detail/ItemDetailContent";
+import { ReportProblemDialog } from "./ReportProblemDialog";
 import { getItemBrandLabel, getItemCategoryLabel } from "./wardrobe-utils";
 
 interface ItemDetailCardProps {
@@ -55,8 +57,29 @@ export function ItemDetailCard({
 }: ItemDetailCardProps) {
   const isMobile = useIsMobile();
   const inclusionButtonRef = useRef<HTMLButtonElement>(null);
+  const reportButtonRef = useRef<HTMLButtonElement>(null);
+  // A new key per opening starts the report form fresh.
+  const [report, setReport] = useState({ open: false, key: 0 });
+  const reportFocus = useReturnFocus();
 
   if (!item) return null;
+
+  // Custom items are the user's own to edit, so only catalog items can be reported.
+  const reportable = item.item_type !== "custom";
+  const openReport = () => {
+    reportFocus.remember(() => reportButtonRef.current);
+    setReport((prev) => ({ open: true, key: prev.key + 1 }));
+  };
+  // Stacks on top of the details, which stay open underneath.
+  const reportDialog = reportable && (
+    <ReportProblemDialog
+      key={report.key}
+      item={item}
+      open={open && report.open}
+      onOpenChange={(next) => setReport((prev) => ({ ...prev, open: next }))}
+      onCloseAutoFocus={reportFocus.restore}
+    />
+  );
 
   const title = item.details.model_name;
   const description = `${getItemCategoryLabel(item)} · ${getItemBrandLabel(item)}`;
@@ -122,6 +145,16 @@ export function ItemDetailCard({
         </Button>
         <p className="text-sm text-muted-foreground">You can restore it until you leave this page.</p>
       </div>
+
+      {reportable && (
+        <div className="flex flex-col items-start gap-1 border-t border-border pt-4">
+          <Button ref={reportButtonRef} type="button" variant="outline" size="sm" onClick={openReport}>
+            <Flag />
+            Report a problem
+          </Button>
+          <p className="text-sm text-muted-foreground">Wrong photo, specs or warmth? Tell us and we&apos;ll fix it.</p>
+        </div>
+      )}
     </div>
   );
 
@@ -139,6 +172,7 @@ export function ItemDetailCard({
               {actions}
             </DrawerBody>
           </div>
+          {reportDialog}
         </DrawerContent>
       </Drawer>
     );
@@ -153,6 +187,7 @@ export function ItemDetailCard({
         </DialogHeader>
         <ItemDetailContent item={item} />
         {actions}
+        {reportDialog}
       </DialogContent>
     </Dialog>
   );
