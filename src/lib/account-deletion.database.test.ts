@@ -15,7 +15,7 @@ describe("delete_user_data in Postgres", () => {
   beforeAll(async () => { db = await createAccountDeletionDatabase(); }, 60_000);
   afterAll(async () => { await db.close(); });
   beforeEach(async () => {
-    await db.exec(`TRUNCATE trips, user_preferences, user_wardrobe, user_item_mappings, user_custom_items, trip_kit_saves CASCADE;`);
+    await db.exec(`TRUNCATE trips, user_preferences, user_wardrobe, user_item_mappings, user_custom_items, trip_kit_saves, user_outing_feedback CASCADE;`);
     await seedAccounts(db);
   });
 
@@ -31,8 +31,11 @@ describe("delete_user_data in Postgres", () => {
       // Two shared gear items, the guest's day check, the tour plan, the conditions
       // source and its day link, the manual drive estimate and the organizer's starting point.
       trip_rows_anonymized: 8,
-      user_preferences: 1, user_wardrobe: 2, user_item_mappings: 1, user_custom_items: 1,
+      user_preferences: 1, user_wardrobe: 2, user_item_mappings: 1, user_custom_items: 1, user_outing_feedback: 1,
     });
+    // The other account's feedback about its kit on the deleted account's trip stays, without the trip.
+    expect(await rows(db, "SELECT user_id, trip_id FROM user_outing_feedback ORDER BY source_key"))
+      .toEqual([{ user_id: OTHER, trip_id: null }, { user_id: OTHER, trip_id: null }]);
     expect(await rows(db, "SELECT id FROM trips")).toEqual([{ id: SHARED_TRIP }]);
     expect(await rows(db, "SELECT display_name FROM trip_members ORDER BY display_name")).toEqual([{ display_name: "Gus" }, { display_name: "You" }]);
   });
@@ -102,7 +105,7 @@ describe("delete_user_data in Postgres", () => {
     await deleteUserData(db, DELETED);
     const before = await snapshot(db);
     const zero = { trips: 0, trip_memberships: 0, trip_conditions_reviews: 0, trip_kit_saves: 0, trip_rows_anonymized: 0,
-      user_preferences: 0, user_wardrobe: 0, user_item_mappings: 0, user_custom_items: 0 };
+      user_preferences: 0, user_wardrobe: 0, user_item_mappings: 0, user_custom_items: 0, user_outing_feedback: 0 };
     expect(await deleteUserData(db, DELETED)).toEqual(zero);
     expect(await deleteUserData(db, "user_2NeverSeen000000000000000")).toEqual(zero);
     expect(await snapshot(db)).toEqual(before);

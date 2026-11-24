@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { useTrip } from "@/hooks/useTrip";
 import { useUserId } from "@/hooks/useUserId";
 import { SavedKitView } from "@/components/trips/SavedKitView";
+import { TripDayFeedback } from "@/components/OutingFeedback";
 import { PlanMyLayersButton, useTripDayOuting } from "@/components/trips/TripDayGearUp";
 import { CopyDayCard } from "@/components/trips/CopyDayCard";
 import { canEditMemberKit } from "@/lib/trip-permissions";
@@ -279,6 +280,7 @@ export default function DayDetailPage({
           {me && (myKit?.outfit ? (
             <div id={`kit-${me.id}`}>
               <SavedKitView outfit={myKit.outfit} savedAt={myKit.outfit_saved_at} day={{ date, activity: day.activity, stop: effectiveStop ?? null }} tripId={id} dayOuting={dayOuting} />
+              <TripDayFeedback tripId={id} date={date} kit={myKit.outfit} kitId={myKit.id} savedAt={myKit.outfit_saved_at} />
             </div>
           ) : (
             // Without a row, the Day checklist links to the section itself (#336).

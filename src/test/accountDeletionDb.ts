@@ -28,7 +28,7 @@ export const SHARED_IDS = ids;
 
 // Every migration that makes or changes a table holding a user ID, in order.
 const UNAPPLIED_IN_PROD = ["20261021201500_trip_attendance_lodging", "20261023000200_trip_drive_departures",
-  "20261023233000_trip_member_starting_points", "20261028130000_trip_day_notes"];
+  "20261023233000_trip_member_starting_points", "20261028130000_trip_day_notes", "20261124130000_user_outing_feedback"];
 const MIGRATIONS = ["001_schema", "004_user_preferences_body_metrics", "005_user_item_mappings", "007_item_media_urls",
   "010_user_custom_items", "012_trips", "014_restrict_to_service_role", "015_user_preferences_timestamps",
   "016_atomic_trip_creation", "017_trip_stays", "018_trip_saved_kits", "019_trip_kit_save_tombstones",
@@ -39,7 +39,7 @@ const MIGRATIONS = ["001_schema", "004_user_preferences_body_metrics", "005_user
   "20261018131917_trip_shared_gear_responsibility", "20261020000407_trip_conflicts_no_retry",
   "20261021201500_trip_attendance_lodging", "20261023000200_trip_drive_departures",
   "20261023233000_trip_member_starting_points", "20261024230000_trip_day_meet_times", "20261026120000_trip_day_checks",
-  "20261028130000_trip_day_notes", "20261116150000_delete_user_data"];
+  "20261028130000_trip_day_notes", "20261116150000_delete_user_data", "20261124130000_user_outing_feedback"];
 
 // Prod also has trip_nudges, from a migration that isn't in this repo
 // (20260520002401). Its rows go with either member.
@@ -152,6 +152,15 @@ export async function seedAccounts(db: PGlite) {
       [SHARED_TRIP, ids.sharedCrew, ids.sharedOrganizer]);
     await db.query(`INSERT INTO trip_member_lodging_nights (trip_id, member_id, date, stay_id, status) VALUES
       ($1, $2, '2026-12-12', $4, 'assigned'), ($1, $3, '2026-12-12', $4, 'assigned')`, [SHARED_TRIP, ids.sharedCrew, ids.sharedOrganizer, ids.sharedStay]);
+  }
+  if (await hasTable(db, "user_outing_feedback")) {
+    // Each account's feedback on a Gear up outing of its own, and the other's on its kit from the deleted account's trip.
+    await db.query(`INSERT INTO user_outing_feedback (user_id, source, source_key, trip_id, trip_date, activity, exertion,
+        advice_kind, temperature_f, wind_mph, overall, recommended, weather, context) VALUES
+      ($1, 'gear_up', 'gear_up:1', NULL, '2026-11-20', 'running', 'moderate', 'personalized', 56, 8, 'too_warm', '{}', '{}', '{}'),
+      ($2, 'gear_up', 'gear_up:2', NULL, '2026-11-20', 'running', 'moderate', 'personalized', 56, 8, 'just_right', '{}', '{}', '{}'),
+      ($2, 'trip_kit', 'trip_kit:3', $3, '2026-12-05', 'backcountry_skiing', 'hard', 'personalized', 20, 10, 'too_cold', '{}', '{}', '{}')`,
+    [DELETED, OTHER, OWNED_TRIP]);
   }
   if (await hasTable(db, "trip_member_day_origins")) {
     await db.query(`INSERT INTO trip_member_day_origins (trip_id, trip_day_id, member_id, no_drive, updated_by) VALUES

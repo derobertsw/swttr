@@ -378,7 +378,7 @@ export function outfitDate(outfit: SavedOutfit): string | null {
 }
 
 /** The destination's time zone, as the forecast or the place reported it; undefined when neither did. */
-function kitTimeZone(kit: SavedKit | SavedPlan): string | undefined {
+export function kitTimeZone(kit: SavedKit | SavedPlan): string | undefined {
   if (kit.kind === "plan" || kit.kind === "plan_day") return kit.provenance?.timeZone ?? kit.outing.place.timeZone;
   const context = kit.weather.context;
   return (context?.source === "forecast" ? context.timeZone : undefined)

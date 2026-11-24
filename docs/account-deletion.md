@@ -11,6 +11,7 @@ The account's own data is deleted. So are trips it owns, for their whole crew, a
 | Table | What happens |
 | --- | --- |
 | `user_preferences` (including height and weight), `user_wardrobe`, `user_item_mappings`, `user_custom_items` | Deleted. |
+| `user_outing_feedback` (#8, migration `20261124130000`) | Deleted, including feedback about kits on trips that are gone. |
 | `trips` they own (`owner_user_id`) | Deleted, with everything on them through `ON DELETE CASCADE`: stops, days (and their notes, meets and starting points), crew, invitations, kits, packing lists, attendance, nights, stays, shared gear, tour plans, conditions sources and reviews, day checks, drive estimates, nudges and the mutation receipts. |
 | `trip_members` on other people's trips (`user_id`) | Deleted. Their kits, packing list, attendance, nights, starting points, own day checks and nudges cascade. Shared gear they were bringing goes back to the organizer to reassign (`release_member_shared_gear`), with a `member_removed` event. |
 | `trip_conditions_reviews` on other people's trips (`user_id`) | Deleted. The review and its note were theirs, not the crew's. |
@@ -78,6 +79,7 @@ Prod runs on Clerk's **development** instance (its key is `pk_test_…`), so the
      UNION ALL SELECT 'user_wardrobe', user_id FROM user_wardrobe
      UNION ALL SELECT 'user_item_mappings', user_id FROM user_item_mappings
      UNION ALL SELECT 'user_custom_items', user_id FROM user_custom_items
+     UNION ALL SELECT 'user_outing_feedback', user_id FROM user_outing_feedback
      UNION ALL SELECT 'trips', owner_user_id FROM trips
      UNION ALL SELECT 'trip_members', user_id FROM trip_members
      UNION ALL SELECT 'trip_kit_saves', user_id FROM trip_kit_saves
@@ -111,6 +113,7 @@ Accounts deleted before the webhook was set up still have data. This read-only q
 SELECT DISTINCT id FROM (
   SELECT user_id AS id FROM user_preferences UNION SELECT user_id FROM user_wardrobe
   UNION SELECT user_id FROM user_item_mappings UNION SELECT user_id FROM user_custom_items
+  UNION SELECT user_id FROM user_outing_feedback
   UNION SELECT owner_user_id FROM trips UNION SELECT user_id FROM trip_members
   UNION SELECT user_id FROM trip_kit_saves UNION SELECT user_id FROM trip_conditions_reviews
   UNION SELECT unnest(ARRAY[assigned_by, accepted_by, packed_by]) FROM trip_group_gear

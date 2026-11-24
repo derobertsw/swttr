@@ -51,6 +51,14 @@ export default function PrivacyPage() {
               invitation and join; share them only with people you intend to invite.
             </li>
             <li>
+              <strong>Outing feedback.</strong> If you tell us how an outing&apos;s layers felt, we store your
+              answer and any details you add, such as what you actually wore, with the activity, effort,
+              conditions, the suggested outfit, your temperature sensitivity, and your height and weight
+              rounded to a range. We keep the region and country, not the place&apos;s name or coordinates.
+              We use it to review and improve recommendations. It is not shown to other people, and it
+              doesn&apos;t change your settings.
+            </li>
+            <li>
               <strong>Support.</strong> If you use our feedback form, we receive the message and any
               contact information you include so we can review feedback or respond. The form is hosted
               by Google Forms. Please leave out passwords, sign-in codes, and information we do not need
