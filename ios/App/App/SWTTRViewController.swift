@@ -1,3 +1,4 @@
+import SafariServices
 import SWTTRShellKit
 import UIKit
 import WebKit
@@ -39,7 +40,7 @@ private final class SWTTRScriptMessageProxy: NSObject, WKScriptMessageHandler {
     }
 }
 
-final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
+final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     private let shell: SWTTRShellConfig
     private let initialPath: String
     private lazy var navigationPolicy = SWTTRNavigationPolicy(allowedHosts: shell.allowedHosts)
@@ -50,6 +51,10 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
     private var webView: WKWebView!
     private var didFallbackFromLocalDev = false
     private var lastRequestedPath: String
+    /// The last main-frame page this tab asked for, which Retry loads again.
+    private var retryURL: URL?
+    private var processRecovery = SWTTRProcessRecovery()
+    private lazy var failureView = SWTTRLoadFailureView { [weak self] in self?.retryAfterFailure() }
 
     fileprivate init(shell: SWTTRShellConfig, initialPath: String) {
         self.shell = shell
@@ -90,6 +95,7 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
 
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = self
+        webView.uiDelegate = self
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.isOpaque = false
         webView.backgroundColor = .clear
@@ -101,6 +107,17 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        ])
+
+        failureView.backgroundColor = view.backgroundColor
+        failureView.isHidden = true
+        failureView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(failureView)
+        NSLayoutConstraint.activate([
+            failureView.topAnchor.constraint(equalTo: view.topAnchor),
+            failureView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            failureView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            failureView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
 
         loadRelativePath(initialPath, animated: false)
@@ -141,14 +158,18 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
 
     private func loadRelativePath(_ relativePath: String, animated: Bool = true) {
         lastRequestedPath = relativePath
-        let url = resolveURL(relativePath: relativePath, baseURL: shell.appURL)
-        webView.load(URLRequest(url: url))
+        load(resolveURL(relativePath: relativePath, baseURL: shell.appURL))
 
         if animated {
             UIView.animate(withDuration: 0.16) {
                 self.view.alpha = 1
             }
         }
+    }
+
+    private func load(_ url: URL) {
+        retryURL = url
+        webView.load(URLRequest(url: url))
     }
 
     private func resolveURL(relativePath: String, baseURL: URL) -> URL {
@@ -419,36 +440,287 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate {
             return
         }
 
-        let isMainFrame = navigationAction.targetFrame?.isMainFrame == true
-        let decision = navigationPolicy.decide(targetURL: url, isMainFrame: isMainFrame)
+        // A new window (target="_blank", window.open) has no target frame.
+        let opensNewWindow = navigationAction.targetFrame == nil
+        let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
+        let decision = navigationPolicy.decide(
+            targetURL: url,
+            isMainFrame: isMainFrame,
+            opensNewWindow: opensNewWindow,
+            userInitiated: navigationAction.navigationType == .linkActivated,
+            sourceIsMainFrame: navigationAction.sourceFrame.isMainFrame
+        )
 
         switch decision {
+        case .allow where opensNewWindow:
+            // Each tab has one web view, so trusted new windows load in place.
+            decisionHandler(.cancel)
+            load(url)
         case .allow:
+            if isMainFrame { retryURL = url }
             decisionHandler(.allow)
         case .openExternal:
-            UIApplication.shared.open(url)
             decisionHandler(.cancel)
+            openExternally(url)
         case .cancel:
             decisionHandler(.cancel)
         }
     }
 
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        failureView.hide()
+    }
+
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        handleDebugLocalFallback()
+        handleLoadFailure(error)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        handleDebugLocalFallback()
+        handleLoadFailure(error)
     }
 
-    private func handleDebugLocalFallback() {
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        // Reload once; a page that keeps crashing WebKit waits for Retry.
+        guard processRecovery.shouldReload(now: ProcessInfo.processInfo.systemUptime) else {
+            failureView.show(.stoppedResponding)
+            return
+        }
+        if webView.url != nil {
+            webView.reload()
+        } else if let retryURL {
+            load(retryURL)
+        }
+    }
+
+    private func handleLoadFailure(_ error: Error) {
+        let error = error as NSError
+        let kind = SWTTRLoadFailure.classify(error)
+        if kind == .cancelled { return }
+        if kind == .network, fallBackFromLocalDev() { return }
+        if let failingURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL,
+           let host = failingURL.host, navigationPolicy.isAllowedHost(host) {
+            retryURL = failingURL
+        }
+        failureView.show(kind == .network ? .offline : .notLoaded)
+    }
+
+    private func retryAfterFailure() {
+        processRecovery.reset()
+        failureView.setRetrying(true)
+        if let retryURL {
+            load(retryURL)
+        } else {
+            loadRelativePath(lastRequestedPath, animated: false)
+        }
+    }
+
+    /// Debug builds fall back once from a stopped local dev server to the remote site.
+    private func fallBackFromLocalDev() -> Bool {
         #if DEBUG
-        guard !didFallbackFromLocalDev else { return }
-        guard shell.appURL.host == "localhost" || shell.appURL.host == "127.0.0.1" else { return }
+        guard !didFallbackFromLocalDev, SWTTRShellConfig.isLoopback(host: shell.appURL.host) else { return false }
         didFallbackFromLocalDev = true
-        let fallbackURL = resolveURL(relativePath: lastRequestedPath, baseURL: shell.remoteURL)
-        webView.load(URLRequest(url: fallbackURL))
+        load(resolveURL(relativePath: lastRequestedPath, baseURL: shell.remoteURL))
+        return true
+        #else
+        return false
         #endif
+    }
+
+    // MARK: - WKUIDelegate
+
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        // decidePolicyFor normally handles new windows first; this covers
+        // WebKit delivering one straight here. The shell never opens a second web view.
+        guard let url = navigationAction.request.url else { return nil }
+        switch navigationPolicy.decide(
+            targetURL: url,
+            isMainFrame: true,
+            opensNewWindow: true,
+            userInitiated: navigationAction.navigationType == .linkActivated,
+            sourceIsMainFrame: navigationAction.sourceFrame.isMainFrame
+        ) {
+        case .allow: load(url)
+        case .openExternal: openExternally(url)
+        case .cancel: break
+        }
+        return nil
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        guard canShowDialog(from: frame) else { completionHandler(); return }
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
+        if !presentOverCurrentContent(alert) { completionHandler() }
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        guard canShowDialog(from: frame) else { completionHandler(false); return }
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(false) })
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler(true) })
+        if !presentOverCurrentContent(alert) { completionHandler(false) }
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
+        guard canShowDialog(from: frame) else { completionHandler(nil); return }
+        let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
+        alert.addTextField { field in
+            field.text = defaultText
+            field.accessibilityLabel = prompt
+            field.clearButtonMode = .whileEditing
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(nil) })
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak alert] _ in
+            completionHandler(alert?.textFields?.first?.text ?? "")
+        })
+        if !presentOverCurrentContent(alert) { completionHandler(nil) }
+    }
+
+    /// Only SWTTR's own pages can show dialogs; embedded third-party frames can't.
+    private func canShowDialog(from frame: WKFrameInfo) -> Bool {
+        navigationPolicy.isAllowedHost(frame.securityOrigin.host)
+    }
+
+    private func openExternally(_ url: URL) {
+        switch SWTTRExternalOpener.forURL(url) {
+        case .safariSheet:
+            let safari = SFSafariViewController(url: url)
+            safari.dismissButtonStyle = .close
+            if !presentOverCurrentContent(safari) { UIApplication.shared.open(url) }
+        case .system:
+            UIApplication.shared.open(url)
+        }
+    }
+
+    /// Presents over whatever is on screen. Returns false when this tab isn't
+    /// on screen or a dialog is already showing, so callers can answer WebKit.
+    private func presentOverCurrentContent(_ controller: UIViewController) -> Bool {
+        guard var top = viewIfLoaded?.window?.rootViewController else { return false }
+        while let presented = top.presentedViewController { top = presented }
+        guard !top.isBeingDismissed, !(top is UIAlertController) else { return false }
+        top.present(controller, animated: true)
+        return true
+    }
+}
+
+/// "Can't reach SWTTR": covers a tab whose page didn't load, with Retry.
+private final class SWTTRLoadFailureView: UIView {
+    enum Reason {
+        /// Not connected, timed out, host not found, connection lost.
+        case offline
+        /// Any other load error, such as a certificate a captive portal swapped in.
+        case notLoaded
+        /// The web content process crashed again soon after a reload.
+        case stoppedResponding
+    }
+
+    private let iconView = UIImageView()
+    private let titleLabel = UILabel()
+    private let messageLabel = UILabel()
+    private let retryButton = UIButton(configuration: .filled())
+    private let onRetry: () -> Void
+
+    init(onRetry: @escaping () -> Void) {
+        self.onRetry = onRetry
+        super.init(frame: .zero)
+        accessibilityViewIsModal = true
+
+        iconView.tintColor = .secondaryLabel
+        iconView.contentMode = .scaleAspectFit
+        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .largeTitle)
+        iconView.isAccessibilityElement = false
+
+        titleLabel.font = UIFontMetrics(forTextStyle: .title2).scaledFont(for: .systemFont(ofSize: 22, weight: .bold))
+        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.textColor = .label
+        titleLabel.textAlignment = .center
+        titleLabel.numberOfLines = 0
+        titleLabel.accessibilityTraits = .header
+
+        messageLabel.font = .preferredFont(forTextStyle: .body)
+        messageLabel.adjustsFontForContentSizeCategory = true
+        messageLabel.textColor = .secondaryLabel
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+
+        retryButton.configuration?.buttonSize = .large
+        retryButton.addAction(UIAction { [weak self] _ in self?.onRetry() }, for: .touchUpInside)
+        setRetrying(false)
+
+        let stack = UIStackView(arrangedSubviews: [iconView, titleLabel, messageLabel, retryButton])
+        stack.axis = .vertical
+        stack.alignment = .center
+        stack.spacing = 12
+        stack.setCustomSpacing(24, after: messageLabel)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        // Scrolls at the largest text sizes instead of clipping.
+        let scrollView = UIScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(stack)
+        addSubview(scrollView)
+
+        let content = scrollView.contentLayoutGuide
+        let frame = scrollView.frameLayoutGuide
+        let fillHeight = content.heightAnchor.constraint(equalTo: frame.heightAnchor)
+        fillHeight.priority = .defaultLow
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor),
+            content.widthAnchor.constraint(equalTo: frame.widthAnchor),
+            content.heightAnchor.constraint(greaterThanOrEqualTo: frame.heightAnchor),
+            fillHeight,
+            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -24),
+            stack.topAnchor.constraint(greaterThanOrEqualTo: content.topAnchor, constant: 24),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -24),
+            stack.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func show(_ reason: Reason) {
+        switch reason {
+        case .offline:
+            iconView.image = UIImage(systemName: "wifi.slash")
+            titleLabel.text = "Can't reach SWTTR"
+            messageLabel.text = "Check your internet connection, then try again."
+        case .notLoaded:
+            iconView.image = UIImage(systemName: "exclamationmark.triangle")
+            titleLabel.text = "Can't reach SWTTR"
+            messageLabel.text = "This page didn't load. Try again in a moment."
+        case .stoppedResponding:
+            iconView.image = UIImage(systemName: "exclamationmark.triangle")
+            titleLabel.text = "This page stopped responding"
+            messageLabel.text = "Try again, or choose another tab."
+        }
+        setRetrying(false)
+        let wasHidden = isHidden
+        isHidden = false
+        superview?.bringSubviewToFront(self)
+        UIAccessibility.post(notification: wasHidden ? .screenChanged : .layoutChanged, argument: titleLabel)
+    }
+
+    func hide() {
+        guard !isHidden else { return }
+        isHidden = true
+        setRetrying(false)
+        UIAccessibility.post(notification: .screenChanged, argument: nil)
+    }
+
+    func setRetrying(_ retrying: Bool) {
+        retryButton.configuration?.title = retrying ? "Trying again…" : "Retry"
+        retryButton.configuration?.showsActivityIndicator = retrying
+        retryButton.isEnabled = !retrying
     }
 }
 
