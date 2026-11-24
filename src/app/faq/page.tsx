@@ -135,7 +135,7 @@ export default function FAQ() {
   const { temperatureUnit } = useTemperatureUnit();
   return (
     <PageLayout>
-      <div className="flex flex-col gap-6 w-full max-w-2xl">
+      <div className="flex flex-col gap-6 w-full max-w-2xl lg:self-start">
         <header>
           <h1 className="text-title font-semibold text-foreground md:text-title-lg">
             Frequently Asked Questions

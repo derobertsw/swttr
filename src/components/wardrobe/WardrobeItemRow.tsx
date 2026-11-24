@@ -68,8 +68,9 @@ export function WardrobeItemRow({
   };
 
   return (
-    <li aria-busy={pending !== null} className="rounded-card border border-border bg-card text-card-foreground">
-      <div className="flex items-center gap-1 p-1.5">
+    <li aria-busy={pending !== null} className="flex flex-col rounded-card border border-border bg-card text-card-foreground">
+      {/* Grows to the height of the tallest row beside it in the desktop grid. */}
+      <div className="flex flex-1 items-center gap-1 p-1.5">
         <button
           id={rowButtonId(item.id)}
           type="button"
