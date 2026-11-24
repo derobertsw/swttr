@@ -255,7 +255,7 @@ function NewTripWizard() {
           onDone={() => router.push(`/trips/${trip.id}`)}
         />
       )}
-      <div className="h-24" />
+      <div className="h-24 md:hidden" />
     </div>
   );
 }

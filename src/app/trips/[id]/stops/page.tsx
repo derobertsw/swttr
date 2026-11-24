@@ -20,7 +20,7 @@ export default function TripStopsPage({ params }: { params: Promise<{ id: string
     setEditedStops(null);
   };
   const stops = data && (editedStops ?? data.stops);
-  return <div className="flex w-full max-w-2xl flex-col gap-5 pb-24">
+  return <div className="flex w-full max-w-2xl flex-col gap-5 pb-24 md:pb-0">
     <header><h1 className="text-title font-semibold text-foreground md:text-title-lg">Destinations</h1><p className="mt-2 text-sm text-muted-foreground">Add, order and remove stops, then choose the days that use them.</p></header>
     {loading && !data && <p role="status">Loading destinations…</p>}
     {error && <div role="alert"><p>{error}</p><Button variant="outline" onClick={() => void refresh()}>Retry</Button></div>}
