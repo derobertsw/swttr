@@ -168,6 +168,8 @@ function geometry(trip, date, revision) {
     : { ...base, state: drive.state === 'not_applicable' ? 'not_applicable' : 'unavailable', geometry: null } };
 }
 function tripApi(url, method, viewer, data = fx) {
+  // The trips list (November 22), so /trips renders around #214's "Saved on this device" link.
+  if (url.pathname === '/api/v1/trips' && method === 'GET') return { body: { trips: [] }, delay: API_DELAY };
   const match = url.pathname.match(/^\/api\/v1\/trips\/(trip-(?:drive|edge|split))(\/.*)?$/);
   if (!match) return { status: 503, body: { error: 'Not served by the #235 fixture' } };
   const trip = data[match[1]], rest = match[2] ?? '';
@@ -301,7 +303,9 @@ await run('lazy', async () => {
   const box = await page.eval('(() => { const r = document.querySelector(".maplibregl-canvas").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()');
   await page.drag(box, [box[0] + 120, box[1] + 60]); await page.drag(box, [box[0] - 160, box[1] - 40]);
   await sleep(1500);
-  out.interactions = { apiAfterOpen: page.api.slice(before).map((entry) => entry.path) };
+  // Routing happens only on the server, so any routing host seen from the browser is a failure too.
+  out.interactions = { apiAfterOpen: page.api.slice(before).map((entry) => entry.path),
+    routingHosts: page.requests.filter((entry) => /geoapify|osrm|graphhopper|valhalla|directions/i.test(new URL(entry.url).hostname + new URL(entry.url).pathname)).map((entry) => entry.url) };
   await page.eval(`__qa.select("map-date", "${SAT}")`); await sleep(400);
   await page.eval('__qa.click("button", "Show drive")');
   await page.waitFor('/Road route line:/.test(document.body.textContent)');
@@ -898,6 +902,20 @@ await run('offline', async () => {
     await page.screenshot(shot(`offline-${name}`));
   };
 
+  // Where #214 offers a saved copy: Plan's Offline copy and the trips list's Saved on this device link.
+  const offers = async () => {
+    await page.goto(`${BASE}/trips/trip-drive`);
+    await page.waitFor('__qa.find("h2", "Offline copy") && !/Checking this device/.test(__qa.find("h2", "Offline copy").parentElement.textContent)', 20_000);
+    const plan = await page.eval('({ openSaved: __qa.find("a", "Open saved brief")?.getAttribute("href") ?? null, saveForOffline: !!__qa.find("button", "Save for offline"), copy: __qa.norm(__qa.find("h2", "Offline copy").parentElement.textContent).slice(0, 200) })');
+    await page.goto(`${BASE}/trips`);
+    await page.waitFor('document.querySelector("main h1")', 20_000);
+    await sleep(1500);   // the count is read from this device's storage once the account is known
+    const trips = await page.eval('({ h1: __qa.norm(document.querySelector("main h1").textContent), savedLink: [...document.querySelectorAll("main a")].filter((a) => a.getAttribute("href") === "/trips/saved").map((a) => __qa.norm(a.textContent)) })');
+    return { plan, trips };
+  };
+  log('offline: offers before anything is saved');
+  out.offersBeforeSave = await offers();
+
   log('offline: nothing saved');
   await page.goto(`${BASE}/trips/trip-drive/map?date=${SAT}`);
   await ready(page); await page.waitFor('__qa.canvasReady()', 30_000);
@@ -920,6 +938,10 @@ await run('offline', async () => {
     workers: (await navigator.serviceWorker.getRegistrations()).map((registration) => ({ scope: registration.scope.replace(${literal(BASE)}, ''), active: !!registration.active })),
     caches: await Promise.all((await caches.keys()).map(async (name) => [name, (await (await caches.open(name)).keys()).map((request) => new URL(request.url).pathname).filter((path) => !path.startsWith('/_next/static/')).slice(0, 12)])) }))()`);
 
+  out.offersAfterSave = await offers();
+  await page.goto(`${BASE}/trips/trip-drive`);
+  await page.waitFor('__qa.find("a", "View trip map")', 20_000);
+
   log('offline: map with the copy saved');
   await page.eval('__qa.click("a", "View trip map")');
   await page.waitFor('location.pathname.endsWith("/map")', 15_000); await ready(page);
@@ -933,7 +955,7 @@ await run('offline', async () => {
   await page.screenshot(shot('offline-opened-from-map'));
 
   log('offline: entry with the connection already gone');
-  for (const [name, path] of [['map', `/trips/trip-drive/map?date=${SAT}`], ['plan', '/trips/trip-drive'], ['start', '/'], ['saved', '/trips/saved']]) {
+  for (const [name, path] of [['map', `/trips/trip-drive/map?date=${SAT}`], ['plan', '/trips/trip-drive'], ['start', '/'], ['trips', '/trips'], ['saved', '/trips/saved']]) {
     await page.goto(`${BASE}${path}`);
     await sleep(name === 'saved' ? 4500 : 1500);   // the saved list waits up to 3 s for an account Clerk can't load offline
     out[`entry_${name}`] = await where();
@@ -962,6 +984,21 @@ await run('offline', async () => {
   await page.goto(`${BASE}/trips/trip-drive/map?date=${SAT}`);
   await ready(page); await page.waitFor('__qa.canvasReady()', 30_000);
   await mapOffline('mapOtherAccount', '/saved on this device/i.test(__qa.find("h2", "Map needs a connection").parentElement.textContent)');
+  await goOnline();
+  out.offersOtherAccount = await offers();
+
+  log('offline: the organizer removes the copy');
+  page.viewer = 'user-1';
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: "try { localStorage.setItem('qa235User', 'user-1'); } catch {}" });
+  await page.goto(`${BASE}/trips/trip-drive`);
+  await page.waitFor('__qa.find("button", "Remove from this device")', 20_000);
+  await page.eval('__qa.click("button", "Remove from this device")');
+  await page.waitFor('/Removed from this device/.test(document.body.textContent)', 15_000);
+  out.removed = await page.eval('({ status: __qa.live().filter((text) => /Removed/.test(text)), focus: __qa.describe(document.activeElement) })');
+  out.offersAfterRemove = await offers();
+  await page.goto(`${BASE}/trips/trip-drive/map?date=${SAT}`);
+  await ready(page); await page.waitFor('__qa.canvasReady()', 30_000);
+  await mapOffline('mapAfterRemove', '/saved on this device/i.test(__qa.find("h2", "Map needs a connection").parentElement.textContent)');
   await goOnline();
   await page.close();
   return out;
@@ -1014,13 +1051,34 @@ await run('edits', async () => {
   await page.waitFor('document.querySelector("[role=dialog] input[name=name]")', 10_000);
   const original = await page.eval('document.querySelector("[role=dialog] input[name=name]").value');
   await page.eval('(() => { const input = document.querySelector("[role=dialog] input[name=name]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, input.value + " (renamed)"); input.dispatchEvent(new Event("input", { bubbles: true })); })()');
-  const attempt = async () => {
-    await page.eval('[...document.querySelectorAll("[role=dialog] button")].find((button) => /^Review/.test(__qa.norm(button.textContent))).click()');
+  const attempt = async (button = '^Review') => {
+    await page.eval(`[...document.querySelectorAll("[role=dialog] button")].find((button) => new RegExp(${literal(button)}).test(__qa.norm(button.textContent))).click()`);
     await page.waitFor('document.querySelector("#stay-error") && !document.querySelector("[role=dialog] [aria-busy=true]")', 15_000);
     await sleep(300);
     return page.eval('({ alert: __qa.norm(document.querySelector("#stay-error").textContent), role: document.querySelector("#stay-error").getAttribute("role"), open: !!document.querySelector("[role=dialog]"), name: document.querySelector("[role=dialog] input[name=name]")?.value, focus: __qa.describe(document.activeElement), onPage: /\\(renamed\\)/.test(document.querySelector("main").textContent.replace(document.querySelector("[role=dialog]")?.textContent ?? "", "")) })');
   };
   out.failedStay = { stay, original, network: await attempt(), server: await attempt(), writes };
+
+  // November 22: the preview answers, so the save itself fails: a dropped connection, a 500, then a 409 (changed meanwhile).
+  log('edits: the night preview answers, then saving fails');
+  let previewAnswers = false;
+  const saves = [];
+  page.rules.unshift((url, request) => {
+    if (!previewAnswers || request.method === 'GET' || !/^\/api\/v1\/trips\//.test(url.pathname)) return undefined;
+    if (url.pathname.endsWith('/stays/preview')) return { delay: API_DELAY, body: { revision: 0, people_key: 'qa235', nights: [], conflicts: [], changes: [], summary: [], day_changes: [], review_dates: [], date_label: 'Fri Jan 8 → Sun Jan 10' } };
+    saves.push(`${request.method} ${url.pathname}`);
+    return [{ fail: 'ConnectionReset' }, { status: 500, body: { error: "Couldn't save the stay. Try again." } },
+      { status: 409, body: { error: 'This stay changed since you opened it. Review the saved plan.' } }][Math.min(saves.length - 1, 2)];
+  });
+  previewAnswers = true;
+  await page.eval('[...document.querySelectorAll("[role=dialog] button")].find((button) => /^Review/.test(__qa.norm(button.textContent))).click()');
+  await page.waitFor('[...document.querySelectorAll("[role=dialog] button")].some((button) => __qa.norm(button.textContent) === "Save stay")', 10_000);
+  out.failedSave = { preview: await page.eval('__qa.norm([...document.querySelectorAll("[role=dialog] h3")].find((h) => /preview/i.test(h.textContent))?.parentElement.textContent).slice(0, 160)') };
+  out.failedSave.network = await attempt('^Save stay$');
+  out.failedSave.server = await attempt('^Save stay$');
+  out.failedSave.conflict = { ...await attempt('^Save stay$'), buttons: await page.eval('[...document.querySelectorAll("[role=dialog] button")].map((button) => __qa.norm(button.textContent)).filter(Boolean)') };
+  out.failedSave.writes = saves;
+  previewAnswers = false;
   await page.eval('[...document.querySelectorAll("[role=dialog] button")].find((button) => __qa.norm(button.textContent) === "Cancel").click()');
   await sleep(600);
   out.failedStay.cancel = await page.eval('__qa.norm(document.querySelector("[role=dialog]")?.textContent).slice(0, 140)');

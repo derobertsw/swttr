@@ -2,7 +2,7 @@
 
 Checked November 16, 2026. This is the **web part** of #235's release evidence for the trip maps from #232 (data and geometry), #233 (overview map and list), #234 (day logistics) and the #348 fix. It also covers the per-person departures and meet times that #333 added since then.
 
-Box 4's offline entry and failed edits, and box 6's before/after comparison of the core trip load, were checked on November 19: see [Boxes 4 and 6](#boxes-4-and-6-november-19-2026).
+Box 4's offline entry and failed edits, and box 6's before/after comparison of the core trip load, were checked on November 19: see [Boxes 4 and 6](#boxes-4-and-6-november-19-2026). They were checked again on November 22 against current `main`, with a stricter "before" revision, the removal of a saved copy and failed saves: see [Boxes 4 and 6 on current main](#boxes-4-and-6-on-current-main-november-22-2026).
 
 Every result here comes from a local production build with **fictional fixture trips**. It is not evidence from a device, VoiceOver, a signed-in account, production data or participants. Those are listed under [Untested surfaces](#untested-surfaces).
 
@@ -279,6 +279,148 @@ Both tests fail on `main`.
 | --- | --- | --- |
 | Low | Once a loaded tab is offline, View trip map (and every other link except to Saved on this device) ends on Chrome's "No internet" page. Back returns to the page. | Part of #214's open decision on a site-wide offline fallback: the small worker it proposes for `/` and `/trips` could redirect any offline navigation to Saved on this device. Nothing map-specific. |
 
+## Boxes 4 and 6 on current main, November 22, 2026
+
+Both boxes again, on current `main`. This run adds three things the November 19 run didn't do:
+
+- It checks every place #214 offers a saved copy, before saving, after saving, for another account and after removing the copy.
+- It makes the save itself fail, after a successful night preview.
+- It uses a stricter "before" for the load comparison: the commit just before *any* map work.
+
+| | |
+| --- | --- |
+| Implementation checked | `main` at `10f2308ea69caa94d19a85380db8f71dcca488df` ("Test the support and privacy links App Review relies on (#140) (#416)"). No app code changed in this PR. |
+| Before (box 6) | `f766f581d17c19f005435948b84967094bad028d` (#320), the parent of `8e4b389` (#319), which was the first map commit (#232's map data foundation) |
+| Build | `next build --turbopack` with `preview-auth.mjs`. Now uses Next.js 16.4.6 on `127.0.0.1:3435`. Before uses 16.4.0 on `localhost:3437`; its build stopped with the upgrade nudge after writing complete output. |
+| Browser | Headless Chrome 157.0.8103.79 over the DevTools Protocol, 1440 × 1000 at 2× |
+| Offline | The same TCP gate on `127.0.0.1:3436`, closed, with the tab also emulating offline |
+| Data | The same fixture trips. `/api/v1/trips` now answers an empty list, so `/trips` renders around its Saved on this device link. `preview-auth.mjs` also lets `/trips` skip Clerk. Writes get a dropped connection, a 500 or a 409 from the fixture. |
+| Machine | macOS 27.0.1, Apple silicon, Node 26.10.0, shared with other agents. The 1-minute load was 5 to 11, higher than on November 19 (2–3). |
+
+### Offline and the saved brief (box 4): pass
+
+`run.mjs offline`, one page throughout, as the organizer unless noted.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Offers before anything is saved | Pass | Plan's Offline copy has Save for offline and no Open saved brief. `/trips` has no Saved on this device link. |
+| Map offline, nothing saved | Pass | "Map needs a connection. Use List for places already loaded. Maps aren't available offline. This trip isn't saved on this device." The only control is Use list. Show drive is disabled, and the 3 places stay listed. |
+| Save for offline | Pass | All four days are ticked. The status says "Saved on this device Thu, Jan 7, 10:00 AM EST · Fri Jan 8 – Mon Jan 11 …", with no alert. One worker is active at scope `/trips/saved`. Its cache holds `/trips/saved`, `/favicon.ico`, `/icon.png` and the build files. |
+| Offers after saving | Pass | Plan shows **Open saved brief** (`/trips/saved?trip=trip-drive`), Update, Change saved days and Remove. `/trips` shows **Saved on this device · 1 trip**. |
+| Map offline, this trip saved | Pass | The card adds the saved line, "The saved brief has the day logistics, not a map.", and **Open saved brief** next to Use list. |
+| Open saved brief from the map, offline | Pass | The worker answers `/trips/saved?trip=trip-drive` and controls the page. It shows h1 Vermont and "changes since … are unknown", and the brief has Sat Jan 9 and the Spruce Peak lot. |
+| Another account (Sam) on the same device | Pass | The map says "This trip isn't saved on this device." and offers no link. Plan offers only Save for offline, and `/trips` has no Saved link. |
+| Organizer removes the copy | Pass | Removing it says "Removed from this device. The trip online hasn't changed." and focus goes to the Offline copy heading. Afterwards Plan offers only Save for offline, `/trips` has no Saved link, and the map offline says "This trip isn't saved on this device." with no link. |
+| Offline entry: map, Plan, `/`, `/trips` | Chrome's "No internet" page (`ERR_INTERNET_DISCONNECTED`) | Today no worker answers these pages. That's within the release boundary (no offline map). |
+| Offline entry: `/trips/saved` | Pass | The worker answers with "Read-only trip briefs you saved, for when there's no connection." |
+| A loaded Plan tab goes offline, then View trip map | Chrome's "No internet" page | Same as November 19. Plan's own Open saved brief does reach the copy offline. |
+
+So a saved brief is offered only when one is saved for the signed-in account on this device: on the map, on Plan and on the trips list. After removal, none of them offers it.
+
+**Once #214's redirect worker lands.** A parallel change adds a redirect-only worker at scope `/`. Once a brief is saved, it sends offline navigations to `/` and `/trips` to `/trips/saved`. These checks ran without it. Expected behavior then:
+
+- **`/` and `/trips` offline, with a brief saved:** they land on Saved on this device instead of Chrome's page, which closes the November 19 "found, not fixed" row for those two entries.
+- **Nothing saved, or the copy removed:** they should still get Chrome's page, because there is nothing to offer. That worker's own tests need to cover removal and sign-out.
+- **`/trips/:id/map` and `/trips/:id`:** they aren't redirected, so they still get Chrome's page, both when entered offline and when a loaded tab follows View trip map. The map's own card (Open saved brief) stays the way to reach the copy from a loaded map.
+- **`/trips/saved`:** it stays with its own worker, whose scope is more specific.
+
+Re-run `run.mjs offline` after it merges. `entry_start` and `entry_trips` should then report `/trips/saved`.
+
+### Failed edits (box 4): pass
+
+`run.mjs edits`, as the organizer on Saturday's map.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| The map's six editor links and Back | Pass | Edit trip goes to `/settings`. Edit Getting there and Edit tour plan focus their day headings, in view. Edit tonight's stay and the stay's Edit in trip plan focus `h3` "Stowe Motel" on Stays (bug J's fix holds). The destination's Edit in trip plan goes to `/stops`. Back restores `?date=2027-01-09`, and the selected place too when there was one. |
+| Night preview: connection dropped, then 500 | Pass | "Check your connection and try again." and then "Couldn't save the stay. Try again." each appear in a `role=alert`. The sheet stays open with "Stowe Motel (renamed)" kept, and nothing changes on the page. |
+| **New:** the preview answers, then the save (`PATCH …/stays/stay-motel`) drops | Pass | The night preview shows "No night assignments will change." Saving gives "Check your connection and try again." with the sheet open and the typed name kept. |
+| **New:** the save answers 500 | Pass | "Couldn't save the stay. Try again.", the same as above |
+| **New:** the save answers 409 (changed meanwhile) | Pass | The fixture's message shows in the alert, and Save stay becomes **Review saved plan**. The typed name is kept, and nothing changes on the page. |
+| Cancel and discard, then Back to the map | Pass | "Discard changes? Your saved plan will be kept." Focus returns to Edit Stowe Motel. The map shows the same 3 rows, the old name and no error. |
+
+Successful edits still need a signed-in organizer (see [Untested surfaces](#untested-surfaces)).
+
+### Request discipline (box 6): pass
+
+`run.mjs lazy` on current `main`.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| The trip's initial load downloads no map SDK | Pass | The Overview loaded no MapLibre JS chunk (`2wbwpckv_y2_y.js` in this build), no CSS, no worker and no tiles. Its API reads are `/trips/trip-drive` and `/map`. The day page loads no map code either. Its reads are the trip, equipment, drive estimates, weather and outing. |
+| Opening the map requests no day's route | Pass | Opening it loaded the chunk, CSS, worker and 27 OpenFreeMap files. The trip API reads after opening are the trip, the Overview's `/map` and the map page's `/map`, with **0** geometry requests across the 4-day trip. |
+| Dates, selection, zoom and pan route nothing | Pass | Changing through every date, selecting a place, zooming in and out, and dragging twice made **0** trip API requests and **0** requests to any routing host. |
+| Show drive | Pass | Show drive sent exactly 1 geometry request, for Saturday. Show whole day followed by Show drive again sent none. |
+| Phone list deep link | Pass | `?view=list` at 390px loads no map code and no tiles. Pressing Map loads the chunk and 22 tiles. |
+
+### Core trip load before and after maps (box 6): pass, no regression
+
+`run.mjs compare` loads the Overview (`/trips/trip-drive`) on the two builds, five runs each per profile, interleaved. "Core trip" means the trip's name heading plus a day link, checked every 20 ms.
+
+**Why `f766f58`.** It is the parent of `8e4b389` (#319), the first commit of the map work. November 19's "before", `b60faa4` (#321), already had #232's map APIs. Between the two commits, the only client-side change is a hook the Overview never imports (`useTripMapGeometry`, used later by the map page); the rest is server routes, `src/lib` and types. The Overview's client is the same, but `f766f58` is the literal "just before the map work", so nothing from the map work can sit in the baseline.
+
+Medians of 5. Every run is listed in `results.json`.
+
+| Unthrottled | Before `f766f58` | Now `10f2308` | Change |
+| --- | --- | --- | --- |
+| Core trip | 278 ms | 286 ms | +8 ms |
+| Places | — | 437 ms | |
+| Largest contentful paint | 432 ms | 304 ms | −128 ms |
+| First contentful paint | 56 ms | 68 ms | +12 ms |
+
+| CPU 4×, 150 ms RTT, 1.6 Mbps down | Before | Now | Change |
+| --- | --- | --- | --- |
+| Core trip | 2,655 ms | 2,683 ms | +28 ms (1.1%) |
+| Places | — | 2,861 ms | |
+| Largest contentful paint | 2,796 ms | 2,708 ms | −88 ms |
+| First contentful paint | 992 ms | 884 ms | −108 ms |
+
+| Transfer (same in both profiles) | Before | Now |
+| --- | --- | --- |
+| JS | 327 KB, 15 files | 334 KB, 19 files |
+| All app files | 469 KB | 486 KB |
+| Requests | 42 | 53 |
+| Trip API reads | trip, drive estimates | trip, `/map` |
+| MapLibre JS, CSS, worker or tiles | none | none |
+
+Raw core times, ms:
+
+| Run | Before, unthrottled | Now, unthrottled | Before, throttled | Now, throttled |
+| --- | --- | --- | --- | --- |
+| 1–5 | 352, 281, 278, 262, 252 | 826, 286, 694, 268, 278 | 4,890, 2,650, 2,675, 2,655, 2,628 | 2,683, 2,656, 2,871, 3,026, 2,677 |
+
+**Investigation.**
+
+- **Within noise.** The core trip median moved 8 ms unthrottled and 28 ms throttled. Two unthrottled "now" runs (826 and 694 ms) and one throttled "before" run (4,890 ms) were outliers while load peaked; the medians and their neighbours agree to about 30 ms.
+- **The 11 extra requests, from the request lists (`QA_COMPARE_URLS=1`).**
+  - **4 more script files.** One is Places' small chunk from #323; the other 3 come from later trip work (#330, #333, #212, #214, #401), 7 KB of JS in all.
+  - **7 more route prefetches, made after the page renders.** 2 are for View trip map. The other 5 are net from later trip work: #330's Stays and Pack tabs, the Privacy link, and day links for Jan 9–11 (the Overview now links every day). The old Roll call and sign-in prefetches went away.
+  - **The same number of trip API reads.** `/map` was added and drive estimates were dropped.
+- **Off the core path.** The Overview no longer reads drive estimates (moved off it after maps). Places still mounts after the trip arrives and shows about 150–180 ms (one fixture round trip) after the core trip. It never delays the core trip, as on November 19.
+
+The Overview's cost for maps is still one API read, one small chunk and two route prefetches, with no map SDK. No regression needs a fix.
+
+**Limits.**
+
+- Before runs Next.js 16.4.0 and Now runs 16.4.6.
+- Before is served on `localhost`, because 16.4.0 forwards to `localhost` internally.
+- Both builds get the same fixture responses, after 150 ms.
+- The first full `compare` attempt stopped when a DevTools call to a throttled page got no answer in 60 s. The second attempt, recorded here, completed, but the harness waited about 8 minutes after the first throttled "before" run, which is that run's 4,890 ms outlier.
+- The machine was busier than on November 19, so these numbers aren't comparable with that table. Compare them only with each other.
+
+### Result
+
+- **Box 4 passes on current `main`:**
+  - the map is useful offline (list, summary, notice)
+  - the saved brief is offered only when this account has one saved, and stops being offered once it's removed
+  - failed previews and failed saves keep the typed edit and leave the trip unchanged
+- **Box 6 passes:**
+  - no map SDK on the trip's initial load
+  - no route requests on opening the map or on pan and zoom
+  - the before/after core trip load is within noise (+8 ms unthrottled, +28 ms throttled)
+
+No new bugs. Nothing remains in #235 for the web. The device, signed-in and participant checks are in #144 and #205.
+
 ## Untested surfaces
 
 - **iPhone app (Capacitor/WKWebView):** WebGL, worker and memory recovery; safe areas around the map, controls and attribution; touch scrolling past the map; and the external handoffs, which do nothing in the app until #146.
@@ -326,6 +468,13 @@ node docs/qa/235-trip-maps/run.mjs --base http://127.0.0.1:3436 --upstream http:
 node docs/qa/235-trip-maps/run.mjs --out /tmp/qa235 --compare \
   "before=http://localhost:3437=../qa-235-before/.next,maps=http://localhost:3438=../qa-235-maps/.next,now=http://127.0.0.1:3435=.next" compare
 ```
+
+On November 22 the comparison ran with two builds:
+
+- before: `f766f58` in a detached worktree (`git worktree add --detach <dir> f766f58`; then `npm ci`, link `.env.local`, apply, build, revert), served on `localhost:3437`
+- now: `main`, served on `127.0.0.1:3435`
+
+The command was `--compare "before=http://localhost:3437=<dir>/.next,now=http://127.0.0.1:3435=.next" compare`, with `QA_COMPARE_URLS=1` to list every request. Remove the worktree afterwards.
 
 `QA_COMPARE_RUNS` sets the runs per build and profile (default 5). Next.js 16.4.0's build stops after writing its output to recommend an upgrade for a known vulnerability; the output is complete, and these builds are never deployed. `fixtures.mjs <out.json>` writes the fixture responses on their own. The first run fetches OpenFreeMap resources once into `<out>/tile-cache`; later runs reuse them, except `perf`.
 
