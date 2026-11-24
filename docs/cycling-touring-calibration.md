@@ -165,10 +165,49 @@ Comfort can rise while a shortfall appears, because the comfort score also count
 So no climb outfit inside its own band, combined with the catalog's warmest over-pant, reaches the descent's leg minimum in these cases. Before this change the climb wore heavier pants, and the same ceiling already left cold, windy and extreme-cold descents 0.37 and 1.21 clo short. This is a target-design and catalog question, not a selection bug, so it is recorded here rather than forced:
 
 - **The descent target uses rates this change was told to leave alone.** The descent's 146 W/m² is half the Compendium's moderate downhill active time (6.3 MET, 293 W/m²), plus 5 m/s of skiing air. A low rate makes the target warmer. Since #375 the leg band also equals the whole-body band. Recalibrating the descent is option 3 of #374 and needs field feedback (#8).
-- **Catalog gap.** There are no insulated over-pants or belay pants warmer than 1.8 clo with regional data.
+- **Catalog gap.** There were no insulated over-pants or belay pants warmer than 1.8 clo with regional data. #412 added one (below).
 - **Model limit.** Only one leg layer can be added at the transition. Base and fleece layers would go underneath, which would mean taking boots and pants off.
 
 **One selection fix made here.** When no layer reaches the descent minimum, the pack used to trade the gap it closes against weight (70/30). In the wardrobe's extreme-cold case that chose a 226 g down jacket over an owned 539 g synthetic puffy that closes more of the gap. Now, unless a light pack is asked for, the layer leaving the smallest remaining gap wins and weight only breaks ties (`packForRegion` in `ski-touring-outfit.ts`). In that case the torso shortfall drops from 0.63 to none and the arms from 1.37 to 1.09 clo. The descent's metabolic rate, air speed and margins are unchanged.
+
+### Warmer over-pant and clearer guidance (#412)
+
+**Decision (2026-11-22).** The owner chose #412's options 2 and 4: add a belay over-pant warmer than 2 clo with full side zips, and say plainly when a shortfall remains. The descent's metabolic rate, air speed and margins stay as they are until there is field feedback (#8, option 1). The pack still adds one leg layer, never a second (option 3). Climb, transition and descent stay separate phases, and no target changes, so climb targets stay monotonic.
+
+**Duplicate check.** The live catalog was checked read-only on 2026-11-22: no `insulation_synthetic` or `insulation_down` leg garment, and no belay, puffy or down pant. The warmest leg layers were the three 1.8 clo insulated ski pants, none with full side zips.
+
+**The pant.** Black Diamond Solution 4.0 Pants, sold as the Belay Pants until 2025 and still listed by Black Diamond and retailers. The [manufacturer page](https://blackdiamondequipment.com/products/solution-4-0-pants) gives "two-way insulation" of 60 g/m² PrimaLoft Gold Crosscore and 40 g/m² PrimaLoft Rise, a 50D polyester ripstop shell with DWR (80 g/m², no membrane), a 20D nylon taffeta lining, full-length side zippers, 603 g and US$449. [VPO Canada](https://vpo.ca/products/belay-pants-mens-1) and [varuste.net](https://varuste.net/en/p98808/black-diamond-solution-4-0-pants-unisex) list the same specs.
+
+**Its warmth, on 036's scale.** The [insulated-pants rule](catalog-thermal-calibration.md#rules) is legs = 0.65 + 0.70 × inc(fill), with inc(f) = 0.0522 × f^0.842.
+
+- **Assumption:** the two insulations are stacked, 100 g/m² in all. Black Diamond's wording doesn't say whether they are layered or zoned. At 100 g/m² the rule gives 2.41, rounded to **2.40 clo** (whole body 0.60). T21-03's DAS Pants, a belay pant with 100 g PrimaLoft One, measured 2.60.
+- If the insulation were zoned (about 50 g/m² on average), the rule would give about 1.65 clo, no warmer than today's pants. So the row carries `uncertainty_clo` 0.6 and confidence 0.5, 036's convention for rows resting on an assumption.
+- The aerogel in Gold Crosscore is ignored, because the curve uses fill weight only.
+- Ret is 49.6 m²Pa/W: it scales with clo at the DAS Pants' permeability (53.7 / 2.60). `evap_potential` 0.30, between the catalog's DWR synthetic puffies (0.28–0.32), is also an assumption.
+- Category `insulation_synthetic`: wind resistant, DWR only. Activity scores are editorial: descent 7, climb 2, alpine 4, XC 2. `suitable_activities` lists only the two touring keys. Alpine, XC, running and cycling never see it, because their builders would put a puffy pant under a shell. The side zips are recorded as side vents with no cooling factor, so the descent's vent advice says to keep them closed.
+
+Migration `20261122120000_seed_bd_solution_belay_pants.sql` adds the row (not yet applied in production), and the golden fixture carries it. The fixture's wardrobe is every other catalog garment, so the golden wardrobe owns the pant too.
+
+**Golden touring descents, leg shortfall in clo, before → after.** Only touring snapshots change. Climbs are unchanged in every case.
+
+| Case | Pack leg layer | Descent legs / minimum, clo | Leg shortfall, clo | Descent comfort |
+| --- | --- | --- | --- | --- |
+| catalog: cool, breezy, moderate (25°F) | Legendary 1.8 → Solution 4.0 2.4 | 2.21 → 2.79 / 2.59 | **0.38 → none** | 74.6 → 98 |
+| catalog: cold, windy, snowing, hard (5°F) | Legendary → Solution 4.0 | 2.50 → 3.08 / 3.30 | **0.80 → 0.22** | 54.4 → 54.4 |
+| catalog: extreme cold (−15°F) | Legendary → Solution 4.0 | 2.93 → 3.51 / 4.77 | **1.84 → 1.26** | 55.3 → 64.6 |
+| catalog: large body (18°F) | Legendary → Solution 4.0 | 2.21 → 2.79 / 2.57 | 0.36 → none | 75 → 97.7 |
+| catalog: light pack, cold, windy (5°F) | Legendary → Solution 4.0 | 2.50 → 3.08 / 3.30 | 0.80 → 0.22 | 67.1 → 74.3 |
+| empty wardrobe, catalog fallback (25°F) | Legendary → Solution 4.0 | 2.21 → 2.79 / 2.59 | 0.38 → none | as catalog 25°F |
+| wardrobe: cool, breezy, moderate (25°F) | Bugaboo II 1.8 → Solution 4.0 | 2.26 → 2.83 / 2.59 | 0.33 → none | 62.8 → 62.8 |
+| wardrobe: cold, windy, snowing, hard (5°F) | Bugaboo II → Solution 4.0 | 2.55 → 3.12 / 3.30 | 0.75 → 0.18 | 68.1 → 69 |
+| wardrobe: extreme cold (−15°F) | Bugaboo II → Solution 4.0 | 2.93 → 3.51 / 4.77 | 1.84 → 1.26 | 55.3 → 57.6 |
+| wardrobe: large body (18°F) | Bugaboo II → Solution 4.0 | 2.26 → 2.83 / 2.57 | 0.31 → none | 70.4 → 70.4 |
+
+The mild and rain cases keep their 1.8 clo pant and have no leg shortfall, before or after. Arm shortfalls are unchanged (catalog −15°F 0.36, wardrobe −15°F 1.09, light pack 0.48).
+
+**What's left.** The 5°F and −15°F descents are still short on the legs: 0.22 and 1.26 clo in the catalog, 0.18 and 1.26 in the golden wardrobe. Every remaining shortfall is still reported in the descent evaluation ("Legs needs more insulation"), and its comfort status stays "Uneven warmth" or "Cooler than recommended". At −15°F the ceiling is now 0.961 × (climb legs + 2.4). Reaching 4.77 would need regressed climb legs of 2.56 against the climb's 1.66 upper limit. That is the descent-target question, left for field feedback (#8).
+
+**Clearer guidance (option 4).** When the descent evaluation still has the legs under their minimum, the guidance now adds: "Descent: your packed layers won't fully cover your legs on the descent. Bring warmer over-pants with full side zips, or climb in warmer pants and open their vents." It appears in exactly the five golden cases with a leg shortfall, and also when nothing owned can go over the legs. This is copy only (`descentLegsGuidance` in `ski-touring.ts`). Selection, targets and scoring are unchanged.
 
 ## Limits
 

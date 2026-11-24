@@ -70,11 +70,15 @@ describe('catalog thermal calibration migration (036) in Postgres', () => {
     expect(offWeighting.map(row => `${row.brand} ${row.model_name}`)).toEqual([]);
 
     const byName = new Map(rows.map(row => [`${row.brand} ${row.model_name}`, row]));
-    const actual = catalog.garments.map(g => {
+    // Seeded after 036 and checked against the fixture by its own test
+    // (catalog-descent-over-pant.database.test.ts, #412).
+    const seededLater = new Set(['Black Diamond Solution 4.0 Pants']);
+    const fixtureRows = catalog.garments.filter(g => !seededLater.has(`${g.brand} ${g.model_name}`));
+    const actual = fixtureRows.map(g => {
       const row = byName.get(`${g.brand} ${g.model_name}`) ?? {};
       return { name: `${g.brand} ${g.model_name}`, category: row.category, weight: numberOrNull(row.weight_grams), ...values(row) };
     });
-    const expected = catalog.garments.map(g => ({
+    const expected = fixtureRows.map(g => ({
       name: `${g.brand} ${g.model_name}`, category: g.category, weight: numberOrNull(g.weight_grams),
       ...values(g.garment_thermal_properties as Record<string, unknown>),
     }));

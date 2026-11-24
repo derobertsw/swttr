@@ -68,7 +68,6 @@ Most climbs still read "Warmer than recommended" because of head and hand access
 
 - Climb targets assume a membrane outer (above), #374.
 - Leg bias and regional weights, #375: decided 2026-11-19. Every region gets the whole-body band and the weights stay, so the descent's legs still rely on the packed over-pant described above.
-- The catalog has no side-zip insulated over-pants, the usual touring descent leg layer, so cold descents pack insulated resort ski pants.
-- Since #374's climbing rates the climb wears lighter pants, and one 1.8 clo over-pant no longer covers the descent's leg minimum in more golden cases (25°F and colder). The causes and per-case numbers are in [Cycling and touring-climb calibration](cycling-touring-calibration.md#descent-findings); the descent's targets are the open question.
+- Since #374's climbing rates the climb wears lighter pants. #412 added a side-zip belay pant (Black Diamond Solution 4.0 Pants, 2.4 clo, an estimate), which closes the 25°F and large-body leg gaps in the catalog. The 5°F and −15°F descents are still short, and the guidance says so. The causes and per-case numbers are in [Cycling and touring-climb calibration](cycling-touring-calibration.md#descent-findings); the descent's targets wait for field feedback (#8).
 - The climb's manual check doesn't carry its protection needs, so removing a shell in rain isn't flagged as incomplete. Touring has no `ireq.policy`, which is where running and XC pass them.
 - In deep cold with no wind, the climb doesn't wear an owned hard shell for warmth, even when it falls short.

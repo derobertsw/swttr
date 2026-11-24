@@ -61,11 +61,13 @@ describe('ski-touring outfits (#372)', () => {
     // Was legs 1.01 against a 2.87 minimum: the pack now brings a leg layer.
     const legLayer = packed(body).find((g) => g.covers_legs);
     expect(legLayer).toBeDefined();
-    // Since #374 the climb wears lighter fleece pants, and the warmest catalog
-    // over-pants leave the descent (whose targets are unchanged) short on the
-    // legs. The shortfall is reported, not hidden.
-    expect(body.descent_evaluation?.bodyParts.legs.status).toBe('under');
-    expect(body.descent_evaluation?.decision?.status).toBe('cooler');
+    // Since #374 the climb wears lighter pants, which left 1.8 clo over-pants
+    // short of the descent's leg minimum. #412's 2.4 clo side-zip belay pant
+    // covers it, so no leg shortfall guidance is given.
+    expect(legLayer!.name).toBe('Black Diamond Solution 4.0 Pants');
+    expect(body.descent_evaluation?.bodyParts.legs.status).toBe('in_range');
+    expect(body.descent_evaluation?.decision?.status).toBe('near_target');
+    expect(body.guidance.some((g) => g.includes("won't fully cover your legs"))).toBe(false);
     expect(body.transition_protocol?.steps).toContain(`Leg layer to add: ${legLayer!.name}`);
     // The shell the climb didn't wear goes on for the descent.
     expect(packed(body).some((g) => g.covers_torso && g.covers_arms && g.protection?.waterproof_rating === 'waterproof')).toBe(true);
@@ -114,6 +116,10 @@ describe('ski-touring outfits (#372)', () => {
     expect(climbGarments(body).some((g) => ['insulation_down', 'insulation_synthetic', 'outer_insulated'].includes(g.category))).toBe(false);
     expect(packed(body).some((g) => g.covers_legs)).toBe(true);
     expect(body.descent_breakdown!.regional_clo.legs).toBeGreaterThan(body.recommendation.ensemble_properties.regional_clo!.legs + 1);
+    // Even the 2.4 clo belay pant leaves the legs short at −15°F (#412): the
+    // evaluation reports it and the guidance says so.
+    expect(body.descent_evaluation?.bodyParts.legs.status).toBe('under');
+    expect(body.guidance.some((g) => g.includes("packed layers won't fully cover your legs"))).toBe(true);
   });
 
   it('sparse wardrobe: dresses every region and packs the shell it owns', async () => {
@@ -123,6 +129,7 @@ describe('ski-touring outfits (#372)', () => {
     expect(packed(body).map((g) => g.name).sort()).toEqual(["Arc'teryx Alpha FL Jacket", 'Patagonia Nano-Air Hoody']);
     // Nothing owned can go over the legs, so they stay short and say so.
     expect(body.descent_evaluation?.bodyParts.legs.status).toBe('under');
+    expect(body.guidance).toContain("Descent: your packed layers won't fully cover your legs on the descent. Bring warmer over-pants with full side zips, or climb in warmer pants and open their vents.");
   });
 
   it('a wardrobe without any shell still gets a climb and descent', async () => {
