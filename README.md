@@ -58,7 +58,7 @@ graph TD
     RIDE --> C[IREQ Calculation]
     C --> D[Activity Target Range<br/>Running, XC, cycling, touring climb: retain heat-balance minimum<br/>Taper only added activity allowance<br/>Clothing-blind exposure heuristic widens the range only]
     D --> E[CoWEDA-inspired heuristic buffer<br/>Running, XC, cycling, touring climb: taper with cold, wind and wet exposure<br/>Taper and heuristic wind terms read ambient wind, never riding speed<br/>Alpine and touring descent: full margins]
-    E --> F[Regional & Extremity Targets<br/>Whole-body and regional bands converted to basic clo<br/>ISO 11079 wind and motion correction<br/>Inferred movement capped at 0.7 m/s<br/>Hands and head keep resultant IREQ]
+    E --> F[Regional & Extremity Targets<br/>Whole-body and regional bands converted to basic clo<br/>ISO 11079 wind and motion correction<br/>Inferred movement capped at 0.7 m/s<br/>Hands and head keep resultant IREQ<br/>Heuristic foot band, without the CoWEDA buffer]
     F --> BOUND[Cycling: each effort's bands at most the next easier effort's<br/>faster riding raises the basic-clo conversion]
     BOUND --> PREF[Running/XC Run Warm or Run Cold:<br/>request value, else signed-in user's saved one, else neutral<br/>narrow each band by a quarter from one side<br/>Warm lowers upper limits, Cold raises minimums<br/>Weather, IREQ, buffers and protection unchanged]
     PREF --> P[Load Gear Pool:<br/>wardrobe, or catalog filtered by activity score]
@@ -67,7 +67,8 @@ graph TD
     G --> GUARD[Run Warm or Run Cold: also select with standard targets<br/>keep the standard layers if the narrowed choice adds<br/>a reported shortfall for Warm, or excess for Cold<br/>Response explains only real changes<br/>Other sports: not supported]
     GUARD --> R[Running, cycling and XC: clothing requirements<br/>from regional and extremity targets<br/>owned match, generic suggestion, missing or not needed<br/>unsuitable wardrobe items are not presented as matches]
     R --> PROT[Alpine, cycling, touring descent: helmet requirement<br/>whatever the thermal demand<br/>owned match, catalog suggestion, or missing with a warning]
-    PROT --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
+    PROT --> FEET[Feet, a heuristic: the sport's assumed footwear<br/>plus the lightest generic sock reaching the foot band<br/>Touring: sized on the descent<br/>Short: a warning naming the sport's usual remedy<br/>Outside the comfort score; no toe temperature]
+    FEET --> XCCARRY[XC: Carry extra warmth for stops and after skiing<br/>Excluded from moving insulation and comfort]
     XCCARRY --> I[Canonical server phase assessment:<br/>actual worn regional and extremity basic clo<br/>local shortfalls and excess, moisture and clothing gaps]
     I --> DLE[Exposure limit of the worn outfit, ISO 11079 DLE:<br/>whole-body basic clo to resultant clo for the phase's wind and motion<br/>heat-storage rate S at minimal and neutral skin temperature<br/>S below 0: 144 kJ/m² heat debt ÷ abs S, more than 8 h as ISO reports<br/>S of 0 or more: not limited by whole-body cooling, no duration]
     DLE --> H[Ensemble thermal scoring and API/UI reasons<br/>consume the same phase assessment]
@@ -92,6 +93,10 @@ graph TD
     subgraph "Sport-Specific — sports/*.ts"
         G
         GUARD
+    end
+
+    subgraph "Shared Feet Heuristic — footwear.ts"
+        FEET
     end
 
     subgraph "Shared Evaluation — layer-evaluation.ts, response-builder.ts, exposure.ts"
@@ -321,6 +326,23 @@ graph TD
     HEAD -.->|Same choice for any hood credit| PLAN[hoodHeadPlanner: the head's remaining gap<br/>for each candidate outfit's hoods<br/>joins the torso selectors' fit]
 ```
 
+#### Feet (#405, a heuristic)
+
+Feet get a sock suggestion, not a selection: no catalog or wardrobe item covers them yet. Each sport assumes the footwear it dictates (running shoes, cycling shoes, XC, alpine or touring boots) with an estimated insulation, and `assessFootwear` in `src/lib/recommendations/footwear.ts` picks the lightest generic sock weight whose footwear-plus-sock clo reaches the foot band's minimum, at a 0.03 clo tolerance. Alpine and touring boots take sock weights up to midweight only, since a fitted shell leaves no room for a heavyweight sock. When even the warmest allowed sock falls short, the assessment is `short` and a warning names the sport's usual remedy (toe covers or overshoes, overboots, boot heaters or boot covers) without counting any insulation for it. The touring sock is sized on the descent, the colder phase. The result is `recommendation.footwear`; its message is a guidance line, or a warning when short. Feet aren't part of the comfort score, the verdict or manual edits, and nothing here is a toe temperature, a frostbite risk or an exposure time.
+
+Clo is on USARIEM T18-01's foot part-manikin scale (total minus the bare manikin's air layer). Only the midweight sock (T18-01's sock, 0.39 clo) is measured; the other sock weights (0.20, 0.30, 0.50) and every footwear value (shoes 0.15, XC boots 0.35, touring boots 0.60, alpine boots 0.70) are estimates bracketed by that sock and T18-01's extreme-cold bootie (1.42). See [footwear-heuristic.md](docs/footwear-heuristic.md).
+
+```mermaid
+graph TD
+    FIREQ[Whole-body IREQ of the phase the hands and head follow] --> FBAND[Foot band: foot multiplier × wind factor<br/>× temperature factor from 0.8 to 1<br/>Running, XC, cycling, touring climb: tapered like the hand band<br/>No CoWEDA buffer: it comes from finger errors]
+    FBAND --> FWEAR[Sport's assumed footwear, estimated clo<br/>never chosen, never owned]
+    FWEAR --> FSOCK{Lightest allowed sock where<br/>footwear + sock reaches the band minimum?}
+    FSOCK -->|Yes| FSEL[Selected: guidance line<br/>Thinnest sock above the band: enough, no warning]
+    FSOCK -->|No| FSHORT[Short: warmest allowed sock<br/>Warning names the sport's usual remedy<br/>Remedy insulation not counted]
+    FSEL --> FOUT[recommendation.footwear<br/>Outside comfort score, verdict and manual edits]
+    FSHORT --> FOUT
+```
+
 ### 7. Thermal Targets and Comfort
 
 The response's `recommendation.evaluation` and manual `POST /api/v1/ensembles/evaluate` share `evaluatePhase`. Touring exposes a separate `descent_evaluation`; packed layers never raise climb insulation. Pack items say which body regions they cover, so the descent's manual check puts packed pants on the legs. `decision.status`, `summary`, `reasons` and `warnings` are server-owned. The legacy `riskType` is retained for saved-outfit compatibility; it is a thermal mismatch direction, not a medical diagnosis. UI judgments must use the server summary rather than infer comfort from a score.
@@ -343,6 +365,8 @@ graph TD
     SPLIT --> REG[Convert whole-body and regional bands to basic clo<br/>Phase-specific wind, motion and outer permeability<br/>Shared clothing area factor<br/>Never below resultant heat balance]
     PIREQ[Whole-body IREQ of the phase the hands and head follow<br/>alpine: skiing phase] --> EXT[Hand and head targets:<br/>activity multiplier × wind factor<br/>× temperature factor from 0.8 to 1<br/>+ CoWEDA-inspired extremity buffer<br/>× part-manikin scale: hands 0.60, head 0.45<br/>Running, XC, cycling, touring climb: taper both bands and buffer<br/>Wind factor reads ambient wind<br/>Allow zero thermal coverage in mild dry exercise]
 
+    PIREQ --> FOOT[Heuristic foot band:<br/>foot multiplier × the same wind and temperature factors<br/>no CoWEDA buffer, tapered like the hand band<br/>Sizes the sock suggestion only, not a comfort input]
+    FOOT --> PREFBAND
     RANGE --> PREFBAND[Running/XC Run Warm or Run Cold:<br/>each band narrowed by a quarter from one side<br/>never below a minimum or above an upper limit<br/>XC keeps the pole-grip glove allowance]
     REG --> PREFBAND
     EXT --> PREFBAND

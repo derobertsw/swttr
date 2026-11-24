@@ -5,6 +5,7 @@
  */
 import {
   calculateExtremityIreq,
+  calculateFootIreq,
   calculateIreq,
   requiredBasicInsulation,
   walkingSpeedFromMetabolicRate,
@@ -208,6 +209,13 @@ export function phaseTargets(
     taperedExtremity,
     validationBuffer
   );
+  // The heuristic foot band (#405) follows the hands' baseline and taper.
+  // CoWEDA's extremity margin isn't added: it comes from finger errors, and
+  // there is no toe or foot reference data behind it.
+  const rawFeet = calculateFootIreq(extremityBaseline, activity, conditions.tempC, windMs);
+  const standardFeet = tapered
+    ? { min: round2(rawFeet.min * exposure), neutral: round2(rawFeet.neutral * exposure) }
+    : rawFeet;
 
   // Run Warm/Run Cold narrows each final band from one side; with no
   // preference these are the standard bands unchanged. Hand and head upper
@@ -217,6 +225,7 @@ export function phaseTargets(
   const targetRange = preferenceBand(standardRange[0], standardRange[1], preference);
   const regional = preferenceBands(standardRegional, preference);
   const extremity = preferenceBands(standardExtremity, preference);
+  const [feetMin, feetNeutral] = preferenceBand(standardFeet.min, standardFeet.neutral, preference);
   const finalPolicy = preference ? {
     ...policy,
     preference: {
@@ -238,6 +247,8 @@ export function phaseTargets(
 
   return {
     targetRange, validationBuffer, regional,
+    /** Heuristic foot band for the sock suggestion only; not in the comfort check. */
+    feet: { min: feetMin, neutral: feetNeutral },
     ...(exposureConditions ? { exposureConditions } : {}),
     ...(tapered && !policy ? { coldExposureFactor: round2(exposure) } : {}),
     extremity: {
@@ -254,16 +265,17 @@ export function phaseTargets(
 export type PhaseTargets = ReturnType<typeof phaseTargets>;
 
 /**
- * `targets`' whole-body, regional and hand/head bands, each limited to
+ * `targets`' whole-body, regional, hand/head and foot bands, each limited to
  * `bound`'s: never warmer than it anywhere. Every band's minimum stays at or
  * below its upper limit, since both sets keep that order.
  */
-export function noWarmerThan(targets: PhaseTargets, bound: PhaseTargets): Pick<PhaseTargets, 'targetRange' | 'regional' | 'extremity'> {
+export function noWarmerThan(targets: PhaseTargets, bound: PhaseTargets): Pick<PhaseTargets, 'targetRange' | 'regional' | 'extremity' | 'feet'> {
   const lower = <Part extends string>(own: Record<Part, number>, limit: Record<Part, number>) =>
     Object.fromEntries(Object.entries(own).map(([part, clo]) => [part, Math.min(clo as number, limit[part as Part])])) as Record<Part, number>;
   return {
     targetRange: [Math.min(targets.targetRange[0], bound.targetRange[0]), Math.min(targets.targetRange[1], bound.targetRange[1])],
     regional: { min: lower(targets.regional.min, bound.regional.min), neutral: lower(targets.regional.neutral, bound.regional.neutral) },
     extremity: { ...targets.extremity, min: lower(targets.extremity.min, bound.extremity.min), neutral: lower(targets.extremity.neutral, bound.extremity.neutral) },
+    feet: { min: Math.min(targets.feet.min, bound.feet.min), neutral: Math.min(targets.feet.neutral, bound.feet.neutral) },
   };
 }

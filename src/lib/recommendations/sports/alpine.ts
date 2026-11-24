@@ -13,6 +13,7 @@ import { buildAlpineEnsemble, alpineRegionalCapacity } from './alpine-ensemble';
 import { hoodHeadPlanner, selectPhaseAccessories } from '../extremities';
 import { buildHelmetRequirement } from '../requirements';
 import { buildScoredRecommendation } from '../response-builder';
+import { assessFootwear, footwearAdvice } from '../footwear';
 import { ventilationAdvice } from '../ventilation';
 import {
   formatConditions,
@@ -83,7 +84,7 @@ export const alpine: SportRecommender<AlpineTargets> = {
         validation_buffer_clo: formatValidationBuffer(targets.validationBuffer),
         validation_source: COWEDA_VALIDATION_SOURCE,
       },
-      guidance: getAlpineGuidance(tempC, weather.precipitation),
+      guidance: [...getAlpineGuidance(tempC, weather.precipitation), assessFootwear('alpine_skiing', targets.feet).message],
     };
   },
 
@@ -137,6 +138,8 @@ export const alpine: SportRecommender<AlpineTargets> = {
     );
     recommendation.accessories = accessories.assessments;
     warnings.push(...accessories.warnings);
+    recommendation.footwear = assessFootwear('alpine_skiing', targets.feet);
+    const feet = footwearAdvice(recommendation.footwear);
 
     // Regional minima split the whole-body band derived from the 60/40
     // skiing/chairlift cycle. Warn only about a shortfall the
@@ -156,6 +159,7 @@ export const alpine: SportRecommender<AlpineTargets> = {
       }
     }
     if (helmet) warnings.push(...helmet.warnings);
+    warnings.push(...feet.warnings);
 
     // Vent settings for the selected garments: skiing, then the lift ride.
     const ventilation = ventilationAdvice({
@@ -184,7 +188,7 @@ export const alpine: SportRecommender<AlpineTargets> = {
       },
       recommendation,
       warnings,
-      guidance: [...(recommendation.evaluation?.decision?.reasons ?? []), ...getAlpineGuidance(tempC, weather.precipitation)],
+      guidance: [...(recommendation.evaluation?.decision?.reasons ?? []), ...getAlpineGuidance(tempC, weather.precipitation), ...feet.guidance],
       ...(ventilation && { ventilation }),
     };
   },

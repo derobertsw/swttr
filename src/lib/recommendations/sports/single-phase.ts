@@ -25,6 +25,7 @@ import {
 } from '../thermal-targets';
 import { hoodHeadPlanner, selectPhaseAccessories, type HoodHeadPlanner } from '../extremities';
 import { buildScoredRecommendation } from '../response-builder';
+import { assessFootwear, footwearAdvice } from '../footwear';
 import { formatConditions, formatSinglePhaseIreq } from '../formatting';
 import { buildClothingRequirements, buildHelmetRequirement, filterUnsuitableEnsemble } from '../requirements';
 import { describePreference, preferenceOverreach, warmOrCold } from '../preference';
@@ -130,6 +131,7 @@ export function createSinglePhaseSport(
     emptyResponse(request, targets) {
       // The no-garment fast path has not inspected accessory availability.
       const accessories = selectPhaseAccessories(config.activity, targets, { handwear: [], headwear: [], availability: 'unknown' }, request.tempC);
+      const footwear = assessFootwear(config.activity, targets.feet);
       const setting = warmOrCold(request.preference);
       const preference = setting && targets.policy
         ? describePreference(setting, targets, { targets: sport.computeTargets({ ...request, preference: undefined }) })
@@ -147,8 +149,9 @@ export function createSinglePhaseSport(
           target_clo_range: targets.targetRange,
           min_evap_potential: config.minEvapPotential,
           accessories: accessories.assessments,
+          footwear,
           guidance: [...(config.activity === 'xc_skiing' ? config.guidance(request, targets.basicIreq, [], targets) : config.guidance(request, targets.basicIreq)), ...(targets.policy?.assumptions ?? []),
-            ...(preference ? [preference.message] : [])],
+            footwear.message, ...(preference ? [preference.message] : [])],
         },
       };
     },
@@ -237,6 +240,8 @@ export function createSinglePhaseSport(
         headwear
       );
       recommendation.accessories = accessories.assessments;
+      recommendation.footwear = assessFootwear(config.activity, targets.feet);
+      const feet = footwearAdvice(recommendation.footwear);
 
       const requirements = config.requirementFirst
         ? buildClothingRequirements(config.activity, targets, {
@@ -264,9 +269,9 @@ export function createSinglePhaseSport(
         ireq: { ...formatSinglePhaseIreq(targets.ireq, judged), ...outfitChecks(targets, config.requirementFirst) },
         ...(requirements || helmet ? { requirements: [...(requirements ?? []), ...(helmet ? [helmet.requirement] : [])] } : {}),
         recommendation,
-        warnings: [...warnings, ...protectionWarnings, ...accessories.warnings, ...(helmet?.warnings ?? [])],
+        warnings: [...warnings, ...protectionWarnings, ...accessories.warnings, ...(helmet?.warnings ?? []), ...feet.warnings],
         guidance: [...new Set([...config.guidance(request, targets.basicIreq, ensemble, targets), ...(recommendation.evaluation?.decision?.reasons ?? []), ...missingGuidance,
-          ...Object.values(accessories.assessments).map(assessment => assessment.message),
+          ...Object.values(accessories.assessments).map(assessment => assessment.message), ...feet.guidance,
           ...(targets.policy?.assumptions ?? []), ...(preference ? [preference.message] : [])])],
       };
     },

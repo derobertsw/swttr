@@ -138,6 +138,13 @@ Because agent calls are anonymous, garment ensembles and extremity picks
 user wardrobe; garment candidates are filtered by per-activity suitability
 scores where the schema has them (alpine, xc, ski-touring).
 
+`recommendation.footwear` (#405) is a heuristic sock suggestion for the
+footwear the sport assumes (running shoes, cycling shoes, XC, alpine or
+touring boots), with estimated clo and a `short` state when even the warmest
+allowed sock falls below the heuristic foot band. It isn't part of the comfort
+score and isn't a toe temperature or frostbite estimate. See
+[Feet: a first heuristic](footwear-heuristic.md).
+
 ### Clo values in the response
 
 `recommendation.ensemble_properties.total_clo`, `evaluation.totalClo` and

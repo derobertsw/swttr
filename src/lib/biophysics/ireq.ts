@@ -10,6 +10,8 @@ import {
   EXTREMITY_IREQ_MULTIPLIERS,
   DEFAULT_EXTREMITY_MULTIPLIERS,
   ACCESSORY_CLO_SCALE,
+  FOOT_IREQ_MULTIPLIERS,
+  DEFAULT_FOOT_MULTIPLIER,
   type ExtremityIreqActivity,
 } from './constants';
 import type { IreqResult } from '@/types/garments';
@@ -381,6 +383,43 @@ interface ExtremityIreqResult {
 }
 
 /**
+ * The heuristic temperature and wind factors the hand, head and foot bands
+ * share: 0.8 at 0°C and above, rising 2% per degree to 1 at -10°C; then 3%
+ * more per m/s of wind, since small parts lose more of their surface air
+ * layer to it.
+ */
+function extremityConditionFactor(airTempC: number, windSpeedMs: number): number {
+  const tempFactor = Math.max(0.8, Math.min(1.0, 1.0 + (-airTempC - 10) * 0.02));
+  const windFactor = 1.0 + (windSpeedMs * 0.03);
+  return tempFactor * windFactor;
+}
+
+/**
+ * A heuristic foot band (#405) from the whole-body IREQ of the phase the
+ * hands and head follow, in clo on T18-01's foot part-manikin scale (total
+ * minus the bare manikin's air layer).
+ *
+ * Like the hand and head bands, this is not a local heat balance: ISO 11079
+ * has none, and nothing here predicts a toe temperature. It sizes a sock
+ * suggestion and a coverage check only (`FOOT_IREQ_MULTIPLIERS`).
+ */
+export function calculateFootIreq(
+  baseIreq: IreqResult,
+  activity: ExtremityIreqActivity | string,
+  airTempC: number,
+  windSpeedMs: number,
+): { min: number; neutral: number } {
+  const multiplier = activity in FOOT_IREQ_MULTIPLIERS
+    ? FOOT_IREQ_MULTIPLIERS[activity as ExtremityIreqActivity]
+    : DEFAULT_FOOT_MULTIPLIER;
+  const factor = multiplier * extremityConditionFactor(airTempC, windSpeedMs);
+  return {
+    min: Math.round(baseIreq.ireqMin * factor * 100) / 100,
+    neutral: Math.round(baseIreq.ireqNeutral * factor * 100) / 100,
+  };
+}
+
+/**
  * Calculate IREQ targets for extremities (hands, head) from the whole-body
  * IREQ of the phase they follow.
  *
@@ -407,17 +446,11 @@ export function calculateExtremityIreq(
   const activityMultipliers = activity in EXTREMITY_IREQ_MULTIPLIERS
     ? EXTREMITY_IREQ_MULTIPLIERS[activity as ExtremityIreqActivity]
     : DEFAULT_EXTREMITY_MULTIPLIERS;
-
-  // Temperature factor: 0.8 at 0°C and above, rising 2% per degree to 1 at -10°C
-  const tempFactor = Math.max(0.8, Math.min(1.0, 1.0 + (-airTempC - 10) * 0.02));
-
-  // Wind factor: hands and head are small, so wind strips more of their
-  // surface air layer. Increases 3% per m/s of wind
-  const windFactor = 1.0 + (windSpeedMs * 0.03);
+  const conditionFactor = extremityConditionFactor(airTempC, windSpeedMs);
 
   // Calculate final multipliers
-  const handMult = activityMultipliers.hands * tempFactor * windFactor * ACCESSORY_CLO_SCALE.hands;
-  const headMult = activityMultipliers.head * tempFactor * windFactor * ACCESSORY_CLO_SCALE.head;
+  const handMult = activityMultipliers.hands * conditionFactor * ACCESSORY_CLO_SCALE.hands;
+  const headMult = activityMultipliers.head * conditionFactor * ACCESSORY_CLO_SCALE.head;
 
   return {
     min: {

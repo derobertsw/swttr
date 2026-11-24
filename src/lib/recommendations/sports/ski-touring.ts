@@ -31,6 +31,7 @@ import {
   type ClimbProtection,
 } from './ski-touring-outfit';
 import { buildHelmetRequirement } from '../requirements';
+import { assessFootwear, footwearAdvice } from '../footwear';
 import {
   ensembleToThermalGarments,
   formatConditions,
@@ -167,7 +168,8 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         validation_source: COWEDA_VALIDATION_SOURCE,
         ...climbMarginEcho(targets.uphill),
       },
-      guidance: generateTouringGuidance(tempC, targets.uphillIreq, targets.downhillIreq),
+      guidance: [...generateTouringGuidance(tempC, targets.uphillIreq, targets.downhillIreq),
+        assessFootwear('ski_touring_downhill', targets.downhill.feet, 'descent').message],
     };
   },
 
@@ -258,6 +260,9 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
     const uphillResult = scorePhase(uphillEnsemble, uphill, climbExtremity, true);
     const downhillResult = scorePhase(downhillEnsemble, downhill, descentExtremity, false);
     uphillResult.recommendation.accessories = climbAccessories.assessments;
+    // One pair of socks for the day, sized for the colder descent.
+    uphillResult.recommendation.footwear = assessFootwear('ski_touring_downhill', downhill.feet, 'descent');
+    const feet = footwearAdvice(uphillResult.recommendation.footwear);
 
     // Vent settings for the selected garments: the climb, then the
     // transition and descent (climb layers stay on, pack layers go on).
@@ -324,6 +329,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         ...[...uphillResult.warnings, ...climbAccessories.warnings].map(w => `Climb: ${w}`),
         ...climbProtectionWarnings(uphillEnsemble, targets.climbProtection),
         ...[...downhillResult.warnings, ...descentAccessories.warnings, ...(descentHelmet?.warnings ?? [])].map(w => `Descent: ${w}`),
+        ...feet.warnings,
       ],
       guidance: [
         ...(uphillResult.recommendation.evaluation?.decision?.reasons ?? []).map(r => `Climb: ${r}`),
@@ -332,6 +338,7 @@ export const skiTouring: SportRecommender<SkiTouringTargets> = {
         ...(pack.legs ? [`Descent: put ${pack.legs.brand} ${pack.legs.model_name} on over your climbing layers. Pants with full side zips go on over ski boots.`] : []),
         ...descentLegsGuidance(downhillResult.recommendation.evaluation),
         ...generateTouringGuidance(tempC, targets.uphillIreq, targets.downhillIreq),
+        ...feet.guidance,
       ],
       ...(ventilation && { ventilation }),
     };
