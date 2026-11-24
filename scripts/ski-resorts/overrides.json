@@ -1,0 +1,17 @@
+{
+  "$comment": "Curated fixes applied by scripts/import-ski-resorts.mjs on every import. Keyed by resort ID. See docs/ski-resort-catalog.md.",
+  "aliases": {
+    "wd-Q4784196": ["A-Basin", "A Basin", "ABasin"],
+    "wd-Q2182804": ["Squaw Valley", "Olympic Valley"],
+    "skimap-522": ["Alpine Meadows"],
+    "skimap-151": ["JHMR"],
+    "wd-Q3821979": ["PCMR"],
+    "wd-Q3497349": ["Tremblant"],
+    "skimap-987": ["Matterhorn Ski Paradise", "Cervinia"]
+  },
+  "names": {},
+  "points": {},
+  "timeZones": {},
+  "ids": {},
+  "exclude": []
+}
