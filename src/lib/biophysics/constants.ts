@@ -126,6 +126,34 @@ export const DEFAULT_EXTREMITY_MULTIPLIERS = {
 } as const;
 
 /**
+ * Foot multipliers by activity (#405): scale the whole-body IREQ of the phase
+ * the hands and head follow into a heuristic foot band, like
+ * EXTREMITY_IREQ_MULTIPLIERS (the same temperature and wind factors apply).
+ * Feet clo is on the part-manikin scale USARIEM T18-01 reports for its foot
+ * manikin (total minus the bare manikin's air layer), so no scale factor follows.
+ *
+ * There is no foot heat balance, foot data or field data behind these. Each
+ * one is set so that the sport's assumed footwear plus a midweight sock
+ * (T18-01's measured sock, 0.39 clo) just reaches the band's minimum at
+ * a reference condition, at moderate effort in an 8 mph wind:
+ * -10°C for running, 0°C for cycling, -15°C for XC, alpine and touring.
+ * Each reference is cold enough that no mild-weather taper applies.
+ * Those reference temperatures are SWTTR's judgment, not data
+ * (docs/footwear-heuristic.md). `footwear.test.ts` checks the calibration.
+ */
+export const FOOT_IREQ_MULTIPLIERS = {
+  running: 0.96,
+  biking: 1.20,
+  xc_skiing: 1.08,
+  // Calibrated like the descent; the touring sock is sized on the descent.
+  ski_touring_uphill: 1.49,
+  ski_touring_downhill: 0.35,
+  alpine_skiing: 0.44,
+} as const satisfies Record<ExtremityIreqActivity, number>;
+
+export const DEFAULT_FOOT_MULTIPLIER = 1.0;
+
+/**
  * Hand and head clo are on the part-manikin scale (#376): total insulation
  * on a hand or head manikin (ASTM F1291 conditions, 20°C, 0.4 m/s) minus the
  * bare manikin's air layer, from USARIEM T18-01 and T22-14. The catalog's

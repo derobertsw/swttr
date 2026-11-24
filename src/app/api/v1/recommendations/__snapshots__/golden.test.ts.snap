@@ -34,6 +34,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "Heavy base + substantial insulation + shell",
       "Precipitation expected - waterproof shell recommended",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): midweight socks in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -235,6 +236,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         "maxRegionalDeficit": 1.8013999999999997,
         "thermal_data_status": "known",
         "totalClo": 3.8142249999999995,
+      },
+      "footwear": {
+        "clo": 1.09,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 1.14,
+        "message": "Feet (estimate): midweight socks in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 1.05,
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -461,6 +482,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "Standard resort conditions",
       "Mid-weight base + light insulation + shell",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -657,6 +679,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         "maxRegionalDeficit": 0.7513999999999998,
         "thermal_data_status": "known",
         "totalClo": 3.2836374999999993,
+      },
+      "footwear": {
+        "clo": 0.9,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 0.82,
+        "message": "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.73,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -1097,6 +1139,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         "thermal_data_status": "known",
         "totalClo": 3.8142249999999995,
       },
+      "footwear": {
+        "clo": 1.09,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 1.56,
+        "message": "Feet (estimate): even midweight socks in ski boots fall short of the heuristic foot range. Consider boot heaters or insulated boot covers.",
+        "method": "heuristic",
+        "min": 1.46,
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -1296,6 +1358,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "head: the closest available option still falls short of the local warmth range; check warmth before use.",
       "BlackStrap Expedition Hood Balaclava isn't rated for this cold; check warmth before use.",
       "Insufficient torso insulation: 4.6 clo vs 5.7 clo required for alpine conditions",
+      "Feet (estimate): even midweight socks in ski boots fall short of the heuristic foot range. Consider boot heaters or insulated boot covers.",
     ],
   },
   "status": 200,
@@ -1324,6 +1387,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "Standard resort conditions",
       "Mid-weight base + light insulation + shell",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -1522,6 +1586,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         "maxRegionalDeficit": 0.6214,
         "thermal_data_status": "known",
         "totalClo": 3.2484450000000002,
+      },
+      "footwear": {
+        "clo": 0.9,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 0.87,
+        "message": "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.78,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -1755,6 +1839,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "Warm conditions - lighter insulation is fine",
       "Soft shell may be preferable for breathability",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -1949,6 +2034,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 2.50385,
+      },
+      "footwear": {
+        "clo": 0.9,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 0.56,
+        "message": "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.47,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -2177,6 +2282,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
       "Soft shell may be preferable for breathability",
       "Precipitation expected - waterproof shell recommended",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -2371,6 +2477,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in (wardrobe) >
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 2.6002824999999996,
+      },
+      "footwear": {
+        "clo": 0.9,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 0.57,
+        "message": "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.49,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -2587,6 +2713,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in with an empt
       "Standard resort conditions",
       "Mid-weight base + light insulation + shell",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -2779,6 +2906,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed in with an empt
         "maxRegionalDeficit": 0.17579999999999973,
         "thermal_data_status": "known",
         "totalClo": 3.4334874999999996,
+      },
+      "footwear": {
+        "clo": 0.9,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 0.82,
+        "message": "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.73,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -3035,6 +3182,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "Heavy base + substantial insulation + shell",
       "Precipitation expected - waterproof shell recommended",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): midweight socks in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -3233,6 +3381,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         "maxRegionalDeficit": 1.0806499999999999,
         "thermal_data_status": "known",
         "totalClo": 4.3355500000000005,
+      },
+      "footwear": {
+        "clo": 1.09,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 1.14,
+        "message": "Feet (estimate): midweight socks in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 1.05,
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -3500,6 +3668,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "Standard resort conditions",
       "Mid-weight base + light insulation + shell",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -3694,6 +3863,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         "maxRegionalDeficit": 0.030650000000000066,
         "thermal_data_status": "known",
         "totalClo": 3.4948375,
+      },
+      "footwear": {
+        "clo": 0.9,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 0.82,
+        "message": "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.73,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -4179,6 +4368,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         "thermal_data_status": "known",
         "totalClo": 4.3355500000000005,
       },
+      "footwear": {
+        "clo": 1.09,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 1.56,
+        "message": "Feet (estimate): even midweight socks in ski boots fall short of the heuristic foot range. Consider boot heaters or insulated boot covers.",
+        "method": "heuristic",
+        "min": 1.46,
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -4423,6 +4632,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "hands: the closest available option still falls short of the local warmth range; check warmth before use.",
       "head: the closest available option still falls short of the local warmth range; check warmth before use.",
       "Insufficient torso insulation: 5.1 clo vs 5.7 clo required for alpine conditions",
+      "Feet (estimate): even midweight socks in ski boots fall short of the heuristic foot range. Consider boot heaters or insulated boot covers.",
     ],
   },
   "status": 200,
@@ -4450,6 +4660,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "Standard resort conditions",
       "Mid-weight base + light insulation + shell",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -4647,6 +4858,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 3.38182,
+      },
+      "footwear": {
+        "clo": 0.9,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 0.87,
+        "message": "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.78,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -4924,6 +5155,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "Warm conditions - lighter insulation is fine",
       "Soft shell may be preferable for breathability",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -5118,6 +5350,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 2.4177999999999997,
+      },
+      "footwear": {
+        "clo": 0.9,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 0.56,
+        "message": "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.47,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -5348,6 +5600,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
       "Soft shell may be preferable for breathability",
       "Precipitation expected - waterproof shell recommended",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -5541,6 +5794,26 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > signed out (catalog) >
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 2.5959675,
+      },
+      "footwear": {
+        "clo": 0.9,
+        "footwear": {
+          "clo": 0.7,
+          "label": "ski boots",
+          "type": "alpine_boot",
+        },
+        "max": 0.57,
+        "message": "Feet (estimate): thin liner socks are enough in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.49,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -5743,6 +6016,7 @@ exports[`POST /api/v1/recommendations/'alpine' (golden) > wardrobe-only with an 
       "Heavy base + substantial insulation + shell",
       "Precipitation expected - waterproof shell recommended",
       "Remember: chairlift time requires more insulation than skiing",
+      "Feet (estimate): midweight socks in ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "chairlift": {
@@ -6004,6 +6278,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
         "thermal_data_status": "known",
         "totalClo": 1.4909249999999998,
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 1.14,
+        "message": "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
+        "method": "heuristic",
+        "min": 1.03,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -6208,6 +6502,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "Available clothing does not provide the required wet protection for legs.",
       "hands: the closest available option still falls short of the local warmth range; check warmth before use.",
       "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
+      "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
     ],
   },
   "status": 200,
@@ -6435,6 +6730,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
         "thermal_data_status": "known",
         "totalClo": 1.0599375,
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 0.86,
+        "message": "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
+        "method": "heuristic",
+        "min": 0.75,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -6628,6 +6943,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
     ],
     "warnings": [
       "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
+      "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
     ],
   },
   "status": 200,
@@ -6854,6 +7170,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
         "thermal_data_status": "known",
         "totalClo": 2.0421625,
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 1.73,
+        "message": "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
+        "method": "heuristic",
+        "min": 1.61,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -7042,6 +7378,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
     ],
     "warnings": [
       "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
+      "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
     ],
   },
   "status": 200,
@@ -7265,6 +7602,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
         "thermal_data_status": "known",
         "totalClo": 1.0118874999999998,
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 0.83,
+        "message": "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
+        "method": "heuristic",
+        "min": 0.73,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -7451,6 +7808,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
     "warnings": [
       "head: no suitable thermal accessory available; check warmth and protection before use.",
       "No bike helmet in your wardrobe. Wear one in any weather: it's required protection, not optional warmth.",
+      "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
     ],
   },
   "status": 200,
@@ -7478,6 +7836,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "Selected for hands: Outdoor Research Firebrand Mitt.",
       "head: no suitable thermal accessory available; check warmth and protection before use.",
       "hands: gloves stay on for this activity, and the lightest available pair is warmer than the local warmth range.",
+      "Feet (estimate): thin liner socks are enough in cycling shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "cold_exposure_factor": 0.28,
@@ -7672,6 +8031,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
         "maxRegionalDeficit": 0.03234999999999999,
         "thermal_data_status": "known",
         "totalClo": 0.8150249999999999,
+      },
+      "footwear": {
+        "clo": 0.35,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 0.21,
+        "message": "Feet (estimate): thin liner socks are enough in cycling shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.17,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -7880,6 +8259,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
       "Cycling tights or pants with rain protection — best available in your wardrobe: Patagonia Wind Shield Pants; still missing required rain protection for legs. Additional or alternative clothing is needed to meet this requirement.",
       "hands: gloves stay on for this activity, and the lightest available pair is warmer than the local warmth range.",
       "head: existing hood insulation exceeds the local warmth range; vent the hood or choose a lighter layer.",
+      "Feet (estimate): thin liner socks in cycling shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "cold_exposure_factor": 0.78,
@@ -8078,6 +8458,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in (wardrobe) >
         "maxRegionalDeficit": 0.01144999999999996,
         "thermal_data_status": "known",
         "totalClo": 0.76385,
+      },
+      "footwear": {
+        "clo": 0.35,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 0.43,
+        "message": "Feet (estimate): thin liner socks in cycling shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.36,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -8462,6 +8862,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in with an empt
         "thermal_data_status": "known",
         "totalClo": 1.1789625,
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 0.86,
+        "message": "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
+        "method": "heuristic",
+        "min": 0.75,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -8640,6 +9060,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed in with an empt
       "Significant insulation shortfall: improve coverage of the areas below target.",
       "hands: no gloves available, and gloves stay on for this activity; check warmth and protection before use.",
       "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
+      "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
     ],
   },
   "status": 200,
@@ -8874,6 +9295,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
         "thermal_data_status": "known",
         "totalClo": 1.4136375,
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 1.14,
+        "message": "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
+        "method": "heuristic",
+        "min": 1.03,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -9064,6 +9505,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "Selected legs clothing does not establish the required wet protection.",
       "Available clothing does not provide the required wet protection for legs.",
       "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
+      "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
     ],
   },
   "status": 200,
@@ -9291,6 +9733,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
         "thermal_data_status": "known",
         "totalClo": 1.0238999999999998,
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 0.86,
+        "message": "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
+        "method": "heuristic",
+        "min": 0.75,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -9484,6 +9946,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
     ],
     "warnings": [
       "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
+      "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
     ],
   },
   "status": 200,
@@ -9709,6 +10172,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
         "thermal_data_status": "known",
         "totalClo": 2.1863124999999997,
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 1.73,
+        "message": "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
+        "method": "heuristic",
+        "min": 1.61,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -9914,6 +10397,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
     ],
     "warnings": [
       "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
+      "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
     ],
   },
   "status": 200,
@@ -10141,6 +10625,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
         "thermal_data_status": "known",
         "totalClo": 1.0118874999999998,
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 0.83,
+        "message": "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
+        "method": "heuristic",
+        "min": 0.73,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -10330,6 +10834,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
     ],
     "warnings": [
       "No bike helmet available to suggest. Wear one in any weather: it's required protection, not optional warmth.",
+      "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
     ],
   },
   "status": 200,
@@ -10357,6 +10862,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "Selected for head and neck: Patagonia Capilene Cool Daily Headband.",
       "hands: selected for the local warmth range.",
       "head: the lightest available option is warmer than the local warmth range; going without would leave you colder.",
+      "Feet (estimate): thin liner socks are enough in cycling shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "cold_exposure_factor": 0.28,
@@ -10553,6 +11059,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
         "maxRegionalDeficit": 0.03234999999999999,
         "thermal_data_status": "known",
         "totalClo": 0.8030124999999999,
+      },
+      "footwear": {
+        "clo": 0.35,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 0.21,
+        "message": "Feet (estimate): thin liner socks are enough in cycling shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.17,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -10763,6 +11289,7 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
       "Cycling tights or pants with rain protection — best available from the catalog (not owned): Patagonia Wind Shield Pants; still missing required rain protection for legs. Additional or alternative clothing is needed to meet this requirement.",
       "hands: selected for the local warmth range.",
       "head: no additional thermal coverage needed.",
+      "Feet (estimate): thin liner socks in cycling shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "cold_exposure_factor": 0.78,
@@ -10961,6 +11488,26 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > signed out (catalog) >
         "thermal_data_status": "known",
         "totalClo": 0.76385,
       },
+      "footwear": {
+        "clo": 0.35,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 0.43,
+        "message": "Feet (estimate): thin liner socks in cycling shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.36,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -11158,8 +11705,29 @@ exports[`POST /api/v1/recommendations/'biking' (golden) > wardrobe-only with an 
           "thermal_status": "under",
         },
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "cycling shoes",
+          "type": "cycling_shoe",
+        },
+        "max": 1.14,
+        "message": "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
+        "method": "heuristic",
+        "min": 1.03,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "guidance": [
         "Choose a cycling top and shorts or tights to meet the riding targets.",
+        "Feet (estimate): even heavyweight socks in cycling shoes fall short of the heuristic foot range. Consider toe covers, insulated overshoes or winter cycling boots.",
       ],
       "min_evap_potential": 0.25,
       "target_clo_range": [
@@ -11251,6 +11819,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       "Standalone running tights or pants with rain protection — best available in your wardrobe: SWTTR Generic Running Shorts + Spyder Sentinel Gore-Tex Pant; still below the insulation target for legs. Additional or alternative clothing is needed to meet this requirement.",
       "head: no suitable thermal accessory available; check warmth and protection before use.",
       "hands: selected for the local warmth range.",
+      "Feet (estimate): heavyweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -11459,6 +12028,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
         "maxRegionalDeficit": 0.4176900000000001,
         "thermal_data_status": "known",
         "totalClo": 1.21624,
+      },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.69,
+        "message": "Feet (estimate): heavyweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.62,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -11691,6 +12280,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       "The worn hood contributes to head warmth; helmet compatibility is included.",
       "hands: the lightest available option is warmer than the local warmth range; going without would leave you colder.",
       "head: no additional thermal coverage needed during sustained activity.",
+      "Feet (estimate): lightweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -11895,6 +12485,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 0.9909875,
+      },
+      "footwear": {
+        "clo": 0.45,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.5,
+        "message": "Feet (estimate): lightweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.42,
+        "sock": {
+          "clo": 0.3,
+          "label": "lightweight socks",
+          "measured": false,
+          "weight": "light",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -12294,6 +12904,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
         "thermal_data_status": "known",
         "totalClo": 1.78395,
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 1.05,
+        "message": "Feet (estimate): even heavyweight socks in running shoes fall short of the heuristic foot range. Consider winter running shoes with a wind-resistant upper, or shoe covers.",
+        "method": "heuristic",
+        "min": 0.97,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -12472,7 +13102,9 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
         "target_clo": 0.47,
       },
     ],
-    "warnings": [],
+    "warnings": [
+      "Feet (estimate): even heavyweight socks in running shoes fall short of the heuristic foot range. Consider winter running shoes with a wind-resistant upper, or shoe covers.",
+    ],
   },
   "status": 200,
 }
@@ -12498,6 +13130,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       "The worn hood contributes to head warmth; helmet compatibility is included.",
       "hands: the lightest available option is warmer than the local warmth range; going without would leave you colder.",
       "head: no additional thermal coverage needed during sustained activity.",
+      "Feet (estimate): thin liner socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -12705,6 +13338,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
         "thermal_data_status": "known",
         "totalClo": 0.7119375,
       },
+      "footwear": {
+        "clo": 0.35,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.42,
+        "message": "Feet (estimate): thin liner socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.35,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -12873,6 +13526,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       "Breathable long-sleeve running top with insulation as needed — best available in your wardrobe: Patagonia Capilene Cool Lightweight; still below the insulation target for arms. Additional or alternative clothing is needed to meet this requirement.",
       "hands: no suitable thermal accessory available; check warmth and protection before use.",
       "head: no suitable thermal accessory available; check warmth and protection before use.",
+      "Feet (estimate): thin liner socks are enough in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -13076,6 +13730,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
         "thermal_data_status": "known",
         "totalClo": 0.329,
       },
+      "footwear": {
+        "clo": 0.35,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.06,
+        "message": "Feet (estimate): thin liner socks are enough in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.04,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -13227,6 +13901,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
       "Selected partial coverage intentionally leaves some skin exposed; regional insulation already includes that exposure.",
       "hands: no suitable thermal accessory available; check warmth and protection before use.",
       "head: existing hood insulation exceeds the local warmth range; vent the hood or choose a lighter layer.",
+      "Feet (estimate): thin liner socks are enough in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -13432,6 +14107,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in (wardrobe) 
         "thermal_data_status": "known",
         "totalClo": 0.80229,
       },
+      "footwear": {
+        "clo": 0.35,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.22,
+        "message": "Feet (estimate): thin liner socks are enough in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.16,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -13633,6 +14328,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in with an emp
       "Selected partial coverage intentionally leaves some skin exposed; regional insulation already includes that exposure.",
       "hands: no suitable thermal accessory available; check warmth and protection before use.",
       "head: no additional thermal coverage needed during sustained activity.",
+      "Feet (estimate): lightweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -13837,6 +14533,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed in with an emp
         "maxRegionalDeficit": 0.036169999999999924,
         "thermal_data_status": "known",
         "totalClo": 0.8368450000000001,
+      },
+      "footwear": {
+        "clo": 0.45,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.5,
+        "message": "Feet (estimate): lightweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.42,
+        "sock": {
+          "clo": 0.3,
+          "label": "lightweight socks",
+          "measured": false,
+          "weight": "light",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -14061,6 +14777,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       "Selected partial coverage intentionally leaves some skin exposed; regional insulation already includes that exposure.",
       "hands: selected for the local warmth range.",
       "head: selected the lightest option rated for this cold; lighter hats aren't rated for it.",
+      "Feet (estimate): heavyweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -14271,6 +14988,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 1.365415,
+      },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.69,
+        "message": "Feet (estimate): heavyweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.62,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -14536,6 +15273,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       "Selected partial coverage intentionally leaves some skin exposed; regional insulation already includes that exposure.",
       "hands: selected for the local warmth range.",
       "head: no additional thermal coverage needed during sustained activity.",
+      "Feet (estimate): lightweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -14741,6 +15479,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
         "maxRegionalDeficit": 0.036169999999999924,
         "thermal_data_status": "known",
         "totalClo": 0.8368450000000001,
+      },
+      "footwear": {
+        "clo": 0.45,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.5,
+        "message": "Feet (estimate): lightweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.42,
+        "sock": {
+          "clo": 0.3,
+          "label": "lightweight socks",
+          "measured": false,
+          "weight": "light",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -15173,6 +15931,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
         "thermal_data_status": "known",
         "totalClo": 1.9512075,
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 1.05,
+        "message": "Feet (estimate): even heavyweight socks in running shoes fall short of the heuristic foot range. Consider winter running shoes with a wind-resistant upper, or shoe covers.",
+        "method": "heuristic",
+        "min": 0.97,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -15375,7 +16153,9 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
         "target_clo": 0.47,
       },
     ],
-    "warnings": [],
+    "warnings": [
+      "Feet (estimate): even heavyweight socks in running shoes fall short of the heuristic foot range. Consider winter running shoes with a wind-resistant upper, or shoe covers.",
+    ],
   },
   "status": 200,
 }
@@ -15403,6 +16183,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       "Selected partial coverage intentionally leaves some skin exposed; regional insulation already includes that exposure.",
       "hands: selected for the local warmth range.",
       "head: no additional thermal coverage needed during sustained activity.",
+      "Feet (estimate): thin liner socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -15611,6 +16392,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
         "thermal_data_status": "known",
         "totalClo": 0.60082,
       },
+      "footwear": {
+        "clo": 0.35,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.42,
+        "message": "Feet (estimate): thin liner socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.35,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -15791,6 +16592,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       "Breathable long-sleeve running top with insulation as needed — best available from the catalog (not owned): Patagonia Capilene Cool Lightweight; still below the insulation target for arms. Additional or alternative clothing is needed to meet this requirement.",
       "hands: no suitable thermal accessory available; check warmth and protection before use.",
       "head: no suitable thermal accessory available; check warmth and protection before use.",
+      "Feet (estimate): thin liner socks are enough in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -15994,6 +16796,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
         "thermal_data_status": "known",
         "totalClo": 0.256925,
       },
+      "footwear": {
+        "clo": 0.35,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.06,
+        "message": "Feet (estimate): thin liner socks are enough in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.04,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -16154,6 +16976,7 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
       "Selected partial coverage intentionally leaves some skin exposed; regional insulation already includes that exposure.",
       "hands: the lightest available option is warmer than the local warmth range; going without would leave you colder.",
       "head: existing hood insulation exceeds the local warmth range; vent the hood or choose a lighter layer.",
+      "Feet (estimate): thin liner socks are enough in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -16360,6 +17183,26 @@ exports[`POST /api/v1/recommendations/'running' (golden) > signed out (catalog) 
         "maxRegionalDeficit": 0.008419999999999983,
         "thermal_data_status": "known",
         "totalClo": 0.6512724999999999,
+      },
+      "footwear": {
+        "clo": 0.35,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.22,
+        "message": "Feet (estimate): thin liner socks are enough in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.16,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -16650,10 +17493,31 @@ exports[`POST /api/v1/recommendations/'running' (golden) > wardrobe-only with an
           "thermal_status": "under",
         },
       },
+      "footwear": {
+        "clo": 0.65,
+        "footwear": {
+          "clo": 0.15,
+          "label": "running shoes",
+          "type": "running_shoe",
+        },
+        "max": 0.69,
+        "message": "Feet (estimate): heavyweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.62,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
+      },
       "guidance": [
         "Choose a running top and shorts or standalone tights to meet the moving-phase targets.",
         "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
         "These are clothing estimates; adjust layers for your comfort and changing conditions.",
+        "Feet (estimate): heavyweight socks in running shoes. Sized by a heuristic foot range; feet are not in the comfort score.",
       ],
       "min_evap_potential": 0.3,
       "target_clo_range": [
@@ -16923,6 +17787,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Pack insulation adding ~1.4 clo for transitions/descent",
       "Cold conditions - ensure robust insulation in pack",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): midweight socks in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -17216,6 +18081,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 0.815025,
+      },
+      "footwear": {
+        "clo": 0.99,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 1.01,
+        "message": "Feet, sized for the descent (estimate): midweight socks in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.93,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -17681,6 +18567,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Pack insulation adding ~1.3 clo for transitions/descent",
       "Standard touring conditions - bring packable insulation",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -17974,6 +18861,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 0.6910375,
+      },
+      "footwear": {
+        "clo": 0.8,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 0.73,
+        "message": "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.66,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -18696,6 +19604,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         "thermal_data_status": "known",
         "totalClo": 1.26305,
       },
+      "footwear": {
+        "clo": 0.99,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 1.4,
+        "message": "Feet, sized for the descent (estimate): even midweight socks in touring boots fall short of the heuristic foot range. Consider insulated boot covers or boot heaters for the descent.",
+        "method": "heuristic",
+        "min": 1.31,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -18955,6 +19884,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Descent: hands: the closest available option still falls short of the local warmth range; check warmth before use.",
       "Descent: head: the closest available option still falls short of the local warmth range; check warmth before use.",
       "Descent: BlackStrap Expedition Hood Balaclava isn't rated for this cold; check warmth before use.",
+      "Feet, sized for the descent (estimate): even midweight socks in touring boots fall short of the heuristic foot range. Consider insulated boot covers or boot heaters for the descent.",
     ],
   },
   "status": 200,
@@ -19160,6 +20090,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Pack insulation adding ~1.5 clo for transitions/descent",
       "Standard touring conditions - bring packable insulation",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): thin liner socks in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -19453,6 +20384,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 0.535975,
+      },
+      "footwear": {
+        "clo": 0.8,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 0.79,
+        "message": "Feet, sized for the descent (estimate): thin liner socks in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.71,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -19841,6 +20793,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Pack insulation adding ~1.3 clo for transitions/descent",
       "Warm conditions - may need minimal extra layers for descent",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -20123,6 +21076,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 0.329,
+      },
+      "footwear": {
+        "clo": 0.8,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 0.51,
+        "message": "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.43,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -20494,6 +21468,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
       "Pack insulation adding ~1.2 clo for transitions/descent",
       "Warm conditions - may need minimal extra layers for descent",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -20759,6 +21734,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in (wardro
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 0.83905,
+      },
+      "footwear": {
+        "clo": 0.8,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 0.51,
+        "message": "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.44,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -21157,6 +22153,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
       "Pack insulation adding ~1.3 clo for transitions/descent",
       "Standard touring conditions - bring packable insulation",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -21442,6 +22439,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed in with an
         "maxRegionalDeficit": 0.039500000000000035,
         "thermal_data_status": "known",
         "totalClo": 0.679025,
+      },
+      "footwear": {
+        "clo": 0.8,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 0.73,
+        "message": "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.66,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -21811,6 +22829,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Pack insulation adding ~1.4 clo for transitions/descent",
       "Cold conditions - ensure robust insulation in pack",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): midweight socks in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -22107,6 +23126,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 0.8030125,
+      },
+      "footwear": {
+        "clo": 0.99,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 1.01,
+        "message": "Feet, sized for the descent (estimate): midweight socks in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.93,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -22541,6 +23581,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Pack insulation adding ~1.3 clo for transitions/descent",
       "Standard touring conditions - bring packable insulation",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -22829,6 +23870,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         "maxRegionalDeficit": 0.039500000000000035,
         "thermal_data_status": "known",
         "totalClo": 0.5961000000000001,
+      },
+      "footwear": {
+        "clo": 0.8,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 0.73,
+        "message": "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.66,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -23468,6 +24530,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         "thermal_data_status": "known",
         "totalClo": 1.26305,
       },
+      "footwear": {
+        "clo": 0.99,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 1.4,
+        "message": "Feet, sized for the descent (estimate): even midweight socks in touring boots fall short of the heuristic foot range. Consider insulated boot covers or boot heaters for the descent.",
+        "method": "heuristic",
+        "min": 1.31,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "mid_layer_light",
@@ -23690,6 +24773,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Descent: Limited breathability may cause moisture buildup during activity; vent or choose more breathable layers.",
       "Descent: hands: the closest available option still falls short of the local warmth range; check warmth before use.",
       "Descent: head: the closest available option still falls short of the local warmth range; check warmth before use.",
+      "Feet, sized for the descent (estimate): even midweight socks in touring boots fall short of the heuristic foot range. Consider insulated boot covers or boot heaters for the descent.",
     ],
   },
   "status": 200,
@@ -23900,6 +24984,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Pack insulation adding ~1.5 clo for transitions/descent",
       "Standard touring conditions - bring packable insulation",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): thin liner socks in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -24186,6 +25271,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 0.5239625,
+      },
+      "footwear": {
+        "clo": 0.8,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 0.79,
+        "message": "Feet, sized for the descent (estimate): thin liner socks in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.71,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -24520,6 +25626,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Pack insulation adding ~1.3 clo for transitions/descent",
       "Warm conditions - may need minimal extra layers for descent",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -24794,6 +25901,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 0.3169875,
+      },
+      "footwear": {
+        "clo": 0.8,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 0.51,
+        "message": "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.43,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -25124,6 +26252,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
       "Pack insulation adding ~1.2 clo for transitions/descent",
       "Warm conditions - may need minimal extra layers for descent",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -25382,6 +26511,27 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > signed out (catal
         "thermal_data_status": "known",
         "totalClo": 0.83905,
       },
+      "footwear": {
+        "clo": 0.8,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 0.51,
+        "message": "Feet, sized for the descent (estimate): thin liner socks are enough in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.44,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -25591,6 +26741,7 @@ exports[`POST /api/v1/recommendations/'ski-touring' (golden) > wardrobe-only wit
       "Pack insulation adding ~1.4 clo for transitions/descent",
       "Cold conditions - ensure robust insulation in pack",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): midweight socks in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -25675,6 +26826,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'co
       "Keep hand protection for pole grip; functional protection is separate from thermal warmth.",
       "hands: the lightest available option is warmer than the local warmth range; going without would leave you colder.",
       "head: existing hood insulation exceeds the local warmth range; vent the hood or choose a lighter layer.",
+      "Feet (estimate): midweight socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -25891,6 +27043,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'co
         "thermal_data_status": "known",
         "totalClo": 1.26305,
       },
+      "footwear": {
+        "clo": 0.74,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.75,
+        "message": "Feet (estimate): midweight socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.68,
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -26092,6 +27264,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'co
       "Keep hand protection for pole grip; functional protection is separate from thermal warmth.",
       "hands: the lightest available option is warmer than the local warmth range; going without would leave you colder.",
       "head: no additional thermal coverage needed during sustained activity.",
+      "Feet (estimate): thin liner socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -26304,6 +27477,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'co
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 1.0118874999999998,
+      },
+      "footwear": {
+        "clo": 0.55,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.56,
+        "message": "Feet (estimate): thin liner socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.47,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -26727,6 +27920,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ex
         "thermal_data_status": "known",
         "totalClo": 1.9181124999999999,
       },
+      "footwear": {
+        "clo": 0.85,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 1.18,
+        "message": "Feet (estimate): even heavyweight socks in XC ski boots fall short of the heuristic foot range. Consider insulated XC boots or overboots.",
+        "method": "heuristic",
+        "min": 1.09,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -26900,7 +28113,9 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ex
         "target_clo": 0.47,
       },
     ],
-    "warnings": [],
+    "warnings": [
+      "Feet (estimate): even heavyweight socks in XC ski boots fall short of the heuristic foot range. Consider insulated XC boots or overboots.",
+    ],
   },
   "status": 200,
 }
@@ -26938,6 +28153,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'la
       "Keep hand protection for pole grip; functional protection is separate from thermal warmth.",
       "hands: the lightest available option is warmer than the local warmth range; going without would leave you colder.",
       "head: no additional thermal coverage needed during sustained activity.",
+      "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -27155,6 +28371,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'la
         "thermal_data_status": "known",
         "totalClo": 0.815025,
       },
+      "footwear": {
+        "clo": 0.55,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.47,
+        "message": "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.39,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -27333,6 +28569,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'mi
       "Breathable Nordic top with insulation as needed — no matching item in your wardrobe",
       "hands: no suitable pole-grip gloves available; check warmth and protection before use.",
       "head: no suitable thermal accessory available; check warmth and protection before use.",
+      "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -27546,6 +28783,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'mi
         "thermal_data_status": "known",
         "totalClo": 0.329,
       },
+      "footwear": {
+        "clo": 0.55,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.07,
+        "message": "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.04,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -27714,6 +28971,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ne
       "Standalone Nordic tights or pants with wet-weather protection — no matching item in your wardrobe",
       "hands: the lightest available option is warmer than the local warmth range; going without would leave you colder.",
       "head: existing hood insulation exceeds the local warmth range; vent the hood or choose a lighter layer.",
+      "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -27935,6 +29193,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in (wardrobe) > 'ne
         "thermal_data_status": "known",
         "totalClo": 0.76385,
       },
+      "footwear": {
+        "clo": 0.55,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.25,
+        "message": "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.19,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -28125,6 +29403,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in with an empty wa
       "Pole-grip hand protection is missing; this is separate from a thermal cold deficit.",
       "hands: no suitable pole-grip gloves available; check warmth and protection before use.",
       "head: no additional thermal coverage needed during sustained activity.",
+      "Feet (estimate): thin liner socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -28338,6 +29617,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed in with an empty wa
         "thermal_data_status": "known",
         "totalClo": 0.999875,
       },
+      "footwear": {
+        "clo": 0.55,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.56,
+        "message": "Feet (estimate): thin liner socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.47,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -28542,6 +29841,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'co
       "Keep hand protection for pole grip; functional protection is separate from thermal warmth.",
       "hands: selected for the local warmth range and pole grip.",
       "head: selected the lightest option rated for this cold; lighter hats aren't rated for it.",
+      "Feet (estimate): midweight socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -28760,6 +30060,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'co
         "thermal_data_status": "known",
         "totalClo": 1.238105,
       },
+      "footwear": {
+        "clo": 0.74,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.75,
+        "message": "Feet (estimate): midweight socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.68,
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
+      },
       "garments": [
         {
           "category": "mid_layer_heavy",
@@ -28970,6 +30290,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'co
       "Keep hand protection for pole grip; functional protection is separate from thermal warmth.",
       "hands: selected for the local warmth range and pole grip.",
       "head: selected for the local warmth range.",
+      "Feet (estimate): thin liner socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -29184,6 +30505,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'co
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 0.999875,
+      },
+      "footwear": {
+        "clo": 0.55,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.56,
+        "message": "Feet (estimate): thin liner socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.47,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {
@@ -29612,6 +30953,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ex
         "thermal_data_status": "known",
         "totalClo": 2.0142124999999997,
       },
+      "footwear": {
+        "clo": 0.85,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 1.18,
+        "message": "Feet (estimate): even heavyweight socks in XC ski boots fall short of the heuristic foot range. Consider insulated XC boots or overboots.",
+        "method": "heuristic",
+        "min": 1.09,
+        "sock": {
+          "clo": 0.5,
+          "label": "heavyweight socks",
+          "measured": false,
+          "weight": "heavy",
+        },
+        "state": "short",
+        "thermal_status": "under",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -29806,7 +31167,9 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ex
         "target_clo": 0.47,
       },
     ],
-    "warnings": [],
+    "warnings": [
+      "Feet (estimate): even heavyweight socks in XC ski boots fall short of the heuristic foot range. Consider insulated XC boots or overboots.",
+    ],
   },
   "status": 200,
 }
@@ -29844,6 +31207,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'la
       "Keep hand protection for pole grip; functional protection is separate from thermal warmth.",
       "hands: selected for the local warmth range and pole grip.",
       "head: no additional thermal coverage needed during sustained activity.",
+      "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -30059,6 +31423,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'la
         "thermal_data_status": "known",
         "totalClo": 0.8030125,
       },
+      "footwear": {
+        "clo": 0.55,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.47,
+        "message": "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.39,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -30234,6 +31618,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'mi
       "Breathable Nordic top with insulation as needed — no suitable item found; consider: Breathable Nordic top with insulation as needed (generic suggestion, not owned)",
       "head: no suitable thermal accessory available; check warmth and protection before use.",
       "hands: selected for the local warmth range and pole grip.",
+      "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -30447,6 +31832,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'mi
         "thermal_data_status": "known",
         "totalClo": 0.3169875,
       },
+      "footwear": {
+        "clo": 0.55,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.07,
+        "message": "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.04,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
+      },
       "garments": [
         {
           "category": "base_layer",
@@ -30616,6 +32021,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ne
       "Standalone Nordic tights or pants with wet-weather protection — no suitable item found; consider: Standalone Nordic tights or pants with wet-weather protection (generic suggestion, not owned)",
       "hands: selected for the local warmth range and pole grip.",
       "head: existing hood insulation exceeds the local warmth range; vent the hood or choose a lighter layer.",
+      "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
       "These are clothing estimates; adjust layers for your comfort and changing conditions.",
     ],
@@ -30837,6 +32243,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > signed out (catalog) > 'ne
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 2.1608875,
+      },
+      "footwear": {
+        "clo": 0.55,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.25,
+        "message": "Feet (estimate): thin liner socks are enough in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.19,
+        "sock": {
+          "clo": 0.2,
+          "label": "thin liner socks",
+          "measured": false,
+          "weight": "thin",
+        },
+        "state": "selected",
+        "thermal_status": "over",
       },
       "garments": [
         {
@@ -31103,6 +32529,26 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > wardrobe-only with an empt
           "thermal_status": "under",
         },
       },
+      "footwear": {
+        "clo": 0.74,
+        "footwear": {
+          "clo": 0.35,
+          "label": "XC ski boots",
+          "type": "xc_boot",
+        },
+        "max": 0.75,
+        "message": "Feet (estimate): midweight socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.68,
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
+      },
       "guidance": [
         "No available clothing forms a suitable XC moving outfit; fill the clothing gaps below.",
         "Wind protection is required by the current exposure; an existing wind-resistant garment can supply it without another shell.",
@@ -31111,6 +32557,7 @@ exports[`POST /api/v1/recommendations/'xc' (golden) > wardrobe-only with an empt
         "Outing pattern is unknown; moving targets assume continuous skiing. Classic versus skate does not determine effort.",
         "These targets assume continuous movement. Bring extra layers for breaks and frequent stops.",
         "These are clothing estimates; adjust layers for your comfort and changing conditions.",
+        "Feet (estimate): midweight socks in XC ski boots. Sized by a heuristic foot range; feet are not in the comfort score.",
       ],
       "min_evap_potential": 0.25,
       "target_clo_range": [
@@ -31372,6 +32819,7 @@ exports[`POST /api/v1/recommendations/ski-touring (golden, pack options) > prior
       "Pack insulation adding ~1.4 clo for transitions/descent",
       "Cold conditions - ensure robust insulation in pack",
       "Prioritize breathability for uphill (evap potential >= 0.2)",
+      "Feet, sized for the descent (estimate): midweight socks in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
     ],
     "ireq": {
       "downhill": {
@@ -31661,6 +33109,27 @@ exports[`POST /api/v1/recommendations/ski-touring (golden, pack options) > prior
         "maxRegionalDeficit": 0,
         "thermal_data_status": "known",
         "totalClo": 0.8030125,
+      },
+      "footwear": {
+        "clo": 0.99,
+        "footwear": {
+          "clo": 0.6,
+          "label": "touring boots",
+          "type": "touring_boot",
+        },
+        "max": 1.01,
+        "message": "Feet, sized for the descent (estimate): midweight socks in touring boots. Sized by a heuristic foot range; feet are not in the comfort score.",
+        "method": "heuristic",
+        "min": 0.93,
+        "phase": "descent",
+        "sock": {
+          "clo": 0.39,
+          "label": "midweight socks",
+          "measured": true,
+          "weight": "midweight",
+        },
+        "state": "selected",
+        "thermal_status": "in_range",
       },
       "garments": [
         {

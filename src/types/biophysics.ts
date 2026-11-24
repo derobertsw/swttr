@@ -115,6 +115,36 @@ export interface AccessoryAssessments {
 }
 
 /**
+ * Feet (#405): a sock suggestion for the footwear the sport assumes, checked
+ * against a heuristic foot band. Clo is on USARIEM T18-01's foot part-manikin
+ * scale. Feet aren't part of the comfort score or verdict, and nothing here
+ * is a toe temperature, a frostbite risk or an exposure time.
+ */
+export interface FootwearAssessment {
+  /** Always heuristic: no foot heat balance, foot data or field data behind it. */
+  method: 'heuristic';
+  /** The phase the band comes from, when a sport has several (touring: the descent). */
+  phase?: 'descent';
+  /** The sport's footwear, assumed (not chosen or owned) with an estimated clo. */
+  footwear: { type: string; label: string; clo: number };
+  sock: {
+    weight: 'thin' | 'light' | 'midweight' | 'heavy';
+    label: string;
+    clo: number;
+    /** True only for the midweight sock, T18-01's measured sock. */
+    measured: boolean;
+  };
+  /** Footwear plus sock, added. */
+  clo: number;
+  min: number;
+  max: number;
+  thermal_status: 'under' | 'in_range' | 'over';
+  /** `short`: even the warmest sock the footwear allows falls below the band. */
+  state: 'selected' | 'short';
+  message: string;
+}
+
+/**
  * Single-phase sports report `min`/`neutral` at the top level; alpine reports
  * `skiing`/`chairlift` and ski touring `uphill`/`downhill` phases instead.
  */
@@ -367,6 +397,8 @@ export interface BiophysicsRecommendation {
   ireq: IreqRange;
   recommendation: {
     accessories?: AccessoryAssessments;
+    /** Heuristic sock suggestion for the sport's footwear (#405). */
+    footwear?: FootwearAssessment;
     garments: RecommendedGarment[];
     handwear?: RecommendedHandwear | null;
     headwear?: RecommendedHeadwear | null;
