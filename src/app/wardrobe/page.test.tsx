@@ -49,7 +49,12 @@ function inTurn(...replies: Array<ReturnType<typeof reply>>) {
 }
 
 function stubApi(routes: Parameters<typeof fakeApi>[0]) {
-  const fetchMock = fakeApi({ "GET /api/wardrobe/available": emptyCatalog, ...routes });
+  // The coverage section has its own tests; here it stays out of the way.
+  const fetchMock = fakeApi({
+    "GET /api/wardrobe/available": emptyCatalog,
+    "GET /api/wardrobe/coverage": reply(401, { error: "Authentication required" }),
+    ...routes,
+  });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }

@@ -34,6 +34,11 @@ type GearPoolResult =
   | { status: 'empty' }
   | { status: 'error'; message: string };
 
+/** A garment listing no activities suits every activity. */
+export function suitsActivity(garment: GarmentRow, activity: string | undefined): boolean {
+  return !activity || !garment.suitable_activities?.length || garment.suitable_activities.includes(activity);
+}
+
 /** Load usable wardrobe/catalog gear, applying activity eligibility before categorization. */
 export async function loadGearPool(
   { supabase, userId, useWardrobeOnly }: RecommendationRequest,
@@ -56,8 +61,7 @@ export async function loadGearPool(
 
   const fetched = data ?? [];
   const eligible = usingWardrobe || !catalog.predicate ? fetched : fetched.filter(catalog.predicate);
-  const garments = eligible.filter(g => hasUsableThermalData(g)
-    && (!catalog.activity || !g.suitable_activities?.length || g.suitable_activities.includes(catalog.activity)));
+  const garments = eligible.filter(g => hasUsableThermalData(g) && suitsActivity(g, catalog.activity));
   if (garments.length === 0) {
     return { status: 'empty' };
   }
