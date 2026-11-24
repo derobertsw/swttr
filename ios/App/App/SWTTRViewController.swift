@@ -58,6 +58,11 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
     private var failureOverlay = SWTTRFailureOverlay()
     /// Whether the web view shows a page that loaded, for when Retry hands off.
     private var hasCommittedPage = false
+    private var nativeBridges: SWTTRNativeBridges?
+    private lazy var shareBridge = SWTTRShareBridge(
+        anchor: { [weak self] in self?.viewIfLoaded },
+        present: { [weak self] sheet in self?.presentOverCurrentContent(sheet) ?? false }
+    )
 
     fileprivate init(shell: SWTTRShellConfig, initialPath: String) {
         self.shell = shell
@@ -90,6 +95,14 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
         let proxy = SWTTRScriptMessageProxy(tabController: self)
         contentController.add(proxy, name: activityChangeHandlerName)
         scriptMessageProxy = proxy
+
+        // #147: native location and the share sheet, for SWTTR's own pages only.
+        let bridges = SWTTRNativeBridges(policy: navigationPolicy) { [weak self] request, done in
+            guard let self else { done(.failed); return }
+            self.shareBridge.share(request, completion: done)
+        }
+        bridges.install(in: contentController)
+        nativeBridges = bridges
 
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
@@ -403,6 +416,8 @@ final class SWTTRWebTabViewController: UIViewController, WKNavigationDelegate, W
 
     fileprivate func handleScriptMessage(_ message: WKScriptMessage) {
         guard message.name == activityChangeHandlerName else { return }
+        // Only SWTTR's own pages, including its frames, report the activity.
+        guard navigationPolicy.isAllowedHost(message.frameInfo.securityOrigin.host) else { return }
 
         if let body = message.body as? [String: Any],
            let value = body["value"] as? String,

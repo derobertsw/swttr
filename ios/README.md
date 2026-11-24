@@ -85,8 +85,12 @@ and web content crashes.
 
 `apple/SWTTRShellKit` has swift-testing tests for the navigation policy
 (including new windows and other link schemes), where external links open, load
-failure classification, crash recovery, the Gear Up pulse tracker and config
-resolution. The tabs, the Gear Up button, the injected activity script, the
+failure classification, crash recovery, the Gear Up pulse tracker, config
+resolution, and the location and share bridges (#147): their message types,
+origin checks, error mapping and location requests, using a fake
+CLLocationManager. `src/lib/native-shell-bridges.test.ts` (vitest) runs the
+bridge scripts themselves. The real location prompt and share sheet need the
+Simulator or a device. The tabs, the Gear Up button, the injected activity script, the
 Safari sheet, native dialogs and the "Can't reach SWTTR" view have no automated
 tests; check them in the Simulator. To see the offline view, stop `npm run dev`
 first (a running dev server stays reachable on `localhost` without a network),
