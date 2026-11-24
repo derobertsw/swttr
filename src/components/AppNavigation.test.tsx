@@ -11,6 +11,9 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
+// The sidebar's account control reads Clerk's signed-in state.
+vi.mock("@clerk/nextjs", async () => (await import("@/test/fakeClerk")).fakeClerkModule);
+
 vi.mock("@/hooks/usePreferences", () => ({
   usePreferences: () => ({
     sensitivity: "neutral",

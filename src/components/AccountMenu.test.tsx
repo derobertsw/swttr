@@ -36,6 +36,48 @@ describe("AccountMenu", () => {
     ]);
   });
 
+  describe("in the sidebar (#267)", () => {
+    const name = () => document.querySelector<HTMLElement>("[data-account-name]")!;
+    const sidebarMenu = () => render(<AccountMenu placement="sidebar" onOpenSettings={vi.fn()} onShare={vi.fn()} />);
+
+    it("shows the account's name beside the avatar, or Account without one", () => {
+      fakeClerkState.fullName = "Ada Lovelace";
+      const { unmount } = sidebarMenu();
+      expect(name()).toHaveTextContent("Ada Lovelace");
+      unmount();
+
+      fakeClerkState.fullName = null;
+      sidebarMenu();
+      expect(name()).toHaveTextContent("Account");
+    });
+
+    it("leaves the avatar as the one control, with its own name", () => {
+      sidebarMenu();
+      expect(screen.getAllByRole("button")).toEqual([avatar()]);
+      expect(name()).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("opens the menu from a click on the name, and doesn't reopen it when that press closed it", async () => {
+      const user = userEvent.setup();
+      sidebarMenu();
+
+      await user.click(name());
+      expect(screen.getByRole("menu", { name: "User menu" })).toBeInTheDocument();
+
+      // Clerk closes its menu on the press outside it; the click follows.
+      await user.pointer({ keys: "[MouseLeft>]", target: name() });
+      await user.click(avatar());
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      await user.pointer({ keys: "[/MouseLeft]", target: name() });
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+
+    it("has no name beside the header's avatar", () => {
+      render(<AccountMenu onOpenSettings={vi.fn()} onShare={vi.fn()} />);
+      expect(document.querySelector("[data-account-name]")).toBeNull();
+    });
+  });
+
   it("opens Settings once the menu has closed and the avatar has focus back", async () => {
     const user = userEvent.setup();
     const seen: { menuOpen: boolean; avatarFocused: boolean }[] = [];

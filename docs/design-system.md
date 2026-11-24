@@ -83,6 +83,16 @@ The font is Geist, loaded by `next/font` on `<html>`. iOS keeps the system font 
 - **Elevation:** one container per meaningful group. Don't nest cards, glass panels or inset shadows. Shadows are for overlays only.
 - **Motion:** keep state feedback brief (Tailwind's default 150ms transitions). Don't scale or resize selected items. `prefers-reduced-motion` cuts every animation and transition to near zero (see `globals.css`).
 
+### Desktop layout
+
+Desktop rules start at Tailwind `lg` (1024px), where the sidebar shows its labels. Below `lg` every page keeps the phone layout, and the native shells keep their own chrome at every width.
+
+- **Canvas:** `PageLayout` caps the page at 1200px, beside the sidebar.
+- **Shared left edge:** from `lg`, every page's content starts at the canvas's left edge, so the `h1` is in the same place on every page. Reading pages and single forms keep their maximum width, left-aligned rather than centred. The sign-in and sign-up cards are the exception and stay centred.
+- **No header row:** on desktop web (`md` and up, outside the native shells) the header leaves the page, so content starts at the top of the canvas. Below `md`, and in the native shells, the header keeps the wordmark, the avatar and the menu.
+- **Account in the sidebar:** on desktop web the account control sits at the foot of the sidebar, below Settings and help: the avatar and name when signed in (the avatar alone in the icon sidebar), or a Sign in item for guests. It opens the same menu as the header's avatar.
+- **Two columns only for two real groups:** split a page into columns when its content has two groups that are used together, such as a form and its result, or a list and its detail. Don't stretch a field, card or paragraph just to fill the width.
+
 ## Components
 
 | Component | File | Notes |
