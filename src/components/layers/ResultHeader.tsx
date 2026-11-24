@@ -209,55 +209,62 @@ export function ResultHeader({
         </Button>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <h2 className="text-title font-semibold text-foreground md:text-title-lg">{title}</h2>
-        {adviceKind === "personalized" && <Badge variant="primary">Personalized</Badge>}
-        {adviceKind === "general" && <Badge variant="neutral">General guide</Badge>}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        {(activity || exertion) && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-base">
-            <ActivityControl activity={activity} onActivityChange={onActivityChange} loading={loading} />
-            {exertion && <span className="text-muted-foreground">{EXERTION_LABELS[exertion]} effort</span>}
+      {/* From lg the outing reads as one line under the title, with its source and the way to change it on the right (#267). */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-x-8">
+        <div className="flex min-w-0 flex-col gap-3 lg:gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 lg:justify-start">
+            <h2 className="text-title font-semibold text-foreground md:text-title-lg">{title}</h2>
+            {adviceKind === "personalized" && <Badge variant="primary">Personalized</Badge>}
+            {adviceKind === "general" && <Badge variant="neutral">General guide</Badge>}
           </div>
-        )}
-        {context && (
-          <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
-            <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span>
-              <span className="text-foreground">{context.place ?? "Your location"}</span>
-              <span aria-hidden="true"> · </span>
-              <span>{when}</span>
-            </span>
-          </p>
-        )}
-        {outing && <OutingTimeSummary when={outing.when} />}
-        <p className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{formatTemperature(temperature, temperatureUnit)}</span>
-          {feelsLike !== temperature && <> · Feels like {formatTemperature(feelsLike, temperatureUnit)}</>}
-          {" · "}
-          <span>Wind {windspeed} mph</span>
-        </p>
-        {precipitationState && (
-          <p
-            className="flex items-center gap-1.5 text-sm font-medium text-foreground"
-            data-precipitation-state={precipitationType ?? "precipitation"}
-          >
-            <precipitationState.icon className="size-4 shrink-0" aria-hidden="true" />
-            {precipitationState.label}
-          </p>
-        )}
+
+          <div className="flex flex-col gap-1.5 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-5">
+            {(activity || exertion) && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-base">
+                <ActivityControl activity={activity} onActivityChange={onActivityChange} loading={loading} />
+                {exertion && <span className="text-muted-foreground">{EXERTION_LABELS[exertion]} effort</span>}
+              </div>
+            )}
+            {context && (
+              <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
+                <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <span>
+                  <span className="text-foreground">{context.place ?? "Your location"}</span>
+                  <span aria-hidden="true"> · </span>
+                  <span>{when}</span>
+                </span>
+              </p>
+            )}
+            {outing && <OutingTimeSummary when={outing.when} />}
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{formatTemperature(temperature, temperatureUnit)}</span>
+              {feelsLike !== temperature && <> · Feels like {formatTemperature(feelsLike, temperatureUnit)}</>}
+              {" · "}
+              <span>Wind {windspeed} mph</span>
+            </p>
+            {precipitationState && (
+              <p
+                className="flex items-center gap-1.5 text-sm font-medium text-foreground"
+                data-precipitation-state={precipitationType ?? "precipitation"}
+              >
+                <precipitationState.icon className="size-4 shrink-0" aria-hidden="true" />
+                {precipitationState.label}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 lg:w-64 lg:shrink-0 lg:items-end lg:gap-0 lg:text-right">
+          <WeatherSourceDetails provenance={context?.provenance} />
+
+          {onEditWeather && (
+            <Button id={EDIT_WEATHER_ID} type="button" variant="outline" size="sm" className="self-start lg:self-end" onClick={onEditWeather} disabled={loading}>
+              <Pencil aria-hidden="true" />
+              Change place or time
+            </Button>
+          )}
+        </div>
       </div>
-
-      <WeatherSourceDetails provenance={context?.provenance} />
-
-      {onEditWeather && (
-        <Button id={EDIT_WEATHER_ID} type="button" variant="outline" size="sm" className="self-start" onClick={onEditWeather} disabled={loading}>
-          <Pencil aria-hidden="true" />
-          Change place or time
-        </Button>
-      )}
     </header>
   );
 }

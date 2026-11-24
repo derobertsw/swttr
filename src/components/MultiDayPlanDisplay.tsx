@@ -154,7 +154,7 @@ export default function MultiDayPlanDisplay({
     : null;
 
   return (
-    <section className="flex w-full flex-col gap-6 pb-24">
+    <section className="flex w-full flex-col gap-6 pb-24 md:pb-0">
       <header className="flex flex-col gap-3">
         {onReset && (
           <Button type="button" variant="ghost" size="sm" className="-ml-3 self-start" onClick={onReset}>
@@ -163,12 +163,13 @@ export default function MultiDayPlanDisplay({
           </Button>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 lg:justify-start">
           <h2 className="text-title font-semibold text-foreground md:text-title-lg">Multi-day layer plan</h2>
           {hasLayers && <Badge variant="neutral">General guide</Badge>}
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        {/* From lg the activity, place and dates share a line, as on Your layers (#267). */}
+        <div className="flex flex-col gap-1.5 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-5">
           {activityOption && (
             <span className="inline-flex items-center gap-1.5 text-base font-semibold text-foreground">
               <activityOption.icon className="size-4" aria-hidden="true" />
@@ -190,11 +191,11 @@ export default function MultiDayPlanDisplay({
               </span>
             </span>
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground lg:basis-full">
             Layers for {formatHour(plan.dayStartHour)} to {formatHour(plan.dayEndHour)} each day, local time.
             {startsLate && ` The first day starts at ${formatHour(plan.firstDayStartHour)}.`}
           </p>
-          {outing && <OutingTimeSummary when={outing.when} />}
+          {outing && <OutingTimeSummary when={outing.when} className="lg:basis-full" />}
         </div>
         <WeatherSourceDetails provenance={plan.provenance} />
       </header>
@@ -241,7 +242,7 @@ export default function MultiDayPlanDisplay({
           <TabsTrigger value="packing">Packing</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="days" className="flex flex-col gap-3">
+        <TabsContent value="days" className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4">
           {plan.days.map((day, index) => (
             <PlanDayCard
               key={day.date}
