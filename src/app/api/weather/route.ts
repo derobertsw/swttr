@@ -3,6 +3,7 @@ import { addDaysToDateString, describeForecastCoverage, FORECAST_DAYS } from "@/
 import { formatZonedIsoTime, formatZonedTime, isLocalDateTime, isTimeZone, zonedTimeToInstant } from "@/lib/timeZones";
 import { parseOpenMeteoHourly } from "@/lib/openMeteoHourly";
 import { openMeteoProvenance } from "@/lib/weatherProvenance";
+import { forecastPointProvenance, openMeteoForecastUrl, readForecastPoint, type ForecastPoint } from "@/lib/weather/openMeteo";
 import type { PrecipitationType } from "@/types/weather";
 
 const HOUR_SECONDS = 3600;
@@ -40,7 +41,7 @@ function forecastDate(hourStart: number, timeZone: string): string {
  * serves (it answers 400), drop the day after, as on its last forecast day,
  * and then the day before too.
  */
-async function fetchHourlyRange(lat: string, lon: string, startDate: string, endDate: string) {
+async function fetchHourlyRange(point: ForecastPoint, startDate: string, endDate: string) {
   const dayBefore = addDaysToDateString(startDate, -1);
   const ranges = [
     [dayBefore, addDaysToDateString(endDate, 1)],
@@ -48,7 +49,8 @@ async function fetchHourlyRange(lat: string, lon: string, startDate: string, end
     [startDate, endDate],
   ];
   for (const [from, to] of ranges) {
-    const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&start_date=${from}&end_date=${to}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`);
+    // Every retry asks for the same point and elevation.
+    const response = await fetch(openMeteoForecastUrl(point, `hourly=temperature_2m,wind_speed_10m,precipitation_probability&start_date=${from}&end_date=${to}`));
     if (response.ok) return response.json();
     if (response.status !== 400) break;
   }
@@ -59,10 +61,10 @@ async function fetchHourlyRange(lat: string, lon: string, startDate: string, end
  * The forecast for the hour a local date-time falls in at the coordinates.
  * The time is read on the place's clock, whatever time zone the caller is in.
  */
-async function getHourlyForecast(lat: string, lon: string, localDateTime: string) {
+async function getHourlyForecast(point: ForecastPoint, localDateTime: string) {
   // Exact timestamps, because Open-Meteo labels its local times with today's
   // UTC offset, which is an hour out after a daylight saving change.
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,weather_code&forecast_days=${FORECAST_DAYS}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+  const url = openMeteoForecastUrl(point, `hourly=temperature_2m,wind_speed_10m,weather_code&forecast_days=${FORECAST_DAYS}`);
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -120,7 +122,7 @@ async function getHourlyForecast(lat: string, lon: string, localDateTime: string
     // When the forecast hour starts, with the place's UTC offset at that time.
     forecastTime: formatZonedIsoTime(hour.start * 1000, timeZone),
     timeZone,
-    provenance: openMeteoProvenance(timeZone, hours.map(({ start }) => formatZonedIsoTime(start * 1000, timeZone))),
+    provenance: openMeteoProvenance(timeZone, hours.map(({ start }) => formatZonedIsoTime(start * 1000, timeZone)), undefined, forecastPointProvenance(point, data)),
   });
 }
 
@@ -128,17 +130,21 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const lat = searchParams.get("lat");
   const lon = searchParams.get("lon");
+  // A resort's catalog ID reads its forecast point; `elevation` (meters) a known point's elevation (#7).
+  const resortId = searchParams.get("resort");
   // Local date and time at the coordinates, e.g. 2026-10-15T14:00
   const dateTime = searchParams.get("datetime");
   const startDate = searchParams.get("startDate");
   const daysParam = searchParams.get("days");
 
-  if (!lat || !lon) {
+  if ((!lat || !lon) && !resortId) {
     return NextResponse.json(
       { error: "Missing latitude or longitude" },
       { status: 400 }
     );
   }
+  const point = readForecastPoint({ latitude: lat, longitude: lon, resortId, elevationM: searchParams.get("elevation"), label: searchParams.get("label") });
+  if ("error" in point) return NextResponse.json({ error: point.error }, { status: 400 });
 
   try {
     if (startDate) {
@@ -158,7 +164,7 @@ export async function GET(request: NextRequest) {
       }
 
       const endDate = addDaysToDateString(startDate, parsedDays - 1);
-      const data = await fetchHourlyRange(lat, lon, startDate, endDate);
+      const data = await fetchHourlyRange(point, startDate, endDate);
       const timeZone: unknown = data?.timezone;
       if (!isTimeZone(timeZone)) {
         throw new Error("Forecast has no valid time zone");
@@ -174,7 +180,7 @@ export async function GET(request: NextRequest) {
         hourly,
         isForecast: true,
         isMultiDay: true,
-        provenance: openMeteoProvenance(timeZone, hourly.map(({ time }) => time)),
+        provenance: openMeteoProvenance(timeZone, hourly.map(({ time }) => time), undefined, forecastPointProvenance(point, data)),
       });
     }
 
@@ -186,10 +192,10 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
       }
-      return await getHourlyForecast(lat, lon, dateTime);
+      return await getHourlyForecast(point, dateTime);
     } else {
       // Current weather
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&timeformat=unixtime`;
+      const url = openMeteoForecastUrl(point, "current=temperature_2m,wind_speed_10m,weather_code");
 
       const response = await fetch(url);
 
@@ -218,7 +224,7 @@ export async function GET(request: NextRequest) {
         precipitation: precipInfo.precipitation,
         precipitationType: precipInfo.precipitationType,
         isForecast: false,
-        provenance: openMeteoProvenance(timeZone, [], observedTime),
+        provenance: openMeteoProvenance(timeZone, [], observedTime, forecastPointProvenance(point, data)),
       });
     }
   } catch (error) {

@@ -6,6 +6,7 @@ import { parse } from "date-fns";
 import { getAdjustedTempRange } from "@/lib/getTempRange";
 import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/layers";
 import type { Recommendation, LocationSuggestion } from "@/types/recommendations";
+import { forecastLocationOf } from "@/lib/locationSuggestion";
 import type { WeatherData } from "@/types/weather";
 import type { BiophysicsOutcome, BiophysicsRecommendation, BiophysicsStatus } from "@/types/biophysics";
 import type { MultiDayLayerPlan } from "@/types/plan";
@@ -287,6 +288,16 @@ export class PlanAheadError extends Error {
 
 const PLAN_AHEAD_FALLBACK_ERROR = "Couldn't get the forecast for this place. Try again.";
 
+/** A resort by its catalog ID, or a trip stop's saved resort point with its elevation and label. */
+function planPoint(place: Outing["place"]): { resortId?: string; elevationM?: number; pointLabel?: string } {
+  const { resort, elevation, label } = forecastLocationOf(place);
+  return {
+    ...(resort ? { resortId: resort } : {}),
+    ...(elevation !== undefined ? { elevationM: elevation } : {}),
+    ...(label ? { pointLabel: label } : {}),
+  };
+}
+
 /**
  * Multi-day forecast plan for an outing, from its start date and hour on.
  * Throws a PlanAheadError that says what went wrong.
@@ -305,6 +316,8 @@ export async function fetchPlanAhead(
       sensitivity,
       lat: outing.place.latitude,
       lon: outing.place.longitude,
+      // A resort's plan is read at its forecast point and elevation (#7).
+      ...planPoint(outing.place),
       startDate: outing.when.date,
       durationDays: outing.when.durationDays,
       startHour: Number.isFinite(parsedStartHour) ? parsedStartHour : undefined,

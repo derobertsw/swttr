@@ -8,6 +8,17 @@ describe("weather source metadata", () => {
     expect(readWeatherProvenance({ provider: "Open-Meteo", units: { temperature: "celsius", windSpeed: "mph" } })).toBeUndefined();
   });
 
+  it("keeps where the forecast was read, and drops a point that doesn't add up (#7)", () => {
+    const base = { provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" } } as const;
+    const point = { latitude: 43.6047, longitude: -72.8187, label: "Top of K-1 Express Gondola", resortId: "wd-Q14711916", elevationM: 1262, elevationSource: "requested" } as const;
+    expect(readWeatherProvenance({ ...base, point })).toEqual({ ...base, point });
+    expect(readWeatherProvenance({ ...base, point: { ...point, elevationSource: "guess" } })).toEqual(base);
+    expect(readWeatherProvenance({ ...base, point: { ...point, latitude: 99 } })).toEqual(base);
+    expect(readWeatherProvenance({ ...base, point: { ...point, label: 7, elevationM: "high" } })).toEqual({
+      ...base, point: { latitude: 43.6047, longitude: -72.8187, resortId: "wd-Q14711916", elevationSource: "requested" },
+    });
+  });
+
   it("drops malformed optional facts while keeping valid source facts", () => {
     expect(readWeatherProvenance({
       provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" },

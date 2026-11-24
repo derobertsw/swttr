@@ -5,6 +5,7 @@ import { convertLegacyRecommendation, type LegacyRecommendation } from "@/lib/la
 import { isLocalDateTime, isTimeZone } from "@/lib/timeZones";
 import { parseOpenMeteoHourly } from "@/lib/openMeteoHourly";
 import { openMeteoProvenance } from "@/lib/weatherProvenance";
+import { forecastPointProvenance, openMeteoForecastUrl, readForecastPoint } from "@/lib/weather/openMeteo";
 import { FORECAST_DAYS, planOutsideForecast } from "@/lib/forecastRange";
 import { Recommendation } from "@/types/recommendations";
 import { TemperatureSensitivity } from "@/types/preferences";
@@ -43,6 +44,12 @@ export async function POST(request: NextRequest) {
     startDate: string;
     durationDays: number;
     startHour?: number;
+    /** A resort's catalog ID: its forecast point and elevation are used (#7). */
+    resortId?: string;
+    /** A known point's elevation in meters. */
+    elevationM?: number;
+    /** A saved point's label, such as a trip stop's resort point. */
+    pointLabel?: string;
   };
 
   try {
@@ -55,9 +62,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { activity, sensitivity, lat, lon, startDate, durationDays, startHour } = body;
+  const { activity, sensitivity, lat, lon, startDate, durationDays, startHour, resortId, elevationM, pointLabel } = body;
 
-  if (!activity || !sensitivity || lat == null || lon == null || !startDate || durationDays == null) {
+  if (!activity || !sensitivity || ((lat == null || lon == null) && !resortId) || !startDate || durationDays == null) {
     return NextResponse.json(
       { error: "Missing required fields: activity, sensitivity, lat, lon, startDate, durationDays" },
       { status: 400 }
@@ -79,12 +86,14 @@ export async function POST(request: NextRequest) {
   }
 
   const parsedDays = Math.min(7, Math.max(1, Math.round(durationDays)));
+  const point = readForecastPoint({ latitude: lat, longitude: lon, resortId, elevationM, label: pointLabel });
+  if ("error" in point) return NextResponse.json({ error: point.error }, { status: 400 });
 
   try {
     // The whole hourly forecast from Open-Meteo, so a plan past its end can say
     // which dates it covers. The dates, start hour and daytime windows are all
     // local time at the coordinates.
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&forecast_days=${FORECAST_DAYS}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+    const url = openMeteoForecastUrl(point, `hourly=temperature_2m,wind_speed_10m,precipitation_probability&forecast_days=${FORECAST_DAYS}`);
 
     const weatherResponse = await fetch(url);
     if (!weatherResponse.ok) {
@@ -144,7 +153,7 @@ export async function POST(request: NextRequest) {
 
     const firstDay = plan.days[0];
     return NextResponse.json({
-      plan: { ...plan, provenance: openMeteoProvenance(timeZone, hourly.map(({ time }) => time)) },
+      plan: { ...plan, provenance: openMeteoProvenance(timeZone, hourly.map(({ time }) => time), undefined, forecastPointProvenance(point, data)) },
       baseline: {
         recommendation: firstDay.baseline.recommendation,
         effectiveTemperature: firstDay.baseline.effectiveTemperature,

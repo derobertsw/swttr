@@ -5,8 +5,10 @@ import { formatZonedTime, isTimeZone } from "@/lib/timeZones";
 import type { ForecastHour } from "@/types/plan";
 import type { TripDayForecastResponse } from "@/types/trip-coverage";
 import type { TripDay, TripStop } from "@/types/trips";
+import type { ForecastPointProvenance } from "@/types/weather";
+import { forecastPointKey, forecastPointProvenance, openMeteoForecastUrl, tripStopForecastPoint } from "@/lib/weather/openMeteo";
 
-type TripForecast = { hourly: ForecastHour[]; today: string; lastDate: string } | null;
+type TripForecast = { hourly: ForecastHour[]; today: string; lastDate: string; point: ForecastPointProvenance } | null;
 const forecastsInFlight = new Map<string, Promise<TripForecast>>();
 
 export function resolveTripStop(day: Pick<TripDay, "stop_id">, stops: TripStop[]) {
@@ -18,9 +20,12 @@ export function hasTripCoordinates(stop: TripStop | undefined | null): stop is T
     && typeof stop.longitude === "number" && Number.isFinite(stop.longitude) && Math.abs(stop.longitude) <= 180;
 }
 
-/** Share location forecasts across trip days and packing requests. */
+/**
+ * Share location forecasts across trip days and packing requests. A resort
+ * stop's point is read at its saved elevation (#7), so the key has it too.
+ */
 export function fetchTripForecast(stop: TripStop): Promise<TripForecast> {
-  const key = `${stop.latitude},${stop.longitude}`;
+  const key = forecastPointKey(tripStopForecastPoint(stop));
   const existing = forecastsInFlight.get(key);
   if (existing) return existing;
   const pending = loadTripForecast(stop).finally(() => forecastsInFlight.delete(key));
@@ -30,7 +35,8 @@ export function fetchTripForecast(stop: TripStop): Promise<TripForecast> {
 
 async function loadTripForecast(stop: TripStop): Promise<TripForecast> {
   try {
-    const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${stop.latitude}&longitude=${stop.longitude}&hourly=temperature_2m,wind_speed_10m,precipitation_probability&forecast_days=${FORECAST_DAYS}&timezone=auto&timeformat=unixtime&temperature_unit=fahrenheit&wind_speed_unit=mph`, {
+    const point = tripStopForecastPoint(stop);
+    const response = await fetch(openMeteoForecastUrl(point, `hourly=temperature_2m,wind_speed_10m,precipitation_probability&forecast_days=${FORECAST_DAYS}`), {
       signal: AbortSignal.timeout(15_000),
       // Only public provider weather is cached; trip/member data stays private.
       // Next's Data Cache shares successful responses across server instances.
@@ -46,7 +52,7 @@ async function loadTripForecast(stop: TripStop): Promise<TripForecast> {
     // window, so the window ends at its last hour, not a day after it.
     const window = addDaysToDateString(today, FORECAST_DAYS - 1);
     const lastHour = hourly.reduce((last, hour) => hour.time.slice(0, 10) > last ? hour.time.slice(0, 10) : last, "");
-    return { hourly, today, lastDate: lastHour && lastHour < window ? lastHour : window };
+    return { hourly, today, lastDate: lastHour && lastHour < window ? lastHour : window, point: forecastPointProvenance(point, data) };
   } catch {
     return null;
   }

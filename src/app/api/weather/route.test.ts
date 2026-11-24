@@ -103,7 +103,10 @@ describe("Weather API Route", () => {
       expect(data.precipitation).toBe(false);
       expect(data.precipitationType).toBeUndefined();
       expect(data.isForecast).toBe(false);
-      expect(data.provenance).toEqual({ provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" } });
+      expect(data.provenance).toEqual({
+        provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" },
+        point: { latitude: 40.7128, longitude: -74.006, elevationSource: "terrain" },
+      });
     });
 
     it("should call Open-Meteo API with correct parameters for current weather", async () => {
@@ -202,6 +205,7 @@ describe("Weather API Route", () => {
       });
       expect(data.provenance).toEqual({
         provider: "Open-Meteo", units: { temperature: "fahrenheit", windSpeed: "mph" },
+        point: { latitude: 44.47, longitude: -72.69, elevationSource: "terrain" },
         timeZone: "America/New_York",
         coverage: { firstHour: "2026-09-27T00:00-04:00", lastHour: "2026-10-12T23:00-04:00", availableHours: 384 },
       });

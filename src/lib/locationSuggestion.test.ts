@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { forecastPointText, isResortId, isSameLocation, pickedPlace, placeKey, readResortFields, searchKindFor, tripPlaceFrom } from "./locationSuggestion";
+import { forecastLocationOf, TRIP_STOP_PLACE_ID, forecastPointText, isResortId, isSameLocation, pickedPlace, placeKey, readResortFields, searchKindFor, tripPlaceFrom } from "./locationSuggestion";
 import type { LocationSuggestion } from "@/types/recommendations";
 
 const TOWN: LocationSuggestion = { id: 5241803, name: "Stowe", region: "Vermont", country: "United States", latitude: 44.4654, longitude: -72.6874, timeZone: "America/New_York" };
@@ -27,6 +27,9 @@ describe("readResortFields", () => {
     });
     expect(readResortFields({ ...RESORT, elevationM: null, pointKind: "reference", pointLabel: "Resort reference point" })).toMatchObject({ elevationM: null });
   });
+  it("keeps a trip stop's saved resort point on the trip stop's own ID", () => {
+    expect(readResortFields({ ...RESORT, id: TRIP_STOP_PLACE_ID })).toMatchObject({ resortId: "wd-Q7620695", elevationM: 1116 });
+  });
   it.each([
     { ...RESORT, id: "resort:skimap-1" },
     { ...RESORT, id: 12 },
@@ -38,6 +41,22 @@ describe("readResortFields", () => {
     { ...TOWN, id: "5241803" },
   ])("refuses resort fields that don't agree (%#)", (value) => {
     expect(readResortFields(value as Record<string, unknown>)).toBeNull();
+  });
+});
+
+describe("forecastLocationOf", () => {
+  it("sends a picked resort by its catalog ID", () => {
+    expect(forecastLocationOf(RESORT)).toEqual({ lat: 44.5376, lon: -72.8142, resort: "wd-Q7620695" });
+  });
+  it("sends a trip stop's saved resort point as explicit coordinates and elevation, never re-resolved", () => {
+    // The trip saved an older point; the catalog has since moved it, or dropped the resort.
+    const saved = { ...RESORT, id: TRIP_STOP_PLACE_ID, latitude: 44.53, longitude: -72.81, elevationM: 1100 };
+    expect(forecastLocationOf(saved)).toEqual({ lat: 44.53, lon: -72.81, elevation: 1100, label: "Top of Gondola Skyride" });
+    expect(forecastLocationOf({ ...saved, resortId: "skimap-999999999" })).not.toHaveProperty("resort");
+    expect(forecastLocationOf({ ...saved, elevationM: null, pointLabel: "Resort reference point" })).toEqual({ lat: 44.53, lon: -72.81, label: "Resort reference point" });
+  });
+  it("sends an ordinary place by its coordinates", () => {
+    expect(forecastLocationOf(TOWN)).toEqual({ lat: 44.4654, lon: -72.6874 });
   });
 });
 
@@ -59,9 +78,12 @@ describe("comparing places", () => {
 });
 
 describe("searchKindFor", () => {
-  it("runs the general search while resort search is off", () => {
-    expect(searchKindFor("alpine_skiing")).toBeUndefined();
-    expect(searchKindFor("Alpine")).toBeUndefined();
+  it("runs the general search when resort search is switched off", () => {
+    expect(searchKindFor("alpine_skiing", false)).toBeUndefined();
+    expect(searchKindFor("Alpine", false)).toBeUndefined();
+  });
+  it("is on, now that forecasts read the resort's point", () => {
+    expect(searchKindFor("alpine_skiing")).toBe("resort");
   });
   it("searches resorts for alpine skiing and every place otherwise once it's on", () => {
     expect(searchKindFor("alpine_skiing", true)).toBe("resort");

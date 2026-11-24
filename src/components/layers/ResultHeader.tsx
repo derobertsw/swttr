@@ -13,7 +13,7 @@ import type { PrecipitationType, WeatherContext } from "@/types/weather";
 import { useTemperatureUnit } from "@/components/TemperatureUnitProvider";
 import { formatTemperature } from "@/lib/temperature";
 import { OutingTimeSummary } from "@/components/OutingTimeSummary";
-import { WeatherSourceDetails } from "@/components/WeatherSourceDetails";
+import { ForecastPointLine, WeatherSourceDetails } from "@/components/WeatherSourceDetails";
 import type { Outing } from "@/types/outing";
 
 /** The button that opens the place and time drawer, which returns focus to it. */
@@ -232,6 +232,7 @@ export function ResultHeader({
             </span>
           </p>
         )}
+        <ForecastPointLine point={context?.provenance?.point} />
         {outing && <OutingTimeSummary when={outing.when} />}
         <p className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{formatTemperature(temperature, temperatureUnit)}</span>

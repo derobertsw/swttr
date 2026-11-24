@@ -92,7 +92,7 @@ The standing decision is to stay on free tiers until launch and product-market f
 
 - **What for:** hourly and current forecasts, and the weather place search on the home page.
 - **In code:**
-  - Forecasts: `src/app/api/weather/route.ts`, `src/app/api/plan-ahead/route.ts`, `src/lib/trip-forecast.ts`, `src/lib/trip-tour-plans.ts`.
+  - Forecasts: `src/app/api/weather/route.ts`, `src/app/api/plan-ahead/route.ts`, `src/lib/trip-forecast.ts`, `src/lib/trip-tour-plans.ts`. All forecast requests except the tour plan's time zone lookup are built by `src/lib/weather/openMeteo.ts`, which sends a ski resort's forecast-point elevation (#7).
   - Search: `src/app/api/geocode/route.ts`.
   - All server-side, with no key. The API names Open-Meteo in its weather provenance, which `src/components/WeatherSourceDetails.tsx` shows.
 - **Free** ([pricing](https://open-meteo.com/en/pricing), [terms](https://open-meteo.com/en/terms), checked November 16):
@@ -106,8 +106,8 @@ The standing decision is to stay on free tiers until launch and product-market f
   - Commercial use: a subscription, ads, or the paid agent API taking real money.
   - Sustained traffic near 10,000 calls a day, or rate-limit errors from Vercel's shared IPs.
 - **Paid:** Standard, 1M calls a month, $29 a month. Professional, 5M calls a month, $99 a month. Both include geocoding. The amounts come from Open-Meteo's [June 12, 2023 announcement](https://openmeteo.substack.com/p/api-subscriptions-for-commercial); the pricing page we fetched listed call volumes but no prices.
-  - **Buying a plan alone changes nothing.** Paid plans are served from the customer endpoint `customer-api.open-meteo.com`, with the plan's API key on each request. All four forecast files above call the free `api.open-meteo.com` with no key, and `src/app/api/geocode/route.ts` calls the free `geocoding-api.open-meteo.com`. Each needs its host changed and a server-side key added (an env var, never sent to the browser) before the plan's terms and limits apply. Check Open-Meteo's docs for the customer host for geocoding.
-- **Alternatives considered:** weather search was deliberately kept on Open-Meteo when trip search moved to Geoapify (#208). No other forecast provider has been evaluated.
+  - **Buying a plan alone changes nothing.** Paid plans are served from the customer endpoint `customer-api.open-meteo.com`, with the plan's API key on each request. The forecast builder and the tour plan lookup call the free `api.open-meteo.com` with no key, and `src/app/api/geocode/route.ts` calls the free `geocoding-api.open-meteo.com`. Each needs its host changed and a server-side key added (an env var, never sent to the browser) before the plan's terms and limits apply. Check Open-Meteo's docs for the customer host for geocoding.
+- **Alternatives considered:** weather search was deliberately kept on Open-Meteo when trip search moved to Geoapify (#208). OpenSnow was considered for mountain forecasts and deferred, with price, access and accuracy unconfirmed: [`mountain-weather-providers.md`](mountain-weather-providers.md).
 
 ## OpenSkiData
 

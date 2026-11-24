@@ -2,6 +2,7 @@
 
 import { formatLocationName } from "@/hooks/useLocationSearch";
 import type { LocationSuggestion } from "@/types/recommendations";
+import { forecastLocationOf } from "@/lib/locationSuggestion";
 import type { WeatherData } from "@/types/weather";
 import { isLocalDateTime, isTimeZone } from "@/lib/timeZones";
 import { readWeatherProvenance } from "@/lib/weatherProvenance";
@@ -47,7 +48,10 @@ export async function fetchWeatherAt(
   const fallbackError = localDateTime
     ? "Couldn't get the forecast for this place. Try again."
     : "Couldn't get the weather. Try again.";
-  const query = `lat=${location.latitude}&lon=${location.longitude}`;
+  // A resort's weather is read at its forecast point and elevation (#7).
+  const { lat, lon, resort, elevation, label } = forecastLocationOf(location);
+  const query = `lat=${lat}&lon=${lon}${resort ? `&resort=${encodeURIComponent(resort)}` : ""}`
+    + `${elevation !== undefined ? `&elevation=${elevation}` : ""}${label ? `&label=${encodeURIComponent(label)}` : ""}`;
   if (localDateTime !== undefined && !isLocalDateTime(localDateTime)) {
     return { data: null, error: "Choose a valid date and time for the forecast." };
   }
